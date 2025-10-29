@@ -11,7 +11,8 @@ import {
 } from "@heroicons/react/24/outline";
 
 // Import Modal tùy chỉnh
-import ConfirmModal from "../components/ConfirmModal"; // <-- SỬA ĐƯỜNG DẪN NẾU CẦN
+import ConfirmModal from "../components/ConfirmModal";
+import ViewOrderModal from "../components/ViewOrderModal";
 
 // Interface Order (dựa trên DB)
 interface Order {
@@ -46,12 +47,10 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  // State cho Modal xác nhận xóa
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
-
-  // Lấy ngày hôm nay
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -79,9 +78,14 @@ export default function Orders() {
 
   // --- Hàm xử lý cho các nút Hành động ---
 
-  const handleViewOrder = (orderId: number) => {
-    console.log("Xem đơn hàng ID:", orderId);
-    // TODO: Triển khai logic Xem
+  const handleViewOrder = (orderWithVirtualFields: Order) => {
+    // Nhận đơn hàng đã tính toán
+    console.log(
+      "Mở modal xem chi tiết cho đơn hàng ID:",
+      orderWithVirtualFields.id
+    );
+    setOrderToView(orderWithVirtualFields); // Lưu đơn hàng (bao gồm cả trường ảo)
+    setIsViewModalOpen(true); // Mở modal
   };
 
   const handleEditOrder = (orderId: number) => {
@@ -159,9 +163,13 @@ export default function Orders() {
   const formatCurrency = (value: number | string) => {
     const num = Number(value) || 0;
     const roundedNum = Math.round(num);
-    return roundedNum.toLocaleString("vi-VN") + "Đ";
+    return roundedNum.toLocaleString("vi-VN") + " " + "đ";
   };
 
+  const closeViewModal = () => {
+    setIsViewModalOpen(false);
+    setOrderToView(null);
+  };
   // --- Logic Tính toán & Lọc ---
 
   const ordersWithVirtualFields = orders.map((order) => {
@@ -437,19 +445,19 @@ export default function Orders() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleViewOrder(order.id)}
+                            onClick={() => handleViewOrder(order)} // <-- Sửa: Truyền cả object 'order'
                             className="text-blue-600 hover:text-blue-900 p-1 rounded"
                           >
                             <EyeIcon className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleEditOrder(order.id)}
+                            onClick={() => handleEditOrder(order.id)} // <-- Sửa: Truyền cả object 'order'
                             className="text-green-600 hover:text-green-900 p-1 rounded"
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteOrder(order)}
+                            onClick={() => handleDeleteOrder(order)} // <-- Giữ nguyên: Truyền cả object 'order'
                             className="text-red-600 hover:text-red-900 p-1 rounded"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -518,7 +526,13 @@ export default function Orders() {
         onClose={closeModal}
         onConfirm={confirmDelete}
         title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa đơn hàng ID ${orderToDelete?.id}? (Mã đơn: ${orderToDelete?.id_don_hang})`} // Hiển thị cả ID và mã đơn
+        message={`Bạn có chắc chắn muốn xóa đơn hàng: ${orderToDelete?.id_don_hang}?`} // Hiển thị cả ID và mã đơn
+      />
+      <ViewOrderModal
+        isOpen={isViewModalOpen}
+        onClose={closeViewModal}
+        order={orderToView} // Truyền đơn hàng cần xem
+        formatCurrency={formatCurrency} // Truyền hàm định dạng tiền tệ
       />
     </div>
   );

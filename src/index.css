@@ -1,3 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.fixed.inset-0.z-50 {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
