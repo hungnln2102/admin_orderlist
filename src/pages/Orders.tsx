@@ -10,7 +10,10 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 
-// Interface (dựa trên DB image_14f83a.png)
+// Import Modal tùy chỉnh
+import ConfirmModal from "../components/ConfirmModal"; // <-- SỬA ĐƯỜNG DẪN NẾU CẦN
+
+// Interface Order (dựa trên DB)
 interface Order {
   id: number;
   id_don_hang: string;
@@ -27,13 +30,13 @@ interface Order {
   gia_ban: number;
   note: string;
   tinh_trang: string;
-  check_flag: string;
 }
 
 // Hàm Helper để xử lý ngày tháng (dd/mm/yyyy)
 const parseDMY = (dateString: string): Date => {
   if (!dateString) return new Date(NaN);
   const [day, month, year] = dateString.split("/").map(Number);
+  // Tháng trong JavaScript bắt đầu từ 0
   return new Date(year, month - 1, day);
 };
 
@@ -44,9 +47,15 @@ export default function Orders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // State cho Modal xác nhận xóa
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+
+  // Lấy ngày hôm nay
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // useEffect để tải dữ liệu ban đầu
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -68,20 +77,71 @@ export default function Orders() {
     fetchOrders();
   }, []);
 
-  // Filter
-  const filteredOrders = orders.filter((order) => {
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const matchesSearch =
-      (order.khach_hang || "").toLowerCase().includes(lowerSearchTerm) ||
-      (order.id_don_hang || "").toLowerCase().includes(lowerSearchTerm) ||
-      (order.thong_tin_san_pham || "").toLowerCase().includes(lowerSearchTerm);
-    const matchesStatus =
-      statusFilter === "all" ||
-      (order.tinh_trang || "").toLowerCase() === statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
-  });
+  // --- Hàm xử lý cho các nút Hành động ---
 
-  // Hàm lấy màu
+  const handleViewOrder = (orderId: number) => {
+    console.log("Xem đơn hàng ID:", orderId);
+    // TODO: Triển khai logic Xem
+  };
+
+  const handleEditOrder = (orderId: number) => {
+    console.log("Sửa đơn hàng ID:", orderId);
+    // TODO: Triển khai logic Sửa
+  };
+
+  // Mở Modal xác nhận khi nhấn nút Xóa
+  const handleDeleteOrder = (order: Order) => {
+    console.log("Mở modal xác nhận xóa cho đơn hàng ID:", order.id);
+    setOrderToDelete(order);
+    setIsModalOpen(true);
+  };
+
+  // Thực hiện xóa khi nhấn OK trên Modal
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
+
+    console.log("Xác nhận xóa đơn hàng ID:", orderToDelete.id);
+    setIsModalOpen(false); // Đóng modal
+
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/orders/${orderToDelete.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Lỗi khi xóa đơn hàng từ server");
+      }
+
+      // Cập nhật state trên frontend
+      setOrders((prevOrders) =>
+        prevOrders.filter((order) => order.id !== orderToDelete.id)
+      );
+      console.log(`Đã xóa đơn hàng ID ${orderToDelete.id} thành công.`);
+      // TODO: Hiển thị thông báo thành công
+    } catch (error) {
+      console.error("Lỗi khi xóa đơn hàng:", error);
+      alert(
+        `Lỗi khi xóa đơn hàng: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setOrderToDelete(null); // Reset
+    }
+  };
+
+  // Đóng Modal khi nhấn Hủy
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setOrderToDelete(null);
+  };
+
+  // --- Các hàm Helper ---
+
   const getStatusColor = (status: string) => {
     const lowerStatus = (status || "").toLowerCase();
     switch (lowerStatus) {
@@ -89,23 +149,77 @@ export default function Orders() {
         return "bg-green-100 text-green-800";
       case "chưa thanh toán":
         return "bg-yellow-100 text-yellow-800";
-      case "hết hạn": // Thêm case "Hết Hạn"
+      case "hết hạn":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
   };
+
   const formatCurrency = (value: number | string) => {
     const num = Number(value) || 0;
     const roundedNum = Math.round(num);
-    return roundedNum.toLocaleString("vi-VN") + "đ";
+    return roundedNum.toLocaleString("vi-VN") + "Đ";
   };
-  // Logic Phân trang
+
+  // --- Logic Tính toán & Lọc ---
+
+  const ordersWithVirtualFields = orders.map((order) => {
+    const expirationDate = parseDMY(order.het_han);
+    const diffTime = expirationDate.getTime() - today.getTime();
+    let soNgayConLai = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (isNaN(soNgayConLai)) soNgayConLai = 0;
+
+    const dbStatus = order.tinh_trang || "Chưa Thanh Toán";
+    let trangThaiText = "";
+    let check_flag_status: boolean | null = null;
+
+    if (soNgayConLai <= 0) {
+      trangThaiText = "Hết Hạn";
+      check_flag_status = null;
+      soNgayConLai = 0;
+    } else if (soNgayConLai <= 4) {
+      trangThaiText = "Chưa Thanh Toán";
+      check_flag_status = null;
+    } else {
+      trangThaiText = dbStatus;
+      check_flag_status = dbStatus.toLowerCase() === "đã thanh toán";
+    }
+
+    const giaBan = Number(order.gia_ban) || 0;
+    const soNgayDangKy = Number(order.so_ngay_da_dang_ki) || 0;
+    let giaTriConLai = 0;
+    if (soNgayDangKy > 0) {
+      giaTriConLai = (giaBan * soNgayConLai) / soNgayDangKy;
+    }
+
+    return {
+      ...order,
+      soNgayConLai,
+      giaTriConLai,
+      check_flag_status,
+      trangThaiText,
+    };
+  });
+
+  const filteredOrders = ordersWithVirtualFields.filter((order) => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const matchesSearch =
+      (order.khach_hang || "").toLowerCase().includes(lowerSearchTerm) ||
+      (order.id_don_hang || "").toLowerCase().includes(lowerSearchTerm) ||
+      (order.thong_tin_san_pham || "").toLowerCase().includes(lowerSearchTerm);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (order.trangThaiText || "").toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
+
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstRow, indexOfLastRow);
 
+  // --- Render Giao diện ---
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,7 +252,6 @@ export default function Orders() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-
           {/* Status Filter */}
           <div className="relative">
             <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -153,7 +266,6 @@ export default function Orders() {
               <option value="Hết Hạn">Hết Hạn</option>
             </select>
           </div>
-
           {/* Date Range */}
           <div>
             <input
@@ -227,8 +339,7 @@ export default function Orders() {
                 </th>
               </tr>
             </thead>
-
-            {/* Dùng 'currentOrders' để map */}
+            {/* tbody */}
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOrders.length === 0 ? (
                 <tr>
@@ -243,92 +354,65 @@ export default function Orders() {
                 </tr>
               ) : (
                 currentOrders.map((order) => {
-                  // --- Bắt đầu tính toán ---
-                  const expirationDate = parseDMY(order.het_han);
-                  const diffTime = expirationDate.getTime() - today.getTime();
-                  let soNgayConLai = Math.ceil(
-                    diffTime / (1000 * 60 * 60 * 24)
-                  );
-
-                  // Logic cho "Hết Hạn"
-                  let trangThaiText = order.tinh_trang || "Không xác định";
-                  if (soNgayConLai <= 0 && trangThaiText !== "Đã Thanh Toán") {
-                    soNgayConLai = 0;
-                    // Nếu đã hết hạn VÀ chưa thanh toán, thì cập nhật trạng thái
-                    trangThaiText = "Hết Hạn";
-                  }
-
-                  const giaBan = Number(order.gia_ban) || 0;
-                  const soNgayDangKy = Number(order.so_ngay_da_dang_ki) || 0;
-                  let giaTriConLai = 0;
-                  if (soNgayDangKy > 0) {
-                    giaTriConLai = (giaBan * soNgayConLai) / soNgayDangKy;
-                  }
-                  // --- Kết thúc tính toán ---
-
+                  const {
+                    soNgayConLai,
+                    giaTriConLai,
+                    trangThaiText,
+                    check_flag_status,
+                  } = order;
                   return (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      {/* Cột 1 */}
+                      {/* Cột 1-9 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {order.id_don_hang || ""}
                       </td>
-                      {/* Cột 2 (CSS) */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
                         {order.san_pham || ""}
                       </td>
-                      {/* Cột 3 (CSS) */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
                         {order.thong_tin_san_pham || ""}
                       </td>
-                      {/* Cột 4 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {order.khach_hang || ""}
                       </td>
-                      {/* Cột 5 (CSS) - ĐÃ SỬA */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
                         {order.link_lien_he || ""}
                       </td>
-                      {/* Cột 6 (CSS) */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
                         {order.slot || ""}
                       </td>
-                      {/* Cột 7 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.ngay_dang_ki || ""}
                       </td>
-                      {/* Cột 8 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.so_ngay_da_dang_ki || ""}
                       </td>
-                      {/* Cột 9 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.het_han || ""}
                       </td>
-                      {/* Cột 10 (Tính toán) */}
+                      {/* Cột 10 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {soNgayConLai}
                       </td>
-                      {/* Cột 11 (CSS) - ĐÃ SỬA */}
+                      {/* Cột 11 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
                         {order.nguon || ""}
                       </td>
-                      {/* Cột 12 */}
+                      {/* Cột 12-14 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(order.gia_nhap) || ""}
+                        {formatCurrency(order.gia_nhap)}
                       </td>
-                      {/* Cột 13 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(order.gia_ban) || ""}
+                        {formatCurrency(order.gia_ban)}
                       </td>
-                      {/* Cột 14 (Tính toán) */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatCurrency(giaTriConLai)}
                       </td>
-                      {/* Cột 15 (CSS) - ĐÃ SỬA */}
+                      {/* Cột 15 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
                         {order.note || ""}
                       </td>
-                      {/* Cột 16 (Trạng thái) */}
+                      {/* Cột 16 */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
@@ -338,28 +422,36 @@ export default function Orders() {
                           {trangThaiText}
                         </span>
                       </td>
-                      {/* Cột 17 (Checkbox) */}
+                      {/* Cột 17 */}
                       <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          checked={
-                            (order.check_flag || "").toLowerCase() ===
-                            "đã check"
-                          }
-                          readOnly
-                        />
+                        {check_flag_status !== null && (
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            checked={check_flag_status}
+                            readOnly
+                          />
+                        )}
                       </td>
                       {/* Cột 18 (Hành động) */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900 p-1 rounded">
+                          <button
+                            onClick={() => handleViewOrder(order.id)}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                          >
                             <EyeIcon className="h-4 w-4" />
                           </button>
-                          <button className="text-green-600 hover:text-green-900 p-1 rounded">
+                          <button
+                            onClick={() => handleEditOrder(order.id)}
+                            className="text-green-600 hover:text-green-900 p-1 rounded"
+                          >
                             <PencilIcon className="h-4 w-4" />
                           </button>
-                          <button className="text-red-600 hover:text-red-900 p-1 rounded">
+                          <button
+                            onClick={() => handleDeleteOrder(order)}
+                            className="text-red-600 hover:text-red-900 p-1 rounded"
+                          >
                             <TrashIcon className="h-4 w-4" />
                           </button>
                         </div>
@@ -372,7 +464,7 @@ export default function Orders() {
           </table>
         </div>
 
-        {/* Thanh Phân trang (Pagination) */}
+        {/* Thanh Phân trang */}
         {filteredOrders.length > 0 && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
             {/* Bộ chọn số dòng / trang */}
@@ -383,7 +475,7 @@ export default function Orders() {
                 value={rowsPerPage}
                 onChange={(e) => {
                   setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1); // Reset về trang 1 khi đổi số dòng
+                  setCurrentPage(1);
                 }}
                 className="rounded-md border border-gray-300 py-1 pl-2 pr-7 text-gray-700 focus:border-blue-500 focus:ring-blue-500"
               >
@@ -393,7 +485,6 @@ export default function Orders() {
               </select>
               <span>dòng</span>
             </div>
-
             {/* Nút bấm chuyển trang */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700">
@@ -420,6 +511,15 @@ export default function Orders() {
           </div>
         )}
       </div>
+
+      {/* Render Modal Xác nhận Xóa */}
+      <ConfirmModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onConfirm={confirmDelete}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc chắn muốn xóa đơn hàng ID ${orderToDelete?.id}? (Mã đơn: ${orderToDelete?.id_don_hang})`} // Hiển thị cả ID và mã đơn
+      />
     </div>
   );
 }
