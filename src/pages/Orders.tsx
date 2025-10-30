@@ -21,6 +21,7 @@ import { API_ENDPOINTS, ORDER_FIELDS, VIRTUAL_FIELDS } from "../constants";
 import ConfirmModal from "../components/ConfirmModal";
 import ViewOrderModal from "../components/ViewOrderModal";
 import EditOrderModal from "../components/EditOrderModal";
+import CreateOrderModal from "../components/CreateOrderModal";
 
 // Interface Order (dựa trên DB) - Vẫn giữ nguyên cấu trúc này
 interface Order {
@@ -39,10 +40,14 @@ interface Order {
   gia_ban: number;
   note: string;
   tinh_trang: string;
+  check_flag: boolean;
+  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]?: number;
+  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]?: number;
+  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]?: string;
+  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]?: boolean | null;
 }
 
 // Cấu trúc Stats đã được cập nhật với tên mới và giá trị tạm thời
-// (Giữ nguyên dùng chuỗi cứng để dễ đọc, hoặc có thể chuyển sang hằng số nếu có bảng config riêng)
 const stockStats = [
   {
     name: "Tổng đơn hàng",
@@ -87,6 +92,8 @@ export default function Orders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
@@ -131,7 +138,54 @@ export default function Orders() {
     fetchOrders();
   }, []);
 
-  // --- Hàm xử lý cho các nút Hành động (Cập nhật API Endpoints) ---
+  // --- Hàm xử lý cho Modal Tạo Mới ---
+  const openCreateModal = () => setIsCreateModalOpen(true);
+  const closeCreateModal = () => setIsCreateModalOpen(false);
+
+  // Hàm MỚI cho View Modal (để hiển thị đơn hàng vừa tạo)
+  const openViewModal = (order: Order) => {
+    setOrderToView(order);
+    setIsViewModalOpen(true);
+  };
+
+  const handleSaveNewOrder = async (newOrderData: Partial<Order>) => {
+    console.log("Tạo đơn hàng mới:", newOrderData);
+    closeCreateModal();
+
+    try {
+      const response = await fetch(
+        `http://localhost:3001${API_ENDPOINTS.ORDERS}`, // POST không cần ID
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newOrderData),
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || "Lỗi khi tạo đơn hàng mới từ server"
+        );
+      }
+
+      const createdOrder: Order = await response.json();
+
+      // Cập nhật danh sách orders trên frontend
+      setOrders((prevOrders) => [createdOrder, ...prevOrders]);
+
+      // 🛑 THAY THẾ ALERT BẰNG VIỆC MỞ MODAL VIEW 🛑
+      openViewModal(createdOrder);
+    } catch (error) {
+      console.error("Lỗi khi tạo đơn hàng:", error);
+      alert(
+        `Lỗi khi tạo đơn hàng: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  };
+
+  // --- Hàm xử lý cho Modal Edit/Delete ---
 
   const handleViewOrder = (orderWithVirtualFields: Order) => {
     console.log(
@@ -290,7 +344,7 @@ export default function Orders() {
     setOrderToView(null);
   };
 
-  // --- Logic Tính toán & Lọc (Giữ nguyên, sử dụng order[ORDER_FIELDS.HET_HAN]) ---
+  // --- Logic Tính toán & Lọc (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
 
   const ordersWithVirtualFields = orders.map((order) => {
     const expirationDate = parseDMY(order[ORDER_FIELDS.HET_HAN]); // SỬ DỤNG HẰNG SỐ
@@ -327,7 +381,7 @@ export default function Orders() {
       [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
       [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
       [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
-    };
+    } as Order; // Cast lại về Order để khớp với interface
   });
 
   // --- Tính toán giá trị cho Stats (Sử dụng VIRTUAL_FIELDS) ---
@@ -405,7 +459,10 @@ export default function Orders() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+          <button
+            onClick={openCreateModal} // <-- Mở modal Tạo Mới
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <PlusIcon className="h-4 w-4 mr-2" />
             Tạo đơn hàng mới
           </button>
@@ -475,58 +532,58 @@ export default function Orders() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID Đơn
+                  ORDER
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sản Phẩm
+                  PRODUCT
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thông Tin Đơn Hàng
+                  INFORMATION
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Khách Hàng
+                  CUSTOMER
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thông Tin Liên Hệ
+                  CONTACT
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Slot
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đặt Hàng
+                  ORDER DATE
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Số Ngày
+                  DAYS
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hết Hạn
+                  EXPIRED
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Còn Lại
+                  REMAINING
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nguồn
+                  SUPPLY
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nhập
+                  IMPORT
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Bán
+                  PRICE
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Giá Trị Còn Lại
+                  Residual Value
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ghi Chú
+                  NOTE
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng Thái
+                  STATUS
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Check
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hành Động
+                  ACTION
                 </th>
               </tr>
             </thead>
@@ -627,18 +684,23 @@ export default function Orders() {
                       {/* Cột 18 (Hành động) */}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex space-x-2">
+                          {/* Nút VIEW (Giữ nguyên) */}
                           <button
                             onClick={() => handleViewOrder(order)}
                             className="text-blue-600 hover:text-blue-900 p-1 rounded"
                           >
                             <EyeIcon className="h-4 w-4" />
                           </button>
+
+                          {/* Nút EDIT: Đảm bảo truyền đối tượng 'order' đầy đủ */}
                           <button
                             onClick={() => handleEditOrder(order)}
                             className="text-green-600 hover:text-green-900 p-1 rounded"
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
+
+                          {/* Nút DELETE (Giữ nguyên) */}
                           <button
                             onClick={() => handleDeleteOrder(order)}
                             className="text-red-600 hover:text-red-900 p-1 rounded"
@@ -703,7 +765,7 @@ export default function Orders() {
         )}
       </div>
 
-      {/* Render Modal Xác nhận Xóa (Giữ nguyên) */}
+      {/* Render Modal Xác nhận Xóa */}
       <ConfirmModal
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -722,6 +784,11 @@ export default function Orders() {
         onClose={closeEditModal}
         order={orderToEdit}
         onSave={handleSaveEdit}
+      />
+      <CreateOrderModal
+        isOpen={isCreateModalOpen}
+        onClose={closeCreateModal}
+        onSave={handleSaveNewOrder} // <-- Truyền hàm lưu đơn hàng mới
       />
     </div>
   );

@@ -1,19 +1,17 @@
-// index.js (ĐÃ TÁCH LOGIC CRON JOB)
+// index.js (ĐÃ SỬA LỖI CẤU TRÚC API)
 
-require("dotenv").config(); // Tải biến môi trường từ file .env
+require("dotenv").config();
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
-// const cron = require("node-cron"); // ĐÃ XÓA CRON
-const updateDatabaseTask = require("./scheduler"); // <--- IMPORT TÁC VỤ TỪ FILE RIÊNG
-
+const updateDatabaseTask = require("./scheduler");
 const app = express();
 const port = 3001;
 
 // 1. Cấu hình CORS (Cho phép React gọi đến)
 app.use(
   cors({
-    origin: "http://localhost:5173", // Cổng React app của bạn
+    origin: "http://localhost:5173",
   })
 );
 
@@ -26,7 +24,7 @@ const pool = new Pool({
 });
 
 // =======================================================
-// 4-8. API Endpoints (Giữ nguyên)
+// 4-8. API Endpoints (Lấy, Xóa, Sửa Đơn Hàng)
 // =======================================================
 
 // 4. GET /api/orders
@@ -38,6 +36,51 @@ app.get("/api/orders", async (req, res) => {
   } catch (err) {
     console.error("Lỗi truy vấn database (GET):", err);
     res.status(500).json({ error: "Lỗi server nội bộ khi lấy đơn hàng" });
+  }
+});
+
+// 1. GET /api/supplies
+app.get("/api/supplies", async (req, res) => {
+  console.log("Đã nhận yêu cầu GET /api/supplies");
+  try {
+    const result = await pool.query(
+      "SELECT id, source_name FROM mavryk.supply ORDER BY source_name"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Lỗi truy vấn database (GET /api/supplies):", err);
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy danh sách nguồn" });
+  }
+});
+
+// 2. GET /api/supplies/:supplyId/products (Lấy Sản phẩm theo Nguồn)
+app.get("/api/supplies/:supplyId/products", async (req, res) => {
+  const { supplyId } = req.params;
+  console.log(`Đã nhận yêu cầu GET /api/supplies/${supplyId}/products`);
+
+  const queryText = `
+        SELECT DISTINCT
+            pp.id,
+            pp.san_pham
+        FROM mavryk.supply_price sp
+        JOIN mavryk.product_price pp ON sp.product_id = pp.id
+        WHERE sp.source_id = $1
+        ORDER BY pp.san_pham;
+    `;
+
+  try {
+    const result = await pool.query(queryText, [supplyId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(
+      `Lỗi truy vấn database (GET /api/supplies/${supplyId}/products):`,
+      err
+    );
+    res.status(500).json({
+      error: "Lỗi server nội bộ khi lấy danh sách sản phẩm theo nguồn",
+    });
   }
 });
 
@@ -161,12 +204,130 @@ app.delete("/api/orders/:id", async (req, res) => {
 });
 
 // =======================================================
-// 9. API Test: Kích hoạt Tác vụ Lập lịch Thủ công
+// 9. POST /api/calculate-price (Tính toán Giá)
 // =======================================================
+app.post("/api/calculate-price", async (req, res) => {
+  console.log("Đã nhận yêu cầu POST /api/calculate-price");
+
+  const { supply_id, san_pham_name, id_don_hang } = req.body;
+
+  if (!supply_id || !san_pham_name || !id_don_hang) {
+    return res.status(400).json({
+      error:
+        "Thiếu thông tin cần thiết (supply_id, san_pham_name, id_don_hang).",
+    });
+  }
+
+  try {
+    // Truy vấn phức hợp để lấy giá cơ sở, phần trăm và tính toán số ngày
+    const queryText = `
+            SELECT
+                sp.price AS gia_nhap_co_so,
+                pp.pct_ctv,
+                pp.pct_khach,
+                -- Tính số ngày dựa trên chuỗi tên sản phẩm
+                CASE
+                    WHEN $2 ILIKE '%--24m%' THEN 730
+                    WHEN $2 ILIKE '%--12m%' THEN 365
+                    WHEN $2 ILIKE '%--6m%' THEN 180
+                    WHEN $2 ILIKE '%--4m%' THEN 120
+                    WHEN $2 ILIKE '%--3m%' THEN 90
+                    WHEN $2 ILIKE '%--2m%' THEN 60
+                    WHEN $2 ILIKE '%--1m%' THEN 30
+                    ELSE 30 -- Mặc định 30 ngày nếu không tìm thấy
+                END AS so_ngay_da_dang_ki_moi
+            FROM mavryk.supply_price sp
+            JOIN mavryk.product_price pp ON sp.product_id = pp.id
+            WHERE sp.source_id = $1 AND pp.san_pham = $2;
+        `;
+
+    const result = await pool.query(queryText, [supply_id, san_pham_name]);
+
+    if (result.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Không tìm thấy giá cho Nguồn và Sản phẩm này." });
+    }
+
+    const data = result.rows[0];
+    const basePrice = Number(data.gia_nhap_co_so);
+    const pctCtv = Number(data.pct_ctv) || 1.0;
+    const pctKhach = Number(data.pct_khach) || 1.0;
+
+    // Check MAVC (CTV) vs MAVL (Khách)
+    const isMAVC = id_don_hang.toUpperCase().startsWith("MAVC");
+
+    // --- LOGIC TÍNH GIÁ BÁN ---
+    let finalPrice = basePrice;
+    if (isMAVC) {
+      finalPrice = basePrice * pctCtv;
+    } else {
+      // MAVL hoặc khác
+      finalPrice = basePrice * pctKhach;
+    }
+
+    // Làm tròn giá cuối cùng
+    finalPrice = Math.round(finalPrice);
+
+    const responseData = {
+      gia_nhap: basePrice,
+      gia_ban: finalPrice,
+      so_ngay_da_dang_ki: Number(data.so_ngay_da_dang_ki_moi),
+      het_han: "", // Frontend sẽ tính
+    };
+
+    res.json(responseData);
+  } catch (err) {
+    console.error(
+      `LỖI SERVER KHI TÍNH TOÁN GIÁ (${id_don_hang}):`,
+      err.message || err
+    );
+    res.status(500).json({ error: "Lỗi server nội bộ khi tính toán giá." });
+  }
+});
+
+// =======================================================
+// 10. POST /api/orders (Tạo Đơn Hàng Mới) - ĐÃ TÁCH RA
+// =======================================================
+app.post("/api/orders", async (req, res) => {
+  console.log("Đã nhận yêu cầu POST /api/orders (Tạo mới)");
+  const newOrderData = req.body;
+
+  // Loại bỏ trường ID nếu nó được gửi (DB sẽ tự sinh)
+  delete newOrderData.id;
+
+  const keys = Object.keys(newOrderData);
+  const placeholders = keys.map((_, index) => `$${index + 1}`).join(", ");
+  const columns = keys.map((key) => `"${key}"`).join(", ");
+  const values = Object.values(newOrderData);
+
+  try {
+    const queryText = `
+            INSERT INTO mavryk.order_list (${columns})
+            VALUES (${placeholders})
+            RETURNING *;
+        `;
+
+    const result = await pool.query(queryText, values);
+
+    if (result.rows.length === 0) {
+      return res
+        .status(500)
+        .json({ error: "Không thể tạo đơn hàng, không có dữ liệu trả về." });
+    }
+
+    console.log(`Đã tạo đơn hàng mới ID: ${result.rows[0].id_don_hang}.`);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Lỗi khi tạo đơn hàng mới (POST /api/orders):", err);
+    res.status(500).json({ error: "Lỗi server nội bộ khi tạo đơn hàng" });
+  }
+});
+
+// 11. API Test: Kích hoạt Tác vụ Lập lịch Thủ công
 app.get("/api/run-scheduler", async (req, res) => {
   console.log("--- ĐÃ KÍCH HOẠT CHẠY CRON JOB THỦ CÔNG ---");
   try {
-    // Gọi hàm được export từ scheduler.js
     await updateDatabaseTask();
     res.status(200).json({
       success: true,
@@ -179,7 +340,7 @@ app.get("/api/run-scheduler", async (req, res) => {
   }
 });
 
-// 10. Khởi động server
+// 12. Khởi động server
 app.listen(port, () => {
   console.log(`Backend server đang chạy tại http://localhost:${port}`);
   console.log(

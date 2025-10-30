@@ -9,6 +9,10 @@ export const API_ENDPOINTS = {
     `/api/supplies/${supplyId}/products`,
   CALCULATE_PRICE: "/api/calculate-price",
 
+  PRODUCTS_ALL: "/api/products/all",
+  SUPPLIES_BY_PRODUCT: (productId: number) =>
+    `/api/products/${productId}/supplies`,
+
   PAYMENT_RECEIPTS: "/api/payment-receipts",
   PURCHASE_ORDERS: "/api/purchase-orders",
   REFUNDS: "/api/refunds",
