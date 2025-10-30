@@ -1,8 +1,11 @@
+// index.js (ĐÃ TÁCH LOGIC CRON JOB)
+
 require("dotenv").config(); // Tải biến môi trường từ file .env
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
-const cron = require("node-cron"); // Import node-cron
+// const cron = require("node-cron"); // ĐÃ XÓA CRON
+const updateDatabaseTask = require("./scheduler"); // <--- IMPORT TÁC VỤ TỪ FILE RIÊNG
 
 const app = express();
 const port = 3001;
@@ -14,7 +17,7 @@ app.use(
   })
 );
 
-// 2. Middleware để đọc JSON từ body (cho webhook)
+// 2. Middleware để đọc JSON từ body
 app.use(express.json());
 
 // 3. Kết nối Database
@@ -22,11 +25,15 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-// 4. API endpoint để LẤY danh sách đơn hàng (GET /api/orders)
+// =======================================================
+// 4-8. API Endpoints (Giữ nguyên)
+// =======================================================
+
+// 4. GET /api/orders
 app.get("/api/orders", async (req, res) => {
   console.log("Đã nhận yêu cầu GET /api/orders");
   try {
-    const result = await pool.query("SELECT * FROM mavryk.order_list"); // Đã sửa schema
+    const result = await pool.query("SELECT * FROM mavryk.order_list");
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn database (GET):", err);
@@ -34,7 +41,7 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-// 5. API endpoint để CẬP NHẬT đơn hàng qua Webhook (POST /api/webhook/payment)
+// 5. POST /api/webhook/payment
 app.post("/api/webhook/payment", async (req, res) => {
   console.log("Đã nhận yêu cầu POST /api/webhook/payment");
   const { ma_don_hang } = req.body;
@@ -69,7 +76,7 @@ app.post("/api/webhook/payment", async (req, res) => {
   }
 });
 
-// 6. API endpoint để LẤY CHI TIẾT một đơn hàng (GET /api/orders/:id)
+// 6. GET /api/orders/:id
 app.get("/api/orders/:id", async (req, res) => {
   const { id } = req.params;
   console.log(`Đã nhận yêu cầu GET /api/orders/${id}`);
@@ -92,13 +99,12 @@ app.get("/api/orders/:id", async (req, res) => {
   }
 });
 
-// 7. API endpoint để CẬP NHẬT một đơn hàng (PUT /api/orders/:id)
+// 7. PUT /api/orders/:id
 app.put("/api/orders/:id", async (req, res) => {
   const { id } = req.params;
   const orderData = req.body;
   console.log(`Đã nhận yêu cầu PUT /api/orders/${id}`);
 
-  // Tạo danh sách các trường cần cập nhật và giá trị tương ứng
   const fields = Object.keys(orderData)
     .map((key, index) => `"${key}" = $${index + 1}`)
     .join(", ");
@@ -130,7 +136,7 @@ app.put("/api/orders/:id", async (req, res) => {
   }
 });
 
-// 8. API endpoint để XÓA một đơn hàng (DELETE /api/orders/:id)
+// 8. DELETE /api/orders/:id
 app.delete("/api/orders/:id", async (req, res) => {
   const { id } = req.params;
   console.log(`Đã nhận yêu cầu DELETE /api/orders/${id}`);
@@ -155,99 +161,28 @@ app.delete("/api/orders/:id", async (req, res) => {
 });
 
 // =======================================================
-// 9. Logic Tác vụ Lập lịch (Cron Job) - Đã sửa lỗi SQL
-// =======================================================
-/**
- * Hàm thực thi logic cập nhật database tự động.
- */
-const updateDatabaseTask = async () => {
-  console.log("📅 Bắt đầu tác vụ lập lịch: Cập nhật database...");
-  const client = await pool.connect(); // Lấy một kết nối từ pool
-
-  try {
-    await client.query("BEGIN"); // Bắt đầu transaction
-
-    // --- Logic 1: Xóa đơn hàng hết hạn (< 0 ngày) ---
-    const deleteResult = await client.query(
-      `DELETE FROM mavryk.order_list
-       WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) < 0;` // <-- Sửa cú pháp ngày
-    );
-    console.log(
-      `   - Đã xóa ${deleteResult.rowCount} đơn hàng hết hạn (< 0 ngày).`
-    );
-
-    // --- Logic 2: Cập nhật thành "Hết Hạn" (= 0 ngày) ---
-    const updateExpiredResult = await client.query(
-      `UPDATE mavryk.order_list
-       SET
-           tinh_trang = 'Hết Hạn',
-           check_flag = NULL
-       WHERE
-           (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) = 0
-           AND tinh_trang != 'Đã Thanh Toán';` // <-- Sửa cú pháp ngày
-    );
-    console.log(
-      `   - Đã cập nhật ${updateExpiredResult.rowCount} đơn hàng thành 'Hết Hạn' (= 0 ngày).`
-    );
-
-    // --- Logic 3: Cập nhật thành "Chưa Thanh Toán" (<= 4 ngày và > 0) ---
-    const updateSoonResult = await client.query(
-      `UPDATE mavryk.order_list
-       SET
-           tinh_trang = 'Chưa Thanh Toán',
-           check_flag = NULL
-       WHERE
-           (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) > 0
-           AND (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) <= 4
-           AND tinh_trang != 'Đã Thanh Toán';` // <-- Sửa cú pháp ngày
-    );
-    console.log(
-      `   - Đã cập nhật ${updateSoonResult.rowCount} đơn hàng thành 'Chưa Thanh Toán' (<= 4 ngày).`
-    );
-
-    await client.query("COMMIT"); // Hoàn tất transaction thành công
-    console.log("✅ Tác vụ lập lịch hoàn thành thành công.");
-  } catch (error) {
-    await client.query("ROLLBACK"); // Hoàn tác transaction nếu có lỗi
-    console.error("❌ Lỗi khi chạy tác vụ lập lịch:", error);
-    throw error; // Ném lỗi để API test bắt được
-  } finally {
-    client.release(); // Luôn trả kết nối về pool
-  }
-};
-
-// =======================================================
-// 10. API Test: Kích hoạt Tác vụ Lập lịch Thủ công
+// 9. API Test: Kích hoạt Tác vụ Lập lịch Thủ công
 // =======================================================
 app.get("/api/run-scheduler", async (req, res) => {
   console.log("--- ĐÃ KÍCH HOẠT CHẠY CRON JOB THỦ CÔNG ---");
   try {
-    await updateDatabaseTask(); // Gọi hàm thực thi cron job
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Tác vụ lập lịch đã được kích hoạt thành công.",
-      });
+    // Gọi hàm được export từ scheduler.js
+    await updateDatabaseTask();
+    res.status(200).json({
+      success: true,
+      message: "Tác vụ lập lịch đã được kích hoạt thành công.",
+    });
   } catch (error) {
-    // Lỗi này xảy ra nếu có lỗi SQL bên trong updateDatabaseTask
     res
       .status(500)
       .json({ error: "Lỗi server nội bộ khi chạy tác vụ lập lịch." });
   }
 });
 
-// 11. Lên lịch chạy tác vụ (00:01 mỗi ngày)
-cron.schedule("1 0 * * *", updateDatabaseTask, {
-  scheduled: true,
-  timezone: "Asia/Ho_Chi_Minh", // Đặt múi giờ của bạn
-});
-// =======================================================
-
-// 12. Khởi động server
+// 10. Khởi động server
 app.listen(port, () => {
   console.log(`Backend server đang chạy tại http://localhost:${port}`);
   console.log(
-    "⏰ Cron job đã được lên lịch chạy hàng ngày vào 00:01 sáng (Asia/Ho_Chi_Minh)."
+    "⏰ Tác vụ lập lịch (cron job) đang chạy ở file scheduler.js riêng biệt."
   );
 });
