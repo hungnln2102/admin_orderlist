@@ -1,4 +1,4 @@
-// CreateOrderModal.tsx - MÃ ĐÃ SỬA LỖI CLICK COMBOBOX
+// CreateOrderModal.tsx - Mã đã được chuẩn hóa lại đúng Tiếng Việt
 
 import React, {
   useState,
@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { XMarkIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 
 // =======================================================
@@ -31,7 +31,6 @@ interface Order {
   tinh_trang: string;
   check_flag: boolean | null;
 }
-
 interface Supply {
   id: number;
   source_name: string;
@@ -40,19 +39,16 @@ interface Product {
   id: number;
   san_pham: string;
 }
-
 interface SupplyPrice {
   source_id: number;
   price: number;
 }
-
 interface CalculatedPriceResult {
   gia_nhap: number;
   gia_ban: number;
   so_ngay_da_dang_ki: number;
   het_han: string;
 }
-
 interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -75,6 +71,15 @@ const calculateDate = (startDate: string, days: number): string => {
 
 const formatCurrency = (value: number) => {
   return (Number(value) || 0).toLocaleString("vi-VN") + " VNĐ";
+};
+
+// Parse chuỗi dạng "--{x}m" để lấy số tháng, ví dụ: "... --3m" => 3
+const parseMonthsFromInfo = (info?: string): number => {
+  if (!info) return 0;
+  const m = info.match(/--(\d+)m/i);
+  if (!m) return 0;
+  const months = Number(m[1] || 0);
+  return Number.isFinite(months) && months > 0 ? months : 0;
 };
 
 const generateRandomId = (length: number) => {
@@ -114,10 +119,6 @@ const inputClass =
 const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 const readOnlyClass = "bg-gray-100 cursor-not-allowed";
 
-// =======================================================
-// 3. CUSTOM HOOK: useCreateOrderLogic
-// =======================================================
-
 interface UseCreateOrderLogicResult {
   formData: Partial<Order>;
   supplies: Supply[];
@@ -131,28 +132,11 @@ interface UseCreateOrderLogicResult {
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => void;
-  handleSourceChange: (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => void;
-  handleProductChange: (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => void;
+  handleProductSelect: (productName: string) => void;
+  handleSourceSelect: (sourceId: number) => void;
+  handleSourceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleProductChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  handleAddNewProductSourceRule: () => void;
-  productSearchTerm: string;
-  supplySearchTerm: string;
-  handleSearchChange: (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "product" | "supply"
-  ) => void;
-  filteredProducts: Product[];
-  filteredSupplies: Supply[];
-  isProductDropdownOpen: boolean;
-  setIsProductDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isSupplyDropdownOpen: boolean;
-  setIsSupplyDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  productDropdownRef: React.RefObject<HTMLDivElement>;
-  supplyDropdownRef: React.RefObject<HTMLDivElement>;
   handleSubmit: (e: React.FormEvent) => boolean;
 }
 
@@ -160,7 +144,6 @@ const useCreateOrderLogic = (
   isOpen: boolean,
   onSave: (newOrderData: Partial<Order> | Order) => void
 ): UseCreateOrderLogicResult => {
-  // --- KHAI BÁO HOOK (Phải luôn ở cấp cao nhất) ---
   const [formData, setFormData] = useState<Partial<Order>>(INITIAL_FORM_DATA);
   const [customerType, setCustomerType] = useState<"MAVC" | "MAVL">("MAVC");
 
@@ -176,60 +159,12 @@ const useCreateOrderLogic = (
   );
   const [selectedSupplyId, setSelectedSupplyId] = useState<number | null>(null);
 
-  // STATE MỚI CHO SEARCH/DROPDOWN UI
-  const [productSearchTerm, setProductSearchTerm] = useState("");
-  const [supplySearchTerm, setSupplySearchTerm] = useState("");
-  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [isSupplyDropdownOpen, setIsSupplyDropdownOpen] = useState(false);
-
-  const productDropdownRef = useRef<HTMLDivElement>(null);
-  const supplyDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Memoized ID và Date
   const currentOrderId = useMemo(
     () => customerType + generateRandomId(5),
     [customerType]
   );
   const todayDate = useMemo(() => getTodayDMY(), []);
-  // --- KẾT THÚC KHAI BÁO HOOK ---
 
-  // --- LOGIC TÌM KIẾM VÀ LỌC (Giữ nguyên) ---
-  const handleSearchChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "product" | "supply"
-  ) => {
-    const value = e.target.value;
-    if (field === "product") {
-      setProductSearchTerm(value);
-      setFormData((prev) => ({
-        ...prev,
-        [ORDER_FIELDS.SAN_PHAM]: value,
-      }));
-    } else {
-      setSupplySearchTerm(value);
-      setFormData((prev) => ({
-        ...prev,
-        [ORDER_FIELDS.NGUON]: value,
-      }));
-    }
-  };
-
-  const filteredProducts = useMemo(() => {
-    if (!productSearchTerm) return products;
-    const lowerTerm = productSearchTerm.toLowerCase();
-    return products.filter((p) => p.san_pham.toLowerCase().includes(lowerTerm));
-  }, [products, productSearchTerm]);
-
-  const filteredSupplies = useMemo(() => {
-    if (!supplySearchTerm) return supplies;
-    const lowerTerm = supplySearchTerm.toLowerCase();
-    return supplies.filter((s) =>
-      s.source_name.toLowerCase().includes(lowerTerm)
-    );
-  }, [supplies, supplySearchTerm]);
-  // --- KẾT THÚC LOGIC TÌM KIẾM VÀ LỌC ---
-
-  // Hàm Fetch: Lấy danh sách TẤT CẢ sản phẩm (tải đầu tiên)
   const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch(
@@ -243,7 +178,6 @@ const useCreateOrderLogic = (
     }
   }, []);
 
-  // Hàm Fetch: Lấy danh sách NGUỒN theo Tên SẢN PHẨM (cho dropdown)
   const fetchSuppliesByProduct = useCallback(async (productName: string) => {
     try {
       const response = await fetch(
@@ -258,7 +192,6 @@ const useCreateOrderLogic = (
     }
   }, []);
 
-  // HÀM FETCH MỚI: Lấy TẤT CẢ giá nhập theo Tên SẢN PHẨM (cho logic hiển thị)
   const fetchAllSupplyPrices = useCallback(async (productName: string) => {
     try {
       const response = await fetch(
@@ -275,7 +208,6 @@ const useCreateOrderLogic = (
     }
   }, []);
 
-  // Hàm Fetch: Tính toán Giá/Số ngày
   const calculatePrice = useCallback(
     async (
       supplyId: number,
@@ -309,6 +241,7 @@ const useCreateOrderLogic = (
         const newDays = result.so_ngay_da_dang_ki;
         const newHetHan = calculateDate(registerDateStr, newDays);
 
+        // Thay vì gọi setFormData ở đây, chúng ta trả về kết quả
         return {
           gia_nhap: result.gia_nhap,
           gia_ban: result.gia_ban,
@@ -351,8 +284,6 @@ const useCreateOrderLogic = (
       setSupplies([]);
       setSupplyPrices([]);
       fetchProducts();
-      setProductSearchTerm("");
-      setSupplySearchTerm("");
     }
   }, [isOpen, fetchProducts]);
 
@@ -379,8 +310,68 @@ const useCreateOrderLogic = (
     formData[ORDER_FIELDS.NGAY_DANG_KI],
   ]);
 
-  // --- HÀM XỬ LÝ SỰ KIỆN ĐÃ ĐIỀU CHỈNH ---
+  // Hỗ trợ chọn sản phẩm trực tiếp (phục vụ ở ô search)
+  const handleProductSelect = (productName: string) => {
+    const selectedProduct = products.find((p) => p.san_pham === productName);
 
+    setSelectedProductId(selectedProduct?.id || null);
+    setSelectedSupplyId(null);
+
+    setFormData((prev) => ({
+      ...prev,
+      [ORDER_FIELDS.SAN_PHAM]: productName,
+      [ORDER_FIELDS.NGUON]: "",
+      [ORDER_FIELDS.GIA_NHAP]: 0,
+      [ORDER_FIELDS.GIA_BAN]: 0,
+      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
+      [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
+    }));
+    setSupplies([]);
+    setSupplyPrices([]);
+
+    if (productName) {
+      fetchSuppliesByProduct(productName);
+      fetchAllSupplyPrices(productName);
+
+      const orderId = formData[ORDER_FIELDS.ID_DON_HANG] as string;
+      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI] as string;
+
+      if (orderId && registerDate) {
+        calculatePrice(0, productName, orderId, registerDate).then((result) => {
+          if (result) {
+            setFormData((prev) => ({
+              ...prev,
+              [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
+              [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
+                result.so_ngay_da_dang_ki
+              ),
+              [ORDER_FIELDS.HET_HAN]: result.het_han,
+            }));
+            setIsDataLoaded(true);
+          }
+        });
+      }
+    } else {
+      setIsDataLoaded(false);
+    }
+  };
+
+  const handleSourceSelect = (sourceId: number) => {
+    const selectedSupply = supplies.find((s) => s.id === sourceId);
+    let newBasePrice = 0;
+    if (sourceId !== 0 && selectedSupply) {
+      newBasePrice =
+        supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
+    }
+    setSelectedSupplyId(sourceId === 0 ? null : sourceId);
+    setFormData((prev) => ({
+      ...prev,
+      [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
+      [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
+    }));
+  };
+
+  // HÀM XỬ LÝ CHUNG CHO CÁC TRƯỜNG INPUT/SELECT CƠ BẢN
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -393,68 +384,39 @@ const useCreateOrderLogic = (
     }));
   };
 
-  // HÀM SỬA CHỮA: Xác nhận chọn Sản Phẩm khi onBlur hoặc onClick
-  const handleProductChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => {
-    const selectedProductName = e.target.value;
-    const confirmedProduct = products.find(
-      (p) => p.san_pham === selectedProductName
-    );
+  // HÀM ĐÃ SỬA: handleProductChange (KÍCH HOẠT TÍNH GIÁ BÁN, RESET GIÁ NHẬP)
+  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const productName = e.target.value;
+    const selectedProduct = products.find((p) => p.san_pham === productName);
 
-    // 1. Logic Xác nhận chọn
-    if (!confirmedProduct) {
-      // Logic reset nếu giá trị KHÔNG khớp với sản phẩm nào
-      if (
-        !selectedProductName ||
-        (e.type === "blur" &&
-          selectedProductName !== formData[ORDER_FIELDS.SAN_PHAM])
-      ) {
-        setFormData((prev) => ({
-          ...prev,
-          [ORDER_FIELDS.SAN_PHAM]: "",
-          [ORDER_FIELDS.NGUON]: "",
-          [ORDER_FIELDS.GIA_NHAP]: 0,
-          [ORDER_FIELDS.GIA_BAN]: 0,
-        }));
-        setProductSearchTerm("");
-        setSupplySearchTerm("");
-        setSupplies([]);
-        setSupplyPrices([]);
-      }
-      return;
-    }
-
-    // 2. Logic Kích hoạt tính giá (Nếu xác nhận thành công)
-    setSelectedProductId(confirmedProduct.id);
+    setSelectedProductId(selectedProduct?.id || null);
     setSelectedSupplyId(null);
-    setProductSearchTerm(confirmedProduct.san_pham); // Đảm bảo input hiển thị tên đầy đủ
 
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: confirmedProduct.san_pham,
+      [ORDER_FIELDS.SAN_PHAM]: productName,
       [ORDER_FIELDS.NGUON]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0,
+      [ORDER_FIELDS.GIA_NHAP]: 0, // ĐẢM BẢO GIÁ NHẬP = 0 KHI CHỌN SẢN PHẨM
       [ORDER_FIELDS.GIA_BAN]: 0,
       [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
       [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
     }));
     setSupplies([]);
     setSupplyPrices([]);
-    setSupplySearchTerm(""); // Reset search nguồn
 
-    fetchSuppliesByProduct(confirmedProduct.san_pham);
-    fetchAllSupplyPrices(confirmedProduct.san_pham);
+    if (productName) {
+      fetchSuppliesByProduct(productName);
+      fetchAllSupplyPrices(productName);
 
-    const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
-    const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
+      const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
+      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
 
-    if (orderId && registerDate) {
-      calculatePrice(0, confirmedProduct.san_pham, orderId, registerDate).then(
-        (result) => {
+      if (orderId && registerDate) {
+        calculatePrice(0, productName, orderId, registerDate).then((result) => {
           if (result) {
             setFormData((prev) => ({
               ...prev,
+              // Ghi đè Giá Bán và Ngày, GIÁ NHẬP KHÔNG ĐƯỢC ĐIỀN (vẫn giữ 0)
               [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
@@ -463,65 +425,36 @@ const useCreateOrderLogic = (
             }));
             setIsDataLoaded(true);
           }
-        }
-      );
+        });
+      }
     } else {
       setIsDataLoaded(false);
     }
   };
 
-  // HÀM SỬA CHỮA: Xác nhận chọn Nguồn khi onBlur hoặc onClick
-  const handleSourceChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => {
-    const selectedSourceName = e.target.value;
-    const confirmedSupply = supplies.find(
-      (s) => s.source_name === selectedSourceName
-    );
+  // HÀM ĐÃ SỬA: handleSourceChange (Cập nhật giá nhập tham khảo và xử lý RESET)
+  const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sourceId = Number(e.target.value);
+    const selectedSupply = supplies.find((s) => s.id === sourceId);
 
-    // 1. Logic Xác nhận chọn
-    if (!confirmedSupply) {
-      // Reset nếu không khớp
-      if (selectedSourceName) {
-        setFormData((prev) => ({ ...prev, [ORDER_FIELDS.NGUON]: "" }));
-        setSelectedSupplyId(null);
-        setSupplySearchTerm("");
-      } else {
-        // Cho phép reset về giá trị rỗng ("-- Chọn Nguồn --")
-        setFormData((prev) => ({
-          ...prev,
-          [ORDER_FIELDS.NGUON]: "",
-          [ORDER_FIELDS.GIA_NHAP]: 0,
-        }));
-        setSelectedSupplyId(null);
-        setSupplySearchTerm("");
-      }
-      return;
-    }
-
-    // 2. Logic cập nhật giá (Nếu xác nhận thành công)
-    const sourceId = confirmedSupply.id;
+    // 1. Logic tìm giá
     let newBasePrice = 0;
-
-    if (sourceId !== 0) {
+    // Kiểm tra nếu sourceId hợp lệ (khác 0)
+    if (sourceId !== 0 && selectedSupply) {
       newBasePrice =
         supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
     }
+    // Nếu sourceId là 0 (hoặc không tìm thấy), newBasePrice sẽ là 0, tức là clear Giá Nhập.
 
     setSelectedSupplyId(sourceId);
-    setSupplySearchTerm(confirmedSupply.source_name); // Đảm bảo input hiển thị tên đầy đủ
 
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.NGUON]: confirmedSupply.source_name,
+      // Đảm bảo tên nguồn là rỗng nếu chọn -- Chọn Nguồn -- (sourceId=0)
+      [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
+      // 2. CẬP NHẬT GIÁ NHẬP (BASE PRICE) THAM KHẢO
       [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
     }));
-  };
-
-  // HÀM MỚI: Xử lý nút Thêm Nguồn/Sản phẩm
-  const handleAddNewProductSourceRule = () => {
-    alert("Chức năng Thêm Nguồn/Sản phẩm mới sẽ được phát triển tại đây.");
-    // Thêm logic mở modal hoặc điều hướng tại đây
   };
 
   const handleCustomerTypeChange = (
@@ -572,28 +505,139 @@ const useCreateOrderLogic = (
     selectedSupplyId,
     customerType,
     handleChange,
+    handleProductSelect,
+    handleSourceSelect,
     handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
-    handleAddNewProductSourceRule,
     handleSubmit,
-    productSearchTerm,
-    supplySearchTerm,
-    handleSearchChange,
-    filteredProducts,
-    filteredSupplies,
-    isProductDropdownOpen,
-    setIsProductDropdownOpen,
-    isSupplyDropdownOpen,
-    setIsSupplyDropdownOpen,
-    productDropdownRef,
-    supplyDropdownRef,
   };
 };
 
 // =======================================================
 // 4. COMPONENT CHÍNH
 // =======================================================
+// =======================================================
+// SearchableSelect (local component)
+// =======================================================
+type SSOption = { value: string | number; label: string };
+
+interface SearchableSelectProps {
+  name?: string;
+  value: string | number | null | undefined;
+  options: SSOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  onChange: (value: SSOption["value"], option: SSOption) => void;
+  onClear?: () => void;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  name,
+  value,
+  options,
+  placeholder,
+  disabled,
+  onChange,
+  onClear,
+}) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selectedLabel = useMemo(() => {
+    const found = options.find((o) => o.value === value);
+    return found ? found.label : "";
+  }, [options, value]);
+
+  useEffect(() => {
+    setQuery(selectedLabel);
+  }, [selectedLabel]);
+
+  const filtered = useMemo(() => {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (containerRef.current.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        name={name}
+        type="text"
+        value={query}
+        onChange={(e) => {
+          const next = e.target.value;
+          setQuery(next);
+          if (next === "") {
+            // Nếu người dùng xóa hết text -> clear selection
+            onClear?.();
+          }
+          if (!open) setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={`${inputClass} pr-8`}
+        autoComplete="off"
+      />
+      {/* Nút clear nhỏ bên phải */}
+      {!disabled && (query || value) ? (
+        <button
+          type="button"
+          aria-label="Xóa lựa chọn"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          onMouseDown={(e) => {
+            // dùng mousedown để tránh input blur trước khi clear
+            e.preventDefault();
+            e.stopPropagation();
+            setQuery("");
+            onClear?.();
+            setOpen(true);
+          }}
+        >
+          ×
+        </button>
+      ) : null}
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-500">
+              Không có kết quả
+            </div>
+          ) : (
+            filtered.map((opt) => (
+              <div
+                key={String(opt.value)}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                  opt.value === value ? "bg-blue-100" : ""
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(opt.value, opt);
+                  setOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
@@ -608,25 +652,45 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     selectedSupplyId,
     customerType,
     handleChange,
+    handleProductSelect,
+    handleSourceSelect,
     handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
-    handleAddNewProductSourceRule,
     handleSubmit,
-    productSearchTerm,
-    supplySearchTerm,
-    handleSearchChange,
-    filteredProducts,
-    filteredSupplies,
-    isProductDropdownOpen,
-    setIsProductDropdownOpen,
-    isSupplyDropdownOpen,
-    setIsSupplyDropdownOpen,
-    productDropdownRef,
-    supplyDropdownRef,
-  } = useCreateOrderLogic(isOpen, onSave); // <<< HOOK ĐƯỢC GỌI Ở ĐÂY
+  } = useCreateOrderLogic(isOpen, onSave);
 
-  if (!isOpen) return null; // <<< IF NÀY PHẢI NẰM SAU CÁC LỜI GỌI HOOK
+  if (!isOpen) return null;
+
+  // Chế độ nhập mới (tự điền Sản Phẩm/Nguồn)
+  const [customMode, setCustomMode] = useState(false);
+
+  // Clear khi xóa text ở ô Sản Phẩm
+  const clearProduct = () => {
+    // sử dụng API đã có để reset toàn bộ dependent fields
+    handleProductSelect("");
+  };
+
+  // Clear khi xóa text ở ô Nguồn
+  const clearSource = () => {
+    // reset nguồn và giá nhập về mặc định
+    // ưu tiên set null cho selectedSupplyId để phản ánh trạng thái chưa chọn
+    handleSourceSelect(0);
+  };
+
+  const toggleCustomMode = () => {
+    if (!customMode) {
+      // Bật chế độ nhập mới: reset các giá trị phụ thuộc
+      clearProduct();
+      clearSource();
+      setCustomMode(true);
+    } else {
+      // Tắt chế độ nhập mới: trở về chọn từ danh sách
+      clearProduct();
+      clearSource();
+      setCustomMode(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
@@ -703,124 +767,94 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
               </div>
 
-              {/* Phần 2: Sản Phẩm & Nguồn & Thông Tin Sản Phẩm */}
-              <div className="grid grid-cols-1 gap-6 border p-4 rounded-lg">
-                {/* Hàng 1: SẢN PHẨM và NGUỒN (Chia 2 cột) */}
-                <div className="grid grid-cols-2 gap-6">
-                  {/* 1. SẢN PHẨM */}
-                  <div className="relative" ref={productDropdownRef}>
-                    <label className={labelClass}>
-                      Sản Phẩm <span className="text-red-500">*</span>
-                    </label>
-                    {/* INPUT VÀ CUSTOM DROPDOWN CHO SẢN PHẨM */}
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.SAN_PHAM}
-                      value={
-                        productSearchTerm ||
-                        formData[ORDER_FIELDS.SAN_PHAM] ||
-                        ""
-                      }
-                      onChange={(e) => handleSearchChange(e, "product")}
-                      onFocus={() => setIsProductDropdownOpen(true)}
-                      onBlur={() =>
-                        setTimeout(() => setIsProductDropdownOpen(false), 150)
-                      }
-                      className={inputClass}
-                      placeholder="Chọn hoặc gõ tên Sản phẩm"
-                      required
-                    />
+              {/* Phần 2: Sản Phẩm & Nguồn */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 border p-4 rounded-lg items-end">
+                {/* 1. SẢN PHẨM */}
+                <div className="md:col-span-5">
+                  <label className={labelClass}>
+                    Sản Phẩm <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    name={ORDER_FIELDS.SAN_PHAM}
+                    value={formData[ORDER_FIELDS.SAN_PHAM] as string}
+                    options={products.map((p) => ({
+                      value: p.san_pham,
+                      label: p.san_pham,
+                    }))}
+                    placeholder="-- Chọn Sản Phẩm --"
+                    onChange={(val) => handleProductSelect(String(val))}
+                    onClear={clearProduct}
+                    disabled={customMode}
+                  />
+                </div>
 
-                    {/* CUSTOM DROPDOWN MỚI CHO SẢN PHẨM */}
-                    {isProductDropdownOpen && filteredProducts.length > 0 && (
-                      <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1">
-                        {filteredProducts.map((p) => (
-                          <li
-                            key={p.id}
-                            className="p-2 cursor-pointer hover:bg-blue-100 text-sm"
-                            onMouseDown={(e) => {
-                              // Dùng onMouseDown để xử lý trước onBlur
-                              e.preventDefault(); // Ngăn onBlur kích hoạt ngay lập tức
-                              setProductSearchTerm(p.san_pham);
-                              handleProductChange({
-                                target: { value: p.san_pham },
-                              } as any);
-                              setIsProductDropdownOpen(false);
-                            }}
-                          >
-                            {p.san_pham}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                {/* 2. NGUỒN */}
+                <div className="md:col-span-5">
+                  <label className={labelClass}>
+                    Nguồn <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    name={ORDER_FIELDS.NGUON}
+                    value={selectedSupplyId ?? ""}
+                    options={supplies.map((s) => ({
+                      value: s.id,
+                      label: s.source_name,
+                    }))}
+                    placeholder="-- Chọn Nguồn --"
+                    disabled={customMode || !formData[ORDER_FIELDS.SAN_PHAM]}
+                    onChange={(val) => handleSourceSelect(Number(val))}
+                    onClear={clearSource}
+                  />
+                </div>
 
-                  {/* 2. NGUỒN + BUTTON */}
-                  <div className="relative" ref={supplyDropdownRef}>
-                    <label className={labelClass}>
-                      Nguồn <span className="text-red-500">*</span>
-                    </label>
-                    {/* INPUT FIELD VÀ BUTTON TRÊN CÙNG 1 HÀNG DÙNG FLEX */}
-                    <div className="flex items-center space-x-2">
-                      {/* INPUT VÀ CUSTOM DROPDOWN CHO NGUỒN */}
+                {/* 3. Nút Thêm (+) ở cuối hàng */}
+                <div className="md:col-span-2 flex md:justify-end">
+                  <button
+                    type="button"
+                    aria-label="Thêm"
+                    onClick={toggleCustomMode}
+                    className={`mt-6 md:mt-0 inline-flex items-center justify-center w-10 h-10 rounded-md text-white text-2xl leading-none ${
+                      customMode
+                        ? "bg-red-500 hover:bg-red-600"
+                        : "bg-green-500 hover:bg-green-600"
+                    }`}
+                  >
+                    {customMode ? "-" : "+"}
+                  </button>
+                </div>
+
+                {/* Chế độ nhập mới: hiển thị 2 input mới ngay dưới, trên Thông Tin Sản Phẩm */}
+                {customMode && (
+                  <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className={labelClass}>Sản Phẩm mới</label>
+                      <input
+                        type="text"
+                        name={ORDER_FIELDS.SAN_PHAM}
+                        value={
+                          (formData[ORDER_FIELDS.SAN_PHAM] as string) || ""
+                        }
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="Nhập tên sản phẩm mới"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Nguồn mới</label>
                       <input
                         type="text"
                         name={ORDER_FIELDS.NGUON}
-                        value={
-                          supplySearchTerm || formData[ORDER_FIELDS.NGUON] || ""
-                        }
-                        onChange={(e) => handleSearchChange(e, "supply")}
-                        onFocus={() => setIsSupplyDropdownOpen(true)}
-                        onBlur={() =>
-                          setTimeout(() => setIsSupplyDropdownOpen(false), 150)
-                        }
-                        className={`${inputClass} flex-grow`}
-                        placeholder="Chọn hoặc gõ tên Nguồn"
-                        required
-                        disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
+                        value={(formData[ORDER_FIELDS.NGUON] as string) || ""}
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="Nhập tên nguồn mới"
                       />
-
-                      {/* CUSTOM DROPDOWN MỚI CHO NGUỒN */}
-                      {isSupplyDropdownOpen && filteredSupplies.length > 0 && (
-                        <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 top-full">
-                          {filteredSupplies.map((s) => (
-                            <li
-                              key={s.id}
-                              className="p-2 cursor-pointer hover:bg-blue-100 text-sm"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setSupplySearchTerm(s.source_name);
-                                handleSourceChange({
-                                  target: { value: s.source_name },
-                                } as any);
-                                setIsSupplyDropdownOpen(false);
-                              }}
-                            >
-                              {s.source_name}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {/* BUTTON MỚI: Thêm rule */}
-                      <button
-                        type="button"
-                        onClick={handleAddNewProductSourceRule}
-                        disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
-                        className={`p-2 rounded-lg transition-colors ${
-                          formData[ORDER_FIELDS.SAN_PHAM]
-                            ? "bg-green-500 hover:bg-green-600 text-white"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <PlusIcon className="h-5 w-5" />
-                      </button>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Hàng 2: THÔNG TIN SẢN PHẨM (Full width) */}
-                <div className="col-span-full">
+                {/* Thông Tin Sản Phẩm: xuống hàng nhưng chung khối */}
+                <div className="md:col-span-12">
                   <label className={labelClass}>
                     Thông Tin Sản Phẩm <span className="text-red-500">*</span>
                   </label>
