@@ -1,7 +1,13 @@
-// CreateOrderModal.tsx - Mã đã được chỉnh sửa logic giá nhập tham khảo
+// CreateOrderModal.tsx - MÃ ĐÃ SỬA LỖI CLICK COMBOBOX
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { XMarkIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 
 // =======================================================
@@ -125,9 +131,28 @@ interface UseCreateOrderLogicResult {
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => void;
-  handleSourceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  handleProductChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleSourceChange: (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => void;
+  handleProductChange: (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleAddNewProductSourceRule: () => void;
+  productSearchTerm: string;
+  supplySearchTerm: string;
+  handleSearchChange: (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: "product" | "supply"
+  ) => void;
+  filteredProducts: Product[];
+  filteredSupplies: Supply[];
+  isProductDropdownOpen: boolean;
+  setIsProductDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isSupplyDropdownOpen: boolean;
+  setIsSupplyDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  productDropdownRef: React.RefObject<HTMLDivElement>;
+  supplyDropdownRef: React.RefObject<HTMLDivElement>;
   handleSubmit: (e: React.FormEvent) => boolean;
 }
 
@@ -135,6 +160,7 @@ const useCreateOrderLogic = (
   isOpen: boolean,
   onSave: (newOrderData: Partial<Order> | Order) => void
 ): UseCreateOrderLogicResult => {
+  // --- KHAI BÁO HOOK (Phải luôn ở cấp cao nhất) ---
   const [formData, setFormData] = useState<Partial<Order>>(INITIAL_FORM_DATA);
   const [customerType, setCustomerType] = useState<"MAVC" | "MAVL">("MAVC");
 
@@ -150,16 +176,61 @@ const useCreateOrderLogic = (
   );
   const [selectedSupplyId, setSelectedSupplyId] = useState<number | null>(null);
 
+  // STATE MỚI CHO SEARCH/DROPDOWN UI
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [supplySearchTerm, setSupplySearchTerm] = useState("");
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [isSupplyDropdownOpen, setIsSupplyDropdownOpen] = useState(false);
+
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+  const supplyDropdownRef = useRef<HTMLDivElement>(null);
+
   // Memoized ID và Date
   const currentOrderId = useMemo(
     () => customerType + generateRandomId(5),
     [customerType]
   );
   const todayDate = useMemo(() => getTodayDMY(), []);
+  // --- KẾT THÚC KHAI BÁO HOOK ---
+
+  // --- LOGIC TÌM KIẾM VÀ LỌC (Giữ nguyên) ---
+  const handleSearchChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: "product" | "supply"
+  ) => {
+    const value = e.target.value;
+    if (field === "product") {
+      setProductSearchTerm(value);
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.SAN_PHAM]: value,
+      }));
+    } else {
+      setSupplySearchTerm(value);
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.NGUON]: value,
+      }));
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm) return products;
+    const lowerTerm = productSearchTerm.toLowerCase();
+    return products.filter((p) => p.san_pham.toLowerCase().includes(lowerTerm));
+  }, [products, productSearchTerm]);
+
+  const filteredSupplies = useMemo(() => {
+    if (!supplySearchTerm) return supplies;
+    const lowerTerm = supplySearchTerm.toLowerCase();
+    return supplies.filter((s) =>
+      s.source_name.toLowerCase().includes(lowerTerm)
+    );
+  }, [supplies, supplySearchTerm]);
+  // --- KẾT THÚC LOGIC TÌM KIẾM VÀ LỌC ---
 
   // Hàm Fetch: Lấy danh sách TẤT CẢ sản phẩm (tải đầu tiên)
   const fetchProducts = useCallback(async () => {
-    // Logic giữ nguyên
     try {
       const response = await fetch(
         `http://localhost:3001${API_ENDPOINTS.PRODUCTS_ALL}`
@@ -174,7 +245,6 @@ const useCreateOrderLogic = (
 
   // Hàm Fetch: Lấy danh sách NGUỒN theo Tên SẢN PHẨM (cho dropdown)
   const fetchSuppliesByProduct = useCallback(async (productName: string) => {
-    // Logic giữ nguyên
     try {
       const response = await fetch(
         `http://localhost:3001${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
@@ -239,7 +309,6 @@ const useCreateOrderLogic = (
         const newDays = result.so_ngay_da_dang_ki;
         const newHetHan = calculateDate(registerDateStr, newDays);
 
-        // Thay vì gọi setFormData ở đây, chúng ta trả về kết quả
         return {
           gia_nhap: result.gia_nhap,
           gia_ban: result.gia_ban,
@@ -282,6 +351,8 @@ const useCreateOrderLogic = (
       setSupplies([]);
       setSupplyPrices([]);
       fetchProducts();
+      setProductSearchTerm("");
+      setSupplySearchTerm("");
     }
   }, [isOpen, fetchProducts]);
 
@@ -322,39 +393,68 @@ const useCreateOrderLogic = (
     }));
   };
 
-  // HÀM ĐÃ SỬA: handleProductChange (KÍCH HOẠT TÍNH GIÁ BÁN, RESET GIÁ NHẬP)
-  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const productName = e.target.value;
-    const selectedProduct = products.find((p) => p.san_pham === productName);
+  // HÀM SỬA CHỮA: Xác nhận chọn Sản Phẩm khi onBlur hoặc onClick
+  const handleProductChange = (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => {
+    const selectedProductName = e.target.value;
+    const confirmedProduct = products.find(
+      (p) => p.san_pham === selectedProductName
+    );
 
-    setSelectedProductId(selectedProduct?.id || null);
+    // 1. Logic Xác nhận chọn
+    if (!confirmedProduct) {
+      // Logic reset nếu giá trị KHÔNG khớp với sản phẩm nào
+      if (
+        !selectedProductName ||
+        (e.type === "blur" &&
+          selectedProductName !== formData[ORDER_FIELDS.SAN_PHAM])
+      ) {
+        setFormData((prev) => ({
+          ...prev,
+          [ORDER_FIELDS.SAN_PHAM]: "",
+          [ORDER_FIELDS.NGUON]: "",
+          [ORDER_FIELDS.GIA_NHAP]: 0,
+          [ORDER_FIELDS.GIA_BAN]: 0,
+        }));
+        setProductSearchTerm("");
+        setSupplySearchTerm("");
+        setSupplies([]);
+        setSupplyPrices([]);
+      }
+      return;
+    }
+
+    // 2. Logic Kích hoạt tính giá (Nếu xác nhận thành công)
+    setSelectedProductId(confirmedProduct.id);
     setSelectedSupplyId(null);
+    setProductSearchTerm(confirmedProduct.san_pham); // Đảm bảo input hiển thị tên đầy đủ
 
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: productName,
+      [ORDER_FIELDS.SAN_PHAM]: confirmedProduct.san_pham,
       [ORDER_FIELDS.NGUON]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0, // ĐẢM BẢO GIÁ NHẬP = 0 KHI CHỌN SẢN PHẨM
+      [ORDER_FIELDS.GIA_NHAP]: 0,
       [ORDER_FIELDS.GIA_BAN]: 0,
       [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
       [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
     }));
     setSupplies([]);
     setSupplyPrices([]);
+    setSupplySearchTerm(""); // Reset search nguồn
 
-    if (productName) {
-      fetchSuppliesByProduct(productName);
-      fetchAllSupplyPrices(productName);
+    fetchSuppliesByProduct(confirmedProduct.san_pham);
+    fetchAllSupplyPrices(confirmedProduct.san_pham);
 
-      const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
-      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
+    const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
+    const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
 
-      if (orderId && registerDate) {
-        calculatePrice(0, productName, orderId, registerDate).then((result) => {
+    if (orderId && registerDate) {
+      calculatePrice(0, confirmedProduct.san_pham, orderId, registerDate).then(
+        (result) => {
           if (result) {
             setFormData((prev) => ({
               ...prev,
-              // Ghi đè Giá Bán và Ngày, GIÁ NHẬP KHÔNG ĐƯỢC ĐIỀN (vẫn giữ 0)
               [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
@@ -363,36 +463,65 @@ const useCreateOrderLogic = (
             }));
             setIsDataLoaded(true);
           }
-        });
-      }
+        }
+      );
     } else {
       setIsDataLoaded(false);
     }
   };
 
-  // HÀM ĐÃ SỬA: handleSourceChange (Cập nhật giá nhập tham khảo và xử lý RESET)
-  const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sourceId = Number(e.target.value);
-    const selectedSupply = supplies.find((s) => s.id === sourceId);
+  // HÀM SỬA CHỮA: Xác nhận chọn Nguồn khi onBlur hoặc onClick
+  const handleSourceChange = (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => {
+    const selectedSourceName = e.target.value;
+    const confirmedSupply = supplies.find(
+      (s) => s.source_name === selectedSourceName
+    );
 
-    // 1. Logic tìm giá
+    // 1. Logic Xác nhận chọn
+    if (!confirmedSupply) {
+      // Reset nếu không khớp
+      if (selectedSourceName) {
+        setFormData((prev) => ({ ...prev, [ORDER_FIELDS.NGUON]: "" }));
+        setSelectedSupplyId(null);
+        setSupplySearchTerm("");
+      } else {
+        // Cho phép reset về giá trị rỗng ("-- Chọn Nguồn --")
+        setFormData((prev) => ({
+          ...prev,
+          [ORDER_FIELDS.NGUON]: "",
+          [ORDER_FIELDS.GIA_NHAP]: 0,
+        }));
+        setSelectedSupplyId(null);
+        setSupplySearchTerm("");
+      }
+      return;
+    }
+
+    // 2. Logic cập nhật giá (Nếu xác nhận thành công)
+    const sourceId = confirmedSupply.id;
     let newBasePrice = 0;
-    // Kiểm tra nếu sourceId hợp lệ (khác 0)
-    if (sourceId !== 0 && selectedSupply) {
+
+    if (sourceId !== 0) {
       newBasePrice =
         supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
     }
-    // Nếu sourceId là 0 (hoặc không tìm thấy), newBasePrice sẽ là 0, tức là clear Giá Nhập.
 
     setSelectedSupplyId(sourceId);
+    setSupplySearchTerm(confirmedSupply.source_name); // Đảm bảo input hiển thị tên đầy đủ
 
     setFormData((prev) => ({
       ...prev,
-      // Đảm bảo tên nguồn là rỗng nếu chọn -- Chọn Nguồn -- (sourceId=0)
-      [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-      // 2. CẬP NHẬT GIÁ NHẬP (BASE PRICE) THAM KHẢO
+      [ORDER_FIELDS.NGUON]: confirmedSupply.source_name,
       [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
     }));
+  };
+
+  // HÀM MỚI: Xử lý nút Thêm Nguồn/Sản phẩm
+  const handleAddNewProductSourceRule = () => {
+    alert("Chức năng Thêm Nguồn/Sản phẩm mới sẽ được phát triển tại đây.");
+    // Thêm logic mở modal hoặc điều hướng tại đây
   };
 
   const handleCustomerTypeChange = (
@@ -446,7 +575,19 @@ const useCreateOrderLogic = (
     handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
+    handleAddNewProductSourceRule,
     handleSubmit,
+    productSearchTerm,
+    supplySearchTerm,
+    handleSearchChange,
+    filteredProducts,
+    filteredSupplies,
+    isProductDropdownOpen,
+    setIsProductDropdownOpen,
+    isSupplyDropdownOpen,
+    setIsSupplyDropdownOpen,
+    productDropdownRef,
+    supplyDropdownRef,
   };
 };
 
@@ -470,10 +611,22 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
+    handleAddNewProductSourceRule,
     handleSubmit,
-  } = useCreateOrderLogic(isOpen, onSave);
+    productSearchTerm,
+    supplySearchTerm,
+    handleSearchChange,
+    filteredProducts,
+    filteredSupplies,
+    isProductDropdownOpen,
+    setIsProductDropdownOpen,
+    isSupplyDropdownOpen,
+    setIsSupplyDropdownOpen,
+    productDropdownRef,
+    supplyDropdownRef,
+  } = useCreateOrderLogic(isOpen, onSave); // <<< HOOK ĐƯỢC GỌI Ở ĐÂY
 
-  if (!isOpen) return null;
+  if (!isOpen) return null; // <<< IF NÀY PHẢI NẰM SAU CÁC LỜI GỌI HOOK
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
@@ -550,53 +703,124 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
               </div>
 
-              {/* Phần 2: Sản Phẩm & Nguồn */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border p-4 rounded-lg">
-                {/* 1. SẢN PHẨM */}
-                <div>
-                  <label className={labelClass}>
-                    Sản Phẩm <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name={ORDER_FIELDS.SAN_PHAM}
-                    value={formData[ORDER_FIELDS.SAN_PHAM]}
-                    onChange={handleProductChange}
-                    className={inputClass}
-                    required
-                  >
-                    <option value="">-- Chọn Sản Phẩm --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.san_pham}>
-                        {p.san_pham}
-                      </option>
-                    ))}
-                  </select>
+              {/* Phần 2: Sản Phẩm & Nguồn & Thông Tin Sản Phẩm */}
+              <div className="grid grid-cols-1 gap-6 border p-4 rounded-lg">
+                {/* Hàng 1: SẢN PHẨM và NGUỒN (Chia 2 cột) */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* 1. SẢN PHẨM */}
+                  <div className="relative" ref={productDropdownRef}>
+                    <label className={labelClass}>
+                      Sản Phẩm <span className="text-red-500">*</span>
+                    </label>
+                    {/* INPUT VÀ CUSTOM DROPDOWN CHO SẢN PHẨM */}
+                    <input
+                      type="text"
+                      name={ORDER_FIELDS.SAN_PHAM}
+                      value={
+                        productSearchTerm ||
+                        formData[ORDER_FIELDS.SAN_PHAM] ||
+                        ""
+                      }
+                      onChange={(e) => handleSearchChange(e, "product")}
+                      onFocus={() => setIsProductDropdownOpen(true)}
+                      onBlur={() =>
+                        setTimeout(() => setIsProductDropdownOpen(false), 150)
+                      }
+                      className={inputClass}
+                      placeholder="Chọn hoặc gõ tên Sản phẩm"
+                      required
+                    />
+
+                    {/* CUSTOM DROPDOWN MỚI CHO SẢN PHẨM */}
+                    {isProductDropdownOpen && filteredProducts.length > 0 && (
+                      <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1">
+                        {filteredProducts.map((p) => (
+                          <li
+                            key={p.id}
+                            className="p-2 cursor-pointer hover:bg-blue-100 text-sm"
+                            onMouseDown={(e) => {
+                              // Dùng onMouseDown để xử lý trước onBlur
+                              e.preventDefault(); // Ngăn onBlur kích hoạt ngay lập tức
+                              setProductSearchTerm(p.san_pham);
+                              handleProductChange({
+                                target: { value: p.san_pham },
+                              } as any);
+                              setIsProductDropdownOpen(false);
+                            }}
+                          >
+                            {p.san_pham}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* 2. NGUỒN + BUTTON */}
+                  <div className="relative" ref={supplyDropdownRef}>
+                    <label className={labelClass}>
+                      Nguồn <span className="text-red-500">*</span>
+                    </label>
+                    {/* INPUT FIELD VÀ BUTTON TRÊN CÙNG 1 HÀNG DÙNG FLEX */}
+                    <div className="flex items-center space-x-2">
+                      {/* INPUT VÀ CUSTOM DROPDOWN CHO NGUỒN */}
+                      <input
+                        type="text"
+                        name={ORDER_FIELDS.NGUON}
+                        value={
+                          supplySearchTerm || formData[ORDER_FIELDS.NGUON] || ""
+                        }
+                        onChange={(e) => handleSearchChange(e, "supply")}
+                        onFocus={() => setIsSupplyDropdownOpen(true)}
+                        onBlur={() =>
+                          setTimeout(() => setIsSupplyDropdownOpen(false), 150)
+                        }
+                        className={`${inputClass} flex-grow`}
+                        placeholder="Chọn hoặc gõ tên Nguồn"
+                        required
+                        disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
+                      />
+
+                      {/* CUSTOM DROPDOWN MỚI CHO NGUỒN */}
+                      {isSupplyDropdownOpen && filteredSupplies.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 top-full">
+                          {filteredSupplies.map((s) => (
+                            <li
+                              key={s.id}
+                              className="p-2 cursor-pointer hover:bg-blue-100 text-sm"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setSupplySearchTerm(s.source_name);
+                                handleSourceChange({
+                                  target: { value: s.source_name },
+                                } as any);
+                                setIsSupplyDropdownOpen(false);
+                              }}
+                            >
+                              {s.source_name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {/* BUTTON MỚI: Thêm rule */}
+                      <button
+                        type="button"
+                        onClick={handleAddNewProductSourceRule}
+                        disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
+                        className={`p-2 rounded-lg transition-colors ${
+                          formData[ORDER_FIELDS.SAN_PHAM]
+                            ? "bg-green-500 hover:bg-green-600 text-white"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* 2. NGUỒN */}
-                <div>
-                  <label className={labelClass}>
-                    Nguồn <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name={ORDER_FIELDS.NGUON}
-                    value={selectedSupplyId || ""}
-                    onChange={handleSourceChange}
-                    className={inputClass}
-                    required
-                    disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
-                  >
-                    <option value="">-- Chọn Nguồn --</option>
-                    {supplies.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.source_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3. Thông Tin Sản Phẩm */}
-                <div>
+                {/* Hàng 2: THÔNG TIN SẢN PHẨM (Full width) */}
+                <div className="col-span-full">
                   <label className={labelClass}>
                     Thông Tin Sản Phẩm <span className="text-red-500">*</span>
                   </label>

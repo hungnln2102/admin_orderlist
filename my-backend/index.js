@@ -90,7 +90,9 @@ app.get("/api/supplies/:supplyId/products", async (req, res) => {
 app.get("/api/products", async (req, res) => {
   console.log("Đã nhận yêu cầu GET /api/products (Lấy TẤT CẢ Sản phẩm)");
   const queryText = `
-    SELECT id, san_pham FROM mavryk.product_price
+    SELECT id, san_pham 
+    FROM mavryk.product_price
+    WHERE is_active = TRUE -- <<< ĐIỀU KIỆN MỚI
     ORDER BY san_pham;
   `;
   try {
@@ -121,7 +123,7 @@ app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
     FROM mavryk.supply s
     JOIN mavryk.supply_price sp ON s.id = sp.source_id
     JOIN mavryk.product_price pp ON sp.product_id = pp.id
-    WHERE pp.san_pham = $1
+    WHERE pp.san_pham = $1 AND pp.is_active = TRUE -- <<< ĐIỀU KIỆN MỚI
     ORDER BY s.source_name;
   `;
 

@@ -774,11 +774,11 @@ export default function Orders() {
 
                       {/* 3. GỘP SUPPLY + IMPORT */}
                       <td className="px-6 py-4 text-sm text-gray-900 w-[150px] text-right">
-                        <div className="flex flex-col items-end">
-                          <span className="text-gray-500 text-xs whitespace-nowrap truncate max-w-full">
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium whitespace-nowrap truncate max-w-full">
                             {order[ORDER_FIELDS.NGUON] || "N/A"}
                           </span>
-                          <span className="font-medium whitespace-nowrap truncate max-w-full">
+                          <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full">
                             {formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
                           </span>
                         </div>
