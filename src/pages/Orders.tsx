@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+// Orders.tsx - Mã đã được làm sạch
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -14,7 +16,6 @@ import {
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
 
-// Import Constants
 import { API_ENDPOINTS, ORDER_FIELDS, VIRTUAL_FIELDS } from "../constants";
 
 // Import Modal tùy chỉnh
@@ -23,7 +24,11 @@ import ViewOrderModal from "../components/ViewOrderModal";
 import EditOrderModal from "../components/EditOrderModal";
 import CreateOrderModal from "../components/CreateOrderModal";
 
-// Interface Order (dựa trên DB) - Vẫn giữ nguyên cấu trúc này
+// =======================================================
+// 1. INTERFACES VÀ CONSTANTS
+// =======================================================
+
+// Interface Order (dựa trên DB + trường ảo)
 interface Order {
   id: number;
   id_don_hang: string;
@@ -47,7 +52,7 @@ interface Order {
   [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]?: boolean | null;
 }
 
-// Cấu trúc Stats đã được cập nhật với tên mới và giá trị tạm thời
+// Cấu trúc Stats
 const stockStats = [
   {
     name: "Tổng đơn hàng",
@@ -61,12 +66,7 @@ const stockStats = [
     icon: ExclamationTriangleIcon,
     color: "bg-yellow-500",
   },
-  {
-    name: "Hết Hạn",
-    value: "0",
-    icon: ArrowDownIcon,
-    color: "bg-red-500",
-  },
+  { name: "Hết Hạn", value: "0", icon: ArrowDownIcon, color: "bg-red-500" },
   {
     name: "Đăng Ký Hôm Nay",
     value: "0",
@@ -79,17 +79,64 @@ const stockStats = [
 const parseDMY = (dateString: string): Date => {
   if (!dateString) return new Date(NaN);
   const [day, month, year] = dateString.split("/").map(Number);
-  // Tháng trong JavaScript bắt đầu từ 0
-  return new Date(year, month - 1, day);
+  return new Date(year, month - 1, day); // Tháng trong JS là 0-indexed
 };
 
-export default function Orders() {
+// Hàm Helper để kiểm tra ngày đăng ký có phải là hôm nay không (dd/mm/yyyy)
+const isRegisteredToday = (dateString: string, today: Date): boolean => {
+  if (!dateString) return false;
+  const [day, month, year] = dateString.split("/").map(Number);
+  if (!day || !month || !year) return false;
+
+  const registerDate = new Date(year, month - 1, day);
+  registerDate.setHours(0, 0, 0, 0);
+
+  return registerDate.getTime() === today.getTime();
+};
+
+const getStatusColor = (status: string) => {
+  const lowerStatus = (status || "").toLowerCase();
+  switch (lowerStatus) {
+    case "đã thanh toán":
+      return "bg-green-100 text-green-800";
+    case "chưa thanh toán":
+    case "cần gia hạn": // Thêm trạng thái này cho trực quan
+      return "bg-yellow-100 text-yellow-800";
+    case "hết hạn":
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+const formatCurrency = (value: number | string) => {
+  const num = Number(value) || 0;
+  const roundedNum = Math.round(num);
+  return roundedNum.toLocaleString("vi-VN") + " " + "đ";
+};
+
+// =======================================================
+// 2. CUSTOM HOOK: useOrdersData
+// =======================================================
+
+// Hàm Helper để gán giá trị ưu tiên cho trạng thái sắp xếp
+const getStatusPriority = (status: string): number => {
+  const lowerStatus = status.toLowerCase();
+  if (lowerStatus === "hết hạn") return 1;
+  if (lowerStatus === "cần gia hạn") return 2;
+  if (lowerStatus === "chưa thanh toán") return 3;
+  if (lowerStatus === "đã thanh toán") return 4;
+  return 5; // Giá trị mặc định thấp nhất
+};
+
+const useOrdersData = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [isModalOpen, setIsModalOpen] = useState(false); // Confirm Delete
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -97,64 +144,230 @@ export default function Orders() {
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  // Hàm Helper để kiểm tra ngày đăng ký có phải là hôm nay không (dd/mm/yyyy)
-  const isRegisteredToday = (dateString: string): boolean => {
-    if (!dateString) return false;
-    const [day, month, year] = dateString.split("/").map(Number);
-    if (!day || !month || !year) return false;
-
-    const registerDate = new Date(year, month - 1, day);
-    // Chuẩn hóa giờ về 0:0:0:0 để so sánh chỉ ngày
-    registerDate.setHours(0, 0, 0, 0);
-
-    return registerDate.getTime() === today.getTime();
-  };
-
-  // useEffect để tải dữ liệu ban đầu
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        // SỬ DỤNG HẰNG SỐ API
-        const response = await fetch(
-          `http://localhost:3001${API_ENDPOINTS.ORDERS}`
-        );
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setOrders(data);
-        } else {
-          console.error("Dữ liệu nhận được không phải là mảng:", data);
-        }
-      } catch (error) {
-        console.error("Lỗi khi tải đơn hàng:", error);
-      }
-    };
-
-    fetchOrders();
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
   }, []);
 
-  // --- Hàm xử lý cho Modal Tạo Mới ---
+  // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
+  const fetchOrders = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001${API_ENDPOINTS.ORDERS}`
+      );
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else {
+        console.error("Dữ liệu nhận được không phải là mảng:", data);
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải đơn hàng:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // --- LOGIC TÍNH TOÁN CÁC TRƯỜNG ẢO VÀ LỌC ---
+  const calculatedData = useMemo(() => {
+    const ordersWithVirtualFields: Order[] = orders.map((order) => {
+      const expirationDate = parseDMY(order[ORDER_FIELDS.HET_HAN]);
+      const diffTime = expirationDate.getTime() - today.getTime();
+      let soNgayConLai = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (isNaN(soNgayConLai)) soNgayConLai = 0;
+
+      const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán";
+      let trangThaiText = "";
+      let check_flag_status: boolean | null = null;
+
+      if (soNgayConLai <= 0) {
+        trangThaiText = "Hết Hạn";
+        check_flag_status = null;
+        soNgayConLai = 0;
+      } else if (soNgayConLai <= 4 && soNgayConLai > 0) {
+        trangThaiText = "Cần Gia Hạn"; // Trạng thái này giúp lọc/hiển thị rõ ràng hơn
+        check_flag_status = null;
+      } else {
+        trangThaiText = dbStatus;
+        check_flag_status = dbStatus.toLowerCase() === "đã thanh toán";
+      }
+
+      const giaBan = Number(order[ORDER_FIELDS.GIA_BAN]) || 0;
+      const soNgayDangKy = Number(order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
+      let giaTriConLai = 0;
+      if (soNgayDangKy > 0) {
+        giaTriConLai = (giaBan * soNgayConLai) / soNgayDangKy;
+      }
+
+      return {
+        ...order,
+        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
+        [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
+        [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
+        [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
+      } as Order;
+    });
+
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filteredOrders = ordersWithVirtualFields.filter((order) => {
+      const matchesSearch =
+        (order[ORDER_FIELDS.KHACH_HANG] || "")
+          .toLowerCase()
+          .includes(lowerSearchTerm) ||
+        (order[ORDER_FIELDS.ID_DON_HANG] || "")
+          .toLowerCase()
+          .includes(lowerSearchTerm) ||
+        (order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || "")
+          .toLowerCase()
+          .includes(lowerSearchTerm);
+
+      let matchesStatus = statusFilter === "all";
+
+      // Lọc theo trạng thái ảo
+      if (!matchesStatus) {
+        const statusText = (
+          order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || ""
+        ).toLowerCase();
+        const filterLower = statusFilter.toLowerCase();
+
+        if (
+          filterLower === "chưa thanh toán" &&
+          statusText === "chưa thanh toán"
+        ) {
+          matchesStatus = true;
+        } else if (
+          filterLower === "đã thanh toán" &&
+          statusText === "đã thanh toán"
+        ) {
+          matchesStatus = true;
+        } else if (filterLower === "hết hạn" && statusText === "hết hạn") {
+          matchesStatus = true;
+        } else if (
+          filterLower === "cần gia hạn" &&
+          statusText === "cần gia hạn"
+        ) {
+          matchesStatus = true;
+        }
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+
+    // --- LOGIC SẮP XẾP ---
+    filteredOrders.sort((a, b) => {
+      const statusA = a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
+      const statusB = b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
+
+      // 1. Sắp xếp CHÍNH theo Trạng thái (Priority: 1 -> 4)
+      const priorityA = getStatusPriority(statusA);
+      const priorityB = getStatusPriority(statusB);
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB; // Sắp xếp từ ưu tiên cao (số nhỏ) đến thấp
+      }
+
+      // 2. Sắp xếp PHỤ theo Số Ngày Còn Lại (từ nhỏ đến lớn)
+      const remainingA = a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] || 0;
+      const remainingB = b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] || 0;
+
+      if (remainingA !== remainingB) {
+        return remainingA - remainingB; // Sắp xếp số từ nhỏ đến lớn
+      }
+
+      // 3. Sắp xếp PHỤ theo ID Đơn Hàng (từ nhỏ đến lớn) nếu 2 mục trên bằng nhau
+      const idA = a[ORDER_FIELDS.ID_DON_HANG] || "";
+      const idB = b[ORDER_FIELDS.ID_DON_HANG] || "";
+
+      if (idA < idB) return -1;
+      if (idA > idB) return 1;
+
+      return 0;
+    });
+
+    // Tính toán Stats
+    const totalOrders = ordersWithVirtualFields.length;
+    const needsRenewal = ordersWithVirtualFields.filter(
+      (order) =>
+        order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] > 0 &&
+        order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 4
+    ).length;
+    const expiredOrders = ordersWithVirtualFields.filter(
+      (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
+    ).length;
+    const registeredTodayCount = ordersWithVirtualFields.filter((order) =>
+      isRegisteredToday(order[ORDER_FIELDS.NGAY_DANG_KI], today)
+    ).length;
+
+    // Cập nhật mảng stats
+    const updatedStats = [
+      { ...stockStats[0], value: String(totalOrders) },
+      { ...stockStats[1], value: String(needsRenewal) },
+      { ...stockStats[2], value: String(expiredOrders) },
+      { ...stockStats[3], value: String(registeredTodayCount) },
+    ];
+
+    // Phân trang
+    const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+    const indexOfLastRow = currentPage * rowsPerPage;
+    const indexOfFirstRow = indexOfLastRow - rowsPerPage;
+    const currentOrders = filteredOrders.slice(indexOfFirstRow, indexOfLastRow);
+
+    return { filteredOrders, currentOrders, totalPages, updatedStats };
+  }, [orders, searchTerm, statusFilter, rowsPerPage, currentPage, today]);
+
+  // Reset trang khi lọc/tìm kiếm thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, rowsPerPage]);
+
+  // --- HÀM XỬ LÝ MODAL VÀ CRUD ---
+
+  // Modals
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
+  const closeViewModal = () => {
+    setIsViewModalOpen(false);
+    setOrderToView(null);
+  };
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setOrderToEdit(null);
+  };
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setOrderToDelete(null);
+  };
 
-  // Hàm MỚI cho View Modal (để hiển thị đơn hàng vừa tạo)
-  const openViewModal = (order: Order) => {
+  // Hành động
+  const handleViewOrder = (order: Order) => {
     setOrderToView(order);
     setIsViewModalOpen(true);
   };
 
+  const handleEditOrder = (order: Order) => {
+    setOrderToEdit(order);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteOrder = (order: Order) => {
+    setOrderToDelete(order);
+    setIsModalOpen(true);
+  };
+
+  // Lưu đơn hàng mới
   const handleSaveNewOrder = async (newOrderData: Partial<Order>) => {
-    console.log("Tạo đơn hàng mới:", newOrderData);
     closeCreateModal();
 
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDERS}`, // POST không cần ID
+        `http://localhost:3001${API_ENDPOINTS.ORDERS}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -173,8 +386,8 @@ export default function Orders() {
       // Cập nhật danh sách orders trên frontend
       setOrders((prevOrders) => [createdOrder, ...prevOrders]);
 
-      // 🛑 THAY THẾ ALERT BẰNG VIỆC MỞ MODAL VIEW 🛑
-      openViewModal(createdOrder);
+      // Mở Modal View cho đơn hàng vừa tạo
+      handleViewOrder(createdOrder);
     } catch (error) {
       console.error("Lỗi khi tạo đơn hàng:", error);
       alert(
@@ -185,83 +398,11 @@ export default function Orders() {
     }
   };
 
-  // --- Hàm xử lý cho Modal Edit/Delete ---
-
-  const handleViewOrder = (orderWithVirtualFields: Order) => {
-    console.log(
-      "Mở modal xem chi tiết cho đơn hàng ID:",
-      orderWithVirtualFields.id
-    );
-    setOrderToView(orderWithVirtualFields);
-    setIsViewModalOpen(true);
-  };
-
-  const handleEditOrder = (orderToEdit: Order) => {
-    // SỬA: Nhận đủ object Order
-    console.log("Mở modal sửa cho đơn hàng ID:", orderToEdit.id);
-    setOrderToEdit(orderToEdit);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteOrder = (order: Order) => {
-    console.log("Mở modal xác nhận xóa cho đơn hàng ID:", order.id);
-    setOrderToDelete(order);
-    setIsModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!orderToDelete) return;
-
-    console.log("Xác nhận xóa đơn hàng ID:", orderToDelete.id);
-    setIsModalOpen(false);
-
-    try {
-      // SỬ DỤNG HẰNG SỐ API
-      const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id)}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Lỗi khi xóa đơn hàng từ server");
-      }
-
-      setOrders((prevOrders) =>
-        prevOrders.filter((order) => order.id !== orderToDelete.id)
-      );
-      console.log(`Đã xóa đơn hàng ID ${orderToDelete.id} thành công.`);
-      // TODO: Hiển thị thông báo thành công
-    } catch (error) {
-      console.error("Lỗi khi xóa đơn hàng:", error);
-      alert(
-        `Lỗi khi xóa đơn hàng: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setOrderToDelete(null);
-    }
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setOrderToDelete(null);
-  };
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-    setOrderToEdit(null);
-  };
-
-  // --- HÀM CẬP NHẬT ĐÃ SỬA ĐỂ LỌC BỎ TRƯỜNG ẢO (SỬ DỤNG HẰNG SỐ) ---
+  // Lưu đơn hàng đã chỉnh sửa
   const handleSaveEdit = async (updatedOrder: Order) => {
-    console.log("Lưu đơn hàng đã chỉnh sửa:", updatedOrder);
-    closeEditModal(); // Đóng modal ngay lập tức
+    closeEditModal();
 
-    // Lọc bỏ các trường ảo (virtual fields) trước khi gửi
+    // Lọc bỏ các trường ảo trước khi gửi
     const dbFields: Partial<Order> = {
       [ORDER_FIELDS.ID_DON_HANG]: updatedOrder.id_don_hang,
       [ORDER_FIELDS.SAN_PHAM]: updatedOrder.san_pham,
@@ -277,19 +418,16 @@ export default function Orders() {
       [ORDER_FIELDS.GIA_BAN]: updatedOrder.gia_ban,
       [ORDER_FIELDS.NOTE]: updatedOrder.note,
       [ORDER_FIELDS.TINH_TRANG]: updatedOrder.tinh_trang,
-      // KHÔNG BAO GỒM VIRTUAL_FIELDS
+      [ORDER_FIELDS.CHECK_FLAG]: updatedOrder.check_flag,
     };
 
     try {
-      // SỬ DỤNG HẰNG SỐ API
       const response = await fetch(
         `http://localhost:3001${API_ENDPOINTS.ORDER_BY_ID(updatedOrder.id)}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(dbFields), // <-- CHỈ GỬI CÁC TRƯỜNG CỦA DB
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dbFields),
         }
       );
       if (!response.ok) {
@@ -305,8 +443,6 @@ export default function Orders() {
           order.id === updatedOrder.id ? updatedOrder : order
         )
       );
-      console.log(`Đã cập nhật đơn hàng ID ${updatedOrder.id} thành công.`);
-      // TODO: Hiển thị thông báo thành công
     } catch (error) {
       console.error("Lỗi khi cập nhật đơn hàng:", error);
       alert(
@@ -317,140 +453,115 @@ export default function Orders() {
     }
   };
 
-  // --- Các hàm Helper (Giữ nguyên) ---
+  // Xác nhận xóa
+  const confirmDelete = async () => {
+    if (!orderToDelete) return;
+    setIsModalOpen(false);
 
-  const getStatusColor = (status: string) => {
-    const lowerStatus = (status || "").toLowerCase();
-    switch (lowerStatus) {
-      case "đã thanh toán":
-        return "bg-green-100 text-green-800";
-      case "chưa thanh toán":
-        return "bg-yellow-100 text-yellow-800";
-      case "hết hạn":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+    try {
+      const response = await fetch(
+        `http://localhost:3001${API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id)}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Lỗi khi xóa đơn hàng từ server");
+      }
+
+      setOrders((prevOrders) =>
+        prevOrders.filter((order) => order.id !== orderToDelete.id)
+      );
+    } catch (error) {
+      console.error("Lỗi khi xóa đơn hàng:", error);
+      alert(
+        `Lỗi khi xóa đơn hàng: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setOrderToDelete(null);
     }
   };
 
-  const formatCurrency = (value: number | string) => {
-    const num = Number(value) || 0;
-    const roundedNum = Math.round(num);
-    return roundedNum.toLocaleString("vi-VN") + " " + "đ";
+  return {
+    // Data & Logic
+    ...calculatedData,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+
+    // Modal State
+    isModalOpen,
+    isViewModalOpen,
+    isEditModalOpen,
+    isCreateModalOpen,
+    orderToView,
+    orderToDelete,
+    orderToEdit,
+
+    // Modal Actions
+    openCreateModal,
+    closeCreateModal,
+    closeViewModal,
+    closeEditModal,
+    closeModal,
+    handleViewOrder,
+    handleEditOrder,
+    handleDeleteOrder,
+    handleSaveNewOrder,
+    handleSaveEdit,
+    confirmDelete,
   };
+};
 
-  const closeViewModal = () => {
-    setIsViewModalOpen(false);
-    setOrderToView(null);
-  };
+// =======================================================
+// 3. COMPONENT CHÍNH (Chỉ là UI)
+// =======================================================
 
-  // --- Logic Tính toán & Lọc (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
-
-  const ordersWithVirtualFields = orders.map((order) => {
-    const expirationDate = parseDMY(order[ORDER_FIELDS.HET_HAN]); // SỬ DỤNG HẰNG SỐ
-    const diffTime = expirationDate.getTime() - today.getTime();
-    let soNgayConLai = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (isNaN(soNgayConLai)) soNgayConLai = 0;
-
-    const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán"; // SỬ DỤNG HẰNG SỐ
-    let trangThaiText = "";
-    let check_flag_status: boolean | null = null;
-
-    if (soNgayConLai <= 0) {
-      trangThaiText = "Hết Hạn";
-      check_flag_status = null;
-      soNgayConLai = 0;
-    } else if (soNgayConLai <= 4) {
-      trangThaiText = "Chưa Thanh Toán";
-      check_flag_status = null;
-    } else {
-      trangThaiText = dbStatus;
-      check_flag_status = dbStatus.toLowerCase() === "đã thanh toán";
-    }
-
-    const giaBan = Number(order[ORDER_FIELDS.GIA_BAN]) || 0; // SỬ DỤNG HẰNG SỐ
-    const soNgayDangKy = Number(order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0; // SỬ DỤNG HẰNG SỐ
-    let giaTriConLai = 0;
-    if (soNgayDangKy > 0) {
-      giaTriConLai = (giaBan * soNgayConLai) / soNgayDangKy;
-    }
-
-    return {
-      ...order,
-      [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
-      [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
-      [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
-      [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
-    } as Order; // Cast lại về Order để khớp với interface
-  });
-
-  // --- Tính toán giá trị cho Stats (Sử dụng VIRTUAL_FIELDS) ---
-  const totalOrders = ordersWithVirtualFields.length;
-  // Cần Gia Hạn: Ngày còn lại > 0 và <= 4
-  const needsRenewal = ordersWithVirtualFields.filter(
-    (order) =>
-      order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] > 0 &&
-      order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 4
-  ).length;
-  // Hết Hạn: Ngày còn lại <= 0
-  const expiredOrders = ordersWithVirtualFields.filter(
-    (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
-  ).length;
-  // Đăng Ký Hôm Nay: Ngày đăng ký là ngày hôm nay
-  const registeredToday = ordersWithVirtualFields.filter((order) =>
-    isRegisteredToday(order[ORDER_FIELDS.NGAY_DANG_KI])
-  ).length;
-
-  // Cập nhật mảng stats với giá trị đã tính toán (Giữ nguyên)
-  const updatedStats = [
-    {
-      ...stockStats[0],
-      value: String(totalOrders),
-    },
-    {
-      ...stockStats[1],
-      value: String(needsRenewal),
-    },
-    {
-      ...stockStats[2],
-      value: String(expiredOrders),
-    },
-    {
-      ...stockStats[3],
-      value: String(registeredToday),
-    },
-  ];
-
-  // --- Logic Lọc (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
-
-  const filteredOrders = ordersWithVirtualFields.filter((order) => {
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const matchesSearch =
-      (order[ORDER_FIELDS.KHACH_HANG] || "")
-        .toLowerCase()
-        .includes(lowerSearchTerm) ||
-      (order[ORDER_FIELDS.ID_DON_HANG] || "")
-        .toLowerCase()
-        .includes(lowerSearchTerm) ||
-      (order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || "")
-        .toLowerCase()
-        .includes(lowerSearchTerm);
-    const matchesStatus =
-      statusFilter === "all" ||
-      (order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").toLowerCase() ===
-        statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
-  });
-
-  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
-  const indexOfLastRow = currentPage * rowsPerPage;
-  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-  const currentOrders = filteredOrders.slice(indexOfFirstRow, indexOfLastRow);
+export default function Orders() {
+  const {
+    currentOrders,
+    totalPages,
+    updatedStats,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    isModalOpen,
+    isViewModalOpen,
+    isEditModalOpen,
+    isCreateModalOpen,
+    orderToView,
+    orderToDelete,
+    orderToEdit,
+    openCreateModal,
+    closeCreateModal,
+    closeViewModal,
+    closeEditModal,
+    closeModal,
+    handleViewOrder,
+    handleEditOrder,
+    handleDeleteOrder,
+    handleSaveNewOrder,
+    handleSaveEdit,
+    confirmDelete,
+    filteredOrders, // Dùng để hiển thị tổng số dòng
+  } = useOrdersData();
 
   // --- Render Giao diện (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
   return (
     <div className="space-y-6">
-      {/* Header (Giữ nguyên) */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn hàng</h1>
@@ -460,7 +571,7 @@ export default function Orders() {
         </div>
         <div className="mt-4 sm:mt-0">
           <button
-            onClick={openCreateModal} // <-- Mở modal Tạo Mới
+            onClick={openCreateModal}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
@@ -469,7 +580,7 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Stats (Giữ nguyên) */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {updatedStats.map((stat) => (
           <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
@@ -486,7 +597,7 @@ export default function Orders() {
         ))}
       </div>
 
-      {/* Filters (Giữ nguyên) */}
+      {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
@@ -511,14 +622,16 @@ export default function Orders() {
               <option value="all">Tất cả trạng thái</option>
               <option value="Đã Thanh Toán">Đã Thanh Toán</option>
               <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
+              <option value="Cần Gia Hạn">Cần Gia Hạn</option>
               <option value="Hết Hạn">Hết Hạn</option>
             </select>
           </div>
-          {/* Date Range */}
+          {/* Date Range - Tạm thời chưa có logic */}
           <div>
             <input
               type="date"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled
             />
           </div>
         </div>
@@ -527,67 +640,61 @@ export default function Orders() {
       {/* Orders Table */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            {/* thead (Giữ nguyên) */}
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+            {/* thead: Áp dụng width cố định, whitespace-nowrap và truncate, text-center */}
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ORDER
+                {/* 1. GỘP ORDER + PRODUCT */}
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px] whitespace-nowrap truncate">
+                  ORDER/PRODUCT
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PRODUCT
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px] whitespace-nowrap truncate">
                   INFORMATION
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  CUSTOMER
+                {/* 2. GỘP CUSTOMER + CONTACT */}
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px] whitespace-nowrap truncate">
+                  CUSTOMER/CONTACT
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  CONTACT
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
                   Slot
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] whitespace-nowrap truncate">
                   ORDER DATE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] whitespace-nowrap truncate">
                   DAYS
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   EXPIRED
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px] whitespace-nowrap truncate">
                   REMAINING
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SUPPLY
+                {/* 3. GỘP SUPPLY + IMPORT */}
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
+                  SUPPLY/IMPORT
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  IMPORT
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px] whitespace-nowrap truncate">
                   PRICE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px] whitespace-nowrap truncate">
                   Residual Value
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px] whitespace-nowrap truncate">
                   NOTE
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] whitespace-nowrap truncate">
                   STATUS
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] whitespace-nowrap truncate">
                   Check
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px] whitespace-nowrap truncate">
                   ACTION
                 </th>
               </tr>
             </thead>
-            {/* tbody */}
+            {/* tbody: Áp dụng text-center và text-right cho các cột cụ thể */}
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOrders.length === 0 ? (
                 <tr>
@@ -610,58 +717,90 @@ export default function Orders() {
                   } = order;
                   return (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      {/* Cột 1-9 (Sử dụng ORDER_FIELDS) */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {order[ORDER_FIELDS.ID_DON_HANG] || ""}
+                      {/* 1. GỘP ORDER + PRODUCT */}
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 w-[180px] text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="font-bold whitespace-nowrap truncate max-w-full">
+                            {order[ORDER_FIELDS.ID_DON_HANG] || ""}
+                          </span>
+                          <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full">
+                            {order[ORDER_FIELDS.SAN_PHAM] || ""}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
-                        {order[ORDER_FIELDS.SAN_PHAM] || ""}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+
+                      {/* INFORMATION (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[120px] text-center">
                         {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order[ORDER_FIELDS.KHACH_HANG] || ""}
+
+                      {/* 2. GỘP CUSTOMER + CONTACT */}
+                      <td className="px-6 py-4 text-sm text-gray-900 w-[200px] text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium whitespace-nowrap truncate max-w-full">
+                            {order[ORDER_FIELDS.KHACH_HANG] || ""}
+                          </span>
+                          <span
+                            className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full"
+                            title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                          >
+                            {order[ORDER_FIELDS.LINK_LIEN_HE] ||
+                              "Chưa có liên hệ"}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                        {order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate">
+
+                      {/* SLOT (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[60px] text-center">
                         {order[ORDER_FIELDS.SLOT] || ""}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+
+                      {/* ORDER DATE (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[100px] text-center">
                         {order[ORDER_FIELDS.NGAY_DANG_KI] || ""}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* DAYS (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[50px] text-center">
                         {order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || ""}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* EXPIRED (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[90px] text-center">
                         {order[ORDER_FIELDS.HET_HAN] || ""}
                       </td>
-                      {/* Cột 10 (Sử dụng VIRTUAL_FIELDS) */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* REMAINING (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm font-bold text-indigo-600 w-[70px] text-center">
                         {soNgayConLai}
                       </td>
-                      {/* Cột 11 */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                        {order[ORDER_FIELDS.NGUON] || ""}
+
+                      {/* 3. GỘP SUPPLY + IMPORT */}
+                      <td className="px-6 py-4 text-sm text-gray-900 w-[150px] text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="text-gray-500 text-xs whitespace-nowrap truncate max-w-full">
+                            {order[ORDER_FIELDS.NGUON] || "N/A"}
+                          </span>
+                          <span className="font-medium whitespace-nowrap truncate max-w-full">
+                            {formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
+                          </span>
+                        </div>
                       </td>
-                      {/* Cột 12-14 */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+
+                      {/* PRICE (text-right) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[110px] text-right">
                         {formatCurrency(order[ORDER_FIELDS.GIA_BAN])}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+
+                      {/* RESIDUAL VALUE (text-right) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[120px] text-right">
                         {formatCurrency(giaTriConLai)}
                       </td>
-                      {/* Cột 15 */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+
+                      {/* NOTE (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[70px] text-center">
                         {order[ORDER_FIELDS.NOTE] || ""}
                       </td>
-                      {/* Cột 16 */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+
+                      {/* STATUS (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate w-[100px] text-center">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
                             trangThaiText
@@ -670,8 +809,9 @@ export default function Orders() {
                           {trangThaiText}
                         </span>
                       </td>
-                      {/* Cột 17 */}
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+
+                      {/* CHECK (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-center w-[50px]">
                         {check_flag_status !== null && (
                           <input
                             type="checkbox"
@@ -681,26 +821,22 @@ export default function Orders() {
                           />
                         )}
                       </td>
-                      {/* Cột 18 (Hành động) */}
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex space-x-2">
-                          {/* Nút VIEW (Giữ nguyên) */}
+
+                      {/* ACTION (text-right) */}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-right text-sm font-medium w-[110px]">
+                        <div className="flex space-x-2 justify-end">
                           <button
                             onClick={() => handleViewOrder(order)}
                             className="text-blue-600 hover:text-blue-900 p-1 rounded"
                           >
                             <EyeIcon className="h-4 w-4" />
                           </button>
-
-                          {/* Nút EDIT: Đảm bảo truyền đối tượng 'order' đầy đủ */}
                           <button
                             onClick={() => handleEditOrder(order)}
                             className="text-green-600 hover:text-green-900 p-1 rounded"
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
-
-                          {/* Nút DELETE (Giữ nguyên) */}
                           <button
                             onClick={() => handleDeleteOrder(order)}
                             className="text-red-600 hover:text-red-900 p-1 rounded"
@@ -717,7 +853,7 @@ export default function Orders() {
           </table>
         </div>
 
-        {/* Thanh Phân trang (Giữ nguyên) */}
+        {/* Thanh Phân trang */}
         {filteredOrders.length > 0 && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
             {/* Bộ chọn số dòng / trang */}
@@ -726,10 +862,7 @@ export default function Orders() {
               <select
                 id="rowsPerPage"
                 value={rowsPerPage}
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => setRowsPerPage(Number(e.target.value))}
                 className="rounded-md border border-gray-300 py-1 pl-2 pr-7 text-gray-700 focus:border-blue-500 focus:ring-blue-500"
               >
                 <option value={10}>10</option>
@@ -765,7 +898,7 @@ export default function Orders() {
         )}
       </div>
 
-      {/* Render Modal Xác nhận Xóa */}
+      {/* Modals */}
       <ConfirmModal
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -788,7 +921,7 @@ export default function Orders() {
       <CreateOrderModal
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
-        onSave={handleSaveNewOrder} // <-- Truyền hàm lưu đơn hàng mới
+        onSave={handleSaveNewOrder}
       />
     </div>
   );

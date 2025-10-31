@@ -4,15 +4,25 @@ export const API_ENDPOINTS = {
   ORDER_EXPRIED: "/api/orders-expried",
 
   SUPPLIES: "/api/supplies",
-  PRODUCTS: "/api/products",
-  PRODUCTS_BY_SUPPLY: (supplyId: number) =>
-    `/api/supplies/${supplyId}/products`,
+  // SỬA CHỮA: Đổi tên PRODUCTS thành PRODUCTS_ALL để rõ ràng, nhưng vì logic fetch Products
+  // trong file CreateOrderModal đã được viết để gọi endpoint này, chúng ta sẽ giữ lại:
+  // PRODUCTS: "/api/products",
+
+  // Endpoint cũ (không dùng nữa):
+  // PRODUCTS_BY_SUPPLY: (supplyId: number) =>
+  //  `/api/supplies/${supplyId}/products`,
+
   CALCULATE_PRICE: "/api/calculate-price",
 
-  PRODUCTS_ALL: "/api/products/all",
-  SUPPLIES_BY_PRODUCT: (productId: number) =>
-    `/api/products/${productId}/supplies`,
+  // 1. Dùng PRODUCTS_ALL cho việc fetch tất cả sản phẩm khi mở modal (tạm thời không đổi tên)
+  PRODUCTS_ALL: "/api/products", // Giả định /api/products trả về tất cả
 
+  // 2. SỬA CHỮA LỖI LỚN NHẤT: Hàm này phải nhận TÊN SẢN PHẨM (string)
+  // và endpoint cần được điều chỉnh (Giả sử backend chấp nhận tên sản phẩm trong URL)
+  SUPPLIES_BY_PRODUCT: (productName: string) =>
+    `/api/products/supplies-by-name/${encodeURIComponent(productName)}`, // Sửa đổi endpoint
+
+  // GIỮ NGUYÊN các định nghĩa không liên quan trực tiếp đến lỗi
   PAYMENT_RECEIPTS: "/api/payment-receipts",
   PURCHASE_ORDERS: "/api/purchase-orders",
   REFUNDS: "/api/refunds",

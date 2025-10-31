@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from "react";
-// Import các hằng số cần thiết
+// EditOrderModal.tsx - Mã đã được làm sạch
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 
-// Interface Order (Giữ nguyên)
+// =======================================================
+// 1. INTERFACES VÀ HELPER FUNCTIONS
+// =======================================================
+
 interface Order {
   id: number;
   id_don_hang: string;
@@ -22,7 +26,6 @@ interface Order {
   check_flag: boolean;
 }
 
-// Interface cho dữ liệu Dropdown từ Backend
 interface Supply {
   id: number;
   source_name: string;
@@ -33,12 +36,11 @@ interface Product {
   san_pham: string;
 }
 
-// Interface cho dữ liệu trả về từ API tính toán giá (Đã định nghĩa ở bước trước)
 interface CalculatedPriceResult {
   gia_nhap: number;
   gia_ban: number;
   so_ngay_da_dang_ki: number;
-  het_han: string; // Thực tế frontend sẽ tự tính, nhưng vẫn giữ trường này
+  het_han: string;
 }
 
 interface EditOrderModalProps {
@@ -65,7 +67,6 @@ const calculateExpirationDate = (
 ): string => {
   if (!registerDateStr || days <= 0) return "N/A";
 
-  // Chuyển chuỗi dd/mm/yyyy sang Date
   const parts = registerDateStr.split("/");
   if (parts.length !== 3) return "N/A";
 
@@ -73,14 +74,10 @@ const calculateExpirationDate = (
   const month = parseInt(parts[1], 10);
   const year = parseInt(parts[2], 10);
 
-  // Tạo đối tượng Date (tháng trong JS là 0-indexed)
   const date = new Date(year, month - 1, day);
-
-  // Cộng thêm số ngày (days)
   // -1 vì ngày đăng ký là ngày đầu tiên
   date.setDate(date.getDate() + days - 1);
 
-  // Định dạng lại thành dd/mm/yyyy
   const newDay = String(date.getDate()).padStart(2, "0");
   const newMonth = String(date.getMonth() + 1).padStart(2, "0");
   const newYear = date.getFullYear();
@@ -93,64 +90,34 @@ const formatCurrency = (value: number) => {
   return (Number(value) || 0).toLocaleString("vi-VN") + " đ";
 };
 
-const EditOrderModal: React.FC<EditOrderModalProps> = ({
-  isOpen,
-  onClose,
-  order,
-  onSave,
-}) => {
+// =======================================================
+// 2. CUSTOM HOOK: useEditOrderLogic
+// =======================================================
+
+const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<Order | null>(order);
-  const [supplies, setSupplies] = useState<Supply[]>([]); // Danh sách nguồn
-  const [products, setProducts] = useState<Product[]>([]); // Danh sách sản phẩm
-  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null); // ID của nguồn đang chọn
+  const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null);
 
-  // 1. Tải danh sách nguồn (Supplies) và thiết lập state ban đầu
-  useEffect(() => {
-    const fetchSupplies = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:3001${API_ENDPOINTS.SUPPLIES}`
-        );
-        if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
-        const data: Supply[] = await response.json();
-        setSupplies(data);
-      } catch (error) {
-        console.error("Lỗi tải nguồn:", error);
-      }
-    };
-    if (isOpen && supplies.length === 0) {
-      fetchSupplies();
+  // --- HÀM FETCH DỮ LIỆU ---
+
+  const fetchSupplies = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001${API_ENDPOINTS.SUPPLIES}`
+      );
+      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
+      const data: Supply[] = await response.json();
+      setSupplies(data);
+      return data;
+    } catch (error) {
+      console.error("Lỗi tải nguồn:", error);
+      return [];
     }
-  }, [isOpen, supplies.length]);
+  }, []);
 
-  // 2. Cập nhật formData và ID Nguồn khi order/supplies thay đổi
-  useEffect(() => {
-    if (order && supplies.length > 0) {
-      // Đảm bảo các giá trị số là Number
-      const newFormData = {
-        ...order,
-        [ORDER_FIELDS.GIA_NHAP]: Number(order.gia_nhap) || 0,
-        [ORDER_FIELDS.GIA_BAN]: Number(order.gia_ban) || 0,
-        [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]:
-          Number(order.so_ngay_da_dang_ki) || 0,
-      } as Order;
-      setFormData(newFormData);
-
-      // Cập nhật ID nguồn ban đầu để tải sản phẩm
-      const initialSupply = supplies.find((s) => s.source_name === order.nguon);
-      if (initialSupply) {
-        setSelectedSourceId(initialSupply.id);
-        fetchProductsBySupply(initialSupply.id);
-      } else {
-        // Nếu không tìm thấy ID nguồn, đặt về null và reset sản phẩm
-        setSelectedSourceId(null);
-        setProducts([]);
-      }
-    }
-  }, [order, supplies]);
-
-  // 3. Hàm tải sản phẩm theo ID nguồn
-  const fetchProductsBySupply = async (supplyId: number) => {
+  const fetchProductsBySupply = useCallback(async (supplyId: number) => {
     try {
       const response = await fetch(
         `http://localhost:3001${API_ENDPOINTS.PRODUCTS_BY_SUPPLY(supplyId)}`
@@ -162,67 +129,115 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
       console.error("Lỗi tải sản phẩm theo nguồn:", error);
       setProducts([]);
     }
-  };
+  }, []);
 
-  // 4. HÀM GỌI API TÍNH TOÁN GIÁ MỚI
-  const calculatePrice = async (
-    supplyId: number,
-    productName: string,
-    orderIdDonHang: string,
-    registerDateStr: string
-  ) => {
-    if (!supplyId || !productName || !orderIdDonHang) return;
+  // HÀM GỌI API TÍNH TOÁN GIÁ MỚI
+  const calculatePrice = useCallback(
+    async (
+      supplyId: number,
+      productName: string,
+      orderIdDonHang: string,
+      registerDateStr: string
+    ) => {
+      if (!supplyId || !productName || !orderIdDonHang) return;
 
-    try {
-      const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.CALCULATE_PRICE}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            supply_id: supplyId,
-            san_pham_name: productName,
-            id_don_hang: orderIdDonHang,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Lỗi tính toán giá từ server.");
-      }
-
-      const result: CalculatedPriceResult = await response.json();
-
-      // --- LOGIC CẬP NHẬT FORM SAU KHI TÍNH TOÁN ---
-      setFormData((prev) => {
-        if (!prev) return null;
-
-        const newDays = result.so_ngay_da_dang_ki;
-        const newExpirationDate = calculateExpirationDate(
-          registerDateStr,
-          newDays
+      try {
+        const response = await fetch(
+          `http://localhost:3001${API_ENDPOINTS.CALCULATE_PRICE}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              supply_id: supplyId,
+              san_pham_name: productName,
+              id_don_hang: orderIdDonHang,
+            }),
+          }
         );
 
-        return {
-          ...prev,
-          [ORDER_FIELDS.GIA_NHAP]: Number(result.gia_nhap),
-          [ORDER_FIELDS.GIA_BAN]: Number(result.gia_ban),
-          [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(newDays), // Lưu dưới dạng chuỗi như trong DB
-          [ORDER_FIELDS.HET_HAN]: newExpirationDate,
-        };
-      });
-    } catch (error) {
-      console.error("Lỗi khi tính toán giá:", error);
-      alert(
-        `Lỗi khi tính toán giá: ${
-          error instanceof Error ? error.message : "Lỗi không xác định"
-        }`
-      );
-    }
-  };
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Lỗi tính toán giá từ server.");
+        }
 
-  // 5. Xử lý thay đổi Nguồn
+        const result: CalculatedPriceResult = await response.json();
+
+        // --- LOGIC CẬP NHẬT FORM SAU KHI TÍNH TOÁN ---
+        setFormData((prev) => {
+          if (!prev) return null;
+
+          const newDays = result.so_ngay_da_dang_ki;
+          const newExpirationDate = calculateExpirationDate(
+            registerDateStr,
+            newDays
+          );
+
+          return {
+            ...prev,
+            [ORDER_FIELDS.GIA_NHAP]: Number(result.gia_nhap),
+            [ORDER_FIELDS.GIA_BAN]: Number(result.gia_ban),
+            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(newDays),
+            [ORDER_FIELDS.HET_HAN]: newExpirationDate,
+          };
+        });
+      } catch (error) {
+        console.error("Lỗi khi tính toán giá:", error);
+        alert(
+          `Lỗi khi tính toán giá: ${
+            error instanceof Error ? error.message : "Lỗi không xác định"
+          }`
+        );
+      }
+    },
+    [] // No external dependency needed for useCallback, function uses passed arguments
+  );
+
+  // --- EFFECT: Tải Nguồn & Thiết lập State ban đầu ---
+  useEffect(() => {
+    if (isOpen) {
+      // Tải nguồn
+      const loadInitialData = async () => {
+        const fetchedSupplies = await fetchSupplies();
+
+        if (order && fetchedSupplies.length > 0) {
+          // 1. Thiết lập FormData
+          const newFormData = {
+            ...order,
+            [ORDER_FIELDS.GIA_NHAP]: Number(order.gia_nhap) || 0,
+            [ORDER_FIELDS.GIA_BAN]: Number(order.gia_ban) || 0,
+            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]:
+              String(order.so_ngay_da_dang_ki) || "",
+          } as Order;
+          setFormData(newFormData);
+
+          // 2. Xác định Nguồn ban đầu và tải Sản phẩm
+          const initialSupply = fetchedSupplies.find(
+            (s) => s.source_name === order.nguon
+          );
+          if (initialSupply) {
+            setSelectedSourceId(initialSupply.id);
+            fetchProductsBySupply(initialSupply.id);
+          } else {
+            setSelectedSourceId(null);
+            setProducts([]);
+          }
+        } else if (order) {
+          // Nếu không có supplies, vẫn thiết lập formData cơ bản
+          setFormData({
+            ...order,
+            [ORDER_FIELDS.GIA_NHAP]: Number(order.gia_nhap) || 0,
+            [ORDER_FIELDS.GIA_BAN]: Number(order.gia_ban) || 0,
+            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]:
+              String(order.so_ngay_da_dang_ki) || "",
+          } as Order);
+        }
+      };
+      loadInitialData();
+    }
+  }, [isOpen, order, fetchSupplies, fetchProductsBySupply]);
+
+  // --- HÀM XỬ LÝ SỰ KIỆN ---
+
   const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const sourceId = Number(e.target.value);
     const selectedSupply = supplies.find((s) => s.id === sourceId);
@@ -238,8 +253,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
         [ORDER_FIELDS.SAN_PHAM]: "", // Reset sản phẩm
         [ORDER_FIELDS.GIA_NHAP]: 0,
         [ORDER_FIELDS.GIA_BAN]: 0,
-        [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "", // Đặt lại là chuỗi rỗng
-        [ORDER_FIELDS.HET_HAN]: "", // Đặt lại là chuỗi rỗng
+        [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "",
+        [ORDER_FIELDS.HET_HAN]: "",
       };
     });
 
@@ -251,52 +266,42 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
     }
   };
 
-  // 6. Xử lý thay đổi Sản phẩm (TRIGGER TÍNH GIÁ)
   const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const productName = e.target.value;
 
     setFormData((prev) => {
       if (!prev) return null;
-      return {
+
+      // Cập nhật tên sản phẩm
+      const newForm = {
         ...prev,
         [ORDER_FIELDS.SAN_PHAM]: productName,
       };
-    });
 
-    // GỌI API TÍNH TOÁN GIÁ VỚI DỮ LIỆU MỚI
-    if (selectedSourceId && formData?.id_don_hang && formData?.ngay_dang_ki) {
-      const registerDateStr = formData[ORDER_FIELDS.NGAY_DANG_KI];
-
-      if (productName) {
+      // Tự động tính giá nếu có đủ thông tin
+      if (
+        selectedSourceId &&
+        newForm.id_don_hang &&
+        newForm.ngay_dang_ki &&
+        productName
+      ) {
+        const registerDateStr = newForm[ORDER_FIELDS.NGAY_DANG_KI];
         calculatePrice(
           selectedSourceId,
           productName,
-          formData.id_don_hang,
+          newForm.id_don_hang,
           registerDateStr
         );
-      } else {
+      } else if (!productName) {
         // Reset giá nếu chọn lại "Chọn Sản phẩm"
-        setFormData((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            [ORDER_FIELDS.GIA_NHAP]: 0,
-            [ORDER_FIELDS.GIA_BAN]: 0,
-            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "",
-            [ORDER_FIELDS.HET_HAN]: "",
-          };
-        });
+        newForm[ORDER_FIELDS.GIA_NHAP] = 0;
+        newForm[ORDER_FIELDS.GIA_BAN] = 0;
+        newForm[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] = "";
+        newForm[ORDER_FIELDS.HET_HAN] = "";
       }
-    }
+      return newForm;
+    });
   };
-
-  if (!isOpen || !formData) return null;
-
-  // Lấy ID nguồn hiện tại để đặt giá trị mặc định cho Dropdown Nguồn
-  const currentSupply = supplies.find(
-    (s) => s.source_name === formData[ORDER_FIELDS.NGUON]
-  );
-  const currentSupplyId = currentSupply ? currentSupply.id : "";
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -311,13 +316,55 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
     setFormData((prev) => {
       if (!prev) return null;
 
-      // Không cần chuyển số nếu là trường read-only. Chỉ cần cập nhật value
       return {
         ...prev,
         [name]: value,
       };
     });
   };
+
+  // Lấy ID nguồn hiện tại để đặt giá trị mặc định cho Dropdown Nguồn
+  const currentSupplyId = useMemo(() => {
+    const currentSupply = supplies.find(
+      (s) => s.source_name === formData?.[ORDER_FIELDS.NGUON]
+    );
+    return currentSupply ? currentSupply.id : "";
+  }, [supplies, formData]);
+
+  return {
+    formData,
+    supplies,
+    products,
+    selectedSourceId,
+    currentSupplyId,
+    handleChange,
+    handleSourceChange,
+    handleProductChange,
+  };
+};
+
+// =======================================================
+// 3. COMPONENT CHÍNH (Sử dụng Hook)
+// =======================================================
+
+const EditOrderModal: React.FC<EditOrderModalProps> = ({
+  isOpen,
+  onClose,
+  order,
+  onSave,
+}) => {
+  const {
+    formData,
+    supplies,
+    products,
+    selectedSourceId,
+    currentSupplyId,
+    handleChange,
+    handleSourceChange,
+    handleProductChange,
+  } = useEditOrderLogic(order, isOpen);
+
+  if (!isOpen || !formData) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,10 +375,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const inputClass =
     "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
-  const readOnlyClass = `bg-gray-200 cursor-not-allowed`; // Style cho trường cố định
+  const readOnlyClass = `bg-gray-200 cursor-not-allowed`;
   const labelClass = "block text-sm font-medium text-gray-700";
 
-  // Hàm kiểm tra trường readOnly
   const isReadOnly = (fieldName: string) =>
     READ_ONLY_FIELDS.includes(fieldName);
 
@@ -398,7 +444,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <label className={labelClass}>Nguồn</label>
                     <select
                       name={ORDER_FIELDS.NGUON}
-                      value={currentSupplyId || ""} // Sử dụng ID làm value của select
+                      value={currentSupplyId || ""}
                       onChange={handleSourceChange}
                       className={inputClass}
                     >
@@ -425,6 +471,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     >
                       <option value="Đã Thanh Toán">Đã Thanh Toán</option>
                       <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
+                      {/* Trạng thái Hết Hạn chỉ do hệ thống cập nhật */}
                       <option value="Hết Hạn" disabled>
                         Hết Hạn (Hệ thống)
                       </option>
@@ -446,7 +493,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                       name={ORDER_FIELDS.SAN_PHAM}
                       value={formData[ORDER_FIELDS.SAN_PHAM] || ""}
                       onChange={handleProductChange}
-                      disabled={!selectedSourceId} // Disable nếu chưa chọn nguồn
+                      disabled={!selectedSourceId}
                       className={`${inputClass} ${
                         !selectedSourceId ? readOnlyClass : ""
                       }`}
@@ -540,7 +587,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   <div>
                     <label className={labelClass}>Giá Nhập (đ)</label>
                     <input
-                      type="text" // Chuyển sang text để hiển thị định dạng tiền tệ
+                      type="text"
                       name={ORDER_FIELDS.GIA_NHAP}
                       value={formatCurrency(formData[ORDER_FIELDS.GIA_NHAP])}
                       readOnly={isReadOnly(ORDER_FIELDS.GIA_NHAP)}
@@ -552,7 +599,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   <div>
                     <label className={labelClass}>Giá Bán (đ)</label>
                     <input
-                      type="text" // Chuyển sang text để hiển thị định dạng tiền tệ
+                      type="text"
                       name={ORDER_FIELDS.GIA_BAN}
                       value={formatCurrency(formData[ORDER_FIELDS.GIA_BAN])}
                       readOnly={isReadOnly(ORDER_FIELDS.GIA_BAN)}

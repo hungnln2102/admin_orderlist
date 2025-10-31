@@ -1,8 +1,7 @@
-// CreateOrderModal.tsx
+// CreateOrderModal.tsx - Mã đã được chỉnh sửa logic giá nhập tham khảo
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-// Đảm bảo bạn có file constants.ts và đã export các hằng số này
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 
 // =======================================================
@@ -36,6 +35,11 @@ interface Product {
   san_pham: string;
 }
 
+interface SupplyPrice {
+  source_id: number;
+  price: number;
+}
+
 interface CalculatedPriceResult {
   gia_nhap: number;
   gia_ban: number;
@@ -52,6 +56,17 @@ interface CreateOrderModalProps {
 // =======================================================
 // 2. HELPER FUNCTIONS & CONSTANTS
 // =======================================================
+
+const calculateDate = (startDate: string, days: number): string => {
+  if (!startDate || days <= 0) return startDate;
+  const [d, m, y] = startDate.split("/").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days - 1);
+  return `${String(date.getDate()).padStart(2, "0")}/${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}/${date.getFullYear()}`;
+};
+
 const formatCurrency = (value: number) => {
   return (Number(value) || 0).toLocaleString("vi-VN") + " VNĐ";
 };
@@ -65,16 +80,6 @@ const generateRandomId = (length: number) => {
 
 const getTodayDMY = () => {
   const date = new Date();
-  return `${String(date.getDate()).padStart(2, "0")}/${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}/${date.getFullYear()}`;
-};
-
-const calculateDate = (startDate: string, days: number) => {
-  const [d, m, y] = startDate.split("/").map(Number);
-  // -1 vì ngày đăng ký là ngày đầu tiên
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + days);
   return `${String(date.getDate()).padStart(2, "0")}/${String(
     date.getMonth() + 1
   ).padStart(2, "0")}/${date.getFullYear()}`;
@@ -104,22 +109,45 @@ const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 const readOnlyClass = "bg-gray-100 cursor-not-allowed";
 
 // =======================================================
-// 3. COMPONENT CHÍNH
+// 3. CUSTOM HOOK: useCreateOrderLogic
 // =======================================================
-const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
-  isOpen,
-  onClose,
-  onSave,
-}) => {
-  // --- START: TẤT CẢ HOOKS PHẢI Ở ĐẦU COMPONENT ---
 
+interface UseCreateOrderLogicResult {
+  formData: Partial<Order>;
+  supplies: Supply[];
+  products: Product[];
+  isLoading: boolean;
+  isDataLoaded: boolean;
+  selectedSupplyId: number | null;
+  customerType: "MAVC" | "MAVL";
+  handleChange: (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => void;
+  handleSourceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleProductChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleSubmit: (e: React.FormEvent) => boolean;
+}
+
+const useCreateOrderLogic = (
+  isOpen: boolean,
+  onSave: (newOrderData: Partial<Order> | Order) => void
+): UseCreateOrderLogicResult => {
   const [formData, setFormData] = useState<Partial<Order>>(INITIAL_FORM_DATA);
   const [customerType, setCustomerType] = useState<"MAVC" | "MAVL">("MAVC");
 
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+
+  const [supplyPrices, setSupplyPrices] = useState<SupplyPrice[]>([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(
+    null
+  );
   const [selectedSupplyId, setSelectedSupplyId] = useState<number | null>(null);
 
   // Memoized ID và Date
@@ -129,32 +157,51 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
   const todayDate = useMemo(() => getTodayDMY(), []);
 
-  // Hàm Fetch: Lấy danh sách nguồn (suppliers)
-  const fetchSupplies = useCallback(async () => {
+  // Hàm Fetch: Lấy danh sách TẤT CẢ sản phẩm (tải đầu tiên)
+  const fetchProducts = useCallback(async () => {
+    // Logic giữ nguyên
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.SUPPLIES}`
-      );
-      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
-      const data: Supply[] = await response.json();
-      setSupplies(data);
-    } catch (error) {
-      console.error("Lỗi khi fetch supplies:", error);
-    }
-  }, []);
-
-  // Hàm Fetch: Lấy danh sách sản phẩm theo nguồn
-  const fetchProductsBySource = useCallback(async (supplyId: number) => {
-    try {
-      const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.PRODUCTS_BY_SUPPLY(supplyId)}`
+        `http://localhost:3001${API_ENDPOINTS.PRODUCTS_ALL}`
       );
       if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
       const data: Product[] = await response.json();
       setProducts(data);
     } catch (error) {
       console.error("Lỗi khi fetch products:", error);
-      setProducts([]);
+    }
+  }, []);
+
+  // Hàm Fetch: Lấy danh sách NGUỒN theo Tên SẢN PHẨM (cho dropdown)
+  const fetchSuppliesByProduct = useCallback(async (productName: string) => {
+    // Logic giữ nguyên
+    try {
+      const response = await fetch(
+        `http://localhost:3001${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
+      );
+      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
+      const data: Supply[] = await response.json();
+      setSupplies(data);
+    } catch (error) {
+      console.error("Lỗi khi fetch supplies:", error);
+      setSupplies([]);
+    }
+  }, []);
+
+  // HÀM FETCH MỚI: Lấy TẤT CẢ giá nhập theo Tên SẢN PHẨM (cho logic hiển thị)
+  const fetchAllSupplyPrices = useCallback(async (productName: string) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/products/all-prices-by-name/${encodeURIComponent(
+          productName
+        )}`
+      );
+      if (!response.ok) throw new Error("Lỗi tải giá nhập các nguồn.");
+      const data: SupplyPrice[] = await response.json();
+      setSupplyPrices(data);
+    } catch (error) {
+      console.error("Lỗi khi fetch all supply prices:", error);
+      setSupplyPrices([]);
     }
   }, []);
 
@@ -165,7 +212,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       productName: string,
       orderId: string,
       registerDateStr: string
-    ) => {
+    ): Promise<CalculatedPriceResult | undefined> => {
       setIsLoading(true);
       setIsDataLoaded(false);
       try {
@@ -192,15 +239,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         const newDays = result.so_ngay_da_dang_ki;
         const newHetHan = calculateDate(registerDateStr, newDays);
 
-        setFormData((prev) => ({
-          ...prev,
-          [ORDER_FIELDS.GIA_NHAP]: result.gia_nhap,
-          [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
-          [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(newDays),
-          [ORDER_FIELDS.HET_HAN]: newHetHan,
-          [ORDER_FIELDS.CHECK_FLAG]: null,
-        }));
-        setIsDataLoaded(true);
+        // Thay vì gọi setFormData ở đây, chúng ta trả về kết quả
+        return {
+          gia_nhap: result.gia_nhap,
+          gia_ban: result.gia_ban,
+          so_ngay_da_dang_ki: newDays,
+          het_han: newHetHan,
+        } as CalculatedPriceResult;
       } catch (error) {
         console.error("Lỗi khi tính giá:", error);
         setIsDataLoaded(false);
@@ -209,14 +254,15 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             error instanceof Error ? error.message : "Lỗi không xác định"
           }`
         );
+        return undefined; // Trả về undefined khi có lỗi
       } finally {
         setIsLoading(false);
       }
     },
-    [formData[ORDER_FIELDS.NGAY_DANG_KI]] // Dependency: Ngày đăng ký
+    []
   );
 
-  // Logic Reset Form khi mở Modal
+  // LOGIC 1, 2, 3 (Giữ nguyên)
   useEffect(() => {
     if (isOpen) {
       const initialType = "MAVC";
@@ -231,43 +277,38 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         [ORDER_FIELDS.HET_HAN]: initialDate,
       });
       setIsDataLoaded(false);
+      setSelectedProductId(null);
       setSelectedSupplyId(null);
-      setProducts([]);
-      fetchSupplies();
+      setSupplies([]);
+      setSupplyPrices([]);
+      fetchProducts();
     }
-  }, [isOpen, fetchSupplies]);
+  }, [isOpen, fetchProducts]);
 
-  // Logic Cập nhật ID khi CustomerType thay đổi
   useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      [ORDER_FIELDS.ID_DON_HANG]: currentOrderId,
-    }));
-  }, [currentOrderId]);
+    if (isOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.ID_DON_HANG]: currentOrderId,
+      }));
+    }
+  }, [currentOrderId, isOpen]);
 
-  // Logic Cập nhật Giá/Ngày khi Source/Product thay đổi
   useEffect(() => {
     const productName = formData[ORDER_FIELDS.SAN_PHAM];
     const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
     const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
 
-    if (selectedSupplyId && productName && orderId && registerDate) {
-      calculatePrice(selectedSupplyId, productName, orderId, registerDate);
-    } else {
+    if (!productName || !orderId || !registerDate) {
       setIsDataLoaded(false);
     }
   }, [
-    selectedSupplyId,
     formData[ORDER_FIELDS.SAN_PHAM],
     formData[ORDER_FIELDS.ID_DON_HANG],
     formData[ORDER_FIELDS.NGAY_DANG_KI],
-    calculatePrice,
   ]);
 
-  // --- END: TẤT CẢ HOOKS PHẢI Ở ĐẦU COMPONENT ---
-
-  // --- BẮT ĐẦU PHẦN JSX/RETURN ---
-  if (!isOpen) return null;
+  // --- HÀM XỬ LÝ SỰ KIỆN ĐÃ ĐIỀU CHỈNH ---
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -281,33 +322,76 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }));
   };
 
+  // HÀM ĐÃ SỬA: handleProductChange (KÍCH HOẠT TÍNH GIÁ BÁN, RESET GIÁ NHẬP)
+  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const productName = e.target.value;
+    const selectedProduct = products.find((p) => p.san_pham === productName);
+
+    setSelectedProductId(selectedProduct?.id || null);
+    setSelectedSupplyId(null);
+
+    setFormData((prev) => ({
+      ...prev,
+      [ORDER_FIELDS.SAN_PHAM]: productName,
+      [ORDER_FIELDS.NGUON]: "",
+      [ORDER_FIELDS.GIA_NHAP]: 0, // ĐẢM BẢO GIÁ NHẬP = 0 KHI CHỌN SẢN PHẨM
+      [ORDER_FIELDS.GIA_BAN]: 0,
+      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
+      [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
+    }));
+    setSupplies([]);
+    setSupplyPrices([]);
+
+    if (productName) {
+      fetchSuppliesByProduct(productName);
+      fetchAllSupplyPrices(productName);
+
+      const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
+      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
+
+      if (orderId && registerDate) {
+        calculatePrice(0, productName, orderId, registerDate).then((result) => {
+          if (result) {
+            setFormData((prev) => ({
+              ...prev,
+              // Ghi đè Giá Bán và Ngày, GIÁ NHẬP KHÔNG ĐƯỢC ĐIỀN (vẫn giữ 0)
+              [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
+              [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
+                result.so_ngay_da_dang_ki
+              ),
+              [ORDER_FIELDS.HET_HAN]: result.het_han,
+            }));
+            setIsDataLoaded(true);
+          }
+        });
+      }
+    } else {
+      setIsDataLoaded(false);
+    }
+  };
+
+  // HÀM ĐÃ SỬA: handleSourceChange (Cập nhật giá nhập tham khảo và xử lý RESET)
   const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const sourceId = Number(e.target.value);
     const selectedSupply = supplies.find((s) => s.id === sourceId);
+
+    // 1. Logic tìm giá
+    let newBasePrice = 0;
+    // Kiểm tra nếu sourceId hợp lệ (khác 0)
+    if (sourceId !== 0 && selectedSupply) {
+      newBasePrice =
+        supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
+    }
+    // Nếu sourceId là 0 (hoặc không tìm thấy), newBasePrice sẽ là 0, tức là clear Giá Nhập.
 
     setSelectedSupplyId(sourceId);
 
     setFormData((prev) => ({
       ...prev,
+      // Đảm bảo tên nguồn là rỗng nếu chọn -- Chọn Nguồn -- (sourceId=0)
       [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-      [ORDER_FIELDS.SAN_PHAM]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0,
-      [ORDER_FIELDS.GIA_BAN]: 0,
-      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
-      [ORDER_FIELDS.HET_HAN]: formData[ORDER_FIELDS.NGAY_DANG_KI],
-    }));
-    setProducts([]);
-
-    if (sourceId) {
-      fetchProductsBySource(sourceId);
-    }
-  };
-
-  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const productName = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: productName,
+      // 2. CẬP NHẬT GIÁ NHẬP (BASE PRICE) THAM KHẢO
+      [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
     }));
   };
 
@@ -318,43 +402,83 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setCustomerType(newType);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): boolean => {
     e.preventDefault();
 
-    // Kiểm tra tất cả 4 trường: Nguồn, Sản phẩm, Tên Khách Hàng, Thông tin Sản phẩm
-    if (
+    const requiredFieldsFilled =
       formData &&
       formData[ORDER_FIELDS.SAN_PHAM] &&
       formData[ORDER_FIELDS.NGUON] &&
-      formData[ORDER_FIELDS.KHACH_HANG] && // <-- BẮT BUỘC CHECK KHÁCH HÀNG
-      formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM] && // <-- BẮT BUỘC CHECK THÔNG TIN SP
-      isDataLoaded &&
-      !isLoading
-    ) {
+      formData[ORDER_FIELDS.KHACH_HANG] &&
+      formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM];
+
+    if (requiredFieldsFilled && isDataLoaded && !isLoading) {
       const dataToSave = {
         ...formData,
         [ORDER_FIELDS.GIA_NHAP]: Number(formData[ORDER_FIELDS.GIA_NHAP]),
         [ORDER_FIELDS.GIA_BAN]: Number(formData[ORDER_FIELDS.GIA_BAN]),
 
-        // Chuyển chuỗi rỗng thành null nếu cần cho các trường tùy chọn khác (nếu có)
         [ORDER_FIELDS.LINK_LIEN_HE]:
           formData[ORDER_FIELDS.LINK_LIEN_HE] || null,
         [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
         [ORDER_FIELDS.NOTE]: formData[ORDER_FIELDS.NOTE] || null,
-        // Các trường đã được điền ở trên nên không cần null check
       };
 
       onSave(dataToSave as Order);
+      return true;
     } else {
       alert(
         "Vui lòng điền đủ Tên Khách Hàng, Thông Tin Sản Phẩm và đảm bảo đã chọn Nguồn/Sản phẩm để tính giá."
       );
+      return false;
     }
   };
+
+  return {
+    formData,
+    supplies,
+    products,
+    isLoading,
+    isDataLoaded,
+    selectedSupplyId,
+    customerType,
+    handleChange,
+    handleSourceChange,
+    handleProductChange,
+    handleCustomerTypeChange,
+    handleSubmit,
+  };
+};
+
+// =======================================================
+// 4. COMPONENT CHÍNH
+// =======================================================
+const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+}) => {
+  const {
+    formData,
+    supplies,
+    products,
+    isLoading,
+    isDataLoaded,
+    selectedSupplyId,
+    customerType,
+    handleChange,
+    handleSourceChange,
+    handleProductChange,
+    handleCustomerTypeChange,
+    handleSubmit,
+  } = useCreateOrderLogic(isOpen, onSave);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+        {/* Header Modal */}
         <div className="p-5 border-b border-gray-200 sticky top-0 bg-white z-10 flex justify-between items-center">
           <h3 className="text-xl font-semibold text-gray-900">
             Tạo Đơn Hàng Mới
@@ -369,11 +493,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Form sử dụng HTML validation, nhưng logic submit vẫn kiểm tra data đã có */}
+          {/* Form */}
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
               {/* Phần 1: Mã Đơn & Khách Hàng */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-lg bg-gray-50">
+                {/* Loại Khách Hàng */}
                 <div>
                   <label className={labelClass}>Loại Khách Hàng</label>
                   <select
@@ -386,6 +511,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <option value="MAVL">MAVL (Khách Lẻ)</option>
                   </select>
                 </div>
+                {/* Mã Đơn Hàng */}
                 <div>
                   <label className={labelClass}>Mã Đơn Hàng (Tự Động)</label>
                   <input
@@ -397,7 +523,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   />
                 </div>
 
-                {/* Các trường thông tin Khách Hàng - BẮT BUỘC */}
+                {/* Tên Khách Hàng */}
                 <div>
                   <label className={labelClass}>
                     Tên Khách Hàng <span className="text-red-500">*</span>
@@ -408,9 +534,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={formData[ORDER_FIELDS.KHACH_HANG]}
                     onChange={handleChange}
                     className={inputClass}
-                    required // <--- BẮT BUỘC: Không được rỗng
+                    required
                   />
                 </div>
+                {/* Link Liên Hệ */}
                 <div>
                   <label className={labelClass}>Link Liên Hệ</label>
                   <input
@@ -425,29 +552,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
               {/* Phần 2: Sản Phẩm & Nguồn */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border p-4 rounded-lg">
-                <div>
-                  <label className={labelClass}>
-                    Nguồn <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name={ORDER_FIELDS.NGUON}
-                    value={
-                      supplies.find(
-                        (s) => s.source_name === formData[ORDER_FIELDS.NGUON]
-                      )?.id || ""
-                    }
-                    onChange={handleSourceChange}
-                    className={inputClass}
-                    required
-                  >
-                    <option value="">-- Chọn Nguồn --</option>
-                    {supplies.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.source_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* 1. SẢN PHẨM */}
                 <div>
                   <label className={labelClass}>
                     Sản Phẩm <span className="text-red-500">*</span>
@@ -458,7 +563,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     onChange={handleProductChange}
                     className={inputClass}
                     required
-                    disabled={!selectedSupplyId}
                   >
                     <option value="">-- Chọn Sản Phẩm --</option>
                     {products.map((p) => (
@@ -468,6 +572,30 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* 2. NGUỒN */}
+                <div>
+                  <label className={labelClass}>
+                    Nguồn <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name={ORDER_FIELDS.NGUON}
+                    value={selectedSupplyId || ""}
+                    onChange={handleSourceChange}
+                    className={inputClass}
+                    required
+                    disabled={!formData[ORDER_FIELDS.SAN_PHAM]}
+                  >
+                    <option value="">-- Chọn Nguồn --</option>
+                    {supplies.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.source_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Thông Tin Sản Phẩm */}
                 <div>
                   <label className={labelClass}>
                     Thông Tin Sản Phẩm <span className="text-red-500">*</span>
@@ -478,7 +606,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM]}
                     onChange={handleChange}
                     className={inputClass}
-                    required // <--- BẮT BUỘC: Không được rỗng
+                    required
                   />
                 </div>
               </div>
@@ -486,6 +614,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               {/* Phần 3: Thời Gian & Giá Tiền */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6">
+                  {/* Ngày Đăng Ký */}
                   <div>
                     <label className={labelClass}>Ngày Đăng Ký</label>
                     <input
@@ -496,6 +625,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} ${readOnlyClass}`}
                     />
                   </div>
+                  {/* Số Ngày Đã Đăng Ký */}
                   <div>
                     <label className={labelClass}>Số Ngày Đã Đăng Ký</label>
                     <input
@@ -506,6 +636,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} ${readOnlyClass}`}
                     />
                   </div>
+                  {/* Ngày Hết Hạn */}
                   <div>
                     <label className={labelClass}>Ngày Hết Hạn</label>
                     <input
@@ -516,6 +647,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} font-medium text-red-600 ${readOnlyClass}`}
                     />
                   </div>
+                  {/* Slot */}
                   <div>
                     <label className={labelClass}>Slot</label>
                     <input
@@ -529,8 +661,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
 
                 <div className="space-y-6">
+                  {/* Giá Nhập (Sẽ hiển thị giá của Nguồn được chọn) */}
                   <div>
-                    <label className={labelClass}>Giá Nhập (Base Price)</label>
+                    <label className={labelClass}>
+                      Giá Nhập (Base Price) - Nguồn Chọn
+                    </label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.GIA_NHAP}
@@ -541,8 +676,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} font-semibold ${readOnlyClass}`}
                     />
                   </div>
+                  {/* Giá Bán (Sẽ hiển thị giá tính toán từ giá nhập cao nhất) */}
                   <div>
-                    <label className={labelClass}>Giá Bán (Theo Loại KH)</label>
+                    <label className={labelClass}>Giá Bán (Giá cố định)</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.GIA_BAN}
@@ -554,6 +690,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     />
                   </div>
 
+                  {/* Ghi Chú */}
                   <div>
                     <label className={labelClass}>Ghi Chú</label>
                     <textarea

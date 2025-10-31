@@ -1,4 +1,4 @@
-// index.js (ĐÃ SỬA LỖI CẤU TRÚC API)
+// index.js (ĐÃ CẬP NHẬT LOGIC: Tính Giá Nhập và Giá Bán dựa trên GIÁ NHẬP CAO NHẤT)
 
 require("dotenv").config();
 const express = require("express");
@@ -8,7 +8,7 @@ const updateDatabaseTask = require("./scheduler");
 const app = express();
 const port = 3001;
 
-// 1. Cấu hình CORS (Cho phép React gọi đến)
+// 1. Cấu hình CORS
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -80,6 +80,61 @@ app.get("/api/supplies/:supplyId/products", async (req, res) => {
     );
     res.status(500).json({
       error: "Lỗi server nội bộ khi lấy danh sách sản phẩm theo nguồn",
+    });
+  }
+});
+
+// =======================================================
+// 13. API MỚI: GET /api/products (Lấy TẤT CẢ Sản phẩm)
+// =======================================================
+app.get("/api/products", async (req, res) => {
+  console.log("Đã nhận yêu cầu GET /api/products (Lấy TẤT CẢ Sản phẩm)");
+  const queryText = `
+    SELECT id, san_pham FROM mavryk.product_price
+    ORDER BY san_pham;
+  `;
+  try {
+    const result = await pool.query(queryText);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Lỗi truy vấn database (GET /api/products):", err);
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy danh sách sản phẩm" });
+  }
+});
+
+// =======================================================
+// 14. API MỚI: GET /api/products/supplies-by-name/:productName
+//    (Lấy Nguồn theo Tên Sản phẩm)
+// =======================================================
+app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
+  const { productName } = req.params;
+  console.log(
+    `Đã nhận yêu cầu GET /api/products/supplies-by-name/${productName}`
+  );
+
+  const queryText = `
+    SELECT 
+      s.id, 
+      s.source_name 
+    FROM mavryk.supply s
+    JOIN mavryk.supply_price sp ON s.id = sp.source_id
+    JOIN mavryk.product_price pp ON sp.product_id = pp.id
+    WHERE pp.san_pham = $1
+    ORDER BY s.source_name;
+  `;
+
+  try {
+    const result = await pool.query(queryText, [productName]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(
+      `Lỗi truy vấn database (GET supplies-by-name/${productName}):`,
+      err
+    );
+    res.status(500).json({
+      error: "Lỗi server nội bộ khi lấy danh sách nguồn theo sản phẩm",
     });
   }
 });
@@ -205,64 +260,74 @@ app.delete("/api/orders/:id", async (req, res) => {
 
 // =======================================================
 // 9. POST /api/calculate-price (Tính toán Giá)
+//    LOGIC MỚI: Tính GIÁ NHẬP & GIÁ BÁN dựa trên GIÁ NHẬP CAO NHẤT
 // =======================================================
 app.post("/api/calculate-price", async (req, res) => {
   console.log("Đã nhận yêu cầu POST /api/calculate-price");
 
   const { supply_id, san_pham_name, id_don_hang } = req.body;
 
-  if (!supply_id || !san_pham_name || !id_don_hang) {
+  // SỬA LỖI: Chỉ kiểm tra các trường bắt buộc cho logic tính MAX Price
+  if (!san_pham_name || !id_don_hang) {
     return res.status(400).json({
-      error:
-        "Thiếu thông tin cần thiết (supply_id, san_pham_name, id_don_hang).",
+      error: "Thiếu thông tin cần thiết (san_pham_name, id_don_hang).",
     });
   }
 
   try {
-    // Truy vấn phức hợp để lấy giá cơ sở, phần trăm và tính toán số ngày
+    // 1. TRUY VẤN LẤY GIÁ NHẬP CAO NHẤT VÀ CÁC HỆ SỐ CỦA SẢN PHẨM
     const queryText = `
             SELECT
-                sp.price AS gia_nhap_co_so,
+                -- Lấy giá nhập CAO NHẤT từ tất cả các nguồn cho sản phẩm $2
+                (SELECT MAX(sp_max.price)
+                 FROM mavryk.supply_price sp_max
+                 JOIN mavryk.product_price pp_max ON sp_max.product_id = pp_max.id
+                 WHERE pp_max.san_pham = $1
+                ) AS gia_nhap_co_so,
+                
                 pp.pct_ctv,
                 pp.pct_khach,
+                
                 -- Tính số ngày dựa trên chuỗi tên sản phẩm
                 CASE
-                    WHEN $2 ILIKE '%--24m%' THEN 730
-                    WHEN $2 ILIKE '%--12m%' THEN 365
-                    WHEN $2 ILIKE '%--6m%' THEN 180
-                    WHEN $2 ILIKE '%--4m%' THEN 120
-                    WHEN $2 ILIKE '%--3m%' THEN 90
-                    WHEN $2 ILIKE '%--2m%' THEN 60
-                    WHEN $2 ILIKE '%--1m%' THEN 30
-                    ELSE 30 -- Mặc định 30 ngày nếu không tìm thấy
+                    WHEN $1 ILIKE '%--24m%' THEN 730
+                    WHEN $1 ILIKE '%--12m%' THEN 365
+                    WHEN $1 ILIKE '%--6m%' THEN 180
+                    WHEN $1 ILIKE '%--4m%' THEN 120
+                    WHEN $1 ILIKE '%--3m%' THEN 90
+                    WHEN $1 ILIKE '%--2m%' THEN 60
+                    WHEN $1 ILIKE '%--1m%' THEN 30
+                    ELSE 30
                 END AS so_ngay_da_dang_ki_moi
-            FROM mavryk.supply_price sp
-            JOIN mavryk.product_price pp ON sp.product_id = pp.id
-            WHERE sp.source_id = $1 AND pp.san_pham = $2;
+            
+            FROM mavryk.product_price pp
+            WHERE pp.san_pham = $1
+            LIMIT 1;
         `;
 
-    const result = await pool.query(queryText, [supply_id, san_pham_name]);
+    // Chúng ta chỉ truyền san_pham_name ($1) vì supply_id không còn được dùng để lọc giá
+    // Note: Dùng [san_pham_name] vì nó được tham chiếu là $1 trong truy vấn (sau khi loại bỏ $1 ban đầu)
+    const result = await pool.query(queryText, [san_pham_name]);
 
-    if (result.rowCount === 0) {
-      return res
-        .status(404)
-        .json({ error: "Không tìm thấy giá cho Nguồn và Sản phẩm này." });
+    if (result.rowCount === 0 || result.rows[0].gia_nhap_co_so === null) {
+      return res.status(404).json({
+        error: "Không tìm thấy giá hoặc sản phẩm này không có nguồn cung nào.",
+      });
     }
 
     const data = result.rows[0];
-    const basePrice = Number(data.gia_nhap_co_so);
+    const basePrice = Number(data.gia_nhap_co_so); // Đây là GIÁ NHẬP CAO NHẤT
     const pctCtv = Number(data.pct_ctv) || 1.0;
     const pctKhach = Number(data.pct_khach) || 1.0;
 
     // Check MAVC (CTV) vs MAVL (Khách)
     const isMAVC = id_don_hang.toUpperCase().startsWith("MAVC");
 
-    // --- LOGIC TÍNH GIÁ BÁN ---
+    // --- LOGIC TÍNH GIÁ BÁN --- (Dựa trên basePrice CAO NHẤT)
     let finalPrice = basePrice;
     if (isMAVC) {
       finalPrice = basePrice * pctCtv;
     } else {
-      // MAVL hoặc khác
       finalPrice = basePrice * pctKhach;
     }
 
@@ -270,8 +335,8 @@ app.post("/api/calculate-price", async (req, res) => {
     finalPrice = Math.round(finalPrice);
 
     const responseData = {
-      gia_nhap: basePrice,
-      gia_ban: finalPrice,
+      gia_nhap: basePrice, // Trả về giá nhập CAO NHẤT
+      gia_ban: finalPrice, // Giá bán dựa trên giá nhập CAO NHẤT
       so_ngay_da_dang_ki: Number(data.so_ngay_da_dang_ki_moi),
       het_han: "", // Frontend sẽ tính
     };
@@ -287,7 +352,7 @@ app.post("/api/calculate-price", async (req, res) => {
 });
 
 // =======================================================
-// 10. POST /api/orders (Tạo Đơn Hàng Mới) - ĐÃ TÁCH RA
+// 10. POST /api/orders (Tạo Đơn Hàng Mới)
 // =======================================================
 app.post("/api/orders", async (req, res) => {
   console.log("Đã nhận yêu cầu POST /api/orders (Tạo mới)");
@@ -321,6 +386,25 @@ app.post("/api/orders", async (req, res) => {
   } catch (err) {
     console.error("Lỗi khi tạo đơn hàng mới (POST /api/orders):", err);
     res.status(500).json({ error: "Lỗi server nội bộ khi tạo đơn hàng" });
+  }
+});
+
+// Trong index.js, thêm route sau:
+app.get("/api/products/all-prices-by-name/:productName", async (req, res) => {
+  const { productName } = req.params;
+  const queryText = `
+        SELECT sp.source_id, sp.price
+        FROM mavryk.supply_price sp
+        JOIN mavryk.product_price pp ON sp.product_id = pp.id
+        WHERE pp.san_pham = $1;
+    `;
+  // Thực hiện truy vấn và trả về JSON
+  try {
+    const result = await pool.query(queryText, [productName]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Lỗi khi lấy tất cả giá nguồn:", err);
+    res.status(500).json({ error: "Lỗi server nội bộ." });
   }
 });
 
