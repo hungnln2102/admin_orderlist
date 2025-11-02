@@ -1,7 +1,13 @@
-// EditOrderModal.tsx - Mã đã được làm sạch
+// EditOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
+import * as Helpers from "../lib/helpers";
+
+const API_BASE =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (process.env.VITE_API_BASE_URL as string) ||
+  "http://localhost:3001";
 
 // =======================================================
 // 1. INTERFACES VÀ HELPER FUNCTIONS
@@ -15,9 +21,9 @@ interface Order {
   khach_hang: string;
   link_lien_he: string;
   slot: string;
-  ngay_dang_ki: string;
+  ngay_dang_ki: string; // Đã là YYYY-MM-DD
   so_ngay_da_dang_ki: string;
-  het_han: string;
+  het_han: string; // Đã là YYYY-MM-DD
   nguon: string;
   gia_nhap: number;
   gia_ban: number;
@@ -40,6 +46,7 @@ interface CalculatedPriceResult {
   gia_nhap: number;
   gia_ban: number;
   so_ngay_da_dang_ki: number;
+  // Bỏ het_han, vì Backend sẽ tính và trả về theo logic tính giá mới
   het_han: string;
 }
 
@@ -52,7 +59,7 @@ interface EditOrderModalProps {
 
 const READ_ONLY_FIELDS = [
   ORDER_FIELDS.ID_DON_HANG,
-  ORDER_FIELDS.TINH_TRANG,
+  // Giữ lại các trường ngày tháng/giá là read-only vì chúng được tính toán tự động
   ORDER_FIELDS.NGAY_DANG_KI,
   ORDER_FIELDS.SO_NGAY_DA_DANG_KI,
   ORDER_FIELDS.HET_HAN,
@@ -60,30 +67,7 @@ const READ_ONLY_FIELDS = [
   ORDER_FIELDS.GIA_BAN,
 ];
 
-// Hàm Helper để tính Ngày Hết Hạn
-const calculateExpirationDate = (
-  registerDateStr: string,
-  days: number
-): string => {
-  if (!registerDateStr || days <= 0) return "N/A";
-
-  const parts = registerDateStr.split("/");
-  if (parts.length !== 3) return "N/A";
-
-  const day = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  const year = parseInt(parts[2], 10);
-
-  const date = new Date(year, month - 1, day);
-  // -1 vì ngày đăng ký là ngày đầu tiên
-  date.setDate(date.getDate() + days - 1);
-
-  const newDay = String(date.getDate()).padStart(2, "0");
-  const newMonth = String(date.getMonth() + 1).padStart(2, "0");
-  const newYear = date.getFullYear();
-
-  return `${newDay}/${newMonth}/${newYear}`;
-};
+// HÀM TÍNH NGÀY HẾT HẠN TRÊN FRONTEND ĐÃ BỊ XÓA (để Backend xử lý)
 
 // Hàm định dạng tiền tệ
 const formatCurrency = (value: number) => {
@@ -104,9 +88,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
 
   const fetchSupplies = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.SUPPLIES}`
-      );
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.SUPPLIES}`);
       if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
       const data: Supply[] = await response.json();
       setSupplies(data);
@@ -120,7 +102,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const fetchProductsBySupply = useCallback(async (supplyId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.PRODUCTS_BY_SUPPLY(supplyId)}`
+        `${API_BASE}${API_ENDPOINTS.PRODUCTS_BY_SUPPLY(supplyId)}`
       );
       if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
       const data: Product[] = await response.json();
@@ -133,24 +115,22 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
 
   // HÀM GỌI API TÍNH TOÁN GIÁ MỚI
   const calculatePrice = useCallback(
-    async (
-      supplyId: number,
-      productName: string,
-      orderIdDonHang: string,
-      registerDateStr: string
-    ) => {
+    async (supplyId: number, productName: string, orderIdDonHang: string) => {
       if (!supplyId || !productName || !orderIdDonHang) return;
 
       try {
         const response = await fetch(
-          `http://localhost:3001${API_ENDPOINTS.CALCULATE_PRICE}`,
+          `${API_BASE}${API_ENDPOINTS.CALCULATE_PRICE}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              supply_id: supplyId,
+              // Không truyền registerDateStr vì Backend tự tính
+              // Chỉ truyền các tham số cần thiết cho Backend tính giá bán.
+              supply_id: supplyId, // Backend cần nguồn để tính giá nhập
               san_pham_name: productName,
               id_don_hang: orderIdDonHang,
+              // Backend sẽ trả về gia_nhap, gia_ban, so_ngay_da_dang_ki, het_han
             }),
           }
         );
@@ -166,18 +146,16 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         setFormData((prev) => {
           if (!prev) return null;
 
-          const newDays = result.so_ngay_da_dang_ki;
-          const newExpirationDate = calculateExpirationDate(
-            registerDateStr,
-            newDays
-          );
-
+          // LƯU Ý: Các trường ngày tháng đã được tính toán ở Backend (hoặc logic tính giá)
+          // và trả về ở định dạng YYYY-MM-DD
           return {
             ...prev,
             [ORDER_FIELDS.GIA_NHAP]: Number(result.gia_nhap),
             [ORDER_FIELDS.GIA_BAN]: Number(result.gia_ban),
-            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(newDays),
-            [ORDER_FIELDS.HET_HAN]: newExpirationDate,
+            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
+              result.so_ngay_da_dang_ki
+            ),
+            [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy giá trị mới từ Backend
           };
         });
       } catch (error) {
@@ -189,7 +167,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         );
       }
     },
-    [] // No external dependency needed for useCallback, function uses passed arguments
+    []
   );
 
   // --- EFFECT: Tải Nguồn & Thiết lập State ban đầu ---
@@ -203,6 +181,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           // 1. Thiết lập FormData
           const newFormData = {
             ...order,
+            // Đảm bảo kiểu number cho các trường giá
             [ORDER_FIELDS.GIA_NHAP]: Number(order.gia_nhap) || 0,
             [ORDER_FIELDS.GIA_BAN]: Number(order.gia_ban) || 0,
             [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]:
@@ -250,7 +229,8 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       return {
         ...prev,
         [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-        [ORDER_FIELDS.SAN_PHAM]: "", // Reset sản phẩm
+        // Chỉ reset sản phẩm và giá/ngày nếu thay đổi nguồn
+        [ORDER_FIELDS.SAN_PHAM]: "",
         [ORDER_FIELDS.GIA_NHAP]: 0,
         [ORDER_FIELDS.GIA_BAN]: 0,
         [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "",
@@ -279,19 +259,9 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       };
 
       // Tự động tính giá nếu có đủ thông tin
-      if (
-        selectedSourceId &&
-        newForm.id_don_hang &&
-        newForm.ngay_dang_ki &&
-        productName
-      ) {
-        const registerDateStr = newForm[ORDER_FIELDS.NGAY_DANG_KI];
-        calculatePrice(
-          selectedSourceId,
-          productName,
-          newForm.id_don_hang,
-          registerDateStr
-        );
+      if (selectedSourceId && newForm.id_don_hang && productName) {
+        // KHÔNG CẦN registerDateStr vì Backend không cần nó để tính giá bán
+        calculatePrice(selectedSourceId, productName, newForm.id_don_hang);
       } else if (!productName) {
         // Reset giá nếu chọn lại "Chọn Sản phẩm"
         newForm[ORDER_FIELDS.GIA_NHAP] = 0;
@@ -315,6 +285,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
 
     setFormData((prev) => {
       if (!prev) return null;
+
+      // Xử lý chuyển đổi ngày tháng từ YYYY-MM-DD sang hiển thị DD/MM/YYYY (Chỉ cho input type="text")
+      // Do input type="text" đang được sử dụng, ta không cần chuyển đổi phức tạp.
+      // Dữ liệu hiển thị (value) sẽ được giữ nguyên (YYYY-MM-DD) hoặc chuyển đổi ở component cha.
 
       return {
         ...prev,
@@ -369,6 +343,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData) {
+      // FIX: Đảm bảo onSave được gọi với dữ liệu form
       onSave(formData);
     }
   };
@@ -380,6 +355,15 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const isReadOnly = (fieldName: string) =>
     READ_ONLY_FIELDS.includes(fieldName);
+
+  // Helper để hiển thị ngày tháng ở định dạng DD/MM/YYYY
+  const displayDate = (dateStr: string) => {
+    if (!dateStr || dateStr.length < 10 || dateStr.indexOf("-") === -1)
+      return dateStr;
+    const parts = dateStr.substring(0, 10).split("-"); // Giả định YYYY-MM-DD
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`; // Chuyển sang DD/MM/YYYY
+    return dateStr;
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
@@ -404,6 +388,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   Chi tiết Khách hàng & Đơn
                 </h4>
                 <div className="space-y-4">
+                  {/* ... (Các trường giữ nguyên) */}
                   <div>
                     <label className={labelClass}>ID Đơn Hàng</label>
                     <input
@@ -533,13 +518,13 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     />
                   </div>
 
-                  {/* CÁC TRƯỜNG NGÀY THÁNG (CỐ ĐỊNH / TỰ ĐỘNG CẬP NHẬT) */}
+                  {/* CÁC TRƯỜNG NGÀY THÁNG (FIX: Hiển thị DD/MM/YYYY) */}
                   <div>
                     <label className={labelClass}>Ngày Đăng Ký</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.NGAY_DANG_KI}
-                      value={formData[ORDER_FIELDS.NGAY_DANG_KI]}
+                      value={displayDate(formData[ORDER_FIELDS.NGAY_DANG_KI])}
                       readOnly={isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)}
                       className={`${inputClass} ${
                         isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)
@@ -563,11 +548,11 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Hết Hạn</label>
+                    <label className={labelClass}>Ngày Hết Hạn</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.HET_HAN}
-                      value={formData[ORDER_FIELDS.HET_HAN]}
+                      value={displayDate(formData[ORDER_FIELDS.HET_HAN])}
                       readOnly={isReadOnly(ORDER_FIELDS.HET_HAN)}
                       className={`${inputClass} ${
                         isReadOnly(ORDER_FIELDS.HET_HAN) ? readOnlyClass : ""
@@ -579,7 +564,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
               {/* Cột 3: Thông tin Tài chính & Ghi chú */}
               <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
+                <h4
+                  className
+                  className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2"
+                >
                   Thông tin Tài chính & Ghi chú
                 </h4>
                 <div className="space-y-4">
@@ -589,7 +577,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.GIA_NHAP}
-                      value={formatCurrency(formData[ORDER_FIELDS.GIA_NHAP])}
+                      value={Helpers.formatCurrency(formData[ORDER_FIELDS.GIA_NHAP])}
                       readOnly={isReadOnly(ORDER_FIELDS.GIA_NHAP)}
                       className={`${inputClass} font-semibold text-blue-700 ${
                         isReadOnly(ORDER_FIELDS.GIA_NHAP) ? readOnlyClass : ""
@@ -601,7 +589,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.GIA_BAN}
-                      value={formatCurrency(formData[ORDER_FIELDS.GIA_BAN])}
+                      value={Helpers.formatCurrency(formData[ORDER_FIELDS.GIA_BAN])}
                       readOnly={isReadOnly(ORDER_FIELDS.GIA_BAN)}
                       className={`${inputClass} font-semibold text-green-700 ${
                         isReadOnly(ORDER_FIELDS.GIA_BAN) ? readOnlyClass : ""
@@ -648,3 +636,4 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 };
 
 export default EditOrderModal;
+

@@ -1,9 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShoppingBagIcon,
-  CurrencyDollarIcon,
-  TruckIcon,
-  CheckCircleIcon,
   ArrowUpIcon,
   ArrowDownIcon,
   CalendarDaysIcon, // Icon mới cho Đơn Đến Hạn
@@ -22,31 +19,38 @@ import {
   Bar,
 } from "recharts";
 
-// --- MÔ PHỎNG LOGIC TÍNH TOÁN DỮ LIỆU THỐNG KÊ ---
-// Trong một ứng dụng thực tế, hàm này sẽ gọi API để lấy dữ liệu.
-// Tôi đang giả định ngày hiện tại là ngày 15/10 để mô phỏng logic tính toán so sánh chu kỳ.
+// Định nghĩa kiểu dữ liệu cho dữ liệu thống kê nhận được từ API
+interface StatsApiResponse {
+  totalOrders: { current: number; previous: number };
+  totalImports: { current: number; previous: number };
+  totalProfit: { current: number; previous: number };
+  overdueOrders: { count: number };
+}
 
-interface StatData {
+// Định nghĩa kiểu dữ liệu cho dữ liệu thống kê đã xử lý
+interface ProcessedStat {
   name: string;
-  current: number;
-  previous: number;
-  isCurrency: boolean;
-  unit?: string;
+  value: string;
+  change: string;
+  changeType: "increase" | "decrease" | "alert";
+  icon: React.ElementType;
+  color: string;
 }
 
 /**
- * Hàm mô phỏng tính toán giá trị và tỷ lệ thay đổi cho mục thống kê
+ * Hàm tính toán giá trị và tỷ lệ thay đổi cho mục thống kê
  * dựa trên dữ liệu hiện tại và dữ liệu chu kỳ trước.
  */
-const calculateStat = ({
-  name,
-  current,
-  previous,
-  isCurrency = false,
-  unit = "",
-}: StatData) => {
+const calculateStat = (
+  name: string,
+  current: number,
+  previous: number,
+  isCurrency: boolean
+): Omit<ProcessedStat, "icon" | "color" | "changeType"> & {
+  changeType: "increase" | "decrease";
+} => {
   const value = isCurrency
-    ? current.toLocaleString("vi-VN") + unit
+    ? current.toLocaleString("vi-VN")
     : current.toLocaleString();
   let change = 0;
   if (previous !== 0) {
@@ -55,7 +59,8 @@ const calculateStat = ({
     change = 100; // Tăng 100% nếu tháng trước bằng 0
   }
 
-  const changeType = change >= 0 ? "increase" : "decrease";
+  const changeType: "increase" | "decrease" =
+    change >= 0 ? "increase" : "decrease";
   const changeValue = `${change >= 0 ? "+" : ""}${Math.abs(change).toFixed(
     1
   )}%`;
@@ -68,77 +73,112 @@ const calculateStat = ({
   };
 };
 
-// --- DỮ LIỆU MẪU ĐƯỢC MÔ PHỎNG VỚI LOGIC MỚI ---
-// Giả định dữ liệu thực tế cho chu kỳ 1/10 - 15/10 so với 1/9 - 15/9
-
-const totalOrdersData = calculateStat({
-  name: "Tổng đơn hàng",
-  current: 1547, // Tổng đơn hàng 1/10 - 15/10
-  previous: 1350, // Tổng đơn hàng 1/9 - 15/9
-  isCurrency: false,
-});
-
-const overdueOrdersData = {
-  // Đơn Đến Hạn: tổng hợp lại các đơn đang Cần Gia Hạn (con_lai <=4). Không có so sánh chu kỳ tháng trước.
-  name: "Đơn Đến Hạn",
-  value: "45", // Giá trị cố định mô phỏng
-  change: "Cần xử lý", // Thay đổi thông báo trạng thái thay vì %
-  changeType: "alert", // Loại thay đổi mới để áp dụng màu sắc cảnh báo
-};
-
-const totalImportsData = calculateStat({
-  name: "Tổng Nhập Hàng",
-  current: 65000000, // Tổng tiền giá nhập 1/10 - 15/10
-  previous: 58000000, // Tổng tiền giá nhập 1/9 - 15/9
-  isCurrency: true,
-  unit: "", // Đơn vị tiền tệ sẽ được thêm vào trong hàm calculateStat
-});
-
-const totalProfitData = calculateStat({
-  name: "Tổng Lợi Nhuận",
-  current: 25000000, // Tổng (giá bán - giá nhập) 1/10 - 15/10
-  previous: 21000000, // Tổng (giá bán - giá nhập) 1/9 - 15/9
-  isCurrency: true,
-  unit: "",
-});
-
-const statsData = [
-  {
-    ...totalOrdersData,
-    icon: ShoppingBagIcon,
-    color: "bg-blue-500",
-  },
-  {
-    ...overdueOrdersData,
-    icon: CalendarDaysIcon, // Icon mới
-    color: "bg-red-500", // Màu mới cho cảnh báo
-  },
-  {
-    ...totalImportsData,
-    icon: ArchiveBoxIcon, // Icon mới
-    color: "bg-orange-500",
-  },
-  {
-    ...totalProfitData,
-    icon: ChartBarIcon, // Icon mới
-    color: "bg-green-500", // Thay đổi màu sắc phù hợp hơn với lợi nhuận
-  },
-];
-
-// Dữ liệu biểu đồ vẫn giữ nguyên
+// Dữ liệu biểu đồ vẫn giữ nguyên (MOCK DATA)
 const revenueData = [
   { month: "T1", revenue: 45000000 },
-  // ... (Dữ liệu khác giữ nguyên)
+  { month: "T2", revenue: 50000000 },
+  { month: "T3", revenue: 62000000 },
+  { month: "T4", revenue: 55000000 },
+  { month: "T5", revenue: 70000000 },
+  { month: "T6", revenue: 68000000 },
+  { month: "T7", revenue: 75000000 },
+  { month: "T8", revenue: 80000000 },
+  { month: "T9", revenue: 90000000 },
+  { month: "T10", revenue: 85000000 },
+  { month: "T11", revenue: 92000000 },
   { month: "T12", revenue: 98000000 },
 ];
 
 const orderStatusData = [
   { status: "Chờ xử lý", count: 45 },
-  // ... (Dữ liệu khác giữ nguyên)
+  { status: "Đang xử lý", count: 120 },
+  { status: "Đang giao", count: 75 },
+  { status: "Hoàn thành", count: 450 },
   { status: "Đã hủy", count: 8 },
 ];
 
 export default function Dashboard() {
+  const [statsData, setStatsData] = useState<ProcessedStat[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const API_BASE =
+    (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
+    (process.env.VITE_API_BASE_URL as string) ||
+    "http://localhost:3001";
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/dashboard/stats`
+        );
+        if (!response.ok) {
+          throw new Error("Lỗi khi tải dữ liệu thống kê từ API.");
+        }
+        const data: StatsApiResponse = await response.json();
+
+        // Xử lý dữ liệu và định dạng lại
+        const newStats: ProcessedStat[] = [
+          {
+            ...calculateStat(
+              "Tổng đơn hàng",
+              data.totalOrders.current,
+              data.totalOrders.previous,
+              false
+            ),
+            icon: ShoppingBagIcon,
+            color: "bg-blue-500",
+          },
+          {
+            name: "Đơn Đến Hạn",
+            value: data.overdueOrders.count.toLocaleString(),
+            change: "Cần xử lý",
+            changeType: "alert",
+            icon: CalendarDaysIcon,
+            color: "bg-red-500",
+          },
+          {
+            ...calculateStat(
+              "Tổng Nhập Hàng",
+              data.totalImports.current,
+              data.totalImports.previous,
+              true
+            ),
+            icon: ArchiveBoxIcon,
+            color: "bg-orange-500",
+          },
+          {
+            ...calculateStat(
+              "Tổng Lợi Nhuận",
+              data.totalProfit.current,
+              data.totalProfit.previous,
+              true
+            ),
+            icon: ChartBarIcon,
+            color: "bg-green-500",
+          },
+        ];
+
+        setStatsData(newStats);
+      } catch (error) {
+        console.error("Lỗi khi tải dữ liệu dashboard:", error);
+        // Có thể thêm logic hiển thị lỗi cho người dùng ở đây
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []); // Chỉ chạy một lần khi component mount
+
+  if (loading) {
+    return (
+      <div className="text-center py-10">
+        <p className="text-lg font-medium text-gray-700">Đang tải dữ liệu...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

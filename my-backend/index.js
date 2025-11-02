@@ -6,14 +6,23 @@ const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const updateDatabaseTask = require("./scheduler");
+const Helpers = require("./helpers");
 
 const app = express();
 const port = 3001;
 
 // 1) CORS
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim());
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow non-browser or same-origin
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS: " + origin));
+    },
   })
 );
 
@@ -39,13 +48,180 @@ function daysFromMonths(months) {
   return months * 30;
 }
 
+/**
+ * FIX LỖI DB DATE: Chuyển đổi định dạng ngày từ DD/MM/YYYY (từ Frontend) sang YYYY-MM-DD (cho DB DATE type).
+ * @param {string} dmyString - Ngày ở định dạng DD/MM/YYYY
+ * @returns {string} Ngày ở định dạng YYYY-MM-DD
+ */
+function convertDMYToYMD(dmyString) {
+  if (
+    !dmyString ||
+    typeof dmyString !== "string" ||
+    dmyString.length < 10 ||
+    dmyString.indexOf("/") === -1
+  ) {
+    return dmyString;
+  }
+  const parts = dmyString.split("/");
+  // parts[0]=DD, parts[1]=MM, parts[2]=YYYY
+  if (parts.length === 3) {
+    // Return YYYY-MM-DD
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dmyString;
+}
+
+// =============== Helpers cho Dashboard Stats ===============
+
+/**
+ * Tính toán ngày bắt đầu và kết thúc cho chu kỳ hiện tại và chu kỳ trước.
+ * @returns {object} { currentStart, currentEnd, previousStart, previousEnd } (dạng 'YYYY-MM-DD')
+ */
+function calculatePeriods() {
+  const now = new Date();
+  // Lấy ngày giả định MOCK_DATE nếu đang ở chế độ test
+  if (process.env.MOCK_DATE) {
+    const mockDate = new Date(process.env.MOCK_DATE);
+    if (!isNaN(mockDate)) {
+      now.setTime(mockDate.getTime());
+    }
+  }
+
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const currentDay = now.getDate();
+
+  // Chu kỳ Hiện tại: 1/Tháng hiện tại đến Ngày hiện tại
+  const currentStart = new Date(currentYear, currentMonth, 1);
+  const currentEnd = new Date(currentYear, currentMonth, currentDay); // Ngày hôm nay
+
+  // Chu kỳ Trước: 1/Tháng trước đến Ngày tương ứng của tháng trước
+  const previousStart = new Date(currentYear, currentMonth - 1, 1);
+  const previousEnd = new Date(currentYear, currentMonth - 1, currentDay);
+
+  // Format sang 'YYYY-MM-DD' để SQL dễ xử lý
+  const formatDate = (d) => d.toISOString().split("T")[0];
+
+  return {
+    currentStart: formatDate(currentStart),
+    currentEnd: formatDate(currentEnd),
+    previousStart: formatDate(previousStart),
+    previousEnd: formatDate(previousEnd),
+  };
+}
+
 // =============== API Endpoints ===============
+
+// GET /api/dashboard/stats — Lấy 4 mục thống kê chính
+app.get("/api/dashboard/stats", async (_req, res) => {
+  console.log("[GET] /api/dashboard/stats");
+  const periods = Helpers.calculatePeriods();
+
+  // FIX: Loại bỏ TO_DATE vì các cột ngày đã là DATE type
+  const q = `
+    -- CTE: Lọc dữ liệu cho cả 2 chu kỳ (ngay_dang_ki đã là DATE)
+    WITH period_data AS (
+      SELECT
+          id_don_hang,
+          ngay_dang_ki AS registration_date, -- Dùng trực tiếp
+          gia_nhap,
+          gia_ban,
+          (het_han - CURRENT_DATE) AS days_left -- Dùng trực tiếp
+      FROM mavryk.order_list
+      WHERE 
+          -- Lọc cho cả hai chu kỳ tính toán
+          ngay_dang_ki BETWEEN $1::date AND $2::date  -- Dùng trực tiếp
+          OR ngay_dang_ki BETWEEN $3::date AND $4::date -- Dùng trực tiếp
+    )
+    SELECT
+      -- 1. TỔNG ĐƠN HÀNG
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $3::date AND $4::date THEN 1 
+        ELSE 0 
+      END), 0) AS total_orders_current,
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $1::date AND $2::date THEN 1 
+        ELSE 0 
+      END), 0) AS total_orders_previous,
+      
+      -- 2. TỔNG NHẬP HÀNG (Tổng giá nhập)
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $3::date AND $4::date THEN gia_nhap 
+        ELSE 0 
+      END), 0) AS total_imports_current,
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $1::date AND $2::date THEN gia_nhap 
+        ELSE 0 
+      END), 0) AS total_imports_previous,
+
+      -- 3. TỔNG LỢI NHUẬN (Tổng giá bán - Tổng giá nhập)
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $3::date AND $4::date THEN (gia_ban - gia_nhap)
+        ELSE 0 
+      END), 0) AS total_profit_current,
+      COALESCE(SUM(CASE 
+        WHEN registration_date BETWEEN $1::date AND $2::date THEN (gia_ban - gia_nhap) 
+        ELSE 0 
+      END), 0) AS total_profit_previous,
+      
+      -- 4. ĐƠN ĐẾN HẠN (Số đơn còn 1-4 ngày, tính theo ngày hiện tại)
+      (
+        SELECT COUNT(id_don_hang)
+        FROM mavryk.order_list
+        WHERE (het_han - CURRENT_DATE) BETWEEN 1 AND 4 -- Dùng trực tiếp
+      ) AS overdue_orders_count
+    FROM period_data;
+  `;
+
+  try {
+    const result = await pool.query(q, [
+      periods.previousStart,
+      periods.previousEnd,
+      periods.currentStart,
+      periods.currentEnd,
+    ]);
+
+    // Format dữ liệu trả về theo cấu trúc Dashboard mong muốn
+    const data = result.rows[0];
+
+    res.json({
+      totalOrders: {
+        current: Number(data.total_orders_current),
+        previous: Number(data.total_orders_previous),
+      },
+      totalImports: {
+        current: Number(data.total_imports_current),
+        previous: Number(data.total_imports_previous),
+      },
+      totalProfit: {
+        current: Number(data.total_profit_current),
+        previous: Number(data.total_profit_previous),
+      },
+      overdueOrders: {
+        count: Number(data.overdue_orders_count),
+      },
+      periods: periods,
+    });
+  } catch (err) {
+    console.error("Lỗi truy vấn (GET /api/dashboard/stats):", err);
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy dữ liệu thống kê" });
+  }
+});
 
 // GET /api/orders
 app.get("/api/orders", async (_req, res) => {
   console.log("[GET] /api/orders");
   try {
-    const result = await pool.query("SELECT * FROM mavryk.order_list");
+    // FIX: Loại bỏ TO_DATE và tính cột so_ngay_con_lai
+    const result = await pool.query(`
+      SELECT 
+        *, 
+        -- Tính số ngày còn lại: (Ngày Hết Hạn - Ngày Hiện Tại)
+        (het_han - CURRENT_DATE) AS so_ngay_con_lai 
+      FROM mavryk.order_list
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn (GET /api/orders):", err);
@@ -55,6 +231,7 @@ app.get("/api/orders", async (_req, res) => {
 
 // GET /api/supplies
 app.get("/api/supplies", async (_req, res) => {
+  // ... (endpoint này giữ nguyên)
   console.log("[GET] /api/supplies");
   try {
     const result = await pool.query(
@@ -63,12 +240,15 @@ app.get("/api/supplies", async (_req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn (GET /api/supplies):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi lấy danh sách nguồn" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy danh sách nguồn" });
   }
 });
 
 // GET /api/supplies/:supplyId/products
 app.get("/api/supplies/:supplyId/products", async (req, res) => {
+  // ... (endpoint này giữ nguyên)
   const { supplyId } = req.params;
   console.log(`[GET] /api/supplies/${supplyId}/products`);
   const q = `
@@ -83,17 +263,19 @@ app.get("/api/supplies/:supplyId/products", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn (GET supplies/:id/products):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi lấy sản phẩm theo nguồn" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy sản phẩm theo nguồn" });
   }
 });
 
-// GET /api/products (chỉ sản phẩm active)
+// GET /api/products
 app.get("/api/products", async (_req, res) => {
+  // ... (endpoint này giữ nguyên)
   console.log("[GET] /api/products");
   const q = `
     SELECT id, san_pham
     FROM mavryk.product_price
-    WHERE is_active = TRUE
     ORDER BY san_pham;
   `;
   try {
@@ -101,12 +283,15 @@ app.get("/api/products", async (_req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn (GET /api/products):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi lấy danh sách sản phẩm" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy danh sách sản phẩm" });
   }
 });
 
 // GET /api/products/supplies-by-name/:productName
 app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
+  // ... (endpoint này giữ nguyên)
   const { productName } = req.params;
   console.log(`[GET] /api/products/supplies-by-name/${productName}`);
   const q = `
@@ -122,12 +307,15 @@ app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Lỗi truy vấn (GET supplies-by-name):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi lấy nguồn theo tên sản phẩm" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server nội bộ khi lấy nguồn theo tên sản phẩm" });
   }
 });
 
 // POST /api/calculate-price — tính giá nhập (max) + giá bán theo hệ số
 app.post("/api/calculate-price", async (req, res) => {
+  // ... (endpoint này giữ nguyên)
   console.log("[POST] /api/calculate-price");
   const { san_pham_name, id_don_hang, customer_type } = req.body || {};
 
@@ -153,7 +341,9 @@ app.post("/api/calculate-price", async (req, res) => {
     `;
     const db = await pool.query(q, [san_pham_name]);
     if (db.rowCount === 0 || db.rows[0].gia_nhap_co_so === null) {
-      return res.status(404).json({ error: "Không tìm thấy giá cho sản phẩm này." });
+      return res
+        .status(404)
+        .json({ error: "Không tìm thấy giá cho sản phẩm này." });
     }
 
     const basePrice = Number(db.rows[0].gia_nhap_co_so);
@@ -170,14 +360,14 @@ app.post("/api/calculate-price", async (req, res) => {
     finalPrice = Math.round(isMAVC ? basePrice * pctCtv : basePrice * pctKhach);
 
     // Số ngày theo mẫu --xm
-    const months = monthsFromString(san_pham_name);
-    const days = daysFromMonths(months) || 30;
+    const months = Helpers.monthsFromString(san_pham_name);
+    const days = Helpers.daysFromMonths(months) || 30;
 
     res.json({
       gia_nhap: basePrice,
       gia_ban: finalPrice,
       so_ngay_da_dang_ki: Number(days),
-      het_han: "", // FE tự tính từ ngày đăng ký + (days - 1)
+      het_han: "",
     });
   } catch (err) {
     console.error(`[ERROR] Tính giá (${id_don_hang}):`, err.message || err);
@@ -189,7 +379,15 @@ app.post("/api/calculate-price", async (req, res) => {
 app.post("/api/orders", async (req, res) => {
   console.log("[POST] /api/orders (Tạo mới)");
   const newOrderData = { ...req.body };
-  delete newOrderData.id; // DB tự sinh id
+  delete newOrderData.id;
+
+  // FIX LỖI DB DATE: Chuyển đổi định dạng ngày trước khi insert
+  if (newOrderData.ngay_dang_ki) {
+    newOrderData.ngay_dang_ki = Helpers.convertDMYToYMD(newOrderData.ngay_dang_ki);
+  }
+  if (newOrderData.het_han) {
+    newOrderData.het_han = Helpers.convertDMYToYMD(newOrderData.het_han);
+  }
 
   const keys = Object.keys(newOrderData);
   const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
@@ -200,7 +398,9 @@ app.post("/api/orders", async (req, res) => {
     const q = `INSERT INTO mavryk.order_list (${columns}) VALUES (${placeholders}) RETURNING *;`;
     const result = await pool.query(q, values);
     if (result.rows.length === 0) {
-      return res.status(500).json({ error: "Không thể tạo đơn hàng (không có dữ liệu trả về)." });
+      return res
+        .status(500)
+        .json({ error: "Không thể tạo đơn hàng (không có dữ liệu trả về)." });
     }
     console.log(`Đã tạo đơn hàng ID: ${result.rows[0].id_don_hang}`);
     res.status(201).json(result.rows[0]);
@@ -212,6 +412,7 @@ app.post("/api/orders", async (req, res) => {
 
 // GET /api/products/all-prices-by-name/:productName — lấy tất cả giá theo nguồn cho 1 sản phẩm
 app.get("/api/products/all-prices-by-name/:productName", async (req, res) => {
+  // ... (endpoint này giữ nguyên)
   const { productName } = req.params;
   const q = `
     SELECT sp.source_id, sp.price
@@ -230,10 +431,13 @@ app.get("/api/products/all-prices-by-name/:productName", async (req, res) => {
 
 // GET /api/run-scheduler — chạy thử cron job
 app.get("/api/run-scheduler", async (_req, res) => {
+  // ... (endpoint này giữ nguyên)
   console.log("--- KÍCH HOẠT CHẠY CRON JOB THỬ CÔNG ---");
   try {
     await updateDatabaseTask();
-    res.status(200).json({ success: true, message: "Đã chạy cron job thành công." });
+    res
+      .status(200)
+      .json({ success: true, message: "Đã chạy cron job thành công." });
   } catch (err) {
     res.status(500).json({ error: "Lỗi server nội bộ khi chạy cron job." });
   }
@@ -243,4 +447,3 @@ app.get("/api/run-scheduler", async (_req, res) => {
 app.listen(port, () => {
   console.log(`Backend server đang chạy tại http://localhost:${port}`);
 });
-

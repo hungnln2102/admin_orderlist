@@ -1,7 +1,8 @@
 import React from "react";
+import * as Helpers from "../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-// Interface Order (Giữ nguyên)
+// Interface Order (Đã thêm trường ảo và trường so_ngay_con_lai từ Backend)
 interface Order {
   id: number;
   id_don_hang: string;
@@ -18,7 +19,8 @@ interface Order {
   gia_ban: number;
   note: string;
   tinh_trang: string;
-  soNgayConLai?: number;
+  // Trường từ Backend (so_ngay_con_lai) và trường ảo (trangThaiText, giaTriConLai)
+  so_ngay_con_lai?: number;
   giaTriConLai?: number;
   trangThaiText?: string;
 }
@@ -29,6 +31,22 @@ interface ViewOrderModalProps {
   order: Order | null;
   formatCurrency: (value: number | string) => string;
 }
+
+// Hàm Helper để hiển thị màu trạng thái
+const getStatusColor = (status: string) => {
+  const lowerStatus = (status || "").toLowerCase();
+  switch (lowerStatus) {
+    case "đã thanh toán":
+      return "bg-green-100 text-green-800";
+    case "chưa thanh toán":
+    case "cần gia hạn":
+      return "bg-yellow-100 text-yellow-800";
+    case "hết hạn":
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
 
 const BANK_SHORT_CODE = "VPB";
 const ACCOUNT_NO = "9183400998";
@@ -42,11 +60,14 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 }) => {
   if (!isOpen || !order) return null;
 
+  // Lấy giá trị đã được tính toán từ Orders.tsx
   const displayStatus = order.trangThaiText || order.tinh_trang;
   const displayRemainingValue =
     order.giaTriConLai !== undefined ? order.giaTriConLai : 0;
+
+  // FIX: Lấy soNgayConLai (từ Backend)
   const displayRemainingDays =
-    order.soNgayConLai !== undefined ? order.soNgayConLai : 0;
+    order.so_ngay_con_lai !== undefined ? order.so_ngay_con_lai : 0;
 
   // --- Logic Giá Trị Hiển Thị ---
   const displayPriceClass =
@@ -55,15 +76,14 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       ? "text-red-600"
       : "text-green-600";
 
-  // --- Tạo Link VietQR (Đã sửa lỗi URL) ---
+  // --- Tạo Link VietQR ---
   const qrAmount = order.gia_ban;
   const qrMessage = order.id_don_hang;
 
   const safeQrAmount = Math.round(Math.max(0, Number(qrAmount)));
 
-  // SỬA CẤU TRÚC: Chỉ sử dụng BANK_SHORT_CODE
   const qrCodeImageUrl =
-    `https://img.vietqr.io/image/${BANK_SHORT_CODE}-${ACCOUNT_NO}-compact2.png` + // <-- Đã dùng BANK_SHORT_CODE
+    `https://img.vietqr.io/image/${BANK_SHORT_CODE}-${ACCOUNT_NO}-compact2.png` +
     `?amount=${safeQrAmount}` +
     `&addInfo=${encodeURIComponent(qrMessage)}` +
     `&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
@@ -71,13 +91,24 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 transition-opacity duration-300 px-4 py-6">
       {/* Khung Modal */}
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden">
+      <div
+        className
+        className="bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden"
+      >
         {/* Header */}
         <div className="flex justify-center items-center p-4 border-b bg-gray-50 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-gray-800">
             Chi tiết đơn hàng:{" "}
             <span className="text-blue-600">{order.id_don_hang}</span>
           </h3>
+          {/* Nút đóng */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
         </div>
 
         {/* Body (Cho phép cuộn) */}
@@ -121,7 +152,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <dt className="font-medium text-gray-500 w-1/3">Trạng thái:</dt>
                 <dd className="w-2/3 text-right">
                   <span
-                    className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${getStatusColor(
+                    className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
                       displayStatus
                     )}`}
                   >
@@ -245,21 +276,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       </div>
     </div>
   );
-};
-
-// Hàm getStatusColor (Giữ nguyên)
-const getStatusColor = (status: string) => {
-  const lowerStatus = (status || "").toLowerCase();
-  switch (lowerStatus) {
-    case "đã thanh toán":
-      return "bg-green-100 text-green-800";
-    case "chưa thanh toán":
-      return "bg-yellow-100 text-yellow-800";
-    case "hết hạn":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
 };
 
 export default ViewOrderModal;

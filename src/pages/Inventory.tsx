@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import * as Helpers from "../lib/helpers";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -291,7 +292,7 @@ export default function Inventory() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
                         item.status
                       )}`}
                     >
@@ -324,3 +325,4 @@ export default function Inventory() {
     </div>
   );
 }
+

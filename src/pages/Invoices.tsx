@@ -115,6 +115,8 @@ const invoiceStats = [
   },
 ];
 
+import * as Helpers from "../lib/helpers";
+
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -301,7 +303,7 @@ export default function Invoices() {
                     <div className="flex items-center">
                       {getStatusIcon(invoice.status)}
                       <span
-                        className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                        className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
                           invoice.status
                         )}`}
                       >
@@ -375,3 +377,4 @@ export default function Invoices() {
     </div>
   );
 }
+

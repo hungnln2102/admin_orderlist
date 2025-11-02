@@ -17,7 +17,7 @@ const getSqlCurrentDate = () => {
     return `'${process.env.MOCK_DATE}'::date`;
   }
   // Trả về ngày hiện tại thực tế của PostgreSQL
-  return "CURRENT_DATE";
+  return "(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date";
 };
 
 /**
@@ -114,6 +114,17 @@ const updateDatabaseTask = async () => {
       );
     }
 
+    // 2a) Update 0 ngay con lai -> 'Het Han'
+    const dueToday = await client.query(`
+      UPDATE mavryk.order_list
+      SET tinh_trang = 'Het Han',
+          check_flag = NULL
+      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) = 0
+        AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
+        AND (tinh_trang IS DISTINCT FROM 'Het Han');
+    `);
+    console.log(`  - Cap nhat ${dueToday.rowCount} don sang 'Het Han' (0 ngay).`);
+
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const del = await client.query(`
       DELETE FROM mavryk.order_list
@@ -128,12 +139,14 @@ const updateDatabaseTask = async () => {
     }
 
     // 2) Update "Can Gia Han" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
+    // 2b) Update 1..4 ngay -> 'Can Gia Han'
     const soon = await client.query(`
       UPDATE mavryk.order_list
       SET tinh_trang = 'Can Gia Han',
           check_flag = NULL
       WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) BETWEEN 1 AND 4
-        AND tinh_trang <> 'Da Thanh Toan';
+        AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
+        AND (tinh_trang IS DISTINCT FROM 'Het Han');
     `);
     console.log(
       `  - Cap nhat ${soon.rowCount} don sang 'Can Gia Han' (1..4 ngay).`

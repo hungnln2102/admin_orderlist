@@ -1,4 +1,4 @@
-// Orders.tsx - Mã đã được làm sạch
+// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -16,17 +16,53 @@ import {
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
 
-import { API_ENDPOINTS, ORDER_FIELDS, VIRTUAL_FIELDS } from "../constants";
-
 // Import Modal tùy chỉnh
 import ConfirmModal from "../components/ConfirmModal";
 import ViewOrderModal from "../components/ViewOrderModal";
 import EditOrderModal from "../components/EditOrderModal";
 import CreateOrderModal from "../components/CreateOrderModal";
+import * as Helpers from "../lib/helpers";
+
+const API_BASE =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (process.env.VITE_API_BASE_URL as string) ||
+  "http://localhost:3001";
 
 // =======================================================
 // 1. INTERFACES VÀ CONSTANTS
 // =======================================================
+
+// Khai báo lại các constants
+const API_ENDPOINTS = {
+  ORDERS: "/api/orders",
+  ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
+  // ... (Thêm các endpoints khác nếu cần)
+};
+
+const ORDER_FIELDS = {
+  ID_DON_HANG: "id_don_hang",
+  SAN_PHAM: "san_pham",
+  THONG_TIN_SAN_PHAM: "thong_tin_san_pham",
+  KHACH_HANG: "khach_hang",
+  LINK_LIEN_HE: "link_lien_he",
+  SLOT: "slot",
+  NGAY_DANG_KI: "ngay_dang_ki",
+  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
+  HET_HAN: "het_han",
+  NGUON: "nguon",
+  GIA_NHAP: "gia_nhap",
+  GIA_BAN: "gia_ban",
+  NOTE: "note",
+  TINH_TRANG: "tinh_trang",
+  CHECK_FLAG: "check_flag",
+};
+
+const VIRTUAL_FIELDS = {
+  SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
+  GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
+  TRANG_THAI_TEXT: "trang_thai_text_virtual",
+  CHECK_FLAG_STATUS: "check_flag_status_virtual",
+};
 
 // Interface Order (dựa trên DB + trường ảo)
 interface Order {
@@ -37,19 +73,22 @@ interface Order {
   khach_hang: string;
   link_lien_he: string;
   slot: string;
-  ngay_dang_ki: string;
+  ngay_dang_ki: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
   so_ngay_da_dang_ki: string;
-  het_han: string;
+  het_han: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
   nguon: string;
-  gia_nhap: number;
-  gia_ban: number;
+  gia_nhap: string; // String/Numeric từ DB
+  gia_ban: string; // String/Numeric từ DB
   note: string;
   tinh_trang: string;
-  check_flag: boolean;
-  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]?: number;
-  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]?: number;
-  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]?: string;
-  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]?: boolean | null;
+  check_flag: boolean | null;
+  // Trường từ Backend:
+  so_ngay_con_lai: number;
+  // Trường ảo Frontend:
+  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
+  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
+  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
+  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
 }
 
 // Cấu trúc Stats
@@ -75,22 +114,28 @@ const stockStats = [
   },
 ];
 
-// Hàm Helper để xử lý ngày tháng (dd/mm/yyyy)
-const parseDMY = (dateString: string): Date => {
-  if (!dateString) return new Date(NaN);
-  const [day, month, year] = dateString.split("/").map(Number);
-  return new Date(year, month - 1, day); // Tháng trong JS là 0-indexed
-};
-
-// Hàm Helper để kiểm tra ngày đăng ký có phải là hôm nay không (dd/mm/yyyy)
-const isRegisteredToday = (dateString: string, today: Date): boolean => {
+// Hàm Helper để kiểm tra ngày đăng ký có phải là hôm nay không (DD/MM/YYYY hoặc YYYY-MM-DD)
+// Giữ lại hàm này để logic tính Stats Đăng ký Hôm Nay vẫn hoạt động
+const isRegisteredToday = (dateString: string): boolean => {
   if (!dateString) return false;
-  const [day, month, year] = dateString.split("/").map(Number);
-  if (!day || !month || !year) return false;
 
-  const registerDate = new Date(year, month - 1, day);
+  // Tạo ngày hiện tại (chỉ ngày, không giờ)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let registerDate: Date;
+
+  if (dateString.includes("-")) {
+    // Nếu là YYYY-MM-DD (định dạng chuẩn từ DB sau chuẩn hóa)
+    registerDate = new Date(dateString);
+  } else {
+    // Nếu là DD/MM/YYYY (trường hợp cũ)
+    const [day, month, year] = dateString.split("/").map(Number);
+    if (!day || !month || !year) return false;
+    registerDate = new Date(year, month - 1, day);
+  }
+
   registerDate.setHours(0, 0, 0, 0);
-
   return registerDate.getTime() === today.getTime();
 };
 
@@ -100,7 +145,7 @@ const getStatusColor = (status: string) => {
     case "đã thanh toán":
       return "bg-green-100 text-green-800";
     case "chưa thanh toán":
-    case "cần gia hạn": // Thêm trạng thái này cho trực quan
+    case "cần gia hạn":
       return "bg-yellow-100 text-yellow-800";
     case "hết hạn":
       return "bg-red-100 text-red-800";
@@ -131,11 +176,13 @@ const getStatusPriority = (status: string): number => {
 
 const useOrdersData = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // ... (Các state Modal giữ nguyên)
   const [isModalOpen, setIsModalOpen] = useState(false); // Confirm Delete
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -144,30 +191,27 @@ const useOrdersData = () => {
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
-
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+  // ... (Các state Modal giữ nguyên)
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDERS}`
-      );
+      setLoading(true);
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`);
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
       const data = await response.json();
       if (Array.isArray(data)) {
-        setOrders(data);
+        // Ép kiểu dữ liệu so_ngay_con_lai từ DB (number) vào state
+        setOrders(data as Order[]);
       } else {
         console.error("Dữ liệu nhận được không phải là mảng:", data);
       }
     } catch (error) {
       console.error("Lỗi khi tải đơn hàng:", error);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -177,22 +221,22 @@ const useOrdersData = () => {
 
   // --- LOGIC TÍNH TOÁN CÁC TRƯỜNG ẢO VÀ LỌC ---
   const calculatedData = useMemo(() => {
+    // Không cần today: const today = new Date(); today.setHours(0, 0, 0, 0);
+
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
-      const expirationDate = parseDMY(order[ORDER_FIELDS.HET_HAN]);
-      const diffTime = expirationDate.getTime() - today.getTime();
-      let soNgayConLai = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (isNaN(soNgayConLai)) soNgayConLai = 0;
+      // FIX: Lấy trực tiếp so_ngay_con_lai từ API
+      const soNgayConLai = Number(order.so_ngay_con_lai) || 0;
 
       const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán";
       let trangThaiText = "";
       let check_flag_status: boolean | null = null;
 
+      // Logic trạng thái dựa trên soNgayConLai từ Backend
       if (soNgayConLai <= 0) {
         trangThaiText = "Hết Hạn";
         check_flag_status = null;
-        soNgayConLai = 0;
       } else if (soNgayConLai <= 4 && soNgayConLai > 0) {
-        trangThaiText = "Cần Gia Hạn"; // Trạng thái này giúp lọc/hiển thị rõ ràng hơn
+        trangThaiText = "Cần Gia Hạn";
         check_flag_status = null;
       } else {
         trangThaiText = dbStatus;
@@ -202,13 +246,16 @@ const useOrdersData = () => {
       const giaBan = Number(order[ORDER_FIELDS.GIA_BAN]) || 0;
       const soNgayDangKy = Number(order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
       let giaTriConLai = 0;
+
+      // Tính Giá Trị Còn Lại (Không tính giá trị khi đã hết hạn)
+      const daysForValue = Math.max(0, soNgayConLai);
       if (soNgayDangKy > 0) {
-        giaTriConLai = (giaBan * soNgayConLai) / soNgayDangKy;
+        giaTriConLai = (giaBan * daysForValue) / soNgayDangKy;
       }
 
       return {
         ...order,
-        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
+        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai, // Gán giá trị Backend
         [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
         [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
         [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
@@ -217,6 +264,7 @@ const useOrdersData = () => {
 
     const lowerSearchTerm = searchTerm.toLowerCase();
     const filteredOrders = ordersWithVirtualFields.filter((order) => {
+      // Logic lọc tìm kiếm (giữ nguyên)
       const matchesSearch =
         (order[ORDER_FIELDS.KHACH_HANG] || "")
           .toLowerCase()
@@ -228,9 +276,9 @@ const useOrdersData = () => {
           .toLowerCase()
           .includes(lowerSearchTerm);
 
+      // Logic lọc trạng thái (giữ nguyên)
       let matchesStatus = statusFilter === "all";
 
-      // Lọc theo trạng thái ảo
       if (!matchesStatus) {
         const statusText = (
           order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || ""
@@ -266,16 +314,16 @@ const useOrdersData = () => {
       const statusB = b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
 
       // 1. Sắp xếp CHÍNH theo Trạng thái (Priority: 1 -> 4)
-      const priorityA = getStatusPriority(statusA);
-      const priorityB = getStatusPriority(statusB);
+      const priorityA = Helpers.getStatusPriority(statusA);
+      const priorityB = Helpers.getStatusPriority(statusB);
 
       if (priorityA !== priorityB) {
         return priorityA - priorityB; // Sắp xếp từ ưu tiên cao (số nhỏ) đến thấp
       }
 
       // 2. Sắp xếp PHỤ theo Số Ngày Còn Lại (từ nhỏ đến lớn)
-      const remainingA = a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] || 0;
-      const remainingB = b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] || 0;
+      const remainingA = a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
+      const remainingB = b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
 
       if (remainingA !== remainingB) {
         return remainingA - remainingB; // Sắp xếp số từ nhỏ đến lớn
@@ -301,8 +349,9 @@ const useOrdersData = () => {
     const expiredOrders = ordersWithVirtualFields.filter(
       (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
     ).length;
+    // Cập nhật: Dùng hàm isRegisteredToday mới
     const registeredTodayCount = ordersWithVirtualFields.filter((order) =>
-      isRegisteredToday(order[ORDER_FIELDS.NGAY_DANG_KI], today)
+      Helpers.isRegisteredToday(order[ORDER_FIELDS.NGAY_DANG_KI])
     ).length;
 
     // Cập nhật mảng stats
@@ -320,16 +369,16 @@ const useOrdersData = () => {
     const currentOrders = filteredOrders.slice(indexOfFirstRow, indexOfLastRow);
 
     return { filteredOrders, currentOrders, totalPages, updatedStats };
-  }, [orders, searchTerm, statusFilter, rowsPerPage, currentPage, today]);
+  }, [orders, searchTerm, statusFilter, rowsPerPage, currentPage]);
 
-  // Reset trang khi lọc/tìm kiếm thay đổi
+  // Reset trang khi lọc/tìm kiếm thay đổi (giữ nguyên)
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, rowsPerPage]);
 
-  // --- HÀM XỬ LÝ MODAL VÀ CRUD ---
+  // --- HÀM XỬ LÝ MODAL VÀ CRUD (giữ nguyên) ---
 
-  // Modals
+  // Modals (giữ nguyên)
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
   const closeViewModal = () => {
@@ -345,7 +394,7 @@ const useOrdersData = () => {
     setOrderToDelete(null);
   };
 
-  // Hành động
+  // Hành động (giữ nguyên)
   const handleViewOrder = (order: Order) => {
     setOrderToView(order);
     setIsViewModalOpen(true);
@@ -361,13 +410,13 @@ const useOrdersData = () => {
     setIsModalOpen(true);
   };
 
-  // Lưu đơn hàng mới
+  // Lưu đơn hàng mới (giữ nguyên, nhưng cần đảm bảo EditOrderModal xử lý ngày)
   const handleSaveNewOrder = async (newOrderData: Partial<Order>) => {
     closeCreateModal();
 
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDERS}`,
+        `${API_BASE}${API_ENDPOINTS.ORDERS}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -381,13 +430,11 @@ const useOrdersData = () => {
         );
       }
 
+      // Refetch dữ liệu để đảm bảo tính toán mới nhất
+      await fetchOrders();
+
       const createdOrder: Order = await response.json();
-
-      // Cập nhật danh sách orders trên frontend
-      setOrders((prevOrders) => [createdOrder, ...prevOrders]);
-
-      // Mở Modal View cho đơn hàng vừa tạo
-      handleViewOrder(createdOrder);
+      handleViewOrder(createdOrder); // Mở Modal View cho đơn hàng vừa tạo
     } catch (error) {
       console.error("Lỗi khi tạo đơn hàng:", error);
       alert(
@@ -398,7 +445,7 @@ const useOrdersData = () => {
     }
   };
 
-  // Lưu đơn hàng đã chỉnh sửa
+  // Lưu đơn hàng đã chỉnh sửa (giữ nguyên)
   const handleSaveEdit = async (updatedOrder: Order) => {
     closeEditModal();
 
@@ -423,7 +470,7 @@ const useOrdersData = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDER_BY_ID(updatedOrder.id)}`,
+        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(updatedOrder.id)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -437,12 +484,8 @@ const useOrdersData = () => {
         );
       }
 
-      // Cập nhật state trên frontend với dữ liệu mới
-      setOrders((prevOrders) =>
-        prevOrders.map((order) =>
-          order.id === updatedOrder.id ? updatedOrder : order
-        )
-      );
+      // Refetch dữ liệu để đảm bảo tính toán mới nhất
+      await fetchOrders();
     } catch (error) {
       console.error("Lỗi khi cập nhật đơn hàng:", error);
       alert(
@@ -453,14 +496,14 @@ const useOrdersData = () => {
     }
   };
 
-  // Xác nhận xóa
+  // Xác nhận xóa (giữ nguyên)
   const confirmDelete = async () => {
     if (!orderToDelete) return;
     setIsModalOpen(false);
 
     try {
       const response = await fetch(
-        `http://localhost:3001${API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id)}`,
+        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id)}`,
         { method: "DELETE" }
       );
 
@@ -768,8 +811,18 @@ export default function Orders() {
                         {order[ORDER_FIELDS.HET_HAN] || ""}
                       </td>
                       {/* REMAINING (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm font-bold text-indigo-600 w-[70px] text-center">
-                        {soNgayConLai}
+                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm font-bold w-[70px] text-center">
+                        <span
+                          className={
+                            soNgayConLai <= 0
+                              ? "text-red-600"
+                              : soNgayConLai <= 4
+                              ? "text-orange-500"
+                              : "text-indigo-600"
+                          }
+                        >
+                          {soNgayConLai}
+                        </span>
                       </td>
 
                       {/* 3. GỘP SUPPLY + IMPORT */}
@@ -779,19 +832,19 @@ export default function Orders() {
                             {order[ORDER_FIELDS.NGUON] || "N/A"}
                           </span>
                           <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full">
-                            {formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
+                            {Helpers.formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
                           </span>
                         </div>
                       </td>
 
                       {/* PRICE (text-right) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[110px] text-right">
-                        {formatCurrency(order[ORDER_FIELDS.GIA_BAN])}
+                        {Helpers.formatCurrency(order[ORDER_FIELDS.GIA_BAN])}
                       </td>
 
                       {/* RESIDUAL VALUE (text-right) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[120px] text-right">
-                        {formatCurrency(giaTriConLai)}
+                        {Helpers.formatCurrency(giaTriConLai)}
                       </td>
 
                       {/* NOTE (text-center) */}
@@ -802,7 +855,7 @@ export default function Orders() {
                       {/* STATUS (text-center) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate w-[100px] text-center">
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
                             trangThaiText
                           )}`}
                         >
@@ -926,3 +979,4 @@ export default function Orders() {
     </div>
   );
 }
+

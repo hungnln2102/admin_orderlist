@@ -4,6 +4,7 @@ export const API_ENDPOINTS = {
   ORDER_EXPRIED: "/api/orders-expried",
 
   SUPPLIES: "/api/supplies",
+  PRODUCTS_BY_SUPPLY: (supplyId: number) => `/api/supplies/${supplyId}/products`,
   // SỬA CHỮA: Đổi tên PRODUCTS thành PRODUCTS_ALL để rõ ràng, nhưng vì logic fetch Products
   // trong file CreateOrderModal đã được viết để gọi endpoint này, chúng ta sẽ giữ lại:
   // PRODUCTS: "/api/products",
