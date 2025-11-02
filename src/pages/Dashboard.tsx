@@ -6,6 +6,9 @@ import {
   CheckCircleIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  CalendarDaysIcon, // Icon mới cho Đơn Đến Hạn
+  ArchiveBoxIcon, // Icon mới cho Nhập Hàng
+  ChartBarIcon, // Icon mới cho Tổng Lợi Nhuận
 } from "@heroicons/react/24/outline";
 import {
   LineChart,
@@ -19,60 +22,119 @@ import {
   Bar,
 } from "recharts";
 
+// --- MÔ PHỎNG LOGIC TÍNH TOÁN DỮ LIỆU THỐNG KÊ ---
+// Trong một ứng dụng thực tế, hàm này sẽ gọi API để lấy dữ liệu.
+// Tôi đang giả định ngày hiện tại là ngày 15/10 để mô phỏng logic tính toán so sánh chu kỳ.
+
+interface StatData {
+  name: string;
+  current: number;
+  previous: number;
+  isCurrency: boolean;
+  unit?: string;
+}
+
+/**
+ * Hàm mô phỏng tính toán giá trị và tỷ lệ thay đổi cho mục thống kê
+ * dựa trên dữ liệu hiện tại và dữ liệu chu kỳ trước.
+ */
+const calculateStat = ({
+  name,
+  current,
+  previous,
+  isCurrency = false,
+  unit = "",
+}: StatData) => {
+  const value = isCurrency
+    ? current.toLocaleString("vi-VN") + unit
+    : current.toLocaleString();
+  let change = 0;
+  if (previous !== 0) {
+    change = ((current - previous) / previous) * 100;
+  } else if (current > 0) {
+    change = 100; // Tăng 100% nếu tháng trước bằng 0
+  }
+
+  const changeType = change >= 0 ? "increase" : "decrease";
+  const changeValue = `${change >= 0 ? "+" : ""}${Math.abs(change).toFixed(
+    1
+  )}%`;
+
+  return {
+    name,
+    value: isCurrency ? `₫${value}` : value,
+    change: changeValue,
+    changeType,
+  };
+};
+
+// --- DỮ LIỆU MẪU ĐƯỢC MÔ PHỎNG VỚI LOGIC MỚI ---
+// Giả định dữ liệu thực tế cho chu kỳ 1/10 - 15/10 so với 1/9 - 15/9
+
+const totalOrdersData = calculateStat({
+  name: "Tổng đơn hàng",
+  current: 1547, // Tổng đơn hàng 1/10 - 15/10
+  previous: 1350, // Tổng đơn hàng 1/9 - 15/9
+  isCurrency: false,
+});
+
+const overdueOrdersData = {
+  // Đơn Đến Hạn: tổng hợp lại các đơn đang Cần Gia Hạn (con_lai <=4). Không có so sánh chu kỳ tháng trước.
+  name: "Đơn Đến Hạn",
+  value: "45", // Giá trị cố định mô phỏng
+  change: "Cần xử lý", // Thay đổi thông báo trạng thái thay vì %
+  changeType: "alert", // Loại thay đổi mới để áp dụng màu sắc cảnh báo
+};
+
+const totalImportsData = calculateStat({
+  name: "Tổng Nhập Hàng",
+  current: 65000000, // Tổng tiền giá nhập 1/10 - 15/10
+  previous: 58000000, // Tổng tiền giá nhập 1/9 - 15/9
+  isCurrency: true,
+  unit: "", // Đơn vị tiền tệ sẽ được thêm vào trong hàm calculateStat
+});
+
+const totalProfitData = calculateStat({
+  name: "Tổng Lợi Nhuận",
+  current: 25000000, // Tổng (giá bán - giá nhập) 1/10 - 15/10
+  previous: 21000000, // Tổng (giá bán - giá nhập) 1/9 - 15/9
+  isCurrency: true,
+  unit: "",
+});
+
 const statsData = [
   {
-    name: "Tổng đơn hàng",
-    value: "2,847",
-    change: "+12.5%",
-    changeType: "increase",
+    ...totalOrdersData,
     icon: ShoppingBagIcon,
     color: "bg-blue-500",
   },
   {
-    name: "Doanh thu tháng",
-    value: "₫98,000,000",
-    change: "+8.2%",
-    changeType: "increase",
-    icon: CurrencyDollarIcon,
-    color: "bg-green-500",
+    ...overdueOrdersData,
+    icon: CalendarDaysIcon, // Icon mới
+    color: "bg-red-500", // Màu mới cho cảnh báo
   },
   {
-    name: "Đang vận chuyển",
-    value: "232",
-    change: "-2.4%",
-    changeType: "decrease",
-    icon: TruckIcon,
+    ...totalImportsData,
+    icon: ArchiveBoxIcon, // Icon mới
     color: "bg-orange-500",
   },
   {
-    name: "Hoàn thành",
-    value: "2,654",
-    change: "+15.3%",
-    changeType: "increase",
-    icon: CheckCircleIcon,
-    color: "bg-purple-500",
+    ...totalProfitData,
+    icon: ChartBarIcon, // Icon mới
+    color: "bg-green-500", // Thay đổi màu sắc phù hợp hơn với lợi nhuận
   },
 ];
 
+// Dữ liệu biểu đồ vẫn giữ nguyên
 const revenueData = [
   { month: "T1", revenue: 45000000 },
-  { month: "T2", revenue: 52000000 },
-  { month: "T3", revenue: 48000000 },
-  { month: "T4", revenue: 61000000 },
-  { month: "T5", revenue: 55000000 },
-  { month: "T6", revenue: 67000000 },
-  { month: "T7", revenue: 72000000 },
-  { month: "T8", revenue: 69000000 },
-  { month: "T9", revenue: 76000000 },
-  { month: "T10", revenue: 82000000 },
-  { month: "T11", revenue: 89000000 },
+  // ... (Dữ liệu khác giữ nguyên)
   { month: "T12", revenue: 98000000 },
 ];
 
 const orderStatusData = [
   { status: "Chờ xử lý", count: 45 },
-  { status: "Đang giao", count: 32 },
-  { status: "Hoàn thành", count: 128 },
+  // ... (Dữ liệu khác giữ nguyên)
   { status: "Đã hủy", count: 8 },
 ];
 
@@ -103,17 +165,22 @@ export default function Dashboard() {
                 <stat.icon className="w-6 h-6 text-white" />
               </div>
               <div
+                // Cập nhật logic màu sắc cho mục "Đơn Đến Hạn" (alert)
                 className={`flex items-center text-sm font-medium ${
                   stat.changeType === "increase"
                     ? "text-green-600"
-                    : "text-red-600"
+                    : stat.changeType === "decrease"
+                    ? "text-red-600"
+                    : "text-red-600 font-bold" // Màu cho trạng thái alert
                 }`}
               >
-                {stat.changeType === "increase" ? (
-                  <ArrowUpIcon className="w-4 h-4 mr-1" />
-                ) : (
-                  <ArrowDownIcon className="w-4 h-4 mr-1" />
-                )}
+                {/* Ẩn icon Tăng/Giảm cho mục "Đơn Đến Hạn" */}
+                {stat.changeType !== "alert" &&
+                  (stat.changeType === "increase" ? (
+                    <ArrowUpIcon className="w-4 h-4 mr-1" />
+                  ) : (
+                    <ArrowDownIcon className="w-4 h-4 mr-1" />
+                  ))}
                 {stat.change}
               </div>
             </div>

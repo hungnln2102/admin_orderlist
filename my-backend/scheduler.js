@@ -1,4 +1,4 @@
-﻿// scheduler.js — Chuẩn hóa tiếng Việt, điều chỉnh điều kiện hết hạn
+// scheduler.js - Logic tự động chuyển đơn hàng hết hạn và cập nhật trạng thái
 
 require("dotenv").config();
 const { Pool } = require("pg");
@@ -7,66 +7,155 @@ const cron = require("node-cron");
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 /**
- * Cron: 00:01 hằng ngày
- * - Chuyển đơn hết hạn (<= 0 ngày) sang bảng order_expried
- * - Xóa khỏi order_list sau khi chuyển
- * - Cập nhật trạng thái "Cần Gia Hạn" cho các đơn còn 1..4 ngày
+ * Lấy ngày hiện tại để sử dụng trong truy vấn SQL.
+ * Cho phép giả định ngày kiểm thử thông qua biến môi trường MOCK_DATE.
+ * Định dạng ngày giả định (MOCK_DATE): 'YYYY-MM-DD'.
+ */
+const getSqlCurrentDate = () => {
+  if (process.env.MOCK_DATE) {
+    // Trả về ngày giả định dưới dạng SQL Date
+    return `'${process.env.MOCK_DATE}'::date`;
+  }
+  // Trả về ngày hiện tại thực tế của PostgreSQL
+  return "CURRENT_DATE";
+};
+
+/**
+ * Cron: 00:01 hang ngay
+ * - Move expired orders (< 0 days) to table order_expried
+ * - Remove them from order_list after moving
+ * - Update status "Can Gia Han" for orders with 1..4 days left
  */
 const updateDatabaseTask = async () => {
-  console.log("[CRON] Bắt đầu cập nhật đơn hết hạn / cần gia hạn...");
+  const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
+  console.log(
+    `[CRON] Bat dau cap nhat don het han / can gia han (Date: ${
+      process.env.MOCK_DATE || "CURRENT_DATE"
+    })...`
+  );
+
+  if (process.env.MOCK_DATE) {
+    console.warn(
+      `[TEST MODE] Dang su dung ngay gia dinh: ${process.env.MOCK_DATE}`
+    );
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // 1) Chuyển các đơn hết hạn (<= 0 ngày) sang order_expried
+    // 1) Move expired orders (< 0 days) to mavryk.order_expried
     const transfer = await client.query(`
       WITH expired AS (
-        SELECT * FROM mavryk.order_list
-        WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) <= 0
+        SELECT
+          id_don_hang,
+          san_pham,
+          thong_tin_san_pham,
+          khach_hang,
+          link_lien_he,
+          slot,
+          -- CHUYỂN ĐỔI TỪ TEXT SANG DATE VÀ INTEGER CHO CÁC CỘT NGÀY/SỐ NGÀY
+          TO_DATE(ngay_dang_ki, 'DD/MM/YYYY') AS ngay_dang_ki, 
+          so_ngay_da_dang_ki::integer AS so_ngay_da_dang_ki, 
+          TO_DATE(het_han, 'DD/MM/YYYY') AS het_han, 
+          -- KẾT THÚC CHUYỂN ĐỔI
+          nguon,
+          gia_nhap,
+          gia_ban,
+          note,
+          tinh_trang,
+          check_flag
+        FROM mavryk.order_list
+        WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) < 0
       )
       INSERT INTO mavryk.order_expried (
-        id_don_hang, san_pham, thong_tin_san_pham, khach_hang, link_lien_he,
-        slot, ngay_dang_ki, so_ngay_da_dang_ki, het_han, nguon,
-        gia_nhap, gia_ban, note, tinh_trang, check_flag
+        id_don_hang,
+        san_pham,
+        thong_tin_san_pham,
+        khach_hang,
+        link_lien_he,
+        slot,
+        ngay_dang_ki,
+        so_ngay_da_dang_ki,
+        het_han,
+        nguon,
+        gia_nhap,
+        gia_ban,
+        note,
+        tinh_trang,
+        check_flag
       )
-      SELECT id_don_hang, san_pham, thong_tin_san_pham, khach_hang, link_lien_he,
-             slot, ngay_dang_ki, so_ngay_da_dang_ki, het_han, nguon,
-             gia_nhap, gia_ban, note, tinh_trang, check_flag
-      FROM expired;
+      SELECT 
+        id_don_hang,
+        san_pham,
+        thong_tin_san_pham,
+        khach_hang,
+        link_lien_he,
+        slot,
+        ngay_dang_ki,
+        so_ngay_da_dang_ki,
+        het_han,
+        nguon,
+        gia_nhap,
+        gia_ban,
+        note,
+        tinh_trang,
+        check_flag
+      FROM expired
+      ON CONFLICT (id_don_hang) DO NOTHING
+      RETURNING id_don_hang;
     `);
-    console.log(`  - Đã chuyển ${transfer.rowCount} đơn hết hạn (<= 0 ngày).`);
+    console.log(`  - Da chuyen ${transfer.rowCount} don het han (< 0 ngay).`);
+    if (transfer.rows.length) {
+      console.log(
+        `    -> ID da luu: ${transfer.rows
+          .map((r) => r.id_don_hang)
+          .join(", ")}`
+      );
+    }
 
-    // Xóa các đơn đã chuyển khỏi order_list
+    // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const del = await client.query(`
       DELETE FROM mavryk.order_list
-      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) <= 0;
+      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) < 0
+      RETURNING id_don_hang;
     `);
-    console.log(`  - Đã xóa ${del.rowCount} đơn khỏi order_list.`);
+    console.log(`  - Da xoa ${del.rowCount} don khoi order_list.`);
+    if (del.rows.length) {
+      console.log(
+        `    -> ID da xoa: ${del.rows.map((r) => r.id_don_hang).join(", ")}`
+      );
+    }
 
-    // 2) Cập nhật "Cần Gia Hạn" cho các đơn còn 1..4 ngày
+    // 2) Update "Can Gia Han" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const soon = await client.query(`
       UPDATE mavryk.order_list
-      SET tinh_trang = 'Cần Gia Hạn',
+      SET tinh_trang = 'Can Gia Han',
           check_flag = NULL
-      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - CURRENT_DATE) BETWEEN 1 AND 4
-        AND tinh_trang <> 'Đã Thanh Toán';
+      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) BETWEEN 1 AND 4
+        AND tinh_trang <> 'Da Thanh Toan';
     `);
-    console.log(`  - Cập nhật ${soon.rowCount} đơn sang 'Cần Gia Hạn' (1..4 ngày).`);
+    console.log(
+      `  - Cap nhat ${soon.rowCount} don sang 'Can Gia Han' (1..4 ngay).`
+    );
 
     await client.query("COMMIT");
-    console.log("[CRON] Hoàn thành cập nhật.");
+    console.log("[CRON] Hoan thanh cap nhat.");
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[CRON] Lỗi khi cập nhật:", err);
+    console.error("[CRON] Loi khi cap nhat:", err);
     throw err;
   } finally {
     client.release();
   }
 };
 
-// Lên lịch chạy 00:01 hằng ngày theo múi giờ VN
-cron.schedule("1 0 * * *", updateDatabaseTask, { scheduled: true, timezone: "Asia/Ho_Chi_Minh" });
+// Schedule at 00:01 every day in Vietnam timezone
+cron.schedule("1 0 * * *", updateDatabaseTask, {
+  scheduled: true,
+  timezone: "Asia/Ho_Chi_Minh",
+});
 
-console.log("[Scheduler] Đã khởi động. Cron 00:01 Asia/Ho_Chi_Minh");
+console.log("[Scheduler] Da khoi dong. Cron 00:01 Asia/Ho_Chi_Minh");
 
 module.exports = updateDatabaseTask;
