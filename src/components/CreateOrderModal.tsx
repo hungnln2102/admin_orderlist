@@ -430,7 +430,7 @@ const useCreateOrderLogic = (
               ),
               [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy Hết Hạn từ Backend
             }));
-            setIsDataLoaded(true);
+            // readiness now derived from required fields only
           }
         });
       }
@@ -506,7 +506,7 @@ const useCreateOrderLogic = (
               ),
               [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy Hết Hạn từ Backend
             }));
-            setIsDataLoaded(true);
+            // readiness now derived from required fields only
           }
         });
       }
@@ -565,7 +565,7 @@ const useCreateOrderLogic = (
       formData[ORDER_FIELDS.KHACH_HANG] &&
       formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM];
 
-    if (requiredFieldsFilled && isDataLoaded && !isLoading) {
+    if (requiredFieldsFilled && !isLoading) {
       const registerDMY =
         Helpers.formatDateToDMY(
           formData[ORDER_FIELDS.NGAY_DANG_KI] as string
@@ -814,29 +814,54 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     formData[ORDER_FIELDS.NGAY_DANG_KI],
   ]);
 
-  // In custom mode, mark data as loaded when required fields are entered
+  // Ensure expiry date is populated and formatted.
+  // If backend doesn't return it, compute from register date + days.
   useEffect(() => {
-    if (!customMode) return;
+    const rawExpiry = (formData[ORDER_FIELDS.HET_HAN] as string) || "";
+    const registerDMY =
+      (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) || Helpers.getTodayDMY();
+    const days = Number(formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || 0) || 0;
+
+    const normalized = Helpers.formatDateToDMY(rawExpiry);
+
+    if (!normalized && registerDMY && days > 0) {
+      const computed = calculateExpirationDate(registerDMY, days);
+      if (computed && computed !== "N/A") {
+        updateForm({ [ORDER_FIELDS.HET_HAN]: computed } as any);
+      }
+    } else if (normalized && normalized !== rawExpiry) {
+      updateForm({ [ORDER_FIELDS.HET_HAN]: normalized } as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    formData[ORDER_FIELDS.HET_HAN],
+    formData[ORDER_FIELDS.NGAY_DANG_KI],
+    formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI],
+  ]);
+
+  // Mark data as ready when 4 required fields are filled
+  useEffect(() => {
     const prod = (formData[ORDER_FIELDS.SAN_PHAM] as string) || "";
     const src = (formData[ORDER_FIELDS.NGUON] as string) || "";
     const info = (formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM] as string) || "";
     const customer = (formData[ORDER_FIELDS.KHACH_HANG] as string) || "";
-    const giaNhap = Number(formData[ORDER_FIELDS.GIA_NHAP] || 0);
-    const giaBan = Number(formData[ORDER_FIELDS.GIA_BAN] || 0);
-    const ready =
-      !!prod && !!src && !!info && !!customer && giaNhap > 0 && giaBan > 0;
+    const ready = !!prod && !!src && !!info && !!customer;
     setIsDataLoaded(ready);
   }, [
-    customMode,
     formData[ORDER_FIELDS.SAN_PHAM],
     formData[ORDER_FIELDS.NGUON],
     formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM],
     formData[ORDER_FIELDS.KHACH_HANG],
-    formData[ORDER_FIELDS.GIA_NHAP],
-    formData[ORDER_FIELDS.GIA_BAN],
   ]);
 
   if (!isOpen) return null;
+
+  const isFormComplete = Boolean(
+    formData[ORDER_FIELDS.KHACH_HANG] &&
+    formData[ORDER_FIELDS.SAN_PHAM] &&
+    formData[ORDER_FIELDS.NGUON] &&
+    formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM]
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
@@ -1147,11 +1172,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             type="submit"
             onClick={handleSubmit}
             className={`px-6 py-2 text-base font-medium text-white rounded-lg transition-colors shadow-md ${
-              isDataLoaded && !isLoading
+              isFormComplete && !isLoading
                 ? "bg-green-600 hover:bg-green-700"
                 : "bg-gray-400 cursor-not-allowed"
             }`}
-            disabled={!isDataLoaded || isLoading}
+            disabled={!isFormComplete || isLoading}
           >
             {isLoading ? "Đang Tính Giá..." : "Tạo Đơn Hàng"}
           </button>

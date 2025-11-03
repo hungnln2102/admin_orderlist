@@ -2,7 +2,7 @@
 
 Tài liệu này tổng hợp cấu trúc các bảng chính liên quan tới đơn hàng trong cơ sở dữ liệu `mavryk`. Dùng làm tài liệu tham khảo nhanh khi làm việc với backend/front-end.
 
-> **Chú ý:** bảng đơn hết hạn trong database hiện có tên `order_expried` (trong đó chữ *expired* bị viết sai). Khi truy vấn cần dùng đúng tên để tránh lỗi `relation does not exist`.
+> Lưu ý: bảng đơn hết hạn dùng tên chuẩn `order_expired`.
 
 ## `mavryk.order_list`
 
@@ -46,7 +46,7 @@ Tài liệu này tổng hợp cấu trúc các bảng chính liên quan tới đ
 | `tinh_trang` | `text` | Trạng thái hiện tại (đã hoàn, đang xử lý...). |
 | `check_flag` | `bool` | Đánh dấu đã kiểm tra. |
 
-## `mavryk.order_expried`
+## `mavryk.order_expired`
 
 | Cột | Kiểu dữ liệu | Ghi chú |
 | --- | --- | --- |

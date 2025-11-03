@@ -202,7 +202,7 @@ app.get("/api/dashboard/years", async (_req, res) => {
     WITH all_dates AS (
       SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_list
       UNION ALL
-      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_expried
+      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_expired
       UNION ALL
       SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_canceled
     ),
@@ -251,7 +251,7 @@ app.get("/api/dashboard/charts", async (req, res) => {
         ${orderYearCase} AS order_year,
         COALESCE(gia_ban, 0) AS gia_ban,
         FALSE AS is_canceled
-      FROM mavryk.order_expried
+      FROM mavryk.order_expired
       WHERE TRIM(ngay_dang_ki::text) <> ''
       UNION ALL
       SELECT
@@ -318,26 +318,76 @@ app.get("/api/dashboard/charts", async (req, res) => {
   }
 });
 
+// Helpers to normalize raw date strings and compute days without timezone drift
+const normalizeRawToYMD = (raw) => {
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss...
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // YYYY/MM/DD
+  m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // DD/MM/YYYY
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // DD-MM-YYYY
+  m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // YYYYMMDD
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+};
+
+const todayYMDInVietnam = () => {
+  // Vietnam time is UTC+7, no DST
+  const now = Date.now();
+  const vnMs = now + 7 * 60 * 60 * 1000;
+  const d = new Date(vnMs);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const diffDaysYMD = (fromYmd, toYmd) => {
+  if (!fromYmd || !toYmd) return null;
+  const [fy, fm, fd] = fromYmd.split("-").map(Number);
+  const [ty, tm, td] = toYmd.split("-").map(Number);
+  const fromMs = Date.UTC(fy, fm - 1, fd);
+  const toMs = Date.UTC(ty, tm - 1, td);
+  return Math.floor((fromMs - toMs) / (24 * 60 * 60 * 1000));
+};
+
 app.get("/api/orders", async (_req, res) => {
   console.log("[GET] /api/orders");
-  const expiryDateCase = createDateNormalization("het_han");
-
+  // Fetch raw values without casting to DATE to avoid timezone effects
   const q = `
-    WITH normalized AS (
-      SELECT
-        *,
-        ${expiryDateCase} AS expiry_date
-      FROM mavryk.order_list
-    )
-    SELECT
-      normalized.*,
-      (normalized.expiry_date - ${CURRENT_DATE_SQL}) AS so_ngay_con_lai
-    FROM normalized;
+    SELECT *,
+           ngay_dang_ki::text AS ngay_dang_ki_raw,
+           het_han::text      AS het_han_raw
+    FROM mavryk.order_list;
   `;
 
   try {
     const result = await pool.query(q);
-    res.json(result.rows);
+    const todayYmd = todayYMDInVietnam();
+    const mapped = result.rows.map((row) => {
+      const regYmd = normalizeRawToYMD(row.ngay_dang_ki_raw ?? row.ngay_dang_ki);
+      const expYmd = normalizeRawToYMD(row.het_han_raw ?? row.het_han);
+      const soNgayConLai = diffDaysYMD(expYmd, todayYmd);
+      return {
+        ...row,
+        registration_date: regYmd, // normalized ISO-like string
+        expiry_date: expYmd,        // normalized ISO-like string
+        registration_date_str: regYmd,
+        expiry_date_str: expYmd,
+        so_ngay_con_lai: soNgayConLai,
+      };
+    });
+    res.json(mapped);
   } catch (error) {
     console.error("Query failed (GET /api/orders):", error);
     res.status(500).json({

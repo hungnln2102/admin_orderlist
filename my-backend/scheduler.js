@@ -6,6 +6,33 @@ const cron = require("node-cron");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Normalize mixed-format date columns to a proper DATE in SQL
+const normalizeDateSQL = (column) => `
+  CASE
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$' THEN TO_DATE(TRIM(${column}::text), 'DD/MM/YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}[ T]' THEN TO_DATE(SUBSTRING(TRIM(${column}::text) FROM 1 FOR 10), 'DD/MM/YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}$' THEN TO_DATE(TRIM(${column}::text), 'DD-MM-YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}[ T]' THEN TO_DATE(SUBSTRING(TRIM(${column}::text) FROM 1 FOR 10), 'DD-MM-YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN TRIM(${column}::text)::date
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[ T]' THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 10)::date
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$' THEN TO_DATE(TRIM(${column}::text), 'YYYY/MM/DD')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{8}$' THEN TO_DATE(TRIM(${column}::text), 'YYYYMMDD')
+    ELSE NULL
+  END`;
+
+// Safely parse integer from possibly-text column
+const intFromTextSQL = (column) => `
+  CASE WHEN TRIM(${column}::text) ~ '^-?[0-9]+$' THEN TRIM(${column}::text)::int ELSE NULL END
+`;
+
+// Expiry date with fallback: normalized het_han, else ngay_dang_ki + days - 1
+const expiryDateSQL = () => `
+  COALESCE(
+    ${normalizeDateSQL('het_han')},
+    (${normalizeDateSQL('ngay_dang_ki')} + (COALESCE(${intFromTextSQL('so_ngay_da_dang_ki')}, 0) - 1))
+  )
+`;
+
 /**
  * Lấy ngày hiện tại để sử dụng trong truy vấn SQL.
  * Cho phép giả định ngày kiểm thử thông qua biến môi trường MOCK_DATE.
@@ -22,7 +49,7 @@ const getSqlCurrentDate = () => {
 
 /**
  * Cron: 00:01 hang ngay
- * - Move expired orders (< 0 days) to table order_expried
+ * - Move expired orders (< 0 days) to table order_expired
  * - Remove them from order_list after moving
  * - Update status "Can Gia Han" for orders with 1..4 days left
  */
@@ -44,7 +71,7 @@ const updateDatabaseTask = async () => {
   try {
     await client.query("BEGIN");
 
-    // 1) Move expired orders (< 0 days) to mavryk.order_expried
+    // 1) Move expired orders (< 0 days) to mavryk.order_expired
     const transfer = await client.query(`
       WITH expired AS (
         SELECT
@@ -55,9 +82,9 @@ const updateDatabaseTask = async () => {
           link_lien_he,
           slot,
           -- CHUYỂN ĐỔI TỪ TEXT SANG DATE VÀ INTEGER CHO CÁC CỘT NGÀY/SỐ NGÀY
-          TO_DATE(ngay_dang_ki, 'DD/MM/YYYY') AS ngay_dang_ki, 
-          so_ngay_da_dang_ki::integer AS so_ngay_da_dang_ki, 
-          TO_DATE(het_han, 'DD/MM/YYYY') AS het_han, 
+          ${normalizeDateSQL('ngay_dang_ki')} AS ngay_dang_ki, 
+          ${intFromTextSQL('so_ngay_da_dang_ki')} AS so_ngay_da_dang_ki, 
+          ${expiryDateSQL()} AS het_han, 
           -- KẾT THÚC CHUYỂN ĐỔI
           nguon,
           gia_nhap,
@@ -66,9 +93,9 @@ const updateDatabaseTask = async () => {
           tinh_trang,
           check_flag
         FROM mavryk.order_list
-        WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) < 0
+        WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       )
-      INSERT INTO mavryk.order_expried (
+      INSERT INTO mavryk.order_expired (
         id_don_hang,
         san_pham,
         thong_tin_san_pham,
@@ -119,7 +146,7 @@ const updateDatabaseTask = async () => {
       UPDATE mavryk.order_list
       SET tinh_trang = 'Het Han',
           check_flag = NULL
-      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) = 0
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
         AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
         AND (tinh_trang IS DISTINCT FROM 'Het Han');
     `);
@@ -128,7 +155,7 @@ const updateDatabaseTask = async () => {
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const del = await client.query(`
       DELETE FROM mavryk.order_list
-      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) < 0
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       RETURNING id_don_hang;
     `);
     console.log(`  - Da xoa ${del.rowCount} don khoi order_list.`);
@@ -144,7 +171,7 @@ const updateDatabaseTask = async () => {
       UPDATE mavryk.order_list
       SET tinh_trang = 'Can Gia Han',
           check_flag = NULL
-      WHERE (TO_DATE(het_han, 'DD/MM/YYYY') - ${sqlDate}) BETWEEN 1 AND 4
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
         AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
         AND (tinh_trang IS DISTINCT FROM 'Het Han');
     `);

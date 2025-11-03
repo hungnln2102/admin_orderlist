@@ -78,6 +78,8 @@ interface Order {
   ngay_dang_ki: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
   so_ngay_da_dang_ki: string;
   het_han: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
+  // Backend normalized date (from query CTE). Optional, used for display/calculation to avoid TZ drift
+  expiry_date?: string;
   nguon: string;
   gia_nhap: string; // String/Numeric từ DB
   gia_ban: string; // String/Numeric từ DB
@@ -229,25 +231,34 @@ const useOrdersData = () => {
 
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
       // Date normalization for display and calculations
-      const formattedOrderDate = Helpers.formatDateToDMY(
-        order[ORDER_FIELDS.NGAY_DANG_KI]
-      );
-      const formattedExpiryDate = Helpers.formatDateToDMY(
-        order[ORDER_FIELDS.HET_HAN]
-      );
+      const rawOrderDate = (order as any).registration_date ?? order[ORDER_FIELDS.NGAY_DANG_KI];
+      const formattedOrderDate = Helpers.formatDateToDMY(rawOrderDate);
 
-      const calculatedRemaining = Helpers.daysUntilDate(
-        order[ORDER_FIELDS.HET_HAN]
-      );
+      const rawExpiry = (order as any).expiry_date ?? order[ORDER_FIELDS.HET_HAN];
+      // Format expiry; if missing, compute from register date + days - 1
+      let formattedExpiryDate = Helpers.formatDateToDMY(rawExpiry);
+      if (!formattedExpiryDate) {
+        const regDMY =
+          Helpers.formatDateToDMY(rawOrderDate) ||
+          (rawOrderDate as any);
+        const daysInt = Number(order.so_ngay_da_dang_ki) || 0;
+        if (regDMY && daysInt > 0) {
+          formattedExpiryDate = Helpers.calculateExpirationDate(regDMY, daysInt);
+        }
+      }
+
       const backendRemainingValue = Number(order.so_ngay_con_lai);
       const backendRemaining = Number.isFinite(backendRemainingValue)
         ? backendRemainingValue
         : null;
-
+      // Prefer backend's computed remaining (from DB current_date); fallback to client calc
+      const remainingCalcBase =
+        (order as any).expiry_date ?? formattedExpiryDate ?? order[ORDER_FIELDS.HET_HAN];
+      const calculatedRemaining = Helpers.daysUntilDate(remainingCalcBase);
       const soNgayConLai =
-        calculatedRemaining !== null
-          ? calculatedRemaining
-          : backendRemaining ?? 0;
+        backendRemaining !== null
+          ? backendRemaining
+          : calculatedRemaining ?? 0;
 
       const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán";
       let trangThaiText = "";

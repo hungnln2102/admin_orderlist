@@ -86,6 +86,19 @@ const parseFlexibleDate = (
 export const formatDateToDMY = (
   value: string | number | Date | null | undefined
 ): string => {
+  // Fast path: avoid timezone shifts by formatting Y-M-D strings lexically
+  if (typeof value === "string") {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      const [, y, mo, d] = m;
+      return `${d}/${mo}/${y}`;
+    }
+    const m2 = value.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+    if (m2) {
+      const [, y, mo, d] = m2;
+      return `${d}/${mo}/${y}`;
+    }
+  }
   const date = parseFlexibleDate(value);
   if (!date) return "";
   return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
