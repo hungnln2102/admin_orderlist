@@ -66,8 +66,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     order.giaTriConLai !== undefined ? order.giaTriConLai : 0;
 
   // FIX: Lấy soNgayConLai (từ Backend)
-  const displayRemainingDays =
-    order.so_ngay_con_lai !== undefined ? order.so_ngay_con_lai : 0;
+  const calculatedRemaining = Helpers.daysUntilDate(order.het_han);\r\n  const displayRemainingDays =\r\n    calculatedRemaining !== null && calculatedRemaining !== undefined\r\n      ? calculatedRemaining\r\n      : order.so_ngay_con_lai !== undefined\r\n      ? order.so_ngay_con_lai\r\n      : 0;
 
   // --- Logic Giá Trị Hiển Thị ---
   const displayPriceClass =
@@ -279,3 +278,4 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 };
 
 export default ViewOrderModal;
+

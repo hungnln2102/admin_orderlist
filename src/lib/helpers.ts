@@ -52,6 +52,56 @@ export const inclusiveDaysBetween = (startDMY: string, endDMY: string): number =
   return diff + 1;
 };
 
+const pad2 = (value: number): string => String(value).padStart(2, "0");
+
+const parseFlexibleDate = (
+  value: string | number | Date | null | undefined
+): Date | null => {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const stringValue = String(value).trim();
+  if (!stringValue) return null;
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(stringValue)) {
+    const [d, m, y] = stringValue.split("/").map(Number);
+    if (!d || !m || !y) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  const isoMatch = stringValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch.map(Number);
+    if (!d || !m || !y) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  const parsed = new Date(stringValue);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+export const formatDateToDMY = (
+  value: string | number | Date | null | undefined
+): string => {
+  const date = parseFlexibleDate(value);
+  if (!date) return "";
+  return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+};
+
+export const daysUntilDate = (
+  value: string | number | Date | null | undefined
+): number | null => {
+  const date = parseFlexibleDate(value);
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.floor((date.getTime() - today.getTime()) / msPerDay);
+};
+
 export const parseMonthsFromInfo = (info?: string): number => {
   if (!info) return 0;
   const m = info.match(/--(\d+)m/i);
@@ -69,7 +119,7 @@ export const daysFromMonths = (months: number): number => {
 export const formatCurrency = (value: number | string): string => {
   const num = Number(value) || 0;
   const rounded = Math.round(num);
-  return rounded.toLocaleString("vi-VN") + " " + "đ";
+  return rounded.toLocaleString("vi-VN") + " ₫";
 };
 
 export const formatCurrencyPlain = (value: number): string => {
@@ -121,4 +171,3 @@ export const getStatusPriority = (status: string): number => {
   if (lower === "đã thanh toán") return 4;
   return 5;
 };
-

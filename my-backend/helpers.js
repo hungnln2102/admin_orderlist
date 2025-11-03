@@ -37,14 +37,26 @@ function calculatePeriods() {
       now.setTime(mockDate.getTime());
     }
   }
+
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   const currentDay = now.getDate();
+
   const currentStart = new Date(currentYear, currentMonth, 1);
   const currentEnd = new Date(currentYear, currentMonth, currentDay);
+
   const previousStart = new Date(currentYear, currentMonth - 1, 1);
-  const previousEnd = new Date(currentYear, currentMonth - 1, currentDay);
-  const formatDate = (d) => d.toISOString().split("T")[0];
+  const previousMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
+  const previousEndDay = Math.min(currentDay, previousMonthLastDay);
+  const previousEnd = new Date(currentYear, currentMonth - 1, previousEndDay);
+
+  const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   return {
     currentStart: formatDate(currentStart),
     currentEnd: formatDate(currentEnd),
@@ -59,4 +71,3 @@ module.exports = {
   convertDMYToYMD,
   calculatePeriods,
 };
-

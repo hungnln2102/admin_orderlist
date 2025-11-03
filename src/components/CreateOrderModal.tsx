@@ -566,19 +566,41 @@ const useCreateOrderLogic = (
       formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM];
 
     if (requiredFieldsFilled && isDataLoaded && !isLoading) {
-      // FIX LỖI DB DATE: Chuyển đổi định dạng ngày trước khi gọi onSave (gửi lên API)
+      const registerDMY =
+        Helpers.formatDateToDMY(
+          formData[ORDER_FIELDS.NGAY_DANG_KI] as string
+        ) ||
+        (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) ||
+        Helpers.getTodayDMY();
+
+      const currentExpiryDMY =
+        Helpers.formatDateToDMY(formData[ORDER_FIELDS.HET_HAN] as string) ||
+        (formData[ORDER_FIELDS.HET_HAN] as string) ||
+        "";
+
+      const totalDays =
+        Number(formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || 0) || 0;
+
+      let expiryDMY = currentExpiryDMY;
+      if (!expiryDMY && registerDMY && totalDays > 0) {
+        const computed = calculateExpirationDate(registerDMY, totalDays);
+        if (computed && computed !== "N/A") {
+          expiryDMY = computed;
+          updateForm({ [ORDER_FIELDS.HET_HAN]: expiryDMY } as any);
+        }
+      }
+
+      const normalizedRegister = Helpers.convertDMYToYMD(registerDMY);
+      const normalizedExpiry = expiryDMY
+        ? Helpers.convertDMYToYMD(expiryDMY)
+        : normalizedRegister;
+
       const dataToSave = {
         ...formData,
         [ORDER_FIELDS.GIA_NHAP]: Number(formData[ORDER_FIELDS.GIA_NHAP]),
         [ORDER_FIELDS.GIA_BAN]: Number(formData[ORDER_FIELDS.GIA_BAN]),
-
-        [ORDER_FIELDS.NGAY_DANG_KI]: Helpers.convertDMYToYMD(
-          formData[ORDER_FIELDS.NGAY_DANG_KI] as string
-        ),
-        [ORDER_FIELDS.HET_HAN]: Helpers.convertDMYToYMD(
-          formData[ORDER_FIELDS.HET_HAN] as string
-        ),
-
+        [ORDER_FIELDS.NGAY_DANG_KI]: normalizedRegister,
+        [ORDER_FIELDS.HET_HAN]: normalizedExpiry,
         [ORDER_FIELDS.LINK_LIEN_HE]:
           formData[ORDER_FIELDS.LINK_LIEN_HE] || null,
         [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
@@ -1140,4 +1162,5 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 };
 
 export default CreateOrderModal;
+
 

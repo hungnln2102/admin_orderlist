@@ -1,189 +1,175 @@
-// index.js — Backend (UTF-8, tiếng Việt chuẩn)
-// Logic: Tính Giá Nhập (cao nhất) và Giá Bán theo hệ số pct_ctv/pct_khach.
-
 require("dotenv").config();
+
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
+
 const updateDatabaseTask = require("./scheduler");
 const Helpers = require("./helpers");
 
 const app = express();
-const port = 3001;
+const port = Number(process.env.PORT) || 3001;
 
-// 1) CORS
 const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
   .split(",")
-  .map((s) => s.trim());
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const createDateNormalization = (column) => `
+  CASE
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
+      THEN TO_DATE(TRIM(${column}::text), 'DD/MM/YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      THEN TRIM(${column}::text)::date
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'
+      THEN TO_DATE(TRIM(${column}::text), 'YYYY/MM/DD')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}$'
+      THEN TO_DATE(TRIM(${column}::text), 'DD-MM-YYYY')
+    WHEN TRIM(${column}::text) ~ '^[0-9]{8}$'
+      THEN TO_DATE(TRIM(${column}::text), 'YYYYMMDD')
+    ELSE NULL
+  END
+`;
+
+const createYearExtraction = (column) => `
+  CASE
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}$'
+      THEN TRIM(${column}::text)::int
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
+      THEN SUBSTRING(TRIM(${column}::text) FROM 7 FOR 4)::int
+    WHEN TRIM(${column}::text) ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}$'
+      THEN SUBSTRING(TRIM(${column}::text) FROM 7 FOR 4)::int
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'
+      THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
+    WHEN TRIM(${column}::text) ~ '^[0-9]{8}$'
+      THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
+    ELSE NULL
+  END
+`;
+
+const normalizeDateInput = (value) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const converted = Helpers.convertDMYToYMD(trimmed);
+  if (!converted || String(converted).trim() === "") return null;
+  return converted;
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // allow non-browser or same-origin
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS: " + origin));
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked request from ${origin}`));
     },
   })
 );
 
-// 2) Parse JSON body
 app.use(express.json());
 
-// 3) Kết nối Postgres
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-// =============== Helpers ===============
-// Lấy số tháng từ chuỗi có chứa mẫu "--{x}m"
-function monthsFromString(text) {
-  if (!text || typeof text !== "string") return 0;
-  const m = text.match(/--(\d+)m/i);
-  return m ? Number(m[1] || 0) : 0;
-}
+const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
+const timezoneCandidate =
+  typeof process.env.APP_TIMEZONE === "string" &&
+  /^[A-Za-z0-9_\/+-]+$/.test(process.env.APP_TIMEZONE)
+    ? process.env.APP_TIMEZONE
+    : DEFAULT_TIMEZONE;
+const CURRENT_DATE_SQL = `(CURRENT_TIMESTAMP AT TIME ZONE '${timezoneCandidate}')::date`;
 
-// Quy đổi tháng ra ngày: 1m=30, 2m=60, 12m=365, 24m=730 (nếu cần)
-function daysFromMonths(months) {
-  if (!Number.isFinite(months) || months <= 0) return 0;
-  if (months === 12) return 365;
-  if (months === 24) return 730;
-  return months * 30;
-}
+const dashStatsQuery = `
+  WITH period_data AS (
+    SELECT
+      id,
+      CASE
+        WHEN TRIM(ngay_dang_ki::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
+          THEN TO_DATE(TRIM(ngay_dang_ki::text), 'DD/MM/YYYY')
+        WHEN TRIM(ngay_dang_ki::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          THEN TRIM(ngay_dang_ki::text)::date
+        ELSE NULL
+      END AS registration_date,
+      CASE
+        WHEN TRIM(het_han::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
+          THEN TO_DATE(TRIM(het_han::text), 'DD/MM/YYYY')
+        WHEN TRIM(het_han::text) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          THEN TRIM(het_han::text)::date
+        ELSE NULL
+      END AS expiry_date,
+      COALESCE(gia_nhap, 0) AS gia_nhap,
+      COALESCE(gia_ban, 0) AS gia_ban
+    FROM mavryk.order_list
+  )
+  SELECT
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $3::date AND $4::date THEN 1
+      ELSE 0
+    END), 0) AS total_orders_current,
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $1::date AND $2::date THEN 1
+      ELSE 0
+    END), 0) AS total_orders_previous,
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $3::date AND $4::date THEN gia_nhap
+      ELSE 0
+    END), 0) AS total_imports_current,
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $1::date AND $2::date THEN gia_nhap
+      ELSE 0
+    END), 0) AS total_imports_previous,
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $3::date AND $4::date THEN (gia_ban - gia_nhap)
+      ELSE 0
+    END), 0) AS total_profit_current,
+    COALESCE(SUM(CASE
+      WHEN registration_date BETWEEN $1::date AND $2::date THEN (gia_ban - gia_nhap)
+      ELSE 0
+    END), 0) AS total_profit_previous,
+    (
+      SELECT COUNT(id)
+      FROM period_data sub
+      WHERE sub.expiry_date IS NOT NULL
+        AND (sub.expiry_date - ${CURRENT_DATE_SQL}) BETWEEN 1 AND 4
+    ) AS overdue_orders_count
+  FROM period_data;
+`;
 
-/**
- * FIX LỖI DB DATE: Chuyển đổi định dạng ngày từ DD/MM/YYYY (từ Frontend) sang YYYY-MM-DD (cho DB DATE type).
- * @param {string} dmyString - Ngày ở định dạng DD/MM/YYYY
- * @returns {string} Ngày ở định dạng YYYY-MM-DD
- */
-function convertDMYToYMD(dmyString) {
-  if (
-    !dmyString ||
-    typeof dmyString !== "string" ||
-    dmyString.length < 10 ||
-    dmyString.indexOf("/") === -1
-  ) {
-    return dmyString;
-  }
-  const parts = dmyString.split("/");
-  // parts[0]=DD, parts[1]=MM, parts[2]=YYYY
-  if (parts.length === 3) {
-    // Return YYYY-MM-DD
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dmyString;
-}
+const normalizedYearCase = `
+  CASE
+    WHEN raw_date IS NULL OR TRIM(raw_date) = '' THEN NULL
+    WHEN TRIM(raw_date) ~ '^[0-9]{4}$' THEN TRIM(raw_date)::int
+    WHEN TRIM(raw_date) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
+      THEN SUBSTRING(TRIM(raw_date) FROM 7 FOR 4)::int
+    WHEN TRIM(raw_date) ~ '^[0-9]{2}-[0-9]{2}-[0-9]{4}$'
+      THEN SUBSTRING(TRIM(raw_date) FROM 7 FOR 4)::int
+    WHEN TRIM(raw_date) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      THEN SUBSTRING(TRIM(raw_date) FROM 1 FOR 4)::int
+    WHEN TRIM(raw_date) ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'
+      THEN SUBSTRING(TRIM(raw_date) FROM 1 FOR 4)::int
+    WHEN TRIM(raw_date) ~ '^[0-9]{8}$'
+      THEN SUBSTRING(TRIM(raw_date) FROM 1 FOR 4)::int
+    ELSE NULL
+  END
+`;
 
-// =============== Helpers cho Dashboard Stats ===============
-
-/**
- * Tính toán ngày bắt đầu và kết thúc cho chu kỳ hiện tại và chu kỳ trước.
- * @returns {object} { currentStart, currentEnd, previousStart, previousEnd } (dạng 'YYYY-MM-DD')
- */
-function calculatePeriods() {
-  const now = new Date();
-  // Lấy ngày giả định MOCK_DATE nếu đang ở chế độ test
-  if (process.env.MOCK_DATE) {
-    const mockDate = new Date(process.env.MOCK_DATE);
-    if (!isNaN(mockDate)) {
-      now.setTime(mockDate.getTime());
-    }
-  }
-
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const currentDay = now.getDate();
-
-  // Chu kỳ Hiện tại: 1/Tháng hiện tại đến Ngày hiện tại
-  const currentStart = new Date(currentYear, currentMonth, 1);
-  const currentEnd = new Date(currentYear, currentMonth, currentDay); // Ngày hôm nay
-
-  // Chu kỳ Trước: 1/Tháng trước đến Ngày tương ứng của tháng trước
-  const previousStart = new Date(currentYear, currentMonth - 1, 1);
-  const previousEnd = new Date(currentYear, currentMonth - 1, currentDay);
-
-  // Format sang 'YYYY-MM-DD' để SQL dễ xử lý
-  const formatDate = (d) => d.toISOString().split("T")[0];
-
-  return {
-    currentStart: formatDate(currentStart),
-    currentEnd: formatDate(currentEnd),
-    previousStart: formatDate(previousStart),
-    previousEnd: formatDate(previousEnd),
-  };
-}
-
-// =============== API Endpoints ===============
-
-// GET /api/dashboard/stats — Lấy 4 mục thống kê chính
 app.get("/api/dashboard/stats", async (_req, res) => {
   console.log("[GET] /api/dashboard/stats");
   const periods = Helpers.calculatePeriods();
 
-  // FIX: Loại bỏ TO_DATE vì các cột ngày đã là DATE type
-  const q = `
-    -- CTE: Lọc dữ liệu cho cả 2 chu kỳ (ngay_dang_ki đã là DATE)
-    WITH period_data AS (
-      SELECT
-          id_don_hang,
-          ngay_dang_ki AS registration_date, -- Dùng trực tiếp
-          gia_nhap,
-          gia_ban,
-          (het_han - CURRENT_DATE) AS days_left -- Dùng trực tiếp
-      FROM mavryk.order_list
-      WHERE 
-          -- Lọc cho cả hai chu kỳ tính toán
-          ngay_dang_ki BETWEEN $1::date AND $2::date  -- Dùng trực tiếp
-          OR ngay_dang_ki BETWEEN $3::date AND $4::date -- Dùng trực tiếp
-    )
-    SELECT
-      -- 1. TỔNG ĐƠN HÀNG
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $3::date AND $4::date THEN 1 
-        ELSE 0 
-      END), 0) AS total_orders_current,
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $1::date AND $2::date THEN 1 
-        ELSE 0 
-      END), 0) AS total_orders_previous,
-      
-      -- 2. TỔNG NHẬP HÀNG (Tổng giá nhập)
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $3::date AND $4::date THEN gia_nhap 
-        ELSE 0 
-      END), 0) AS total_imports_current,
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $1::date AND $2::date THEN gia_nhap 
-        ELSE 0 
-      END), 0) AS total_imports_previous,
-
-      -- 3. TỔNG LỢI NHUẬN (Tổng giá bán - Tổng giá nhập)
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $3::date AND $4::date THEN (gia_ban - gia_nhap)
-        ELSE 0 
-      END), 0) AS total_profit_current,
-      COALESCE(SUM(CASE 
-        WHEN registration_date BETWEEN $1::date AND $2::date THEN (gia_ban - gia_nhap) 
-        ELSE 0 
-      END), 0) AS total_profit_previous,
-      
-      -- 4. ĐƠN ĐẾN HẠN (Số đơn còn 1-4 ngày, tính theo ngày hiện tại)
-      (
-        SELECT COUNT(id_don_hang)
-        FROM mavryk.order_list
-        WHERE (het_han - CURRENT_DATE) BETWEEN 1 AND 4 -- Dùng trực tiếp
-      ) AS overdue_orders_count
-    FROM period_data;
-  `;
-
   try {
-    const result = await pool.query(q, [
+    const result = await pool.query(dashStatsQuery, [
       periods.previousStart,
       periods.previousEnd,
       periods.currentStart,
       periods.currentEnd,
     ]);
 
-    // Format dữ liệu trả về theo cấu trúc Dashboard mong muốn
     const data = result.rows[0];
-
     res.json({
       totalOrders: {
         current: Number(data.total_orders_current),
@@ -200,57 +186,185 @@ app.get("/api/dashboard/stats", async (_req, res) => {
       overdueOrders: {
         count: Number(data.overdue_orders_count),
       },
-      periods: periods,
+      periods,
     });
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET /api/dashboard/stats):", err);
-    res
-      .status(500)
-      .json({ error: "Lỗi server nội bộ khi lấy dữ liệu thống kê" });
+  } catch (error) {
+    console.error("Query failed (GET /api/dashboard/stats):", error);
+    res.status(500).json({
+      error: "Unable to load dashboard statistics.",
+    });
   }
 });
 
-// GET /api/orders
+app.get("/api/dashboard/years", async (_req, res) => {
+  console.log("[GET] /api/dashboard/years");
+  const q = `
+    WITH all_dates AS (
+      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_list
+      UNION ALL
+      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_expried
+      UNION ALL
+      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_canceled
+    ),
+    normalized AS (
+      SELECT DISTINCT ${normalizedYearCase} AS year_value
+      FROM all_dates
+    )
+    SELECT year_value
+    FROM normalized
+    WHERE year_value IS NOT NULL
+    ORDER BY year_value DESC;
+  `;
+
+  try {
+    const result = await pool.query(q);
+    const years = result.rows.map((row) => Number(row.year_value));
+    res.json({ years });
+  } catch (error) {
+    console.error("Query failed (GET /api/dashboard/years):", error);
+    res.status(500).json({
+      error: "Unable to load available years.",
+    });
+  }
+});
+
+app.get("/api/dashboard/charts", async (req, res) => {
+  console.log("[GET] /api/dashboard/charts");
+  const currentYear = new Date().getFullYear();
+  const filterYear = req.query.year ? Number(req.query.year) : currentYear;
+
+  const orderDateCase = createDateNormalization("ngay_dang_ki");
+  const orderYearCase = createYearExtraction("ngay_dang_ki");
+
+  const q = `
+    WITH all_orders AS (
+      SELECT
+        ${orderDateCase} AS order_date,
+        ${orderYearCase} AS order_year,
+        COALESCE(gia_ban, 0) AS gia_ban,
+        FALSE AS is_canceled
+      FROM mavryk.order_list
+      WHERE TRIM(ngay_dang_ki::text) <> ''
+      UNION ALL
+      SELECT
+        ${orderDateCase} AS order_date,
+        ${orderYearCase} AS order_year,
+        COALESCE(gia_ban, 0) AS gia_ban,
+        FALSE AS is_canceled
+      FROM mavryk.order_expried
+      WHERE TRIM(ngay_dang_ki::text) <> ''
+      UNION ALL
+      SELECT
+        ${orderDateCase} AS order_date,
+        ${orderYearCase} AS order_year,
+        COALESCE(gia_ban, 0) AS gia_ban,
+        TRUE AS is_canceled
+      FROM mavryk.order_canceled
+      WHERE TRIM(ngay_dang_ki::text) <> ''
+    ),
+    filtered_orders AS (
+      SELECT *
+      FROM all_orders
+      WHERE order_date IS NOT NULL
+        AND order_year = $1
+    ),
+    monthly_stats AS (
+      SELECT
+        EXTRACT(MONTH FROM order_date) AS month_num,
+        TO_CHAR(order_date, '"T"FM9') AS month_label,
+        COALESCE(SUM(gia_ban), 0) AS total_sales,
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END), 0) AS total_canceled
+      FROM filtered_orders
+      GROUP BY 1, 2
+      ORDER BY 1
+    )
+    SELECT
+      months.month_label,
+      COALESCE(monthly_stats.total_sales, 0) AS total_sales,
+      COALESCE(monthly_stats.total_orders, 0) AS total_orders,
+      COALESCE(monthly_stats.total_canceled, 0) AS total_canceled
+    FROM (
+      VALUES
+      (1, 'T1'), (2, 'T2'), (3, 'T3'), (4, 'T4'), (5, 'T5'), (6, 'T6'),
+      (7, 'T7'), (8, 'T8'), (9, 'T9'), (10, 'T10'), (11, 'T11'), (12, 'T12')
+    ) AS months(month_num, month_label)
+    LEFT JOIN monthly_stats
+      ON months.month_num = monthly_stats.month_num
+    ORDER BY months.month_num;
+  `;
+
+  try {
+    const result = await pool.query(q, [filterYear]);
+    const rows = result.rows;
+
+    const revenueData = rows.map((row) => ({
+      month: row.month_label,
+      total_sales: Number(row.total_sales),
+    }));
+
+    const orderStatusData = rows.map((row) => ({
+      month: row.month_label,
+      total_orders: Number(row.total_orders),
+      total_canceled: Number(row.total_canceled),
+    }));
+
+    res.json({ revenueData, orderStatusData });
+  } catch (error) {
+    console.error("Query failed (GET /api/dashboard/charts):", error);
+    res.status(500).json({
+      error: "Unable to load chart data.",
+    });
+  }
+});
+
 app.get("/api/orders", async (_req, res) => {
   console.log("[GET] /api/orders");
-  try {
-    // FIX: Loại bỏ TO_DATE và tính cột so_ngay_con_lai
-    const result = await pool.query(`
-      SELECT 
-        *, 
-        -- Tính số ngày còn lại: (Ngày Hết Hạn - Ngày Hiện Tại)
-        (het_han - CURRENT_DATE) AS so_ngay_con_lai 
+  const expiryDateCase = createDateNormalization("het_han");
+
+  const q = `
+    WITH normalized AS (
+      SELECT
+        *,
+        ${expiryDateCase} AS expiry_date
       FROM mavryk.order_list
-    `);
+    )
+    SELECT
+      normalized.*,
+      (normalized.expiry_date - ${CURRENT_DATE_SQL}) AS so_ngay_con_lai
+    FROM normalized;
+  `;
+
+  try {
+    const result = await pool.query(q);
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET /api/orders):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi lấy đơn hàng" });
+  } catch (error) {
+    console.error("Query failed (GET /api/orders):", error);
+    res.status(500).json({
+      error: "Unable to load order list.",
+    });
   }
 });
 
-// GET /api/supplies
 app.get("/api/supplies", async (_req, res) => {
-  // ... (endpoint này giữ nguyên)
   console.log("[GET] /api/supplies");
   try {
     const result = await pool.query(
-      "SELECT id, source_name FROM mavryk.supply ORDER BY source_name"
+      "SELECT id, source_name FROM mavryk.supply ORDER BY source_name;"
     );
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET /api/supplies):", err);
-    res
-      .status(500)
-      .json({ error: "Lỗi server nội bộ khi lấy danh sách nguồn" });
+  } catch (error) {
+    console.error("Query failed (GET /api/supplies):", error);
+    res.status(500).json({
+      error: "Unable to load suppliers.",
+    });
   }
 });
 
-// GET /api/supplies/:supplyId/products
 app.get("/api/supplies/:supplyId/products", async (req, res) => {
-  // ... (endpoint này giữ nguyên)
   const { supplyId } = req.params;
   console.log(`[GET] /api/supplies/${supplyId}/products`);
+
   const q = `
     SELECT DISTINCT pp.id, pp.san_pham
     FROM mavryk.supply_price sp
@@ -258,42 +372,41 @@ app.get("/api/supplies/:supplyId/products", async (req, res) => {
     WHERE sp.source_id = $1
     ORDER BY pp.san_pham;
   `;
+
   try {
     const result = await pool.query(q, [supplyId]);
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET supplies/:id/products):", err);
-    res
-      .status(500)
-      .json({ error: "Lỗi server nội bộ khi lấy sản phẩm theo nguồn" });
+  } catch (error) {
+    console.error("Query failed (GET /api/supplies/:id/products):", error);
+    res.status(500).json({
+      error: "Unable to load products for this supplier.",
+    });
   }
 });
 
-// GET /api/products
 app.get("/api/products", async (_req, res) => {
-  // ... (endpoint này giữ nguyên)
   console.log("[GET] /api/products");
   const q = `
     SELECT id, san_pham
     FROM mavryk.product_price
     ORDER BY san_pham;
   `;
+
   try {
     const result = await pool.query(q);
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET /api/products):", err);
-    res
-      .status(500)
-      .json({ error: "Lỗi server nội bộ khi lấy danh sách sản phẩm" });
+  } catch (error) {
+    console.error("Query failed (GET /api/products):", error);
+    res.status(500).json({
+      error: "Unable to load products.",
+    });
   }
 });
 
-// GET /api/products/supplies-by-name/:productName
 app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
-  // ... (endpoint này giữ nguyên)
   const { productName } = req.params;
   console.log(`[GET] /api/products/supplies-by-name/${productName}`);
+
   const q = `
     SELECT s.id, s.source_name
     FROM mavryk.supply s
@@ -302,64 +415,64 @@ app.get("/api/products/supplies-by-name/:productName", async (req, res) => {
     WHERE pp.san_pham = $1 AND pp.is_active = TRUE
     ORDER BY s.source_name;
   `;
+
   try {
     const result = await pool.query(q, [productName]);
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi truy vấn (GET supplies-by-name):", err);
-    res
-      .status(500)
-      .json({ error: "Lỗi server nội bộ khi lấy nguồn theo tên sản phẩm" });
+  } catch (error) {
+    console.error("Query failed (GET /api/products/supplies-by-name):", error);
+    res.status(500).json({
+      error: "Unable to load suppliers for the requested product.",
+    });
   }
 });
 
-// POST /api/calculate-price — tính giá nhập (max) + giá bán theo hệ số
 app.post("/api/calculate-price", async (req, res) => {
-  // ... (endpoint này giữ nguyên)
   console.log("[POST] /api/calculate-price");
   const { san_pham_name, id_don_hang, customer_type } = req.body || {};
 
   if (!san_pham_name || !id_don_hang) {
     return res.status(400).json({
-      error: "Thiếu thông tin cần thiết (san_pham_name, id_don_hang).",
+      error: "Missing required fields: san_pham_name and id_don_hang.",
     });
   }
 
+  const priceQuery = `
+    SELECT
+      (
+        SELECT MAX(sp_max.price)
+        FROM mavryk.supply_price sp_max
+        JOIN mavryk.product_price pp_max ON sp_max.product_id = pp_max.id
+        WHERE pp_max.san_pham = $1
+      ) AS gia_nhap_co_so,
+      pp.pct_ctv,
+      pp.pct_khach
+    FROM mavryk.product_price pp
+    WHERE pp.san_pham = $1
+    LIMIT 1;
+  `;
+
   try {
-    // Lấy giá nhập cơ sở (cao nhất) và hệ số sản phẩm
-    const q = `
-      SELECT
-        (SELECT MAX(sp_max.price)
-         FROM mavryk.supply_price sp_max
-         JOIN mavryk.product_price pp_max ON sp_max.product_id = pp_max.id
-         WHERE pp_max.san_pham = $1) AS gia_nhap_co_so,
-        pp.pct_ctv,
-        pp.pct_khach
-      FROM mavryk.product_price pp
-      WHERE pp.san_pham = $1
-      LIMIT 1;
-    `;
-    const db = await pool.query(q, [san_pham_name]);
-    if (db.rowCount === 0 || db.rows[0].gia_nhap_co_so === null) {
+    const priceResult = await pool.query(priceQuery, [san_pham_name]);
+    const productPricing = priceResult.rows[0];
+
+    if (!productPricing || productPricing.gia_nhap_co_so === null) {
       return res
         .status(404)
-        .json({ error: "Không tìm thấy giá cho sản phẩm này." });
+        .json({ error: "No pricing data found for the selected product." });
     }
 
-    const basePrice = Number(db.rows[0].gia_nhap_co_so);
-    const pctCtv = Number(db.rows[0].pct_ctv) || 1.0;
-    const pctKhach = Number(db.rows[0].pct_khach) || 1.0;
+    const basePrice = Number(productPricing.gia_nhap_co_so);
+    const pctCtv = Number(productPricing.pct_ctv) || 1.0;
+    const pctCustomer = Number(productPricing.pct_khach) || 1.0;
 
-    // Xác định loại khách
-    const prefixIsMAVC = (id_don_hang || "").toUpperCase().startsWith("MAVC");
-    const explicitIsMAVC = (customer_type || "").toUpperCase() === "MAVC";
-    const isMAVC = explicitIsMAVC || prefixIsMAVC;
+    const normalizeType = (value) => (value || "").toUpperCase();
+    const inferredMavc = normalizeType(id_don_hang).startsWith("MAVC");
+    const explicitMavc = normalizeType(customer_type) === "MAVC";
+    const isMavc = inferredMavc || explicitMavc;
 
-    // Giá bán
-    let finalPrice = basePrice;
-    finalPrice = Math.round(isMAVC ? basePrice * pctCtv : basePrice * pctKhach);
+    const finalPrice = Math.round(isMavc ? basePrice * pctCtv : basePrice * pctCustomer);
 
-    // Số ngày theo mẫu --xm
     const months = Helpers.monthsFromString(san_pham_name);
     const days = Helpers.daysFromMonths(months) || 30;
 
@@ -369,81 +482,90 @@ app.post("/api/calculate-price", async (req, res) => {
       so_ngay_da_dang_ki: Number(days),
       het_han: "",
     });
-  } catch (err) {
-    console.error(`[ERROR] Tính giá (${id_don_hang}):`, err.message || err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi tính toán giá." });
+  } catch (error) {
+    console.error(`Pricing calculation failed (${id_don_hang}):`, error);
+    res.status(500).json({
+      error: "Unable to calculate price for the requested product.",
+    });
   }
 });
 
-// POST /api/orders — tạo mới
 app.post("/api/orders", async (req, res) => {
-  console.log("[POST] /api/orders (Tạo mới)");
-  const newOrderData = { ...req.body };
-  delete newOrderData.id;
+  console.log("[POST] /api/orders");
+  const payload = { ...req.body };
+  delete payload.id;
 
-  // FIX LỖI DB DATE: Chuyển đổi định dạng ngày trước khi insert
-  if (newOrderData.ngay_dang_ki) {
-    newOrderData.ngay_dang_ki = Helpers.convertDMYToYMD(newOrderData.ngay_dang_ki);
-  }
-  if (newOrderData.het_han) {
-    newOrderData.het_han = Helpers.convertDMYToYMD(newOrderData.het_han);
+  payload.ngay_dang_ki = normalizeDateInput(payload.ngay_dang_ki);
+  payload.het_han = normalizeDateInput(payload.het_han);
+
+  const columns = Object.keys(payload);
+  if (columns.length === 0) {
+    return res.status(400).json({ error: "Order payload is empty." });
   }
 
-  const keys = Object.keys(newOrderData);
-  const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-  const columns = keys.map((k) => `"${k}"`).join(", ");
-  const values = Object.values(newOrderData);
+  const colList = columns.map((column) => `"${column}"`).join(", ");
+  const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
+  const values = Object.values(payload);
+
+  const q = `
+    INSERT INTO mavryk.order_list (${colList})
+    VALUES (${placeholders})
+    RETURNING *;
+  `;
 
   try {
-    const q = `INSERT INTO mavryk.order_list (${columns}) VALUES (${placeholders}) RETURNING *;`;
     const result = await pool.query(q, values);
     if (result.rows.length === 0) {
       return res
         .status(500)
-        .json({ error: "Không thể tạo đơn hàng (không có dữ liệu trả về)." });
+        .json({ error: "Order was not created, database returned no rows." });
     }
-    console.log(`Đã tạo đơn hàng ID: ${result.rows[0].id_don_hang}`);
+
     res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error("Lỗi khi tạo đơn hàng (POST /api/orders):", err);
-    res.status(500).json({ error: "Lỗi server nội bộ khi tạo đơn hàng" });
+  } catch (error) {
+    console.error("Insert failed (POST /api/orders):", error);
+    res.status(500).json({
+      error: "Unable to create order.",
+    });
   }
 });
 
-// GET /api/products/all-prices-by-name/:productName — lấy tất cả giá theo nguồn cho 1 sản phẩm
 app.get("/api/products/all-prices-by-name/:productName", async (req, res) => {
-  // ... (endpoint này giữ nguyên)
   const { productName } = req.params;
+  console.log(`[GET] /api/products/all-prices-by-name/${productName}`);
+
   const q = `
     SELECT sp.source_id, sp.price
     FROM mavryk.supply_price sp
     JOIN mavryk.product_price pp ON sp.product_id = pp.id
     WHERE pp.san_pham = $1;
   `;
+
   try {
     const result = await pool.query(q, [productName]);
     res.json(result.rows);
-  } catch (err) {
-    console.error("Lỗi khi lấy tất cả giá theo nguồn:", err);
-    res.status(500).json({ error: "Lỗi server nội bộ." });
+  } catch (error) {
+    console.error(
+      "Query failed (GET /api/products/all-prices-by-name/:productName):",
+      error
+    );
+    res.status(500).json({
+      error: "Unable to load price list for this product.",
+    });
   }
 });
 
-// GET /api/run-scheduler — chạy thử cron job
 app.get("/api/run-scheduler", async (_req, res) => {
-  // ... (endpoint này giữ nguyên)
-  console.log("--- KÍCH HOẠT CHẠY CRON JOB THỬ CÔNG ---");
+  console.log("[GET] /api/run-scheduler");
   try {
     await updateDatabaseTask();
-    res
-      .status(200)
-      .json({ success: true, message: "Đã chạy cron job thành công." });
-  } catch (err) {
-    res.status(500).json({ error: "Lỗi server nội bộ khi chạy cron job." });
+    res.json({ success: true, message: "Cron job executed successfully." });
+  } catch (error) {
+    console.error("Cron job failed:", error);
+    res.status(500).json({ error: "Unable to run scheduled task." });
   }
 });
 
-// 12) Khởi động server
 app.listen(port, () => {
-  console.log(`Backend server đang chạy tại http://localhost:${port}`);
+  console.log(`Backend server running at http://localhost:${port}`);
 });

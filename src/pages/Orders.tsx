@@ -62,6 +62,8 @@ const VIRTUAL_FIELDS = {
   GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
   TRANG_THAI_TEXT: "trang_thai_text_virtual",
   CHECK_FLAG_STATUS: "check_flag_status_virtual",
+  ORDER_DATE_DISPLAY: "order_date_display_virtual",
+  EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
 
 // Interface Order (dựa trên DB + trường ảo)
@@ -89,6 +91,8 @@ interface Order {
   [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
   [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
   [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
+  [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
+  [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
 }
 
 // Cấu trúc Stats
@@ -224,8 +228,26 @@ const useOrdersData = () => {
     // Không cần today: const today = new Date(); today.setHours(0, 0, 0, 0);
 
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
-      // FIX: Lấy trực tiếp so_ngay_con_lai từ API
-      const soNgayConLai = Number(order.so_ngay_con_lai) || 0;
+      // Date normalization for display and calculations
+      const formattedOrderDate = Helpers.formatDateToDMY(
+        order[ORDER_FIELDS.NGAY_DANG_KI]
+      );
+      const formattedExpiryDate = Helpers.formatDateToDMY(
+        order[ORDER_FIELDS.HET_HAN]
+      );
+
+      const calculatedRemaining = Helpers.daysUntilDate(
+        order[ORDER_FIELDS.HET_HAN]
+      );
+      const backendRemainingValue = Number(order.so_ngay_con_lai);
+      const backendRemaining = Number.isFinite(backendRemainingValue)
+        ? backendRemainingValue
+        : null;
+
+      const soNgayConLai =
+        calculatedRemaining !== null
+          ? calculatedRemaining
+          : backendRemaining ?? 0;
 
       const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán";
       let trangThaiText = "";
@@ -255,10 +277,12 @@ const useOrdersData = () => {
 
       return {
         ...order,
-        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai, // Gán giá trị Backend
+        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai, // GA�n giA� tr��< Backend
         [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
         [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
         [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
+        [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: formattedOrderDate,
+        [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: formattedExpiryDate,
       } as Order;
     });
 
@@ -351,7 +375,7 @@ const useOrdersData = () => {
     ).length;
     // Cập nhật: Dùng hàm isRegisteredToday mới
     const registeredTodayCount = ordersWithVirtualFields.filter((order) =>
-      Helpers.isRegisteredToday(order[ORDER_FIELDS.NGAY_DANG_KI])
+      Helpers.isRegisteredToday(order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY])
     ).length;
 
     // Cập nhật mảng stats
@@ -758,6 +782,11 @@ export default function Orders() {
                     [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
                     [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
                   } = order;
+
+                  const orderDateDisplay =
+                    order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
+                  const expiryDateDisplay =
+                    order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
                   return (
                     <tr key={order.id} className="hover:bg-gray-50">
                       {/* 1. GỘP ORDER + PRODUCT */}
@@ -800,7 +829,7 @@ export default function Orders() {
 
                       {/* ORDER DATE (text-center) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[100px] text-center">
-                        {order[ORDER_FIELDS.NGAY_DANG_KI] || ""}
+                        {orderDateDisplay}
                       </td>
                       {/* DAYS (text-center) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[50px] text-center">
@@ -808,7 +837,7 @@ export default function Orders() {
                       </td>
                       {/* EXPIRED (text-center) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[90px] text-center">
-                        {order[ORDER_FIELDS.HET_HAN] || ""}
+                        {expiryDateDisplay}
                       </td>
                       {/* REMAINING (text-center) */}
                       <td className="px-6 py-4 whitespace-nowrap truncate text-sm font-bold w-[70px] text-center">

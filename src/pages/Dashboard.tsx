@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ShoppingBagIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  CalendarDaysIcon, // Icon mới cho Đơn Đến Hạn
-  ArchiveBoxIcon, // Icon mới cho Nhập Hàng
-  ChartBarIcon, // Icon mới cho Tổng Lợi Nhuận
+  CalendarDaysIcon,
+  ArchiveBoxIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import {
   LineChart,
@@ -18,8 +18,15 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import {
+  fetchChartData,
+  fetchAvailableYears,
+  apiFetch,
+  type ChartsApiResponse,
+  type RevenueData,
+  type OrderStatusData,
+} from "../lib/api";
 
-// Định nghĩa kiểu dữ liệu cho dữ liệu thống kê nhận được từ API
 interface StatsApiResponse {
   totalOrders: { current: number; previous: number };
   totalImports: { current: number; previous: number };
@@ -27,7 +34,6 @@ interface StatsApiResponse {
   overdueOrders: { count: number };
 }
 
-// Định nghĩa kiểu dữ liệu cho dữ liệu thống kê đã xử lý
 interface ProcessedStat {
   name: string;
   value: string;
@@ -37,10 +43,15 @@ interface ProcessedStat {
   color: string;
 }
 
-/**
- * Hàm tính toán giá trị và tỷ lệ thay đổi cho mục thống kê
- * dựa trên dữ liệu hiện tại và dữ liệu chu kỳ trước.
- */
+const formatCurrency = (value: number) =>
+  `₫${value.toLocaleString("vi-VN", { maximumFractionDigits: 0 })}`;
+
+const toChangeLabel = (diff: number) => {
+  if (!Number.isFinite(diff)) return "N/A";
+  const prefix = diff >= 0 ? "+" : "-";
+  return `${prefix}${Math.abs(diff).toFixed(1)}%`;
+};
+
 const calculateStat = (
   name: string,
   current: number,
@@ -49,312 +60,286 @@ const calculateStat = (
 ): Omit<ProcessedStat, "icon" | "color" | "changeType"> & {
   changeType: "increase" | "decrease";
 } => {
-  const value = isCurrency
-    ? current.toLocaleString("vi-VN")
-    : current.toLocaleString();
-  let change = 0;
-  if (previous !== 0) {
-    change = ((current - previous) / previous) * 100;
-  } else if (current > 0) {
-    change = 100; // Tăng 100% nếu tháng trước bằng 0
-  }
+  const displayValue = isCurrency
+    ? formatCurrency(current)
+    : current.toLocaleString("vi-VN");
 
-  const changeType: "increase" | "decrease" =
-    change >= 0 ? "increase" : "decrease";
-  const changeValue = `${change >= 0 ? "+" : ""}${Math.abs(change).toFixed(
-    1
-  )}%`;
+  let diff = 0;
+  if (previous !== 0) {
+    diff = ((current - previous) / previous) * 100;
+  } else if (current > 0) {
+    diff = 100;
+  }
 
   return {
     name,
-    value: isCurrency ? `₫${value}` : value,
-    change: changeValue,
-    changeType,
+    value: displayValue,
+    change: toChangeLabel(diff),
+    changeType: diff >= 0 ? "increase" : "decrease",
   };
 };
 
-// Dữ liệu biểu đồ vẫn giữ nguyên (MOCK DATA)
-const revenueData = [
-  { month: "T1", revenue: 45000000 },
-  { month: "T2", revenue: 50000000 },
-  { month: "T3", revenue: 62000000 },
-  { month: "T4", revenue: 55000000 },
-  { month: "T5", revenue: 70000000 },
-  { month: "T6", revenue: 68000000 },
-  { month: "T7", revenue: 75000000 },
-  { month: "T8", revenue: 80000000 },
-  { month: "T9", revenue: 90000000 },
-  { month: "T10", revenue: 85000000 },
-  { month: "T11", revenue: 92000000 },
-  { month: "T12", revenue: 98000000 },
-];
+const Dashboard: React.FC = () => {
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
 
-const orderStatusData = [
-  { status: "Chờ xử lý", count: 45 },
-  { status: "Đang xử lý", count: 120 },
-  { status: "Đang giao", count: 75 },
-  { status: "Hoàn thành", count: 450 },
-  { status: "Đã hủy", count: 8 },
-];
-
-export default function Dashboard() {
   const [statsData, setStatsData] = useState<ProcessedStat[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [revenueChartData, setRevenueChartData] = useState<RevenueData[]>([]);
+  const [orderChartData, setOrderChartData] = useState<OrderStatusData[]>([]);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
-  const API_BASE =
-    (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
-    (process.env.VITE_API_BASE_URL as string) ||
-    "http://localhost:3001";
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const fetchDashboardData = async (year: number) => {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const statsResponse = await apiFetch("/api/dashboard/stats");
+      if (!statsResponse.ok) {
+        throw new Error("Không thể tải thống kê tổng quan.");
+      }
+      const stats: StatsApiResponse = await statsResponse.json();
+
+      const formattedStats: ProcessedStat[] = [
+        {
+          ...calculateStat(
+            "Tổng đơn hàng",
+            stats.totalOrders.current,
+            stats.totalOrders.previous,
+            false
+          ),
+          icon: ShoppingBagIcon,
+          color: "bg-blue-500",
+        },
+        {
+          name: "Đơn sắp hết hạn",
+          value: stats.overdueOrders.count.toLocaleString("vi-VN"),
+          change: "Cần xử lý",
+          changeType: "alert",
+          icon: CalendarDaysIcon,
+          color: "bg-red-500",
+        },
+        {
+          ...calculateStat(
+            "Tổng nhập hàng",
+            stats.totalImports.current,
+            stats.totalImports.previous,
+            true
+          ),
+          icon: ArchiveBoxIcon,
+          color: "bg-orange-500",
+        },
+        {
+          ...calculateStat(
+            "Tổng lợi nhuận",
+            stats.totalProfit.current,
+            stats.totalProfit.previous,
+            true
+          ),
+          icon: ChartBarIcon,
+          color: "bg-green-500",
+        },
+      ];
+      setStatsData(formattedStats);
+
+      const charts: ChartsApiResponse = await fetchChartData(year);
+      setRevenueChartData(charts.revenueData);
+      setOrderChartData(charts.orderStatusData);
+    } catch (err) {
+      console.error("Loi khi lay du lieu dashboard:", err);
+      setErrorMessage(
+        "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const loadYears = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE}/api/dashboard/stats`
-        );
-        if (!response.ok) {
-          throw new Error("Lỗi khi tải dữ liệu thống kê từ API.");
+        const years = await fetchAvailableYears();
+        if (years.length > 0) {
+          setAvailableYears(years);
+          setSelectedYear((prev) =>
+            years.includes(prev) ? prev : years[0]
+          );
+        } else {
+          setAvailableYears([currentYear]);
+          setSelectedYear(currentYear);
         }
-        const data: StatsApiResponse = await response.json();
-
-        // Xử lý dữ liệu và định dạng lại
-        const newStats: ProcessedStat[] = [
-          {
-            ...calculateStat(
-              "Tổng đơn hàng",
-              data.totalOrders.current,
-              data.totalOrders.previous,
-              false
-            ),
-            icon: ShoppingBagIcon,
-            color: "bg-blue-500",
-          },
-          {
-            name: "Đơn Đến Hạn",
-            value: data.overdueOrders.count.toLocaleString(),
-            change: "Cần xử lý",
-            changeType: "alert",
-            icon: CalendarDaysIcon,
-            color: "bg-red-500",
-          },
-          {
-            ...calculateStat(
-              "Tổng Nhập Hàng",
-              data.totalImports.current,
-              data.totalImports.previous,
-              true
-            ),
-            icon: ArchiveBoxIcon,
-            color: "bg-orange-500",
-          },
-          {
-            ...calculateStat(
-              "Tổng Lợi Nhuận",
-              data.totalProfit.current,
-              data.totalProfit.previous,
-              true
-            ),
-            icon: ChartBarIcon,
-            color: "bg-green-500",
-          },
-        ];
-
-        setStatsData(newStats);
-      } catch (error) {
-        console.error("Lỗi khi tải dữ liệu dashboard:", error);
-        // Có thể thêm logic hiển thị lỗi cho người dùng ở đây
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error("Loi khi lay danh sach nam dashboard:", err);
+        setAvailableYears([currentYear]);
+        setSelectedYear(currentYear);
       }
     };
 
-    fetchStats();
-  }, []); // Chỉ chạy một lần khi component mount
+    loadYears();
+  }, [currentYear]);
+
+  useEffect(() => {
+    fetchDashboardData(selectedYear);
+  }, [selectedYear]);
 
   if (loading) {
     return (
-      <div className="text-center py-10">
-        <p className="text-lg font-medium text-gray-700">Đang tải dữ liệu...</p>
+      <div className="py-10 text-center">
+        <p className="text-lg font-medium text-gray-700">
+          Đang tải dữ liệu dashboard...
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 sm:p-8 text-white">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
-          Bảng điều khiển
-        </h1>
-        <p className="text-blue-100 text-sm sm:text-base">
-          Tổng quan về hoạt động kinh doanh của bạn
+      <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white sm:p-8">
+        <h1 className="text-3xl font-bold">Bảng điều khiển</h1>
+        <p className="text-sm text-blue-100">
+          Tổng quan hoạt động kinh doanh của bạn
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {statsData.map((stat, index) => (
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {statsData.map((item, index) => (
           <div
             key={index}
-            className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+            className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div
-                className={`w-12 h-12 ${stat.color} rounded-lg flex items-center justify-center`}
+                className={`flex h-12 w-12 items-center justify-center rounded-lg ${item.color}`}
               >
-                <stat.icon className="w-6 h-6 text-white" />
+                <item.icon className="h-6 w-6 text-white" />
               </div>
               <div
-                // Cập nhật logic màu sắc cho mục "Đơn Đến Hạn" (alert)
                 className={`flex items-center text-sm font-medium ${
-                  stat.changeType === "increase"
+                  item.changeType === "increase"
                     ? "text-green-600"
-                    : stat.changeType === "decrease"
+                    : item.changeType === "decrease"
                     ? "text-red-600"
-                    : "text-red-600 font-bold" // Màu cho trạng thái alert
+                    : "text-orange-600"
                 }`}
               >
-                {/* Ẩn icon Tăng/Giảm cho mục "Đơn Đến Hạn" */}
-                {stat.changeType !== "alert" &&
-                  (stat.changeType === "increase" ? (
-                    <ArrowUpIcon className="w-4 h-4 mr-1" />
-                  ) : (
-                    <ArrowDownIcon className="w-4 h-4 mr-1" />
-                  ))}
-                {stat.change}
+                {item.changeType === "alert" ? (
+                  <span className="font-semibold uppercase">Alert</span>
+                ) : item.changeType === "increase" ? (
+                  <>
+                    <ArrowUpIcon className="mr-1 h-4 w-4" />
+                    {item.change}
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownIcon className="mr-1 h-4 w-4" />
+                    {item.change}
+                  </>
+                )}
               </div>
             </div>
-            <h3 className="text-gray-600 text-sm font-medium mb-1">
-              {stat.name}
-            </h3>
-            <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+            <h3 className="text-sm font-medium text-gray-600">{item.name}</h3>
+            <p className="mt-1 text-2xl font-bold text-gray-900">
+              {item.value}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">
-              Doanh thu theo tháng
+              Doanh thu theo tháng (Tổng giá bán)
             </h3>
-            <select className="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>2024</option>
-              <option>2023</option>
+            <select
+              className="rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedYear}
+              onChange={(event) => setSelectedYear(Number(event.target.value))}
+            >
+              {availableYears.length === 0 ? (
+                <option value={selectedYear}>{selectedYear}</option>
+              ) : (
+                availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={revenueData}>
+              <LineChart data={revenueChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
                 <YAxis
                   stroke="#6b7280"
                   fontSize={12}
-                  tickFormatter={(value) => `${value / 1000000}M`}
+                  tickFormatter={(value) =>
+                    `${Math.round((value as number) / 1_000_000)}M`
+                  }
                 />
                 <Tooltip
-                  formatter={(value) => [
-                    `₫${(value as number).toLocaleString()}`,
-                    "Doanh thu",
-                  ]}
-                  labelStyle={{ color: "#374151" }}
+                  formatter={(value: number) => [formatCurrency(value), "Doanh thu"]}
+                  labelStyle={{ color: "#111827" }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="revenue"
+                  dataKey="total_sales"
                   stroke="#3b82f6"
                   strokeWidth={3}
-                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: "#3b82f6", strokeWidth: 2 }}
+                  dot={{ r: 4, fill: "#3b82f6" }}
+                  activeDot={{ r: 6, stroke: "#2563eb", strokeWidth: 2 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Order Status Chart */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">
-            Trạng thái đơn hàng
+        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h3 className="mb-6 text-lg font-semibold text-gray-900">
+            Tổng đơn hàng và đơn hủy theo tháng
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={orderStatusData}>
+              <BarChart data={orderChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="status" stroke="#6b7280" fontSize={12} />
+                <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
                 <YAxis stroke="#6b7280" fontSize={12} />
                 <Tooltip
-                  formatter={(value) => [value, "Số đơn"]}
-                  labelStyle={{ color: "#374151" }}
+                  formatter={(value: number, _name: string, props: any) => [
+                    value,
+                    props?.dataKey === "total_orders" ? "Tổng đơn" : "Đơn hủy",
+                  ]}
+                  labelStyle={{ color: "#111827" }}
                 />
-                <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="total_orders"
+                  name="Tổng đơn"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="total_canceled"
+                  name="Đơn hủy"
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
-
-      {/* Recent Activities */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Hoạt động gần đây
-        </h3>
-        <div className="space-y-4">
-          {[
-            {
-              action: "Đơn hàng mới",
-              details: "#DH-2024-001 - Nguyễn Văn A",
-              time: "2 phút trước",
-              status: "new",
-            },
-            {
-              action: "Thanh toán",
-              details: "Đơn hàng #DH-2024-002 đã thanh toán",
-              time: "15 phút trước",
-              status: "success",
-            },
-            {
-              action: "Cập nhật kho",
-              details: "Sản phẩm SP001 đã nhập thêm 50 cái",
-              time: "1 giờ trước",
-              status: "info",
-            },
-            {
-              action: "Giao hàng",
-              details: "Đơn hàng #DH-2024-003 đang giao",
-              time: "2 giờ trước",
-              status: "warning",
-            },
-          ].map((activity, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
-            >
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    activity.status === "new"
-                      ? "bg-blue-500"
-                      : activity.status === "success"
-                      ? "bg-green-500"
-                      : activity.status === "info"
-                      ? "bg-purple-500"
-                      : "bg-orange-500"
-                  }`}
-                ></div>
-                <div>
-                  <p className="font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-sm text-gray-600">{activity.details}</p>
-                </div>
-              </div>
-              <span className="text-xs text-gray-500">{activity.time}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
-}
+};
+
+export default Dashboard;
