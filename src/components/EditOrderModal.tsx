@@ -114,9 +114,18 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   }, []);
 
   // HÀM GỌI API TÍNH TOÁN GIÁ MỚI
-  const calculatePrice = useCallback(
-    async (supplyId: number, productName: string, orderIdDonHang: string) => {
-      if (!supplyId || !productName || !orderIdDonHang) return;
+const calculatePrice = useCallback(
+  async (
+    supplyId: number,
+    productName: string,
+    orderIdDonHang: string,
+    registerDate?: string
+  ) => {
+    if (!supplyId || !productName || !orderIdDonHang) return;
+
+    const normalizedRegisterDate = registerDate
+      ? Helpers.formatDateToDMY(registerDate)
+      : undefined;
 
       try {
         const response = await fetch(
@@ -125,12 +134,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              // Không truyền registerDateStr vì Backend tự tính
-              // Chỉ truyền các tham số cần thiết cho Backend tính giá bán.
               supply_id: supplyId, // Backend cần nguồn để tính giá nhập
               san_pham_name: productName,
               id_don_hang: orderIdDonHang,
-              // Backend sẽ trả về gia_nhap, gia_ban, so_ngay_da_dang_ki, het_han
+              register_date: normalizedRegisterDate,
             }),
           }
         );
@@ -146,16 +153,61 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         setFormData((prev) => {
           if (!prev) return null;
 
-          // LƯU Ý: Các trường ngày tháng đã được tính toán ở Backend (hoặc logic tính giá)
-          // và trả về ở định dạng YYYY-MM-DD
+          const calculatedDays = Number(result.so_ngay_da_dang_ki);
+          const fallbackDays =
+            Number(prev[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
+          const registerDMY = Helpers.formatDateToDMY(
+            prev[ORDER_FIELDS.NGAY_DANG_KI]
+          );
+          const productInfo =
+            result.thong_tin_san_pham ??
+            prev[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ??
+            "";
+          const inferredMonths = Helpers.parseMonthsFromInfo(productInfo);
+
+          let effectiveDays = Number.isFinite(calculatedDays)
+            ? calculatedDays
+            : fallbackDays;
+
+          if ((!effectiveDays || effectiveDays <= 0) && inferredMonths > 0) {
+            effectiveDays = Helpers.daysFromMonths(inferredMonths);
+          }
+
+          let nextExpiry = result.het_han?.trim();
+          if (nextExpiry) {
+            const normalized = Helpers.convertDMYToYMD(nextExpiry);
+            nextExpiry = normalized || nextExpiry;
+          }
+          if (!nextExpiry && registerDMY) {
+            if (inferredMonths > 0) {
+              const expiryDMY = Helpers.addMonthsMinusOneDay(
+                registerDMY,
+                inferredMonths,
+                3
+              );
+              if (expiryDMY) {
+                nextExpiry = Helpers.convertDMYToYMD(expiryDMY);
+              }
+            }
+          }
+
+          if (!nextExpiry && registerDMY && effectiveDays > 0) {
+            const expiryDMY = Helpers.calculateExpirationDate(
+              registerDMY,
+              effectiveDays,
+              3
+            );
+            if (expiryDMY && expiryDMY !== "N/A") {
+              nextExpiry = Helpers.convertDMYToYMD(expiryDMY);
+            }
+          }
+
           return {
             ...prev,
             [ORDER_FIELDS.GIA_NHAP]: Number(result.gia_nhap),
             [ORDER_FIELDS.GIA_BAN]: Number(result.gia_ban),
-            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
-              result.so_ngay_da_dang_ki
-            ),
-            [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy giá trị mới từ Backend
+            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(effectiveDays || 0),
+            [ORDER_FIELDS.HET_HAN]: nextExpiry || prev[ORDER_FIELDS.HET_HAN],
           };
         });
       } catch (error) {
@@ -261,7 +313,12 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       // Tự động tính giá nếu có đủ thông tin
       if (selectedSourceId && newForm.id_don_hang && productName) {
         // KHÔNG CẦN registerDateStr vì Backend không cần nó để tính giá bán
-        calculatePrice(selectedSourceId, productName, newForm.id_don_hang);
+        calculatePrice(
+          selectedSourceId,
+          productName,
+          newForm.id_don_hang,
+          newForm[ORDER_FIELDS.NGAY_DANG_KI]
+        );
       } else if (!productName) {
         // Reset giá nếu chọn lại "Chọn Sản phẩm"
         newForm[ORDER_FIELDS.GIA_NHAP] = 0;
@@ -394,7 +451,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.ID_DON_HANG}
-                      value={formData[ORDER_FIELDS.ID_DON_HANG]}
+                      value={formData?.[ORDER_FIELDS.ID_DON_HANG] ?? ""}
                       readOnly={isReadOnly(ORDER_FIELDS.ID_DON_HANG)}
                       className={`${inputClass} ${
                         isReadOnly(ORDER_FIELDS.ID_DON_HANG)
@@ -408,7 +465,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.KHACH_HANG}
-                      value={formData[ORDER_FIELDS.KHACH_HANG]}
+                      value={formData?.[ORDER_FIELDS.KHACH_HANG] ?? ""}
                       onChange={handleChange}
                       className={inputClass}
                     />
@@ -418,7 +475,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.LINK_LIEN_HE}
-                      value={formData[ORDER_FIELDS.LINK_LIEN_HE]}
+                      value={formData?.[ORDER_FIELDS.LINK_LIEN_HE] ?? ""}
                       onChange={handleChange}
                       className={inputClass}
                     />
@@ -446,7 +503,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <label className={labelClass}>Trạng Thái</label>
                     <select
                       name={ORDER_FIELDS.TINH_TRANG}
-                      value={formData[ORDER_FIELDS.TINH_TRANG]}
+                      value={formData?.[ORDER_FIELDS.TINH_TRANG] ?? ""}
                       onChange={handleChange}
                       readOnly={isReadOnly(ORDER_FIELDS.TINH_TRANG)}
                       disabled={isReadOnly(ORDER_FIELDS.TINH_TRANG)}
@@ -501,7 +558,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <label className={labelClass}>Thông Tin Sản Phẩm</label>
                     <textarea
                       name={ORDER_FIELDS.THONG_TIN_SAN_PHAM}
-                      value={formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM]}
+                      value={formData?.[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ?? ""}
                       onChange={handleChange}
                       rows={3}
                       className={inputClass}
@@ -512,7 +569,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.SLOT}
-                      value={formData[ORDER_FIELDS.SLOT]}
+                      value={formData?.[ORDER_FIELDS.SLOT] ?? ""}
                       onChange={handleChange}
                       className={inputClass}
                     />
@@ -538,7 +595,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
-                      value={formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]}
+                      value={formData?.[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ?? ""}
                       readOnly={isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)}
                       className={`${inputClass} ${
                         isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)
@@ -601,7 +658,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <label className={labelClass}>Ghi Chú</label>
                     <textarea
                       name={ORDER_FIELDS.NOTE}
-                      value={formData[ORDER_FIELDS.NOTE]}
+                      value={formData?.[ORDER_FIELDS.NOTE] ?? ""}
                       onChange={handleChange}
                       rows={8}
                       className={inputClass}
@@ -636,4 +693,5 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 };
 
 export default EditOrderModal;
+
 

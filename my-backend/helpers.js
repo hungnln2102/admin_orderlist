@@ -13,6 +13,19 @@ function daysFromMonths(months) {
   return months * 30;
 }
 
+function toFiniteNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function roundGiaBanValue(value) {
+  const numeric = toFiniteNumber(value);
+  if (numeric >= 0) {
+    return Math.floor(numeric + 0.5);
+  }
+  return -Math.floor(Math.abs(numeric) + 0.5);
+}
+
 function convertDMYToYMD(dmyString) {
   if (
     !dmyString ||
@@ -68,6 +81,7 @@ function calculatePeriods() {
 module.exports = {
   monthsFromString,
   daysFromMonths,
+  roundGiaBanValue,
   convertDMYToYMD,
   calculatePeriods,
 };

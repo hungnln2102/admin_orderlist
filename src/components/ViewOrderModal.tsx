@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as Helpers from "../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { API_ENDPOINTS } from "../constants";
 
 interface Order {
   id: number;
@@ -26,6 +27,7 @@ interface Order {
   so_ngay_con_lai?: number;
   giaTriConLai?: number;
   trangThaiText?: string;
+  customer_type?: string | null;
 }
 
 interface ViewOrderModalProps {
@@ -39,12 +41,117 @@ const BANK_SHORT_CODE = "VPB";
 const ACCOUNT_NO = "9183400998";
 const ACCOUNT_NAME = "NGO LE NGOC HUNG";
 
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (process.env.VITE_API_BASE_URL as string) ||
+  "http://localhost:3001";
+
 const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
   onClose,
   order,
   formatCurrency,
 }) => {
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !order) {
+      setCalculatedPrice(null);
+      setPriceLoading(false);
+      setPriceError(null);
+      return;
+    }
+
+    let ignore = false;
+    const basePrice = Number(order.gia_ban) || 0;
+    setCalculatedPrice(basePrice);
+
+    if (!order.san_pham || !order.id_don_hang) {
+      setPriceLoading(false);
+      return;
+    }
+
+    const payload: Record<string, unknown> = {
+      san_pham_name: order.san_pham,
+      id_don_hang: order.id_don_hang,
+    };
+
+    const customerType = order.customer_type || order.nguon;
+    if (customerType) {
+      payload.customer_type = customerType;
+    }
+
+    const fetchPrice = async () => {
+      try {
+        setPriceLoading(true);
+        setPriceError(null);
+
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.CALCULATE_PRICE}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            errorText || `Server responded with ${response.status}`
+          );
+        }
+
+        const result = (await response.json()) as {
+          gia_ban?: number;
+        };
+
+        if (!ignore) {
+          const backendPrice = Number(result?.gia_ban);
+          setCalculatedPrice(
+            Number.isFinite(backendPrice) && backendPrice >= 0
+              ? backendPrice
+              : basePrice
+          );
+        }
+      } catch (error) {
+        console.error("Lỗi khi tính lại giá đơn hàng:", error);
+        if (!ignore) {
+          setPriceError(
+            "Không thể tính lại giá tự động. Đang hiển thị giá hiện có."
+          );
+          setCalculatedPrice(basePrice);
+        }
+      } finally {
+        if (!ignore) {
+          setPriceLoading(false);
+        }
+      }
+    };
+
+    fetchPrice();
+
+    return () => {
+      ignore = true;
+    };
+  }, [
+    isOpen,
+    order?.id_don_hang,
+    order?.san_pham,
+    order?.nguon,
+    order?.customer_type,
+    order?.gia_ban,
+  ]);
+
+  const effectiveAmount = useMemo(() => {
+    if (!order) return 0;
+    const fallback = Number(order.gia_ban) || 0;
+    return Math.max(0, calculatedPrice ?? fallback);
+  }, [order, calculatedPrice]);
+
   if (!isOpen || !order) return null;
 
   const displayStatus =
@@ -55,10 +162,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       ? Number(order.so_ngay_con_lai)
       : null;
   const fallbackRemaining = Helpers.daysUntilDate(
-    order.expiry_date ||
-      order.expiry_date_display ||
-      order.het_han ||
-      null
+    order.expiry_date || order.expiry_date_display || order.het_han || null
   );
   const displayRemainingDays =
     remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
@@ -75,9 +179,10 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     String(order.het_han || "");
 
   // VietQR
-  const qrAmount = order.gia_ban;
+  const qrAmount = effectiveAmount;
   const qrMessage = order.id_don_hang;
-  const safeQrAmount = Math.round(Math.max(0, Number(qrAmount)));
+  const normalizedAmount = Math.max(0, Number(qrAmount) || 0);
+  const safeQrAmount = Helpers.roundGiaBanValue(normalizedAmount);
   const qrCodeImageUrl =
     `https://img.vietqr.io/image/${BANK_SHORT_CODE}-${ACCOUNT_NO}-compact2.png` +
     `?amount=${safeQrAmount}` +
@@ -87,13 +192,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 transition-opacity duration-300 px-4 py-6">
       {/* Modal container */}
-      <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden"
-      >
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex justify-center items-center p-4 border-b bg-gray-50 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-gray-800">
-            Chi tiet don hang: <span className="text-blue-600">{order.id_don_hang}</span>
+            Chi Tiết Đơn Hàng:{" "}
+            <span className="text-blue-600">{order.id_don_hang}</span>
           </h3>
           <button
             type="button"
@@ -111,27 +215,37 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             {/* Left */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">ID don:</dt>
-                <dd className="text-gray-900 font-semibold w-2/3 text-right">{order.id_don_hang}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">ID Đơn:</dt>
+                <dd className="text-gray-900 font-semibold w-2/3 text-right">
+                  {order.id_don_hang}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">San pham:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{order.san_pham}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Sản Phẩm:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {order.san_pham}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Thong tin SP:</dt>
-                <dd className="text-gray-900 w-2/3 text-right break-words">{order.thong_tin_san_pham}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">
+                  Thông Tin Sản Phẩm:
+                </dt>
+                <dd className="text-gray-900 w-2/3 text-right break-words">
+                  {order.thong_tin_san_pham}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-gray-500 w-1/3">Slot:</dt>
                 <dd className="text-gray-900 w-2/3 text-right">{order.slot}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ghi chu:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{order.note || "-"}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Ghi Chú:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {order.note || "-"}
+                </dd>
               </div>
               <div className="flex justify-between pt-1 pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Trang thai:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">Trạng Thái:</dt>
                 <dd className="w-2/3 text-right">
                   <span
                     className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
@@ -147,11 +261,15 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             {/* Right */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Khach hang:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{order.khach_hang}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Khách Hàng:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {order.khach_hang}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1 items-start">
-                <dt className="font-medium text-gray-500 w-1/3 shrink-0">Lien he:</dt>
+                <dt className="font-medium text-gray-500 w-1/3 shrink-0">
+                  Liên Hệ:
+                </dt>
                 <dd className="w-2/3 text-right break-all">
                   <a
                     href={order.link_lien_he}
@@ -164,20 +282,32 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ngay dat:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{registrationDisplay}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Ngày Order:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {registrationDisplay}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">So ngay DK:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{order.so_ngay_da_dang_ki}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Số Ngày:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {order.so_ngay_da_dang_ki}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ngay het han:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{expiryDisplay}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">
+                  Ngày Hết Hạn:
+                </dt>
+                <dd className="text-gray-900 w-2/3 text-right">
+                  {expiryDisplay}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">So ngay con lai:</dt>
-                <dd className="text-indigo-600 font-bold w-2/3 text-right">{displayRemainingDays}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">
+                  Số Ngày Còn Lại:
+                </dt>
+                <dd className="text-indigo-600 font-bold w-2/3 text-right">
+                  {displayRemainingDays}
+                </dd>
               </div>
             </dl>
           </div>
@@ -187,7 +317,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
           {/* QR Code */}
           <div className="text-center bg-gradient-to-b from-gray-50 to-white p-4 rounded-md border border-gray-200 shadow-inner">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">Quet ma QR de thanh toan (VietQR)</h4>
+            <h4 className="text-lg font-semibold text-gray-800 mb-3">
+              Quét Mã QR Để Thanh Toán (VietQR)
+            </h4>
             {qrCodeImageUrl ? (
               <div className="flex justify-center mb-3">
                 <img
@@ -200,18 +332,33 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               </div>
             ) : (
               <p className="text-red-600 font-medium">
-                Khong the tao ma QR. Vui long kiem tra lai cau hinh.
+                Không Thể Tạo Mã QR. Vui Lòng Kiểm Tra Lại Cấu Hình
               </p>
             )}
             <div className="text-sm text-gray-700 space-y-1">
-              <p>Ngan hang: <strong>VP Bank</strong></p>
-              <p>So tai khoan: <strong>{ACCOUNT_NO}</strong></p>
-              <p>Chu tai khoan: <strong>{ACCOUNT_NAME}</strong></p>
               <p>
-                So tien: <strong className="text-xl text-red-600">{formatCurrency(safeQrAmount)}</strong>
+                Ngân Hàng: <strong>VP Bank</strong>
               </p>
               <p>
-                Noi dung: <strong className="text-blue-600">{qrMessage}</strong> (Vui long dien dung)
+                Số Tài Khoản: <strong>{ACCOUNT_NO}</strong>
+              </p>
+              <p>
+                Chủ Tài Khoản: <strong>{ACCOUNT_NAME}</strong>
+              </p>
+              <p>
+                Số Tiền:{" "}
+                <strong className="text-xl text-red-600">
+                  {priceLoading
+                    ? "Đang tính..."
+                    : formatCurrency(safeQrAmount)}
+                </strong>
+              </p>
+              {priceError && (
+                <p className="text-xs text-red-500">{priceError}</p>
+              )}
+              <p>
+                Nội Dung: <strong className="text-blue-600">{qrMessage}</strong>{" "}
+                (Vui Lòng Điền Đúng)
               </p>
             </div>
           </div>
@@ -224,7 +371,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             onClick={onClose}
             className="px-5 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
-            Dong
+            Đóng
           </button>
         </div>
       </div>

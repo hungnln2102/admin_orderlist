@@ -15,7 +15,8 @@ export const getTodayDMY = (): string => {
 
 export const calculateExpirationDate = (
   registerDateStr: string,
-  days: number
+  days: number,
+  forceDay?: number
 ): string => {
   if (!registerDateStr || days <= 0) return "N/A";
   const parts = registerDateStr.split("/");
@@ -25,18 +26,28 @@ export const calculateExpirationDate = (
   const year = parseInt(parts[2], 10);
   const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + days - 1);
+  if (Number.isFinite(forceDay) && forceDay! >= 1 && forceDay! <= 31) {
+    date.setDate(forceDay!);
+  }
   const newDay = String(date.getDate()).padStart(2, "0");
   const newMonth = String(date.getMonth() + 1).padStart(2, "0");
   const newYear = date.getFullYear();
   return `${newDay}/${newMonth}/${newYear}`;
 };
 
-export const addMonthsMinusOneDay = (startDMY: string, months: number): string => {
+export const addMonthsMinusOneDay = (
+  startDMY: string,
+  months: number,
+  forceDay?: number
+): string => {
   if (!startDMY || !Number.isFinite(months) || months <= 0) return startDMY;
   const [d, m, y] = startDMY.split("/").map(Number);
   const dt = new Date(y, m - 1, d);
   dt.setMonth(dt.getMonth() + months);
   dt.setDate(dt.getDate() - 1);
+  if (Number.isFinite(forceDay) && forceDay! >= 1 && forceDay! <= 31) {
+    dt.setDate(forceDay!);
+  }
   return `${String(dt.getDate()).padStart(2, "0")}/${String(
     dt.getMonth() + 1
   ).padStart(2, "0")}/${dt.getFullYear()}`;
@@ -128,15 +139,27 @@ export const daysFromMonths = (months: number): number => {
   return months === 12 ? 365 : months * 30;
 };
 
+const toFiniteNumber = (value: number | string): number => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+export const roundGiaBanValue = (value: number | string): number => {
+  const numeric = toFiniteNumber(value);
+  if (numeric >= 0) {
+    return Math.floor(numeric + 0.5);
+  }
+  return -Math.floor(Math.abs(numeric) + 0.5);
+};
+
 // Currency helpers
 export const formatCurrency = (value: number | string): string => {
-  const num = Number(value) || 0;
-  const rounded = Math.round(num);
+  const rounded = roundGiaBanValue(value);
   return rounded.toLocaleString("vi-VN") + " ₫";
 };
 
 export const formatCurrencyPlain = (value: number): string => {
-  const n = Number(value) || 0;
+  const n = toFiniteNumber(value);
   return n > 0 ? n.toLocaleString("vi-VN") : "";
 };
 
@@ -193,6 +216,7 @@ export const getStatusPriority = (status: string): number => {
   if (normalized === "da thanh toan") return 4;
   return 5;
 };
+
 
 
 

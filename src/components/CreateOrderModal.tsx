@@ -800,7 +800,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) || Helpers.getTodayDMY();
 
     if (months > 0) {
-      const end = Helpers.addMonthsMinusOneDay(registerDate, months);
+      const end = Helpers.addMonthsMinusOneDay(registerDate, months, 3);
       const days = Helpers.inclusiveDaysBetween(registerDate, end);
       updateForm({
         [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(days),
@@ -825,7 +825,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const normalized = Helpers.formatDateToDMY(rawExpiry);
 
     if (!normalized && registerDMY && days > 0) {
-      const computed = calculateExpirationDate(registerDMY, days);
+      const computed = calculateExpirationDate(registerDMY, days, 3);
       if (computed && computed !== "N/A") {
         updateForm({ [ORDER_FIELDS.HET_HAN]: computed } as any);
       }
