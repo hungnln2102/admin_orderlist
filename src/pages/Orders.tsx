@@ -1,4 +1,4 @@
-// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
+// Orders.tsx - Ma da duoc lam sach va dong bo voi API Backend
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -16,7 +16,7 @@ import {
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
 
-// Import Modal tùy chỉnh
+// Import Modal tuy chinh
 import ConfirmModal from "../components/ConfirmModal";
 import ViewOrderModal from "../components/ViewOrderModal";
 import EditOrderModal from "../components/EditOrderModal";
@@ -24,19 +24,20 @@ import CreateOrderModal from "../components/CreateOrderModal";
 import * as Helpers from "../lib/helpers";
 
 const API_BASE =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (typeof import.meta !== "undefined" &&
+    (import.meta as any).env?.VITE_API_BASE_URL) ||
   (process.env.VITE_API_BASE_URL as string) ||
   "http://localhost:3001";
 
 // =======================================================
-// 1. INTERFACES VÀ CONSTANTS
+// 1. INTERFACES VA CONSTANTS
 // =======================================================
 
-// Khai báo lại các constants
+// Khai bao lai cac constants
 const API_ENDPOINTS = {
   ORDERS: "/api/orders",
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
-  // ... (Thêm các endpoints khác nếu cần)
+  // ... (Them cac endpoints khac neu can)
 };
 
 const ORDER_FIELDS = {
@@ -66,7 +67,7 @@ const VIRTUAL_FIELDS = {
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
 
-// Interface Order (dựa trên DB + trường ảo)
+// Interface Order (dua tren DB + truong ao)
 interface Order {
   id: number;
   id_don_hang: string;
@@ -75,20 +76,23 @@ interface Order {
   khach_hang: string;
   link_lien_he: string;
   slot: string;
-  ngay_dang_ki: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
+  ngay_dang_ki: string; // Da la YYYY-MM-DD neu DB da chuan hoa
   so_ngay_da_dang_ki: string;
-  het_han: string; // Đã là YYYY-MM-DD nếu DB đã chuẩn hóa
+  het_han: string; // Da la YYYY-MM-DD neu DB da chuan hoa
+  registration_date?: string;
   // Backend normalized date (from query CTE). Optional, used for display/calculation to avoid TZ drift
   expiry_date?: string;
+  registration_date_display?: string;
+  expiry_date_display?: string;
   nguon: string;
-  gia_nhap: string; // String/Numeric từ DB
-  gia_ban: string; // String/Numeric từ DB
+  gia_nhap: string; // String/Numeric tu DB
+  gia_ban: string; // String/Numeric tu DB
   note: string;
   tinh_trang: string;
   check_flag: boolean | null;
-  // Trường từ Backend:
-  so_ngay_con_lai: number;
-  // Trường ảo Frontend:
+  // Truong tu Backend:
+  so_ngay_con_lai: number | null;
+  // Truong ao Frontend:
   [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
   [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
   [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
@@ -97,10 +101,10 @@ interface Order {
   [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
 }
 
-// Cấu trúc Stats
+// Cau truc Stats
 const stockStats = [
   {
-    name: "Tổng đơn hàng",
+    name: "Tổng Đơn Hàng",
     value: "0",
     icon: CheckCircleIcon,
     color: "bg-blue-500",
@@ -120,22 +124,22 @@ const stockStats = [
   },
 ];
 
-// Hàm Helper để kiểm tra ngày đăng ký có phải là hôm nay không (DD/MM/YYYY hoặc YYYY-MM-DD)
-// Giữ lại hàm này để logic tính Stats Đăng ký Hôm Nay vẫn hoạt động
+// Ham Helper de kiem tra ngay dang ky co phai la hom nay khong (DD/MM/YYYY hoac YYYY-MM-DD)
+// Giu lai ham nay de logic tinh Stats Dang ky Hom Nay van hoat dong
 const isRegisteredToday = (dateString: string): boolean => {
   if (!dateString) return false;
 
-  // Tạo ngày hiện tại (chỉ ngày, không giờ)
+  // Tao ngay hien tai (chi ngay, khong gio)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   let registerDate: Date;
 
   if (dateString.includes("-")) {
-    // Nếu là YYYY-MM-DD (định dạng chuẩn từ DB sau chuẩn hóa)
+    // Neu la YYYY-MM-DD (dinh dang chuan tu DB sau chuan hoa)
     registerDate = new Date(dateString);
   } else {
-    // Nếu là DD/MM/YYYY (trường hợp cũ)
+    // Neu la DD/MM/YYYY (truong hop cu)
     const [day, month, year] = dateString.split("/").map(Number);
     if (!day || !month || !year) return false;
     registerDate = new Date(year, month - 1, day);
@@ -163,21 +167,21 @@ const getStatusColor = (status: string) => {
 const formatCurrency = (value: number | string) => {
   const num = Number(value) || 0;
   const roundedNum = Math.round(num);
-  return roundedNum.toLocaleString("vi-VN") + " " + "đ";
+  return roundedNum.toLocaleString("vi-VN") + " " + "d";
 };
 
 // =======================================================
 // 2. CUSTOM HOOK: useOrdersData
 // =======================================================
 
-// Hàm Helper để gán giá trị ưu tiên cho trạng thái sắp xếp
+// Ham Helper de gan gia tri uu tien cho trang thai sap xep
 const getStatusPriority = (status: string): number => {
   const lowerStatus = status.toLowerCase();
   if (lowerStatus === "hết hạn") return 1;
   if (lowerStatus === "cần gia hạn") return 2;
   if (lowerStatus === "chưa thanh toán") return 3;
   if (lowerStatus === "đã thanh toán") return 4;
-  return 5; // Giá trị mặc định thấp nhất
+  return 5; // Gia tri mac dinh thap nhat
 };
 
 const useOrdersData = () => {
@@ -188,7 +192,7 @@ const useOrdersData = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // ... (Các state Modal giữ nguyên)
+  // ... (Cac state Modal giu nguyen)
   const [isModalOpen, setIsModalOpen] = useState(false); // Confirm Delete
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -197,9 +201,9 @@ const useOrdersData = () => {
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
-  // ... (Các state Modal giữ nguyên)
+  // ... (Cac state Modal giu nguyen)
 
-  // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
+  // --- HAM FETCH DU LIEU BAN DAU ---
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -209,10 +213,10 @@ const useOrdersData = () => {
       }
       const data = await response.json();
       if (Array.isArray(data)) {
-        // Ép kiểu dữ liệu so_ngay_con_lai từ DB (number) vào state
+        // Ep kieu du lieu so_ngay_con_lai tu DB (number) vao state
         setOrders(data as Order[]);
       } else {
-        console.error("Dữ liệu nhận được không phải là mảng:", data);
+        console.error("Dữ liệu nhận được không phải mảng:", data);
       }
     } catch (error) {
       console.error("Lỗi khi tải đơn hàng:", error);
@@ -225,72 +229,94 @@ const useOrdersData = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // --- LOGIC TÍNH TOÁN CÁC TRƯỜNG ẢO VÀ LỌC ---
+  // --- LOGIC TINH TOAN CAC TRUONG AO VA LOC ---
   const calculatedData = useMemo(() => {
-    // Không cần today: const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Khong can today: const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const resolveDateDisplay = (
+      displayValue: unknown,
+      fallbackValue: unknown
+    ): string => {
+      const value =
+        displayValue !== undefined && displayValue !== null
+          ? displayValue
+          : fallbackValue;
+      if (value === null || value === undefined) return "";
+      return Helpers.formatDateToDMY(value as any) || String(value);
+    };
+
+    const parseNumeric = (value: unknown): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    };
+
+    const normalizeCheckFlag = (value: unknown): boolean | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "boolean") return value;
+      if (typeof value === "number") {
+        if (value === 1) return true;
+        if (value === 0) return false;
+      }
+      if (typeof value === "string") {
+        const lowered = value.trim().toLowerCase();
+        if (["true", "t", "1"].includes(lowered)) return true;
+        if (["false", "f", "0"].includes(lowered)) return false;
+      }
+      return null;
+    };
 
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
-      // Date normalization for display and calculations
-      const rawOrderDate = (order as any).registration_date ?? order[ORDER_FIELDS.NGAY_DANG_KI];
-      const formattedOrderDate = Helpers.formatDateToDMY(rawOrderDate);
+      const registrationSource =
+        order.registration_date ?? order[ORDER_FIELDS.NGAY_DANG_KI];
+      const expirySource = order.expiry_date ?? order[ORDER_FIELDS.HET_HAN];
 
-      const rawExpiry = (order as any).expiry_date ?? order[ORDER_FIELDS.HET_HAN];
-      // Format expiry; if missing, compute from register date + days - 1
-      let formattedExpiryDate = Helpers.formatDateToDMY(rawExpiry);
-      if (!formattedExpiryDate) {
-        const regDMY =
-          Helpers.formatDateToDMY(rawOrderDate) ||
-          (rawOrderDate as any);
-        const daysInt = Number(order.so_ngay_da_dang_ki) || 0;
-        if (regDMY && daysInt > 0) {
-          formattedExpiryDate = Helpers.calculateExpirationDate(regDMY, daysInt);
-        }
-      }
+      const formattedOrderDate = resolveDateDisplay(
+        order.registration_date_display,
+        registrationSource
+      );
+      const formattedExpiryDate = resolveDateDisplay(
+        order.expiry_date_display,
+        expirySource
+      );
 
-      const backendRemainingValue = Number(order.so_ngay_con_lai);
-      const backendRemaining = Number.isFinite(backendRemainingValue)
-        ? backendRemainingValue
-        : null;
-      // Prefer backend's computed remaining (from DB current_date); fallback to client calc
-      const remainingCalcBase =
-        (order as any).expiry_date ?? formattedExpiryDate ?? order[ORDER_FIELDS.HET_HAN];
-      const calculatedRemaining = Helpers.daysUntilDate(remainingCalcBase);
-      const soNgayConLai =
-        backendRemaining !== null
+      const backendRemaining = parseNumeric(
+        (order as any).so_ngay_con_lai ?? order.so_ngay_con_lai
+      );
+      const fallbackRemaining = Helpers.daysUntilDate(
+        expirySource || formattedExpiryDate
+      );
+      const effectiveRemaining =
+        backendRemaining !== null && backendRemaining !== undefined
           ? backendRemaining
-          : calculatedRemaining ?? 0;
+          : fallbackRemaining ?? 0;
 
-      const dbStatus = order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán";
-      let trangThaiText = "";
-      let check_flag_status: boolean | null = null;
-
-      // Logic trạng thái dựa trên soNgayConLai từ Backend
-      if (soNgayConLai <= 0) {
-        trangThaiText = "Hết Hạn";
-        check_flag_status = null;
-      } else if (soNgayConLai <= 4 && soNgayConLai > 0) {
-        trangThaiText = "Cần Gia Hạn";
-        check_flag_status = null;
-      } else {
-        trangThaiText = dbStatus;
-        check_flag_status = dbStatus.toLowerCase() === "đã thanh toán";
-      }
+      const trangThaiText = (
+        order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán"
+      ).trim();
+      const checkFlagStatus = normalizeCheckFlag(
+        order[ORDER_FIELDS.CHECK_FLAG]
+      );
 
       const giaBan = Number(order[ORDER_FIELDS.GIA_BAN]) || 0;
       const soNgayDangKy = Number(order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
-      let giaTriConLai = 0;
-
-      // Tính Giá Trị Còn Lại (Không tính giá trị khi đã hết hạn)
-      const daysForValue = Math.max(0, soNgayConLai);
-      if (soNgayDangKy > 0) {
-        giaTriConLai = (giaBan * daysForValue) / soNgayDangKy;
-      }
+      const daysForValue = Math.max(0, effectiveRemaining);
+      const giaTriConLai =
+        soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
 
       return {
         ...order,
-        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai, // GA�n giA� tr��< Backend
+        [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: effectiveRemaining,
         [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
-        [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
+        [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: checkFlagStatus,
         [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
         [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: formattedOrderDate,
         [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: formattedExpiryDate,
@@ -299,7 +325,7 @@ const useOrdersData = () => {
 
     const lowerSearchTerm = searchTerm.toLowerCase();
     const filteredOrders = ordersWithVirtualFields.filter((order) => {
-      // Logic lọc tìm kiếm (giữ nguyên)
+      // Logic loc tim kiem (giu nguyen)
       const matchesSearch =
         (order[ORDER_FIELDS.KHACH_HANG] || "")
           .toLowerCase()
@@ -311,7 +337,7 @@ const useOrdersData = () => {
           .toLowerCase()
           .includes(lowerSearchTerm);
 
-      // Logic lọc trạng thái (giữ nguyên)
+      // Logic loc trang thai (giu nguyen)
       let matchesStatus = statusFilter === "all";
 
       if (!matchesStatus) {
@@ -321,20 +347,20 @@ const useOrdersData = () => {
         const filterLower = statusFilter.toLowerCase();
 
         if (
-          filterLower === "chưa thanh toán" &&
-          statusText === "chưa thanh toán"
+          filterLower === "Chưa Thanh Toán" &&
+          statusText === "Chưa Thanh Toán"
         ) {
           matchesStatus = true;
         } else if (
-          filterLower === "đã thanh toán" &&
-          statusText === "đã thanh toán"
+          filterLower === "Đã Thanh Toán" &&
+          statusText === "Đã Thanh Toán"
         ) {
           matchesStatus = true;
-        } else if (filterLower === "hết hạn" && statusText === "hết hạn") {
+        } else if (filterLower === "Hết Hạn" && statusText === "Hết Hạn") {
           matchesStatus = true;
         } else if (
-          filterLower === "cần gia hạn" &&
-          statusText === "cần gia hạn"
+          filterLower === "Cần Gia hạn" &&
+          statusText === "Cần Gia hạn"
         ) {
           matchesStatus = true;
         }
@@ -343,28 +369,28 @@ const useOrdersData = () => {
       return matchesSearch && matchesStatus;
     });
 
-    // --- LOGIC SẮP XẾP ---
+    // --- LOGIC SAP XEP ---
     filteredOrders.sort((a, b) => {
       const statusA = a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
       const statusB = b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
 
-      // 1. Sắp xếp CHÍNH theo Trạng thái (Priority: 1 -> 4)
+      // 1. Sap xep CHINH theo Trang thai (Priority: 1 -> 4)
       const priorityA = Helpers.getStatusPriority(statusA);
       const priorityB = Helpers.getStatusPriority(statusB);
 
       if (priorityA !== priorityB) {
-        return priorityA - priorityB; // Sắp xếp từ ưu tiên cao (số nhỏ) đến thấp
+        return priorityA - priorityB; // Sap xep tu uu tien cao (so nho) den thap
       }
 
-      // 2. Sắp xếp PHỤ theo Số Ngày Còn Lại (từ nhỏ đến lớn)
+      // 2. Sap xep PHU theo So Ngay Con Lai (tu nho den lon)
       const remainingA = a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
       const remainingB = b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
 
       if (remainingA !== remainingB) {
-        return remainingA - remainingB; // Sắp xếp số từ nhỏ đến lớn
+        return remainingA - remainingB; // Sap xep so tu nho den lon
       }
 
-      // 3. Sắp xếp PHỤ theo ID Đơn Hàng (từ nhỏ đến lớn) nếu 2 mục trên bằng nhau
+      // 3. Sap xep PHU theo ID Don Hang (tu nho den lon) neu 2 muc tren bang nhau
       const idA = a[ORDER_FIELDS.ID_DON_HANG] || "";
       const idB = b[ORDER_FIELDS.ID_DON_HANG] || "";
 
@@ -374,7 +400,7 @@ const useOrdersData = () => {
       return 0;
     });
 
-    // Tính toán Stats
+    // Tinh toan Stats
     const totalOrders = ordersWithVirtualFields.length;
     const needsRenewal = ordersWithVirtualFields.filter(
       (order) =>
@@ -384,12 +410,12 @@ const useOrdersData = () => {
     const expiredOrders = ordersWithVirtualFields.filter(
       (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
     ).length;
-    // Cập nhật: Dùng hàm isRegisteredToday mới
+    // Cap nhat: Dung ham isRegisteredToday moi
     const registeredTodayCount = ordersWithVirtualFields.filter((order) =>
       Helpers.isRegisteredToday(order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY])
     ).length;
 
-    // Cập nhật mảng stats
+    // Cap nhat mang stats
     const updatedStats = [
       { ...stockStats[0], value: String(totalOrders) },
       { ...stockStats[1], value: String(needsRenewal) },
@@ -397,7 +423,7 @@ const useOrdersData = () => {
       { ...stockStats[3], value: String(registeredTodayCount) },
     ];
 
-    // Phân trang
+    // Phan trang
     const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
     const indexOfLastRow = currentPage * rowsPerPage;
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
@@ -406,14 +432,14 @@ const useOrdersData = () => {
     return { filteredOrders, currentOrders, totalPages, updatedStats };
   }, [orders, searchTerm, statusFilter, rowsPerPage, currentPage]);
 
-  // Reset trang khi lọc/tìm kiếm thay đổi (giữ nguyên)
+  // Reset trang khi loc/tim kiem thay doi (giu nguyen)
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, rowsPerPage]);
 
-  // --- HÀM XỬ LÝ MODAL VÀ CRUD (giữ nguyên) ---
+  // --- HAM XU LY MODAL VA CRUD (giu nguyen) ---
 
-  // Modals (giữ nguyên)
+  // Modals (giu nguyen)
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
   const closeViewModal = () => {
@@ -429,7 +455,7 @@ const useOrdersData = () => {
     setOrderToDelete(null);
   };
 
-  // Hành động (giữ nguyên)
+  // Hanh dong (giu nguyen)
   const handleViewOrder = (order: Order) => {
     setOrderToView(order);
     setIsViewModalOpen(true);
@@ -445,46 +471,43 @@ const useOrdersData = () => {
     setIsModalOpen(true);
   };
 
-  // Lưu đơn hàng mới (giữ nguyên, nhưng cần đảm bảo EditOrderModal xử lý ngày)
+  // Luu don hang moi (giu nguyen, nhung can dam bao EditOrderModal xu ly ngay)
   const handleSaveNewOrder = async (newOrderData: Partial<Order>) => {
     closeCreateModal();
 
     try {
-      const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.ORDERS}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newOrderData),
-        }
-      );
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newOrderData),
+      });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || "Lỗi khi tạo đơn hàng mới từ server"
+          errorData.error || "Loi khi tao don hang moi tu server"
         );
       }
 
-      // Refetch dữ liệu để đảm bảo tính toán mới nhất
+      // Refetch du lieu de dam bao tinh toan moi nhat
       await fetchOrders();
 
       const createdOrder: Order = await response.json();
-      handleViewOrder(createdOrder); // Mở Modal View cho đơn hàng vừa tạo
+      handleViewOrder(createdOrder); // Mo Modal View cho don hang vua tao
     } catch (error) {
-      console.error("Lỗi khi tạo đơn hàng:", error);
+      console.error("Loi khi tao don hang:", error);
       alert(
-        `Lỗi khi tạo đơn hàng: ${
+        `Loi khi tao don hang: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
     }
   };
 
-  // Lưu đơn hàng đã chỉnh sửa (giữ nguyên)
+  // Luu don hang da chinh sua (giu nguyen)
   const handleSaveEdit = async (updatedOrder: Order) => {
     closeEditModal();
 
-    // Lọc bỏ các trường ảo trước khi gửi
+    // Loc bo cac truong ao truoc khi gui
     const dbFields: Partial<Order> = {
       [ORDER_FIELDS.ID_DON_HANG]: updatedOrder.id_don_hang,
       [ORDER_FIELDS.SAN_PHAM]: updatedOrder.san_pham,
@@ -515,23 +538,23 @@ const useOrdersData = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || "Lỗi khi cập nhật đơn hàng từ server"
+          errorData.error || "Loi khi cap nhat don hang tu server"
         );
       }
 
-      // Refetch dữ liệu để đảm bảo tính toán mới nhất
+      // Refetch du lieu de dam bao tinh toan moi nhat
       await fetchOrders();
     } catch (error) {
-      console.error("Lỗi khi cập nhật đơn hàng:", error);
+      console.error("Loi khi cap nhat don hang:", error);
       alert(
-        `Lỗi khi cập nhật đơn hàng: ${
+        `Loi khi cap nhat don hang: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
     }
   };
 
-  // Xác nhận xóa (giữ nguyên)
+  // Xac nhan xoa (giu nguyen)
   const confirmDelete = async () => {
     if (!orderToDelete) return;
     setIsModalOpen(false);
@@ -544,16 +567,16 @@ const useOrdersData = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Lỗi khi xóa đơn hàng từ server");
+        throw new Error(errorData.error || "Loi khi xoa don hang tu server");
       }
 
       setOrders((prevOrders) =>
         prevOrders.filter((order) => order.id !== orderToDelete.id)
       );
     } catch (error) {
-      console.error("Lỗi khi xóa đơn hàng:", error);
+      console.error("Loi khi xoa don hang:", error);
       alert(
-        `Lỗi khi xóa đơn hàng: ${
+        `Loi khi xoa don hang: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
@@ -599,7 +622,7 @@ const useOrdersData = () => {
 };
 
 // =======================================================
-// 3. COMPONENT CHÍNH (Chỉ là UI)
+// 3. COMPONENT CHINH (Chi la UI)
 // =======================================================
 
 export default function Orders() {
@@ -633,18 +656,18 @@ export default function Orders() {
     handleSaveNewOrder,
     handleSaveEdit,
     confirmDelete,
-    filteredOrders, // Dùng để hiển thị tổng số dòng
+    filteredOrders, // Dung de hien thi tong so dong
   } = useOrdersData();
 
-  // --- Render Giao diện (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
+  // --- Render Giao dien (Su dung ORDER_FIELDS va VIRTUAL_FIELDS) ---
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn hàng</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Quan ly don hang</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý và theo dõi tất cả đơn hàng của khách hàng
+            Quan ly va theo doi tat ca don hang cua khach hang
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
@@ -653,7 +676,7 @@ export default function Orders() {
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
-            Tạo đơn hàng mới
+            Tao don hang moi
           </button>
         </div>
       </div>
@@ -683,7 +706,7 @@ export default function Orders() {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm đơn hàng, khách hàng..."
+              placeholder="Tim kiem don hang, khach hang..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -697,14 +720,14 @@ export default function Orders() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">Tất cả trạng thái</option>
+              <option value="all">Tat ca trang thai</option>
               <option value="Đã Thanh Toán">Đã Thanh Toán</option>
               <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
               <option value="Cần Gia Hạn">Cần Gia Hạn</option>
               <option value="Hết Hạn">Hết Hạn</option>
             </select>
           </div>
-          {/* Date Range - Tạm thời chưa có logic */}
+          {/* Date Range - Tam thoi chua co logic */}
           <div>
             <input
               type="date"
@@ -719,22 +742,19 @@ export default function Orders() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 table-fixed">
-            {/* thead: Áp dụng width cố định, whitespace-nowrap và truncate, text-center */}
+            {/* thead: Ap dung width co dinh, whitespace-nowrap va truncate, text-center */}
             <thead className="bg-gray-50">
               <tr>
-                {/* 1. GỘP ORDER + PRODUCT */}
+                {/* 1. GOP ORDER + PRODUCT */}
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px] whitespace-nowrap truncate">
                   ORDER/PRODUCT
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px] whitespace-nowrap truncate">
-                  INFORMATION
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[160px] whitespace-nowrap truncate">
+                  INFORMATION / SLOT
                 </th>
-                {/* 2. GỘP CUSTOMER + CONTACT */}
+                {/* 2. GOP CUSTOMER + CONTACT */}
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px] whitespace-nowrap truncate">
                   CUSTOMER/CONTACT
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
-                  Slot
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] whitespace-nowrap truncate">
                   ORDER DATE
@@ -748,7 +768,7 @@ export default function Orders() {
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px] whitespace-nowrap truncate">
                   REMAINING
                 </th>
-                {/* 3. GỘP SUPPLY + IMPORT */}
+                {/* 3. GOP SUPPLY + IMPORT */}
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   SUPPLY/IMPORT
                 </th>
@@ -772,16 +792,16 @@ export default function Orders() {
                 </th>
               </tr>
             </thead>
-            {/* tbody: Áp dụng text-center và text-right cho các cột cụ thể */}
+            {/* tbody: Ap dung text-center va text-right cho cac cot cu the */}
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={18} className="text-center py-12">
+                  <td colSpan={14} className="text-center py-12">
                     <div className="text-gray-400 text-lg mb-2">
-                      Không tìm thấy đơn hàng
+                      Khong tim thay don hang
                     </div>
                     <div className="text-gray-500">
-                      Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm
+                      Thu thay doi bo loc hoac tu khoa tim kiem
                     </div>
                   </td>
                 </tr>
@@ -800,7 +820,7 @@ export default function Orders() {
                     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
                   return (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      {/* 1. GỘP ORDER + PRODUCT */}
+                      {/* 1. GOP ORDER + PRODUCT */}
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 w-[180px] text-center">
                         <div className="flex flex-col items-center">
                           <span className="font-bold whitespace-nowrap truncate max-w-full">
@@ -812,12 +832,21 @@ export default function Orders() {
                         </div>
                       </td>
 
-                      {/* INFORMATION (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[120px] text-center">
-                        {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
+                      {/* INFORMATION + SLOT (text-center) */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[160px] text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-gray-600 text-xs whitespace-nowrap truncate max-w-full">
+                            {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
+                          </span>
+                          {order[ORDER_FIELDS.SLOT] ? (
+                            <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full">
+                              {order[ORDER_FIELDS.SLOT]}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
 
-                      {/* 2. GỘP CUSTOMER + CONTACT */}
+                      {/* 2. GOP CUSTOMER + CONTACT */}
                       <td className="px-6 py-4 text-sm text-gray-900 w-[200px] text-center">
                         <div className="flex flex-col items-center">
                           <span className="font-medium whitespace-nowrap truncate max-w-full">
@@ -828,14 +857,9 @@ export default function Orders() {
                             title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
                           >
                             {order[ORDER_FIELDS.LINK_LIEN_HE] ||
-                              "Chưa có liên hệ"}
+                              "Chua co lien he"}
                           </span>
                         </div>
-                      </td>
-
-                      {/* SLOT (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[60px] text-center">
-                        {order[ORDER_FIELDS.SLOT] || ""}
                       </td>
 
                       {/* ORDER DATE (text-center) */}
@@ -865,14 +889,16 @@ export default function Orders() {
                         </span>
                       </td>
 
-                      {/* 3. GỘP SUPPLY + IMPORT */}
+                      {/* 3. GOP SUPPLY + IMPORT */}
                       <td className="px-6 py-4 text-sm text-gray-900 w-[150px] text-right">
                         <div className="flex flex-col items-center">
                           <span className="font-medium whitespace-nowrap truncate max-w-full">
                             {order[ORDER_FIELDS.NGUON] || "N/A"}
                           </span>
                           <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-full">
-                            {Helpers.formatCurrency(order[ORDER_FIELDS.GIA_NHAP])}
+                            {Helpers.formatCurrency(
+                              order[ORDER_FIELDS.GIA_NHAP]
+                            )}
                           </span>
                         </div>
                       </td>
@@ -946,12 +972,12 @@ export default function Orders() {
           </table>
         </div>
 
-        {/* Thanh Phân trang */}
+        {/* Thanh Phan trang */}
         {filteredOrders.length > 0 && (
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-            {/* Bộ chọn số dòng / trang */}
+            {/* Bo chon so dong / trang */}
             <div className="flex items-center space-x-2 text-sm text-gray-700">
-              <span>Hiển thị</span>
+              <span>Hien thi</span>
               <select
                 id="rowsPerPage"
                 value={rowsPerPage}
@@ -962,13 +988,13 @@ export default function Orders() {
                 <option value={25}>25</option>
                 <option value={50}>50</option>
               </select>
-              <span>dòng</span>
+              <span>dong</span>
             </div>
-            {/* Nút bấm chuyển trang */}
+            {/* Nut bam chuyen trang */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700">
-                Trang {currentPage} trên {totalPages} (Tổng:{" "}
-                {filteredOrders.length} dòng)
+                Trang {currentPage} tren {totalPages} (Tong:{" "}
+                {filteredOrders.length} dong)
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -996,8 +1022,8 @@ export default function Orders() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onConfirm={confirmDelete}
-        title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa đơn hàng: ${orderToDelete?.id_don_hang}?`}
+        title="Xac nhan xoa"
+        message={`Ban co chac chan muon xoa don hang: ${orderToDelete?.id_don_hang}?`}
       />
       <ViewOrderModal
         isOpen={isViewModalOpen}
@@ -1019,4 +1045,3 @@ export default function Orders() {
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-// Date format helpers
+﻿// Date format helpers
 export const convertDMYToYMD = (dmyString: string): string => {
   if (!dmyString || dmyString.indexOf("/") === -1) return dmyString;
   const parts = dmyString.split("/");
@@ -161,15 +161,24 @@ export const isRegisteredToday = (dateString: string): boolean => {
   return registerDate.getTime() === today.getTime();
 };
 
+const normalizeStatus = (status: string): string => {
+  if (!status) return "";
+  return status
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+};
+
 export const getStatusColor = (status: string): string => {
-  const lowerStatus = (status || "").toLowerCase();
-  switch (lowerStatus) {
-    case "đã thanh toán":
+  const normalized = normalizeStatus(status);
+  switch (normalized) {
+    case "đa thanh toan":
       return "bg-green-100 text-green-800";
-    case "chưa thanh toán":
-    case "cần gia hạn":
+    case "chua thanh toan":
+    case "can gia han":
       return "bg-yellow-100 text-yellow-800";
-    case "hết hạn":
+    case "het han":
       return "bg-red-100 text-red-800";
     default:
       return "bg-gray-100 text-gray-800";
@@ -177,10 +186,13 @@ export const getStatusColor = (status: string): string => {
 };
 
 export const getStatusPriority = (status: string): number => {
-  const lower = (status || "").toLowerCase();
-  if (lower === "hết hạn") return 1;
-  if (lower === "cần gia hạn") return 2;
-  if (lower === "chưa thanh toán") return 3;
-  if (lower === "đã thanh toán") return 4;
+  const normalized = normalizeStatus(status);
+  if (normalized === "het han") return 1;
+  if (normalized === "can gia han") return 2;
+  if (normalized === "chua thanh toan") return 3;
+  if (normalized === "da thanh toan") return 4;
   return 5;
 };
+
+
+

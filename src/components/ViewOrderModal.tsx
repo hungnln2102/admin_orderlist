@@ -13,11 +13,16 @@ interface Order {
   ngay_dang_ki: string;
   so_ngay_da_dang_ki: string;
   het_han: string;
+  registration_date?: string;
+  expiry_date?: string;
+  registration_date_display?: string;
+  expiry_date_display?: string;
   nguon: string;
   gia_nhap: number;
   gia_ban: number;
   note: string;
   tinh_trang: string;
+  check_flag?: boolean | null;
   so_ngay_con_lai?: number;
   giaTriConLai?: number;
   trangThaiText?: string;
@@ -42,16 +47,32 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 }) => {
   if (!isOpen || !order) return null;
 
-  const displayStatus = order.trangThaiText || order.tinh_trang;
+  const displayStatus =
+    (order.trangThaiText || order.tinh_trang || "").trim() || "Chua Thanh Toan";
 
-  // Remaining days: prefer calculated, fallback to backend value
-  const calculatedRemaining = Helpers.daysUntilDate(order.het_han);
+  const remainingFromBackend =
+    order.so_ngay_con_lai !== undefined && order.so_ngay_con_lai !== null
+      ? Number(order.so_ngay_con_lai)
+      : null;
+  const fallbackRemaining = Helpers.daysUntilDate(
+    order.expiry_date ||
+      order.expiry_date_display ||
+      order.het_han ||
+      null
+  );
   const displayRemainingDays =
-    calculatedRemaining !== null && calculatedRemaining !== undefined
-      ? calculatedRemaining
-      : order.so_ngay_con_lai !== undefined
-      ? order.so_ngay_con_lai
-      : 0;
+    remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
+      ? remainingFromBackend
+      : fallbackRemaining ?? 0;
+
+  const registrationDisplay =
+    order.registration_date_display ||
+    Helpers.formatDateToDMY(order.registration_date || order.ngay_dang_ki) ||
+    String(order.ngay_dang_ki || "");
+  const expiryDisplay =
+    order.expiry_date_display ||
+    Helpers.formatDateToDMY(order.expiry_date || order.het_han) ||
+    String(order.het_han || "");
 
   // VietQR
   const qrAmount = order.gia_ban;
@@ -72,7 +93,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         {/* Header */}
         <div className="flex justify-center items-center p-4 border-b bg-gray-50 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-gray-800">
-            Chi tiết đơn hàng: <span className="text-blue-600">{order.id_don_hang}</span>
+            Chi tiet don hang: <span className="text-blue-600">{order.id_don_hang}</span>
           </h3>
           <button
             type="button"
@@ -85,20 +106,20 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto flex-grow space-y-5 text-gray-700">
-          {/* Thông tin chung */}
+          {/* Thong tin chung */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             {/* Left */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">ID đơn:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">ID don:</dt>
                 <dd className="text-gray-900 font-semibold w-2/3 text-right">{order.id_don_hang}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Sản phẩm:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">San pham:</dt>
                 <dd className="text-gray-900 w-2/3 text-right">{order.san_pham}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Thông tin SP:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">Thong tin SP:</dt>
                 <dd className="text-gray-900 w-2/3 text-right break-words">{order.thong_tin_san_pham}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
@@ -106,11 +127,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <dd className="text-gray-900 w-2/3 text-right">{order.slot}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ghi chú:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">Ghi chu:</dt>
                 <dd className="text-gray-900 w-2/3 text-right">{order.note || "-"}</dd>
               </div>
               <div className="flex justify-between pt-1 pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Trạng thái:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">Trang thai:</dt>
                 <dd className="w-2/3 text-right">
                   <span
                     className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
@@ -126,11 +147,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             {/* Right */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Khách hàng:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">Khach hang:</dt>
                 <dd className="text-gray-900 w-2/3 text-right">{order.khach_hang}</dd>
               </div>
               <div className="flex justify-between border-b pb-1 items-start">
-                <dt className="font-medium text-gray-500 w-1/3 shrink-0">Liên hệ:</dt>
+                <dt className="font-medium text-gray-500 w-1/3 shrink-0">Lien he:</dt>
                 <dd className="w-2/3 text-right break-all">
                   <a
                     href={order.link_lien_he}
@@ -143,19 +164,19 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ngày đặt:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{Helpers.formatDateToDMY(order.ngay_dang_ki) || String(order.ngay_dang_ki)}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Ngay dat:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">{registrationDisplay}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Số ngày ĐK:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">So ngay DK:</dt>
                 <dd className="text-gray-900 w-2/3 text-right">{order.so_ngay_da_dang_ki}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ngày hết hạn:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{Helpers.formatDateToDMY(order.het_han) || String(order.het_han)}</dd>
+                <dt className="font-medium text-gray-500 w-1/3">Ngay het han:</dt>
+                <dd className="text-gray-900 w-2/3 text-right">{expiryDisplay}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Số ngày còn lại:</dt>
+                <dt className="font-medium text-gray-500 w-1/3">So ngay con lai:</dt>
                 <dd className="text-indigo-600 font-bold w-2/3 text-right">{displayRemainingDays}</dd>
               </div>
             </dl>
@@ -166,12 +187,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
           {/* QR Code */}
           <div className="text-center bg-gradient-to-b from-gray-50 to-white p-4 rounded-md border border-gray-200 shadow-inner">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">Quét mã QR để thanh toán (VietQR)</h4>
+            <h4 className="text-lg font-semibold text-gray-800 mb-3">Quet ma QR de thanh toan (VietQR)</h4>
             {qrCodeImageUrl ? (
               <div className="flex justify-center mb-3">
                 <img
                   src={qrCodeImageUrl}
-                  alt={`QR Code thanh toán ${order.id_don_hang}`}
+                  alt={`QR Code thanh toan ${order.id_don_hang}`}
                   className="border-2 border-gray-300 rounded-lg p-1 bg-white shadow-md"
                   width={280}
                   height={280}
@@ -179,18 +200,18 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               </div>
             ) : (
               <p className="text-red-600 font-medium">
-                Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình.
+                Khong the tao ma QR. Vui long kiem tra lai cau hinh.
               </p>
             )}
             <div className="text-sm text-gray-700 space-y-1">
-              <p>Ngân hàng: <strong>VP Bank</strong></p>
-              <p>Số tài khoản: <strong>{ACCOUNT_NO}</strong></p>
-              <p>Chủ tài khoản: <strong>{ACCOUNT_NAME}</strong></p>
+              <p>Ngan hang: <strong>VP Bank</strong></p>
+              <p>So tai khoan: <strong>{ACCOUNT_NO}</strong></p>
+              <p>Chu tai khoan: <strong>{ACCOUNT_NAME}</strong></p>
               <p>
-                Số tiền: <strong className="text-xl text-red-600">{formatCurrency(safeQrAmount)}</strong>
+                So tien: <strong className="text-xl text-red-600">{formatCurrency(safeQrAmount)}</strong>
               </p>
               <p>
-                Nội dung: <strong className="text-blue-600">{qrMessage}</strong> (Vui lòng điền đúng)
+                Noi dung: <strong className="text-blue-600">{qrMessage}</strong> (Vui long dien dung)
               </p>
             </div>
           </div>
@@ -203,7 +224,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             onClick={onClose}
             className="px-5 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
-            Đóng
+            Dong
           </button>
         </div>
       </div>

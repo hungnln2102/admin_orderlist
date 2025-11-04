@@ -361,6 +361,97 @@ const diffDaysYMD = (fromYmd, toYmd) => {
   return Math.floor((fromMs - toMs) / (24 * 60 * 60 * 1000));
 };
 
+const formatYMDToDMY = (value) => {
+  if (!value) return "";
+  const str = String(value).trim();
+  if (!str) return "";
+  let match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  match = str.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  return "";
+};
+
+const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
+  const registrationRaw = row.ngay_dang_ki_raw ?? row.ngay_dang_ki;
+  const expiryRaw = row.het_han_raw ?? row.het_han;
+
+  const registrationYmd = normalizeRawToYMD(registrationRaw);
+  const expiryYmd = normalizeRawToYMD(expiryRaw);
+  const remainingDays =
+    expiryYmd && todayYmd ? diffDaysYMD(expiryYmd, todayYmd) : null;
+  const backendRemaining =
+    row.so_ngay_con_lai !== undefined && row.so_ngay_con_lai !== null
+      ? Number(row.so_ngay_con_lai)
+      : null;
+  const soNgayConLai =
+    Number.isFinite(remainingDays) && remainingDays !== null
+      ? remainingDays
+      : Number.isFinite(backendRemaining)
+      ? backendRemaining
+      : null;
+
+  let computedStatus = (row.tinh_trang || "").trim();
+  if (!computedStatus) {
+    computedStatus = "Chua Thanh Toan";
+  }
+
+  let computedCheckFlag = null;
+  if (typeof row.check_flag === "boolean") {
+    computedCheckFlag = row.check_flag;
+  } else if (typeof row.check_flag === "string") {
+    const lowered = row.check_flag.trim().toLowerCase();
+    if (["true", "t", "1"].includes(lowered)) {
+      computedCheckFlag = true;
+    } else if (["false", "f", "0"].includes(lowered)) {
+      computedCheckFlag = false;
+    }
+  } else if (typeof row.check_flag === "number") {
+    if (row.check_flag === 1) computedCheckFlag = true;
+    if (row.check_flag === 0) computedCheckFlag = false;
+  }
+
+  if (computedStatus !== "Da Thanh Toan") {
+    if (Number.isFinite(soNgayConLai)) {
+      if (soNgayConLai <= 0) {
+        computedStatus = "Het Han";
+        computedCheckFlag = null;
+      } else if (soNgayConLai > 0 && soNgayConLai <= 4) {
+        computedStatus = "Can Gia Han";
+        computedCheckFlag = null;
+      }
+    }
+  }
+
+  if (computedStatus === "Da Thanh Toan" && computedCheckFlag === null) {
+    computedCheckFlag = true;
+  }
+
+  const registrationDisplay = formatYMDToDMY(registrationYmd);
+  const expiryDisplay = formatYMDToDMY(expiryYmd);
+
+  return {
+    ...row,
+    registration_date: registrationYmd,
+    expiry_date: expiryYmd,
+    registration_date_str: registrationDisplay,
+    expiry_date_str: expiryDisplay,
+    registration_date_display: registrationDisplay,
+    expiry_date_display: expiryDisplay,
+    so_ngay_con_lai: Number.isFinite(soNgayConLai) ? soNgayConLai : null,
+    tinh_trang: computedStatus,
+    check_flag: computedCheckFlag,
+  };
+};
+
 app.get("/api/orders", async (_req, res) => {
   console.log("[GET] /api/orders");
   // Fetch raw values without casting to DATE to avoid timezone effects
@@ -374,19 +465,7 @@ app.get("/api/orders", async (_req, res) => {
   try {
     const result = await pool.query(q);
     const todayYmd = todayYMDInVietnam();
-    const mapped = result.rows.map((row) => {
-      const regYmd = normalizeRawToYMD(row.ngay_dang_ki_raw ?? row.ngay_dang_ki);
-      const expYmd = normalizeRawToYMD(row.het_han_raw ?? row.het_han);
-      const soNgayConLai = diffDaysYMD(expYmd, todayYmd);
-      return {
-        ...row,
-        registration_date: regYmd, // normalized ISO-like string
-        expiry_date: expYmd,        // normalized ISO-like string
-        registration_date_str: regYmd,
-        expiry_date_str: expYmd,
-        so_ngay_con_lai: soNgayConLai,
-      };
-    });
+    const mapped = result.rows.map((row) => normalizeOrderRow(row, todayYmd));
     res.json(mapped);
   } catch (error) {
     console.error("Query failed (GET /api/orders):", error);
@@ -547,6 +626,8 @@ app.post("/api/orders", async (req, res) => {
 
   payload.ngay_dang_ki = normalizeDateInput(payload.ngay_dang_ki);
   payload.het_han = normalizeDateInput(payload.het_han);
+  payload.tinh_trang = "Chua Thanh Toan";
+  payload.check_flag = null;
 
   const columns = Object.keys(payload);
   if (columns.length === 0) {
@@ -571,7 +652,8 @@ app.post("/api/orders", async (req, res) => {
         .json({ error: "Order was not created, database returned no rows." });
     }
 
-    res.status(201).json(result.rows[0]);
+    const normalizedRow = normalizeOrderRow(result.rows[0], todayYMDInVietnam());
+    res.status(201).json(normalizedRow);
   } catch (error) {
     console.error("Insert failed (POST /api/orders):", error);
     res.status(500).json({
