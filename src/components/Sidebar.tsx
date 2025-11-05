@@ -19,7 +19,7 @@ interface SidebarProps {
 const menuItems = [
   { name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon },
   { name: "Đơn hàng", href: "/orders", icon: ShoppingBagIcon },
-  { name: "Nhập hàng", href: "/inventory", icon: CubeIcon },
+  { name: "Sản phẩm Gói", href: "/packet-products", icon: CubeIcon },
   { name: "Nguồn thông tin", href: "/sources", icon: DocumentTextIcon },
   { name: "Bảng giá", href: "/pricing", icon: CurrencyDollarIcon },
   { name: "Biên lai", href: "/invoices", icon: DocumentIcon },

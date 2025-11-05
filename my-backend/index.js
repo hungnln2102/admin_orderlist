@@ -492,6 +492,9 @@ app.get("/api/orders", async(_req, res) => {
     }
 });
 
+// New endpoint: Purchase Orders (table mavryk.purchase_order)
+
+
 app.get("/api/supplies", async(_req, res) => {
     console.log("[GET] /api/supplies");
     try {
@@ -797,4 +800,28 @@ app.get("/api/run-scheduler", async(_req, res) => {
 
 app.listen(port, () => {
     console.log(`Backend server running at http://localhost:${port}`);
+});
+
+// Package products: export data from mavryk.package_product
+app.get("/api/package-products", async (_req, res) => {
+  console.log("[GET] /api/package-products");
+  const q = `
+    SELECT 
+      "ID" AS id,
+      package,
+      information,
+      "Note" AS note,
+      "Supplier" AS supplier,
+      "Import" AS import,
+      ("Expired")::text AS expired
+    FROM mavryk.package_product
+    ORDER BY "ID";
+  `;
+  try {
+    const result = await pool.query(q);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Query failed (GET /api/package-products):", error);
+    res.status(500).json({ error: "Unable to load package products." });
+  }
 });

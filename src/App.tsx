@@ -8,7 +8,7 @@ import {
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
-import Inventory from "./pages/Inventory";
+import PacketProducts from "./pages/PacketProducts";
 import Sources from "./pages/Sources";
 import Pricing from "./pages/Pricing";
 import Invoices from "./pages/Invoices";
@@ -31,7 +31,7 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/orders" element={<Orders />} />
-              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/packet-products" element={<PacketProducts />} />
               <Route path="/sources" element={<Sources />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/invoices" element={<Invoices />} />

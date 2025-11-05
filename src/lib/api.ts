@@ -1,18 +1,39 @@
-﻿export const API_BASE_URL: string =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.VITE_API_BASE_URL) ||
-  (process.env.VITE_API_BASE_URL as string) ||
-  "http://localhost:3001";
+const RAW_API_BASE: string = (
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) as string
+) || ((process.env.VITE_API_BASE_URL as string) || "http://localhost:3001");
+
+function normalizeBaseUrl(value: string): string {
+  const v = (value || "").trim();
+  if (!v) return "http://localhost:3001";
+  if (/^:\\d+/.test(v)) return `http://localhost${v}`; // fix ":3001" -> http://localhost:3001
+  if (/^localhost:\\d+/.test(v)) return `http://${v}`; // add protocol if missing
+  if (!/^https?:\/\//i.test(v)) return `http://${v}`;
+  return v;
+}
+
+export const API_BASE_URL: string = normalizeBaseUrl(RAW_API_BASE);
 
 export async function apiFetch(
   input: string,
   init?: RequestInit
 ): Promise<Response> {
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
-  return fetch(url, init);
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (!input.startsWith("http")) {
+      try {
+        return await fetch(`http://127.0.0.1:3001${input}`, init);
+      } catch {}
+      try {
+        return await fetch(input, init);
+      } catch {}
+    }
+    throw err as any;
+  }
 }
 
-// Äá»‹nh nghÄ©a kiá»ƒu dá»¯ liá»‡u cho Charts API
+// Ã„ÂÃ¡Â»â€¹nh nghÃ„Â©a kiÃ¡Â»Æ’u dÃ¡Â»Â¯ liÃ¡Â»â€¡u cho Charts API
 export interface RevenueData {
   month: string;
   total_sales: number;
@@ -34,8 +55,8 @@ export interface YearsApiResponse {
 
 
 /**
- * Láº¥y dá»¯ liá»‡u biá»ƒu Ä‘á»“ Doanh thu vÃ  Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.
- * @param year NÄƒm cáº§n láº¥y dá»¯ liá»‡u
+ * LÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u biÃ¡Â»Æ’u Ã„â€˜Ã¡Â»â€œ Doanh thu vÃƒÂ  TrÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã†Â¡n hÃƒÂ ng.
+ * @param year NÃ„Æ’m cÃ¡ÂºÂ§n lÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u
  * @returns {ChartsApiResponse}
  */
 export async function fetchChartData(
@@ -64,6 +85,8 @@ export async function fetchAvailableYears(): Promise<number[]> {
     .map((year) => Number(year))
     .filter((year) => Number.isFinite(year));
 }
+
+
 
 
 

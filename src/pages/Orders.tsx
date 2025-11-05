@@ -67,7 +67,6 @@ const VIRTUAL_FIELDS = {
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
 
-
 // Interface Order (dua tren DB + truong ao)
 interface Order {
   id: number;
