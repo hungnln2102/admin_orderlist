@@ -67,6 +67,7 @@ const VIRTUAL_FIELDS = {
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
 
+
 // Interface Order (dua tren DB + truong ao)
 interface Order {
   id: number;
@@ -671,7 +672,7 @@ export default function Orders() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search */}
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -698,14 +699,7 @@ export default function Orders() {
               <option value="Hết Hạn">Hết Hạn</option>
             </select>
           </div>
-          {/* Date Range - Tam thoi chua co logic */}
-          <div>
-            <input
-              type="date"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled
-            />
-          </div>
+          {/* Date Range removed as requested */}
         </div>
       </div>
 
