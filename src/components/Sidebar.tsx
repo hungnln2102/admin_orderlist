@@ -28,7 +28,7 @@ const baseMenuItems: MenuItem[] = [
   { name: "Đơn Hàng", href: "/orders", icon: ShoppingBagIcon },
   {
     name: "Sản Phẩm Gói",
-    href: "/packet-products",
+    href: "/package-products",
     icon: CubeIcon,
   },
   { name: "Nguồn Thông Tin", href: "/sources", icon: DocumentTextIcon },

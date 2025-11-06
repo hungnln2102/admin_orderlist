@@ -30,23 +30,64 @@ type PackageRow = {
   supplier: string | null;
   import: number | string | null;
   expired: string | null;
-  capacity?: string | null;
+  capacity?: string | number | null;
+  capacityUsed?: string | number | null;
+  slot?: string | number | null;
+  slotUsed?: string | number | null;
 };
-type AugmentedRow = PackageRow & { stock: number };
+type AugmentedRow = PackageRow & {
+  slotUsed: number;
+  slotLimit: number;
+  remainingSlots: number;
+  capacityLimit: number;
+  capacityUsed: number;
+  remainingCapacity: number;
+};
 type PackageTemplate = {
   name: string;
   fields: PackageField[];
 };
-type PackageFormValues = Record<PackageField, string>;
+type PackageFormValues = {
+  information: string;
+  note: string;
+  supplier: string;
+  import: string;
+  expired: string;
+  capacity: string;
+  slot: string;
+};
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "information", label: "Package information" },
   { value: "note", label: "Note" },
   { value: "supplier", label: "Supplier" },
   { value: "import", label: "Import price (VND)" },
   { value: "expired", label: "Expired date" },
-  { value: "capacity", label: "Capacity" },
+  { value: "capacity", label: "Total capacity (slots)" },
 ];
-function PacketProducts() {
+const DEFAULT_SLOT_LIMIT = 5;
+const DEFAULT_CAPACITY_LIMIT = 2000;
+const LOW_THRESHOLD_RATIO = 0.2;
+type AvailabilityState = "ok" | "low" | "out";
+const getAvailabilityState = (remaining: number, limit: number): AvailabilityState => {
+  if (limit <= 0) return "out";
+  if (remaining <= 0) return "out";
+  const ratio = remaining / limit;
+  return ratio <= LOW_THRESHOLD_RATIO ? "low" : "ok";
+};
+const parseNumericValue = (input: unknown): number | null => {
+  if (input === null || input === undefined) return null;
+  if (typeof input === "number") {
+    return Number.isFinite(input) ? input : null;
+  }
+  if (typeof input === "string") {
+    const cleaned = input.replace(/[^0-9.-]/g, "");
+    if (!cleaned) return null;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+function PackageProduct() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out">(
@@ -121,7 +162,6 @@ function PacketProducts() {
       setStatusFilter("all");
     }
   }, [location.search]);
-  const mockMin = 10;
   const handleCategorySelect = useCallback(
     (value: string) => {
       setCategoryFilter(value);
@@ -146,10 +186,61 @@ function PacketProducts() {
   );
   const computedRows: AugmentedRow[] = useMemo(
     () =>
-      rows.map((item, idx) => ({
-        ...item,
-        stock: idx % 3 === 0 ? 15 : idx % 3 === 1 ? 7 : 0,
-      })),
+      rows.map((item, idx) => {
+        const slotLimitRaw = parseNumericValue(item.slot);
+        const slotLimit =
+          slotLimitRaw && slotLimitRaw > 0
+            ? Math.floor(slotLimitRaw)
+            : DEFAULT_SLOT_LIMIT;
+        const slotUsedRaw = parseNumericValue(
+          (item as PackageRow).slotUsed
+        );
+        const fallbackSlotUsed =
+          slotLimit > 0 ? Math.min(idx % (slotLimit + 1), slotLimit) : 0;
+        const slotUsed = Math.min(
+          Math.max(
+            slotUsedRaw !== null ? Math.floor(slotUsedRaw) : fallbackSlotUsed,
+            0
+          ),
+          slotLimit
+        );
+        const remainingSlots = Math.max(slotLimit - slotUsed, 0);
+
+        const capacityLimitRaw = parseNumericValue(item.capacity);
+        const capacityLimit =
+          capacityLimitRaw && capacityLimitRaw > 0
+            ? Math.floor(capacityLimitRaw)
+            : DEFAULT_CAPACITY_LIMIT;
+        const capacityUsedRaw = parseNumericValue(
+          (item as PackageRow).capacityUsed
+        );
+        const fallbackCapacityUsed = Math.min(
+          slotUsed * 100,
+          capacityLimit
+        );
+        const capacityUsed = Math.min(
+          Math.max(
+            capacityUsedRaw !== null
+              ? Math.floor(capacityUsedRaw)
+              : fallbackCapacityUsed,
+            0
+          ),
+          capacityLimit
+        );
+        const remainingCapacity = Math.max(
+          capacityLimit - capacityUsed,
+          0
+        );
+        return {
+          ...item,
+          slotUsed,
+          slotLimit,
+          remainingSlots,
+          capacityLimit,
+          capacityUsed,
+          remainingCapacity,
+        };
+      }),
     [rows]
   );
   const selectedPackage = categoryFilter !== "all" ? categoryFilter : null;
@@ -174,19 +265,23 @@ function PacketProducts() {
     const matchesSearch = name.includes(term) || sku.includes(term);
     const matchesCategory =
       categoryFilter === "all" || item.package === categoryFilter;
+    const slotState = getAvailabilityState(
+      item.remainingSlots,
+      item.slotLimit || DEFAULT_SLOT_LIMIT
+    );
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "low" && item.stock > 0 && item.stock < mockMin) ||
-      (statusFilter === "out" && item.stock === 0);
+      (statusFilter === "low" && slotState === "low") ||
+      (statusFilter === "out" && slotState === "out");
     return matchesSearch && matchesCategory && matchesStatus;
   });
   const statusLabel =
     statusFilter === "all"
       ? "All"
       : statusFilter === "low"
-      ? "Low stock"
-      : "Out of stock";
-  const stockStats = useMemo(
+      ? "Low slots"
+      : "Out of slots";
+  const slotStats = useMemo(
     () =>
       [
         {
@@ -197,11 +292,16 @@ function PacketProducts() {
           statusKey: "all" as const,
         },
         {
-          name: "Low Stock",
+          name: "Low Slots",
           value: String(
             scopedRows.reduce(
               (total, row) =>
-                row.stock > 0 && row.stock < mockMin ? total + 1 : total,
+                getAvailabilityState(
+                  row.remainingSlots,
+                  row.slotLimit || DEFAULT_SLOT_LIMIT
+                ) === "low"
+                  ? total + 1
+                  : total,
               0
             )
           ),
@@ -210,10 +310,16 @@ function PacketProducts() {
           statusKey: "low" as const,
         },
         {
-          name: "Out of Stock",
+          name: "Out of Slots",
           value: String(
             scopedRows.reduce(
-              (total, row) => (row.stock === 0 ? total + 1 : total),
+              (total, row) =>
+                getAvailabilityState(
+                  row.remainingSlots,
+                  row.slotLimit || DEFAULT_SLOT_LIMIT
+                ) === "out"
+                  ? total + 1
+                  : total,
               0
             )
           ),
@@ -229,7 +335,7 @@ function PacketProducts() {
           statusKey: null,
         },
       ] as const,
-    [scopedRows, mockMin]
+    [scopedRows]
   );
   const allPackageNames = useMemo(() => {
     const names = new Set<string>();
@@ -253,14 +359,18 @@ function PacketProducts() {
       const entry = stats.get(key);
       if (!entry) return;
       entry.total += 1;
-      if (row.stock > 0 && row.stock < mockMin) entry.low += 1;
-      if (row.stock === 0) entry.out += 1;
+      const availability = getAvailabilityState(
+        row.remainingSlots,
+        row.slotLimit || DEFAULT_SLOT_LIMIT
+      );
+      if (availability === "low") entry.low += 1;
+      if (availability === "out") entry.out += 1;
     });
     return allPackageNames.map((name) => ({
       name,
       ...(stats.get(name) ?? { total: 0, low: 0, out: 0 }),
     }));
-  }, [allPackageNames, computedRows, mockMin]);
+  }, [allPackageNames, computedRows]);
   const openCreateModal = useCallback(
     (initialName = "", initialFields?: PackageField[]) => {
       setCreateInitialName(initialName);
@@ -290,6 +400,16 @@ function PacketProducts() {
   const handleAddSubmit = useCallback(
     (values: PackageFormValues) => {
       if (!selectedTemplate) return;
+      const parsedSlotLimit = parseNumericValue(values.slot);
+      const slotLimit =
+        parsedSlotLimit !== null && parsedSlotLimit > 0
+          ? Math.floor(parsedSlotLimit)
+          : DEFAULT_SLOT_LIMIT;
+      const parsedCapacityLimit = parseNumericValue(values.capacity);
+      const capacityLimit =
+        parsedCapacityLimit !== null && parsedCapacityLimit > 0
+          ? Math.floor(parsedCapacityLimit)
+          : DEFAULT_CAPACITY_LIMIT;
       const newRow: PackageRow = {
         id: Date.now(),
         package: selectedTemplate.name,
@@ -308,9 +428,12 @@ function PacketProducts() {
         expired: selectedTemplate.fields.includes("expired")
           ? values.expired || null
           : null,
+        slot: slotLimit,
+        slotUsed: 0,
         capacity: selectedTemplate.fields.includes("capacity")
-          ? values.capacity || null
-          : null,
+          ? capacityLimit
+          : DEFAULT_CAPACITY_LIMIT,
+        capacityUsed: 0,
       };
       setRows((prev) => [...prev, newRow]);
       setAddModalOpen(false);
@@ -362,7 +485,7 @@ function PacketProducts() {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stockStats.map((stat) => {
+        {slotStats.map((stat) => {
           const isSelectable = selectedPackage !== null && stat.statusKey;
           const isActive = isSelectable && statusFilter === stat.statusKey;
           const classes = `
@@ -544,7 +667,7 @@ function PacketProducts() {
                       Note
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Stock
+                      Slot
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Capacity
@@ -583,65 +706,110 @@ function PacketProducts() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRows.map((item, idx) => (
-                      <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.package}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.information || ""}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.note || ""}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            <span className="font-medium">{item.stock}</span> / {mockMin} min
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                            <div
-                              className={`h-2 rounded-full ${
-                                item.stock > mockMin
-                                  ? "bg-green-500"
-                                  : item.stock > 0
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                              }`}
-                              style={{
-                                width: `${Math.min(
-                                  (item.stock / (mockMin * 2)) * 100,
-                                  100
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {item.capacity ? (
-                            <div className="text-sm text-gray-900">{item.capacity}</div>
-                          ) : (
-                            <div className="text-sm text-gray-500 italic">Not set</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.supplier || ""}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {Number(item.import || 0).toLocaleString("vi-VN")} VND
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.expired || ""}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            Edit
-                          </button>
-                          <button className="text-green-600 hover:text-green-900">
-                            Import
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredRows.map((item, idx) => {
+                      const totalSlots = item.slotLimit || DEFAULT_SLOT_LIMIT;
+                      const slotUsed = item.slotUsed;
+                      const remainingSlots = item.remainingSlots;
+                      const slotAvailabilityRatio =
+                        totalSlots > 0
+                          ? Math.min(
+                              (remainingSlots / totalSlots) * 100,
+                              100
+                            )
+                          : 0;
+                      const slotAvailabilityState = getAvailabilityState(
+                        remainingSlots,
+                        totalSlots
+                      );
+                      const slotColorClass =
+                        slotAvailabilityState === "out"
+                          ? "bg-red-500"
+                          : slotAvailabilityState === "low"
+                          ? "bg-yellow-500"
+                          : "bg-green-500";
+
+                      const capacityLimit =
+                        item.capacityLimit || DEFAULT_CAPACITY_LIMIT;
+                      const capacityUsed = item.capacityUsed;
+                      const remainingCapacity = item.remainingCapacity;
+                      const capacityAvailabilityRatio =
+                        capacityLimit > 0
+                          ? Math.min(
+                              (remainingCapacity / capacityLimit) * 100,
+                              100
+                            )
+                          : 0;
+                      const capacityAvailabilityState = getAvailabilityState(
+                        remainingCapacity,
+                        capacityLimit
+                      );
+                      const capacityColorClass =
+                        capacityAvailabilityState === "out"
+                          ? "bg-red-500"
+                          : capacityAvailabilityState === "low"
+                          ? "bg-yellow-500"
+                          : "bg-green-500";
+                      return (
+                        <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.package}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.information || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.note || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              <span className="font-medium">{slotUsed}</span> / {totalSlots} slots
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div
+                                className={`h-2 rounded-full ${slotColorClass}`}
+                                style={{ width: `${slotAvailabilityRatio}%` }}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Available: {remainingSlots}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              <span className="font-medium">{capacityUsed}</span> / {capacityLimit}
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div
+                                className={`h-2 rounded-full ${capacityColorClass}`}
+                                style={{
+                                  width: `${capacityAvailabilityRatio}%`,
+                                }}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Available: {remainingCapacity}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.supplier || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {Number(item.import || 0).toLocaleString("vi-VN")} VND
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.expired || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                            <button className="text-blue-600 hover:text-blue-900">
+                              Edit
+                            </button>
+                            <button className="text-green-600 hover:text-green-900">
+                              Import
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -852,6 +1020,7 @@ function AddPackageModal({
     import: "",
     expired: "",
     capacity: "",
+    slot: "",
   };
   const [values, setValues] = useState<PackageFormValues>(initialValues);
   useEffect(() => {
@@ -860,7 +1029,7 @@ function AddPackageModal({
     }
   }, [open]);
   const handleChange = (
-    field: PackageField,
+    field: keyof PackageFormValues,
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const value = e.target.value;
@@ -873,7 +1042,7 @@ function AddPackageModal({
   return (
     <ModalShell
       open={open}
-      title={`Add Package – ${template.name}`}
+      title={`Add Package - ${template.name}`}
       onClose={onClose}
       footer={
         <>
@@ -946,7 +1115,7 @@ function AddPackageModal({
             />
           </div>
         )}
-        {template.fields.includes("expired") and (
+        {template.fields.includes("expired") && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Expired date
@@ -959,16 +1128,30 @@ function AddPackageModal({
             />
           </div>
         )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Slot limit
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={values.slot}
+            onChange={(e) => handleChange("slot", e)}
+            placeholder={`Default ${DEFAULT_SLOT_LIMIT}`}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         {template.fields.includes("capacity") && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Capacity
+              Capacity (total slots)
             </label>
             <input
-              type="text"
+              type="number"
+              min={0}
               value={values.capacity}
               onChange={(e) => handleChange("capacity", e)}
-              placeholder="Example: 100 GB"
+              placeholder={`Default ${DEFAULT_CAPACITY_LIMIT}`}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -982,4 +1165,4 @@ function AddPackageModal({
     </ModalShell>
   );
 }
-export default PacketProducts;
+export default PackageProduct;
