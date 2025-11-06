@@ -23,33 +23,43 @@ type MenuItem = {
   children?: { name: string; href: string }[];
 };
 
-const menuItems: MenuItem[] = [
-  { name: "T?ng quan", href: "/dashboard", icon: ChartBarIcon },
-  { name: "Ðon hàng", href: "/orders", icon: ShoppingBagIcon },
+const baseMenuItems: MenuItem[] = [
+  { name: "Tá»•ng Quan", href: "/dashboard", icon: ChartBarIcon },
+  { name: "ÄÆ¡n HÃ ng", href: "/orders", icon: ShoppingBagIcon },
   {
-    name: "S?n ph?m Gói",
+    name: "Sáº£n Pháº©m GÃ³i",
     href: "/packet-products",
     icon: CubeIcon,
-    children: [
-      { name: "T?t c? gói", href: "/packet-products" },
-      { name: "Gói slot th?p", href: "/packet-products?view=low" },
-      { name: "Gói h?t slot", href: "/packet-products?view=out" },
-    ],
   },
-  { name: "Ngu?n thông tin", href: "/sources", icon: DocumentTextIcon },
-  { name: "B?ng giá", href: "/pricing", icon: CurrencyDollarIcon },
-  { name: "Biên lai", href: "/invoices", icon: DocumentIcon },
+  { name: "Nguá»“n ThÃ´ng Tin", href: "/sources", icon: DocumentTextIcon },
+  { name: "Báº£ng GiÃ¡", href: "/pricing", icon: CurrencyDollarIcon },
+  { name: "BiÃªn Lai", href: "/invoices", icon: DocumentIcon },
 ];
 
-const matchesHref = (currentPath: string, currentSearch: string, targetHref: string) => {
+const normalizeSearch = (input: string) => {
+  if (!input) return "";
+  const str = input.startsWith("?") ? input.slice(1) : input;
+  const params = new URLSearchParams(str);
+  return Array.from(params.entries())
+    .map(([key, value]) => `${key}=${value}`)
+    .sort()
+    .join("&");
+};
+
+const matchesHref = (
+  currentPath: string,
+  currentSearch: string,
+  targetHref: string
+) => {
   const [path, query] = targetHref.split("?");
   const search = query ? `?${query}` : "";
   if (currentPath !== path) return false;
-  return currentSearch === search;
+  return normalizeSearch(currentSearch) === normalizeSearch(search);
 };
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
+  const computedMenu = baseMenuItems;
 
   return (
     <>
@@ -87,13 +97,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
-            {menuItems.map((item) => {
-              const childActive = item.children?.some((child) =>
-                matchesHref(location.pathname, location.search, child.href)
-              );
+            {computedMenu.map((item) => {
               const isActive =
-                matchesHref(location.pathname, location.search, item.href) || childActive;
-
+                location.pathname === item.href ||
+                matchesHref(location.pathname, location.search, item.href);
               return (
                 <div key={item.name} className="space-y-2">
                   <Link
@@ -121,32 +128,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       <div className="absolute right-2 w-2 h-2 bg-white rounded-full" />
                     )}
                   </Link>
-
-                  {item.children && (
-                    <div className="ml-11 space-y-1">
-                      {item.children.map((child) => {
-                        const childIsActive = matchesHref(
-                          location.pathname,
-                          location.search,
-                          child.href
-                        );
-                        return (
-                          <Link
-                            key={child.name}
-                            to={child.href}
-                            onClick={() => setIsOpen(false)}
-                            className={`block rounded-lg px-3 py-2 text-xs font-medium transition ${
-                              childIsActive
-                                ? "bg-blue-50 text-blue-600"
-                                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                            }`}
-                          >
-                            {child.name}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               );
             })}

@@ -1,4 +1,4 @@
-// CreateOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
+﻿// CreateOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
 
 import React, {
   useState,
@@ -7,7 +7,11 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  XMarkIcon,
+  PlusCircleIcon,
+  MinusCircleIcon,
+} from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 import * as Helpers from "../lib/helpers";
 
@@ -55,6 +59,7 @@ interface CalculatedPriceResult {
   so_ngay_da_dang_ki: number;
   het_han: string;
 }
+type CustomerType = "MAVC" | "MAVL" | "MAVK";
 interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -189,7 +194,7 @@ interface UseCreateOrderLogicResult {
   isLoading: boolean;
   isDataLoaded: boolean;
   selectedSupplyId: number | null;
-  customerType: "MAVC" | "MAVL";
+  customerType: CustomerType;
   updateForm: (patch: Partial<Order>) => void;
   setIsDataLoaded: (v: boolean) => void;
   handleChange: (
@@ -210,7 +215,7 @@ const useCreateOrderLogic = (
   onSave: (newOrderData: Partial<Order> | Order) => void
 ): UseCreateOrderLogicResult => {
   const [formData, setFormData] = useState<Partial<Order>>(INITIAL_FORM_DATA);
-  const [customerType, setCustomerType] = useState<"MAVC" | "MAVL">("MAVC");
+  const [customerType, setCustomerType] = useState<CustomerType>("MAVC");
 
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -333,7 +338,7 @@ const useCreateOrderLogic = (
 
   useEffect(() => {
     if (isOpen) {
-      const initialType = "MAVC";
+      const initialType: CustomerType = "MAVC";
       const initialID = initialType + Helpers.generateRandomId(5);
       const initialDate = Helpers.getTodayDMY();
 
@@ -363,24 +368,18 @@ const useCreateOrderLogic = (
   }, [currentOrderId, isOpen]);
 
   useEffect(() => {
-    const productName = formData[ORDER_FIELDS.SAN_PHAM];
-    const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
-    const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
-
-    if (!productName || !orderId || !registerDate) {
-      setIsDataLoaded(false);
-    }
-  }, [
-    formData[ORDER_FIELDS.SAN_PHAM],
-    formData[ORDER_FIELDS.ID_DON_HANG],
-    formData[ORDER_FIELDS.NGAY_DANG_KI],
-  ]);
-
-  useEffect(() => {
     const productName = formData[ORDER_FIELDS.SAN_PHAM] as string;
     const orderId = formData[ORDER_FIELDS.ID_DON_HANG] as string;
     const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI] as string;
     if (!productName || !orderId || !registerDate) return;
+
+    if (customerType === "MAVK") {
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.GIA_BAN]: prev[ORDER_FIELDS.GIA_NHAP] || 0,
+      }));
+      return;
+    }
 
     // Trigger tính giá lại khi loại khách hàng thay đổi
     calculatePrice(0, productName, orderId, registerDate).then((result) => {
@@ -392,7 +391,6 @@ const useCreateOrderLogic = (
       }
     });
   }, [customerType, calculatePrice]);
-
   const handleProductSelect = (productName: string) => {
     // ... (logic giữ nguyên)
     const selectedProduct = products.find((p) => p.san_pham === productName);
@@ -424,7 +422,7 @@ const useCreateOrderLogic = (
           if (result) {
             setFormData((prev) => ({
               ...prev,
-              [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
+              [ORDER_FIELDS.GIA_BAN]: customerType === "MAVK" ? 0 : result.gia_ban,
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
               ),
@@ -447,11 +445,17 @@ const useCreateOrderLogic = (
         supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
     }
     setSelectedSupplyId(sourceId === 0 ? null : sourceId);
-    setFormData((prev) => ({
-      ...prev,
-      [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-      [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
-    }));
+    setFormData((prev) => {
+      const updated: Partial<Order> = {
+        ...prev,
+        [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
+        [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
+      };
+      if (customerType === "MAVK") {
+        updated[ORDER_FIELDS.GIA_BAN] = newBasePrice;
+      }
+      return updated;
+    });
     if (!selectedSupply || sourceId === 0) {
       setIsDataLoaded(false);
     }
@@ -500,7 +504,7 @@ const useCreateOrderLogic = (
           if (result) {
             setFormData((prev) => ({
               ...prev,
-              [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
+              [ORDER_FIELDS.GIA_BAN]: customerType === "MAVK" ? 0 : result.gia_ban,
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
               ),
@@ -527,17 +531,23 @@ const useCreateOrderLogic = (
 
     setSelectedSupplyId(sourceId);
 
-    setFormData((prev) => ({
-      ...prev,
-      [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-      [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
-    }));
+    setFormData((prev) => {
+      const updated: Partial<Order> = {
+        ...prev,
+        [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
+        [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
+      };
+      if (customerType === "MAVK") {
+        updated[ORDER_FIELDS.GIA_BAN] = newBasePrice;
+      }
+      return updated;
+    });
   };
 
   const handleCustomerTypeChange = (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
-    const newType = e.target.value as "MAVC" | "MAVL";
+    const newType = e.target.value as CustomerType;
     setCustomerType(newType);
     setSelectedProductId(null);
     setSelectedSupplyId(null);
@@ -897,6 +907,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   >
                     <option value="MAVC">Cộng Tác Viên</option>
                     <option value="MAVL">Khách Lẻ</option>
+                    <option value="MAVK">Khuyến Mãi</option>
                   </select>
                 </div>
                 {/* Mã Đơn Hàng */}
@@ -984,13 +995,17 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     type="button"
                     aria-label="Toggle"
                     onClick={() => setCustomMode((v) => !v)}
-                    className={`mt-6 md:mt-0 inline-flex items-center justify-center w-10 h-10 rounded-md text-white text-2xl leading-none ${
+                    className={`mt-6 md:mt-0 inline-flex items-center justify-center w-10 h-10 rounded-md text-white ${
                       customMode
                         ? "bg-red-500 hover:bg-red-600"
                         : "bg-green-500 hover:bg-green-600"
                     }`}
                   >
-                    {customMode ? "-" : "+"}
+                    {customMode ? (
+                      <MinusCircleIcon className="h-6 w-6" aria-hidden="true" />
+                    ) : (
+                      <PlusCircleIcon className="h-6 w-6" aria-hidden="true" />
+                    )}
                   </button>
                 </div>
 
@@ -1133,9 +1148,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <input
                         type="text"
                         name={ORDER_FIELDS.GIA_BAN}
-                        value={Helpers.formatCurrency(
-                          formData[ORDER_FIELDS.GIA_BAN] || 0
-                        )}
+                        value={
+                          customerType === "MAVK" && !selectedSupplyId
+                            ? ""
+                            : Helpers.formatCurrency(
+                                formData[ORDER_FIELDS.GIA_BAN] || 0
+                              )
+                        }
                         readOnly
                         className={`${inputClass} font-semibold text-green-700 ${readOnlyClass}`}
                       />
