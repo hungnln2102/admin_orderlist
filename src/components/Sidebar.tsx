@@ -16,21 +16,43 @@ interface SidebarProps {
   setIsOpen: (open: boolean) => void;
 }
 
-const menuItems = [
-  { name: "T·ªïng quan", href: "/dashboard", icon: ChartBarIcon },
-  { name: "ƒê∆°n h√†ng", href: "/orders", icon: ShoppingBagIcon },
-  { name: "S·∫£n ph·∫©m G√≥i", href: "/packet-products", icon: CubeIcon },
-  { name: "Ngu·ªìn th√¥ng tin", href: "/sources", icon: DocumentTextIcon },
-  { name: "B·∫£ng gi√°", href: "/pricing", icon: CurrencyDollarIcon },
-  { name: "Bi√™n lai", href: "/invoices", icon: DocumentIcon },
+type MenuItem = {
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  children?: { name: string; href: string }[];
+};
+
+const menuItems: MenuItem[] = [
+  { name: "T?ng quan", href: "/dashboard", icon: ChartBarIcon },
+  { name: "–on h‡ng", href: "/orders", icon: ShoppingBagIcon },
+  {
+    name: "S?n ph?m GÛi",
+    href: "/packet-products",
+    icon: CubeIcon,
+    children: [
+      { name: "T?t c? gÛi", href: "/packet-products" },
+      { name: "GÛi slot th?p", href: "/packet-products?view=low" },
+      { name: "GÛi h?t slot", href: "/packet-products?view=out" },
+    ],
+  },
+  { name: "Ngu?n thÙng tin", href: "/sources", icon: DocumentTextIcon },
+  { name: "B?ng gi·", href: "/pricing", icon: CurrencyDollarIcon },
+  { name: "BiÍn lai", href: "/invoices", icon: DocumentIcon },
 ];
+
+const matchesHref = (currentPath: string, currentSearch: string, targetHref: string) => {
+  const [path, query] = targetHref.split("?");
+  const search = query ? `?${query}` : "";
+  if (currentPath !== path) return false;
+  return currentSearch === search;
+};
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
 
   return (
     <>
-      {/* Mobile menu button - fixed position */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -44,7 +66,6 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         </button>
       </div>
 
-      {/* Mobile overlay */}
       {isOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
@@ -52,57 +73,85 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar - fixed for desktop, overlay for mobile */}
       <div
         className={`
-        fixed top-0 left-0 z-40 w-64 h-full bg-white shadow-xl border-r border-gray-200
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:translate-x-0
-      `}
+          fixed top-0 left-0 z-40 w-64 h-full bg-white shadow-xl border-r border-gray-200
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          lg:translate-x-0
+        `}
       >
         <div className="flex flex-col h-full">
-          {/* Logo/Header */}
           <div className="flex items-center justify-center h-16 px-4 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
             <h1 className="text-xl font-bold text-white">Admin Orderlist</h1>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.href;
+              const childActive = item.children?.some((child) =>
+                matchesHref(location.pathname, location.search, child.href)
+              );
+              const isActive =
+                matchesHref(location.pathname, location.search, item.href) || childActive;
+
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`
-                    flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200
-                    group relative
-                    ${
-                      isActive
-                        ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105"
-                        : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:scale-102"
-                    }
-                  `}
-                >
-                  <item.icon
-                    className={`mr-3 h-5 w-5 ${
-                      isActive
-                        ? "text-white"
-                        : "text-gray-500 group-hover:text-gray-700"
-                    }`}
-                  />
-                  {item.name}
-                  {isActive && (
-                    <div className="absolute right-2 w-2 h-2 bg-white rounded-full"></div>
+                <div key={item.name} className="space-y-2">
+                  <Link
+                    to={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`
+                      flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200
+                      group relative
+                      ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105"
+                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      }
+                    `}
+                  >
+                    <item.icon
+                      className={`mr-3 h-5 w-5 ${
+                        isActive
+                          ? "text-white"
+                          : "text-gray-500 group-hover:text-gray-700"
+                      }`}
+                    />
+                    {item.name}
+                    {isActive && (
+                      <div className="absolute right-2 w-2 h-2 bg-white rounded-full" />
+                    )}
+                  </Link>
+
+                  {item.children && (
+                    <div className="ml-11 space-y-1">
+                      {item.children.map((child) => {
+                        const childIsActive = matchesHref(
+                          location.pathname,
+                          location.search,
+                          child.href
+                        );
+                        return (
+                          <Link
+                            key={child.name}
+                            to={child.href}
+                            onClick={() => setIsOpen(false)}
+                            className={`block rounded-lg px-3 py-2 text-xs font-medium transition ${
+                              childIsActive
+                                ? "bg-blue-50 text-blue-600"
+                                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                            }`}
+                          >
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
                   )}
-                </Link>
+                </div>
               );
             })}
           </nav>
 
-          {/* User section */}
           <div className="p-4 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">

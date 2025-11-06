@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import {
   MagnifyingGlassIcon,
@@ -8,7 +9,6 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-
 type PackageRow = {
   id: number;
   package: string;
@@ -19,38 +19,15 @@ type PackageRow = {
   expired: string | null; // YYYY-MM-DD or similar
 };
 
-const stockStats = [
-  {
-    name: "Total Packages",
-    value: "0",
-    icon: CheckCircleIcon,
-    color: "bg-blue-500",
-  },
-  {
-    name: "Low Stock",
-    value: "0",
-    icon: ExclamationTriangleIcon,
-    color: "bg-yellow-500",
-  },
-  {
-    name: "Out of Stock",
-    value: "0",
-    icon: ArrowDownIcon,
-    color: "bg-red-500",
-  },
-  {
-    name: "Created Today",
-    value: "0",
-    icon: ArrowUpIcon,
-    color: "bg-green-500",
-  },
-];
-
 export default function PacketProducts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out">(
+    "all"
+  );
   const [rows, setRows] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     (async () => {
@@ -74,19 +51,83 @@ export default function PacketProducts() {
     [rows]
   );
 
-  const filtered = rows.filter((item) => {
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const view = params.get("view");
+    if (view === "low") {
+      setStatusFilter("low");
+      setCategoryFilter("all");
+    } else if (view === "out") {
+      setStatusFilter("out");
+      setCategoryFilter("all");
+    } else {
+      setStatusFilter("all");
+    }
+  }, [location.search]);
+
+  const mockMin = 10;
+  const mockStock = (idx: number) =>
+    idx % 3 === 0 ? 15 : idx % 3 === 1 ? 7 : 0;
+
+  const filtered = rows.filter((item, idx) => {
     const term = searchTerm.toLowerCase();
     const name = (item.package || "").toLowerCase();
     const sku = `PKG-${String(item.id).padStart(4, "0")}`.toLowerCase();
     const matchesSearch = name.includes(term) || sku.includes(term);
     const matchesCategory =
       categoryFilter === "all" || item.package === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const stock = mockStock(idx);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "low" && stock > 0 && stock < mockMin) ||
+      (statusFilter === "out" && stock === 0);
+    return matchesSearch && matchesCategory && matchesStatus;
   });
-
-  const mockStock = (idx: number) =>
-    idx % 3 === 0 ? 15 : idx % 3 === 1 ? 7 : 0;
-  const mockMin = 10;
+  const statusLabel =
+    statusFilter === "all"
+      ? "Tat ca"
+      : statusFilter === "low"
+      ? "Slot thap"
+      : "Het slot";
+  const stockStats = useMemo(
+    () => [
+      {
+        name: "Total Packages",
+        value: String(rows.length),
+        icon: CheckCircleIcon,
+        color: "bg-blue-500",
+      },
+      {
+        name: "Low Stock",
+        value: String(
+          rows.reduce(
+            (total, _, idx) => (mockStock(idx) < 2 ? total + 1 : total),
+            0
+          )
+        ),
+        icon: ExclamationTriangleIcon,
+        color: "bg-yellow-500",
+      },
+      {
+        name: "Out of Stock",
+        value: String(
+          rows.reduce(
+            (total, _, idx) => (mockStock(idx) === 0 ? total + 1 : total),
+            0
+          )
+        ),
+        icon: ArrowDownIcon,
+        color: "bg-red-500",
+      },
+      {
+        name: "Created Today",
+        value: "0",
+        icon: ArrowUpIcon,
+        color: "bg-green-500",
+      },
+    ],
+    [rows]
+  );
 
   return (
     <div className="space-y-6">
@@ -123,7 +164,7 @@ export default function PacketProducts() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
         <div className="grid grid-cols-3 gap-4 items-center">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -151,6 +192,14 @@ export default function PacketProducts() {
           <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
             Export Report
           </button>
+        </div>
+        <div className="text-sm text-gray-500">
+          Dang xem:{" "}
+          <span className="font-medium text-gray-900">
+            {categoryFilter === "all" ? "Tat ca" : categoryFilter}
+          </span>{" "}
+          | Trang thai:{" "}
+          <span className="font-medium text-gray-900">{statusLabel}</span>
         </div>
       </div>
 
