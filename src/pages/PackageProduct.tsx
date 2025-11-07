@@ -14,6 +14,9 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XMarkIcon,
+  BoltIcon,
+  PencilIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 type PackageField =
   | "information"
@@ -26,7 +29,14 @@ type PackageRow = {
   id: number;
   package: string;
   information: string | null;
+  informationUser?: string | null;
+  informationPass?: string | null;
+  informationMail?: string | null;
   note: string | null;
+  accountUser?: string | null;
+  accountPass?: string | null;
+  accountMail?: string | null;
+  accountNote?: string | null;
   supplier: string | null;
   import: number | string | null;
   expired: string | null;
@@ -48,13 +58,39 @@ type PackageTemplate = {
   fields: PackageField[];
 };
 type PackageFormValues = {
-  information: string;
+  informationUser: string;
+  informationPass: string;
+  informationMail: string;
   note: string;
+  accountUser: string;
+  accountPass: string;
+  accountMail: string;
+  accountNote: string;
   supplier: string;
   import: string;
   expired: string;
   capacity: string;
   slot: string;
+};
+type EditContext = {
+  rowId: number;
+  template: PackageTemplate;
+  initialValues: PackageFormValues;
+};
+const EMPTY_FORM_VALUES: PackageFormValues = {
+  informationUser: "",
+  informationPass: "",
+  informationMail: "",
+  note: "",
+  accountUser: "",
+  accountPass: "",
+  accountMail: "",
+  accountNote: "",
+  supplier: "",
+  import: "",
+  expired: "",
+  capacity: "",
+  slot: "",
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "information", label: "Package information" },
@@ -87,13 +123,40 @@ const parseNumericValue = (input: unknown): number | null => {
   }
   return null;
 };
+const toInputString = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return typeof value === "string" ? value : String(value);
+};
+const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValues => {
+  const slotValue =
+    "slotLimit" in row && typeof row.slotLimit === "number"
+      ? String(row.slotLimit)
+      : toInputString(row.slot);
+  const capacityValue =
+    "capacityLimit" in row && typeof row.capacityLimit === "number"
+      ? String(row.capacityLimit)
+      : toInputString(row.capacity);
+  return {
+    informationUser: row.informationUser ?? "",
+    informationPass: row.informationPass ?? "",
+    informationMail: row.informationMail ?? "",
+    note: row.note ?? "",
+    accountUser: row.accountUser ?? "",
+    accountPass: row.accountPass ?? "",
+    accountMail: row.accountMail ?? "",
+    accountNote: row.accountNote ?? "",
+    supplier: row.supplier ?? "",
+    import: toInputString(row.import),
+    expired: row.expired ?? "",
+    capacity: capacityValue,
+    slot: slotValue,
+  };
+};
 function PackageProduct() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out">(
-    "all"
-  );
   const [rows, setRows] = useState<PackageRow[]>([]);
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<PackageTemplate[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -102,6 +165,8 @@ function PackageProduct() {
     PACKAGE_FIELD_OPTIONS.map((opt) => opt.value)
   );
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editContext, setEditContext] = useState<EditContext | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const defaultTemplateFields = useMemo(
@@ -146,28 +211,17 @@ function PackageProduct() {
   }, [packageNames, defaultTemplateFields]);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const view = params.get("view");
     const packageParam = params.get("package");
     if (packageParam) {
       setCategoryFilter(packageParam);
-      setStatusFilter("all");
-      return;
-    }
-    setCategoryFilter("all");
-    if (view === "low") {
-      setStatusFilter("low");
-    } else if (view === "out") {
-      setStatusFilter("out");
     } else {
-      setStatusFilter("all");
+      setCategoryFilter("all");
     }
   }, [location.search]);
   const handleCategorySelect = useCallback(
     (value: string) => {
       setCategoryFilter(value);
-      setStatusFilter("all");
       const params = new URLSearchParams(location.search);
-      params.delete("view");
       if (value === "all") {
         params.delete("package");
       } else {
@@ -265,22 +319,8 @@ function PackageProduct() {
     const matchesSearch = name.includes(term) || sku.includes(term);
     const matchesCategory =
       categoryFilter === "all" || item.package === categoryFilter;
-    const slotState = getAvailabilityState(
-      item.remainingSlots,
-      item.slotLimit || DEFAULT_SLOT_LIMIT
-    );
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "low" && slotState === "low") ||
-      (statusFilter === "out" && slotState === "out");
-    return matchesSearch && matchesCategory && matchesStatus;
+    return matchesSearch && matchesCategory;
   });
-  const statusLabel =
-    statusFilter === "all"
-      ? "All"
-      : statusFilter === "low"
-      ? "Low slots"
-      : "Out of slots";
   const slotStats = useMemo(
     () =>
       [
@@ -289,7 +329,6 @@ function PackageProduct() {
           value: String(scopedRows.length),
           icon: CheckCircleIcon,
           color: "bg-blue-500",
-          statusKey: "all" as const,
         },
         {
           name: "Low Slots",
@@ -307,7 +346,6 @@ function PackageProduct() {
           ),
           icon: ExclamationTriangleIcon,
           color: "bg-yellow-500",
-          statusKey: "low" as const,
         },
         {
           name: "Out of Slots",
@@ -325,14 +363,12 @@ function PackageProduct() {
           ),
           icon: ArrowDownIcon,
           color: "bg-red-500",
-          statusKey: "out" as const,
         },
         {
           name: "Created Today",
           value: "0",
           icon: ArrowUpIcon,
           color: "bg-green-500",
-          statusKey: null,
         },
       ] as const,
     [scopedRows]
@@ -400,6 +436,17 @@ function PackageProduct() {
   const handleAddSubmit = useCallback(
     (values: PackageFormValues) => {
       if (!selectedTemplate) return;
+      const includeAccountStorage = selectedTemplate.fields.includes("capacity");
+      const includePackageInfo = selectedTemplate.fields.includes("information");
+      const packageInfoSummary = includePackageInfo
+        ? [
+            values.informationUser && `User: ${values.informationUser}`,
+            values.informationPass && `Pass: ${values.informationPass}`,
+            values.informationMail && `Mail 2nd: ${values.informationMail}`,
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        : "";
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
@@ -413,12 +460,17 @@ function PackageProduct() {
       const newRow: PackageRow = {
         id: Date.now(),
         package: selectedTemplate.name,
-        information: selectedTemplate.fields.includes("information")
-          ? values.information || null
-          : null,
+        information: includePackageInfo ? packageInfoSummary || null : null,
+        informationUser: includePackageInfo ? values.informationUser || null : null,
+        informationPass: includePackageInfo ? values.informationPass || null : null,
+        informationMail: includePackageInfo ? values.informationMail || null : null,
         note: selectedTemplate.fields.includes("note")
           ? values.note || null
           : null,
+        accountUser: includeAccountStorage ? values.accountUser || null : null,
+        accountPass: includeAccountStorage ? values.accountPass || null : null,
+        accountMail: includeAccountStorage ? values.accountMail || null : null,
+        accountNote: includeAccountStorage ? values.accountNote || null : null,
         supplier: selectedTemplate.fields.includes("supplier")
           ? values.supplier || null
           : null,
@@ -455,6 +507,85 @@ function PackageProduct() {
     }
     setAddModalOpen(true);
   };
+  const openEditModal = useCallback(
+    (row: AugmentedRow) => {
+      const template =
+        templates.find((tpl) => tpl.name === row.package) ?? {
+          name: row.package,
+          fields: defaultTemplateFields,
+        };
+      setEditContext({
+        rowId: row.id,
+        template,
+        initialValues: buildFormValuesFromRow(row),
+      });
+      setEditModalOpen(true);
+    },
+    [templates, defaultTemplateFields]
+  );
+  const closeEditModal = useCallback(() => {
+    setEditModalOpen(false);
+    setEditContext(null);
+  }, []);
+  const handleRowToggle = useCallback((rowId: number) => {
+    setExpandedRowId((prev) => (prev === rowId ? null : rowId));
+  }, []);
+  const handleEditSubmit = useCallback(
+    (values: PackageFormValues) => {
+      if (!editContext) return;
+      const { template, rowId } = editContext;
+      const includeAccountStorage = template.fields.includes("capacity");
+      const includePackageInfo = template.fields.includes("information");
+      const packageInfoSummary = includePackageInfo
+        ? [
+            values.informationUser && `User: ${values.informationUser}`,
+            values.informationPass && `Pass: ${values.informationPass}`,
+            values.informationMail && `Mail 2nd: ${values.informationMail}`,
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        : "";
+      const parsedSlotLimit = parseNumericValue(values.slot);
+      const slotLimit =
+        parsedSlotLimit !== null && parsedSlotLimit > 0
+          ? Math.floor(parsedSlotLimit)
+          : DEFAULT_SLOT_LIMIT;
+      const parsedCapacityLimit = parseNumericValue(values.capacity);
+      const capacityLimit =
+        parsedCapacityLimit !== null && parsedCapacityLimit > 0
+          ? Math.floor(parsedCapacityLimit)
+          : DEFAULT_CAPACITY_LIMIT;
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          return {
+            ...row,
+            information: includePackageInfo ? packageInfoSummary || null : row.information,
+            informationUser: includePackageInfo ? values.informationUser || null : row.informationUser ?? null,
+            informationPass: includePackageInfo ? values.informationPass || null : row.informationPass ?? null,
+            informationMail: includePackageInfo ? values.informationMail || null : row.informationMail ?? null,
+            note: template.fields.includes("note") ? values.note || null : row.note,
+            supplier: template.fields.includes("supplier") ? values.supplier || null : row.supplier,
+            import: template.fields.includes("import")
+              ? Number(values.import || 0) || 0
+              : row.import,
+            expired:
+              includeAccountStorage && template.fields.includes("expired")
+                ? values.expired || null
+                : row.expired,
+            slot: slotLimit,
+            accountUser: includeAccountStorage ? values.accountUser || null : row.accountUser ?? null,
+            accountPass: includeAccountStorage ? values.accountPass || null : row.accountPass ?? null,
+            accountMail: includeAccountStorage ? values.accountMail || null : row.accountMail ?? null,
+            accountNote: includeAccountStorage ? values.accountNote || null : row.accountNote ?? null,
+            capacity: includeAccountStorage ? capacityLimit : row.capacity,
+          };
+        })
+      );
+      closeEditModal();
+    },
+    [editContext, closeEditModal]
+  );
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -485,15 +616,11 @@ function PackageProduct() {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {slotStats.map((stat) => {
-          const isSelectable = selectedPackage !== null && stat.statusKey;
-          const isActive = isSelectable && statusFilter === stat.statusKey;
-          const classes = `
-            bg-white rounded-xl p-6 shadow-sm transition w-full text-left
-            ${isSelectable ? "cursor-pointer hover:shadow-md" : ""}
-            ${isActive ? "ring-2 ring-blue-400" : ""}
-          `;
-          const content = (
+        {slotStats.map((stat) => (
+          <div
+            key={stat.name}
+            className="bg-white rounded-xl p-6 shadow-sm transition w-full text-left"
+          >
             <div className="flex items-center">
               <div className={`${stat.color} rounded-lg p-3`}>
                 <stat.icon className="h-6 w-6 text-white" />
@@ -503,25 +630,8 @@ function PackageProduct() {
                 <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
               </div>
             </div>
-          );
-          if (isSelectable && stat.statusKey) {
-            return (
-              <button
-                key={stat.name}
-                type="button"
-                onClick={() => setStatusFilter(stat.statusKey!)}
-                className={`${classes} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2`}
-              >
-                {content}
-              </button>
-            );
-          }
-          return (
-            <div key={stat.name} className={classes}>
-              {content}
-            </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -647,9 +757,9 @@ function PackageProduct() {
             </div>
             <div className="text-sm text-gray-500">
               Viewing:{" "}
-              <span className="font-medium text-gray-900">{selectedPackage}</span>{" "}
-              | Status:{" "}
-              <span className="font-medium text-gray-900">{statusLabel}</span>
+              <span className="font-medium text-gray-900">
+                {selectedPackage ?? "All packages"}
+              </span>
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -749,11 +859,26 @@ function PackageProduct() {
                           : capacityAvailabilityState === "low"
                           ? "bg-yellow-500"
                           : "bg-green-500";
+                      const slotCells = Array.from(
+                        { length: Math.max(totalSlots, 0) },
+                        (_, slotIdx) => {
+                          const slotNumber = slotIdx + 1;
+                          const isUsed = slotNumber <= slotUsed;
+                          return { slotNumber, isUsed };
+                        }
+                      );
+                      const isExpanded = expandedRowId === item.id;
                       return (
-                        <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.package}
-                          </td>
+                        <React.Fragment key={`${item.id}-${idx}`}>
+                          <tr
+                            onClick={() => handleRowToggle(item.id)}
+                            className={`hover:bg-gray-50 ${
+                              isExpanded ? "bg-gray-50" : ""
+                            } cursor-pointer`}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {item.package}
+                            </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {item.information || ""}
                           </td>
@@ -800,14 +925,82 @@ function PackageProduct() {
                             {item.expired || ""}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                            <button className="text-blue-600 hover:text-blue-900">
-                              Edit
+                            <button
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                              type="button"
+                              aria-label="Edit package"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(item);
+                              }}
+                            >
+                              <PencilIcon className="h-4 w-4" />
                             </button>
-                            <button className="text-green-600 hover:text-green-900">
-                              Import
+                            <button
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
+                              type="button"
+                              aria-label="Show slot information"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRowToggle(item.id);
+                              }}
+                            >
+                              <EyeIcon className="h-4 w-4" />
                             </button>
                           </td>
-                        </tr>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={9} className="bg-gray-50 px-6 py-4">
+                                <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-4 text-center">
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      Slot details
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      Showing {totalSlots} slots — {slotUsed} used,{" "}
+                                      {remainingSlots} available
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap justify-center gap-3">
+                                    {slotCells.map((slot) => (
+                                      <div
+                                        key={slot.slotNumber}
+                                        className={`flex flex-col items-center justify-center rounded-lg border px-3 py-2 basis-1/2 sm:basis-1/3 lg:basis-1/5 min-w-[120px] ${
+                                          slot.isUsed
+                                            ? "border-yellow-300 bg-yellow-50"
+                                            : "border-green-200 bg-green-50"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <BoltIcon
+                                            className={`h-5 w-5 ${
+                                              slot.isUsed
+                                                ? "text-yellow-500"
+                                                : "text-green-500"
+                                            }`}
+                                          />
+                                          <span className="text-sm font-semibold text-gray-900">
+                                            Slot {slot.slotNumber}
+                                          </span>
+                                        </div>
+                                        <p
+                                          className={`text-xs mt-1 ${
+                                            slot.isUsed
+                                              ? "text-yellow-700"
+                                              : "text-green-700"
+                                          }`}
+                                        >
+                                          {slot.isUsed ? "Used" : "Available"}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })
                   )}
@@ -825,11 +1018,22 @@ function PackageProduct() {
         onSubmit={handleCreateTemplate}
       />
       {selectedTemplate && (
-        <AddPackageModal
+        <PackageFormModal
+          mode="add"
           open={addModalOpen}
           template={selectedTemplate}
           onClose={() => setAddModalOpen(false)}
           onSubmit={handleAddSubmit}
+        />
+      )}
+      {editModalOpen && editContext && (
+        <PackageFormModal
+          mode="edit"
+          open={editModalOpen}
+          template={editContext.template}
+          initialValues={editContext.initialValues}
+          onClose={closeEditModal}
+          onSubmit={handleEditSubmit}
         />
       )}
     </div>
@@ -847,7 +1051,7 @@ function ModalShell({ open, title, onClose, children, footer }: ModalShellProps)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div
-        className="bg-white rounded-xl shadow-lg w-full max-w-lg overflow-hidden"
+        className="bg-white rounded-xl shadow-lg w-full max-w-4xl overflow-hidden"
         role="dialog"
         aria-modal="true"
       >
@@ -1001,33 +1205,35 @@ function CreatePackageModal({
     </ModalShell>
   );
 }
-type AddPackageModalProps = {
+type PackageFormModalProps = {
   open: boolean;
+  mode: "add" | "edit";
   template: PackageTemplate;
+  initialValues?: PackageFormValues;
   onClose: () => void;
   onSubmit: (values: PackageFormValues) => void;
 };
-function AddPackageModal({
+function PackageFormModal({
   open,
+  mode,
   template,
+  initialValues,
   onClose,
   onSubmit,
-}: AddPackageModalProps) {
-  const initialValues: PackageFormValues = {
-    information: "",
-    note: "",
-    supplier: "",
-    import: "",
-    expired: "",
-    capacity: "",
-    slot: "",
-  };
-  const [values, setValues] = useState<PackageFormValues>(initialValues);
+}: PackageFormModalProps) {
+  const mergedInitialValues = useMemo(
+    () => ({
+      ...EMPTY_FORM_VALUES,
+      ...(initialValues ?? {}),
+    }),
+    [initialValues]
+  );
+  const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
   useEffect(() => {
     if (open) {
-      setValues(initialValues);
+      setValues(mergedInitialValues);
     }
-  }, [open]);
+  }, [open, mergedInitialValues]);
   const handleChange = (
     field: keyof PackageFormValues,
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -1039,10 +1245,21 @@ function AddPackageModal({
     e.preventDefault();
     onSubmit(values);
   };
+  const packageDetailFields: PackageField[] = [
+    "information",
+    "note",
+    "supplier",
+    "import",
+  ];
+  const showPackageDetailsSection = packageDetailFields.some((field) =>
+    template.fields.includes(field)
+  );
+  const showAccountStorageSection = template.fields.includes("capacity");
+  const showSectionGrid = showPackageDetailsSection || showAccountStorageSection;
   return (
     <ModalShell
       open={open}
-      title={`Add Package - ${template.name}`}
+      title={`${mode === "add" ? "Add" : "Edit"} Package - ${template.name}`}
       onClose={onClose}
       footer={
         <>
@@ -1056,76 +1273,197 @@ function AddPackageModal({
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            Save Package
+            {mode === "add" ? "Save Package" : "Save Changes"}
           </button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {template.fields.includes("information") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Package information
-            </label>
-            <textarea
-              value={values.information}
-              onChange={(e) => handleChange("information", e)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
-            />
-          </div>
-        )}
-        {template.fields.includes("note") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Note
-            </label>
-            <textarea
-              value={values.note}
-              onChange={(e) => handleChange("note", e)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-              rows={3}
-            />
-          </div>
-        )}
-        {template.fields.includes("supplier") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Supplier
-            </label>
-            <input
-              type="text"
-              value={values.supplier}
-              onChange={(e) => handleChange("supplier", e)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        )}
-        {template.fields.includes("import") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Import price (VND)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={values.import}
-              onChange={(e) => handleChange("import", e)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        )}
-        {template.fields.includes("expired") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Expired date
-            </label>
-            <input
-              type="date"
-              value={values.expired}
-              onChange={(e) => handleChange("expired", e)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+        {showSectionGrid && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {showPackageDetailsSection && (
+              <div className="border border-gray-200 rounded-lg p-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Package Information
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Enter the descriptive fields tied to this package.
+                  </p>
+                </div>
+                {template.fields.includes("information") && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          User
+                        </label>
+                        <input
+                          type="text"
+                          value={values.informationUser}
+                          onChange={(e) => handleChange("informationUser", e)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="username"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Pass
+                        </label>
+                        <input
+                          type="text"
+                          value={values.informationPass}
+                          onChange={(e) => handleChange("informationPass", e)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="password"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Mail 2nd
+                      </label>
+                      <input
+                        type="email"
+                        value={values.informationMail}
+                        onChange={(e) => handleChange("informationMail", e)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="secondary email"
+                      />
+                    </div>
+                  </div>
+                )}
+                {template.fields.includes("note") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Note
+                    </label>
+                    <input
+                      type="text"
+                      value={values.note}
+                      onChange={(e) => handleChange("note", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optional note"
+                    />
+                  </div>
+                )}
+                {template.fields.includes("supplier") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Supplier
+                    </label>
+                    <input
+                      type="text"
+                      value={values.supplier}
+                      onChange={(e) => handleChange("supplier", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                )}
+                {template.fields.includes("import") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Import price (VND)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={values.import}
+                      onChange={(e) => handleChange("import", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            {showAccountStorageSection && (
+              <div className="border border-gray-200 rounded-lg p-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Account Storage
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Provide credentials tied to this capacity-based package.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      User
+                    </label>
+                    <input
+                      type="text"
+                      value={values.accountUser}
+                      onChange={(e) => handleChange("accountUser", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="username"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Pass
+                    </label>
+                    <input
+                      type="text"
+                      value={values.accountPass}
+                      onChange={(e) => handleChange("accountPass", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Mail 2nd
+                    </label>
+                    <input
+                      type="email"
+                      value={values.accountMail}
+                      onChange={(e) => handleChange("accountMail", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="secondary email"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Note
+                  </label>
+                  <textarea
+                    value={values.accountNote}
+                    onChange={(e) => handleChange("accountNote", e)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                    placeholder="Account details note"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Capacity (total slots)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={values.capacity}
+                    onChange={(e) => handleChange("capacity", e)}
+                    placeholder={`Default ${DEFAULT_CAPACITY_LIMIT}`}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                {template.fields.includes("expired") && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Expired date
+                    </label>
+                    <input
+                      type="date"
+                      value={values.expired}
+                      onChange={(e) => handleChange("expired", e)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <div>
@@ -1141,21 +1479,6 @@ function AddPackageModal({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        {template.fields.includes("capacity") && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Capacity (total slots)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={values.capacity}
-              onChange={(e) => handleChange("capacity", e)}
-              placeholder={`Default ${DEFAULT_CAPACITY_LIMIT}`}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        )}
         {template.fields.length === 0 && (
           <p className="text-sm text-gray-500">
             This template does not have any configured fields.
