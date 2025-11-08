@@ -56,6 +56,7 @@ type OrderListItem = {
   san_pham?: string | null;
   thong_tin_san_pham?: string | null;
   slot?: string | null;
+  khach_hang?: string | null;
   [key: string]: unknown;
 };
 type PackageSlotAssignment = {
@@ -91,10 +92,12 @@ type NormalizedOrderRecord = {
   informationDisplay: string;
   informationKey: string;
   informationMatchKey: string;
+  customerDisplay: string;
 };
 type PackageTemplate = {
   name: string;
   fields: PackageField[];
+  isCustom?: boolean;
 };
 type PackageFormValues = {
   informationUser: string;
@@ -134,7 +137,7 @@ const EMPTY_FORM_VALUES: PackageFormValues = {
   capacity: "",
   slot: "",
   slotLinkMode: "information",
-  hasCapacity: true,
+  hasCapacity: false,
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "information", label: "Package information" },
@@ -144,6 +147,8 @@ const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "expired", label: "Expired date" },
   { value: "capacity", label: "Total capacity (slots)" },
 ];
+const stripCapacityFields = (fields: PackageField[]): PackageField[] =>
+  fields.filter((field) => field !== "capacity" && field !== "expired");
 const DEFAULT_SLOT_LIMIT = 5;
 const DEFAULT_CAPACITY_LIMIT = 2000;
 const DEFAULT_SLOT_CAPACITY_UNIT = 100;
@@ -223,6 +228,25 @@ const buildPackageLinkKeys = (row: PackageRow): string[] => {
   ];
   return Array.from(
     new Set(combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean))
+  );
+};
+const resolveOrderDisplayValue = (
+  record: NormalizedOrderRecord,
+  column: "slot" | "information"
+): string => {
+  if (column === "slot") {
+    return (
+      record.slotDisplay ||
+      record.customerDisplay ||
+      record.informationDisplay ||
+      ""
+    );
+  }
+  return (
+    record.informationDisplay ||
+    record.customerDisplay ||
+    record.slotDisplay ||
+    ""
   );
 };
 const extractDigitsValue = (text: string | null | undefined): number | null => {
@@ -353,7 +377,7 @@ const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValu
     capacity: capacityValue,
     slot: slotValue,
     slotLinkMode: row.slotLinkMode ?? "information",
-    hasCapacity: row.hasCapacityField ?? true,
+    hasCapacity: row.hasCapacityField ?? false,
   };
 };
 function PackageProduct() {
@@ -412,6 +436,14 @@ function PackageProduct() {
         if (!cancelled) {
           if (Array.isArray(data)) {
             const normalizedRows = data.map((row) => {
+              const normalizedCapacity =
+                row.capacity === undefined || row.capacity === null
+                  ? null
+                  : row.capacity;
+              const normalizedHasCapacity =
+                typeof row.hasCapacityField === "boolean"
+                  ? row.hasCapacityField
+                  : parseNumericValue(normalizedCapacity) !== null;
               const storedMode =
                 row.id !== undefined && row.id !== null
                   ? slotLinkPrefsRef.current[String(row.id)]
@@ -420,7 +452,8 @@ function PackageProduct() {
                 ...row,
                 slot: row.slot ?? DEFAULT_SLOT_LIMIT,
                 slotUsed: row.slotUsed ?? 0,
-                capacity: row.capacity ?? DEFAULT_CAPACITY_LIMIT,
+                capacity: normalizedCapacity,
+                hasCapacityField: normalizedHasCapacity,
                 slotLinkMode: storedMode ?? row.slotLinkMode ?? "information",
               };
             });
@@ -499,6 +532,7 @@ function PackageProduct() {
         informationDisplay: toCleanString(order.thong_tin_san_pham),
         informationKey: normalizeSlotKey(order.thong_tin_san_pham),
         informationMatchKey: normalizeMatchKey(order.thong_tin_san_pham),
+        customerDisplay: toCleanString(order.khach_hang as string | null),
       };
     });
   }, [orders]);
@@ -507,8 +541,32 @@ function PackageProduct() {
       const map = new Map(prev.map((tpl) => [tpl.name, tpl]));
       let changed = false;
       packageNames.forEach((name) => {
-        if (name && !map.has(name)) {
-          map.set(name, { name, fields: defaultTemplateFields });
+        if (!name) return;
+        const hasCapacityConfigured = rows.some(
+          (row) => row.package === name && row.hasCapacityField
+        );
+        const existing = map.get(name);
+        if (!existing) {
+          const inferredFields = hasCapacityConfigured
+            ? defaultTemplateFields
+            : stripCapacityFields(defaultTemplateFields);
+          map.set(name, {
+            name,
+            fields: inferredFields,
+            isCustom: false,
+          });
+          changed = true;
+          return;
+        }
+        if (
+          existing.isCustom !== true &&
+          !hasCapacityConfigured &&
+          existing.fields.some(
+            (field) => field === "capacity" || field === "expired"
+          )
+        ) {
+          const strippedFields = stripCapacityFields(existing.fields);
+          map.set(name, { ...existing, fields: strippedFields });
           changed = true;
         }
       });
@@ -517,7 +575,7 @@ function PackageProduct() {
         a.name.localeCompare(b.name)
       );
     });
-  }, [packageNames, defaultTemplateFields]);
+  }, [packageNames, rows, defaultTemplateFields]);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const packageParam = params.get("package");
@@ -550,20 +608,13 @@ function PackageProduct() {
   const computedRows: AugmentedRow[] = useMemo(
     () =>
       rows.map((item) => {
+        const includeCapacity = Boolean(item.hasCapacityField);
         const slotLimitRaw = parseNumericValue(item.slot);
         const slotLimit =
           slotLimitRaw && slotLimitRaw > 0
             ? Math.floor(slotLimitRaw)
             : DEFAULT_SLOT_LIMIT;
         const slotUsedRaw = parseNumericValue((item as PackageRow).slotUsed);
-        const capacityLimitRaw = parseNumericValue(item.capacity);
-        const capacityLimit =
-          capacityLimitRaw && capacityLimitRaw > 0
-            ? Math.floor(capacityLimitRaw)
-            : DEFAULT_CAPACITY_LIMIT;
-        const capacityUsedRaw = parseNumericValue(
-          (item as PackageRow).capacityUsed
-        );
         const packageCode = normalizeIdentifier(item.package);
         const packageLettersCode = packageCode.replace(/[0-9]/g, "");
         const slotMode = item.slotLinkMode ?? "information";
@@ -615,14 +666,16 @@ function PackageProduct() {
         const slotAssignments: PackageSlotAssignment[] = [];
         if (shouldMatchOrders) {
           relevantOrders.forEach((orderRecord) => {
-            const displayValue =
-              displayColumn === "slot"
-                ? orderRecord.slotDisplay
-                : orderRecord.informationDisplay;
-            const matchValue =
+            const displayValue = resolveOrderDisplayValue(
+              orderRecord,
+              displayColumn
+            );
+            const matchValueRaw =
               matchColumn === "slot"
                 ? orderRecord.slotDisplay
                 : orderRecord.informationDisplay;
+            const matchValue =
+              matchValueRaw || orderRecord.customerDisplay || "";
             const uniqueKey =
               orderRecord.base?.id !== undefined && orderRecord.base?.id !== null
                 ? `id:${orderRecord.base.id}`
@@ -634,10 +687,6 @@ function PackageProduct() {
             seenOrderIds.add(uniqueKey);
             const label = displayValue || matchValue;
             if (!label) return;
-            const capacityUnits = extractCapacityUnitsFromOrder(
-              packageCode,
-              orderRecord
-            );
             slotAssignments.push({
               slotLabel: label,
               matchValue,
@@ -647,7 +696,9 @@ function PackageProduct() {
                 null,
               displayColumn,
               matchColumn,
-              capacityUnits,
+              capacityUnits: includeCapacity
+                ? extractCapacityUnitsFromOrder(packageCode, orderRecord)
+                : null,
             });
           });
         }
@@ -659,30 +710,42 @@ function PackageProduct() {
             : 0;
         const slotUsed = Math.min(slotUsageCount, slotLimit);
         const remainingSlots = Math.max(slotLimit - slotUsed, 0);
-
-        const derivedCapacityUnits =
-          slotAssignments.length > 0
-            ? slotAssignments.reduce(
-                (total, assignment) =>
-                  total +
-                  (assignment.capacityUnits ?? DEFAULT_SLOT_CAPACITY_UNIT),
-                0
-              )
-            : slotUsageCount * DEFAULT_SLOT_CAPACITY_UNIT;
-        const fallbackCapacityUsed = Math.min(
-          derivedCapacityUnits,
-          capacityLimit
-        );
-        const capacityUsed = Math.min(
-          Math.max(
-            capacityUsedRaw !== null
-              ? Math.floor(capacityUsedRaw)
-              : fallbackCapacityUsed,
-            0
-          ),
-          capacityLimit
-        );
-        const remainingCapacity = Math.max(capacityLimit - capacityUsed, 0);
+        let capacityLimit = 0;
+        let capacityUsed = 0;
+        let remainingCapacity = 0;
+        if (includeCapacity) {
+          const capacityLimitRaw = parseNumericValue(item.capacity);
+          capacityLimit =
+            capacityLimitRaw && capacityLimitRaw > 0
+              ? Math.floor(capacityLimitRaw)
+              : DEFAULT_CAPACITY_LIMIT;
+          const capacityUsedRaw = parseNumericValue(
+            (item as PackageRow).capacityUsed
+          );
+          const derivedCapacityUnits =
+            slotAssignments.length > 0
+              ? slotAssignments.reduce(
+                  (total, assignment) =>
+                    total +
+                    (assignment.capacityUnits ?? DEFAULT_SLOT_CAPACITY_UNIT),
+                  0
+                )
+              : slotUsageCount * DEFAULT_SLOT_CAPACITY_UNIT;
+          const fallbackCapacityUsed = Math.min(
+            derivedCapacityUnits,
+            capacityLimit
+          );
+          capacityUsed = Math.min(
+            Math.max(
+              capacityUsedRaw !== null
+                ? Math.floor(capacityUsedRaw)
+                : fallbackCapacityUsed,
+              0
+            ),
+            capacityLimit
+          );
+          remainingCapacity = Math.max(capacityLimit - capacityUsed, 0);
+        }
         const matchedOrders = shouldMatchOrders
           ? relevantOrders.map((entry) => entry.base)
           : [];
@@ -730,6 +793,14 @@ function PackageProduct() {
       statusFilter === slotState;
     return matchesSearch && matchesCategory && matchesStatus;
   });
+  const hasCapacityRows = filteredRows.some(
+    (row) => row.hasCapacityField ?? false
+  );
+  const showCapacityColumn =
+    hasCapacityRows ||
+    (filteredRows.length === 0 &&
+      (selectedTemplate?.fields.includes("capacity") ?? false));
+  const tableColumnCount = showCapacityColumn ? 9 : 8;
   const slotStats = useMemo(
     () =>
       [
@@ -825,7 +896,7 @@ function PackageProduct() {
       if (!trimmed) return;
       setTemplates((prev) => {
         const next = prev.filter((tpl) => tpl.name !== trimmed);
-        next.push({ name: trimmed, fields });
+        next.push({ name: trimmed, fields, isCustom: true });
         return next.sort((a, b) => a.name.localeCompare(b.name));
       });
       setCreateModalOpen(false);
@@ -925,7 +996,10 @@ function PackageProduct() {
       const template =
         templates.find((tpl) => tpl.name === row.package) ?? {
           name: row.package,
-          fields: defaultTemplateFields,
+          fields: row.hasCapacityField
+            ? defaultTemplateFields
+            : stripCapacityFields(defaultTemplateFields),
+          isCustom: false,
         };
       setEditContext({
         rowId: row.id,
@@ -1222,9 +1296,11 @@ function PackageProduct() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Slot
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Capacity
-                    </th>
+                    {showCapacityColumn && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Capacity
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Supplier
                     </th>
@@ -1243,7 +1319,7 @@ function PackageProduct() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
                         Loading...
@@ -1252,7 +1328,7 @@ function PackageProduct() {
                   ) : filteredRows.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
                         No data
@@ -1313,6 +1389,8 @@ function PackageProduct() {
                           return { slotNumber, isUsed, assignment };
                         }
                       );
+                      const showRowCapacity =
+                        showCapacityColumn && !!item.hasCapacityField;
                       const isExpanded = expandedRowId === item.id;
                       return (
                         <React.Fragment key={`${item.id}-${idx}`}>
@@ -1345,22 +1423,32 @@ function PackageProduct() {
                               Available: {remainingSlots}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              <span className="font-medium">{capacityUsed}</span> / {capacityLimit}
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                              <div
-                                className={`h-2 rounded-full ${capacityColorClass}`}
-                                style={{
-                                  width: `${capacityAvailabilityRatio}%`,
-                                }}
-                              />
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Available: {remainingCapacity}
-                            </div>
-                          </td>
+                          {showCapacityColumn && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {showRowCapacity ? (
+                                <>
+                                  <div className="text-sm text-gray-900">
+                                    <span className="font-medium">{capacityUsed}</span> / {capacityLimit}
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                    <div
+                                      className={`h-2 rounded-full ${capacityColorClass}`}
+                                      style={{
+                                        width: `${capacityAvailabilityRatio}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Available: {remainingCapacity}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-sm text-gray-400 italic">
+                                  Capacity not configured
+                                </div>
+                              )}
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {item.supplier || ""}
                           </td>
@@ -1397,7 +1485,10 @@ function PackageProduct() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={9} className="bg-gray-50 px-6 py-4">
+                              <td
+                                colSpan={tableColumnCount}
+                                className="bg-gray-50 px-6 py-4"
+                              >
                                 <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-4 text-center">
                                   <div>
                                     <p className="text-sm font-semibold text-gray-900">
@@ -1456,7 +1547,7 @@ function PackageProduct() {
                                               : "text-green-700"
                                           }`}
                                         >
-                                          {slot.assignment
+                                          {slot.assignment && showRowCapacity
                                             ? formatCapacityLabel(
                                                 slot.assignment.capacityUnits
                                               )

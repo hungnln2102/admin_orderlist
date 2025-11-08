@@ -99,6 +99,11 @@ interface Order {
   [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
 }
 
+const STATUS_DISPLAY_LABELS: Record<string, string> = {
+  "het han": "Hết Hạn",
+  "can gia han": "Cần Gia Hạn",
+};
+
 const stockStats = [
   {
     name: "Tổng Đơn Hàng",
@@ -265,6 +270,13 @@ const useOrdersData = () => {
         .toLowerCase()
         .trim();
     };
+    const formatStatusDisplay = (value: string): string => {
+      const normalized = normalizeStatusValue(value);
+      if (normalized && STATUS_DISPLAY_LABELS[normalized]) {
+        return STATUS_DISPLAY_LABELS[normalized];
+      }
+      return value;
+    };
 
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
       const registrationSource =
@@ -291,9 +303,9 @@ const useOrdersData = () => {
           ? backendRemaining
           : fallbackRemaining ?? 0;
 
-      const trangThaiText = (
-        order[ORDER_FIELDS.TINH_TRANG] || "Chưa Thanh Toán"
-      ).trim();
+      const rawStatus =
+        (order[ORDER_FIELDS.TINH_TRANG] as string | null) || "Chưa Thanh Toán";
+      const trangThaiText = formatStatusDisplay(rawStatus.trim());
       const checkFlagStatus = normalizeCheckFlag(
         order[ORDER_FIELDS.CHECK_FLAG]
       );
