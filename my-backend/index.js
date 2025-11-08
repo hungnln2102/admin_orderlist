@@ -4,7 +4,7 @@ const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 
-const updateDatabaseTask = require("./scheduler");
+const { updateDatabaseTask, getSchedulerStatus } = require("./scheduler");
 const Helpers = require("./helpers");
 
 const app = express();
@@ -57,6 +57,50 @@ const normalizeDateInput = (value) => {
     if (!converted || String(converted).trim() === "") return null;
     return converted;
 };
+const toNullableNumber = (value) => {
+    if (value === undefined || value === null) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+const getNextAccountStorageId = async (client) => {
+    const result = await client.query(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.account_storage`
+    );
+    const nextId = Number(result.rows?.[0]?.next_id ?? 1);
+    return Number.isFinite(nextId) ? nextId : 1;
+};
+const fromDbNumber = (value) => {
+    if (value === undefined || value === null) return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+const formatDateOutput = (value) => {
+    if (!value) return null;
+    const dateValue = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(dateValue.getTime())) return null;
+    return dateValue.toISOString().slice(0, 10);
+};
+const summarizePackageInformation = (user, pass, mail) => {
+    return (
+        [
+            user && `User: ${user}`,
+            pass && `Pass: ${pass}`,
+            mail && `Mail 2nd: ${mail}`,
+        ]
+        .filter(Boolean)
+        .join(" | ") || null
+    );
+};
+const getRowId = (row, ...keys) => {
+    if (!row) return null;
+    for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null) {
+            const value = Number(row[key]);
+            if (Number.isFinite(value)) return value;
+        }
+    }
+    return null;
+};
 
 app.use(
     cors({
@@ -74,6 +118,71 @@ app.use(express.json());
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
+const PACKAGE_PRODUCTS_SELECT = `
+  SELECT
+    pp.id AS package_id,
+    pp.package AS package_name,
+    pp.username AS package_username,
+    pp.password AS package_password,
+    pp."mail 2nd" AS package_mail_2nd,
+    pp.note AS package_note,
+    pp.supplier AS package_supplier,
+    pp."Import" AS package_import,
+    acc.id AS account_id,
+    acc.username AS account_username,
+    acc.password AS account_password,
+    acc."Mail 2nd" AS account_mail_2nd,
+    acc.note AS account_note,
+    acc.storage AS account_storage,
+    acc.expired AS account_expired,
+    acc."Mail Family" AS account_mail_family
+  FROM mavryk.package_product pp
+  LEFT JOIN mavryk.account_storage acc
+    ON acc."Mail Family" = pp.username
+`;
+const mapPackageProductRow = (row) => {
+    const packageId = getRowId(row, "package_id", "id", "ID");
+    const informationUser = row.package_username ?? null;
+    const informationPass = row.package_password ?? null;
+    const informationMail = row.package_mail_2nd ?? null;
+    const informationSummary = summarizePackageInformation(
+        informationUser,
+        informationPass,
+        informationMail
+    );
+    const accountStorageId = getRowId(row, "account_id", "account_storage_id");
+    return {
+        id: packageId,
+        package: row.package_name || "",
+        information: informationSummary,
+        informationUser,
+        informationPass,
+        informationMail,
+        note: row.package_note ?? null,
+        supplier: row.package_supplier ?? null,
+        import: fromDbNumber(row.package_import),
+        accountStorageId,
+        accountUser: row.account_username ?? null,
+        accountPass: row.account_password ?? null,
+        accountMail: row.account_mail_2nd ?? null,
+        accountNote: row.account_note ?? null,
+        capacity: fromDbNumber(row.account_storage),
+        expired: formatDateOutput(row.account_expired),
+        slot: null,
+        slotUsed: null,
+        capacityUsed: null,
+    };
+};
+const fetchPackageProductById = async (client, id) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return null;
+    const result = await client.query(
+        `${PACKAGE_PRODUCTS_SELECT} WHERE pp.id = $1`,
+        [numericId]
+    );
+    if (!result.rows.length) return null;
+    return mapPackageProductRow(result.rows[0]);
+};
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
 const timezoneCandidate =
@@ -790,38 +899,301 @@ app.get("/api/products/all-prices-by-name/:productName", async(req, res) => {
 app.get("/api/run-scheduler", async(_req, res) => {
     console.log("[GET] /api/run-scheduler");
     try {
-        await updateDatabaseTask();
+        await updateDatabaseTask("manual");
         res.json({ success: true, message: "Cron job executed successfully." });
     } catch (error) {
         console.error("Cron job failed:", error);
         res.status(500).json({ error: "Unable to run scheduled task." });
     }
 });
+app.get("/api/scheduler/status", (_req, res) => {
+    const status = getSchedulerStatus();
+    res.json({
+        ...status,
+        lastRunAt: status.lastRunAt ? status.lastRunAt.toISOString() : null,
+    });
+});
 
 app.listen(port, () => {
     console.log(`Backend server running at http://localhost:${port}`);
 });
 
-// Package products: export data from mavryk.package_product
+// Package products: export data with account storage details
 app.get("/api/package-products", async (_req, res) => {
-  console.log("[GET] /api/package-products");
-  const q = `
-    SELECT 
-      "ID" AS id,
-      package,
-      information,
-      "Note" AS note,
-      "Supplier" AS supplier,
-      "Import" AS import,
-      ("Expired")::text AS expired
-    FROM mavryk.package_product
-    ORDER BY "ID";
-  `;
-  try {
-    const result = await pool.query(q);
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Query failed (GET /api/package-products):", error);
-    res.status(500).json({ error: "Unable to load package products." });
-  }
+    console.log("[GET] /api/package-products");
+    try {
+        const result = await pool.query(`${PACKAGE_PRODUCTS_SELECT} ORDER BY pp.id ASC`);
+        const rows = result.rows.map(mapPackageProductRow);
+        res.json(rows);
+    } catch (error) {
+        console.error("Query failed (GET /api/package-products):", error);
+        res.status(500).json({ error: "Unable to load package products." });
+    }
+});
+app.post("/api/package-products", async (req, res) => {
+    console.log("[POST] /api/package-products");
+    const {
+        packageName,
+        informationUser,
+        informationPass,
+        informationMail,
+        note,
+        supplier,
+        importPrice,
+        accountUser,
+        accountPass,
+        accountMail,
+        accountNote,
+        capacity,
+        expired,
+    } = req.body || {};
+    if (!packageName || typeof packageName !== "string") {
+        return res.status(400).json({ error: "Package name is required." });
+    }
+    const trimmedPackageName = packageName.trim();
+    if (!trimmedPackageName) {
+        return res.status(400).json({ error: "Package name cannot be empty." });
+    }
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const pkgResult = await client.query(
+            `
+        INSERT INTO mavryk.package_product
+          (package, username, password, "mail 2nd", note, supplier, "Import")
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id;
+      `,
+            [
+                trimmedPackageName,
+                informationUser || null,
+                informationPass || null,
+                informationMail || null,
+                note || null,
+                supplier || null,
+                toNullableNumber(importPrice),
+            ]
+        );
+        if (!pkgResult.rows.length) {
+            throw new Error("Package insert returned no rows.");
+        }
+        const packageId = getRowId(pkgResult.rows[0], "id", "ID");
+        if (packageId === null) {
+            throw new Error("Package insert returned invalid id.");
+        }
+        const hasAccountStoragePayload = Boolean(
+            accountUser ||
+            accountPass ||
+            accountMail ||
+            accountNote ||
+            capacity !== undefined ||
+            expired
+        );
+        const normalizedExpired = normalizeDateInput(expired);
+        const mailFamily = informationUser || null;
+        let createdAccountStorageId = null;
+        if (hasAccountStoragePayload) {
+            const nextStorageId = await getNextAccountStorageId(client);
+            await client.query(
+                `
+          INSERT INTO mavryk.account_storage
+            (id, username, password, "Mail 2nd", note, storage, expired, "Mail Family")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+        `,
+                [
+                    nextStorageId,
+                    accountUser || null,
+                    accountPass || null,
+                    accountMail || null,
+                    accountNote || null,
+                    toNullableNumber(capacity),
+                    normalizedExpired,
+                    mailFamily,
+                ]
+            );
+            createdAccountStorageId = nextStorageId;
+        }
+        const newRow = await fetchPackageProductById(client, packageId);
+        await client.query("COMMIT");
+        if (!newRow) {
+            const fallbackRow = mapPackageProductRow({
+                package_id: packageId,
+                package_name: trimmedPackageName,
+                package_username: informationUser || null,
+                package_password: informationPass || null,
+                package_mail_2nd: informationMail || null,
+                package_note: note || null,
+                package_supplier: supplier || null,
+                package_import: toNullableNumber(importPrice),
+                account_id: createdAccountStorageId,
+                account_username: accountUser || null,
+                account_password: accountPass || null,
+                account_mail_2nd: accountMail || null,
+                account_note: accountNote || null,
+                account_storage: toNullableNumber(capacity),
+                account_expired: normalizedExpired,
+                account_mail_family: mailFamily,
+            });
+            return res.status(201).json(fallbackRow);
+        }
+        res.status(201).json(newRow);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Insert failed (POST /api/package-products):", error);
+        res.status(500).json({ error: "Unable to create package product." });
+    } finally {
+        client.release();
+    }
+});
+app.put("/api/package-products/:id", async (req, res) => {
+    const { id } = req.params;
+    console.log(`[PUT] /api/package-products/${id}`);
+    if (!id) {
+        return res.status(400).json({ error: "Package product id is required." });
+    }
+    const {
+        packageName,
+        informationUser,
+        informationPass,
+        informationMail,
+        note,
+        supplier,
+        importPrice,
+        accountStorageId,
+        accountUser,
+        accountPass,
+        accountMail,
+        accountNote,
+        capacity,
+        expired,
+    } = req.body || {};
+    if (!packageName || typeof packageName !== "string") {
+        return res.status(400).json({ error: "Package name is required." });
+    }
+    const trimmedPackageName = packageName.trim();
+    if (!trimmedPackageName) {
+        return res.status(400).json({ error: "Package name cannot be empty." });
+    }
+    let storageIdNumber = null;
+    if (accountStorageId !== undefined && accountStorageId !== null && accountStorageId !== "") {
+        const parsed = Number(accountStorageId);
+        storageIdNumber = Number.isFinite(parsed) ? parsed : null;
+    }
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const pkgResult = await client.query(
+            `
+        UPDATE mavryk.package_product
+        SET package = $1,
+            username = $2,
+            password = $3,
+            "mail 2nd" = $4,
+            note = $5,
+            supplier = $6,
+            "Import" = $7
+        WHERE id = $8
+        RETURNING id;
+      `,
+            [
+                trimmedPackageName,
+                informationUser || null,
+                informationPass || null,
+                informationMail || null,
+                note || null,
+                supplier || null,
+                toNullableNumber(importPrice),
+                id,
+            ]
+        );
+        if (!pkgResult.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Package product not found." });
+        }
+        const packageId = getRowId(pkgResult.rows[0], "id", "ID");
+        const normalizedExpired = normalizeDateInput(expired);
+        const mailFamily = informationUser || null;
+        if (storageIdNumber) {
+            await client.query(
+                `
+          UPDATE mavryk.account_storage
+          SET username = $1,
+              password = $2,
+              "Mail 2nd" = $3,
+              note = $4,
+              storage = $5,
+              expired = $6,
+              "Mail Family" = $7
+          WHERE id = $8;
+        `,
+                [
+                    accountUser || null,
+                    accountPass || null,
+                    accountMail || null,
+                    accountNote || null,
+                    toNullableNumber(capacity),
+                    normalizedExpired,
+                    mailFamily,
+                    storageIdNumber,
+                ]
+            );
+        } else if (
+            accountUser ||
+            accountPass ||
+            accountMail ||
+            accountNote ||
+            capacity !== undefined ||
+            expired
+        ) {
+            const nextStorageId = await getNextAccountStorageId(client);
+            storageIdNumber = nextStorageId;
+            await client.query(
+                `
+          INSERT INTO mavryk.account_storage
+            (id, username, password, "Mail 2nd", note, storage, expired, "Mail Family")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+        `,
+                [
+                    nextStorageId,
+                    accountUser || null,
+                    accountPass || null,
+                    accountMail || null,
+                    accountNote || null,
+                    toNullableNumber(capacity),
+                    normalizedExpired,
+                    mailFamily,
+                ]
+            );
+        }
+        const updatedRow = await fetchPackageProductById(client, packageId ?? id);
+        await client.query("COMMIT");
+        if (!updatedRow) {
+            const fallbackRow = mapPackageProductRow({
+                package_id: packageId ?? id,
+                package_name: trimmedPackageName,
+                package_username: informationUser || null,
+                package_password: informationPass || null,
+                package_mail_2nd: informationMail || null,
+                package_note: note || null,
+                package_supplier: supplier || null,
+                package_import: toNullableNumber(importPrice),
+                account_id: storageIdNumber,
+                account_username: accountUser || null,
+                account_password: accountPass || null,
+                account_mail_2nd: accountMail || null,
+                account_note: accountNote || null,
+                account_storage: toNullableNumber(capacity),
+                account_expired: normalizedExpired,
+                account_mail_family: mailFamily,
+            });
+            return res.json(fallbackRow);
+        }
+        res.json(updatedRow);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error(`Update failed (PUT /api/package-products/${id}):`, error);
+        res.status(500).json({ error: "Unable to update package product." });
+    } finally {
+        client.release();
+    }
 });

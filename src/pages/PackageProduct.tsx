@@ -25,6 +25,7 @@ type PackageField =
   | "import"
   | "expired"
   | "capacity";
+type SlotLinkMode = "information" | "slot";
 type PackageRow = {
   id: number;
   package: string;
@@ -33,6 +34,7 @@ type PackageRow = {
   informationPass?: string | null;
   informationMail?: string | null;
   note: string | null;
+  accountStorageId?: number | null;
   accountUser?: string | null;
   accountPass?: string | null;
   accountMail?: string | null;
@@ -44,6 +46,7 @@ type PackageRow = {
   capacityUsed?: string | number | null;
   slot?: string | number | null;
   slotUsed?: string | number | null;
+  slotLinkMode?: SlotLinkMode;
 };
 type AugmentedRow = PackageRow & {
   slotUsed: number;
@@ -71,11 +74,13 @@ type PackageFormValues = {
   expired: string;
   capacity: string;
   slot: string;
+  slotLinkMode: SlotLinkMode;
 };
 type EditContext = {
   rowId: number;
   template: PackageTemplate;
   initialValues: PackageFormValues;
+  accountStorageId: number | null;
 };
 const EMPTY_FORM_VALUES: PackageFormValues = {
   informationUser: "",
@@ -91,6 +96,7 @@ const EMPTY_FORM_VALUES: PackageFormValues = {
   expired: "",
   capacity: "",
   slot: "",
+  slotLinkMode: "information",
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "information", label: "Package information" },
@@ -103,13 +109,41 @@ const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
 const DEFAULT_SLOT_LIMIT = 5;
 const DEFAULT_CAPACITY_LIMIT = 2000;
 const LOW_THRESHOLD_RATIO = 0.2;
+const LOW_SLOT_THRESHOLD = 2;
 type AvailabilityState = "ok" | "low" | "out";
-const getAvailabilityState = (remaining: number, limit: number): AvailabilityState => {
+const getCapacityAvailabilityState = (
+  remaining: number,
+  limit: number
+): AvailabilityState => {
   if (limit <= 0) return "out";
   if (remaining <= 0) return "out";
   const ratio = remaining / limit;
   return ratio <= LOW_THRESHOLD_RATIO ? "low" : "ok";
 };
+const getSlotAvailabilityState = (remaining: number): AvailabilityState => {
+  if (remaining <= 0) return "out";
+  if (remaining < LOW_SLOT_THRESHOLD) return "low";
+  return "ok";
+};
+type StatusFilter = "all" | "full" | "low" | "out";
+const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
+  { value: "all", label: "All statuses" },
+  { value: "full", label: "Full" },
+  { value: "low", label: "Low (<2 slots)" },
+  { value: "out", label: "Out" },
+];
+const SLOT_LINK_OPTIONS: Array<{ value: SlotLinkMode; label: string; helper: string }> = [
+  {
+    value: "information",
+    label: "Information Order",
+    helper: "Match order information fields",
+  },
+  {
+    value: "slot",
+    label: "Slot",
+    helper: "Match order slot identifiers",
+  },
+];
 const parseNumericValue = (input: unknown): number | null => {
   if (input === null || input === undefined) return null;
   if (typeof input === "number") {
@@ -126,6 +160,21 @@ const parseNumericValue = (input: unknown): number | null => {
 const toInputString = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   return typeof value === "string" ? value : String(value);
+};
+const buildInformationSummary = (
+  user?: string | null,
+  pass?: string | null,
+  mail?: string | null
+): string => {
+  return (
+    [
+      user && `User: ${user}`,
+      pass && `Pass: ${pass}`,
+      mail && `Mail 2nd: ${mail}`,
+    ]
+      .filter(Boolean)
+      .join(" | ") || ""
+  );
 };
 const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValues => {
   const slotValue =
@@ -150,11 +199,13 @@ const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValu
     expired: row.expired ?? "",
     capacity: capacityValue,
     slot: slotValue,
+    slotLinkMode: row.slotLinkMode ?? "information",
   };
 };
 function PackageProduct() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [rows, setRows] = useState<PackageRow[]>([]);
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -180,7 +231,19 @@ function PackageProduct() {
         const res = await apiFetch(`/api/package-products`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as PackageRow[];
-        setRows(Array.isArray(data) ? data : []);
+        if (Array.isArray(data)) {
+          setRows(
+            data.map((row) => ({
+              ...row,
+              slot: row.slot ?? DEFAULT_SLOT_LIMIT,
+              slotUsed: row.slotUsed ?? 0,
+              capacity: row.capacity ?? DEFAULT_CAPACITY_LIMIT,
+              slotLinkMode: row.slotLinkMode ?? "information",
+            }))
+          );
+        } else {
+          setRows([]);
+        }
       } catch (error) {
         console.error("Load package products failed:", error);
         setRows([]);
@@ -319,7 +382,12 @@ function PackageProduct() {
     const matchesSearch = name.includes(term) || sku.includes(term);
     const matchesCategory =
       categoryFilter === "all" || item.package === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const slotState = getSlotAvailabilityState(item.remainingSlots);
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "full" && slotState === "ok") ||
+      statusFilter === slotState;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
   const slotStats = useMemo(
     () =>
@@ -335,10 +403,7 @@ function PackageProduct() {
           value: String(
             scopedRows.reduce(
               (total, row) =>
-                getAvailabilityState(
-                  row.remainingSlots,
-                  row.slotLimit || DEFAULT_SLOT_LIMIT
-                ) === "low"
+                getSlotAvailabilityState(row.remainingSlots) === "low"
                   ? total + 1
                   : total,
               0
@@ -352,10 +417,7 @@ function PackageProduct() {
           value: String(
             scopedRows.reduce(
               (total, row) =>
-                getAvailabilityState(
-                  row.remainingSlots,
-                  row.slotLimit || DEFAULT_SLOT_LIMIT
-                ) === "out"
+                getSlotAvailabilityState(row.remainingSlots) === "out"
                   ? total + 1
                   : total,
               0
@@ -395,10 +457,7 @@ function PackageProduct() {
       const entry = stats.get(key);
       if (!entry) return;
       entry.total += 1;
-      const availability = getAvailabilityState(
-        row.remainingSlots,
-        row.slotLimit || DEFAULT_SLOT_LIMIT
-      );
+      const availability = getSlotAvailabilityState(row.remainingSlots);
       if (availability === "low") entry.low += 1;
       if (availability === "out") entry.out += 1;
     });
@@ -434,19 +493,15 @@ function PackageProduct() {
     [handleCategorySelect]
   );
   const handleAddSubmit = useCallback(
-    (values: PackageFormValues) => {
+    async (values: PackageFormValues) => {
       if (!selectedTemplate) return;
       const includeAccountStorage = selectedTemplate.fields.includes("capacity");
       const includePackageInfo = selectedTemplate.fields.includes("information");
-      const packageInfoSummary = includePackageInfo
-        ? [
-            values.informationUser && `User: ${values.informationUser}`,
-            values.informationPass && `Pass: ${values.informationPass}`,
-            values.informationMail && `Mail 2nd: ${values.informationMail}`,
-          ]
-            .filter(Boolean)
-            .join(" | ")
-        : "";
+      const includeNote = selectedTemplate.fields.includes("note");
+      const includeSupplier = selectedTemplate.fields.includes("supplier");
+      const includeImport = selectedTemplate.fields.includes("import");
+      const includeExpired =
+        includeAccountStorage && selectedTemplate.fields.includes("expired");
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
@@ -457,38 +512,50 @@ function PackageProduct() {
         parsedCapacityLimit !== null && parsedCapacityLimit > 0
           ? Math.floor(parsedCapacityLimit)
           : DEFAULT_CAPACITY_LIMIT;
-      const newRow: PackageRow = {
-        id: Date.now(),
-        package: selectedTemplate.name,
-        information: includePackageInfo ? packageInfoSummary || null : null,
+      const packageInfoSummary = includePackageInfo
+        ? buildInformationSummary(
+            values.informationUser || null,
+            values.informationPass || null,
+            values.informationMail || null
+          )
+        : "";
+      const payload = {
+        packageName: selectedTemplate.name,
         informationUser: includePackageInfo ? values.informationUser || null : null,
         informationPass: includePackageInfo ? values.informationPass || null : null,
         informationMail: includePackageInfo ? values.informationMail || null : null,
-        note: selectedTemplate.fields.includes("note")
-          ? values.note || null
-          : null,
+        note: includeNote ? values.note || null : null,
+        supplier: includeSupplier ? values.supplier || null : null,
+        importPrice: includeImport ? Number(values.import || 0) || 0 : null,
         accountUser: includeAccountStorage ? values.accountUser || null : null,
         accountPass: includeAccountStorage ? values.accountPass || null : null,
         accountMail: includeAccountStorage ? values.accountMail || null : null,
         accountNote: includeAccountStorage ? values.accountNote || null : null,
-        supplier: selectedTemplate.fields.includes("supplier")
-          ? values.supplier || null
-          : null,
-        import: selectedTemplate.fields.includes("import")
-          ? Number(values.import || 0) || 0
-          : 0,
-        expired: selectedTemplate.fields.includes("expired")
-          ? values.expired || null
-          : null,
-        slot: slotLimit,
-        slotUsed: 0,
-        capacity: selectedTemplate.fields.includes("capacity")
-          ? capacityLimit
-          : DEFAULT_CAPACITY_LIMIT,
-        capacityUsed: 0,
+        capacity: includeAccountStorage ? capacityLimit : null,
+        expired: includeExpired ? values.expired || null : null,
+        slotLinkMode: values.slotLinkMode,
       };
-      setRows((prev) => [...prev, newRow]);
-      setAddModalOpen(false);
+      try {
+        const res = await apiFetch(`/api/package-products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const created = (await res.json()) as PackageRow;
+        const mergedRow: PackageRow = {
+          ...created,
+          slot: slotLimit,
+          slotUsed: 0,
+          capacity: includeAccountStorage ? capacityLimit : created.capacity,
+          information: includePackageInfo ? packageInfoSummary || null : created.information,
+          slotLinkMode: values.slotLinkMode,
+        };
+        setRows((prev) => [...prev, mergedRow]);
+        setAddModalOpen(false);
+      } catch (error) {
+        console.error("Create package product failed:", error);
+      }
     },
     [selectedTemplate]
   );
@@ -518,6 +585,7 @@ function PackageProduct() {
         rowId: row.id,
         template,
         initialValues: buildFormValuesFromRow(row),
+        accountStorageId: row.accountStorageId ?? null,
       });
       setEditModalOpen(true);
     },
@@ -531,20 +599,16 @@ function PackageProduct() {
     setExpandedRowId((prev) => (prev === rowId ? null : rowId));
   }, []);
   const handleEditSubmit = useCallback(
-    (values: PackageFormValues) => {
+    async (values: PackageFormValues) => {
       if (!editContext) return;
-      const { template, rowId } = editContext;
+      const { template, rowId, accountStorageId } = editContext;
       const includeAccountStorage = template.fields.includes("capacity");
       const includePackageInfo = template.fields.includes("information");
-      const packageInfoSummary = includePackageInfo
-        ? [
-            values.informationUser && `User: ${values.informationUser}`,
-            values.informationPass && `Pass: ${values.informationPass}`,
-            values.informationMail && `Mail 2nd: ${values.informationMail}`,
-          ]
-            .filter(Boolean)
-            .join(" | ")
-        : "";
+      const includeNote = template.fields.includes("note");
+      const includeSupplier = template.fields.includes("supplier");
+      const includeImport = template.fields.includes("import");
+      const includeExpired =
+        includeAccountStorage && template.fields.includes("expired");
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
@@ -555,34 +619,52 @@ function PackageProduct() {
         parsedCapacityLimit !== null && parsedCapacityLimit > 0
           ? Math.floor(parsedCapacityLimit)
           : DEFAULT_CAPACITY_LIMIT;
-      setRows((prev) =>
-        prev.map((row) => {
-          if (row.id !== rowId) return row;
-          return {
-            ...row,
-            information: includePackageInfo ? packageInfoSummary || null : row.information,
-            informationUser: includePackageInfo ? values.informationUser || null : row.informationUser ?? null,
-            informationPass: includePackageInfo ? values.informationPass || null : row.informationPass ?? null,
-            informationMail: includePackageInfo ? values.informationMail || null : row.informationMail ?? null,
-            note: template.fields.includes("note") ? values.note || null : row.note,
-            supplier: template.fields.includes("supplier") ? values.supplier || null : row.supplier,
-            import: template.fields.includes("import")
-              ? Number(values.import || 0) || 0
-              : row.import,
-            expired:
-              includeAccountStorage && template.fields.includes("expired")
-                ? values.expired || null
-                : row.expired,
-            slot: slotLimit,
-            accountUser: includeAccountStorage ? values.accountUser || null : row.accountUser ?? null,
-            accountPass: includeAccountStorage ? values.accountPass || null : row.accountPass ?? null,
-            accountMail: includeAccountStorage ? values.accountMail || null : row.accountMail ?? null,
-            accountNote: includeAccountStorage ? values.accountNote || null : row.accountNote ?? null,
-            capacity: includeAccountStorage ? capacityLimit : row.capacity,
-          };
-        })
-      );
-      closeEditModal();
+      const packageInfoSummary = includePackageInfo
+        ? buildInformationSummary(
+            values.informationUser || null,
+            values.informationPass || null,
+            values.informationMail || null
+          )
+        : "";
+      const payload = {
+        packageName: template.name,
+        informationUser: includePackageInfo ? values.informationUser || null : null,
+        informationPass: includePackageInfo ? values.informationPass || null : null,
+        informationMail: includePackageInfo ? values.informationMail || null : null,
+        note: includeNote ? values.note || null : null,
+        supplier: includeSupplier ? values.supplier || null : null,
+        importPrice: includeImport ? Number(values.import || 0) || 0 : null,
+        expired: includeExpired ? values.expired || null : null,
+        accountStorageId: accountStorageId ?? null,
+        accountUser: includeAccountStorage ? values.accountUser || null : null,
+        accountPass: includeAccountStorage ? values.accountPass || null : null,
+        accountMail: includeAccountStorage ? values.accountMail || null : null,
+        accountNote: includeAccountStorage ? values.accountNote || null : null,
+        capacity: includeAccountStorage ? capacityLimit : null,
+        slotLinkMode: values.slotLinkMode,
+      };
+      try {
+        const res = await apiFetch(`/api/package-products/${rowId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const updated = (await res.json()) as PackageRow;
+        const mergedRow: PackageRow = {
+          ...updated,
+          slot: slotLimit,
+          capacity: includeAccountStorage ? capacityLimit : updated.capacity,
+          information: includePackageInfo ? packageInfoSummary || null : updated.information,
+          slotLinkMode: values.slotLinkMode,
+        };
+        setRows((prev) =>
+          prev.map((row) => (row.id === rowId ? mergedRow : row))
+        );
+        closeEditModal();
+      } catch (error) {
+        console.error(`Update package product ${rowId} failed:`, error);
+      }
     },
     [editContext, closeEditModal]
   );
@@ -733,14 +815,13 @@ function PackageProduct() {
                 />
               </div>
               <select
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={categoryFilter}
-                onChange={(e) => handleCategorySelect(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               >
-                <option value="all">All Packages</option>
-                {packageNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
+                {STATUS_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -760,6 +841,19 @@ function PackageProduct() {
               <span className="font-medium text-gray-900">
                 {selectedPackage ?? "All packages"}
               </span>
+              {statusFilter !== "all" && (
+                <>
+                  {" "}
+                  •{" "}
+                  <span className="font-medium text-gray-900">
+                    {
+                      STATUS_FILTERS.find(
+                        (option) => option.value === statusFilter
+                      )?.label
+                    }
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -827,10 +921,8 @@ function PackageProduct() {
                               100
                             )
                           : 0;
-                      const slotAvailabilityState = getAvailabilityState(
-                        remainingSlots,
-                        totalSlots
-                      );
+                      const slotAvailabilityState =
+                        getSlotAvailabilityState(remainingSlots);
                       const slotColorClass =
                         slotAvailabilityState === "out"
                           ? "bg-red-500"
@@ -849,7 +941,7 @@ function PackageProduct() {
                               100
                             )
                           : 0;
-                      const capacityAvailabilityState = getAvailabilityState(
+                      const capacityAvailabilityState = getCapacityAvailabilityState(
                         remainingCapacity,
                         capacityLimit
                       );
@@ -1228,7 +1320,7 @@ function PackageFormModal({
     }),
     [initialValues]
   );
-  const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
+const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
   useEffect(() => {
     if (open) {
       setValues(mergedInitialValues);
@@ -1245,6 +1337,9 @@ function PackageFormModal({
     e.preventDefault();
     onSubmit(values);
   };
+  const handleSlotLinkModeChange = (mode: SlotLinkMode) => {
+    setValues((prev) => ({ ...prev, slotLinkMode: mode }));
+  };
   const packageDetailFields: PackageField[] = [
     "information",
     "note",
@@ -1256,6 +1351,8 @@ function PackageFormModal({
   );
   const showAccountStorageSection = template.fields.includes("capacity");
   const showSectionGrid = showPackageDetailsSection || showAccountStorageSection;
+  const shouldUseTwoColumns =
+    showPackageDetailsSection && showAccountStorageSection;
   return (
     <ModalShell
       open={open}
@@ -1280,7 +1377,11 @@ function PackageFormModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {showSectionGrid && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div
+            className={`grid grid-cols-1 gap-4 ${
+              shouldUseTwoColumns ? "md:grid-cols-2" : ""
+            }`}
+          >
             {showPackageDetailsSection && (
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
@@ -1478,6 +1579,46 @@ function PackageFormModal({
             placeholder={`Default ${DEFAULT_SLOT_LIMIT}`}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-medium text-gray-700">
+                Package ↔ Order matching
+              </p>
+              <p className="text-xs text-gray-500">
+                Choose how slots are counted from orders.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {SLOT_LINK_OPTIONS.map((option) => {
+              const isSelected = values.slotLinkMode === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSlotLinkModeChange(option.value)}
+                  className={`border rounded-lg p-3 text-left transition ${
+                    isSelected
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 hover:border-blue-300 text-gray-700"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">
+                    {option.label}
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-1">
+                    {option.helper}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Information Order: compare package Information with order details.
+            Slot: compare package Information with order slot references.
+          </p>
         </div>
         {template.fields.length === 0 && (
           <p className="text-sm text-gray-500">

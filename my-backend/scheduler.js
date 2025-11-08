@@ -5,6 +5,15 @@ const { Pool } = require("pg");
 const cron = require("node-cron");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
+const schedulerTimezone =
+  typeof process.env.APP_TIMEZONE === "string" &&
+  /^[A-Za-z0-9_\/+\-]+$/.test(process.env.APP_TIMEZONE)
+    ? process.env.APP_TIMEZONE
+    : DEFAULT_TIMEZONE;
+const cronExpression = process.env.CRON_SCHEDULE || "1 0 * * *";
+const runOnStart = process.env.RUN_CRON_ON_START === "true";
+let lastRunAt = null;
 
 // Normalize mixed-format date columns to a proper DATE in SQL
 const normalizeDateSQL = (column) => `
@@ -53,10 +62,10 @@ const getSqlCurrentDate = () => {
  * - Remove them from order_list after moving
  * - Update status "Can Gia Han" for orders with 1..4 days left
  */
-const updateDatabaseTask = async () => {
+const updateDatabaseTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
   console.log(
-    `[CRON] Bat dau cap nhat don het han / can gia han (Date: ${
+    `[CRON] Bat dau cap nhat don het han / can gia han (Trigger: ${trigger}, Date: ${
       process.env.MOCK_DATE || "CURRENT_DATE"
     })...`
   );
@@ -181,6 +190,7 @@ const updateDatabaseTask = async () => {
 
     await client.query("COMMIT");
     console.log("[CRON] Hoan thanh cap nhat.");
+    lastRunAt = new Date();
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[CRON] Loi khi cap nhat:", err);
@@ -190,12 +200,36 @@ const updateDatabaseTask = async () => {
   }
 };
 
-// Schedule at 00:01 every day in Vietnam timezone
-cron.schedule("1 0 * * *", updateDatabaseTask, {
-  scheduled: true,
-  timezone: "Asia/Ho_Chi_Minh",
-});
+const runCronSafe = (source) =>
+  updateDatabaseTask(source).catch((err) =>
+    console.error(`[CRON] Failed during ${source}:`, err)
+  );
 
-console.log("[Scheduler] Da khoi dong. Cron 00:01 Asia/Ho_Chi_Minh");
+cron.schedule(
+  cronExpression,
+  () => runCronSafe("cron"),
+  {
+    scheduled: true,
+    timezone: schedulerTimezone,
+  }
+);
 
-module.exports = updateDatabaseTask;
+if (runOnStart) {
+  runCronSafe("startup");
+}
+
+console.log(
+  `[Scheduler] Da khoi dong. Cron ${cronExpression} ${schedulerTimezone}${
+    runOnStart ? " (run on start enabled)" : ""
+  }`
+);
+
+module.exports = {
+  updateDatabaseTask,
+  getSchedulerStatus: () => ({
+    timezone: schedulerTimezone,
+    cronExpression,
+    runOnStart,
+    lastRunAt,
+  }),
+};
