@@ -101,6 +101,36 @@ const getRowId = (row, ...keys) => {
     }
     return null;
 };
+const hasMeaningfulValue = (value) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    return true;
+};
+const hasAccountStoragePayload = (payload = {}) => {
+    const {
+        accountUser,
+        accountPass,
+        accountMail,
+        accountNote,
+        capacity,
+        expired,
+    } = payload;
+    if (
+        hasMeaningfulValue(accountUser) ||
+        hasMeaningfulValue(accountPass) ||
+        hasMeaningfulValue(accountMail) ||
+        hasMeaningfulValue(accountNote)
+    ) {
+        return true;
+    }
+    if (capacity !== undefined && capacity !== null && capacity !== "") {
+        return true;
+    }
+    if (expired !== undefined && expired !== null && String(expired).trim()) {
+        return true;
+    }
+    return false;
+};
 
 app.use(
     cors({
@@ -946,6 +976,7 @@ app.post("/api/package-products", async (req, res) => {
         accountNote,
         capacity,
         expired,
+        hasCapacityField,
     } = req.body || {};
     if (!packageName || typeof packageName !== "string") {
         return res.status(400).json({ error: "Package name is required." });
@@ -981,21 +1012,20 @@ app.post("/api/package-products", async (req, res) => {
         if (packageId === null) {
             throw new Error("Package insert returned invalid id.");
         }
-        const hasAccountStoragePayload = Boolean(
-            accountUser ||
-            accountPass ||
-            accountMail ||
-            accountNote ||
-            capacity !== undefined ||
-            expired
-        );
-        const normalizedExpired = normalizeDateInput(expired);
-        const mailFamily = informationUser || null;
-        let createdAccountStorageId = null;
-        if (hasAccountStoragePayload) {
-            const nextStorageId = await getNextAccountStorageId(client);
-            await client.query(
-                `
+    const normalizedExpired = normalizeDateInput(expired);
+    const mailFamily = informationUser || null;
+    let createdAccountStorageId = null;
+    if (hasAccountStoragePayload({
+        accountUser,
+        accountPass,
+        accountMail,
+        accountNote,
+        capacity,
+        expired,
+    })) {
+        const nextStorageId = await getNextAccountStorageId(client);
+        await client.query(
+            `
           INSERT INTO mavryk.account_storage
             (id, username, password, "Mail 2nd", note, storage, expired, "Mail Family")
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
@@ -1033,10 +1063,14 @@ app.post("/api/package-products", async (req, res) => {
                 account_storage: toNullableNumber(capacity),
                 account_expired: normalizedExpired,
                 account_mail_family: mailFamily,
+                has_capacity_field: Boolean(hasCapacityField),
             });
             return res.status(201).json(fallbackRow);
         }
-        res.status(201).json(newRow);
+        res.status(201).json({
+            ...newRow,
+            hasCapacityField: Boolean(hasCapacityField),
+        });
     } catch (error) {
         await client.query("ROLLBACK");
         console.error("Insert failed (POST /api/package-products):", error);
@@ -1066,6 +1100,7 @@ app.put("/api/package-products/:id", async (req, res) => {
         accountNote,
         capacity,
         expired,
+        hasCapacityField,
     } = req.body || {};
     if (!packageName || typeof packageName !== "string") {
         return res.status(400).json({ error: "Package name is required." });
@@ -1113,7 +1148,15 @@ app.put("/api/package-products/:id", async (req, res) => {
         const packageId = getRowId(pkgResult.rows[0], "id", "ID");
         const normalizedExpired = normalizeDateInput(expired);
         const mailFamily = informationUser || null;
-        if (storageIdNumber) {
+        const shouldUpsertAccountStorage = hasAccountStoragePayload({
+            accountUser,
+            accountPass,
+            accountMail,
+            accountNote,
+            capacity,
+            expired,
+        });
+        if (storageIdNumber && shouldUpsertAccountStorage) {
             await client.query(
                 `
           UPDATE mavryk.account_storage
@@ -1137,14 +1180,7 @@ app.put("/api/package-products/:id", async (req, res) => {
                     storageIdNumber,
                 ]
             );
-        } else if (
-            accountUser ||
-            accountPass ||
-            accountMail ||
-            accountNote ||
-            capacity !== undefined ||
-            expired
-        ) {
+        } else if (!storageIdNumber && shouldUpsertAccountStorage) {
             const nextStorageId = await getNextAccountStorageId(client);
             storageIdNumber = nextStorageId;
             await client.query(
@@ -1185,10 +1221,14 @@ app.put("/api/package-products/:id", async (req, res) => {
                 account_storage: toNullableNumber(capacity),
                 account_expired: normalizedExpired,
                 account_mail_family: mailFamily,
+                has_capacity_field: Boolean(hasCapacityField),
             });
             return res.json(fallbackRow);
         }
-        res.json(updatedRow);
+        res.json({
+            ...updatedRow,
+            hasCapacityField: Boolean(hasCapacityField),
+        });
     } catch (error) {
         await client.query("ROLLBACK");
         console.error(`Update failed (PUT /api/package-products/${id}):`, error);

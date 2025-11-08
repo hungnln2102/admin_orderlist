@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -47,6 +48,24 @@ type PackageRow = {
   slot?: string | number | null;
   slotUsed?: string | number | null;
   slotLinkMode?: SlotLinkMode;
+  hasCapacityField?: boolean;
+};
+type OrderListItem = {
+  id?: number | string | null;
+  id_don_hang?: string | number | null;
+  san_pham?: string | null;
+  thong_tin_san_pham?: string | null;
+  slot?: string | null;
+  [key: string]: unknown;
+};
+type PackageSlotAssignment = {
+  slotLabel: string;
+  matchValue?: string | null;
+  sourceOrderId?: number | string | null;
+  sourceOrderCode?: string | number | null;
+  displayColumn: "slot" | "information";
+  matchColumn: "slot" | "information";
+  capacityUnits?: number | null;
 };
 type AugmentedRow = PackageRow & {
   slotUsed: number;
@@ -55,6 +74,23 @@ type AugmentedRow = PackageRow & {
   capacityLimit: number;
   capacityUsed: number;
   remainingCapacity: number;
+  slotAssignments: PackageSlotAssignment[];
+  matchedOrders: OrderListItem[];
+  packageCode: string;
+  hasCapacityField: boolean;
+};
+type NormalizedOrderRecord = {
+  base: OrderListItem;
+  productKey: string;
+  productLettersKey: string;
+  infoKey: string;
+  infoLettersKey: string;
+  slotDisplay: string;
+  slotKey: string;
+  slotMatchKey: string;
+  informationDisplay: string;
+  informationKey: string;
+  informationMatchKey: string;
 };
 type PackageTemplate = {
   name: string;
@@ -75,6 +111,7 @@ type PackageFormValues = {
   capacity: string;
   slot: string;
   slotLinkMode: SlotLinkMode;
+  hasCapacity: boolean;
 };
 type EditContext = {
   rowId: number;
@@ -97,6 +134,7 @@ const EMPTY_FORM_VALUES: PackageFormValues = {
   capacity: "",
   slot: "",
   slotLinkMode: "information",
+  hasCapacity: true,
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "information", label: "Package information" },
@@ -108,6 +146,7 @@ const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
 ];
 const DEFAULT_SLOT_LIMIT = 5;
 const DEFAULT_CAPACITY_LIMIT = 2000;
+const DEFAULT_SLOT_CAPACITY_UNIT = 100;
 const LOW_THRESHOLD_RATIO = 0.2;
 const LOW_SLOT_THRESHOLD = 2;
 type AvailabilityState = "ok" | "low" | "out";
@@ -124,6 +163,120 @@ const getSlotAvailabilityState = (remaining: number): AvailabilityState => {
   if (remaining <= 0) return "out";
   if (remaining < LOW_SLOT_THRESHOLD) return "low";
   return "ok";
+};
+const normalizeIdentifier = (value: string | null | undefined): string => {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+};
+const buildIdentifierKeys = (value: string | null | undefined) => {
+  const normalized = normalizeIdentifier(value);
+  return {
+    normalized,
+    lettersOnly: normalized.replace(/[0-9]/g, ""),
+  };
+};
+const toCleanString = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  const str = typeof value === "string" ? value : String(value);
+  return str.trim();
+};
+const normalizeSlotKey = (value: unknown): string => {
+  const cleaned = toCleanString(value);
+  return cleaned ? cleaned.replace(/\s+/g, " ").trim().toLowerCase() : "";
+};
+const normalizeMatchKey = (value: string | null | undefined): string => {
+  const trimmed = toCleanString(value);
+  return trimmed ? trimmed.toLowerCase().replace(/\s+/g, "") : "";
+};
+const extractInfoTokens = (value: string | null | undefined): string[] => {
+  if (!value) return [];
+  return value
+    .split(/[|,]/)
+    .map((segment) => {
+      const trimmed = toCleanString(segment);
+      if (!trimmed) return "";
+      const parts = trimmed.split(":");
+      return toCleanString(parts.length > 1 ? parts.slice(1).join(":") : trimmed);
+    })
+    .filter(Boolean);
+};
+const buildPackageLinkKeys = (row: PackageRow): string[] => {
+  const directCandidates: string[] = [
+    row.informationUser ?? "",
+    row.informationMail ?? "",
+    row.informationPass ?? "",
+    row.accountUser ?? "",
+    row.accountMail ?? "",
+    row.accountPass ?? "",
+  ]
+    .map(toCleanString)
+    .filter(Boolean);
+  const summaryCandidates = extractInfoTokens(row.information);
+  const noteCandidates = extractInfoTokens(row.note);
+  const accountNoteCandidates = extractInfoTokens(row.accountNote);
+  const combined = [
+    ...directCandidates,
+    ...summaryCandidates,
+    ...noteCandidates,
+    ...accountNoteCandidates,
+  ];
+  return Array.from(
+    new Set(combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean))
+  );
+};
+const extractDigitsValue = (text: string | null | undefined): number | null => {
+  if (!text) return null;
+  const match = text.match(/(\d{2,4})/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+};
+const extractCapacityUnitsFromOrder = (
+  packageCode: string,
+  record: NormalizedOrderRecord
+): number | null => {
+  const normalizedProduct = record.productKey;
+  let remainder = normalizedProduct;
+  if (packageCode) {
+    const idx = remainder.indexOf(packageCode);
+    if (idx >= 0) {
+      remainder = remainder.slice(idx + packageCode.length);
+    }
+  }
+  const normalizedValue = extractDigitsValue(remainder);
+  if (normalizedValue) return normalizedValue;
+  const fallbackNormalized = normalizeIdentifier(record.base?.san_pham ?? "");
+  return extractDigitsValue(fallbackNormalized);
+};
+const formatCapacityLabel = (units?: number | null): string => {
+  const value =
+    units && Number.isFinite(units) && units > 0
+      ? Math.round(units)
+      : DEFAULT_SLOT_CAPACITY_UNIT;
+  return `${value} GB`;
+};
+type SlotLinkPreferenceMap = Record<string, SlotLinkMode>;
+const SLOT_LINK_PREFS_KEY = "package_slot_link_prefs";
+const readSlotLinkPrefs = (): SlotLinkPreferenceMap => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SLOT_LINK_PREFS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed;
+    return {};
+  } catch {
+    return {};
+  }
+};
+const writeSlotLinkPrefs = (prefs: SlotLinkPreferenceMap) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SLOT_LINK_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    /* ignore */
+  }
 };
 type StatusFilter = "all" | "full" | "low" | "out";
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
@@ -200,6 +353,7 @@ const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValu
     capacity: capacityValue,
     slot: slotValue,
     slotLinkMode: row.slotLinkMode ?? "information",
+    hasCapacity: row.hasCapacityField ?? true,
   };
 };
 function PackageProduct() {
@@ -207,8 +361,15 @@ function PackageProduct() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [rows, setRows] = useState<PackageRow[]>([]);
+  const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [packagesLoading, setPackagesLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersReady, setOrdersReady] = useState(false);
+  const [slotLinkPrefs, setSlotLinkPrefs] = useState<SlotLinkPreferenceMap>(
+    () => readSlotLinkPrefs()
+  );
+  const slotLinkPrefsRef = useRef(slotLinkPrefs);
   const [templates, setTemplates] = useState<PackageTemplate[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createInitialName, setCreateInitialName] = useState("");
@@ -220,42 +381,127 @@ function PackageProduct() {
   const [editContext, setEditContext] = useState<EditContext | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const loading = packagesLoading || ordersLoading;
+  useEffect(() => {
+    slotLinkPrefsRef.current = slotLinkPrefs;
+  }, [slotLinkPrefs]);
+  const persistSlotLinkPreference = useCallback(
+    (id: number | string, mode: SlotLinkMode) => {
+      const key = String(id);
+      setSlotLinkPrefs((prev) => {
+        if (prev[key] === mode) return prev;
+        const next = { ...prev, [key]: mode };
+        writeSlotLinkPrefs(next);
+        return next;
+      });
+    },
+    []
+  );
   const defaultTemplateFields = useMemo(
     () => PACKAGE_FIELD_OPTIONS.map((opt) => opt.value),
     []
   );
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        setLoading(true);
+        setPackagesLoading(true);
         const res = await apiFetch(`/api/package-products`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as PackageRow[];
-        if (Array.isArray(data)) {
-          setRows(
-            data.map((row) => ({
-              ...row,
-              slot: row.slot ?? DEFAULT_SLOT_LIMIT,
-              slotUsed: row.slotUsed ?? 0,
-              capacity: row.capacity ?? DEFAULT_CAPACITY_LIMIT,
-              slotLinkMode: row.slotLinkMode ?? "information",
-            }))
-          );
-        } else {
-          setRows([]);
+        if (!cancelled) {
+          if (Array.isArray(data)) {
+            const normalizedRows = data.map((row) => {
+              const storedMode =
+                row.id !== undefined && row.id !== null
+                  ? slotLinkPrefsRef.current[String(row.id)]
+                  : undefined;
+              return {
+                ...row,
+                slot: row.slot ?? DEFAULT_SLOT_LIMIT,
+                slotUsed: row.slotUsed ?? 0,
+                capacity: row.capacity ?? DEFAULT_CAPACITY_LIMIT,
+                slotLinkMode: storedMode ?? row.slotLinkMode ?? "information",
+              };
+            });
+            setRows(
+              normalizedRows
+            );
+          } else {
+            setRows([]);
+          }
         }
       } catch (error) {
         console.error("Load package products failed:", error);
-        setRows([]);
+        if (!cancelled) {
+          setRows([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setPackagesLoading(false);
+        }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setOrdersLoading(true);
+        setOrdersReady(false);
+        const res = await apiFetch(`/api/orders`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as OrderListItem[];
+        if (!cancelled) {
+          if (Array.isArray(data)) {
+            setOrders(data);
+          } else {
+            setOrders([]);
+          }
+          setOrdersReady(true);
+        }
+      } catch (error) {
+        console.error("Load order list failed:", error);
+        if (!cancelled) {
+          setOrders([]);
+          setOrdersReady(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setOrdersLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   const packageNames = useMemo(
     () => Array.from(new Set(rows.map((row) => row.package))).sort(),
     [rows]
   );
+  const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
+    return orders.map((order) => {
+      const productKeys = buildIdentifierKeys(order.san_pham ?? "");
+      const infoKeys = buildIdentifierKeys(order.thong_tin_san_pham ?? "");
+      return {
+        base: order,
+        productKey: productKeys.normalized,
+        productLettersKey: productKeys.lettersOnly,
+        infoKey: infoKeys.normalized,
+        infoLettersKey: infoKeys.lettersOnly,
+        slotDisplay: toCleanString(order.slot),
+        slotKey: normalizeSlotKey(order.slot),
+        slotMatchKey: normalizeMatchKey(order.slot),
+        informationDisplay: toCleanString(order.thong_tin_san_pham),
+        informationKey: normalizeSlotKey(order.thong_tin_san_pham),
+        informationMatchKey: normalizeMatchKey(order.thong_tin_san_pham),
+      };
+    });
+  }, [orders]);
   useEffect(() => {
     setTemplates((prev) => {
       const map = new Map(prev.map((tpl) => [tpl.name, tpl]));
@@ -303,26 +549,13 @@ function PackageProduct() {
   );
   const computedRows: AugmentedRow[] = useMemo(
     () =>
-      rows.map((item, idx) => {
+      rows.map((item) => {
         const slotLimitRaw = parseNumericValue(item.slot);
         const slotLimit =
           slotLimitRaw && slotLimitRaw > 0
             ? Math.floor(slotLimitRaw)
             : DEFAULT_SLOT_LIMIT;
-        const slotUsedRaw = parseNumericValue(
-          (item as PackageRow).slotUsed
-        );
-        const fallbackSlotUsed =
-          slotLimit > 0 ? Math.min(idx % (slotLimit + 1), slotLimit) : 0;
-        const slotUsed = Math.min(
-          Math.max(
-            slotUsedRaw !== null ? Math.floor(slotUsedRaw) : fallbackSlotUsed,
-            0
-          ),
-          slotLimit
-        );
-        const remainingSlots = Math.max(slotLimit - slotUsed, 0);
-
+        const slotUsedRaw = parseNumericValue((item as PackageRow).slotUsed);
         const capacityLimitRaw = parseNumericValue(item.capacity);
         const capacityLimit =
           capacityLimitRaw && capacityLimitRaw > 0
@@ -331,8 +564,113 @@ function PackageProduct() {
         const capacityUsedRaw = parseNumericValue(
           (item as PackageRow).capacityUsed
         );
+        const packageCode = normalizeIdentifier(item.package);
+        const packageLettersCode = packageCode.replace(/[0-9]/g, "");
+        const slotMode = item.slotLinkMode ?? "information";
+        const displayColumn = slotMode === "information" ? "slot" : "information";
+        const matchColumn = displayColumn === "slot" ? "information" : "slot";
+        const packageLinkKeys = buildPackageLinkKeys(item);
+        const shouldMatchOrders =
+          ordersReady && packageCode.length > 0 && orderMatchers.length > 0;
+        const matchesProductRecord = (record: NormalizedOrderRecord) => {
+          if (!packageCode) return false;
+          const productMatch =
+            (!!record.productKey &&
+              (record.productKey.startsWith(packageCode) ||
+                record.productKey.includes(packageCode))) ||
+            (!!packageLettersCode &&
+              !!record.productLettersKey &&
+              (record.productLettersKey.startsWith(packageLettersCode) ||
+                record.productLettersKey.includes(packageLettersCode)));
+          const infoMatch =
+            (!!record.infoKey &&
+              (record.infoKey.startsWith(packageCode) ||
+                record.infoKey.includes(packageCode))) ||
+            (!!packageLettersCode &&
+              !!record.infoLettersKey &&
+              (record.infoLettersKey.startsWith(packageLettersCode) ||
+                record.infoLettersKey.includes(packageLettersCode)));
+          return productMatch || infoMatch;
+        };
+        const matchesLinkRecord = (record: NormalizedOrderRecord) => {
+          if (packageLinkKeys.length === 0) return true;
+          const linkValue =
+            matchColumn === "slot"
+              ? record.slotMatchKey
+              : record.informationMatchKey;
+          if (!linkValue) return false;
+          return packageLinkKeys.some(
+            (pkgKey) =>
+              pkgKey === linkValue ||
+              pkgKey.includes(linkValue) ||
+              linkValue.includes(pkgKey)
+          );
+        };
+        const relevantOrders = shouldMatchOrders
+          ? orderMatchers.filter(
+              (record) => matchesProductRecord(record) && matchesLinkRecord(record)
+            )
+          : [];
+        const seenOrderIds = new Set<string>();
+        const slotAssignments: PackageSlotAssignment[] = [];
+        if (shouldMatchOrders) {
+          relevantOrders.forEach((orderRecord) => {
+            const displayValue =
+              displayColumn === "slot"
+                ? orderRecord.slotDisplay
+                : orderRecord.informationDisplay;
+            const matchValue =
+              matchColumn === "slot"
+                ? orderRecord.slotDisplay
+                : orderRecord.informationDisplay;
+            const uniqueKey =
+              orderRecord.base?.id !== undefined && orderRecord.base?.id !== null
+                ? `id:${orderRecord.base.id}`
+                : orderRecord.base?.id_don_hang !== undefined &&
+                  orderRecord.base?.id_don_hang !== null
+                ? `code:${orderRecord.base.id_don_hang}`
+                : `${matchValue}-${slotAssignments.length}`;
+            if (seenOrderIds.has(uniqueKey)) return;
+            seenOrderIds.add(uniqueKey);
+            const label = displayValue || matchValue;
+            if (!label) return;
+            const capacityUnits = extractCapacityUnitsFromOrder(
+              packageCode,
+              orderRecord
+            );
+            slotAssignments.push({
+              slotLabel: label,
+              matchValue,
+              sourceOrderId: orderRecord.base?.id ?? null,
+              sourceOrderCode:
+                (orderRecord.base?.id_don_hang as string | number | null) ??
+                null,
+              displayColumn,
+              matchColumn,
+              capacityUnits,
+            });
+          });
+        }
+        const slotUsageCount =
+          slotAssignments.length > 0
+            ? slotAssignments.length
+            : slotUsedRaw !== null
+            ? Math.max(Math.floor(slotUsedRaw), 0)
+            : 0;
+        const slotUsed = Math.min(slotUsageCount, slotLimit);
+        const remainingSlots = Math.max(slotLimit - slotUsed, 0);
+
+        const derivedCapacityUnits =
+          slotAssignments.length > 0
+            ? slotAssignments.reduce(
+                (total, assignment) =>
+                  total +
+                  (assignment.capacityUnits ?? DEFAULT_SLOT_CAPACITY_UNIT),
+                0
+              )
+            : slotUsageCount * DEFAULT_SLOT_CAPACITY_UNIT;
         const fallbackCapacityUsed = Math.min(
-          slotUsed * 100,
+          derivedCapacityUnits,
           capacityLimit
         );
         const capacityUsed = Math.min(
@@ -344,10 +682,10 @@ function PackageProduct() {
           ),
           capacityLimit
         );
-        const remainingCapacity = Math.max(
-          capacityLimit - capacityUsed,
-          0
-        );
+        const remainingCapacity = Math.max(capacityLimit - capacityUsed, 0);
+        const matchedOrders = shouldMatchOrders
+          ? relevantOrders.map((entry) => entry.base)
+          : [];
         return {
           ...item,
           slotUsed,
@@ -356,9 +694,12 @@ function PackageProduct() {
           capacityLimit,
           capacityUsed,
           remainingCapacity,
+          slotAssignments,
+          matchedOrders,
+          packageCode,
         };
       }),
-    [rows]
+    [rows, orderMatchers, ordersReady]
   );
   const selectedPackage = categoryFilter !== "all" ? categoryFilter : null;
   const selectedTemplate = useMemo(
@@ -532,6 +873,7 @@ function PackageProduct() {
         accountMail: includeAccountStorage ? values.accountMail || null : null,
         accountNote: includeAccountStorage ? values.accountNote || null : null,
         capacity: includeAccountStorage ? capacityLimit : null,
+        hasCapacityField: includeAccountStorage,
         expired: includeExpired ? values.expired || null : null,
         slotLinkMode: values.slotLinkMode,
       };
@@ -550,14 +892,18 @@ function PackageProduct() {
           capacity: includeAccountStorage ? capacityLimit : created.capacity,
           information: includePackageInfo ? packageInfoSummary || null : created.information,
           slotLinkMode: values.slotLinkMode,
+          hasCapacityField: includeAccountStorage,
         };
         setRows((prev) => [...prev, mergedRow]);
+        if (created.id !== undefined && created.id !== null) {
+          persistSlotLinkPreference(created.id, values.slotLinkMode);
+        }
         setAddModalOpen(false);
       } catch (error) {
         console.error("Create package product failed:", error);
       }
     },
-    [selectedTemplate]
+    [persistSlotLinkPreference, selectedTemplate]
   );
   const handleCreateButtonClick = () => {
     if (selectedPackage && selectedTemplate) {
@@ -641,6 +987,7 @@ function PackageProduct() {
         accountMail: includeAccountStorage ? values.accountMail || null : null,
         accountNote: includeAccountStorage ? values.accountNote || null : null,
         capacity: includeAccountStorage ? capacityLimit : null,
+        hasCapacityField: includeAccountStorage,
         slotLinkMode: values.slotLinkMode,
       };
       try {
@@ -657,16 +1004,18 @@ function PackageProduct() {
           capacity: includeAccountStorage ? capacityLimit : updated.capacity,
           information: includePackageInfo ? packageInfoSummary || null : updated.information,
           slotLinkMode: values.slotLinkMode,
+          hasCapacityField: includeAccountStorage,
         };
         setRows((prev) =>
           prev.map((row) => (row.id === rowId ? mergedRow : row))
         );
+        persistSlotLinkPreference(rowId, values.slotLinkMode);
         closeEditModal();
       } catch (error) {
         console.error(`Update package product ${rowId} failed:`, error);
       }
     },
-    [editContext, closeEditModal]
+    [editContext, closeEditModal, persistSlotLinkPreference]
   );
   return (
     <div className="space-y-6">
@@ -951,12 +1300,17 @@ function PackageProduct() {
                           : capacityAvailabilityState === "low"
                           ? "bg-yellow-500"
                           : "bg-green-500";
+                      const usedWithinLimit = Math.min(slotUsed, totalSlots);
+                      const slotAssignments = item.slotAssignments ?? [];
+                      const slotLinkMode = item.slotLinkMode ?? "information";
                       const slotCells = Array.from(
                         { length: Math.max(totalSlots, 0) },
                         (_, slotIdx) => {
                           const slotNumber = slotIdx + 1;
-                          const isUsed = slotNumber <= slotUsed;
-                          return { slotNumber, isUsed };
+                          const isUsed = slotNumber <= usedWithinLimit;
+                          const assignment =
+                            slotAssignments[slotNumber - 1] ?? null;
+                          return { slotNumber, isUsed, assignment };
                         }
                       );
                       const isExpanded = expandedRowId === item.id;
@@ -1053,6 +1407,19 @@ function PackageProduct() {
                                       Showing {totalSlots} slots — {slotUsed} used,{" "}
                                       {remainingSlots} available
                                     </p>
+                                    {slotAssignments.length > 0 ? (
+                                      <p className="text-xs text-blue-600 mt-1">
+                                        Matched {slotAssignments.length} order
+                                        {slotAssignments.length > 1 ? "s" : ""} via{" "}
+                                        {slotLinkMode === "information"
+                                          ? "Order slot column"
+                                          : "Order information column"}
+                                      </p>
+                                    ) : (
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        No matched orders for this package name.
+                                      </p>
+                                    )}
                                   </div>
                                   <div className="flex flex-wrap justify-center gap-3">
                                     {slotCells.map((slot) => (
@@ -1063,6 +1430,10 @@ function PackageProduct() {
                                             ? "border-yellow-300 bg-yellow-50"
                                             : "border-green-200 bg-green-50"
                                         }`}
+                                        title={
+                                          slot.assignment?.matchValue ||
+                                          undefined
+                                        }
                                       >
                                         <div className="flex items-center gap-2">
                                           <BoltIcon
@@ -1073,7 +1444,9 @@ function PackageProduct() {
                                             }`}
                                           />
                                           <span className="text-sm font-semibold text-gray-900">
-                                            Slot {slot.slotNumber}
+                                            {slot.assignment?.slotLabel
+                                              ? slot.assignment.slotLabel
+                                              : `Slot ${slot.slotNumber}`}
                                           </span>
                                         </div>
                                         <p
@@ -1083,7 +1456,13 @@ function PackageProduct() {
                                               : "text-green-700"
                                           }`}
                                         >
-                                          {slot.isUsed ? "Used" : "Available"}
+                                          {slot.assignment
+                                            ? formatCapacityLabel(
+                                                slot.assignment.capacityUnits
+                                              )
+                                            : slot.isUsed
+                                            ? "Used"
+                                            : "Available"}
                                         </p>
                                       </div>
                                     ))}
