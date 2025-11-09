@@ -1,143 +1,250 @@
-import React, { useState } from "react";
-import {
-  MagnifyingGlassIcon,
-  PlusIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  MapPinIcon,
-  StarIcon,
-} from "@heroicons/react/24/outline";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { apiFetch } from "../lib/api";
+import * as Helpers from "../lib/helpers";
 
-const sources = [
-  {
-    id: "SUP-001",
-    name: "Apple Store Vietnam",
-    category: "Điện tử",
-    contact: "Nguyễn Văn A",
-    phone: "024-3825-6789",
-    email: "contact@apple.vn",
-    address: "Hà Nội, Việt Nam",
-    rating: 5,
-    totalOrders: 245,
-    totalValue: 15600000000,
-    status: "active",
-    lastOrder: "15/12/2024",
-  },
-  {
-    id: "SUP-002",
-    name: "Samsung Vietnam",
-    category: "Điện tử",
-    contact: "Trần Thị B",
-    phone: "028-3827-4567",
-    email: "business@samsung.vn",
-    address: "TP.HCM, Việt Nam",
-    rating: 4.8,
-    totalOrders: 189,
-    totalValue: 12400000000,
-    status: "active",
-    lastOrder: "14/12/2024",
-  },
-  {
-    id: "SUP-003",
-    name: "Dell Technologies",
-    category: "Máy tính",
-    contact: "Lê Văn C",
-    phone: "024-3654-7890",
-    email: "sales@dell.vn",
-    address: "Hà Nội, Việt Nam",
-    rating: 4.5,
-    totalOrders: 156,
-    totalValue: 8900000000,
-    status: "active",
-    lastOrder: "13/12/2024",
-  },
-  {
-    id: "SUP-004",
-    name: "Phụ kiện Tech Store",
-    category: "Phụ kiện",
-    contact: "Phạm Thị D",
-    phone: "0236-3789-1234",
-    email: "info@techstore.vn",
-    address: "Đà Nẵng, Việt Nam",
-    rating: 4.2,
-    totalOrders: 89,
-    totalValue: 2100000000,
-    status: "active",
-    lastOrder: "12/12/2024",
-  },
-  {
-    id: "SUP-005",
-    name: "Global Electronics",
-    category: "Điện tử",
-    contact: "Hoàng Văn E",
-    phone: "0292-3456-7891",
-    email: "contact@globalelec.vn",
-    address: "Cần Thơ, Việt Nam",
-    rating: 3.8,
-    totalOrders: 45,
-    totalValue: 1200000000,
-    status: "inactive",
-    lastOrder: "28/11/2024",
-  },
-];
+interface SupplySummaryApiItem {
+  id: number;
+  sourceName: string;
+  numberBank: string | null;
+  binBank: string | null;
+  bankName: string | null;
+  status: string;
+  rawStatus?: string | null;
+  products: string[];
+  monthlyOrders: number;
+  monthlyImportValue: number;
+  lastOrderDate: string | null;
+  totalOrders: number;
+}
 
-const supplierStats = [
-  { name: "Tổng nhà cung cấp", value: "24", color: "bg-blue-500" },
-  { name: "Đang hoạt động", value: "19", color: "bg-green-500" },
-  { name: "Đơn hàng tháng này", value: "156", color: "bg-purple-500" },
-  { name: "Giá trị nhập hàng", value: "₫2.4B", color: "bg-orange-500" },
-];
+interface SupplyStats {
+  totalSuppliers: number;
+  activeSuppliers: number;
+  monthlyOrders: number;
+  totalImportValue: number;
+}
+
+interface SupplySummaryResponse {
+  stats?: Partial<SupplyStats>;
+  supplies?: SupplySummaryApiItem[];
+}
+
+interface SupplySummaryItem extends SupplySummaryApiItem {
+  products: string[];
+}
+
+const DEFAULT_STATS: SupplyStats = {
+  totalSuppliers: 0,
+  activeSuppliers: 0,
+  monthlyOrders: 0,
+  totalImportValue: 0,
+};
+
+const formatCurrencyShort = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return "₫0";
+  if (value >= 1_000_000_000) {
+    return `₫${(value / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `₫${(value / 1_000_000).toFixed(1)}M`;
+  }
+  return `₫${Math.round(value).toLocaleString("vi-VN")}`;
+};
+
+const formatCurrencyVnd = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return "₫0";
+  return `₫${Math.round(value).toLocaleString("vi-VN")}`;
+};
+
+const formatStatusLabel = (status: string): string => {
+  if (status === "inactive") return "Tam ngung";
+  if (status === "active") return "Dang hoat dong";
+  return status || "Chua xac dinh";
+};
+
+const getStatusClasses = (status: string): string => {
+  if (status === "inactive") {
+    return "bg-yellow-100 text-yellow-800";
+  }
+  if (status === "active") {
+    return "bg-green-100 text-green-800";
+  }
+  return "bg-gray-100 text-gray-800";
+};
+
+const getFormattedDate = (value: string | null): string => {
+  if (!value) return "--";
+  return Helpers.formatDateToDMY(value) || "--";
+};
+
+const normalizeProducts = (products?: string[]): string[] => {
+  if (!Array.isArray(products)) return [];
+  return products
+    .map((product) => (typeof product === "string" ? product.trim() : ""))
+    .filter((product) => product.length > 0);
+};
+
+const formatSearchValue = (value: string): string => value.trim().toLowerCase();
 
 export default function Sources() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [supplies, setSupplies] = useState<SupplySummaryItem[]>([]);
+  const [stats, setStats] = useState<SupplyStats>(DEFAULT_STATS);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredSources = sources.filter((source) => {
-    const matchesSearch =
-      source.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      source.contact.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "all" || source.category === categoryFilter;
-    const matchesStatus =
-      statusFilter === "all" || source.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const fetchSupplySummary = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiFetch("/api/supply-insights");
+      if (!response.ok) {
+        throw new Error("Khong the tai du lieu nguon.");
+      }
+      const data: SupplySummaryResponse = await response.json();
+      const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
+        data.supplies
+      )
+        ? data.supplies.map((item) => ({
+            ...item,
+            products: normalizeProducts(item.products),
+            monthlyOrders: Number(item.monthlyOrders) || 0,
+            monthlyImportValue: Number(item.monthlyImportValue) || 0,
+            totalOrders: Number(item.totalOrders) || 0,
+          }))
+        : [];
+      setSupplies(normalizedSupplies);
+      setStats({
+        totalSuppliers: Number(data.stats?.totalSuppliers) || 0,
+        activeSuppliers: Number(data.stats?.activeSuppliers) || 0,
+        monthlyOrders: Number(data.stats?.monthlyOrders) || 0,
+        totalImportValue: Number(data.stats?.totalImportValue) || 0,
+      });
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Co loi xay ra khi tai du lieu."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <StarIcon
-        key={i}
-        className={`h-4 w-4 ${
-          i < Math.floor(rating)
-            ? "text-yellow-400 fill-current"
-            : "text-gray-300"
-        }`}
-      />
-    ));
+  useEffect(() => {
+    fetchSupplySummary();
+  }, [fetchSupplySummary]);
+
+  const productFilters = useMemo(() => {
+    const set = new Set<string>();
+    supplies.forEach((supply) => {
+      supply.products.forEach((product) => set.add(product));
+    });
+    return Array.from(set).sort();
+  }, [supplies]);
+
+  const filteredSupplies = useMemo(() => {
+    const formattedSearch = formatSearchValue(searchTerm);
+    return supplies.filter((supply) => {
+      const matchesSearch =
+        !formattedSearch ||
+        supply.sourceName.toLowerCase().includes(formattedSearch) ||
+        (supply.bankName || "").toLowerCase().includes(formattedSearch) ||
+        (supply.numberBank || "").toLowerCase().includes(formattedSearch) ||
+        supply.products.some((product) =>
+          product.toLowerCase().includes(formattedSearch)
+        );
+
+      const matchesStatus =
+        statusFilter === "all" || supply.status === statusFilter;
+
+      const matchesCategory =
+        categoryFilter === "all"
+          ? true
+          : categoryFilter === "no-products"
+          ? supply.products.length === 0
+          : supply.products.includes(categoryFilter);
+
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+  }, [supplies, searchTerm, statusFilter, categoryFilter]);
+
+  const supplierStats = useMemo(
+    () => [
+      {
+        name: "Tong nha cung cap",
+        value: stats.totalSuppliers.toString(),
+        color: "bg-blue-500",
+      },
+      {
+        name: "Dang hoat dong",
+        value: stats.activeSuppliers.toString(),
+        color: "bg-green-500",
+      },
+      {
+        name: "Don hang thang nay",
+        value: stats.monthlyOrders.toString(),
+        color: "bg-purple-500",
+      },
+      {
+        name: "Gia tri nhap hang",
+        value: formatCurrencyShort(stats.totalImportValue),
+        color: "bg-orange-500",
+      },
+    ],
+    [stats]
+  );
+
+  const renderProductBadges = (products: string[]) => {
+    if (!products.length) {
+      return <span className="text-xs text-gray-400">Chua cap nhat</span>;
+    }
+    const maxVisible = 3;
+    const visible = products.slice(0, maxVisible);
+    const hiddenCount = products.length - visible.length;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {visible.map((product) => (
+          <span
+            key={product}
+            className="px-2 py-1 text-xs rounded-full bg-blue-50 text-blue-700"
+          >
+            {product}
+          </span>
+        ))}
+        {hiddenCount > 0 && (
+          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+            +{hiddenCount}
+          </span>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Bảng thông tin nguồn
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Bang thong tin nguon</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý thông tin nhà cung cấp và đối tác
+            Quan ly thong tin nha cung cap va doi tac
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
           <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
             <PlusIcon className="h-4 w-4 mr-2" />
-            Thêm nhà cung cấp
+            Them nha cung cap
           </button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {supplierStats.map((stat, index) => (
           <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
@@ -154,146 +261,159 @@ export default function Sources() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm nhà cung cấp..."
+              placeholder="Tim kiem nha cung cap..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
 
           <select
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(event) => setCategoryFilter(event.target.value)}
           >
-            <option value="all">Tất cả danh mục</option>
-            <option value="Điện tử">Điện tử</option>
-            <option value="Máy tính">Máy tính</option>
-            <option value="Phụ kiện">Phụ kiện</option>
+            <option value="all">Tat ca nguon</option>
+            <option value="no-products">Chua gan san pham</option>
+            {productFilters.map((product) => (
+              <option key={product} value={product}>
+                {product}
+              </option>
+            ))}
           </select>
 
           <select
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(event) => setStatusFilter(event.target.value)}
           >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="inactive">Ngừng hoạt động</option>
+            <option value="all">Tat ca trang thai</option>
+            <option value="active">Dang hoat dong</option>
+            <option value="inactive">Tam ngung</option>
           </select>
 
           <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-            Xuất danh sách
+            Xuat danh sach
           </button>
         </div>
+
+        {error && (
+          <div className="text-sm text-red-600">
+            {error}
+          </div>
+        )}
       </div>
 
-      {/* Sources Table */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nhà cung cấp
+                  Nha cung cap
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thông tin thanh toán
+                  Thong tin thanh toan
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Các Sản Phẩm
+                  Cac san pham
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đơn Trong Tháng
+                  Don trong thang
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
+                  Trang thai
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đơn hàng cuối
+                  Don hang cuoi
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao tác
+                  Tong tien thanh toan
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Thao tac
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredSources.map((source) => (
-                <tr key={source.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {source.name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {source.category}
-                      </div>
-                      <div className="text-xs text-gray-400">{source.id}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="space-y-1">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <PhoneIcon className="h-4 w-4 mr-2 text-gray-400" />
-                        {source.phone}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-900">
-                        <EnvelopeIcon className="h-4 w-4 mr-2 text-gray-400" />
-                        {source.email}
-                      </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <MapPinIcon className="h-4 w-4 mr-2 text-gray-400" />
-                        {source.address}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex">{renderStars(source.rating)}</div>
-                      <span className="ml-2 text-sm text-gray-600">
-                        {source.rating}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      <div>{source.totalOrders} đơn hàng</div>
-                      <div className="text-xs text-gray-500">
-                        ₫{(source.totalValue / 1000000000).toFixed(1)}B
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        source.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {source.status === "active" ? "Hoạt động" : "Ngừng"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {source.lastOrder}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-blue-600 hover:text-blue-900 mr-3">
-                      Xem
-                    </button>
-                    <button className="text-green-600 hover:text-green-900">
-                      Chỉnh Sửa
-                    </button>
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                    Dang tai du lieu...
                   </td>
                 </tr>
-              ))}
+              )}
+
+              {!loading && filteredSupplies.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                    Khong tim thay nha cung cap phu hop.
+                  </td>
+                </tr>
+              )}
+
+              {!loading &&
+                filteredSupplies.map((supply) => (
+                  <tr key={supply.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {supply.sourceName || "Chua dat ten"}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Tong don: {supply.totalOrders}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {supply.numberBank || "Chua co so tai khoan"}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {supply.bankName ||
+                          (supply.binBank ? `BIN ${supply.binBank}` : "Chua co ngan hang")}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {renderProductBadges(supply.products)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {supply.monthlyOrders} don
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrencyVnd(supply.monthlyImportValue)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(
+                          supply.status
+                        )}`}
+                      >
+                        {formatStatusLabel(supply.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {getFormattedDate(supply.lastOrderDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      --{/* Placeholder until payment calculation is finalised */}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-blue-600 hover:text-blue-900 mr-3">
+                        Xem
+                      </button>
+                      <button className="text-green-600 hover:text-green-900">
+                        Chinh sua
+                      </button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

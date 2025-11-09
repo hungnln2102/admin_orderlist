@@ -186,6 +186,24 @@ const toCleanString = (value: unknown): string => {
   const str = typeof value === "string" ? value : String(value);
   return str.trim();
 };
+const formatDisplayDate = (value?: string | null): string => {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+  const slashMatch = trimmed.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+  if (slashMatch) {
+    return `${slashMatch[3]}/${slashMatch[2]}/${slashMatch[1]}`;
+  }
+  const dmyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (dmyMatch) {
+    return `${dmyMatch[1]}/${dmyMatch[2]}/${dmyMatch[3]}`;
+  }
+  return trimmed;
+};
 const normalizeSlotKey = (value: unknown): string => {
   const cleaned = toCleanString(value);
   return cleaned ? cleaned.replace(/\s+/g, " ").trim().toLowerCase() : "";
@@ -1497,7 +1515,7 @@ function PackageProduct() {
                             {Number(item.import || 0).toLocaleString("vi-VN")} VND
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.expired || ""}
+                            {formatDisplayDate(item.expired)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                             <button
@@ -1824,7 +1842,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
     { label: "Note", value: row.note },
     { label: "Supplier", value: row.supplier },
     { label: "Import", value: row.import },
-    { label: "Expired", value: row.expired },
+    { label: "Expired", value: formatDisplayDate(row.expired) },
   ];
   const accountDetails = [
     { label: "Account user", value: row.accountUser },

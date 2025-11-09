@@ -49,6 +49,25 @@ const createYearExtraction = (column) => `
   END
 `;
 
+const createSourceKey = (column) => `
+  LOWER(
+    REGEXP_REPLACE(
+      TRIM(${column}::text),
+      '\\s+',
+      ' ',
+      'g'
+    )
+  )
+`;
+
+const createNumericExtraction = (column) => `
+  CASE
+    WHEN TRIM(${column}::text) ~ '^[-+]?\\d+(\\.\\d+)?$'
+      THEN TRIM(${column}::text)::numeric
+    ELSE 0
+  END
+`;
+
 const normalizeDateInput = (value) => {
     if (value === undefined || value === null) return null;
     const trimmed = String(value).trim();
@@ -76,9 +95,25 @@ const fromDbNumber = (value) => {
 };
 const formatDateOutput = (value) => {
     if (!value) return null;
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        let match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+            return `${match[1]}-${match[2]}-${match[3]}`;
+        }
+        match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (match) {
+            return `${match[3]}-${match[2]}-${match[1]}`;
+        }
+        return trimmed;
+    }
     const dateValue = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(dateValue.getTime())) return null;
-    return dateValue.toISOString().slice(0, 10);
+    const year = dateValue.getUTCFullYear();
+    const month = String(dateValue.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(dateValue.getUTCDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
 };
 const summarizePackageInformation = (user, pass, mail) => {
     return (
@@ -128,6 +163,31 @@ const hasAccountStoragePayload = (payload = {}) => {
     return false;
 };
 
+const normalizeSupplyStatus = (value) => {
+    if (value === undefined || value === null) return "active";
+    const normalized = String(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+    if (!normalized) return "active";
+    if (
+        ["active", "dang hoat dong", "hoat dong", "running"].includes(
+            normalized
+        )
+    ) {
+        return "active";
+    }
+    if (
+        ["inactive", "tam ngung", "tam dung", "pause", "paused"].includes(
+            normalized
+        )
+    ) {
+        return "inactive";
+    }
+    return normalized;
+};
+
 app.use(
     cors({
         origin: (origin, callback) => {
@@ -144,6 +204,42 @@ app.use(express.json());
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
+
+const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "is_active"];
+let supplyStatusColumnNameCache = null;
+let supplyStatusColumnResolved = false;
+
+const resolveSupplyStatusColumn = async () => {
+    if (supplyStatusColumnResolved) {
+        return supplyStatusColumnNameCache;
+    }
+    const client = await pool.connect();
+    try {
+        const detectionQuery = `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'mavryk'
+        AND table_name = 'supply'
+        AND column_name = ANY($1::text[])
+      ORDER BY CASE column_name
+        WHEN 'status' THEN 1
+        WHEN 'trang_thai' THEN 2
+        WHEN 'is_active' THEN 3
+        ELSE 4 END
+      LIMIT 1;
+    `;
+        const result = await client.query(detectionQuery, [SUPPLY_STATUS_CANDIDATES]);
+        supplyStatusColumnNameCache = result.rows[0]?.column_name || null;
+    } catch (error) {
+        console.warn("Unable to detect supply status column:", error.message || error);
+        supplyStatusColumnNameCache = null;
+    } finally {
+        supplyStatusColumnResolved = true;
+        client.release();
+    }
+    return supplyStatusColumnNameCache;
+};
+
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
     pp.id AS package_id,
@@ -156,6 +252,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     pp."Import" AS package_import,
     pp.slot AS package_slot,
     pp.expired AS package_expired,
+    pp.expired::text AS package_expired_raw,
     acc.id AS account_id,
     acc.username AS account_username,
     acc.password AS account_password,
@@ -188,15 +285,14 @@ const mapPackageProductRow = (row) => {
         note: row.package_note ?? null,
         supplier: row.package_supplier ?? null,
         import: fromDbNumber(row.package_import),
-        slot: fromDbNumber(row.package_slot),
         accountStorageId,
         accountUser: row.account_username ?? null,
         accountPass: row.account_password ?? null,
         accountMail: row.account_mail_2nd ?? null,
-        accountNote: row.account_note ?? null,
-        capacity: fromDbNumber(row.account_storage),
-        expired: formatDateOutput(row.package_expired),
-        slot: null,
+    accountNote: row.account_note ?? null,
+    capacity: fromDbNumber(row.account_storage),
+    expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
+    slot: fromDbNumber(row.package_slot),
         slotUsed: null,
         capacityUsed: null,
     };
@@ -489,6 +585,24 @@ const todayYMDInVietnam = () => {
     return `${y}-${m}-${day}`;
 };
 
+const formatDateYMD = (date) => {
+    if (!(date instanceof Date)) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+};
+
+const getCurrentMonthRange = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return {
+        monthStart: formatDateYMD(monthStart),
+        nextMonthStart: formatDateYMD(nextMonthStart),
+    };
+};
+
 const diffDaysYMD = (fromYmd, toYmd) => {
     if (!fromYmd || !toYmd) return null;
     const [fy, fm, fd] = fromYmd.split("-").map(Number);
@@ -631,6 +745,148 @@ app.get("/api/orders", async(_req, res) => {
 
 // New endpoint: Purchase Orders (table mavryk.purchase_order)
 
+
+app.get("/api/supply-insights", async(_req, res) => {
+    console.log("[GET] /api/supply-insights");
+    const { monthStart, nextMonthStart } = getCurrentMonthRange();
+    const orderDateCase = createDateNormalization("ngay_dang_ki");
+    const sourceKeyCase = createSourceKey("nguon");
+    const giaNhapCase = createNumericExtraction("gia_nhap");
+    const supplySourceKey = createSourceKey("s.source_name");
+    const statusColumnName = await resolveSupplyStatusColumn();
+    const statusSelect = statusColumnName ?
+        `s."${statusColumnName}"::text AS raw_status` :
+        "NULL AS raw_status";
+    const query = `
+    WITH orders_union AS (
+      SELECT
+        ${orderDateCase} AS order_date,
+        COALESCE(${sourceKeyCase}, '') AS source_key,
+        TRIM(nguon::text) AS source_name,
+        ${giaNhapCase} AS import_value
+      FROM mavryk.order_list
+      WHERE TRIM(nguon::text) <> ''
+      UNION ALL
+      SELECT
+        ${orderDateCase} AS order_date,
+        COALESCE(${sourceKeyCase}, '') AS source_key,
+        TRIM(nguon::text) AS source_name,
+        ${giaNhapCase} AS import_value
+      FROM mavryk.order_expired
+      WHERE TRIM(nguon::text) <> ''
+      UNION ALL
+      SELECT
+        ${orderDateCase} AS order_date,
+        COALESCE(${sourceKeyCase}, '') AS source_key,
+        TRIM(nguon::text) AS source_name,
+        ${giaNhapCase} AS import_value
+      FROM mavryk.order_canceled
+      WHERE TRIM(nguon::text) <> ''
+    ),
+    orders_filtered AS (
+      SELECT *
+      FROM orders_union
+      WHERE order_date IS NOT NULL
+        AND source_key <> ''
+    ),
+    month_data AS (
+      SELECT
+        source_key,
+        COUNT(*) AS monthly_orders,
+        COALESCE(SUM(import_value), 0) AS monthly_import_value
+      FROM orders_filtered
+      WHERE order_date >= $1::date
+        AND order_date < $2::date
+      GROUP BY source_key
+    ),
+    last_order AS (
+      SELECT
+        source_key,
+        MAX(order_date) AS last_order_date
+      FROM orders_filtered
+      GROUP BY source_key
+    ),
+    total_data AS (
+      SELECT
+        source_key,
+        COUNT(*) AS total_orders
+      FROM orders_filtered
+      GROUP BY source_key
+    ),
+    product_data AS (
+      SELECT
+        sp.source_id,
+        ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(pp.san_pham::text), '')), NULL) AS product_list
+      FROM mavryk.supply_price sp
+      JOIN mavryk.product_price pp ON sp.product_id = pp.id
+      GROUP BY sp.source_id
+    )
+    SELECT
+      s.id,
+      s.source_name,
+      s.number_bank,
+      s.bin_bank,
+      ${statusSelect},
+      COALESCE(bl.bank_name, '') AS bank_name,
+      COALESCE(product_data.product_list, ARRAY[]::text[]) AS product_names,
+      COALESCE(month_data.monthly_orders, 0) AS monthly_orders,
+      COALESCE(month_data.monthly_import_value, 0) AS monthly_import_value,
+      COALESCE(last_order.last_order_date, NULL) AS last_order_date,
+      COALESCE(total_data.total_orders, 0) AS total_orders
+    FROM mavryk.supply s
+    LEFT JOIN product_data ON product_data.source_id = s.id
+    LEFT JOIN month_data
+      ON month_data.source_key = ${supplySourceKey}
+    LEFT JOIN last_order
+      ON last_order.source_key = ${supplySourceKey}
+    LEFT JOIN total_data
+      ON total_data.source_key = ${supplySourceKey}
+    LEFT JOIN mavryk.bank_list bl
+      ON TRIM(bl.bin::text) = TRIM(s.bin_bank::text)
+    ORDER BY s.source_name;
+  `;
+    try {
+        const result = await pool.query(query, [monthStart, nextMonthStart]);
+        const rows = result.rows || [];
+        const supplies = rows.map((row) => ({
+            id: row.id,
+            sourceName: row.source_name || "",
+            numberBank: row.number_bank || null,
+            binBank: row.bin_bank || null,
+            bankName: row.bank_name || null,
+            status: normalizeSupplyStatus(row.raw_status),
+            rawStatus: row.raw_status || null,
+            products: Array.isArray(row.product_names) ? row.product_names : [],
+            monthlyOrders: Number(row.monthly_orders) || 0,
+            monthlyImportValue: Number(row.monthly_import_value) || 0,
+            lastOrderDate: formatDateOutput(row.last_order_date),
+            totalOrders: Number(row.total_orders) || 0,
+        }));
+        const stats = supplies.reduce(
+            (acc, supply) => {
+                acc.totalSuppliers += 1;
+                if (supply.status === "active") {
+                    acc.activeSuppliers += 1;
+                }
+                acc.monthlyOrders += supply.monthlyOrders;
+                acc.totalImportValue += supply.monthlyImportValue;
+                return acc;
+            },
+            {
+                totalSuppliers: 0,
+                activeSuppliers: 0,
+                monthlyOrders: 0,
+                totalImportValue: 0,
+            }
+        );
+        res.json({ stats, supplies });
+    } catch (error) {
+        console.error("Query failed (GET /api/supply-insights):", error);
+        res.status(500).json({
+            error: "Unable to load supply insights.",
+        });
+    }
+});
 
 app.get("/api/supplies", async(_req, res) => {
     console.log("[GET] /api/supplies");
