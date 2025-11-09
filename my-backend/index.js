@@ -113,7 +113,6 @@ const hasAccountStoragePayload = (payload = {}) => {
         accountMail,
         accountNote,
         capacity,
-        expired,
     } = payload;
     if (
         hasMeaningfulValue(accountUser) ||
@@ -124,9 +123,6 @@ const hasAccountStoragePayload = (payload = {}) => {
         return true;
     }
     if (capacity !== undefined && capacity !== null && capacity !== "") {
-        return true;
-    }
-    if (expired !== undefined && expired !== null && String(expired).trim()) {
         return true;
     }
     return false;
@@ -158,13 +154,14 @@ const PACKAGE_PRODUCTS_SELECT = `
     pp.note AS package_note,
     pp.supplier AS package_supplier,
     pp."Import" AS package_import,
+    pp.slot AS package_slot,
+    pp.expired AS package_expired,
     acc.id AS account_id,
     acc.username AS account_username,
     acc.password AS account_password,
     acc."Mail 2nd" AS account_mail_2nd,
     acc.note AS account_note,
     acc.storage AS account_storage,
-    acc.expired AS account_expired,
     acc."Mail Family" AS account_mail_family
   FROM mavryk.package_product pp
   LEFT JOIN mavryk.account_storage acc
@@ -191,13 +188,14 @@ const mapPackageProductRow = (row) => {
         note: row.package_note ?? null,
         supplier: row.package_supplier ?? null,
         import: fromDbNumber(row.package_import),
+        slot: fromDbNumber(row.package_slot),
         accountStorageId,
         accountUser: row.account_username ?? null,
         accountPass: row.account_password ?? null,
         accountMail: row.account_mail_2nd ?? null,
         accountNote: row.account_note ?? null,
         capacity: fromDbNumber(row.account_storage),
-        expired: formatDateOutput(row.account_expired),
+        expired: formatDateOutput(row.package_expired),
         slot: null,
         slotUsed: null,
         capacityUsed: null,
@@ -970,6 +968,7 @@ app.post("/api/package-products", async (req, res) => {
         note,
         supplier,
         importPrice,
+        slotLimit,
         accountUser,
         accountPass,
         accountMail,
@@ -986,13 +985,15 @@ app.post("/api/package-products", async (req, res) => {
         return res.status(400).json({ error: "Package name cannot be empty." });
     }
     const client = await pool.connect();
+    const normalizedExpired = normalizeDateInput(expired);
+    const normalizedSlotLimit = toNullableNumber(slotLimit);
     try {
         await client.query("BEGIN");
         const pkgResult = await client.query(
             `
         INSERT INTO mavryk.package_product
-          (package, username, password, "mail 2nd", note, supplier, "Import")
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+          (package, username, password, "mail 2nd", note, supplier, "Import", expired, slot)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id;
       `,
             [
@@ -1003,6 +1004,8 @@ app.post("/api/package-products", async (req, res) => {
                 note || null,
                 supplier || null,
                 toNullableNumber(importPrice),
+                normalizedExpired,
+                normalizedSlotLimit,
             ]
         );
         if (!pkgResult.rows.length) {
@@ -1012,7 +1015,6 @@ app.post("/api/package-products", async (req, res) => {
         if (packageId === null) {
             throw new Error("Package insert returned invalid id.");
         }
-    const normalizedExpired = normalizeDateInput(expired);
     const mailFamily = informationUser || null;
     let createdAccountStorageId = null;
     if (hasAccountStoragePayload({
@@ -1021,14 +1023,13 @@ app.post("/api/package-products", async (req, res) => {
         accountMail,
         accountNote,
         capacity,
-        expired,
     })) {
         const nextStorageId = await getNextAccountStorageId(client);
         await client.query(
             `
           INSERT INTO mavryk.account_storage
-            (id, username, password, "Mail 2nd", note, storage, expired, "Mail Family")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+            (id, username, password, "Mail 2nd", note, storage, "Mail Family")
+          VALUES ($1, $2, $3, $4, $5, $6, $7);
         `,
                 [
                     nextStorageId,
@@ -1037,7 +1038,6 @@ app.post("/api/package-products", async (req, res) => {
                     accountMail || null,
                     accountNote || null,
                     toNullableNumber(capacity),
-                    normalizedExpired,
                     mailFamily,
                 ]
             );
@@ -1055,13 +1055,15 @@ app.post("/api/package-products", async (req, res) => {
                 package_note: note || null,
                 package_supplier: supplier || null,
                 package_import: toNullableNumber(importPrice),
+                package_expired: normalizedExpired,
+                package_slot: normalizedSlotLimit,
+                package_slot: normalizedSlotLimit,
                 account_id: createdAccountStorageId,
                 account_username: accountUser || null,
                 account_password: accountPass || null,
                 account_mail_2nd: accountMail || null,
                 account_note: accountNote || null,
                 account_storage: toNullableNumber(capacity),
-                account_expired: normalizedExpired,
                 account_mail_family: mailFamily,
                 has_capacity_field: Boolean(hasCapacityField),
             });
@@ -1093,6 +1095,7 @@ app.put("/api/package-products/:id", async (req, res) => {
         note,
         supplier,
         importPrice,
+        slotLimit,
         accountStorageId,
         accountUser,
         accountPass,
@@ -1115,6 +1118,8 @@ app.put("/api/package-products/:id", async (req, res) => {
         storageIdNumber = Number.isFinite(parsed) ? parsed : null;
     }
     const client = await pool.connect();
+    const normalizedExpired = normalizeDateInput(expired);
+    const normalizedSlotLimit = toNullableNumber(slotLimit);
     try {
         await client.query("BEGIN");
         const pkgResult = await client.query(
@@ -1126,8 +1131,10 @@ app.put("/api/package-products/:id", async (req, res) => {
             "mail 2nd" = $4,
             note = $5,
             supplier = $6,
-            "Import" = $7
-        WHERE id = $8
+            "Import" = $7,
+            expired = $8,
+            slot = $9
+        WHERE id = $10
         RETURNING id;
       `,
             [
@@ -1138,6 +1145,8 @@ app.put("/api/package-products/:id", async (req, res) => {
                 note || null,
                 supplier || null,
                 toNullableNumber(importPrice),
+                normalizedExpired,
+                normalizedSlotLimit,
                 id,
             ]
         );
@@ -1146,7 +1155,6 @@ app.put("/api/package-products/:id", async (req, res) => {
             return res.status(404).json({ error: "Package product not found." });
         }
         const packageId = getRowId(pkgResult.rows[0], "id", "ID");
-        const normalizedExpired = normalizeDateInput(expired);
         const mailFamily = informationUser || null;
         const shouldUpsertAccountStorage = hasAccountStoragePayload({
             accountUser,
@@ -1154,7 +1162,6 @@ app.put("/api/package-products/:id", async (req, res) => {
             accountMail,
             accountNote,
             capacity,
-            expired,
         });
         if (storageIdNumber && shouldUpsertAccountStorage) {
             await client.query(
@@ -1165,9 +1172,8 @@ app.put("/api/package-products/:id", async (req, res) => {
               "Mail 2nd" = $3,
               note = $4,
               storage = $5,
-              expired = $6,
-              "Mail Family" = $7
-          WHERE id = $8;
+              "Mail Family" = $6
+          WHERE id = $7;
         `,
                 [
                     accountUser || null,
@@ -1175,7 +1181,6 @@ app.put("/api/package-products/:id", async (req, res) => {
                     accountMail || null,
                     accountNote || null,
                     toNullableNumber(capacity),
-                    normalizedExpired,
                     mailFamily,
                     storageIdNumber,
                 ]
@@ -1186,8 +1191,8 @@ app.put("/api/package-products/:id", async (req, res) => {
             await client.query(
                 `
           INSERT INTO mavryk.account_storage
-            (id, username, password, "Mail 2nd", note, storage, expired, "Mail Family")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+            (id, username, password, "Mail 2nd", note, storage, "Mail Family")
+          VALUES ($1, $2, $3, $4, $5, $6, $7);
         `,
                 [
                     nextStorageId,
@@ -1196,7 +1201,6 @@ app.put("/api/package-products/:id", async (req, res) => {
                     accountMail || null,
                     accountNote || null,
                     toNullableNumber(capacity),
-                    normalizedExpired,
                     mailFamily,
                 ]
             );
@@ -1213,13 +1217,13 @@ app.put("/api/package-products/:id", async (req, res) => {
                 package_note: note || null,
                 package_supplier: supplier || null,
                 package_import: toNullableNumber(importPrice),
+                package_expired: normalizedExpired,
                 account_id: storageIdNumber,
                 account_username: accountUser || null,
                 account_password: accountPass || null,
                 account_mail_2nd: accountMail || null,
                 account_note: accountNote || null,
                 account_storage: toNullableNumber(capacity),
-                account_expired: normalizedExpired,
                 account_mail_family: mailFamily,
                 has_capacity_field: Boolean(hasCapacityField),
             });

@@ -148,7 +148,7 @@ const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
   { value: "capacity", label: "Total capacity (slots)" },
 ];
 const stripCapacityFields = (fields: PackageField[]): PackageField[] =>
-  fields.filter((field) => field !== "capacity" && field !== "expired");
+  fields.filter((field) => field !== "capacity");
 const DEFAULT_SLOT_LIMIT = 5;
 const DEFAULT_CAPACITY_LIMIT = 2000;
 const DEFAULT_SLOT_CAPACITY_UNIT = 100;
@@ -248,6 +248,29 @@ const resolveOrderDisplayValue = (
     record.slotDisplay ||
     ""
   );
+};
+const buildSlotLabelVariants = (
+  record: NormalizedOrderRecord,
+  displayColumn: "slot" | "information",
+  fallbackLabel: string
+): string[] => {
+  const cleanedFallback = toCleanString(fallbackLabel);
+  if (displayColumn !== "slot") {
+    return cleanedFallback ? [cleanedFallback] : [];
+  }
+  const rawSlotText = record.slotDisplay ?? "";
+  const slotPieces = rawSlotText
+    .split("|")
+    .map((piece) => toCleanString(piece))
+    .filter(Boolean);
+  if (slotPieces.length >= 1) {
+    return slotPieces;
+  }
+  const customerLabel = toCleanString(record.customerDisplay);
+  if (customerLabel) {
+    return [customerLabel, `${customerLabel} (2)`];
+  }
+  return cleanedFallback ? [cleanedFallback] : [];
 };
 const extractDigitsValue = (text: string | null | undefined): number | null => {
   if (!text) return null;
@@ -403,6 +426,8 @@ function PackageProduct() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editContext, setEditContext] = useState<EditContext | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewRow, setViewRow] = useState<AugmentedRow | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const loading = packagesLoading || ordersLoading;
@@ -561,9 +586,7 @@ function PackageProduct() {
         if (
           existing.isCustom !== true &&
           !hasCapacityConfigured &&
-          existing.fields.some(
-            (field) => field === "capacity" || field === "expired"
-          )
+          existing.fields.includes("capacity")
         ) {
           const strippedFields = stripCapacityFields(existing.fields);
           map.set(name, { ...existing, fields: strippedFields });
@@ -686,19 +709,29 @@ function PackageProduct() {
             if (seenOrderIds.has(uniqueKey)) return;
             seenOrderIds.add(uniqueKey);
             const label = displayValue || matchValue;
-            if (!label) return;
-            slotAssignments.push({
-              slotLabel: label,
-              matchValue,
-              sourceOrderId: orderRecord.base?.id ?? null,
-              sourceOrderCode:
-                (orderRecord.base?.id_don_hang as string | number | null) ??
-                null,
+            const labelVariants = buildSlotLabelVariants(
+              orderRecord,
               displayColumn,
-              matchColumn,
-              capacityUnits: includeCapacity
-                ? extractCapacityUnitsFromOrder(packageCode, orderRecord)
-                : null,
+              label
+            );
+            if (labelVariants.length === 0) return;
+            const capacityUnits = includeCapacity
+              ? extractCapacityUnitsFromOrder(packageCode, orderRecord)
+              : null;
+            labelVariants.forEach((slotLabel, index) => {
+              const resolvedLabel = slotLabel || label || "";
+              if (!resolvedLabel) return;
+              slotAssignments.push({
+                slotLabel: resolvedLabel,
+                matchValue: matchValue || resolvedLabel,
+                sourceOrderId: orderRecord.base?.id ?? null,
+                sourceOrderCode:
+                  (orderRecord.base?.id_don_hang as string | number | null) ??
+                  null,
+                displayColumn,
+                matchColumn,
+                capacityUnits,
+              });
             });
           });
         }
@@ -912,8 +945,7 @@ function PackageProduct() {
       const includeNote = selectedTemplate.fields.includes("note");
       const includeSupplier = selectedTemplate.fields.includes("supplier");
       const includeImport = selectedTemplate.fields.includes("import");
-      const includeExpired =
-        includeAccountStorage && selectedTemplate.fields.includes("expired");
+      const includeExpired = true;
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
@@ -946,6 +978,7 @@ function PackageProduct() {
         capacity: includeAccountStorage ? capacityLimit : null,
         hasCapacityField: includeAccountStorage,
         expired: includeExpired ? values.expired || null : null,
+        slotLimit,
         slotLinkMode: values.slotLinkMode,
       };
       try {
@@ -1015,6 +1048,14 @@ function PackageProduct() {
     setEditModalOpen(false);
     setEditContext(null);
   }, []);
+  const openViewModal = useCallback((row: AugmentedRow) => {
+    setViewRow(row);
+    setViewModalOpen(true);
+  }, []);
+  const closeViewModal = useCallback(() => {
+    setViewModalOpen(false);
+    setViewRow(null);
+  }, []);
   const handleRowToggle = useCallback((rowId: number) => {
     setExpandedRowId((prev) => (prev === rowId ? null : rowId));
   }, []);
@@ -1027,8 +1068,7 @@ function PackageProduct() {
       const includeNote = template.fields.includes("note");
       const includeSupplier = template.fields.includes("supplier");
       const includeImport = template.fields.includes("import");
-      const includeExpired =
-        includeAccountStorage && template.fields.includes("expired");
+      const includeExpired = true;
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
@@ -1055,6 +1095,7 @@ function PackageProduct() {
         supplier: includeSupplier ? values.supplier || null : null,
         importPrice: includeImport ? Number(values.import || 0) || 0 : null,
         expired: includeExpired ? values.expired || null : null,
+        slotLimit,
         accountStorageId: accountStorageId ?? null,
         accountUser: includeAccountStorage ? values.accountUser || null : null,
         accountPass: includeAccountStorage ? values.accountPass || null : null,
@@ -1404,7 +1445,7 @@ function PackageProduct() {
                               {item.package}
                             </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.information || ""}
+                            {item.informationUser || ""}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {item.note || ""}
@@ -1473,10 +1514,10 @@ function PackageProduct() {
                             <button
                               className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
                               type="button"
-                              aria-label="Show slot information"
+                              aria-label="Show package details"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleRowToggle(item.id);
+                                openViewModal(item);
                               }}
                             >
                               <EyeIcon className="h-4 w-4" />
@@ -1523,6 +1564,7 @@ function PackageProduct() {
                                         }`}
                                         title={
                                           slot.assignment?.matchValue ||
+                                          slot.assignment?.slotLabel ||
                                           undefined
                                         }
                                       >
@@ -1598,6 +1640,7 @@ function PackageProduct() {
           onSubmit={handleEditSubmit}
         />
       )}
+      <PackageViewModal open={viewModalOpen} row={viewRow} onClose={closeViewModal} />
     </div>
   );
 }
@@ -1767,6 +1810,137 @@ function CreatePackageModal({
     </ModalShell>
   );
 }
+type PackageViewModalProps = {
+  open: boolean;
+  row: AugmentedRow | null;
+  onClose: () => void;
+};
+function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
+  if (!open || !row) return null;
+  const packageDetails = [
+    { label: "User", value: row.informationUser },
+    { label: "Pass", value: row.informationPass },
+    { label: "Mail 2nd", value: row.informationMail },
+    { label: "Note", value: row.note },
+    { label: "Supplier", value: row.supplier },
+    { label: "Import", value: row.import },
+    { label: "Expired", value: row.expired },
+  ];
+  const accountDetails = [
+    { label: "Account user", value: row.accountUser },
+    { label: "Account pass", value: row.accountPass },
+    { label: "Mail 2nd", value: row.accountMail },
+    { label: "Account note", value: row.accountNote },
+  ];
+  const showAccountStorage = !!row.hasCapacityField;
+  const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
+  const capacityUsed = row.capacityUsed || 0;
+  const remainingCapacity = row.remainingCapacity || 0;
+  const capacityAvailabilityRatio =
+    capacityLimit > 0
+      ? Math.min((remainingCapacity / capacityLimit) * 100, 100)
+      : 0;
+  const capacityAvailabilityState = getCapacityAvailabilityState(
+    remainingCapacity,
+    capacityLimit
+  );
+  const capacityColorClass =
+    capacityAvailabilityState === "out"
+      ? "bg-red-500"
+      : capacityAvailabilityState === "low"
+      ? "bg-yellow-500"
+      : "bg-green-500";
+  return (
+    <ModalShell
+      open={open}
+      title={`Package Details - ${row.package}`}
+      onClose={onClose}
+      footer={
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+        >
+          Close
+        </button>
+      }
+    >
+      <div
+        className={`grid grid-cols-1 gap-4 ${
+          showAccountStorage ? "md:grid-cols-2" : ""
+        }`}
+      >
+        <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Package Information
+            </h3>
+            <p className="text-xs text-gray-500">
+              Stored descriptive fields for this package.
+            </p>
+          </div>
+          <dl className="grid grid-cols-1 gap-3 text-sm">
+            {packageDetails.map((detail) => (
+              <div key={detail.label}>
+                <dt className="text-[11px] uppercase tracking-wide text-gray-500">
+                  {detail.label}
+                </dt>
+                <dd className="text-sm font-medium text-gray-900 break-words">
+                  {detail.value !== null &&
+                  detail.value !== undefined &&
+                  detail.value !== ""
+                    ? detail.value
+                    : "-"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+        {showAccountStorage && (
+          <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Account Storage
+              </h3>
+              <p className="text-xs text-gray-500">
+                Account credentials and capacity overview.
+              </p>
+            </div>
+            <dl className="grid grid-cols-1 gap-3 text-sm">
+              {accountDetails.map((detail) => (
+                <div key={detail.label}>
+                  <dt className="text-[11px] uppercase tracking-wide text-gray-500">
+                    {detail.label}
+                  </dt>
+                  <dd className="text-sm font-medium text-gray-900 break-words">
+                    {detail.value !== null &&
+                    detail.value !== undefined &&
+                    detail.value !== ""
+                      ? detail.value
+                      : "-"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="space-y-1">
+              <div className="text-sm text-gray-900">
+                <span className="font-semibold">{capacityUsed}</span> / {capacityLimit} capacity
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${capacityColorClass}`}
+                  style={{ width: `${capacityAvailabilityRatio}%` }}
+                />
+              </div>
+              <div className="text-xs text-gray-500">
+                Available: {remainingCapacity}
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
 type PackageFormModalProps = {
   open: boolean;
   mode: "add" | "edit";
@@ -1815,6 +1989,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
     "note",
     "supplier",
     "import",
+    "expired",
   ];
   const showPackageDetailsSection = packageDetailFields.some((field) =>
     template.fields.includes(field)
@@ -1945,6 +2120,17 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                     />
                   </div>
                 )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Expired date
+                  </label>
+                  <input
+                    type="date"
+                    value={values.expired}
+                    onChange={(e) => handleChange("expired", e)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
             )}
             {showAccountStorageSection && (
