@@ -205,13 +205,13 @@ export default function Sources() {
                   Nhà cung cấp
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Liên hệ
+                  Thông tin thanh toán
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Đánh giá
+                  Các Sản Phẩm
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thống kê
+                  Đơn Trong Tháng
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trạng thái
@@ -289,7 +289,7 @@ export default function Sources() {
                       Xem
                     </button>
                     <button className="text-green-600 hover:text-green-900">
-                      Liên hệ
+                      Chỉnh Sửa
                     </button>
                   </td>
                 </tr>
