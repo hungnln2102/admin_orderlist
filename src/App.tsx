@@ -26,7 +26,7 @@ function App() {
           {/* Mobile header space */}
           <div className="h-16 lg:hidden"></div>
 
-          <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+          <main className="p-4 sm:p-6 lg:p-8 max-w-[1230px] mx-auto">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />

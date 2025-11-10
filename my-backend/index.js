@@ -926,6 +926,68 @@ app.get("/api/supplies/:supplyId/products", async(req, res) => {
     }
 });
 
+app.get("/api/supplies/:supplyId/payments", async(req, res) => {
+    const { supplyId } = req.params;
+    console.log(`[GET] /api/supplies/${supplyId}/payments`, req.query);
+
+    const parsedSupplyId = Number.parseInt(supplyId, 10);
+    if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
+        return res.status(400).json({
+            error: "Invalid supply id.",
+        });
+    }
+
+    const limitParam = Number.parseInt(req.query.limit, 10);
+    const offsetParam = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isFinite(limitParam) ?
+        Math.min(Math.max(limitParam, 1), 50) :
+        5;
+    const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
+    const limitPlusOne = limit + 1;
+    const q = `
+    SELECT
+      ps.id,
+      ps.source_id,
+      COALESCE(s.source_name, '') AS source_name,
+      COALESCE(ps.import, 0) AS import_value,
+      COALESCE(ps.paid, 0) AS paid_value,
+      COALESCE(ps.round, '') AS round_label,
+      COALESCE(ps.status, '') AS status_label
+    FROM mavryk.payment_supply ps
+    LEFT JOIN mavryk.supply s ON s.id = ps.source_id
+    WHERE ps.source_id = $1
+    ORDER BY ps.id DESC
+    OFFSET $2
+    LIMIT $3;
+  `;
+
+    try {
+        const result = await pool.query(q, [parsedSupplyId, offset, limitPlusOne]);
+        const rows = result.rows || [];
+        const hasMore = rows.length > limit;
+        const payments = rows.slice(0, limit).map((row) => ({
+            id: row.id,
+            sourceId: row.source_id,
+            sourceName: row.source_name,
+            totalImport: Number(row.import_value) || 0,
+            paid: Number(row.paid_value) || 0,
+            round: row.round_label || "",
+            status: row.status_label || "",
+        }));
+
+        res.json({
+            payments,
+            hasMore,
+            nextOffset: offset + payments.length,
+        });
+    } catch (error) {
+        console.error("Query failed (GET /api/supplies/:id/payments):", error);
+        res.status(500).json({
+            error: "Unable to load payment history for this supplier.",
+        });
+    }
+});
+
 app.get("/api/products", async(_req, res) => {
     console.log("[GET] /api/products");
     const q = `
