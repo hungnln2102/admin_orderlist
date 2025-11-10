@@ -3,6 +3,14 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   ChevronDownIcon,
+  XMarkIcon,
+  ClipboardDocumentListIcon,
+  XCircleIcon,
+  CalendarDaysIcon,
+  CurrencyDollarIcon,
+  UserGroupIcon,
+  CheckCircleIcon,
+  ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
 import { apiFetch } from "../lib/api";
 import * as Helpers from "../lib/helpers";
@@ -20,6 +28,8 @@ interface SupplySummaryApiItem {
   monthlyImportValue: number;
   lastOrderDate: string | null;
   totalOrders: number;
+  totalPaidImport: number;
+  totalUnpaidImport: number;
 }
 
 interface SupplyStats {
@@ -62,9 +72,9 @@ const formatCurrencyVnd = (value: number): string => {
 };
 
 const formatStatusLabel = (status: string): string => {
-  if (status === "inactive") return "Tam ngung";
-  if (status === "active") return "Dang hoat dong";
-  return status || "Chua xac dinh";
+  if (status === "inactive") return "Tạm ngưng";
+  if (status === "active") return "Đang hoạt động";
+  return status || "Chưa xác định";
 };
 
 const getStatusClasses = (status: string): string => {
@@ -91,6 +101,48 @@ const normalizeProducts = (products?: string[]): string[] => {
 
 const formatSearchValue = (value: string): string => value.trim().toLowerCase();
 
+const STATUS_OPTIONS = [
+  { value: "active", label: "Đang Hoạt Động" },
+  { value: "inactive", label: "Tạm Ngưng" },
+];
+
+const getLastOrderTimestamp = (value: string | null): number => {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+};
+
+const compareSuppliersByPriority = (
+  a: SupplySummaryItem,
+  b: SupplySummaryItem
+): number => {
+  const aInactive = a.status === "inactive";
+  const bInactive = b.status === "inactive";
+  if (aInactive !== bInactive) {
+    return aInactive ? 1 : -1;
+  }
+
+  const aHasUnpaid = a.totalUnpaidImport > 0 ? 1 : 0;
+  const bHasUnpaid = b.totalUnpaidImport > 0 ? 1 : 0;
+  if (aHasUnpaid !== bHasUnpaid) {
+    return bHasUnpaid - aHasUnpaid;
+  }
+
+  if (aHasUnpaid === 1 && bHasUnpaid === 1) {
+    if (a.totalUnpaidImport !== b.totalUnpaidImport) {
+      return b.totalUnpaidImport - a.totalUnpaidImport;
+    }
+  } else {
+    const aTime = getLastOrderTimestamp(a.lastOrderDate);
+    const bTime = getLastOrderTimestamp(b.lastOrderDate);
+    if (aTime !== bTime) {
+      return bTime - aTime;
+    }
+  }
+
+  return a.sourceName.localeCompare(b.sourceName);
+};
+
 interface SupplyPayment {
   id: number;
   round: string;
@@ -99,10 +151,15 @@ interface SupplyPayment {
   status: string;
 }
 
+interface EditFormState {
+  sourceName: string;
+  paymentInfo: string;
+  status: string;
+}
+
 interface PaymentHistoryState {
-  baseRows: SupplyPayment[];
-  extraPages: SupplyPayment[][];
-  currentPageIndex: number;
+  pages: SupplyPayment[][];
+  currentPage: number;
   nextOffset: number;
   hasMore: boolean;
   loading: boolean;
@@ -116,13 +173,66 @@ interface PaymentHistoryResponse {
   nextOffset?: number;
 }
 
+interface BankOption {
+  bin: string;
+  name: string;
+}
+
+interface NewSupplierFormState {
+  sourceName: string;
+  numberBank: string;
+  bankBin: string;
+  status: string;
+}
+
+interface SupplyOverviewStats {
+  totalOrders: number;
+  canceledOrders: number;
+  monthlyOrders: number;
+  totalPaidAmount: number;
+}
+
+interface SupplyOverviewSupply {
+  id: number;
+  sourceName: string;
+  numberBank: string | null;
+  binBank: string | null;
+  bankName: string | null;
+  status: string | null;
+  rawStatus?: string | null;
+}
+
+interface UnpaidPaymentCycle {
+  id: number;
+  round: string;
+  totalImport: number;
+  paid: number;
+  status: string;
+}
+
+interface SupplyOverviewResponse {
+  supply: SupplyOverviewSupply;
+  stats: SupplyOverviewStats;
+  unpaidPayments: UnpaidPaymentCycle[];
+}
+
+interface ViewSupplierModalState {
+  isOpen: boolean;
+  loading: boolean;
+  error: string | null;
+  supplyId: number | null;
+  data: SupplyOverviewResponse | null;
+  selectedPaymentId: number | null;
+  confirming: boolean;
+  confirmError: string | null;
+}
+
 const INITIAL_PAYMENT_LIMIT = 3;
 const PAYMENT_PAGE_SIZE = 5;
 
 const createDefaultPaymentState = (): PaymentHistoryState => ({
-  baseRows: [],
-  extraPages: [],
-  currentPageIndex: -1,
+  pages: [[]],
+  currentPage: 0,
   nextOffset: 0,
   hasMore: false,
   loading: false,
@@ -130,9 +240,17 @@ const createDefaultPaymentState = (): PaymentHistoryState => ({
   initialized: false,
 });
 
+const createInitialNewSupplierForm = (
+  defaultStatus: string
+): NewSupplierFormState => ({
+  sourceName: "",
+  numberBank: "",
+  bankBin: "",
+  status: defaultStatus,
+});
+
 export default function Sources() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [supplies, setSupplies] = useState<SupplySummaryItem[]>([]);
   const [stats, setStats] = useState<SupplyStats>(DEFAULT_STATS);
@@ -142,6 +260,29 @@ export default function Sources() {
   const [paymentHistory, setPaymentHistory] = useState<
     Record<number, PaymentHistoryState>
   >({});
+  const [bankOptions, setBankOptions] = useState<BankOption[]>([]);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addModalError, setAddModalError] = useState<string | null>(null);
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+  const [newSupplierForm, setNewSupplierForm] = useState<NewSupplierFormState>(
+    createInitialNewSupplierForm(STATUS_OPTIONS[0].value)
+  );
+  const [viewModalState, setViewModalState] = useState<ViewSupplierModalState>({
+    isOpen: false,
+    loading: false,
+    error: null,
+    supplyId: null,
+    data: null,
+    selectedPaymentId: null,
+    confirming: false,
+    confirmError: null,
+  });
+  const [editingSupplyId, setEditingSupplyId] = useState<number | null>(null);
+  const [editFormValues, setEditFormValues] = useState<EditFormState>({
+    sourceName: "",
+    paymentInfo: "",
+    status: STATUS_OPTIONS[0].value,
+  });
 
   const fetchSupplySummary = useCallback(async () => {
     try {
@@ -149,7 +290,7 @@ export default function Sources() {
       setError(null);
       const response = await apiFetch("/api/supply-insights");
       if (!response.ok) {
-        throw new Error("Khong the tai du lieu nguon.");
+        throw new Error("Không thể tải dữ liệu nguồn");
       }
       const data: SupplySummaryResponse = await response.json();
       const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
@@ -161,6 +302,8 @@ export default function Sources() {
             monthlyOrders: Number(item.monthlyOrders) || 0,
             monthlyImportValue: Number(item.monthlyImportValue) || 0,
             totalOrders: Number(item.totalOrders) || 0,
+            totalPaidImport: Number(item.totalPaidImport) || 0,
+            totalUnpaidImport: Number(item.totalUnpaidImport) || 0,
           }))
         : [];
       setSupplies(normalizedSupplies);
@@ -173,7 +316,7 @@ export default function Sources() {
     } catch (err) {
       console.error(err);
       setError(
-        err instanceof Error ? err.message : "Co loi xay ra khi tai du lieu."
+        err instanceof Error ? err.message : "Có lỗi xảy ra khi tải dữ liệu."
       );
     } finally {
       setLoading(false);
@@ -218,7 +361,7 @@ export default function Sources() {
         `/api/supplies/${supplyId}/payments?${params.toString()}`
       );
       if (!response.ok) {
-        throw new Error("Khong the tai lich su thanh toan.");
+        throw new Error("Không thể tải lịch sử thanh toán.");
       }
       return response.json();
     },
@@ -234,20 +377,15 @@ export default function Sources() {
       }));
 
       try {
-        const data = await fetchPayments(
-          supplyId,
-          0,
-          INITIAL_PAYMENT_LIMIT
-        );
+        const data = await fetchPayments(supplyId, 0, INITIAL_PAYMENT_LIMIT);
         updatePaymentState(supplyId, (prev) => ({
           ...prev,
-          baseRows: data.payments || [],
-          extraPages: [],
-          currentPageIndex: -1,
+          pages: [data.payments || []],
+          currentPage: 0,
           nextOffset:
             typeof data.nextOffset === "number"
               ? data.nextOffset
-              : (data.payments?.length || 0),
+              : data.payments?.length || 0,
           hasMore: Boolean(data.hasMore),
           loading: false,
           error: null,
@@ -261,7 +399,7 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "Khong the tai lich su thanh toan.",
+              : "Không thể tải lịch sử thanh toán.",
         }));
       }
     },
@@ -269,7 +407,10 @@ export default function Sources() {
   );
 
   const loadMorePayments = useCallback(
-    async (supplyId: number, offset: number) => {
+    async (supplyId: number) => {
+      const state = paymentHistory[supplyId];
+      if (!state || state.loading || !state.hasMore) return;
+
       updatePaymentState(supplyId, (prev) => ({
         ...prev,
         loading: true,
@@ -279,15 +420,15 @@ export default function Sources() {
       try {
         const data = await fetchPayments(
           supplyId,
-          Math.max(offset, 0),
+          Math.max(state.nextOffset, 0),
           PAYMENT_PAGE_SIZE
         );
         updatePaymentState(supplyId, (prev) => {
-          const updatedPages = [...prev.extraPages, data.payments || []];
+          const updatedPages = [...prev.pages, data.payments || []];
           return {
             ...prev,
-            extraPages: updatedPages,
-            currentPageIndex: updatedPages.length - 1,
+            pages: updatedPages,
+            currentPage: updatedPages.length - 1,
             nextOffset:
               typeof data.nextOffset === "number"
                 ? data.nextOffset
@@ -306,11 +447,11 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "Khong the tai lich su thanh toan.",
+              : "Không thể tải lịch sử thanh toán.",
         }));
       }
     },
-    [fetchPayments, updatePaymentState]
+    [fetchPayments, paymentHistory, updatePaymentState]
   );
 
   useEffect(() => {
@@ -320,160 +461,971 @@ export default function Sources() {
     }
   }, [expandedSupplyId, paymentHistory, loadInitialPayments]);
 
-  const handleLoadMoreClick = (supplyId: number) => {
-    const state = paymentHistory[supplyId];
-    if (!state) return;
-    const nextIndex = state.currentPageIndex + 1;
-    const cachedPage = state.extraPages[nextIndex];
-    if (cachedPage) {
-      updatePaymentState(supplyId, (prev) => ({
+  const goToPage = useCallback(
+    (supplyId: number, targetPage: number) => {
+      const state = paymentHistory[supplyId];
+      if (!state) return;
+      const clampedTarget = Math.max(0, targetPage);
+
+      if (clampedTarget < state.pages.length) {
+        updatePaymentState(supplyId, (prev) => ({
+          ...prev,
+          currentPage: clampedTarget,
+        }));
+        return;
+      }
+
+      if (
+        clampedTarget === state.pages.length &&
+        state.hasMore &&
+        !state.loading
+      ) {
+        loadMorePayments(supplyId);
+      }
+    },
+    [paymentHistory, loadMorePayments, updatePaymentState]
+  );
+
+  const openAddSupplierModal = useCallback(() => {
+    setNewSupplierForm({
+      sourceName: "",
+      numberBank: "",
+      bankBin: bankOptions[0]?.bin || "",
+      status: STATUS_OPTIONS[0].value,
+    });
+    setAddModalError(null);
+    setAddModalOpen(true);
+  }, [bankOptions]);
+
+  const closeAddSupplierModal = useCallback(() => {
+    if (isCreatingSupplier) return;
+    setAddModalOpen(false);
+  }, [isCreatingSupplier]);
+
+  const handleNewSupplierChange = useCallback(
+    (field: keyof NewSupplierFormState, value: string) => {
+      setNewSupplierForm((prev) => ({
         ...prev,
-        currentPageIndex: nextIndex,
+        [field]: value,
       }));
-      return;
-    }
-    if (!state.hasMore || state.loading) return;
-    loadMorePayments(supplyId, state.nextOffset);
-  };
+    },
+    []
+  );
 
-  const handleLoadPreviousClick = (supplyId: number) => {
-    const state = paymentHistory[supplyId];
-    if (!state || state.currentPageIndex < 0) return;
-    updatePaymentState(supplyId, (prev) => ({
+  const handleCreateSupplierSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmedName = newSupplierForm.sourceName.trim();
+      if (!trimmedName) {
+        setAddModalError("Vui lòng nhập tên nhà cung cấp");
+        return;
+      }
+      if (!newSupplierForm.bankBin) {
+        setAddModalError("Vui lòng chọn ngân hàng");
+        return;
+      }
+      setIsCreatingSupplier(true);
+      setAddModalError(null);
+      try {
+        const payload = {
+          sourceName: trimmedName,
+          numberBank: newSupplierForm.numberBank.trim(),
+          bankBin: newSupplierForm.bankBin,
+          status: newSupplierForm.status,
+        };
+        const response = await apiFetch("/api/supplies", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          let message = "Không thể tạo nhà cung cấp.";
+          try {
+            const data = await response.json();
+            if (data?.error) message = data.error;
+          } catch {
+            /* ignore */
+          }
+          throw new Error(message);
+        }
+        await fetchSupplySummary();
+        closeAddSupplierModal();
+      } catch (error) {
+        console.error(error);
+        setAddModalError(
+          error instanceof Error ? error.message : "Không thể tạo nhà cung cấp"
+        );
+      } finally {
+        setIsCreatingSupplier(false);
+      }
+    },
+    [closeAddSupplierModal, fetchSupplySummary, newSupplierForm]
+  );
+
+  const fetchSupplyOverview = useCallback(async (supplyId: number) => {
+    setViewModalState((prev) => ({
       ...prev,
-      currentPageIndex: Math.max(prev.currentPageIndex - 1, -1),
+      loading: true,
+      error: null,
     }));
-  };
+    try {
+      const response = await apiFetch(`/api/supplies/${supplyId}/overview`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          errorText || "Không thể tải thông tin chi tiết nhà cung cấp"
+        );
+      }
+      const data: SupplyOverviewResponse = await response.json();
+      setViewModalState((prev) => ({
+        ...prev,
+        loading: false,
+        data,
+        selectedPaymentId: data.unpaidPayments[0]?.id ?? null,
+      }));
+    } catch (error) {
+      console.error(error);
+      setViewModalState((prev) => ({
+        ...prev,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Không thể tải thông tin chi tiết nhà cung cấp",
+      }));
+    }
+  }, []);
 
-  const renderPaymentRows = (rows: SupplyPayment[]) => {
+  const openViewModal = useCallback(
+    (supplyId: number) => {
+      setViewModalState({
+        isOpen: true,
+        loading: true,
+        error: null,
+        supplyId,
+        data: null,
+        selectedPaymentId: null,
+        confirming: false,
+        confirmError: null,
+      });
+      fetchSupplyOverview(supplyId);
+    },
+    [fetchSupplyOverview]
+  );
+
+  const closeViewModal = useCallback(() => {
+    setViewModalState({
+      isOpen: false,
+      loading: false,
+      error: null,
+      supplyId: null,
+      data: null,
+      selectedPaymentId: null,
+      confirming: false,
+      confirmError: null,
+    });
+  }, []);
+
+  const handleSelectPaymentCycle = useCallback((paymentId: number) => {
+    setViewModalState((prev) => ({
+      ...prev,
+      selectedPaymentId: paymentId,
+      confirmError: null,
+    }));
+  }, []);
+
+  const handleConfirmPayment = useCallback(async () => {
+    setViewModalState((prev) => ({
+      ...prev,
+      confirmError: null,
+      confirming: true,
+    }));
+    try {
+      const currentId = viewModalState.supplyId;
+      if (
+        !currentId ||
+        !viewModalState.data ||
+        !viewModalState.selectedPaymentId
+      ) {
+        throw new Error("Không tìm thấy chu kỳ thanh toán");
+      }
+      const payment = viewModalState.data.unpaidPayments.find(
+        (item) => item.id === viewModalState.selectedPaymentId
+      );
+      if (!payment) {
+        throw new Error("Không tìm thấy chu kỳ thanh toán");
+      }
+      const response = await apiFetch(
+        `/api/payment-supply/${payment.id}/confirm`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paidAmount: payment.totalImport }),
+        }
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Không thể xác nhận thanh toán.");
+      }
+      await fetchSupplyOverview(currentId);
+      await fetchSupplySummary();
+    } catch (error) {
+      console.error(error);
+      setViewModalState((prev) => ({
+        ...prev,
+        confirmError:
+          error instanceof Error
+            ? error.message
+            : "Không thể xác nhận thanh toán.",
+      }));
+    } finally {
+      setViewModalState((prev) => ({
+        ...prev,
+        confirming: false,
+      }));
+    }
+  }, [fetchSupplyOverview, fetchSupplySummary, viewModalState]);
+
+  const openEditForm = useCallback((supply: SupplySummaryItem) => {
+    setEditingSupplyId(supply.id);
+    setEditFormValues({
+      sourceName: supply.sourceName || "",
+      paymentInfo: supply.numberBank || "",
+      status: supply.status || STATUS_OPTIONS[0].value,
+    });
+  }, []);
+
+  const closeEditForm = useCallback(() => {
+    setEditingSupplyId(null);
+  }, []);
+
+  const handleEditInputChange = useCallback(
+    (field: keyof EditFormState, value: string) => {
+      setEditFormValues((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    []
+  );
+
+  const handleEditSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (editingSupplyId === null) return;
+      const trimmedName = editFormValues.sourceName.trim();
+      const trimmedPayment = editFormValues.paymentInfo.trim();
+      setSupplies((prev) =>
+        prev.map((supply) =>
+          supply.id === editingSupplyId
+            ? {
+                ...supply,
+                sourceName: trimmedName || supply.sourceName,
+                numberBank: trimmedPayment || null,
+                status: editFormValues.status,
+              }
+            : supply
+        )
+      );
+      closeEditForm();
+    },
+    [closeEditForm, editFormValues, editingSupplyId, setSupplies]
+  );
+
+  const renderPaymentRows = (rows: SupplyPayment[], initialized: boolean) => {
+    if (!initialized) {
+      return (
+        <tr>
+          <td
+            colSpan={4}
+            className="px-6 py-4 text-sm text-gray-500 text-center"
+          >
+            Đang tải dữ liệu thuật toán...
+          </td>
+        </tr>
+      );
+    }
+
     if (!rows.length) {
       return (
-        <div className="px-4 py-3 text-sm text-gray-500 border-t border-gray-100">
-          Chua co du lieu thanh toan.
-        </div>
+        <tr>
+          <td
+            colSpan={4}
+            className="px-6 py-4 text-sm text-gray-500 text-center"
+          >
+            Chưa có dữ liệu chu kỳ thanh toán.
+          </td>
+        </tr>
       );
     }
 
     return rows.map((row) => (
-      <div
+      <tr
         key={row.id}
-        className="grid grid-cols-4 gap-4 px-4 py-3 text-sm text-gray-700 border-t border-gray-100"
+        className="border-t border-gray-100 text-sm text-gray-800"
       >
-        <span className="font-medium text-gray-900">{row.round || "--"}</span>
-        <span>{formatCurrencyVnd(row.totalImport)}</span>
-        <span>{formatCurrencyVnd(row.paid)}</span>
-        <span className="text-gray-900">{row.status || "--"}</span>
-      </div>
+        <td className="px-6 py-4 font-medium text-gray-900 text-left sm:text-center">
+          {row.round || "--"}
+        </td>
+        <td className="px-6 py-4 text-center">
+          {formatCurrencyVnd(row.totalImport)}
+        </td>
+        <td className="px-6 py-4 text-center">{formatCurrencyVnd(row.paid)}</td>
+        <td className="px-6 py-4 text-center text-gray-900">
+          {row.status || "--"}
+        </td>
+      </tr>
     ));
   };
 
   const renderPaymentHistorySection = (supplyId: number) => {
     const state = paymentHistory[supplyId];
-    const isLoading = Boolean(state?.loading);
-    const baseRows = state?.baseRows ?? [];
-    const extraRows =
-      state && state.currentPageIndex >= 0
-        ? state.extraPages[state.currentPageIndex] ?? []
+    const currentRows =
+      state && state.pages[state.currentPage]
+        ? state.pages[state.currentPage]
         : [];
 
-    return (
-      <div className="text-left space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-gray-900">
-              Lich su thanh toan
-            </p>
-            <p className="text-xs text-gray-500">
-              Theo doi cac chu ky thanh toan cua nha cung cap
-            </p>
-          </div>
-          {state?.loading && (
-            <span className="text-xs text-blue-600">Dang tai...</span>
-          )}
-        </div>
+    const renderPaginationControls = () => {
+      if (!state || !state.initialized) return null;
+      const totalPages = state.pages.length;
+      const canGoPrev = state.currentPage > 0;
+      const canGoNext = state.hasMore || state.currentPage < totalPages - 1;
 
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-4 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50">
-            <span>Chu ky</span>
-            <span>Tong tien thanh toan</span>
-            <span>Da thanh toan</span>
-            <span>Tinh trang</span>
-          </div>
-          {state?.initialized
-            ? renderPaymentRows(baseRows)
-            : (
-              <div className="px-4 py-3 text-sm text-gray-500 border-t border-gray-100">
-                Dang tai du lieu thanh toan...
-              </div>
-            )}
+      if (totalPages <= 1 && !state.hasMore) return null;
+
+      const pageButtons = state.pages.map((_, index) => (
+        <button
+          key={index}
+          className={`w-9 h-9 rounded-lg text-sm font-medium transition ${
+            state.currentPage === index
+              ? "bg-orange-500 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+          onClick={() => goToPage(supplyId, index)}
+          disabled={state.loading && state.currentPage === index}
+        >
+          {index + 1}
+        </button>
+      ));
+
+      return (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <button
+            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            onClick={() => goToPage(supplyId, state.currentPage - 1)}
+            disabled={!canGoPrev}
+          >
+            &lt;
+          </button>
+
+          {pageButtons}
+
+          {state.hasMore && (
+            <>
+              <span className="text-gray-400 px-1">...</span>
+            </>
+          )}
+
+          <button
+            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            onClick={() => goToPage(supplyId, state.currentPage + 1)}
+            disabled={!canGoNext}
+          >
+            &gt;
+          </button>
         </div>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-gray-900">
+            Lịch sử thanh toán
+          </p>
+          <p className="text-xs text-gray-500">
+            Theo dõi chu kỳ thanh toán của nhà cung cấp.
+          </p>
+        </div>
+        {state?.loading && (
+          <div className="text-center text-xs text-blue-600">Đang tải...</div>
+        )}
 
         {state?.error && (
-          <div className="text-xs text-red-500">{state.error}</div>
+          <div className="text-center text-xs text-red-500">{state.error}</div>
         )}
 
-        {state &&
-          state.initialized &&
-          !baseRows.length &&
-          !isLoading &&
-          !state.error && (
-            <div className="text-xs text-gray-500">
-              Chua co chu ky thanh toan nao.
-            </div>
-          )}
+        <div className="flex justify-center">
+          <div className="w-full max-w-4xl rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wide">
+                <tr>
+                  <th className="px-6 py-3 text-left sm:text-center">Chu kỳ</th>
+                  <th className="px-6 py-3 text-center">
+                    Tổng tiền thanh toán
+                  </th>
+                  <th className="px-6 py-3 text-center">Đã Thanh Toán</th>
+                  <th className="px-6 py-3 text-center">Tình Trạng</th>
+                </tr>
+              </thead>
+              <tbody>
+                {renderPaymentRows(currentRows, Boolean(state?.initialized))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-        {state?.currentPageIndex === -1 && (
-          <div className="flex justify-end">
+        {/* {state &&
+          state.initialized &&
+          !currentRows.length &&
+          !state.loading &&
+          !state.error && (
+            <div className="text-center text-xs text-gray-500">
+              Chưa có chu kỳ thanh toán nào.
+            </div>
+          )} */}
+
+        {renderPaginationControls()}
+      </div>
+    );
+  };
+
+  const renderEditModal = () => {
+    if (editingSupplyId === null) return null;
+    const currentSupply = supplies.find(
+      (supply) => supply.id === editingSupplyId
+    );
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+        onClick={closeEditForm}
+      >
+        <div
+          className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-lg font-semibold text-gray-900">
+                Chỉnh sửa nhà cung cấp
+              </p>
+              <p className="text-xs text-gray-500">
+                Cập nhật thông tin thanh toán và trạng thái nhà cung cấp.
+              </p>
+            </div>
             <button
-              className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition disabled:opacity-50"
-              onClick={() => handleLoadMoreClick(supplyId)}
-              disabled={state.loading || !state.hasMore}
+              type="button"
+              className="text-gray-400 hover:text-gray-600"
+              onClick={closeEditForm}
             >
-              Tai them
+              &#10005;
             </button>
           </div>
-        )}
 
-        {state && state.currentPageIndex >= 0 && (
-          <div className="space-y-3 border-t border-gray-100 pt-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <button
-                className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-                onClick={() => handleLoadPreviousClick(supplyId)}
-                disabled={state.loading}
-              >
-                Tai lai
-              </button>
-              <span className="text-xs text-gray-500">
-                Dang xem cac chu ky truoc do
-              </span>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <div className="grid grid-cols-4 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50">
-                <span>Chu ky</span>
-                <span>Tong tien thanh toan</span>
-                <span>Da thanh toan</span>
-                <span>Tinh trang</span>
-              </div>
-              {renderPaymentRows(extraRows)}
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition disabled:opacity-50"
-                onClick={() => handleLoadMoreClick(supplyId)}
-                disabled={
-                  state.loading ||
-                  (!state.hasMore &&
-                    state.currentPageIndex >= state.extraPages.length - 1)
+          <form className="space-y-4" onSubmit={handleEditSubmit}>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên Nguồn
+              </label>
+              <input
+                type="text"
+                value={editFormValues.sourceName}
+                onChange={(event) =>
+                  handleEditInputChange("sourceName", event.target.value)
                 }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Nhap ten nguon"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Thanh Toán
+              </label>
+              <input
+                type="text"
+                value={editFormValues.paymentInfo}
+                onChange={(event) =>
+                  handleEditInputChange("paymentInfo", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Thong tin thanh toan"
+              />
+              {(currentSupply?.bankName ||
+                (currentSupply?.binBank
+                  ? bankNameByBin.get(currentSupply.binBank.trim())
+                  : null)) && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Ngân hàng hiện tại:{" "}
+                  {currentSupply?.bankName ||
+                    (currentSupply?.binBank
+                      ? bankNameByBin.get(currentSupply.binBank.trim())
+                      : "")}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trạng Thái
+              </label>
+              <select
+                value={editFormValues.status}
+                onChange={(event) =>
+                  handleEditInputChange("status", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
-                Tai them
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50"
+                onClick={closeEditForm}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Lưu Thông Tin
               </button>
             </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderViewSupplierModal = () => {
+    if (!viewModalState.isOpen) return null;
+    const supply = viewModalState.data?.supply;
+    const stats = viewModalState.data?.stats;
+    const unpaidPayments = viewModalState.data?.unpaidPayments || [];
+    const selectedPayment =
+      unpaidPayments.find(
+        (payment) => payment.id === viewModalState.selectedPaymentId
+      ) || null;
+    const bankLabel =
+      supply?.bankName ||
+      (supply?.binBank
+        ? bankNameByBin.get(supply.binBank.trim()) || `BIN ${supply.binBank}`
+        : "Chưa có ngân hàng");
+    const accountNumber = supply?.numberBank || "";
+    const accountName = supply?.sourceName || "";
+    const bankBin = supply?.binBank || "";
+    const qrAmount = selectedPayment?.totalImport || 0;
+    const qrMessage = selectedPayment?.round || `SUPPLIER-${supply?.id ?? ""}`;
+    const qrImageUrl =
+      accountNumber && bankBin
+        ? `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact2.png?amount=${Math.round(
+            Math.max(0, qrAmount)
+          )}&addInfo=${encodeURIComponent(
+            qrMessage
+          )}&accountName=${encodeURIComponent(accountName)}`
+        : null;
+
+    const statCards = [
+      {
+        title: "Tổng Đơn Hàng",
+        value: stats?.totalOrders ?? 0,
+        color: "bg-blue-500",
+        Icon: ClipboardDocumentListIcon,
+      },
+      {
+        title: "Đơn Hàng Hủy",
+        value: stats?.canceledOrders ?? 0,
+        color: "bg-red-500",
+        Icon: XCircleIcon,
+      },
+      {
+        title: "Đơn Tháng Này",
+        value: stats?.monthlyOrders ?? 0,
+        color: "bg-purple-500",
+        Icon: CalendarDaysIcon,
+      },
+      {
+        title: "Tổng Tiền Đã Thanh Toán",
+        value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
+        color: "bg-green-500",
+        Icon: CurrencyDollarIcon,
+      },
+    ];
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl max-h-[95vh] flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+            <div>
+              <p className="text-lg font-semibold text-gray-900">
+                Thông Tin Nhà Cung Cấp
+              </p>
+              {supply && (
+                <p className="text-xs text-gray-500">
+                  ID: {supply.id} | {supply.sourceName}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="text-gray-400 hover:text-gray-600"
+              onClick={closeViewModal}
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
           </div>
-        )}
+
+          <div className="px-6 py-5 overflow-y-auto space-y-6">
+            {viewModalState.loading && (
+              <div className="text-center text-sm text-gray-500">
+                Đang Tải Thông Tin...
+              </div>
+            )}
+
+            {viewModalState.error && !viewModalState.loading && (
+              <div className="text-center text-sm text-red-500">
+                {viewModalState.error}
+              </div>
+            )}
+
+            {!viewModalState.loading && !viewModalState.error && supply && (
+              <React.Fragment>
+                <section className="bg-white border border-gray-100 rounded-3xl p-6 shadow-lg">
+                  <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+                    <div className="flex-1 bg-white rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-2 border-gray-200 shadow-md">
+                      <div>
+                        <p className="text-gray-500">Tên Nhà Cung Cấp</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {supply.sourceName || "Chua dat ten"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Trạng Thái</p>
+                        <span
+                          className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 ${getStatusClasses(
+                            supply.status || "unknown"
+                          )}`}
+                        >
+                          {formatStatusLabel(supply.status || "Chưa Xác Định")}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Số Tài Khoản</p>
+                        <p className="text-base font-semibold text-gray-900">
+                          {accountNumber || "Chưa Cung Cấp"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Ngân Hàng</p>
+                        <p className="text-base font-semibold text-gray-900">
+                          {bankLabel}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex-[1.4] bg-white rounded-3xl p-5 border-2 border-gray-200 shadow-md">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {statCards.map((card) => {
+                          const IconComponent = card.Icon;
+                          return (
+                            <div
+                              key={card.title}
+                              className="bg-gray-50 rounded-2xl px-5 py-4 flex items-center gap-4 border border-gray-100 shadow-sm"
+                            >
+                              <div
+                                className={`${card.color} text-white rounded-2xl w-12 h-12 flex items-center justify-center`}
+                              >
+                                <IconComponent className="h-5 w-5" />
+                              </div>
+                              <div className="text-right flex-1">
+                                <p className="text-[11px] uppercase text-gray-500 tracking-wide">
+                                  {card.title}
+                                </p>
+                                <p className="text-xl font-extrabold text-gray-900">
+                                  {typeof card.value === "number"
+                                    ? card.value.toLocaleString("vi-VN")
+                                    : card.value}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Chu Kỳ Thanh Toán
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Chọn chu kỳ để hiện thông tin thanh toán và QR
+                      </p>
+                    </div>
+                  </div>
+
+                  {unpaidPayments.length === 0 ? (
+                    <div className="text-sm text-gray-500">
+                      Tất cả chu kỳ đã được thanh toán
+                    </div>
+                  ) : (
+                    <div className="grid lg:grid-cols-3 gap-6">
+                      <div className="space-y-3">
+                        {unpaidPayments.map((payment) => (
+                          <button
+                            key={payment.id}
+                            className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
+                              payment.id === viewModalState.selectedPaymentId
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            }`}
+                            onClick={() => handleSelectPaymentCycle(payment.id)}
+                          >
+                            <p className="text-sm font-semibold text-gray-900">
+                              {payment.round || "Chu kỳ không tên"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Tổng Tiền:{" "}
+                              {formatCurrencyVnd(payment.totalImport)}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        {selectedPayment ? (
+                          <div className="border border-gray-200 rounded-2xl p-6 space-y-4 bg-white shadow-sm">
+                            <div>
+                              <p className="text-sm text-gray-600">
+                                Thông Tin Chu Kỳ
+                              </p>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {selectedPayment.round || "Chu Kỳ Không Tên"}
+                              </p>
+                            </div>
+                            {qrImageUrl ? (
+                              <div className="flex flex-col items-center space-y-3">
+                                <img
+                                  src={qrImageUrl}
+                                  alt="QR Thanh Toán"
+                                  className="w-60 h-auto"
+                                />
+                                <p className="text-xs text-gray-500">
+                                  Quét Mã QR Để Thanh Toán
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500 text-center">
+                                Không có dữ liệu tạo mã QR (Thiếu thông tin tài
+                                khoản hoặc ngân hàng).
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <p className="text-gray-500">Ngân Hàng</p>
+                                <p className="font-semibold text-gray-900">
+                                  {bankLabel}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">So tai khoan</p>
+                                <p className="font-semibold text-gray-900">
+                                  {accountNumber || "Chưa Cung Cấp"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">
+                                  Chủ tài khoản / Nội dung
+                                </p>
+                                <p className="font-semibold text-gray-900">
+                                  {accountName}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Nội dung: {qrMessage}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Số Tiền</p>
+                                <p className="font-semibold text-red-600">
+                                  {formatCurrencyVnd(qrAmount)}
+                                </p>
+                              </div>
+                            </div>
+                            {viewModalState.confirmError && (
+                              <div className="text-xs text-red-500">
+                                {viewModalState.confirmError}
+                              </div>
+                            )}
+                            <div className="flex justify-end">
+                              <button
+                                className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                                onClick={handleConfirmPayment}
+                                disabled={viewModalState.confirming}
+                              >
+                                {viewModalState.confirming
+                                  ? "Đang xác nhận..."
+                                  : "Xác nhận thanh toán"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-sm text-gray-500">
+                            Chọn một chu kỳ để xem thông tin thanh toán
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </React.Fragment>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAddSupplierModal = () => {
+    if (!addModalOpen) return null;
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+        onClick={closeAddSupplierModal}
+      >
+        <div
+          className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-lg font-semibold text-gray-900">
+                Thêm nhà cung cấp
+              </p>
+              <p className="text-xs text-gray-500">
+                Nhập thông tin nhà cung cấp mới
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-gray-400 hover:text-gray-600"
+              onClick={closeAddSupplierModal}
+            >
+              &#10005;
+            </button>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleCreateSupplierSubmit}>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên nhà cung cấp
+              </label>
+              <input
+                type="text"
+                value={newSupplierForm.sourceName}
+                onChange={(event) =>
+                  handleNewSupplierChange("sourceName", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Nhập tên nhà cung cấp"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Số tài khoản
+              </label>
+              <input
+                type="text"
+                value={newSupplierForm.numberBank}
+                onChange={(event) =>
+                  handleNewSupplierChange("numberBank", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                placeholder="Nhập số tài khoản"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Ngân Hàng
+              </label>
+              <select
+                value={newSupplierForm.bankBin}
+                onChange={(event) =>
+                  handleNewSupplierChange("bankBin", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="" disabled>
+                  Chọn Ngân hàng
+                </option>
+                {bankOptions.map((bank) => {
+                  const label = bank.name || `BIN ${bank.bin}`;
+                  return (
+                    <option key={bank.bin} value={bank.bin}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trạng Thái
+              </label>
+              <select
+                value={newSupplierForm.status}
+                onChange={(event) =>
+                  handleNewSupplierChange("status", event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {addModalError && (
+              <div className="text-xs text-red-500">{addModalError}</div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50"
+                onClick={closeAddSupplierModal}
+                disabled={isCreatingSupplier}
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70"
+                disabled={isCreatingSupplier}
+              >
+                {isCreatingSupplier ? "Đang Lưu..." : "Thêm Nhà Cung Cấp"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   };
@@ -482,17 +1434,29 @@ export default function Sources() {
     fetchSupplySummary();
   }, [fetchSupplySummary]);
 
-  const productFilters = useMemo(() => {
-    const set = new Set<string>();
-    supplies.forEach((supply) => {
-      supply.products.forEach((product) => set.add(product));
-    });
-    return Array.from(set).sort();
-  }, [supplies]);
+  useEffect(() => {
+    const loadBanks = async () => {
+      try {
+        const response = await apiFetch("/api/banks");
+        if (!response.ok) {
+          throw new Error("Không thể tải danh sách ngân hàng");
+        }
+        const data: BankOption[] = await response.json();
+        setBankOptions(data);
+        setNewSupplierForm((prev) => ({
+          ...prev,
+          bankBin: prev.bankBin || data[0]?.bin || "",
+        }));
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    loadBanks();
+  }, []);
 
   const filteredSupplies = useMemo(() => {
     const formattedSearch = formatSearchValue(searchTerm);
-    return supplies.filter((supply) => {
+    const filtered = supplies.filter((supply) => {
       const matchesSearch =
         !formattedSearch ||
         supply.sourceName.toLowerCase().includes(formattedSearch) ||
@@ -505,275 +1469,288 @@ export default function Sources() {
       const matchesStatus =
         statusFilter === "all" || supply.status === statusFilter;
 
-      const matchesCategory =
-        categoryFilter === "all"
-          ? true
-          : categoryFilter === "no-products"
-          ? supply.products.length === 0
-          : supply.products.includes(categoryFilter);
-
-      return matchesSearch && matchesStatus && matchesCategory;
+      return matchesSearch && matchesStatus;
     });
-  }, [supplies, searchTerm, statusFilter, categoryFilter]);
+    return filtered.sort(compareSuppliersByPriority);
+  }, [supplies, searchTerm, statusFilter]);
+
+  const bankNameByBin = useMemo(() => {
+    const map = new Map<string, string>();
+    bankOptions.forEach((bank) => {
+      if (bank.bin) {
+        map.set(bank.bin.trim(), bank.name || "");
+      }
+    });
+    return map;
+  }, [bankOptions]);
 
   const supplierStats = useMemo(
     () => [
       {
-        name: "Tong nha cung cap",
+        name: "Tổng Nhà Cung Cấp",
         value: stats.totalSuppliers.toString(),
         color: "bg-blue-500",
+        Icon: UserGroupIcon,
       },
       {
-        name: "Dang hoat dong",
+        name: "Đang Hoạt Động",
         value: stats.activeSuppliers.toString(),
         color: "bg-green-500",
+        Icon: CheckCircleIcon,
       },
       {
-        name: "Don hang thang nay",
+        name: "Đơn Hàng Tháng Này",
         value: stats.monthlyOrders.toString(),
         color: "bg-purple-500",
+        Icon: ShoppingBagIcon,
       },
       {
-        name: "Gia tri nhap hang",
+        name: "Giá Trị Nhập Hàng",
         value: formatCurrencyShort(stats.totalImportValue),
         color: "bg-orange-500",
+        Icon: CurrencyDollarIcon,
       },
     ],
     [stats]
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Bang thong tin nguon
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Quan ly thong tin nha cung cap va doi tac
-          </p>
+    <React.Fragment>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Bảng Thông Tin Nguồn
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Quản lý thông tin nhà cung cấp và đối tác
+            </p>
+          </div>
+          <div className="mt-4 sm:mt-0">
+            <button
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={openAddSupplierModal}
+            >
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Thêm Nhà Cung Cấp
+            </button>
+          </div>
         </div>
-        <div className="mt-4 sm:mt-0">
-          <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Them nha cung cap
-          </button>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {supplierStats.map((stat, index) => (
-          <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center">
-              <div className={`${stat.color} rounded-lg p-3`}>
-                <div className="text-white text-xl font-bold">{index + 1}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {supplierStats.map((stat) => {
+            const IconComponent = stat.Icon;
+            return (
+              <div
+                key={stat.name}
+                className="bg-white rounded-xl p-6 shadow-sm"
+              >
+                <div className="flex items-center">
+                  <div className={`${stat.color} rounded-lg p-3 text-white`}>
+                    <IconComponent className="h-6 w-6" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">
+                      {stat.name}
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {stat.value}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
+            );
+          })}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm nhà cung cấp..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
             </div>
+
+            <select
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="active">Đang Hoạt Động</option>
+              <option value="inactive">Tạm Ngưng</option>
+            </select>
+
+            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+              Xuất Danh Sách
+            </button>
           </div>
-        ))}
-      </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tim kiem nha cung cap..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-
-          <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={categoryFilter}
-            onChange={(event) => setCategoryFilter(event.target.value)}
-          >
-            <option value="all">Tat ca nguon</option>
-            <option value="no-products">Chua gan san pham</option>
-            {productFilters.map((product) => (
-              <option key={product} value={product}>
-                {product}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-          >
-            <option value="all">Tat ca trang thai</option>
-            <option value="active">Dang hoat dong</option>
-            <option value="inactive">Tam ngung</option>
-          </select>
-
-          <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-            Xuat danh sach
-          </button>
+          {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden max-w-6xl mx-auto">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Nhà Cung Cấp
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Thanh Toán
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Đơn Trong Tháng
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Trạng Thái
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Đơn Hàng Cuối
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Đã Thanh Toán
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Chưa Thanh Toán
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                  Thao Tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden max-w-6xl mx-auto">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-4 text-center text-sm text-gray-500"
-                  >
-                    Dang tai du lieu...
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Nhà Cung Cấp
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Thanh Toán
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Đơn Trong Tháng
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Trạng Thái
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Đơn Hàng Cuối
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Đã Thanh Toán
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Chưa Thanh Toán
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Thao Tác
+                  </th>
                 </tr>
-              )}
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-6 py-4 text-center text-sm text-gray-500"
+                    >
+                      Đang Tải Dữ Liệu
+                    </td>
+                  </tr>
+                )}
 
-              {!loading && filteredSupplies.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-4 text-center text-sm text-gray-500"
-                  >
-                    Khong tim thay nha cung cap phu hop.
-                  </td>
-                </tr>
-              )}
+                {!loading && filteredSupplies.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-6 py-4 text-center text-sm text-gray-500"
+                    >
+                      Không tìm thấy nhà cung cấp phù hợp.
+                    </td>
+                  </tr>
+                )}
 
-              {!loading &&
-                filteredSupplies.map((supply) => {
-                  const isExpanded = expandedSupplyId === supply.id;
-                  return (
-                    <React.Fragment key={supply.id}>
-                      <tr
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSlotDetails(supply.id)}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                            <ChevronDownIcon
-                              className={`h-4 w-4 text-gray-400 transition-transform ${
-                                isExpanded ? "rotate-180" : ""
-                              }`}
-                            />
-                            <span>{supply.sourceName || "Chua dat ten"}</span>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Tong don: {supply.totalOrders}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {supply.numberBank || "Chua co so tai khoan"}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {supply.bankName ||
-                              (supply.binBank
-                                ? `BIN ${supply.binBank}`
-                                : "Chua co ngan hang")}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {supply.monthlyOrders} don
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatCurrencyVnd(supply.monthlyImportValue)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(
-                              supply.status
-                            )}`}
-                          >
-                            {formatStatusLabel(supply.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {getFormattedDate(supply.lastOrderDate)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          --
-                          {/* Placeholder until payment calculation is finalised */}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          --
-                          {/* Placeholder until payment calculation is finalised */}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            className="text-blue-600 hover:text-blue-900 mr-3"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                            }}
-                          >
-                            Xem
-                          </button>
-                          <button
-                            className="text-green-600 hover:text-green-900"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                            }}
-                          >
-                            Chinh sua
-                          </button>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={8} className="px-6 pb-6">
-                            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                              <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
-                                {renderPaymentHistorySection(supply.id)}
-                              </div>
+                {!loading &&
+                  filteredSupplies.map((supply) => {
+                    const isExpanded = expandedSupplyId === supply.id;
+                    return (
+                      <React.Fragment key={supply.id}>
+                        <tr
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => toggleSlotDetails(supply.id)}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                              <ChevronDownIcon
+                                className={`h-4 w-4 text-gray-400 transition-transform ${
+                                  isExpanded ? "rotate-180" : ""
+                                }`}
+                              />
+                              <span>{supply.sourceName || "Chưa đặt tên"}</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Tổng đơn: {supply.totalOrders}
                             </div>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {supply.numberBank || "Chưa có số tài khoản"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {supply.bankName ||
+                                (supply.binBank
+                                  ? bankNameByBin.get(supply.binBank.trim()) ||
+                                    `BIN ${supply.binBank}`
+                                  : "Chưa có ngân hàng")}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {supply.monthlyOrders} Đơn
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {formatCurrencyVnd(supply.monthlyImportValue)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(
+                                supply.status
+                              )}`}
+                            >
+                              {formatStatusLabel(supply.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {getFormattedDate(supply.lastOrderDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrencyVnd(supply.totalPaidImport)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrencyVnd(supply.totalUnpaidImport)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openViewModal(supply.id);
+                              }}
+                            >
+                              Xem
+                            </button>
+                            <button
+                              className="text-green-600 hover:text-green-900"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEditForm(supply);
+                              }}
+                            >
+                              Chỉnh Sửa
+                            </button>
+                          </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-            </tbody>
-          </table>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={8} className="px-6 pb-6">
+                              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+                                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
+                                  {renderPaymentHistorySection(supply.id)}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+      {renderViewSupplierModal()}
+      {renderAddSupplierModal()}
+      {renderEditModal()}
+    </React.Fragment>
   );
 }

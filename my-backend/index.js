@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -68,6 +68,23 @@ const createNumericExtraction = (column) => `
   END
 `;
 
+const VIETNAMESE_DIACRITICS =
+    "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ" +
+    "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ";
+const VIETNAMESE_ASCII =
+    "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd" +
+    "AAAAAAAAAAAAAAAAAEEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD";
+
+const createVietnameseStatusKey = (column) => `
+  LOWER(
+    TRANSLATE(
+      TRIM(${column}::text),
+      '${VIETNAMESE_DIACRITICS}',
+      '${VIETNAMESE_ASCII}'
+    )
+  )
+`;
+
 const normalizeDateInput = (value) => {
     if (value === undefined || value === null) return null;
     const trimmed = String(value).trim();
@@ -81,7 +98,7 @@ const toNullableNumber = (value) => {
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
 };
-const getNextAccountStorageId = async (client) => {
+const getNextAccountStorageId = async(client) => {
     const result = await client.query(
         `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.account_storage`
     );
@@ -172,14 +189,14 @@ const normalizeSupplyStatus = (value) => {
         .toLowerCase();
     if (!normalized) return "active";
     if (
-        ["active", "dang hoat dong", "hoat dong", "running"].includes(
+        ["active", "Đang hoạt động", "Hoạt động", "running"].includes(
             normalized
         )
     ) {
         return "active";
     }
     if (
-        ["inactive", "tam ngung", "tam dung", "pause", "paused"].includes(
+        ["inactive", "Tạm ngưng", "Tạm dừng", "pause", "paused"].includes(
             normalized
         )
     ) {
@@ -209,7 +226,7 @@ const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "is_active"];
 let supplyStatusColumnNameCache = null;
 let supplyStatusColumnResolved = false;
 
-const resolveSupplyStatusColumn = async () => {
+const resolveSupplyStatusColumn = async() => {
     if (supplyStatusColumnResolved) {
         return supplyStatusColumnNameCache;
     }
@@ -229,7 +246,7 @@ const resolveSupplyStatusColumn = async () => {
       LIMIT 1;
     `;
         const result = await client.query(detectionQuery, [SUPPLY_STATUS_CANDIDATES]);
-        supplyStatusColumnNameCache = result.rows[0]?.column_name || null;
+        supplyStatusColumnNameCache = result.rows?.[0]?.column_name || null;
     } catch (error) {
         console.warn("Unable to detect supply status column:", error.message || error);
         supplyStatusColumnNameCache = null;
@@ -289,20 +306,19 @@ const mapPackageProductRow = (row) => {
         accountUser: row.account_username ?? null,
         accountPass: row.account_password ?? null,
         accountMail: row.account_mail_2nd ?? null,
-    accountNote: row.account_note ?? null,
-    capacity: fromDbNumber(row.account_storage),
-    expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
-    slot: fromDbNumber(row.package_slot),
+        accountNote: row.account_note ?? null,
+        capacity: fromDbNumber(row.account_storage),
+        expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
+        slot: fromDbNumber(row.package_slot),
         slotUsed: null,
         capacityUsed: null,
     };
 };
-const fetchPackageProductById = async (client, id) => {
+const fetchPackageProductById = async(client, id) => {
     const numericId = Number(id);
     if (!Number.isFinite(numericId)) return null;
     const result = await client.query(
-        `${PACKAGE_PRODUCTS_SELECT} WHERE pp.id = $1`,
-        [numericId]
+        `${PACKAGE_PRODUCTS_SELECT} WHERE pp.id = $1`, [numericId]
     );
     if (!result.rows.length) return null;
     return mapPackageProductRow(result.rows[0]);
@@ -626,7 +642,7 @@ const formatYMDToDMY = (value) => {
     }
     match = str.match(/^(\d{4})(\d{2})(\d{2})$/);
     if (match) {
-    return `${match[3]}/${match[2]}/${match[1]}`;
+        return `${match[3]}/${match[2]}/${match[1]}`;
     }
     return "";
 };
@@ -677,29 +693,29 @@ const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
 
     const dbStatusRaw =
         typeof row.tinh_trang === "string" ? row.tinh_trang.trim() : "";
-    let autoStatus = dbStatusRaw || "Chua Thanh Toan";
+    let autoStatus = dbStatusRaw || "Chưa Thanh Toán";
     let autoCheckFlag = normalizeCheckFlagValue(row.check_flag);
 
-    if (autoStatus !== "Da Thanh Toan") {
+    if (autoStatus !== "Đã Thanh Toán") {
         if (Number.isFinite(soNgayConLai)) {
             if (soNgayConLai <= 0) {
-                autoStatus = "Het Han";
+                autoStatus = "Hết Hạn";
                 autoCheckFlag = null;
             } else if (soNgayConLai > 0 && soNgayConLai <= 4) {
-                autoStatus = "Can Gia Han";
+                autoStatus = "Cần Gia Hạn";
                 autoCheckFlag = null;
             }
         }
     }
 
-    if (autoStatus === "Da Thanh Toan" && autoCheckFlag === null) {
+    if (autoStatus === "Đã Thanh Toán" && autoCheckFlag === null) {
         autoCheckFlag = true;
     }
 
     const finalStatus = dbStatusRaw || autoStatus;
     const dbCheckFlag = normalizeCheckFlagValue(row.check_flag);
     const finalCheckFlag =
-        dbCheckFlag !== null ? dbCheckFlag : autoCheckFlag ?? null;
+        dbCheckFlag !== null ? dbCheckFlag : (autoCheckFlag ?? null);
 
     const registrationDisplay = formatYMDToDMY(registrationYmd);
     const expiryDisplay = formatYMDToDMY(expiryYmd);
@@ -754,6 +770,7 @@ app.get("/api/supply-insights", async(_req, res) => {
     const giaNhapCase = createNumericExtraction("gia_nhap");
     const supplySourceKey = createSourceKey("s.source_name");
     const statusColumnName = await resolveSupplyStatusColumn();
+    const paymentStatusKey = createVietnameseStatusKey("ps.status");
     const statusSelect = statusColumnName ?
         `s."${statusColumnName}"::text AS raw_status` :
         "NULL AS raw_status";
@@ -820,6 +837,26 @@ app.get("/api/supply-insights", async(_req, res) => {
       FROM mavryk.supply_price sp
       JOIN mavryk.product_price pp ON sp.product_id = pp.id
       GROUP BY sp.source_id
+    ),
+    payment_summary AS (
+      SELECT
+        ps.source_id,
+        SUM(
+          CASE
+            WHEN ${paymentStatusKey} = 'da thanh toan'
+              THEN COALESCE(ps.import, 0)
+            ELSE 0
+          END
+        ) AS total_paid_import,
+        SUM(
+          CASE
+            WHEN ${paymentStatusKey} = 'chua thanh toan'
+              THEN COALESCE(ps.import, 0)
+            ELSE 0
+          END
+        ) AS total_unpaid_import
+      FROM mavryk.payment_supply ps
+      GROUP BY ps.source_id
     )
     SELECT
       s.id,
@@ -832,7 +869,9 @@ app.get("/api/supply-insights", async(_req, res) => {
       COALESCE(month_data.monthly_orders, 0) AS monthly_orders,
       COALESCE(month_data.monthly_import_value, 0) AS monthly_import_value,
       COALESCE(last_order.last_order_date, NULL) AS last_order_date,
-      COALESCE(total_data.total_orders, 0) AS total_orders
+      COALESCE(total_data.total_orders, 0) AS total_orders,
+      COALESCE(payment_summary.total_paid_import, 0) AS total_paid_import,
+      COALESCE(payment_summary.total_unpaid_import, 0) AS total_unpaid_import
     FROM mavryk.supply s
     LEFT JOIN product_data ON product_data.source_id = s.id
     LEFT JOIN month_data
@@ -841,6 +880,8 @@ app.get("/api/supply-insights", async(_req, res) => {
       ON last_order.source_key = ${supplySourceKey}
     LEFT JOIN total_data
       ON total_data.source_key = ${supplySourceKey}
+    LEFT JOIN payment_summary
+      ON payment_summary.source_id = s.id
     LEFT JOIN mavryk.bank_list bl
       ON TRIM(bl.bin::text) = TRIM(s.bin_bank::text)
     ORDER BY s.source_name;
@@ -861,6 +902,8 @@ app.get("/api/supply-insights", async(_req, res) => {
             monthlyImportValue: Number(row.monthly_import_value) || 0,
             lastOrderDate: formatDateOutput(row.last_order_date),
             totalOrders: Number(row.total_orders) || 0,
+            totalPaidImport: Number(row.total_paid_import) || 0,
+            totalUnpaidImport: Number(row.total_unpaid_import) || 0,
         }));
         const stats = supplies.reduce(
             (acc, supply) => {
@@ -871,8 +914,7 @@ app.get("/api/supply-insights", async(_req, res) => {
                 acc.monthlyOrders += supply.monthlyOrders;
                 acc.totalImportValue += supply.monthlyImportValue;
                 return acc;
-            },
-            {
+            }, {
                 totalSuppliers: 0,
                 activeSuppliers: 0,
                 monthlyOrders: 0,
@@ -1031,6 +1073,314 @@ app.get("/api/products/supplies-by-name/:productName", async(req, res) => {
     }
 });
 
+app.get("/api/banks", async(_req, res) => {
+    console.log("[GET] /api/banks");
+    const q = `
+    SELECT
+      TRIM(bin::text) AS bin,
+      TRIM(bank_name::text) AS bank_name
+    FROM mavryk.bank_list
+    WHERE TRIM(bin::text) <> ''
+    ORDER BY bank_name;
+  `;
+    try {
+        const result = await pool.query(q);
+        const banks = (result.rows || []).map((row) => ({
+            bin: row.bin || "",
+            name: row.bank_name || "",
+        }));
+        res.json(banks);
+    } catch (error) {
+        console.error("Query failed (GET /api/banks):", error);
+        res.status(500).json({
+            error: "Unable to load bank list.",
+        });
+    }
+});
+
+app.post("/api/supplies", async(req, res) => {
+    console.log("[POST] /api/supplies", req.body);
+    const { sourceName, numberBank, bankBin, status } = req.body || {};
+    const trimmedName = typeof sourceName === "string" ? sourceName.trim() : "";
+    const trimmedAccount = typeof numberBank === "string" ?
+        numberBank.trim() :
+        "";
+    const trimmedBin = typeof bankBin === "string" ? bankBin.trim() : "";
+    const trimmedStatus = typeof status === "string" ? status.trim() : "";
+
+    if (!trimmedName) {
+        return res.status(400).json({
+            error: "Supplier name is required.",
+        });
+    }
+    if (!trimmedBin) {
+        return res.status(400).json({
+            error: "Bank selection is required.",
+        });
+    }
+
+    try {
+        const statusColumn = await resolveSupplyStatusColumn();
+        const fields = ["source_name", "number_bank", "bin_bank"];
+        const values = [trimmedName, trimmedAccount || null, trimmedBin];
+        if (statusColumn && trimmedStatus) {
+            fields.push(`"${statusColumn}"`);
+            values.push(trimmedStatus);
+        }
+        const placeholders = values.map((_, index) => `$${index + 1}`);
+        const insertQuery = `
+      INSERT INTO mavryk.supply (${fields.join(", ")})
+      VALUES (${placeholders.join(", ")})
+      RETURNING id;
+    `;
+        const insertResult = await pool.query(insertQuery, values);
+        const newId = insertResult.rows?.[0]?.id;
+        if (!newId) {
+            return res
+                .status(500)
+                .json({ error: "Unable to create supplier record." });
+        }
+
+        const detailQuery = `
+      SELECT
+        s.id,
+        s.source_name,
+        s.number_bank,
+        s.bin_bank,
+        COALESCE(bl.bank_name, '') AS bank_name
+      FROM mavryk.supply s
+      LEFT JOIN mavryk.bank_list bl
+        ON TRIM(bl.bin::text) = TRIM(s.bin_bank::text)
+      WHERE s.id = $1
+      LIMIT 1;
+    `;
+        const detailResult = await pool.query(detailQuery, [newId]);
+        const row = detailResult.rows[0];
+        res.status(201).json({
+            id: row?.id || newId,
+            sourceName: row?.source_name || trimmedName,
+            numberBank: row?.number_bank || trimmedAccount || null,
+            binBank: row?.bin_bank || trimmedBin || null,
+            bankName: row?.bank_name || null,
+            status: trimmedStatus || null,
+        });
+    } catch (error) {
+        console.error("Mutation failed (POST /api/supplies):", error);
+        res.status(500).json({
+            error: "Unable to create supplier.",
+        });
+    }
+});
+
+app.get("/api/supplies/:supplyId/overview", async(req, res) => {
+    const { supplyId } = req.params;
+    console.log(`[GET] /api/supplies/${supplyId}/overview`);
+
+    const parsedSupplyId = Number.parseInt(supplyId, 10);
+    if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
+        return res.status(400).json({
+            error: "Invalid supply id.",
+        });
+    }
+
+    const client = await pool.connect();
+    try {
+        const statusColumnName = await resolveSupplyStatusColumn();
+        const statusSelect = statusColumnName ?
+            `s."${statusColumnName}"::text AS raw_status` :
+            "NULL AS raw_status";
+        const supplySourceKey = createSourceKey("s.source_name");
+        const { monthStart, nextMonthStart } = getCurrentMonthRange();
+        const paymentStatusKey = createVietnameseStatusKey("ps.status");
+
+        const supplyQuery = `
+      SELECT
+        s.id,
+        s.source_name,
+        s.number_bank,
+        s.bin_bank,
+        ${statusSelect},
+        COALESCE(bl.bank_name, '') AS bank_name,
+        ${supplySourceKey} AS supply_key
+      FROM mavryk.supply s
+      LEFT JOIN mavryk.bank_list bl
+        ON TRIM(bl.bin::text) = TRIM(s.bin_bank::text)
+      WHERE s.id = $1
+      LIMIT 1;
+    `;
+        const supplyResult = await client.query(supplyQuery, [parsedSupplyId]);
+        if (!supplyResult.rows.length) {
+            return res.status(404).json({ error: "Supplier not found." });
+        }
+        const supplyRow = supplyResult.rows[0];
+        const supplyKey = supplyRow.supply_key || "";
+
+        let totalOrders = 0;
+        let monthlyOrders = 0;
+        if (supplyKey) {
+            const statsQuery = `
+        WITH orders_union AS (
+          SELECT
+            ${createDateNormalization("ngay_dang_ki")} AS order_date,
+            COALESCE(${createSourceKey("nguon")}, '') AS source_key
+          FROM mavryk.order_list
+          WHERE TRIM(nguon::text) <> ''
+          UNION ALL
+          SELECT
+            ${createDateNormalization("ngay_dang_ki")} AS order_date,
+            COALESCE(${createSourceKey("nguon")}, '') AS source_key
+          FROM mavryk.order_expired
+          WHERE TRIM(nguon::text) <> ''
+          UNION ALL
+          SELECT
+            ${createDateNormalization("ngay_dang_ki")} AS order_date,
+            COALESCE(${createSourceKey("nguon")}, '') AS source_key
+          FROM mavryk.order_canceled
+          WHERE TRIM(nguon::text) <> ''
+        )
+        SELECT
+          COUNT(*) AS total_orders,
+          COUNT(*) FILTER (
+            WHERE order_date >= $2::date
+              AND order_date < $3::date
+          ) AS monthly_orders
+        FROM orders_union
+        WHERE source_key = $1;
+      `;
+            const statsResult = await client.query(statsQuery, [
+                supplyKey,
+                monthStart,
+                nextMonthStart,
+            ]);
+            const statsRow = statsResult.rows[0] || {};
+            totalOrders = Number(statsRow.total_orders) || 0;
+            monthlyOrders = Number(statsRow.monthly_orders) || 0;
+        }
+
+        let canceledOrders = 0;
+        if (supplyKey) {
+            const canceledQuery = `
+        SELECT COUNT(*) AS canceled_orders
+        FROM mavryk.order_canceled
+        WHERE TRIM(nguon::text) <> ''
+          AND ${createSourceKey("nguon")} = $1;
+      `;
+            const canceledResult = await client.query(canceledQuery, [supplyKey]);
+            canceledOrders = Number(canceledResult.rows?.[0]?.canceled_orders) || 0;
+        }
+
+        const totalPaidQuery = `
+      SELECT
+        COALESCE(
+          SUM(
+            CASE WHEN ${paymentStatusKey} = 'da thanh toan'
+              THEN COALESCE(ps.paid, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS total_paid_amount
+      FROM mavryk.payment_supply ps
+      WHERE ps.source_id = $1;
+    `;
+        const totalPaidResult = await client.query(totalPaidQuery, [parsedSupplyId]);
+        const totalPaidAmount = Number(totalPaidResult.rows?.[0]?.total_paid_amount) || 0;
+
+        const unpaidQuery = `
+      SELECT
+        ps.id,
+        ps.round,
+        COALESCE(ps.import, 0) AS import_value,
+        COALESCE(ps.paid, 0) AS paid_value,
+        COALESCE(ps.status, '') AS status_label
+      FROM mavryk.payment_supply ps
+      WHERE ps.source_id = $1
+        AND ${paymentStatusKey} = 'chua thanh toan'
+      ORDER BY ps.id DESC;
+    `;
+        const unpaidResult = await client.query(unpaidQuery, [parsedSupplyId]);
+        const unpaidPayments = (unpaidResult.rows || []).map((row) => ({
+            id: row.id,
+            round: row.round || "",
+            totalImport: Number(row.import_value) || 0,
+            paid: Number(row.paid_value) || 0,
+            status: row.status_label || "",
+        }));
+
+        res.json({
+            supply: {
+                id: supplyRow.id,
+                sourceName: supplyRow.source_name || "",
+                numberBank: supplyRow.number_bank || null,
+                binBank: supplyRow.bin_bank || null,
+                bankName: supplyRow.bank_name || null,
+                status: normalizeSupplyStatus(supplyRow.raw_status),
+                rawStatus: supplyRow.raw_status || null,
+            },
+            stats: {
+                totalOrders,
+                canceledOrders,
+                monthlyOrders,
+                totalPaidAmount,
+            },
+            unpaidPayments,
+        });
+    } catch (error) {
+        console.error("Query failed (GET /api/supplies/:id/overview):", error);
+        res.status(500).json({
+            error: "Unable to load supplier overview.",
+        });
+    } finally {
+        client.release();
+    }
+});
+
+app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
+    const { paymentId } = req.params;
+    console.log(`[POST] /api/payment-supply/${paymentId}/confirm`, req.body);
+
+    const parsedPaymentId = Number.parseInt(paymentId, 10);
+    if (!Number.isInteger(parsedPaymentId) || parsedPaymentId <= 0) {
+        return res.status(400).json({
+            error: "Invalid payment id.",
+        });
+    }
+
+    const paidAmountRaw = req.body?.paidAmount;
+    const paidAmountNumber = Number(paidAmountRaw);
+    const hasPaidAmount = Number.isFinite(paidAmountNumber) && paidAmountNumber >= 0;
+
+    try {
+        const updateQuery = `
+      UPDATE mavryk.payment_supply
+      SET status = 'Đã Thanh Toán',
+          paid = CASE
+            WHEN $2::numeric IS NOT NULL AND $2::numeric >= 0
+              THEN $2::numeric
+            ELSE COALESCE(import, 0)
+          END
+      WHERE id = $1
+      RETURNING id, source_id, import, paid, status, round;
+    `;
+        const result = await pool.query(updateQuery, [
+            parsedPaymentId,
+            hasPaidAmount ? paidAmountNumber : null,
+        ]);
+        if (!result.rows.length) {
+            return res.status(404).json({ error: "Payment record not found." });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error(
+            `Mutation failed (POST /api/payment-supply/${paymentId}/confirm):`,
+            error
+        );
+        res.status(500).json({
+            error: "Unable to confirm payment.",
+        });
+    }
+});
+
 app.post("/api/calculate-price", async(req, res) => {
     console.log("[POST] /api/calculate-price");
     const { san_pham_name, id_don_hang, customer_type } = req.body || {};
@@ -1111,11 +1461,10 @@ app.post("/api/calculate-price", async(req, res) => {
           SELECT MAX(price) AS max_price
           FROM mavryk.supply_price
           WHERE product_id = $1;
-        `,
-                    [productPricing.id]
+        `, [productPricing.id]
                 );
 
-                const maxPrice = Number(supplyPriceResult.rows[0]?.max_price);
+                const maxPrice = Number(supplyPriceResult.rows?.[0]?.max_price);
                 if (Number.isFinite(maxPrice) && maxPrice > 0) {
                     basePrice = maxPrice;
                     giaNhap = maxPrice;
@@ -1181,7 +1530,7 @@ app.post("/api/orders", async(req, res) => {
 
     payload.ngay_dang_ki = normalizeDateInput(payload.ngay_dang_ki);
     payload.het_han = normalizeDateInput(payload.het_han);
-    payload.tinh_trang = "Chua Thanh Toan";
+    payload.tinh_trang = "Chưa Thanh Toán";
     payload.check_flag = null;
 
     const columns = Object.keys(payload);
@@ -1265,7 +1614,7 @@ app.listen(port, () => {
 });
 
 // Package products: export data with account storage details
-app.get("/api/package-products", async (_req, res) => {
+app.get("/api/package-products", async(_req, res) => {
     console.log("[GET] /api/package-products");
     try {
         const result = await pool.query(`${PACKAGE_PRODUCTS_SELECT} ORDER BY pp.id ASC`);
@@ -1276,7 +1625,7 @@ app.get("/api/package-products", async (_req, res) => {
         res.status(500).json({ error: "Unable to load package products." });
     }
 });
-app.post("/api/package-products", async (req, res) => {
+app.post("/api/package-products", async(req, res) => {
     console.log("[POST] /api/package-products");
     const {
         packageName,
@@ -1313,8 +1662,7 @@ app.post("/api/package-products", async (req, res) => {
           (package, username, password, "mail 2nd", note, supplier, "Import", expired, slot)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id;
-      `,
-            [
+      `, [
                 trimmedPackageName,
                 informationUser || null,
                 informationPass || null,
@@ -1333,23 +1681,22 @@ app.post("/api/package-products", async (req, res) => {
         if (packageId === null) {
             throw new Error("Package insert returned invalid id.");
         }
-    const mailFamily = informationUser || null;
-    let createdAccountStorageId = null;
-    if (hasAccountStoragePayload({
-        accountUser,
-        accountPass,
-        accountMail,
-        accountNote,
-        capacity,
-    })) {
-        const nextStorageId = await getNextAccountStorageId(client);
-        await client.query(
-            `
+        const mailFamily = informationUser || null;
+        let createdAccountStorageId = null;
+        if (hasAccountStoragePayload({
+                accountUser,
+                accountPass,
+                accountMail,
+                accountNote,
+                capacity,
+            })) {
+            const nextStorageId = await getNextAccountStorageId(client);
+            await client.query(
+                `
           INSERT INTO mavryk.account_storage
             (id, username, password, "Mail 2nd", note, storage, "Mail Family")
           VALUES ($1, $2, $3, $4, $5, $6, $7);
-        `,
-                [
+        `, [
                     nextStorageId,
                     accountUser || null,
                     accountPass || null,
@@ -1399,7 +1746,7 @@ app.post("/api/package-products", async (req, res) => {
         client.release();
     }
 });
-app.put("/api/package-products/:id", async (req, res) => {
+app.put("/api/package-products/:id", async(req, res) => {
     const { id } = req.params;
     console.log(`[PUT] /api/package-products/${id}`);
     if (!id) {
@@ -1454,8 +1801,7 @@ app.put("/api/package-products/:id", async (req, res) => {
             slot = $9
         WHERE id = $10
         RETURNING id;
-      `,
-            [
+      `, [
                 trimmedPackageName,
                 informationUser || null,
                 informationPass || null,
@@ -1492,8 +1838,7 @@ app.put("/api/package-products/:id", async (req, res) => {
               storage = $5,
               "Mail Family" = $6
           WHERE id = $7;
-        `,
-                [
+        `, [
                     accountUser || null,
                     accountPass || null,
                     accountMail || null,
@@ -1511,8 +1856,7 @@ app.put("/api/package-products/:id", async (req, res) => {
           INSERT INTO mavryk.account_storage
             (id, username, password, "Mail 2nd", note, storage, "Mail Family")
           VALUES ($1, $2, $3, $4, $5, $6, $7);
-        `,
-                [
+        `, [
                     nextStorageId,
                     accountUser || null,
                     accountPass || null,
