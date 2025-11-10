@@ -163,6 +163,20 @@ export const formatCurrencyPlain = (value: number): string => {
   return n > 0 ? n.toLocaleString("vi-VN") : "";
 };
 
+export const formatCurrencyShort = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return "₫0";
+  if (value >= 1_000_000_000) {
+    return `₫${(value / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `₫${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `₫${(value / 1_000).toFixed(1)}K`;
+  }
+  return `₫${Math.round(value).toLocaleString("vi-VN")}`;
+};
+
 // Misc helpers
 export const generateRandomId = (length: number): string => {
   return Math.random().toString(36).substring(2, 2 + length).toUpperCase();

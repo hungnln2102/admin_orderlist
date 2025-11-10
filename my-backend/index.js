@@ -1030,6 +1030,51 @@ app.get("/api/supplies/:supplyId/payments", async(req, res) => {
     }
 });
 
+app.get("/api/payment-receipts", async(req, res) => {
+    console.log("[GET] /api/payment-receipts", req.query);
+    const limitParam = Number.parseInt(req.query.limit, 10);
+    const offsetParam = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isFinite(limitParam) ?
+        Math.min(Math.max(limitParam, 1), 500) :
+        200;
+    const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
+
+    const query = `
+    SELECT
+      id,
+      COALESCE(ma_don_hang::text, '') AS ma_don_hang,
+      COALESCE(ngay_thanh_toan::text, '') AS ngay_thanh_toan,
+      COALESCE(so_tien, 0) AS so_tien,
+      COALESCE(nguoi_gui::text, '') AS nguoi_gui,
+      COALESCE(noi_dung_ck::text, '') AS noi_dung_ck
+    FROM mavryk.payment_receipt
+    ORDER BY
+      NULLIF(ngay_thanh_toan::text, '') DESC NULLS LAST,
+      id DESC
+    OFFSET $1
+    LIMIT $2;
+  `;
+
+    try {
+        const result = await pool.query(query, [offset, limit]);
+        const rows = result.rows || [];
+        const receipts = rows.map((row) => ({
+            id: row.id,
+            orderCode: row.ma_don_hang,
+            paidAt: row.ngay_thanh_toan,
+            amount: Number(row.so_tien) || 0,
+            sender: row.nguoi_gui,
+            note: row.noi_dung_ck,
+        }));
+        res.json({ receipts, count: receipts.length, offset, limit });
+    } catch (error) {
+        console.error("Query failed (GET /api/payment-receipts):", error);
+        res.status(500).json({
+            error: "Unable to load payment receipts.",
+        });
+    }
+});
+
 app.get("/api/products", async(_req, res) => {
     console.log("[GET] /api/products");
     const q = `

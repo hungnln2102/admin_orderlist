@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -8,351 +8,459 @@ import {
   CheckCircleIcon,
   ClockIcon,
   XCircleIcon,
+  CalendarDaysIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
-
-const invoices = [
-  {
-    id: "INV-001",
-    orderId: "#ORD-001",
-    customer: "Nguyễn Văn A",
-    email: "nguyenvana@email.com",
-    amount: 1250000,
-    tax: 125000,
-    total: 1375000,
-    status: "paid",
-    statusText: "Đã thanh toán",
-    method: "Chuyển khoản",
-    issueDate: "15/12/2024",
-    dueDate: "22/12/2024",
-    paidDate: "16/12/2024",
-  },
-  {
-    id: "INV-002",
-    orderId: "#ORD-002",
-    customer: "Trần Thị B",
-    email: "tranthib@email.com",
-    amount: 850000,
-    tax: 85000,
-    total: 935000,
-    status: "pending",
-    statusText: "Chờ thanh toán",
-    method: "Tiền mặt",
-    issueDate: "15/12/2024",
-    dueDate: "22/12/2024",
-    paidDate: null,
-  },
-  {
-    id: "INV-003",
-    orderId: "#ORD-003",
-    customer: "Lê Văn C",
-    email: "levanc@email.com",
-    amount: 2100000,
-    tax: 210000,
-    total: 2310000,
-    status: "overdue",
-    statusText: "Quá hạn",
-    method: "Chuyển khoản",
-    issueDate: "10/12/2024",
-    dueDate: "17/12/2024",
-    paidDate: null,
-  },
-  {
-    id: "INV-004",
-    orderId: "#ORD-004",
-    customer: "Phạm Thị D",
-    email: "phamthid@email.com",
-    amount: 675000,
-    tax: 67500,
-    total: 742500,
-    status: "paid",
-    statusText: "Đã thanh toán",
-    method: "Ví điện tử",
-    issueDate: "14/12/2024",
-    dueDate: "21/12/2024",
-    paidDate: "14/12/2024",
-  },
-  {
-    id: "INV-005",
-    orderId: "#ORD-005",
-    customer: "Hoàng Văn E",
-    email: "hoangvane@email.com",
-    amount: 1450000,
-    tax: 145000,
-    total: 1595000,
-    status: "partial",
-    statusText: "Thanh toán 1 phần",
-    method: "Chuyển khoản",
-    issueDate: "13/12/2024",
-    dueDate: "20/12/2024",
-    paidDate: null,
-  },
-];
-
-const invoiceStats = [
-  {
-    name: "Tổng hóa đơn",
-    value: "2,847",
-    icon: CheckCircleIcon,
-    color: "bg-blue-500",
-  },
-  {
-    name: "Đã thanh toán",
-    value: "₫98M",
-    icon: CheckCircleIcon,
-    color: "bg-green-500",
-  },
-  {
-    name: "Chờ thanh toán",
-    value: "₫12M",
-    icon: ClockIcon,
-    color: "bg-yellow-500",
-  },
-  {
-    name: "Quá hạn",
-    value: "₫2.3M",
-    icon: XCircleIcon,
-    color: "bg-red-500",
-  },
-];
-
 import * as Helpers from "../lib/helpers";
+import { apiFetch } from "../lib/api";
+
+interface PaymentReceipt {
+  id: number;
+  orderCode: string;
+  paidAt: string;
+  amount: number;
+  sender: string;
+  note: string;
+}
+
+type ReceiptCategory = "receipt" | "refund";
+
+const formatCurrencyVnd = (value: number): string => {
+  if (!Number.isFinite(value)) return "VND 0";
+  return `VND ${Math.round(value).toLocaleString("vi-VN")}`;
+};
+
+const CATEGORY_OPTIONS: {
+  value: ReceiptCategory;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "receipt",
+    label: "Receipt",
+    description: "Order code starts with MAV",
+  },
+  {
+    value: "refund",
+    label: "Refund",
+    description: "Other incoming transfers",
+  },
+];
 
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [methodFilter, setMethodFilter] = useState("all");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<ReceiptCategory>(
+    "receipt"
+  );
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(
+    null
+  );
+  const [rangePickerOpen, setRangePickerOpen] = useState(false);
+  const dateRangeRef = useRef<HTMLDivElement | null>(null);
 
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch =
-      invoice.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.orderId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === "all" || invoice.status === statusFilter;
-    const matchesMethod =
-      methodFilter === "all" || invoice.method === methodFilter;
-    return matchesSearch && matchesStatus && matchesMethod;
-  });
+  const filteredReceipts = useMemo(() => {
+    const normalized = searchTerm.trim().toLowerCase();
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "overdue":
-        return "bg-red-100 text-red-800";
-      case "partial":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    const parseDate = (value: string): number | null => {
+      const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!match) return null;
+      const [, d, m, y] = match.map(Number);
+      return new Date(y, m - 1, d).getTime();
+    };
+
+    const startTime = parseDate(dateStart);
+    const endTime = parseDate(dateEnd);
+
+    const determineCategory = (orderCode: string | null | undefined) => {
+      const normalized = (orderCode || "").toUpperCase().trim();
+      if (!normalized) return "refund";
+      return normalized.startsWith("MAV") ? "receipt" : "refund";
+    };
+
+    return receipts.filter((item) => {
+      const recordCategory = determineCategory(item.orderCode);
+      const matchesSearch =
+        !normalized ||
+        [item.orderCode, item.note, item.sender]
+          .map((value) => value?.toLowerCase() ?? "")
+          .some((value) => value.includes(normalized));
+
+      const paidTimestamp = parseDate(
+        Helpers.formatDateToDMY(item.paidAt) || ""
+      );
+
+      const withinStart =
+        startTime === null || paidTimestamp === null || paidTimestamp >= startTime;
+      const withinEnd =
+        endTime === null || paidTimestamp === null || paidTimestamp <= endTime;
+
+      const matchesCategory = recordCategory === categoryFilter;
+
+      return matchesSearch && withinStart && withinEnd && matchesCategory;
+    });
+  }, [receipts, searchTerm, dateStart, dateEnd, categoryFilter]);
+
+  const stats = useMemo(() => {
+    const totalAmount = receipts.reduce((sum, item) => {
+      return (item.orderCode || "").toUpperCase().startsWith("MAV")
+        ? sum + item.amount
+        : sum;
+    }, 0);
+    const uniqueSenders = new Set(receipts.map((item) => item.sender)).size;
+    const latestPaidAt = receipts.length > 0 ? receipts[0].paidAt ?? "" : "";
+
+    return [
+      {
+        name: "Total receipts",
+        value: receipts.length.toString(),
+        icon: CheckCircleIcon,
+        color: "bg-blue-500",
+      },
+      {
+        name: "Total amount",
+        value: Helpers.formatCurrencyShort(totalAmount),
+        icon: CheckCircleIcon,
+        color: "bg-green-500",
+      },
+      {
+        name: "Unique senders",
+        value: uniqueSenders.toString(),
+        icon: ClockIcon,
+        color: "bg-yellow-500",
+      },
+      {
+        name: "Latest payment",
+        value: latestPaidAt
+          ? Helpers.formatDateToDMY(latestPaidAt) ?? "--"
+          : "--",
+        icon: XCircleIcon,
+        color: "bg-purple-500",
+      },
+    ];
+  }, [receipts]);
+
+  const categoryCounts = useMemo(() => {
+    return receipts.reduce(
+      (acc, item) => {
+        const code = (item.orderCode || "").toUpperCase();
+        if (code.startsWith("MAV")) {
+          acc.receipt += 1;
+        } else {
+          acc.refund += 1;
+        }
+        return acc;
+      },
+      { receipt: 0, refund: 0 } as Record<ReceiptCategory, number>
+    );
+  }, [receipts]);
+
+  useEffect(() => {
+    const fetchReceipts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await apiFetch("/api/payment-receipts");
+        if (!response.ok) {
+          throw new Error("Unable to load payment receipts.");
+        }
+        const data = await response.json();
+        setReceipts(Array.isArray(data.receipts) ? data.receipts : []);
+      } catch (err) {
+        console.error(err);
+        setError(
+          err instanceof Error ? err.message : "Unable to load payment receipts."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReceipts();
+  }, []);
+
+  const handleViewReceipt = (receipt: PaymentReceipt) => {
+    setSelectedReceipt(receipt);
+    setViewModalOpen(true);
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "paid":
-        return <CheckCircleIcon className="h-4 w-4 text-green-600" />;
-      case "pending":
-        return <ClockIcon className="h-4 w-4 text-yellow-600" />;
-      case "overdue":
-        return <XCircleIcon className="h-4 w-4 text-red-600" />;
-      case "partial":
-        return <ClockIcon className="h-4 w-4 text-blue-600" />;
-      default:
-        return null;
-    }
+  const closeViewModal = () => {
+    setSelectedReceipt(null);
+    setViewModalOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dateRangeRef.current &&
+        !dateRangeRef.current.contains(event.target as Node)
+      ) {
+        setRangePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toDisplayDate = (value: string): string => {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return value;
+    const [, y, m, d] = match;
+    return `${d}/${m}/${y}`;
+  };
+
+  const dateRangeDisplay =
+    dateStart && dateEnd
+      ? `${dateStart} - ${dateEnd}`
+      : "dd/mm/yyyy - dd/mm/yyyy";
+
+  const toISODate = (value: string): string => {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return "";
+    const [, d, m, y] = match;
+    return `${y}-${m}-${d}`;
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Biên lai thanh toán
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Payment receipts</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý hóa đơn và theo dõi thanh toán
+            Track incoming transfers recorded in the database
           </p>
         </div>
-        <div className="mt-4 sm:mt-0">
-          <button className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Tạo hóa đơn mới
-          </button>
-        </div>
+        <button className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition">
+          <PlusIcon className="w-4 h-4 mr-2" />
+          Add receipt
+        </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {invoiceStats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center">
-              <div className={`${stat.color} rounded-lg p-3`}>
-                <stat.icon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {stats.map((stat) => (
+          <div key={stat.name} className="bg-white rounded-xl shadow-sm p-4 flex items-center">
+            <div className={`${stat.color} text-white p-3 rounded-lg mr-4`}>
+              <stat.icon className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">{stat.name}</p>
+              <p className="text-xl font-semibold text-gray-900">{stat.value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="flex flex-col lg:flex-row gap-3">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm hóa đơn, khách hàng..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Search order code, sender or note..."
+              className="w-full pl-12 pr-4 py-3 border border-gray-200 bg-gray-50/60 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
 
-          <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+          <div
+            className="relative flex items-stretch"
+            ref={dateRangeRef}
           >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="paid">Đã thanh toán</option>
-            <option value="pending">Chờ thanh toán</option>
-            <option value="overdue">Quá hạn</option>
-            <option value="partial">Thanh toán 1 phần</option>
-          </select>
+            <button
+              type="button"
+              onClick={() => setRangePickerOpen((prev) => !prev)}
+              className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition w-full lg:w-64 ${
+                rangePickerOpen
+                  ? "border-blue-500 bg-blue-50/40"
+                  : "border-gray-200 bg-gray-50/60 hover:bg-gray-100"
+              }`}
+            >
+              <div className="flex flex-col text-left">
+                <span className="text-xs uppercase tracking-wide text-gray-400">
+                  Date range
+                </span>
+                <span className="text-sm font-medium text-gray-800">
+                  {dateRangeDisplay}
+                </span>
+              </div>
+              <CalendarDaysIcon
+                className={`w-5 h-5 ${
+                  rangePickerOpen ? "text-blue-600" : "text-gray-400"
+                }`}
+              />
+            </button>
 
-          <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-          >
-            <option value="all">Tất cả phương thức</option>
-            <option value="Chuyển khoản">Chuyển khoản</option>
-            <option value="Tiền mặt">Tiền mặt</option>
-            <option value="Ví điện tử">Ví điện tử</option>
-          </select>
+            {rangePickerOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-10 p-4 space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+                      From
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      value={toISODate(dateStart)}
+                      onChange={(event) =>
+                        setDateStart(
+                          event.target.value
+                            ? toDisplayDate(event.target.value)
+                            : ""
+                        )
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+                      To
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      value={toISODate(dateEnd)}
+                      onChange={(event) =>
+                        setDateEnd(
+                          event.target.value
+                            ? toDisplayDate(event.target.value)
+                            : ""
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                  <button
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    onClick={() => {
+                      setDateStart("");
+                      setDateEnd("");
+                    }}
+                  >
+                    Clear range
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      onClick={() => setRangePickerOpen(false)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      onClick={() => setRangePickerOpen(false)}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-            Xuất báo cáo
+          <button className="px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 transition-colors shadow-sm">
+            Export list
           </button>
         </div>
+
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </div>
 
-      {/* Invoices Table */}
+      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col sm:flex-row gap-3">
+        {CATEGORY_OPTIONS.map((option) => {
+          const isActive = categoryFilter === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setCategoryFilter(option.value)}
+              className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition ${
+                isActive
+                  ? "border-blue-500 bg-blue-50/70"
+                  : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {option.label}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {option.description}
+                  </p>
+                </div>
+                <span className="text-lg font-semibold text-gray-900">
+                  {categoryCounts[option.value]}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hóa đơn
+                  Order code
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Khách hàng
+                  Sender
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái
+                  Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tổng tiền
+                  Transfer note
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phương thức
+                  Paid date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày tạo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Hạn thanh toán
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao tác
+                  Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredInvoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {invoice.id}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {invoice.orderId}
-                      </div>
-                    </div>
+              {filteredReceipts.map((receipt) => (
+                <tr key={receipt.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                    {receipt.orderCode || "--"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {invoice.customer}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {invoice.email}
-                      </div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {receipt.sender || "--"}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {getStatusIcon(invoice.status)}
-                      <span
-                        className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
-                          invoice.status
-                        )}`}
-                      >
-                        {invoice.statusText}
-                      </span>
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    {formatCurrencyVnd(receipt.amount)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">
-                      ₫{invoice.total.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Thuế: ₫{invoice.tax.toLocaleString()}
-                    </div>
+                  <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                    <span className="block truncate">{receipt.note || "--"}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {invoice.method}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {invoice.issueDate}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {invoice.dueDate}
-                    </div>
-                    {invoice.paidDate && (
-                      <div className="text-xs text-green-600">
-                        Đã thanh toán: {invoice.paidDate}
-                      </div>
-                    )}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "--"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 justify-end">
                       <button
                         className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="Xem chi tiết"
+                        title="View invoice"
+                        onClick={() => handleViewReceipt(receipt)}
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button
-                        className="text-green-600 hover:text-green-900 p-1 rounded"
-                        title="In hóa đơn"
-                      >
+                      <button className="text-green-600 hover:text-green-900 p-1 rounded" title="Print invoice">
                         <PrinterIcon className="h-4 w-4" />
                       </button>
-                      <button
-                        className="text-purple-600 hover:text-purple-900 p-1 rounded"
-                        title="Tải xuống"
-                      >
+                      <button className="text-purple-600 hover:text-purple-900 p-1 rounded" title="Download">
                         <ArrowDownTrayIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -363,18 +471,83 @@ export default function Invoices() {
           </table>
         </div>
 
-        {filteredInvoices.length === 0 && (
+        {!loading && filteredReceipts.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">
-              Không tìm thấy hóa đơn
-            </div>
-            <div className="text-gray-500">
-              Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm
-            </div>
+            <div className="text-gray-400 text-lg mb-2">No receipts found</div>
+            <div className="text-gray-500">Try another keyword</div>
+          </div>
+        )}
+        {loading && (
+          <div className="text-center py-8 text-gray-500 text-sm">
+            Loading data...
           </div>
         )}
       </div>
+
+      {viewModalOpen && selectedReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Receipt detail
+              </h2>
+              <button
+                onClick={closeViewModal}
+                className="text-gray-400 hover:text-gray-600 transition rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Close"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500 mb-1">Order code</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedReceipt.orderCode || "--"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Paid date</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedReceipt.paidAt
+                      ? Helpers.formatDateToDMY(selectedReceipt.paidAt)
+                      : "--"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Sender</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedReceipt.sender || "--"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1">Amount</p>
+                  <p className="font-semibold text-gray-900">
+                    {formatCurrencyVnd(selectedReceipt.amount)}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-gray-500 mb-1 text-sm">
+                  Transfer note
+                </p>
+                <div className="p-3 rounded-lg border border-gray-200 text-sm text-gray-800 bg-gray-50 min-h-[80px]">
+                  {selectedReceipt.note || "No note"}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={closeViewModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
