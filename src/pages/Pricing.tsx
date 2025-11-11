@@ -7,6 +7,9 @@ import {
   ArrowTrendingDownIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
+import GlassPanel from "../components/GlassPanel";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+import GradientButton from "../components/GradientButton";
 
 const pricing = [
   {
@@ -81,31 +84,34 @@ const pricingStats = [
     name: "Tỷ suất lợi nhuận TB",
     value: "22.4%",
     icon: CurrencyDollarIcon,
-    color: "bg-green-500",
+    accent: STAT_CARD_ACCENTS.emerald,
     trend: "up",
   },
   {
     name: "Sản phẩm cạnh tranh",
     value: "156",
     icon: ArrowTrendingUpIcon,
-    color: "bg-blue-500",
+    accent: STAT_CARD_ACCENTS.sky,
     trend: "up",
   },
   {
     name: "Giá cập nhật hôm nay",
     value: "12",
     icon: PencilIcon,
-    color: "bg-purple-500",
+    accent: STAT_CARD_ACCENTS.violet,
     trend: "stable",
   },
   {
     name: "Sản phẩm giá thấp",
     value: "3",
     icon: ArrowTrendingDownIcon,
-    color: "bg-red-500",
+    accent: STAT_CARD_ACCENTS.rose,
     trend: "down",
   },
 ];
+
+const GLASS_FIELD_CLASS =
+  "w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 placeholder:text-gray-400";
 
 export default function Pricing() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -170,50 +176,51 @@ export default function Pricing() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {pricingStats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`${stat.color} rounded-lg p-3`}>
-                  <stat.icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    {stat.name}
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stat.value}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                {stat.trend === "up" && (
-                  <ArrowTrendingUpIcon className="h-5 w-5 text-green-500" />
-                )}
-                {stat.trend === "down" && (
-                  <ArrowTrendingDownIcon className="h-5 w-5 text-red-500" />
-                )}
-              </div>
+          <StatCard
+            key={stat.name}
+            title={stat.name}
+            value={stat.value}
+            icon={stat.icon}
+            accent={stat.accent}
+          >
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span className="text-gray-500">Xu hướng</span>
+              {stat.trend === "up" && (
+                <span className="inline-flex items-center text-emerald-600">
+                  <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
+                  Tăng
+                </span>
+              )}
+              {stat.trend === "down" && (
+                <span className="inline-flex items-center text-rose-600">
+                  <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
+                  Giảm
+                </span>
+              )}
+              {stat.trend === "stable" && (
+                <span className="text-slate-500">Ổn định</span>
+              )}
             </div>
-          </div>
+          </StatCard>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <GlassPanel className="p-6" glow="neutral">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Tìm kiếm sản phẩm..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`${GLASS_FIELD_CLASS} pl-11`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={GLASS_FIELD_CLASS}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
@@ -224,7 +231,7 @@ export default function Pricing() {
           </select>
 
           <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={GLASS_FIELD_CLASS}
             value={marginFilter}
             onChange={(e) => setMarginFilter(e.target.value)}
           >
@@ -234,12 +241,11 @@ export default function Pricing() {
             <option value="low">Thấp (&lt;15%)</option>
           </select>
 
-          <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+          <GradientButton className="w-full justify-center" type="button">
             So sánh giá
-          </button>
+          </GradientButton>
         </div>
-      </div>
-
+      </GlassPanel>
       {/* Pricing Table */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">

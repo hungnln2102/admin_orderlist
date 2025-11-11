@@ -7,6 +7,11 @@ import {
   ArchiveBoxIcon,
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
+import GlassPanel from "../components/GlassPanel";
+import StatCard, {
+  STAT_CARD_ACCENTS,
+  type StatAccent,
+} from "../components/StatCard";
 import {
   LineChart,
   Line,
@@ -40,7 +45,7 @@ interface ProcessedStat {
   change: string;
   changeType: "increase" | "decrease" | "alert";
   icon: React.ElementType;
-  color: string;
+  accent: StatAccent;
 }
 
 const formatCurrency = (value: number) =>
@@ -57,7 +62,7 @@ const calculateStat = (
   current: number,
   previous: number,
   isCurrency: boolean
-): Omit<ProcessedStat, "icon" | "color" | "changeType"> & {
+): Omit<ProcessedStat, "icon" | "accent" | "changeType"> & {
   changeType: "increase" | "decrease";
 } => {
   const displayValue = isCurrency
@@ -111,7 +116,7 @@ const Dashboard: React.FC = () => {
             false
           ),
           icon: ShoppingBagIcon,
-          color: "bg-blue-500",
+          accent: STAT_CARD_ACCENTS.sky,
         },
         {
           name: "Đơn sắp hết hạn",
@@ -119,7 +124,7 @@ const Dashboard: React.FC = () => {
           change: "Cần xử lý",
           changeType: "alert",
           icon: CalendarDaysIcon,
-          color: "bg-red-500",
+          accent: STAT_CARD_ACCENTS.rose,
         },
         {
           ...calculateStat(
@@ -129,7 +134,7 @@ const Dashboard: React.FC = () => {
             true
           ),
           icon: ArchiveBoxIcon,
-          color: "bg-orange-500",
+          accent: STAT_CARD_ACCENTS.amber,
         },
         {
           ...calculateStat(
@@ -139,7 +144,7 @@ const Dashboard: React.FC = () => {
             true
           ),
           icon: ChartBarIcon,
-          color: "bg-green-500",
+          accent: STAT_CARD_ACCENTS.emerald,
         },
       ];
       setStatsData(formattedStats);
@@ -209,56 +214,48 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statsData.map((item, index) => (
-          <div
-            key={index}
-            className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+          <StatCard
+            key={`${item.name}-${index}`}
+            title={item.name}
+            value={item.value}
+            icon={item.icon}
+            accent={item.accent}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-lg ${item.color}`}
-              >
-                <item.icon className="h-6 w-6 text-white" />
-              </div>
-              <div
-                className={`flex items-center text-sm font-medium ${
-                  item.changeType === "increase"
-                    ? "text-green-600"
-                    : item.changeType === "decrease"
-                    ? "text-red-600"
-                    : "text-orange-600"
-                }`}
-              >
-                {item.changeType === "alert" ? (
-                  <span className="font-semibold uppercase">Alert</span>
-                ) : item.changeType === "increase" ? (
-                  <>
-                    <ArrowUpIcon className="mr-1 h-4 w-4" />
-                    {item.change}
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownIcon className="mr-1 h-4 w-4" />
-                    {item.change}
-                  </>
-                )}
-              </div>
+            <div
+              className={`flex items-center text-sm font-semibold ${
+                item.changeType === "increase"
+                  ? "text-emerald-600"
+                  : item.changeType === "decrease"
+                  ? "text-rose-600"
+                  : "text-amber-600"
+              }`}
+            >
+              {item.changeType === "alert" ? (
+                <span className="uppercase tracking-wide">Alert</span>
+              ) : item.changeType === "increase" ? (
+                <>
+                  <ArrowUpIcon className="mr-1 h-4 w-4" />
+                  {item.change}
+                </>
+              ) : (
+                <>
+                  <ArrowDownIcon className="mr-1 h-4 w-4" />
+                  {item.change}
+                </>
+              )}
             </div>
-            <h3 className="text-sm font-medium text-gray-600">{item.name}</h3>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {item.value}
-            </p>
-          </div>
+          </StatCard>
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <GlassPanel glow="sky" className="p-6">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">
               Doanh thu theo tháng (Tổng giá bán)
             </h3>
             <select
-              className="rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="rounded-2xl border border-white/60 bg-white/80 px-3 py-1 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
               value={selectedYear}
               onChange={(event) => setSelectedYear(Number(event.target.value))}
             >
@@ -303,9 +300,9 @@ const Dashboard: React.FC = () => {
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </GlassPanel>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+        <GlassPanel glow="violet" className="p-6">
           <h3 className="mb-6 text-lg font-semibold text-gray-900">
             Tổng đơn hàng và đơn hủy theo tháng
           </h3>
@@ -337,7 +334,7 @@ const Dashboard: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </GlassPanel>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
+import GradientButton from "../components/GradientButton";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -19,6 +20,30 @@ import {
   PencilIcon,
   EyeIcon,
 } from "@heroicons/react/24/outline";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+
+const SUMMARY_CARD_ACCENTS = [
+  {
+    border: "border-sky-100/70",
+    glow: "from-sky-100/80 via-white/80 to-blue-100/70",
+    link: "text-sky-600 hover:text-sky-700",
+  },
+  {
+    border: "border-emerald-100/70",
+    glow: "from-emerald-100/80 via-white/80 to-lime-100/70",
+    link: "text-emerald-600 hover:text-emerald-700",
+  },
+  {
+    border: "border-violet-100/70",
+    glow: "from-violet-100/80 via-white/80 to-fuchsia-100/70",
+    link: "text-violet-600 hover:text-violet-700",
+  },
+  {
+    border: "border-amber-100/70",
+    glow: "from-amber-100/80 via-white/80 to-orange-100/70",
+    link: "text-amber-600 hover:text-amber-700",
+  },
+] as const;
 type PackageField =
   | "information"
   | "note"
@@ -868,7 +893,7 @@ function PackageProduct() {
           name: "Tổng Nhóm",
           value: String(scopedRows.length),
           icon: CheckCircleIcon,
-          color: "bg-blue-500",
+          accent: STAT_CARD_ACCENTS.sky,
         },
         {
           name: "Gần Hết Slot",
@@ -882,7 +907,7 @@ function PackageProduct() {
             )
           ),
           icon: ExclamationTriangleIcon,
-          color: "bg-yellow-500",
+          accent: STAT_CARD_ACCENTS.amber,
         },
         {
           name: "Hết Slot",
@@ -896,13 +921,13 @@ function PackageProduct() {
             )
           ),
           icon: ArrowDownIcon,
-          color: "bg-red-500",
+          accent: STAT_CARD_ACCENTS.rose,
         },
         {
           name: "Created Today",
           value: "0",
           icon: ArrowUpIcon,
-          color: "bg-green-500",
+          accent: STAT_CARD_ACCENTS.emerald,
         },
       ] as const,
     [scopedRows]
@@ -1188,42 +1213,28 @@ function PackageProduct() {
             Quản lý các Gói Sản Phẩm và các mục nhập gói riêng
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 flex space-x-3">
-          <button
-            onClick={handleCreateButtonClick}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusIcon className="h-4 w-4 mr-2" /> Tạo Nhóm Mới
-          </button>
-          <button
+        <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
+          <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick}>
+            Tạo Nhóm Mới
+          </GradientButton>
+          <GradientButton
+            icon={PlusIcon}
             onClick={handleAddButtonClick}
             disabled={!selectedPackage}
-            className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border ${
-              selectedPackage
-                ? "bg-white text-blue-600 border-blue-200 hover:bg-blue-50 transition-colors"
-                : "bg-white text-gray-400 border-gray-200 cursor-not-allowed"
-            }`}
           >
-            <PlusIcon className="h-4 w-4 mr-2" /> Thêm Gói Mới
-          </button>
+            Thêm Gói Mới
+          </GradientButton>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {slotStats.map((stat) => (
-          <div
+          <StatCard
             key={stat.name}
-            className="bg-white rounded-xl p-6 shadow-sm transition w-full text-left"
-          >
-            <div className="flex items-center">
-              <div className={`${stat.color} rounded-lg p-3`}>
-                <stat.icon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4 text-left">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            </div>
-          </div>
+            title={stat.name}
+            value={stat.value}
+            icon={stat.icon}
+            accent={stat.accent}
+          />
         ))}
       </div>
       <div className="bg-white rounded-xl shadow-sm p-6">
@@ -1241,31 +1252,39 @@ function PackageProduct() {
           <p className="mt-6 text-sm text-gray-500">Không có dữ liệu gói.</p>
         ) : (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {packageSummaries.map((summary) => {
+            {packageSummaries.map((summary, index) => {
               const isSelected = summary.name === selectedPackage;
+              const accent =
+                SUMMARY_CARD_ACCENTS[index % SUMMARY_CARD_ACCENTS.length];
               return (
                 <div
                   key={summary.name}
-                  className={`border rounded-xl p-5 transition ${
+                  className={`relative isolate rounded-3xl border ${accent.border} bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
                     isSelected
-                      ? "border-blue-400 bg-blue-50 shadow-sm"
-                      : "border-gray-200 bg-gray-50 hover:border-blue-300"
+                      ? "ring-2 ring-blue-400 shadow-[0_25px_65px_-35px_rgba(37,99,235,0.7)]"
+                      : "hover:shadow-[0_30px_75px_-40px_rgba(15,23,42,0.55)]"
                   }`}
                 >
+                  <div
+                    className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${accent.glow} opacity-80 blur-2xl`}
+                  />
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-base font-semibold text-gray-900">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+                        Tổng Quan
+                      </p>
+                      <h3 className="text-lg font-semibold text-gray-900">
                         {summary.name}
                       </h3>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Tổng Số Gói: {summary.total}
+                      <p className="mt-1 text-sm text-gray-500">
+                        Tổng số gói: {summary.total}
                       </p>
                     </div>
                     {isSelected ? (
                       <button
                         type="button"
                         onClick={() => handleCategorySelect("all")}
-                        className="text-sm font-medium text-red-500 hover:text-red-600 transition"
+                        className="text-sm font-semibold text-rose-600 hover:text-rose-700 transition"
                       >
                         Hủy
                       </button>
@@ -1273,34 +1292,34 @@ function PackageProduct() {
                       <button
                         type="button"
                         onClick={() => handleCategorySelect(summary.name)}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
+                        className={`text-sm font-semibold ${accent.link} transition`}
                       >
                         Xem Chi Tiết
                       </button>
                     )}
                   </div>
-                  <dl className="mt-4 grid grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-gray-500">
+                  <dl className="mt-5 grid grid-cols-3 gap-4 text-sm">
+                    <div className="rounded-2xl border border-white/60 bg-white/70 p-3 text-center shadow-inner">
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Tổng
                       </dt>
-                      <dd className="text-lg font-semibold text-gray-900">
+                      <dd className="mt-1 text-2xl font-bold text-slate-900">
                         {summary.total}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    <div className="rounded-2xl border border-amber-100/70 bg-amber-50/60 p-3 text-center shadow-inner">
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-amber-600">
                         Thấp
                       </dt>
-                      <dd className="text-lg font-semibold text-amber-500">
+                      <dd className="mt-1 text-2xl font-bold text-amber-500">
                         {summary.low}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    <div className="rounded-2xl border border-rose-100/70 bg-rose-50/60 p-3 text-center shadow-inner">
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-rose-600">
                         Hết
                       </dt>
-                      <dd className="text-lg font-semibold text-red-500">
+                      <dd className="mt-1 text-2xl font-bold text-rose-500">
                         {summary.out}
                       </dd>
                     </div>

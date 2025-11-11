@@ -12,6 +12,9 @@ import {
   CheckCircleIcon,
   ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
+import GlassPanel from "../components/GlassPanel";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+import GradientButton from "../components/GradientButton";
 import { apiFetch } from "../lib/api";
 import * as Helpers from "../lib/helpers";
 
@@ -54,6 +57,9 @@ const DEFAULT_STATS: SupplyStats = {
   monthlyOrders: 0,
   totalImportValue: 0,
 };
+
+const GLASS_FIELD_CLASS =
+  "w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 placeholder:text-gray-400";
 
 const formatCurrencyShort = (value: number): string => {
   if (!Number.isFinite(value) || value <= 0) return "₫0";
@@ -105,6 +111,25 @@ const STATUS_OPTIONS = [
   { value: "active", label: "Đang Hoạt Động" },
   { value: "inactive", label: "Tạm Ngưng" },
 ];
+
+const MODAL_CARD_ACCENTS = {
+  sky: {
+    iconBg: "from-sky-500 via-sky-400 to-blue-500",
+    glow: "from-sky-100/80 via-white/80 to-blue-50/70",
+  },
+  rose: {
+    iconBg: "from-rose-500 via-pink-500 to-red-500",
+    glow: "from-rose-100/80 via-white/80 to-red-50/70",
+  },
+  violet: {
+    iconBg: "from-purple-500 via-violet-500 to-indigo-500",
+    glow: "from-violet-100/80 via-white/80 to-indigo-50/70",
+  },
+  emerald: {
+    iconBg: "from-emerald-500 via-emerald-400 to-lime-500",
+    glow: "from-emerald-100/80 via-white/80 to-lime-50/70",
+  },
+} as const;
 
 const getLastOrderTimestamp = (value: string | null): number => {
   if (!value) return Number.NEGATIVE_INFINITY;
@@ -1040,25 +1065,25 @@ export default function Sources() {
       {
         title: "Tổng Đơn Hàng",
         value: stats?.totalOrders ?? 0,
-        color: "bg-blue-500",
+        accent: "sky" as const,
         Icon: ClipboardDocumentListIcon,
       },
       {
         title: "Đơn Hàng Hủy",
         value: stats?.canceledOrders ?? 0,
-        color: "bg-red-500",
+        accent: "rose" as const,
         Icon: XCircleIcon,
       },
       {
         title: "Đơn Tháng Này",
         value: stats?.monthlyOrders ?? 0,
-        color: "bg-purple-500",
+        accent: "violet" as const,
         Icon: CalendarDaysIcon,
       },
       {
         title: "Tổng Tiền Đã Thanh Toán",
         value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
-        color: "bg-green-500",
+        accent: "emerald" as const,
         Icon: CurrencyDollarIcon,
       },
     ];
@@ -1137,25 +1162,33 @@ export default function Sources() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {statCards.map((card) => {
                           const IconComponent = card.Icon;
+                          const accent =
+                            MODAL_CARD_ACCENTS[card.accent] ||
+                            MODAL_CARD_ACCENTS.sky;
                           return (
                             <div
                               key={card.title}
-                              className="bg-gray-50 rounded-2xl px-5 py-4 flex items-center gap-4 border border-gray-100 shadow-sm"
+                              className="relative isolate rounded-3xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_25px_65px_-40px_rgba(15,23,42,0.65)]"
                             >
                               <div
-                                className={`${card.color} text-white rounded-2xl w-12 h-12 flex items-center justify-center`}
-                              >
-                                <IconComponent className="h-5 w-5" />
-                              </div>
-                              <div className="text-right flex-1">
-                                <p className="text-[11px] uppercase text-gray-500 tracking-wide">
-                                  {card.title}
-                                </p>
-                                <p className="text-xl font-extrabold text-gray-900">
-                                  {typeof card.value === "number"
-                                    ? card.value.toLocaleString("vi-VN")
-                                    : card.value}
-                                </p>
+                                className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${accent.glow} opacity-70 blur-2xl`}
+                              />
+                              <div className="relative flex items-center gap-4">
+                                <div
+                                  className={`rounded-2xl bg-gradient-to-br ${accent.iconBg} p-3 text-white shadow-inner shadow-black/10`}
+                                >
+                                  <IconComponent className="h-5 w-5" />
+                                </div>
+                                <div className="text-right flex-1">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                    {card.title}
+                                  </p>
+                                  <p className="text-xl font-extrabold text-slate-900">
+                                    {typeof card.value === "number"
+                                      ? card.value.toLocaleString("vi-VN")
+                                      : card.value}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           );
@@ -1489,25 +1522,25 @@ export default function Sources() {
       {
         name: "Tổng Nhà Cung Cấp",
         value: stats.totalSuppliers.toString(),
-        color: "bg-blue-500",
+        accent: STAT_CARD_ACCENTS.sky,
         Icon: UserGroupIcon,
       },
       {
         name: "Đang Hoạt Động",
         value: stats.activeSuppliers.toString(),
-        color: "bg-green-500",
+        accent: STAT_CARD_ACCENTS.emerald,
         Icon: CheckCircleIcon,
       },
       {
         name: "Đơn Hàng Tháng Này",
         value: stats.monthlyOrders.toString(),
-        color: "bg-purple-500",
+        accent: STAT_CARD_ACCENTS.violet,
         Icon: ShoppingBagIcon,
       },
       {
         name: "Giá Trị Nhập Hàng",
         value: formatCurrencyShort(stats.totalImportValue),
-        color: "bg-orange-500",
+        accent: STAT_CARD_ACCENTS.amber,
         Icon: CurrencyDollarIcon,
       },
     ],
@@ -1527,57 +1560,39 @@ export default function Sources() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
-            <button
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-              onClick={openAddSupplierModal}
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
+            <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
               Thêm Nhà Cung Cấp
-            </button>
+            </GradientButton>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {supplierStats.map((stat) => {
-            const IconComponent = stat.Icon;
-            return (
-              <div
-                key={stat.name}
-                className="bg-white rounded-xl p-6 shadow-sm"
-              >
-                <div className="flex items-center">
-                  <div className={`${stat.color} rounded-lg p-3 text-white`}>
-                    <IconComponent className="h-6 w-6" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">
-                      {stat.name}
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {stat.value}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {supplierStats.map((stat) => (
+            <StatCard
+              key={stat.name}
+              title={stat.name}
+              value={stat.value}
+              icon={stat.Icon}
+              accent={stat.accent}
+            />
+          ))}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <GlassPanel className="p-6 space-y-4" glow="neutral">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Tìm kiếm nhà cung cấp..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`${GLASS_FIELD_CLASS} pl-10`}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
 
             <select
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={GLASS_FIELD_CLASS}
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
@@ -1586,13 +1601,13 @@ export default function Sources() {
               <option value="inactive">Tạm Ngưng</option>
             </select>
 
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+            <GradientButton className="w-full justify-center" type="button">
               Xuất Danh Sách
-            </button>
+            </GradientButton>
           </div>
 
           {error && <div className="text-sm text-red-600">{error}</div>}
-        </div>
+        </GlassPanel>
 
         <div className="bg-white rounded-xl shadow-sm overflow-hidden max-w-6xl mx-auto">
           <div className="overflow-x-auto">
