@@ -163,15 +163,13 @@ const Dashboard: React.FC = () => {
         const years = await fetchAvailableYears();
         if (years.length > 0) {
           setAvailableYears(years);
-          setSelectedYear((prev) =>
-            years.includes(prev) ? prev : years[0]
-          );
+          setSelectedYear((prev) => (years.includes(prev) ? prev : years[0]));
         } else {
           setAvailableYears([currentYear]);
           setSelectedYear(currentYear);
         }
       } catch (err) {
-        console.error("Loi khi lay danh sach nam dashboard:", err);
+        console.error("Lỗi khi lấy danh sách năm Dashboard:", err);
         setAvailableYears([currentYear]);
         setSelectedYear(currentYear);
       }
@@ -288,7 +286,10 @@ const Dashboard: React.FC = () => {
                   }
                 />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), "Doanh thu"]}
+                  formatter={(value: number) => [
+                    formatCurrency(value),
+                    "Doanh thu",
+                  ]}
                   labelStyle={{ color: "#111827" }}
                 />
                 <Line

@@ -170,9 +170,7 @@ const getSlotAvailabilityState = (remaining: number): AvailabilityState => {
   return "ok";
 };
 const normalizeIdentifier = (value: string | null | undefined): string => {
-  return (value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 };
 const buildIdentifierKeys = (value: string | null | undefined) => {
   const normalized = normalizeIdentifier(value);
@@ -220,7 +218,9 @@ const extractInfoTokens = (value: string | null | undefined): string[] => {
       const trimmed = toCleanString(segment);
       if (!trimmed) return "";
       const parts = trimmed.split(":");
-      return toCleanString(parts.length > 1 ? parts.slice(1).join(":") : trimmed);
+      return toCleanString(
+        parts.length > 1 ? parts.slice(1).join(":") : trimmed
+      );
     })
     .filter(Boolean);
 };
@@ -245,7 +245,9 @@ const buildPackageLinkKeys = (row: PackageRow): string[] => {
     ...accountNoteCandidates,
   ];
   return Array.from(
-    new Set(combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean))
+    new Set(
+      combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean)
+    )
   );
 };
 const resolveOrderDisplayValue = (
@@ -350,7 +352,11 @@ const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
   { value: "low", label: "Low (<2 slots)" },
   { value: "out", label: "Out" },
 ];
-const SLOT_LINK_OPTIONS: Array<{ value: SlotLinkMode; label: string; helper: string }> = [
+const SLOT_LINK_OPTIONS: Array<{
+  value: SlotLinkMode;
+  label: string;
+  helper: string;
+}> = [
   {
     value: "information",
     label: "Information Order",
@@ -394,7 +400,9 @@ const buildInformationSummary = (
       .join(" | ") || ""
   );
 };
-const buildFormValuesFromRow = (row: PackageRow | AugmentedRow): PackageFormValues => {
+const buildFormValuesFromRow = (
+  row: PackageRow | AugmentedRow
+): PackageFormValues => {
   const slotValue =
     "slotLimit" in row && typeof row.slotLimit === "number"
       ? String(row.slotLimit)
@@ -438,9 +446,9 @@ function PackageProduct() {
   const [templates, setTemplates] = useState<PackageTemplate[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createInitialName, setCreateInitialName] = useState("");
-  const [createInitialFields, setCreateInitialFields] = useState<PackageField[]>(
-    PACKAGE_FIELD_OPTIONS.map((opt) => opt.value)
-  );
+  const [createInitialFields, setCreateInitialFields] = useState<
+    PackageField[]
+  >(PACKAGE_FIELD_OPTIONS.map((opt) => opt.value));
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editContext, setEditContext] = useState<EditContext | null>(null);
@@ -500,9 +508,7 @@ function PackageProduct() {
                 slotLinkMode: storedMode ?? row.slotLinkMode ?? "information",
               };
             });
-            setRows(
-              normalizedRows
-            );
+            setRows(normalizedRows);
           } else {
             setRows([]);
           }
@@ -659,7 +665,8 @@ function PackageProduct() {
         const packageCode = normalizeIdentifier(item.package);
         const packageLettersCode = packageCode.replace(/[0-9]/g, "");
         const slotMode = item.slotLinkMode ?? "information";
-        const displayColumn = slotMode === "information" ? "slot" : "information";
+        const displayColumn =
+          slotMode === "information" ? "slot" : "information";
         const matchColumn = displayColumn === "slot" ? "information" : "slot";
         const packageLinkKeys = buildPackageLinkKeys(item);
         const shouldMatchOrders =
@@ -700,7 +707,8 @@ function PackageProduct() {
         };
         const relevantOrders = shouldMatchOrders
           ? orderMatchers.filter(
-              (record) => matchesProductRecord(record) && matchesLinkRecord(record)
+              (record) =>
+                matchesProductRecord(record) && matchesLinkRecord(record)
             )
           : [];
         const seenOrderIds = new Set<string>();
@@ -718,7 +726,8 @@ function PackageProduct() {
             const matchValue =
               matchValueRaw || orderRecord.customerDisplay || "";
             const uniqueKey =
-              orderRecord.base?.id !== undefined && orderRecord.base?.id !== null
+              orderRecord.base?.id !== undefined &&
+              orderRecord.base?.id !== null
                 ? `id:${orderRecord.base.id}`
                 : orderRecord.base?.id_don_hang !== undefined &&
                   orderRecord.base?.id_don_hang !== null
@@ -856,13 +865,13 @@ function PackageProduct() {
     () =>
       [
         {
-          name: "Total Packages",
+          name: "Tổng Nhóm",
           value: String(scopedRows.length),
           icon: CheckCircleIcon,
           color: "bg-blue-500",
         },
         {
-          name: "Low Slots",
+          name: "Gần Hết Slot",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -876,7 +885,7 @@ function PackageProduct() {
           color: "bg-yellow-500",
         },
         {
-          name: "Out of Slots",
+          name: "Hết Slot",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -910,7 +919,10 @@ function PackageProduct() {
     return Array.from(names).sort((a, b) => a.localeCompare(b));
   }, [computedRows, templates]);
   const packageSummaries = useMemo(() => {
-    const stats = new Map<string, { total: number; low: number; out: number }>();
+    const stats = new Map<
+      string,
+      { total: number; low: number; out: number }
+    >();
     allPackageNames.forEach((name) =>
       stats.set(name, { total: 0, low: 0, out: 0 })
     );
@@ -958,8 +970,10 @@ function PackageProduct() {
   const handleAddSubmit = useCallback(
     async (values: PackageFormValues) => {
       if (!selectedTemplate) return;
-      const includeAccountStorage = selectedTemplate.fields.includes("capacity");
-      const includePackageInfo = selectedTemplate.fields.includes("information");
+      const includeAccountStorage =
+        selectedTemplate.fields.includes("capacity");
+      const includePackageInfo =
+        selectedTemplate.fields.includes("information");
       const includeNote = selectedTemplate.fields.includes("note");
       const includeSupplier = selectedTemplate.fields.includes("supplier");
       const includeImport = selectedTemplate.fields.includes("import");
@@ -983,9 +997,15 @@ function PackageProduct() {
         : "";
       const payload = {
         packageName: selectedTemplate.name,
-        informationUser: includePackageInfo ? values.informationUser || null : null,
-        informationPass: includePackageInfo ? values.informationPass || null : null,
-        informationMail: includePackageInfo ? values.informationMail || null : null,
+        informationUser: includePackageInfo
+          ? values.informationUser || null
+          : null,
+        informationPass: includePackageInfo
+          ? values.informationPass || null
+          : null,
+        informationMail: includePackageInfo
+          ? values.informationMail || null
+          : null,
         note: includeNote ? values.note || null : null,
         supplier: includeSupplier ? values.supplier || null : null,
         importPrice: includeImport ? Number(values.import || 0) || 0 : null,
@@ -1012,7 +1032,9 @@ function PackageProduct() {
           slot: slotLimit,
           slotUsed: 0,
           capacity: includeAccountStorage ? capacityLimit : created.capacity,
-          information: includePackageInfo ? packageInfoSummary || null : created.information,
+          information: includePackageInfo
+            ? packageInfoSummary || null
+            : created.information,
           slotLinkMode: values.slotLinkMode,
           hasCapacityField: includeAccountStorage,
         };
@@ -1022,7 +1044,7 @@ function PackageProduct() {
         }
         setAddModalOpen(false);
       } catch (error) {
-        console.error("Create package product failed:", error);
+        console.error("Lỗi khi tạo gói sản phẩm:", error);
       }
     },
     [persistSlotLinkPreference, selectedTemplate]
@@ -1044,14 +1066,13 @@ function PackageProduct() {
   };
   const openEditModal = useCallback(
     (row: AugmentedRow) => {
-      const template =
-        templates.find((tpl) => tpl.name === row.package) ?? {
-          name: row.package,
-          fields: row.hasCapacityField
-            ? defaultTemplateFields
-            : stripCapacityFields(defaultTemplateFields),
-          isCustom: false,
-        };
+      const template = templates.find((tpl) => tpl.name === row.package) ?? {
+        name: row.package,
+        fields: row.hasCapacityField
+          ? defaultTemplateFields
+          : stripCapacityFields(defaultTemplateFields),
+        isCustom: false,
+      };
       setEditContext({
         rowId: row.id,
         template,
@@ -1106,9 +1127,15 @@ function PackageProduct() {
         : "";
       const payload = {
         packageName: template.name,
-        informationUser: includePackageInfo ? values.informationUser || null : null,
-        informationPass: includePackageInfo ? values.informationPass || null : null,
-        informationMail: includePackageInfo ? values.informationMail || null : null,
+        informationUser: includePackageInfo
+          ? values.informationUser || null
+          : null,
+        informationPass: includePackageInfo
+          ? values.informationPass || null
+          : null,
+        informationMail: includePackageInfo
+          ? values.informationMail || null
+          : null,
         note: includeNote ? values.note || null : null,
         supplier: includeSupplier ? values.supplier || null : null,
         importPrice: includeImport ? Number(values.import || 0) || 0 : null,
@@ -1135,7 +1162,9 @@ function PackageProduct() {
           ...updated,
           slot: slotLimit,
           capacity: includeAccountStorage ? capacityLimit : updated.capacity,
-          information: includePackageInfo ? packageInfoSummary || null : updated.information,
+          information: includePackageInfo
+            ? packageInfoSummary || null
+            : updated.information,
           slotLinkMode: values.slotLinkMode,
           hasCapacityField: includeAccountStorage,
         };
@@ -1145,7 +1174,7 @@ function PackageProduct() {
         persistSlotLinkPreference(rowId, values.slotLinkMode);
         closeEditModal();
       } catch (error) {
-        console.error(`Update package product ${rowId} failed:`, error);
+        console.error(`Cập nhật Gói Sản Phẩm ${rowId} Lỗi:`, error);
       }
     },
     [editContext, closeEditModal, persistSlotLinkPreference]
@@ -1154,9 +1183,9 @@ function PackageProduct() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Package Products</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Gói Sản Phẩm</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage package templates and individual package entries
+            Quản lý các Gói Sản Phẩm và các mục nhập gói riêng
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
@@ -1164,7 +1193,7 @@ function PackageProduct() {
             onClick={handleCreateButtonClick}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <PlusIcon className="h-4 w-4 mr-2" /> Create New Package
+            <PlusIcon className="h-4 w-4 mr-2" /> Tạo Nhóm Mới
           </button>
           <button
             onClick={handleAddButtonClick}
@@ -1175,7 +1204,7 @@ function PackageProduct() {
                 : "bg-white text-gray-400 border-gray-200 cursor-not-allowed"
             }`}
           >
-            <PlusIcon className="h-4 w-4 mr-2" /> Add New Package
+            <PlusIcon className="h-4 w-4 mr-2" /> Thêm Gói Mới
           </button>
         </div>
       </div>
@@ -1201,15 +1230,15 @@ function PackageProduct() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Package overview
+              Tổng Quan Về Gói
             </h2>
             <p className="text-sm text-gray-500">
-              Pick a package below to view details and add entries.
+              Chọn một gói bên dưới để xem chi tiết
             </p>
           </div>
         </div>
         {packageSummaries.length === 0 ? (
-          <p className="mt-6 text-sm text-gray-500">No package data yet.</p>
+          <p className="mt-6 text-sm text-gray-500">Không có dữ liệu gói.</p>
         ) : (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {packageSummaries.map((summary) => {
@@ -1229,7 +1258,7 @@ function PackageProduct() {
                         {summary.name}
                       </h3>
                       <p className="mt-1 text-xs text-gray-500">
-                        Total entries: {summary.total}
+                        Tổng Số Gói: {summary.total}
                       </p>
                     </div>
                     {isSelected ? (
@@ -1238,7 +1267,7 @@ function PackageProduct() {
                         onClick={() => handleCategorySelect("all")}
                         className="text-sm font-medium text-red-500 hover:text-red-600 transition"
                       >
-                        Cancel
+                        Hủy
                       </button>
                     ) : (
                       <button
@@ -1246,14 +1275,14 @@ function PackageProduct() {
                         onClick={() => handleCategorySelect(summary.name)}
                         className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
                       >
-                        View details
+                        Xem Chi Tiết
                       </button>
                     )}
                   </div>
                   <dl className="mt-4 grid grid-cols-3 gap-4 text-sm text-gray-600">
                     <div>
                       <dt className="text-xs uppercase tracking-wide text-gray-500">
-                        Total
+                        Tổng
                       </dt>
                       <dd className="text-lg font-semibold text-gray-900">
                         {summary.total}
@@ -1261,7 +1290,7 @@ function PackageProduct() {
                     </div>
                     <div>
                       <dt className="text-xs uppercase tracking-wide text-gray-500">
-                        Low
+                        Thấp
                       </dt>
                       <dd className="text-lg font-semibold text-amber-500">
                         {summary.low}
@@ -1269,7 +1298,7 @@ function PackageProduct() {
                     </div>
                     <div>
                       <dt className="text-xs uppercase tracking-wide text-gray-500">
-                        Out
+                        Hết
                       </dt>
                       <dd className="text-lg font-semibold text-red-500">
                         {summary.out}
@@ -1299,7 +1328,9 @@ function PackageProduct() {
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
               >
                 {STATUS_FILTERS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1315,11 +1346,13 @@ function PackageProduct() {
                 }`}
                 disabled={!filteredRows.length}
               >
-                {selectedPackage ? `Export ${selectedPackage}` : "Export report"}
+                {selectedPackage
+                  ? `Export ${selectedPackage}`
+                  : "Export report"}
               </button>
             </div>
             <div className="text-sm text-gray-500">
-              Viewing:{" "}
+              Đang Xem:{" "}
               <span className="font-medium text-gray-900">
                 {selectedPackage ?? "All packages"}
               </span>
@@ -1344,33 +1377,33 @@ function PackageProduct() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Package
+                      Gói
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Information
+                      Thông Tin
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Note
+                      Ghi Chú
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Slot
                     </th>
                     {showCapacityColumn && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Capacity
+                        Dung Lượng
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Supplier
+                      Nhà Cung Cấp
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Import
+                      Giá Nhập
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expired
+                      Hết Hạn
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      Hành Động
                     </th>
                   </tr>
                 </thead>
@@ -1381,7 +1414,7 @@ function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        Loading...
+                        Đang Tải...
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
@@ -1390,7 +1423,7 @@ function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        No data
+                        Không Có Dữ Liệu
                       </td>
                     </tr>
                   ) : (
@@ -1400,10 +1433,7 @@ function PackageProduct() {
                       const remainingSlots = item.remainingSlots;
                       const slotAvailabilityRatio =
                         totalSlots > 0
-                          ? Math.min(
-                              (remainingSlots / totalSlots) * 100,
-                              100
-                            )
+                          ? Math.min((remainingSlots / totalSlots) * 100, 100)
                           : 0;
                       const slotAvailabilityState =
                         getSlotAvailabilityState(remainingSlots);
@@ -1425,10 +1455,11 @@ function PackageProduct() {
                               100
                             )
                           : 0;
-                      const capacityAvailabilityState = getCapacityAvailabilityState(
-                        remainingCapacity,
-                        capacityLimit
-                      );
+                      const capacityAvailabilityState =
+                        getCapacityAvailabilityState(
+                          remainingCapacity,
+                          capacityLimit
+                        );
                       const capacityColorClass =
                         capacityAvailabilityState === "out"
                           ? "bg-red-500"
@@ -1462,85 +1493,90 @@ function PackageProduct() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {item.package}
                             </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.informationUser || ""}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.note || ""}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              <span className="font-medium">{slotUsed}</span> / {totalSlots} slots
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                              <div
-                                className={`h-2 rounded-full ${slotColorClass}`}
-                                style={{ width: `${slotAvailabilityRatio}%` }}
-                              />
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Available: {remainingSlots}
-                            </div>
-                          </td>
-                          {showCapacityColumn && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {showRowCapacity ? (
-                                <>
-                                  <div className="text-sm text-gray-900">
-                                    <span className="font-medium">{capacityUsed}</span> / {capacityLimit}
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                                    <div
-                                      className={`h-2 rounded-full ${capacityColorClass}`}
-                                      style={{
-                                        width: `${capacityAvailabilityRatio}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    Available: {remainingCapacity}
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="text-sm text-gray-400 italic">
-                                  Capacity not configured
-                                </div>
-                              )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.informationUser || ""}
                             </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.supplier || ""}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {Number(item.import || 0).toLocaleString("vi-VN")} VND
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDisplayDate(item.expired)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                            <button
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                              type="button"
-                              aria-label="Edit package"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(item);
-                              }}
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                            <button
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
-                              type="button"
-                              aria-label="Show package details"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openViewModal(item);
-                              }}
-                            >
-                              <EyeIcon className="h-4 w-4" />
-                            </button>
-                          </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.note || ""}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                <span className="font-medium">{slotUsed}</span>{" "}
+                                / {totalSlots} slots
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                <div
+                                  className={`h-2 rounded-full ${slotColorClass}`}
+                                  style={{ width: `${slotAvailabilityRatio}%` }}
+                                />
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Còn lại: {remainingSlots}
+                              </div>
+                            </td>
+                            {showCapacityColumn && (
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {showRowCapacity ? (
+                                  <>
+                                    <div className="text-sm text-gray-900">
+                                      <span className="font-medium">
+                                        {capacityUsed}
+                                      </span>{" "}
+                                      / {capacityLimit}
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                      <div
+                                        className={`h-2 rounded-full ${capacityColorClass}`}
+                                        style={{
+                                          width: `${capacityAvailabilityRatio}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Còn lại: {remainingCapacity}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-sm text-gray-400 italic">
+                                    Dung Lượng trống
+                                  </div>
+                                )}
+                              </td>
+                            )}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.supplier || ""}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {Number(item.import || 0).toLocaleString("vi-VN")}{" "}
+                              VND
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatDisplayDate(item.expired)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                              <button
+                                className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                                type="button"
+                                aria-label="Edit package"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(item);
+                                }}
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
+                                type="button"
+                                aria-label="Show package details"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openViewModal(item);
+                                }}
+                              >
+                                <EyeIcon className="h-4 w-4" />
+                              </button>
+                            </td>
                           </tr>
                           {isExpanded && (
                             <tr>
@@ -1551,25 +1587,12 @@ function PackageProduct() {
                                 <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-4 text-center">
                                   <div>
                                     <p className="text-sm font-semibold text-gray-900">
-                                      Slot details
+                                      Chi tiết slot
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      Showing {totalSlots} slots — {slotUsed} used,{" "}
-                                      {remainingSlots} available
+                                      Hiển Thị {totalSlots} slots — {slotUsed}{" "}
+                                      Sử Dụng, {remainingSlots} Khả Dụng
                                     </p>
-                                    {slotAssignments.length > 0 ? (
-                                      <p className="text-xs text-blue-600 mt-1">
-                                        Matched {slotAssignments.length} order
-                                        {slotAssignments.length > 1 ? "s" : ""} via{" "}
-                                        {slotLinkMode === "information"
-                                          ? "Order slot column"
-                                          : "Order information column"}
-                                      </p>
-                                    ) : (
-                                      <p className="text-xs text-gray-400 mt-1">
-                                        No matched orders for this package name.
-                                      </p>
-                                    )}
                                   </div>
                                   <div className="flex flex-wrap justify-center gap-3">
                                     {slotCells.map((slot) => (
@@ -1658,7 +1681,11 @@ function PackageProduct() {
           onSubmit={handleEditSubmit}
         />
       )}
-      <PackageViewModal open={viewModalOpen} row={viewRow} onClose={closeViewModal} />
+      <PackageViewModal
+        open={viewModalOpen}
+        row={viewRow}
+        onClose={closeViewModal}
+      />
     </div>
   );
 }
@@ -1669,7 +1696,13 @@ type ModalShellProps = {
   children: React.ReactNode;
   footer: React.ReactNode;
 };
-function ModalShell({ open, title, onClose, children, footer }: ModalShellProps) {
+function ModalShell({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+}: ModalShellProps) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -1740,11 +1773,11 @@ function CreatePackageModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Please enter a package name.");
+      setError("Vui lòng nhập tên gói.");
       return;
     }
     if (fields.size === 0) {
-      setError("Please select at least one field.");
+      setError("Vui lòng chọn ít nhất một trường.");
       return;
     }
     onSubmit(trimmed, Array.from(fields));
@@ -1752,7 +1785,7 @@ function CreatePackageModal({
   return (
     <ModalShell
       open={open}
-      title="Create New Package"
+      title="Tạo gói mới"
       onClose={onClose}
       footer={
         <>
@@ -1760,13 +1793,13 @@ function CreatePackageModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition"
           >
-            Cancel
+            Hủy
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            Save Template
+            Lưu
           </button>
         </>
       }
@@ -1774,7 +1807,7 @@ function CreatePackageModal({
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Package name
+            Tên Gói
           </label>
           <input
             type="text"
@@ -1787,7 +1820,7 @@ function CreatePackageModal({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Fields included in this template
+              Chọn Các Trường Dưới Đây
             </label>
             <div className="flex items-center gap-3 text-xs">
               <button
@@ -1795,14 +1828,14 @@ function CreatePackageModal({
                 onClick={selectAll}
                 className="text-blue-600 hover:text-blue-700"
               >
-                Select all
+                Chọn Tất Cả
               </button>
               <button
                 type="button"
                 onClick={clearAll}
                 className="text-gray-500 hover:text-gray-600"
               >
-                Clear
+                Làm Mới
               </button>
             </div>
           </div>
@@ -1878,7 +1911,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
           onClick={onClose}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
         >
-          Close
+          Đóng
         </button>
       }
     >
@@ -1889,11 +1922,9 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
       >
         <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">
-              Package Information
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-900">Tên Gói</h3>
             <p className="text-xs text-gray-500">
-              Stored descriptive fields for this package.
+              Đã lưu trữ các trường mô tả cho gói này.
             </p>
           </div>
           <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -1917,10 +1948,10 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
           <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
-                Account Storage
+                Tài Khoản Dung Lượng
               </h3>
               <p className="text-xs text-gray-500">
-                Account credentials and capacity overview.
+                Tổng quan về tài khoản dung lượng
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -1941,7 +1972,8 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
             </dl>
             <div className="space-y-1">
               <div className="text-sm text-gray-900">
-                <span className="font-semibold">{capacityUsed}</span> / {capacityLimit} capacity
+                <span className="font-semibold">{capacityUsed}</span> /{" "}
+                {capacityLimit} Dung Lượng
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
@@ -1950,7 +1982,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
                 />
               </div>
               <div className="text-xs text-gray-500">
-                Available: {remainingCapacity}
+                Khả Dụng: {remainingCapacity}
               </div>
             </div>
           </section>
@@ -1982,7 +2014,7 @@ function PackageFormModal({
     }),
     [initialValues]
   );
-const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
+  const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
   useEffect(() => {
     if (open) {
       setValues(mergedInitialValues);
@@ -2013,7 +2045,8 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
     template.fields.includes(field)
   );
   const showAccountStorageSection = template.fields.includes("capacity");
-  const showSectionGrid = showPackageDetailsSection || showAccountStorageSection;
+  const showSectionGrid =
+    showPackageDetailsSection || showAccountStorageSection;
   const shouldUseTwoColumns =
     showPackageDetailsSection && showAccountStorageSection;
   return (
@@ -2027,7 +2060,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition"
           >
-            Cancel
+            Hủy
           </button>
           <button
             onClick={handleSubmit}
@@ -2049,10 +2082,10 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Package Information
+                    Tên Gói
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Enter the descriptive fields tied to this package.
+                    Nhập các trường mô tả liên quan đến gói này.
                   </p>
                 </div>
                 {template.fields.includes("information") && (
@@ -2060,7 +2093,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          User
+                          Tài Khoản
                         </label>
                         <input
                           type="text"
@@ -2072,7 +2105,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Pass
+                          Mật khẩu
                         </label>
                         <input
                           type="text"
@@ -2085,7 +2118,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Mail 2nd
+                        Mail Dự phòng
                       </label>
                       <input
                         type="email"
@@ -2100,7 +2133,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 {template.fields.includes("note") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Note
+                      Ghi Chú
                     </label>
                     <input
                       type="text"
@@ -2114,7 +2147,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 {template.fields.includes("supplier") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Supplier
+                      Nhà Cung Cấp
                     </label>
                     <input
                       type="text"
@@ -2127,7 +2160,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 {template.fields.includes("import") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Import price (VND)
+                      Giá Nhập
                     </label>
                     <input
                       type="number"
@@ -2140,7 +2173,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Expired date
+                    Ngày Hết Hạn
                   </label>
                   <input
                     type="date"
@@ -2155,16 +2188,16 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Account Storage
+                    Tài Khoản Dung Lượng
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Provide credentials tied to this capacity-based package.
+                    Cung cấp thông tin tài khoản dung lượng
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      User
+                      Tài Khoản
                     </label>
                     <input
                       type="text"
@@ -2176,7 +2209,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Pass
+                      Mật khẩu
                     </label>
                     <input
                       type="text"
@@ -2188,7 +2221,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Mail 2nd
+                      Mail dự phòng
                     </label>
                     <input
                       type="email"
@@ -2201,7 +2234,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Note
+                    Ghi chú
                   </label>
                   <textarea
                     value={values.accountNote}
@@ -2213,7 +2246,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Capacity (total slots)
+                    Dung Lượng
                   </label>
                   <input
                     type="number"
@@ -2224,19 +2257,7 @@ const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                {template.fields.includes("expired") && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expired date
-                    </label>
-                    <input
-                      type="date"
-                      value={values.expired}
-                      onChange={(e) => handleChange("expired", e)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                )}
+
               </div>
             )}
           </div>

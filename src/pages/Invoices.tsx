@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import * as Helpers from "../lib/helpers";
 import { apiFetch } from "../lib/api";
+import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
 
 interface PaymentReceipt {
   id: number;
@@ -30,6 +31,14 @@ const formatCurrencyVnd = (value: number): string => {
   return `VND ${Math.round(value).toLocaleString("vi-VN")}`;
 };
 
+const determineReceiptCategory = (
+  orderCode: string | null | undefined
+): ReceiptCategory => {
+  const normalized = (orderCode || "").toUpperCase().trim();
+  if (!normalized) return "refund";
+  return normalized.startsWith("MAV") ? "receipt" : "refund";
+};
+
 const CATEGORY_OPTIONS: {
   value: ReceiptCategory;
   label: string;
@@ -37,13 +46,13 @@ const CATEGORY_OPTIONS: {
 }[] = [
   {
     value: "receipt",
-    label: "Receipt",
-    description: "Order code starts with MAV",
+    label: "Biên Nhận",
+    description: "Mã đơn bắt đầu bằng MAV",
   },
   {
     value: "refund",
-    label: "Refund",
-    description: "Other incoming transfers",
+    label: "Hoàn tiền",
+    description: "Các biên nhận khác",
   },
 ];
 
@@ -51,9 +60,8 @@ export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<ReceiptCategory>(
-    "receipt"
-  );
+  const [categoryFilter, setCategoryFilter] =
+    useState<ReceiptCategory>("receipt");
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,14 +85,8 @@ export default function Invoices() {
     const startTime = parseDate(dateStart);
     const endTime = parseDate(dateEnd);
 
-    const determineCategory = (orderCode: string | null | undefined) => {
-      const normalized = (orderCode || "").toUpperCase().trim();
-      if (!normalized) return "refund";
-      return normalized.startsWith("MAV") ? "receipt" : "refund";
-    };
-
     return receipts.filter((item) => {
-      const recordCategory = determineCategory(item.orderCode);
+      const recordCategory = determineReceiptCategory(item.orderCode);
       const matchesSearch =
         !normalized ||
         [item.orderCode, item.note, item.sender]
@@ -96,7 +98,9 @@ export default function Invoices() {
       );
 
       const withinStart =
-        startTime === null || paidTimestamp === null || paidTimestamp >= startTime;
+        startTime === null ||
+        paidTimestamp === null ||
+        paidTimestamp >= startTime;
       const withinEnd =
         endTime === null || paidTimestamp === null || paidTimestamp <= endTime;
 
@@ -112,35 +116,40 @@ export default function Invoices() {
         ? sum + item.amount
         : sum;
     }, 0);
-    const uniqueSenders = new Set(receipts.map((item) => item.sender)).size;
     const latestPaidAt = receipts.length > 0 ? receipts[0].paidAt ?? "" : "";
 
     return [
       {
-        name: "Total receipts",
+        name: "Tổng Biên Nhận",
         value: receipts.length.toString(),
         icon: CheckCircleIcon,
-        color: "bg-blue-500",
+        accent: {
+          border: "border-blue-100",
+          iconBg: "bg-blue-100 text-blue-600",
+          glow: "from-blue-600/15 via-blue-300/10 to-transparent",
+        },
       },
       {
-        name: "Total amount",
+        name: "Tổng Số Tiền",
         value: Helpers.formatCurrencyShort(totalAmount),
         icon: CheckCircleIcon,
-        color: "bg-green-500",
+        accent: {
+          border: "border-emerald-100",
+          iconBg: "bg-emerald-100 text-emerald-600",
+          glow: "from-emerald-500/20 via-emerald-300/10 to-transparent",
+        },
       },
       {
-        name: "Unique senders",
-        value: uniqueSenders.toString(),
-        icon: ClockIcon,
-        color: "bg-yellow-500",
-      },
-      {
-        name: "Latest payment",
+        name: "Biên Lai Gần Nhất",
         value: latestPaidAt
           ? Helpers.formatDateToDMY(latestPaidAt) ?? "--"
           : "--",
         icon: XCircleIcon,
-        color: "bg-purple-500",
+        accent: {
+          border: "border-purple-100",
+          iconBg: "bg-purple-100 text-purple-600",
+          glow: "from-purple-500/20 via-purple-300/10 to-transparent",
+        },
       },
     ];
   }, [receipts]);
@@ -148,12 +157,8 @@ export default function Invoices() {
   const categoryCounts = useMemo(() => {
     return receipts.reduce(
       (acc, item) => {
-        const code = (item.orderCode || "").toUpperCase();
-        if (code.startsWith("MAV")) {
-          acc.receipt += 1;
-        } else {
-          acc.refund += 1;
-        }
+        const category = determineReceiptCategory(item.orderCode);
+        acc[category] += 1;
         return acc;
       },
       { receipt: 0, refund: 0 } as Record<ReceiptCategory, number>
@@ -167,14 +172,14 @@ export default function Invoices() {
         setError(null);
         const response = await apiFetch("/api/payment-receipts");
         if (!response.ok) {
-          throw new Error("Unable to load payment receipts.");
+          throw new Error("Không thể tải biên nhận.");
         }
         const data = await response.json();
         setReceipts(Array.isArray(data.receipts) ? data.receipts : []);
       } catch (err) {
         console.error(err);
         setError(
-          err instanceof Error ? err.message : "Unable to load payment receipts."
+          err instanceof Error ? err.message : "Không thể tải biên nhận."
         );
       } finally {
         setLoading(false);
@@ -193,6 +198,53 @@ export default function Invoices() {
     setSelectedReceipt(null);
     setViewModalOpen(false);
   };
+
+  const handleExportToExcel = () => {
+    if (!filteredReceipts.length) return;
+
+    const headerRow = [
+      "#",
+      "Ma don",
+      "Nguoi gui",
+      "So tien goc",
+      "So tien dinh dang",
+      "Noi dung chuyen khoan",
+      "Ngay thanh toan",
+      "Nhom",
+    ];
+
+    const dataRows = filteredReceipts.map((receipt, index) => [
+      index + 1,
+      receipt.orderCode || "",
+      receipt.sender || "",
+      receipt.amount,
+      formatCurrencyVnd(receipt.amount),
+      receipt.note || "",
+      receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "",
+      determineReceiptCategory(receipt.orderCode) === "receipt"
+        ? "Bien nhan"
+        : "Hoan tien",
+    ]);
+
+    const worksheet = XLSXUtils.aoa_to_sheet([headerRow, ...dataRows]);
+    worksheet["!cols"] = [
+      { wch: 5 },
+      { wch: 18 },
+      { wch: 26 },
+      { wch: 14 },
+      { wch: 20 },
+      { wch: 48 },
+      { wch: 14 },
+      { wch: 12 },
+    ];
+
+    const workbook = XLSXUtils.book_new();
+    XLSXUtils.book_append_sheet(workbook, worksheet, "Bien nhan thanh toan");
+    const isoDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    writeXLSXFile(workbook, `payment_receipts_${isoDate}.xlsx`);
+  };
+
+  const exportDisabled = loading || filteredReceipts.length === 0;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -230,26 +282,40 @@ export default function Invoices() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payment receipts</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Biên Nhận Thanh Toán
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Track incoming transfers recorded in the database
+            Theo dõi giao dịch chuyển đến được lưu trong hệ thống
           </p>
         </div>
         <button className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition">
           <PlusIcon className="w-4 h-4 mr-2" />
-          Add receipt
+          Thêm biên nhận
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {stats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-xl shadow-sm p-4 flex items-center">
-            <div className={`${stat.color} text-white p-3 rounded-lg mr-4`}>
-              <stat.icon className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">{stat.name}</p>
-              <p className="text-xl font-semibold text-gray-900">{stat.value}</p>
+          <div
+            key={stat.name}
+            className={`relative isolate overflow-hidden rounded-3xl border ${stat.accent.border} bg-white/90 p-6 shadow-[0_18px_45px_-25px_rgba(15,23,42,0.7)] transition-shadow hover:shadow-[0_35px_65px_-35px_rgba(15,23,42,0.45)]`}
+          >
+            <div
+              className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${stat.accent.glow} opacity-80 blur-2xl`}
+            />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                <p className="mt-2 text-2xl font-semibold text-gray-900">
+                  {stat.value}
+                </p>
+              </div>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-inner ${stat.accent.iconBg}`}
+              >
+                <stat.icon className="h-6 w-6" />
+              </div>
             </div>
           </div>
         ))}
@@ -261,17 +327,14 @@ export default function Invoices() {
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search order code, sender or note..."
+              placeholder="Tim ma don nguoi gui hoac ghi chu..."
               className="w-full pl-12 pr-4 py-3 border border-gray-200 bg-gray-50/60 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
 
-          <div
-            className="relative flex items-stretch"
-            ref={dateRangeRef}
-          >
+          <div className="relative flex items-stretch" ref={dateRangeRef}>
             <button
               type="button"
               onClick={() => setRangePickerOpen((prev) => !prev)}
@@ -283,7 +346,7 @@ export default function Invoices() {
             >
               <div className="flex flex-col text-left">
                 <span className="text-xs uppercase tracking-wide text-gray-400">
-                  Date range
+                  Khoảng Ngày
                 </span>
                 <span className="text-sm font-medium text-gray-800">
                   {dateRangeDisplay}
@@ -301,7 +364,7 @@ export default function Invoices() {
                 <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
-                      From
+                      Từ Ngày
                     </label>
                     <input
                       type="date"
@@ -318,7 +381,7 @@ export default function Invoices() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
-                      To
+                      Đến Ngày
                     </label>
                     <input
                       type="date"
@@ -342,20 +405,20 @@ export default function Invoices() {
                       setDateEnd("");
                     }}
                   >
-                    Clear range
+                    Xóa Khoảng
                   </button>
                   <div className="flex gap-2">
                     <button
                       className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
                       onClick={() => setRangePickerOpen(false)}
                     >
-                      Close
+                      Đóng
                     </button>
                     <button
                       className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                       onClick={() => setRangePickerOpen(false)}
                     >
-                      Apply
+                      Áp Dụng
                     </button>
                   </div>
                 </div>
@@ -363,8 +426,17 @@ export default function Invoices() {
             )}
           </div>
 
-          <button className="px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 transition-colors shadow-sm">
-            Export list
+          <button
+            type="button"
+            onClick={handleExportToExcel}
+            disabled={exportDisabled}
+            className={`px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold transition-colors shadow-sm ${
+              exportDisabled
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-gray-700"
+            }`}
+          >
+            Tải Về
           </button>
         </div>
 
@@ -409,22 +481,22 @@ export default function Invoices() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order code
+                  Mã Đơn
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sender
+                  Người Gửi
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
+                  Số Tiền
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Transfer note
+                  Nội Dung Chuyển Khoản
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Paid date
+                  Ngày Thanh Toán
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
+                  Thao Tác
                 </th>
               </tr>
             </thead>
@@ -443,24 +515,34 @@ export default function Invoices() {
                     {formatCurrencyVnd(receipt.amount)}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
-                    <span className="block truncate">{receipt.note || "--"}</span>
+                    <span className="block truncate">
+                      {receipt.note || "--"}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "--"}
+                    {receipt.paidAt
+                      ? Helpers.formatDateToDMY(receipt.paidAt)
+                      : "--"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex space-x-2 justify-end">
                       <button
                         className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="View invoice"
+                        title="Xem Hóa Đơn"
                         onClick={() => handleViewReceipt(receipt)}
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
-                      <button className="text-green-600 hover:text-green-900 p-1 rounded" title="Print invoice">
+                      <button
+                        className="text-green-600 hover:text-green-900 p-1 rounded"
+                        title="In Hóa Đơn"
+                      >
                         <PrinterIcon className="h-4 w-4" />
                       </button>
-                      <button className="text-purple-600 hover:text-purple-900 p-1 rounded" title="Download">
+                      <button
+                        className="text-purple-600 hover:text-purple-900 p-1 rounded"
+                        title="Tải Xuống"
+                      >
                         <ArrowDownTrayIcon className="h-4 w-4" />
                       </button>
                     </div>
@@ -473,13 +555,13 @@ export default function Invoices() {
 
         {!loading && filteredReceipts.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">No receipts found</div>
-            <div className="text-gray-500">Try another keyword</div>
+            <div className="text-gray-400 text-lg mb-2">Không Có Biên Nhận</div>
+            <div className="text-gray-500">Thử từ khóa khác</div>
           </div>
         )}
         {loading && (
           <div className="text-center py-8 text-gray-500 text-sm">
-            Loading data...
+            Đang tải dữ liệu...
           </div>
         )}
       </div>
@@ -489,12 +571,12 @@ export default function Invoices() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
-                Receipt detail
+                Chi tiết biên nhận
               </h2>
               <button
                 onClick={closeViewModal}
                 className="text-gray-400 hover:text-gray-600 transition rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-label="Close"
+                aria-label="Dong"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -502,13 +584,13 @@ export default function Invoices() {
             <div className="px-5 py-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-gray-500 mb-1">Order code</p>
+                  <p className="text-gray-500 mb-1">Mã Đơn</p>
                   <p className="font-semibold text-gray-900">
                     {selectedReceipt.orderCode || "--"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Paid date</p>
+                  <p className="text-gray-500 mb-1">Ngày Thanh Toán</p>
                   <p className="font-semibold text-gray-900">
                     {selectedReceipt.paidAt
                       ? Helpers.formatDateToDMY(selectedReceipt.paidAt)
@@ -516,13 +598,13 @@ export default function Invoices() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Sender</p>
+                  <p className="text-gray-500 mb-1">Người Gửi</p>
                   <p className="font-semibold text-gray-900">
                     {selectedReceipt.sender || "--"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-500 mb-1">Amount</p>
+                  <p className="text-gray-500 mb-1">Số Tiền</p>
                   <p className="font-semibold text-gray-900">
                     {formatCurrencyVnd(selectedReceipt.amount)}
                   </p>
@@ -530,10 +612,10 @@ export default function Invoices() {
               </div>
               <div>
                 <p className="text-gray-500 mb-1 text-sm">
-                  Transfer note
+                  Nội Dung Chuyển Khoản
                 </p>
                 <div className="p-3 rounded-lg border border-gray-200 text-sm text-gray-800 bg-gray-50 min-h-[80px]">
-                  {selectedReceipt.note || "No note"}
+                  {selectedReceipt.note || "Khong co ghi chu"}
                 </div>
               </div>
             </div>
@@ -542,7 +624,7 @@ export default function Invoices() {
                 onClick={closeViewModal}
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
-                Close
+                Đóng
               </button>
             </div>
           </div>
