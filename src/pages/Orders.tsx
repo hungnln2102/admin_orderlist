@@ -15,6 +15,8 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
+import GradientButton from "../components/GradientButton";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 
 // Import Modal tuy chinh
 import ConfirmModal from "../components/ConfirmModal";
@@ -109,20 +111,25 @@ const stockStats = [
     name: "Tổng Đơn Hàng",
     value: "0",
     icon: CheckCircleIcon,
-    color: "bg-blue-500",
+    accent: STAT_CARD_ACCENTS.sky,
   },
   {
     name: "Cần Gia Hạn",
     value: "0",
     icon: ExclamationTriangleIcon,
-    color: "bg-yellow-500",
+    accent: STAT_CARD_ACCENTS.amber,
   },
-  { name: "Hết Hạn", value: "0", icon: ArrowDownIcon, color: "bg-red-500" },
+  {
+    name: "Hết Hạn",
+    value: "0",
+    icon: ArrowDownIcon,
+    accent: STAT_CARD_ACCENTS.rose,
+  },
   {
     name: "Đăng Ký Hôm Nay",
     value: "0",
     icon: ArrowUpIcon,
-    color: "bg-green-500",
+    accent: STAT_CARD_ACCENTS.emerald,
   },
 ];
 
@@ -654,30 +661,22 @@ export default function Orders() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusIcon className="h-4 w-4 mr-2" />
+          <GradientButton icon={PlusIcon} onClick={openCreateModal}>
             Tạo Đơn Hàng Mới
-          </button>
+          </GradientButton>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {updatedStats.map((stat) => (
-          <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center">
-              <div className={`${stat.color} rounded-lg p-3`}>
-                <stat.icon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            </div>
-          </div>
+          <StatCard
+            key={stat.name}
+            title={stat.name}
+            value={stat.value}
+            icon={stat.icon}
+            accent={stat.accent}
+          />
         ))}
       </div>
 

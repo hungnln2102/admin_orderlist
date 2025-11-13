@@ -11,6 +11,8 @@ import {
   CalendarDaysIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+import GradientButton from "../components/GradientButton";
 import * as Helpers from "../lib/helpers";
 import { apiFetch } from "../lib/api";
 import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
@@ -123,21 +125,13 @@ export default function Invoices() {
         name: "Tổng Biên Nhận",
         value: receipts.length.toString(),
         icon: CheckCircleIcon,
-        accent: {
-          border: "border-blue-100",
-          iconBg: "bg-blue-100 text-blue-600",
-          glow: "from-blue-600/15 via-blue-300/10 to-transparent",
-        },
+        accent: STAT_CARD_ACCENTS.sky,
       },
       {
         name: "Tổng Số Tiền",
         value: Helpers.formatCurrencyShort(totalAmount),
         icon: CheckCircleIcon,
-        accent: {
-          border: "border-emerald-100",
-          iconBg: "bg-emerald-100 text-emerald-600",
-          glow: "from-emerald-500/20 via-emerald-300/10 to-transparent",
-        },
+        accent: STAT_CARD_ACCENTS.emerald,
       },
       {
         name: "Biên Lai Gần Nhất",
@@ -145,11 +139,7 @@ export default function Invoices() {
           ? Helpers.formatDateToDMY(latestPaidAt) ?? "--"
           : "--",
         icon: XCircleIcon,
-        accent: {
-          border: "border-purple-100",
-          iconBg: "bg-purple-100 text-purple-600",
-          glow: "from-purple-500/20 via-purple-300/10 to-transparent",
-        },
+        accent: STAT_CARD_ACCENTS.violet,
       },
     ];
   }, [receipts]);
@@ -289,35 +279,20 @@ export default function Invoices() {
             Theo dõi giao dịch chuyển đến được lưu trong hệ thống
           </p>
         </div>
-        <button className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition">
-          <PlusIcon className="w-4 h-4 mr-2" />
+        <GradientButton icon={PlusIcon} className="mt-4 sm:mt-0">
           Thêm biên nhận
-        </button>
+        </GradientButton>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {stats.map((stat) => (
-          <div
+          <StatCard
             key={stat.name}
-            className={`relative isolate overflow-hidden rounded-3xl border ${stat.accent.border} bg-white/90 p-6 shadow-[0_18px_45px_-25px_rgba(15,23,42,0.7)] transition-shadow hover:shadow-[0_35px_65px_-35px_rgba(15,23,42,0.45)]`}
-          >
-            <div
-              className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${stat.accent.glow} opacity-80 blur-2xl`}
-            />
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                  {stat.value}
-                </p>
-              </div>
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-inner ${stat.accent.iconBg}`}
-              >
-                <stat.icon className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+            title={stat.name}
+            value={stat.value}
+            icon={stat.icon}
+            accent={stat.accent}
+          />
         ))}
       </div>
 

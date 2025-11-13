@@ -15,13 +15,13 @@ import {
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { API_ENDPOINTS } from "../constants";
+import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 
 const API_BASE =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) ||
   (process.env.VITE_API_BASE_URL as string) ||
   "http://localhost:3001";
 
-type Trend = "up" | "down" | "stable";
 type StatusFilter = "all" | "active" | "inactive";
 
 interface ProductPricingRow {
@@ -44,8 +44,8 @@ interface PricingStat {
   name: string;
   value: string;
   icon: typeof CurrencyDollarIcon;
-  color: string;
-  trend: Trend;
+  accent: keyof typeof STAT_CARD_ACCENTS;
+  subtitle: string;
 }
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
@@ -444,35 +444,36 @@ export default function Pricing() {
 
     return [
       {
-        name: "Tổng số gói",
+        name: "Tong so goi",
         value: total.toString(),
         icon: CurrencyDollarIcon,
-        color: "bg-green-500",
-        trend: "up",
+        accent: "emerald",
+        subtitle: total > 0 ? "Tang truong" : "On dinh",
       },
       {
-        name: "Đang hoạt động",
+        name: "Dang hoat dong",
         value: activeCount.toString(),
         icon: ArrowTrendingUpIcon,
-        color: "bg-blue-500",
-        trend: "up",
+        accent: "sky",
+        subtitle: activeCount > 0 ? "Tang truong" : "On dinh",
       },
       {
-        name: "Tạm dừng",
+        name: "Tam dung",
         value: inactiveCount.toString(),
         icon: PencilIcon,
-        color: "bg-purple-500",
-        trend: inactiveCount > 0 ? "stable" : "up",
+        accent: "violet",
+        subtitle: inactiveCount > 0 ? "On dinh" : "Giam nhe",
       },
       {
-        name: "Tỷ giá khách TB",
+        name: "Ty gia khach TB",
         value: formatAvgRate(avgKhach),
         icon: ArrowTrendingDownIcon,
-        color: "bg-red-500",
-        trend: avgKhach >= avgCtv ? "up" : "down",
+        accent: "rose",
+        subtitle: avgKhach >= avgCtv ? "Tang truong" : "Giam nhe",
       },
     ];
   }, [productPrices]);
+
 
 
   return (
@@ -504,25 +505,14 @@ export default function Pricing() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {pricingStats.map((stat) => (
-          <div
+          <StatCard
             key={stat.name}
-            className="bg-white rounded-xl shadow-sm p-5 flex items-center"
-          >
-            <div className={`${stat.color} rounded-lg p-3 text-white`}>
-              <stat.icon className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500">{stat.name}</p>
-              <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-              <p className="text-xs text-gray-400">
-                {stat.trend === "up"
-                  ? "Tăng trưởng"
-                  : stat.trend === "down"
-                  ? "Giảm nhẹ"
-                  : "Ổn định"}
-              </p>
-            </div>
-          </div>
+            title={stat.name}
+            value={stat.value}
+            icon={stat.icon}
+            subtitle={stat.subtitle}
+            accent={STAT_CARD_ACCENTS[stat.accent]}
+          />
         ))}
       </div>
 
@@ -565,8 +555,8 @@ export default function Pricing() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto flex justify-center">
+          <table className="min-w-[960px] w-full max-w-6xl divide-y divide-gray-200 mx-auto">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -577,9 +567,6 @@ export default function Pricing() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Giá Lẻ
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Giá Khuyến Mãi
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Cập Nhật
@@ -593,7 +580,7 @@ export default function Pricing() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-6 py-8 text-center text-sm text-gray-500"
                   >
                     Đang tải dữ liệu product_price...
@@ -602,7 +589,7 @@ export default function Pricing() {
               ) : filteredPricing.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="px-6 py-8 text-center text-sm text-gray-500"
                   >
                     {error
@@ -624,6 +611,9 @@ export default function Pricing() {
                   const handleReloadSupply = () => {
                     fetchSupplyPricesForProduct(item.sanPhamRaw);
                   };
+                  const lastUpdatedDisplay = item.lastUpdated
+                    ? formatDateLabel(item.lastUpdated)
+                    : "";
                   return (
                     <React.Fragment key={item.id}>
                       <tr
@@ -644,9 +634,7 @@ export default function Pricing() {
                               <div className="text-xs text-gray-500">
                                 {item.variantLabel}
                               </div>
-                              <div className="text-xs text-gray-400 font-mono">
-                                {formatSkuLabel(item.sanPhamRaw)}
-                              </div>
+                              
                             </div>
                           </div>
                         </td>
@@ -677,21 +665,8 @@ export default function Pricing() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-green-600">
-                            {formatCurrencyValue(item.promoPrice)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatRateDescription({
-                              multiplier: item.pctKhach,
-                              price: item.promoPrice,
-                              basePrice: item.baseSupplyPrice,
-                              label: "Khách lẻ",
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {formatDateLabel(item.lastUpdated)}
+                            {lastUpdatedDisplay}
                           </div>
                           <span
                             className={`mt-1 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -710,17 +685,12 @@ export default function Pricing() {
                           >
                             <PencilIcon className="h-4 w-4" />
                           </button>
-                          <button
-                            className="text-green-600 hover:text-green-900"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            So sánh
-                          </button>
+                          
                         </td>
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={6} className="px-6 pb-6">
+                          <td colSpan={5} className="px-6 pb-6">
                             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
                               <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5 space-y-4">
                                 <div className="text-center">
@@ -731,8 +701,8 @@ export default function Pricing() {
                                     Theo doi nguon gia va he so hien tai cho san pham nay.
                                   </p>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-3 text-sm">
-                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                <div className="grid gap-4 md:grid-cols-3 text-sm text-center">
+                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
                                     <p className="text-xs uppercase text-gray-500">
                                       Gia nguon thap nhat
                                     </p>
@@ -743,13 +713,13 @@ export default function Pricing() {
                                       {cheapestSupplierName}
                                     </p>
                                   </div>
-                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
                                     <p className="text-xs uppercase text-gray-500">Gia si hien tai</p>
                                     <p className="mt-1 text-lg font-semibold text-gray-900">
                                       {formatCurrencyValue(item.wholesalePrice)}
                                     </p>
                                   </div>
-                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
                                     <p className="text-xs uppercase text-gray-500">Gia le hien tai</p>
                                     <p className="mt-1 text-lg font-semibold text-gray-900">
                                       {formatCurrencyValue(item.retailPrice)}
@@ -808,18 +778,18 @@ export default function Pricing() {
                                             key={supplier.sourceId}
                                             className="border-t border-gray-100"
                                           >
-                                            <td className="px-4 py-3 text-sm text-gray-700">
-                                              {supplier.sourceName}
-                                            </td>
-                                            <td className="px-4 py-3 text-center font-semibold text-gray-900">
-                                              {formatCurrencyValue(supplier.price)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-xs text-gray-600">
-                                              {formatProfitRange(
-                                                supplier.price,
-                                                item.wholesalePrice,
-                                                item.retailPrice
-                                              )}
+                                          <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                            {supplier.sourceName}
+                                          </td>
+                                          <td className="px-4 py-3 text-center font-semibold text-gray-900">
+                                            {formatCurrencyValue(supplier.price)}
+                                          </td>
+                                          <td className="px-4 py-3 text-center text-xs text-gray-600">
+                                            {formatProfitRange(
+                                              supplier.price,
+                                              item.wholesalePrice,
+                                              item.retailPrice
+                                            )}
                                             </td>
                                           </tr>
                                         ))
@@ -843,3 +813,5 @@ export default function Pricing() {
     </div>
   );
 }
+
+
