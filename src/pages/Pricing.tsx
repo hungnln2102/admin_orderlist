@@ -13,6 +13,7 @@ import {
   CurrencyDollarIcon,
   ArrowPathIcon,
   ChevronDownIcon,
+  PowerIcon,
 } from "@heroicons/react/24/outline";
 import { API_ENDPOINTS } from "../constants";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
@@ -129,10 +130,7 @@ const formatRateDescription = ({
   multiplier,
   price,
   basePrice,
-  label,
 }: RateDescriptionInput): string => {
-  const prefix = label ? `Ty gia ${label}` : "Ty gia";
-
   let effectiveRatio: number | null = null;
   if (
     typeof multiplier === "number" &&
@@ -152,11 +150,11 @@ const formatRateDescription = ({
   }
 
   if (!effectiveRatio || !Number.isFinite(effectiveRatio)) {
-    return `${prefix}: N/A`;
+    return "-";
   }
 
   const percent = effectiveRatio * 100;
-  return `${prefix}: ${percent.toFixed(1)}%`;
+  return `${percent.toFixed(1)}%`;
 };
 
 const formatCurrencyValue = (value?: number | null): string => {
@@ -263,15 +261,17 @@ const mapProductPriceRow = (row: any, fallbackId: number): ProductPricingRow => 
       row?.promo_price ?? row?.gia_khuyen_mai ?? row?.gia_km
     ),
     lastUpdated:
-      typeof row?.updated_at === "string"
-        ? row?.updated_at
+      typeof row?.update === "string"
+        ? row.update
+        : typeof row?.updated_at === "string"
+        ? row.updated_at
         : typeof row?.updatedAt === "string"
-        ? row?.updatedAt
+        ? row.updatedAt
         : null,
   };
 };
 
-export default function Pricing() {
+function Pricing() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [productPrices, setProductPrices] = useState<ProductPricingRow[]>([]);
@@ -282,6 +282,12 @@ export default function Pricing() {
   );
   const [supplyPriceMap, setSupplyPriceMap] = useState<
     Record<string, SupplyPriceState>
+  >({});
+  const [statusOverrides, setStatusOverrides] = useState<
+    Record<number, boolean>
+  >({});
+  const [updatedTimestampMap, setUpdatedTimestampMap] = useState<
+    Record<number, string>
   >({});
 
   const fetchProductPrices = useCallback(async () => {
@@ -303,7 +309,18 @@ export default function Pricing() {
       const normalizedRows = rows.map((row, index) =>
         mapProductPriceRow(row, index)
       );
+      const initialUpdatedMap = normalizedRows.reduce<Record<number, string>>(
+        (acc, row) => {
+          if (row.lastUpdated) {
+            acc[row.id] = row.lastUpdated;
+          }
+          return acc;
+        },
+        {}
+      );
       setProductPrices(normalizedRows);
+      setStatusOverrides({});
+      setUpdatedTimestampMap(initialUpdatedMap);
     } catch (err) {
       console.error("Lỗi khi tải product_price:", err);
       setProductPrices([]);
@@ -401,25 +418,139 @@ export default function Pricing() {
     }
   };
 
+  const handleToggleStatus = async (item: ProductPricingRow) => {
+    const current = statusOverrides[item.id] ?? item.isActive ?? false;
+    const nextStatus = !current;
+    const previousOverride = statusOverrides[item.id];
+    const previousUpdated = updatedTimestampMap[item.id];
+    const optimisticTimestamp = new Date().toISOString();
+
+    setStatusOverrides((prev) => ({
+      ...prev,
+      [item.id]: nextStatus,
+    }));
+
+    setProductPrices((prev) =>
+      prev.map((row) =>
+        row.id === item.id ? { ...row, isActive: nextStatus } : row
+      )
+    );
+
+    setUpdatedTimestampMap((prev) => ({
+      ...prev,
+      [item.id]: optimisticTimestamp,
+    }));
+
+    try {
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}/${item.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_active: nextStatus,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update product status.");
+      }
+
+      const payload: {
+        id: number;
+        is_active: boolean;
+        update?: string;
+      } = await response.json();
+
+      const serverStatus = payload?.is_active ?? nextStatus;
+      const serverUpdated =
+        typeof payload?.update === "string"
+          ? payload.update
+          : optimisticTimestamp;
+
+      setStatusOverrides((prev) => ({
+        ...prev,
+        [item.id]: serverStatus,
+      }));
+
+      setProductPrices((prev) =>
+        prev.map((row) =>
+          row.id === item.id
+            ? { ...row, isActive: serverStatus, lastUpdated: serverUpdated }
+            : row
+        )
+      );
+
+      setUpdatedTimestampMap((prev) => ({
+        ...prev,
+        [item.id]: serverUpdated,
+      }));
+    } catch (error) {
+      console.error("Failed to toggle product status:", error);
+
+      setStatusOverrides((prev) => {
+        const next = { ...prev };
+        if (previousOverride === undefined) {
+          delete next[item.id];
+        } else {
+          next[item.id] = previousOverride;
+        }
+        return next;
+      });
+
+      setProductPrices((prev) =>
+        prev.map((row) =>
+          row.id === item.id
+            ? {
+                ...row,
+                isActive: previousOverride ?? item.isActive ?? false,
+              }
+            : row
+        )
+      );
+
+      setUpdatedTimestampMap((prev) => {
+        const next = { ...prev };
+        if (previousUpdated) {
+          next[item.id] = previousUpdated;
+        } else {
+          delete next[item.id];
+        }
+        return next;
+      });
+      alert("Cap nhat tinh trang that bai. Vui long thu lai.");
+    }
+  };
+
   const filteredPricing = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return productPrices.filter((item) => {
-      if (statusFilter === "active" && !item.isActive) return false;
-      if (statusFilter === "inactive" && item.isActive) return false;
-      if (!normalizedSearch) return true;
+    return productPrices
+      .filter((item) => {
+        if (statusFilter === "active" && !item.isActive) return false;
+        if (statusFilter === "inactive" && item.isActive) return false;
+        if (!normalizedSearch) return true;
 
-      const haystack = [
-        item.packageName,
-        item.packageProduct,
-        item.sanPhamRaw,
-        item.variantLabel,
-      ]
-        .join(" ")
-        .toLowerCase();
+        const haystack = [
+          item.packageName,
+          item.packageProduct,
+          item.sanPhamRaw,
+          item.variantLabel,
+        ]
+          .join(" ")
+          .toLowerCase();
 
-      return haystack.includes(normalizedSearch);
-    });
+        return haystack.includes(normalizedSearch);
+      })
+      .sort((a, b) => {
+        const aInactive = !(statusOverrides[a.id] ?? a.isActive);
+        const bInactive = !(statusOverrides[b.id] ?? b.isActive);
+        if (aInactive === bInactive) return 0;
+        return aInactive ? 1 : -1;
+      });
   }, [productPrices, searchTerm, statusFilter]);
 
   const pricingStats = useMemo<PricingStat[]>(() => {
@@ -555,24 +686,30 @@ export default function Pricing() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto flex justify-center">
-          <table className="min-w-[960px] w-full max-w-6xl divide-y divide-gray-200 mx-auto">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sản Phẩm
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  San pham
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Giá Sỉ
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Gia si
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Giá Lẻ
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Gia le
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cập Nhật
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Gia khuyen mai
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao Tác
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Tinh trang
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Cap nhat
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thao tac
                 </th>
               </tr>
             </thead>
@@ -580,7 +717,7 @@ export default function Pricing() {
               {isLoading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-sm text-gray-500"
                   >
                     Đang tải dữ liệu product_price...
@@ -589,7 +726,7 @@ export default function Pricing() {
               ) : filteredPricing.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-sm text-gray-500"
                   >
                     {error
@@ -611,9 +748,19 @@ export default function Pricing() {
                   const handleReloadSupply = () => {
                     fetchSupplyPricesForProduct(item.sanPhamRaw);
                   };
-                  const lastUpdatedDisplay = item.lastUpdated
-                    ? formatDateLabel(item.lastUpdated)
-                    : "";
+                  const resolvedIsActive =
+                    statusOverrides[item.id] ?? item.isActive ?? false;
+                  const displayUpdated =
+                    updatedTimestampMap[item.id] ?? item.lastUpdated ?? "";
+                  const handleToggleClick = (
+                    event: React.MouseEvent<HTMLButtonElement>
+                  ) => {
+                    event.stopPropagation();
+                    handleToggleStatus(item);
+                  };
+                  const formattedUpdated = displayUpdated
+                    ? formatDateLabel(displayUpdated)
+                    : "-";
                   return (
                     <React.Fragment key={item.id}>
                       <tr
@@ -647,7 +794,6 @@ export default function Pricing() {
                               multiplier: item.pctCtv,
                               price: item.wholesalePrice,
                               basePrice: item.baseSupplyPrice,
-                              label: "CTV",
                             })}
                           </div>
                         </td>
@@ -660,23 +806,32 @@ export default function Pricing() {
                               multiplier: item.pctKhach,
                               price: item.retailPrice,
                               basePrice: item.baseSupplyPrice,
-                              label: "Khách lẻ",
                             })}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {lastUpdatedDisplay}
+                          <div className="text-sm text-gray-400">&nbsp;</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col items-center">
+                            <button
+                              type="button"
+                              onClick={handleToggleClick}
+                              className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
+                                resolvedIsActive
+                                  ? "border-emerald-200 bg-emerald-500 text-white"
+                                  : "border-gray-200 bg-gray-200 text-gray-500"
+                              }`}
+                              aria-pressed={resolvedIsActive}
+                            >
+                              <PowerIcon className="h-4 w-4" />
+                            </button>
                           </div>
-                          <span
-                            className={`mt-1 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              item.isActive
-                                ? "bg-green-50 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {item.isActive ? "Hoạt động" : "Tạm dừng"}
-                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formattedUpdated}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
@@ -690,7 +845,7 @@ export default function Pricing() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={5} className="px-6 pb-6">
+                          <td colSpan={7} className="px-6 pb-6">
                             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
                               <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5 space-y-4">
                                 <div className="text-center">
@@ -813,5 +968,9 @@ export default function Pricing() {
     </div>
   );
 }
+
+export default Pricing;
+
+
 
 

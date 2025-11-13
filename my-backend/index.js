@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -69,8 +69,8 @@ const createNumericExtraction = (column) => `
 `;
 
 const VIETNAMESE_DIACRITICS =
-    "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ" +
-    "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ";
+    "àá?ã?a?????â?????èé???ê?????ìí?i?òó?õ?ô?????o?????ùú?u?u??????ý???d" +
+    "ÀÁ?Ã?A?????Â?????ÈÉ???Ê?????ÌÍ?I?ÒÓ?Õ?Ô?????O?????ÙÚ?U?U??????Ý???Ð";
 const VIETNAMESE_ASCII =
     "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd" +
     "AAAAAAAAAAAAAAAAAEEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD";
@@ -196,14 +196,14 @@ const normalizeSupplyStatus = (value) => {
         .toLowerCase();
     if (!normalized) return "active";
     if (
-        ["active", "Đang hoạt động", "Hoạt động", "running"].includes(
+        ["active", "Ðang ho?t d?ng", "Ho?t d?ng", "running"].includes(
             normalized
         )
     ) {
         return "active";
     }
     if (
-        ["inactive", "Tạm ngưng", "Tạm dừng", "pause", "paused"].includes(
+        ["inactive", "T?m ngung", "T?m d?ng", "pause", "paused"].includes(
             normalized
         )
     ) {
@@ -700,22 +700,22 @@ const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
 
     const dbStatusRaw =
         typeof row.tinh_trang === "string" ? row.tinh_trang.trim() : "";
-    let autoStatus = dbStatusRaw || "Chưa Thanh Toán";
+    let autoStatus = dbStatusRaw || "Chua Thanh Toán";
     let autoCheckFlag = normalizeCheckFlagValue(row.check_flag);
 
-    if (autoStatus !== "Đã Thanh Toán") {
+    if (autoStatus !== "Ðã Thanh Toán") {
         if (Number.isFinite(soNgayConLai)) {
             if (soNgayConLai <= 0) {
-                autoStatus = "Hết Hạn";
+                autoStatus = "H?t H?n";
                 autoCheckFlag = null;
             } else if (soNgayConLai > 0 && soNgayConLai <= 4) {
-                autoStatus = "Cần Gia Hạn";
+                autoStatus = "C?n Gia H?n";
                 autoCheckFlag = null;
             }
         }
     }
 
-    if (autoStatus === "Đã Thanh Toán" && autoCheckFlag === null) {
+    if (autoStatus === "Ðã Thanh Toán" && autoCheckFlag === null) {
         autoCheckFlag = true;
     }
 
@@ -1112,7 +1112,8 @@ app.get("/api/product-prices", async(_req, res) => {
         COALESCE(pp.san_pham::text, '') AS san_pham_label,
         pp.pct_ctv,
         pp.pct_khach,
-        pp.is_active
+        pp.is_active,
+        pp.update
       FROM mavryk.product_price pp
     ),
     supply AS (
@@ -1156,6 +1157,10 @@ app.get("/api/product-prices", async(_req, res) => {
             pct_ctv: fromDbNumber(row.pct_ctv),
             pct_khach: fromDbNumber(row.pct_khach),
             is_active: parseDbBoolean(row.is_active),
+            update:
+                row.update instanceof Date ?
+                row.update.toISOString() :
+                row.update,
             computed_wholesale_price: computeRoundedPrice(
                 Number(row.max_supply_price) || 0,
                 normalizeMultiplier(row.pct_ctv),
@@ -1177,6 +1182,53 @@ app.get("/api/product-prices", async(_req, res) => {
         console.error("Query failed (GET /api/product-prices):", error);
         res.status(500).json({
             error: "Unable to load product pricing data.",
+        });
+    }
+});
+
+app.patch("/api/product-prices/:productId/status", async(req, res) => {
+    const { productId } = req.params;
+    const { is_active } = req.body || {};
+
+    const parsedId = Number(productId);
+    if (!Number.isFinite(parsedId)) {
+        return res.status(400).json({ error: "Invalid product id." });
+    }
+    if (typeof is_active !== "boolean") {
+        return res.status(400).json({ error: "is_active must be boolean." });
+    }
+
+    try {
+        const updatedDateObj = new Date();
+        const updatedAtIso = updatedDateObj.toISOString();
+        const updatedAtDateOnly = updatedAtIso.slice(0, 10);
+        const result = await pool.query(
+            `
+      UPDATE mavryk.product_price
+      SET is_active = $1,
+          update = $2
+      WHERE id = $3
+      RETURNING id, is_active, update;
+    `,
+            [is_active, updatedAtDateOnly, parsedId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Product pricing record not found." });
+        }
+        const row = result.rows[0] || {};
+        const normalizedUpdateDate =
+            row.update instanceof Date ?
+            row.update.toISOString() :
+            updatedAtIso;
+        res.json({
+            id: row.id,
+            is_active: row.is_active,
+            update: normalizedUpdateDate,
+        });
+    } catch (error) {
+        console.error(`Mutation failed (PATCH /api/product-prices/${productId}/status):`, error);
+        res.status(500).json({
+            error: "Unable to update product status.",
         });
     }
 });
@@ -1485,7 +1537,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
     try {
         const updateQuery = `
       UPDATE mavryk.payment_supply
-      SET status = 'Đã Thanh Toán',
+      SET status = 'Ðã Thanh Toán',
           paid = CASE
             WHEN $2::numeric IS NOT NULL AND $2::numeric >= 0
               THEN $2::numeric
@@ -1662,7 +1714,7 @@ app.post("/api/orders", async(req, res) => {
 
     payload.ngay_dang_ki = normalizeDateInput(payload.ngay_dang_ki);
     payload.het_han = normalizeDateInput(payload.het_han);
-    payload.tinh_trang = "Chưa Thanh Toán";
+    payload.tinh_trang = "Chua Thanh Toán";
     payload.check_flag = null;
 
     const columns = Object.keys(payload);
@@ -1707,7 +1759,7 @@ app.get("/api/products/all-prices-by-name/:productName", async(req, res) => {
       sp.source_id,
       COALESCE(
         NULLIF(TRIM(s.source_name::text), ''),
-        CONCAT('Nhà cung cấp #', sp.source_id::text)
+        CONCAT('Nhà cung c?p #', sp.source_id::text)
       ) AS source_name,
       sp.price,
       recent.last_order_date
