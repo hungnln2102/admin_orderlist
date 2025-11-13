@@ -17,6 +17,7 @@ export const API_ENDPOINTS = {
 
   // 1. Dùng PRODUCTS_ALL cho việc fetch tất cả sản phẩm khi mở modal (tạm thời không đổi tên)
   PRODUCTS_ALL: "/api/products", // Giả định /api/products trả về tất cả
+  PRODUCT_PRICES: "/api/product-prices",
 
   // 2. SỬA CHỮA LỖI LỚN NHẤT: Hàm này phải nhận TÊN SẢN PHẨM (string)
   // và endpoint cần được điều chỉnh (Giả sử backend chấp nhận tên sản phẩm trong URL)

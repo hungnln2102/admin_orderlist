@@ -110,6 +110,13 @@ const fromDbNumber = (value) => {
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
 };
+const parseDbBoolean = (value) => {
+    if (typeof value === "boolean") return value;
+    if (value === undefined || value === null) return false;
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return false;
+    return ["true", "1", "t", "y", "yes"].includes(normalized);
+};
 const formatDateOutput = (value) => {
     if (!value) return null;
     if (typeof value === "string") {
@@ -1094,6 +1101,86 @@ app.get("/api/products", async(_req, res) => {
     }
 });
 
+app.get("/api/product-prices", async(_req, res) => {
+    console.log("[GET] /api/product-prices");
+    const query = `
+    WITH base AS (
+      SELECT
+        pp.id,
+        COALESCE(pp.package::text, '') AS package_label,
+        COALESCE(pp.package_product::text, '') AS package_product_label,
+        COALESCE(pp.san_pham::text, '') AS san_pham_label,
+        pp.pct_ctv,
+        pp.pct_khach,
+        pp.is_active
+      FROM mavryk.product_price pp
+    ),
+    supply AS (
+      SELECT product_id, MAX(price) AS max_supply_price
+      FROM mavryk.supply_price
+      GROUP BY product_id
+    )
+    SELECT
+      base.*,
+      COALESCE(supply.max_supply_price, 0) AS max_supply_price
+    FROM base
+    LEFT JOIN supply ON supply.product_id = base.id
+    ORDER BY
+      base.package_label ASC,
+      base.package_product_label ASC,
+      base.san_pham_label ASC;
+  `;
+
+    try {
+        const result = await pool.query(query);
+        const rows = result.rows || [];
+        const normalizeMultiplier = (value) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) && numeric > 0 ? numeric : 1.0;
+        };
+        const computeRoundedPrice = (basePrice, pctCtv, pctKhach, isMavc) => {
+            if (!Number.isFinite(basePrice) || basePrice <= 0) return 0;
+            let price = basePrice * pctCtv;
+            if (!isMavc) {
+                price *= pctKhach;
+            }
+            return roundToNearestThousand(
+                Helpers.roundGiaBanValue(Math.max(0, price))
+            );
+        };
+        const items = rows.map((row) => ({
+            id: row.id,
+            package: (row.package_label || "").trim(),
+            package_product: (row.package_product_label || "").trim(),
+            san_pham: (row.san_pham_label || "").trim(),
+            pct_ctv: fromDbNumber(row.pct_ctv),
+            pct_khach: fromDbNumber(row.pct_khach),
+            is_active: parseDbBoolean(row.is_active),
+            computed_wholesale_price: computeRoundedPrice(
+                Number(row.max_supply_price) || 0,
+                normalizeMultiplier(row.pct_ctv),
+                normalizeMultiplier(row.pct_khach),
+                true
+            ),
+            computed_retail_price: computeRoundedPrice(
+                Number(row.max_supply_price) || 0,
+                normalizeMultiplier(row.pct_ctv),
+                normalizeMultiplier(row.pct_khach),
+                false
+            ),
+        }));
+        res.json({
+            items,
+            count: items.length,
+        });
+    } catch (error) {
+        console.error("Query failed (GET /api/product-prices):", error);
+        res.status(500).json({
+            error: "Unable to load product pricing data.",
+        });
+    }
+});
+
 app.get("/api/products/supplies-by-name/:productName", async(req, res) => {
     const { productName } = req.params;
     console.log(`[GET] /api/products/supplies-by-name/${productName}`);
@@ -1616,10 +1703,29 @@ app.get("/api/products/all-prices-by-name/:productName", async(req, res) => {
     console.log(`[GET] /api/products/all-prices-by-name/${productName}`);
 
     const q = `
-    SELECT sp.source_id, sp.price
+    SELECT
+      sp.source_id,
+      COALESCE(
+        NULLIF(TRIM(s.source_name::text), ''),
+        CONCAT('Nhà cung cấp #', sp.source_id::text)
+      ) AS source_name,
+      sp.price,
+      recent.last_order_date
     FROM mavryk.supply_price sp
     JOIN mavryk.product_price pp ON sp.product_id = pp.id
-    WHERE pp.san_pham = $1;
+    LEFT JOIN mavryk.supply s ON sp.source_id = s.id
+    LEFT JOIN LATERAL (
+      SELECT MAX(ol.ngay_dang_ki) AS last_order_date
+      FROM mavryk.order_list ol
+      WHERE
+        s.source_name IS NOT NULL
+        AND LOWER(TRIM(ol.nguon)) = LOWER(TRIM(s.source_name::text))
+    ) AS recent ON TRUE
+    WHERE pp.san_pham = $1
+    ORDER BY
+      sp.price ASC NULLS LAST,
+      COALESCE(recent.last_order_date, '1900-01-01'::date) DESC,
+      source_name ASC;
   `;
 
     try {
