@@ -115,6 +115,15 @@ const getNextProductPriceId = async(client) => {
     return Number.isFinite(nextId) ? nextId : 1;
 };
 
+const getNextSupplyId = async(client) => {
+    await client.query("LOCK TABLE mavryk.supply IN EXCLUSIVE MODE;");
+    const result = await client.query(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.supply;`
+    );
+    const nextId = Number(result.rows?.[0]?.next_id ?? 1);
+    return Number.isFinite(nextId) ? nextId : 1;
+};
+
 const getNextSupplyPriceId = async(client) => {
     await client.query("LOCK TABLE mavryk.supply_price IN EXCLUSIVE MODE;");
     const result = await client.query(
@@ -122,6 +131,35 @@ const getNextSupplyPriceId = async(client) => {
     );
     const nextId = Number(result.rows?.[0]?.next_id ?? 1);
     return Number.isFinite(nextId) ? nextId : 1;
+};
+
+const ensureSupplyRecord = async(client, sourceName) => {
+    const existingId = await findSupplyIdByName(client, sourceName);
+    if (existingId) {
+        return existingId;
+    }
+    const nextSupplyId = await getNextSupplyId(client);
+    const statusColumn = await resolveSupplyStatusColumn();
+    const fields = ["id", "source_name"];
+    const values = [nextSupplyId, sourceName];
+    if (statusColumn) {
+        fields.push(`"${statusColumn}"`);
+        values.push("active");
+    }
+    const placeholders = values.map((_, idx) => `$${idx + 1}`);
+    const insertResult = await client.query(
+        `
+    INSERT INTO mavryk.supply (${fields.join(", ")})
+    VALUES (${placeholders.join(", ")})
+    RETURNING id;
+  `,
+        values
+    );
+    const newId = insertResult.rows?.[0]?.id ?? nextSupplyId;
+    if (!newId) {
+        throw new Error("Unable to create new supplier.");
+    }
+    return newId;
 };
 const fromDbNumber = (value) => {
     if (value === undefined || value === null) return null;
@@ -713,10 +751,7 @@ const computePromoPriceFromSupply = (
         Number.isFinite(Number(pctPromo)) && Number(pctPromo) >= 0 ?
         Number(pctPromo) :
         0;
-    const effectiveRatio = Math.min(
-        1,
-        Math.max(0, khachRatio - promoRatio)
-    );
+    const effectiveRatio = Math.max(0, khachRatio - promoRatio);
     if (effectiveRatio <= 0) return 0;
     return roundToNearestThousand(
         Helpers.roundGiaBanValue(Math.max(0, wholesalePrice * effectiveRatio))
@@ -1438,9 +1473,10 @@ app.post("/api/product-prices", async(req, res) => {
 
             let supplyId = await findSupplyIdByName(client, sourceName);
             if (!supplyId) {
+                const nextSupplyId = await getNextSupplyId(client);
                 const statusColumn = await resolveSupplyStatusColumn();
-                const fields = ["source_name", "number_bank", "bin_bank"];
-                const values = [sourceName, numberBank || null, bankBin];
+                const fields = ["id", "source_name", "number_bank", "bin_bank"];
+                const values = [nextSupplyId, sourceName, numberBank || null, bankBin];
                 if (statusColumn) {
                     fields.push(`"${statusColumn}"`);
                     values.push("active");
@@ -1454,7 +1490,7 @@ app.post("/api/product-prices", async(req, res) => {
         `,
                     values
                 );
-                supplyId = insertSupply.rows?.[0]?.id;
+                supplyId = insertSupply.rows?.[0]?.id ?? nextSupplyId;
             }
 
             if (!supplyId) {
@@ -1485,6 +1521,87 @@ app.post("/api/product-prices", async(req, res) => {
         const friendlyMessage = mapPostgresErrorToMessage(error);
         res.status(friendlyMessage ? 400 : 500).json({
             error: friendlyMessage || "Unable to create product pricing.",
+        });
+    } finally {
+        client.release();
+    }
+});
+
+app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
+    const { productId } = req.params;
+    const parsedProductId = Number(productId);
+    if (!Number.isFinite(parsedProductId) || parsedProductId <= 0) {
+        return res.status(400).json({ error: "Invalid product id." });
+    }
+
+    const { sourceName, price } = req.body || {};
+    const normalizedSourceName = normalizeTextInput(sourceName);
+    const normalizedPrice = toNullableNumber(price);
+
+    if (!normalizedSourceName) {
+        return res.status(400).json({ error: "Ten nguon khong duoc bo trong." });
+    }
+    if (!normalizedPrice || normalizedPrice <= 0) {
+        return res
+            .status(400)
+            .json({ error: "Gia nhap phai lon hon 0." });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const productExists = await client.query(
+            `SELECT id FROM mavryk.product_price WHERE id = $1 LIMIT 1;`, [parsedProductId]
+        );
+        if (!productExists.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Product pricing not found." });
+        }
+
+        const supplyId = await ensureSupplyRecord(
+            client,
+            normalizedSourceName
+        );
+
+        const duplicateCheck = await client.query(
+            `
+      SELECT id FROM mavryk.supply_price
+      WHERE product_id = $1 AND source_id = $2
+      LIMIT 1;
+    `,
+            [parsedProductId, supplyId]
+        );
+        if (duplicateCheck.rows.length) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                error: "Nguon nay da ton tai cho san pham.",
+            });
+        }
+
+        const nextSupplyPriceId = await getNextSupplyPriceId(client);
+        await client.query(
+            `
+      INSERT INTO mavryk.supply_price (id, product_id, source_id, price)
+      VALUES ($1, $2, $3, $4);
+    `,
+            [nextSupplyPriceId, parsedProductId, supplyId, normalizedPrice]
+        );
+
+        await client.query("COMMIT");
+        res.status(201).json({
+            productId: parsedProductId,
+            sourceId: supplyId,
+            sourceName: normalizedSourceName,
+            price: normalizedPrice,
+        });
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error(
+            `Mutation failed (POST /api/product-prices/${productId}/suppliers):`,
+            error
+        );
+        res.status(500).json({
+            error: "Unable to add supplier price for this product.",
         });
     } finally {
         client.release();
@@ -1526,19 +1643,21 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
         return res.status(400).json({ error: "pct_khach must be a positive number." });
     }
     if (pctPromoValue !== null) {
-        if (!Number.isFinite(pctPromoValue) || pctPromoValue < 0) {
+        const MIN_PROMO_RATIO = 0.01;
+        const promoGap = pctCtvValue - pctKhachValue;
+        if (!Number.isFinite(pctPromoValue) || pctPromoValue < MIN_PROMO_RATIO) {
             return res.status(400).json({
-                error: "pct_promo must be greater than or equal to 0.",
+                error: `pct_promo must be at least ${MIN_PROMO_RATIO}.`,
             });
         }
-        if (pctPromoValue >= pctKhachValue) {
+        if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
             return res.status(400).json({
-                error: "pct_promo must be less than pct_khach.",
+                error: "Cannot set promo ratio because pct_ctv - pct_khach is too small.",
             });
         }
-        if (pctKhachValue - pctPromoValue > 1) {
+        if (pctPromoValue > promoGap) {
             return res.status(400).json({
-                error: "Promo price cannot exceed wholesale price.",
+                error: "pct_promo cannot exceed (pct_ctv - pct_khach).",
             });
         }
     }
@@ -2274,6 +2393,58 @@ app.patch(
             res.status(500).json({
                 error: "Unable to update supply price for this product.",
             });
+        }
+    }
+);
+
+app.delete(
+    "/api/products/:productId/suppliers/:sourceId",
+    async(req, res) => {
+        const { productId, sourceId } = req.params;
+        const parsedProductId = Number(productId);
+        const parsedSourceId = Number(sourceId);
+
+        if (
+            !Number.isFinite(parsedProductId) ||
+            parsedProductId <= 0 ||
+            !Number.isFinite(parsedSourceId) ||
+            parsedSourceId <= 0
+        ) {
+            return res.status(400).json({ error: "Invalid product or source id." });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+            const deleteResult = await client.query(
+                `
+        DELETE FROM mavryk.supply_price
+        WHERE product_id = $1 AND source_id = $2
+        RETURNING id;
+      `, [parsedProductId, parsedSourceId]
+            );
+            if (!deleteResult.rows.length) {
+                await client.query("ROLLBACK");
+                return res
+                    .status(404)
+                    .json({ error: "Nguon nay khong ton tai cho san pham." });
+            }
+            await client.query("COMMIT");
+            res.json({
+                productId: parsedProductId,
+                sourceId: parsedSourceId,
+            });
+        } catch (error) {
+            await client.query("ROLLBACK");
+            console.error(
+                `[DELETE] /api/products/${productId}/suppliers/${sourceId} failed:`,
+                error
+            );
+            res.status(500).json({
+                error: "Unable to remove supplier price for this product.",
+            });
+        } finally {
+            client.release();
         }
     }
 );

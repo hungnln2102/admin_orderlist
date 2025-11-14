@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
+  XCircleIcon,
   UserPlusIcon,
+  PlusCircleIcon,
   ArrowTrendingUpIcon,
   CurrencyDollarIcon,
   ChevronDownIcon,
@@ -54,6 +56,8 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
+const MIN_PROMO_RATIO = 0.01;
+
 const cleanupLabel = (value: unknown): string => {
   if (value === undefined || value === null) return "";
   return String(value).replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
@@ -85,7 +89,7 @@ const buildVariantLabel = (packageProduct: string, sanPham: string): string => {
   if (packageProduct) {
     return packageProduct;
   }
-  return monthsLabel || formatSkuLabel(sanPham) || "Không xác định";
+  return monthsLabel || formatSkuLabel(sanPham) || "Không Xác Định";
 };
 
 const toNumberOrNull = (value: unknown): number | null => {
@@ -102,21 +106,56 @@ const parseBoolean = (value: unknown): boolean => {
   return ["true", "1", "t", "y", "yes"].includes(normalized);
 };
 
+const resolvePromoMultiplier = (
+  pctKhach?: number | null,
+  pctPromo?: number | null
+): number | null => {
+  if (
+    typeof pctKhach !== "number" ||
+    !Number.isFinite(pctKhach) ||
+    pctKhach <= 0 ||
+    typeof pctPromo !== "number" ||
+    !Number.isFinite(pctPromo)
+  ) {
+    return null;
+  }
+  const promoMultiplier = pctKhach - pctPromo;
+  if (!Number.isFinite(promoMultiplier) || promoMultiplier <= 0) {
+    return null;
+  }
+  return promoMultiplier;
+};
+
 const hasValidPromoRatio = (
   value?: number | null,
-  pctKhach?: number | null
+  pctKhach?: number | null,
+  pctCtv?: number | null
 ): boolean => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return false;
-  }
   if (
-    typeof pctKhach === "number" &&
-    Number.isFinite(pctKhach) &&
-    pctKhach - value > 1
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < MIN_PROMO_RATIO
   ) {
     return false;
   }
-  return true;
+  if (
+    typeof pctKhach !== "number" ||
+    typeof pctCtv !== "number" ||
+    !Number.isFinite(pctKhach) ||
+    !Number.isFinite(pctCtv) ||
+    pctKhach <= 0 ||
+    pctCtv <= 0
+  ) {
+    return false;
+  }
+  const maxAllowed = pctCtv - pctKhach;
+  if (!Number.isFinite(maxAllowed) || maxAllowed < MIN_PROMO_RATIO) {
+    return false;
+  }
+  if (value > maxAllowed) {
+    return false;
+  }
+  return resolvePromoMultiplier(pctKhach, value) !== null;
 };
 
 interface RateDescriptionInput {
@@ -192,6 +231,7 @@ const applyBasePriceToProduct = (
   const promoCandidate = calculatePromoPrice(
     product.pctKhach,
     product.pctPromo,
+    product.pctCtv,
     resolvedWholesale ?? basePrice,
     basePrice
   );
@@ -294,6 +334,18 @@ const formatCurrencyValue = (value?: number | null): string => {
     return "-";
   }
   return currencyFormatter.format(value);
+};
+
+const formatPromoPercent = (value?: number | null): string | null => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  const percent = value * 100;
+  const rounded =
+    Math.abs(percent - Math.round(percent)) < 0.01
+      ? Math.round(percent).toString()
+      : percent.toFixed(2).replace(/\.?0+$/, "");
+  return `${rounded}%`;
 };
 
 const formatDateLabel = (value?: string | null): string => {
@@ -413,29 +465,10 @@ const multiplyBasePrice = (
 const calculatePromoPrice = (
   pctKhach?: number | null,
   pctPromo?: number | null,
+  pctCtv?: number | null,
   wholesalePrice?: number | null,
   fallbackBasePrice?: number | null
 ): number | null => {
-  if (
-    typeof pctKhach !== "number" ||
-    !Number.isFinite(pctKhach) ||
-    pctKhach <= 0
-  ) {
-    return null;
-  }
-  if (
-    pctPromo !== null &&
-    pctPromo !== undefined &&
-    (!Number.isFinite(pctPromo) || pctPromo < 0)
-  ) {
-    return null;
-  }
-
-  const ratioDiff = pctKhach - (pctPromo ?? 0);
-  if (ratioDiff <= 0) {
-    return null;
-  }
-
   const baseValue =
     (typeof wholesalePrice === "number" &&
       Number.isFinite(wholesalePrice) &&
@@ -447,8 +480,26 @@ const calculatePromoPrice = (
       fallbackBasePrice) ||
     null;
 
-  const cappedRatio = Math.min(1, ratioDiff);
-  return multiplyValue(baseValue, cappedRatio);
+  if (
+    baseValue === null ||
+    pctPromo === null ||
+    pctPromo === undefined ||
+    typeof pctPromo !== "number" ||
+    !Number.isFinite(pctPromo)
+  ) {
+    return null;
+  }
+
+  if (!hasValidPromoRatio(pctPromo, pctKhach, pctCtv)) {
+    return null;
+  }
+
+  const promoMultiplier = resolvePromoMultiplier(pctKhach, pctPromo);
+  if (promoMultiplier === null) {
+    return null;
+  }
+
+  return multiplyValue(baseValue, promoMultiplier);
 };
 
 const mapProductPriceRow = (
@@ -465,7 +516,7 @@ const mapProductPriceRow = (
 
   return {
     id: Number.isFinite(Number(row?.id)) ? Number(row?.id) : fallbackId,
-    packageName: packageName || "Không xác định",
+    packageName: packageName || "Không Xác Định",
     packageProduct,
     sanPhamRaw,
     variantLabel: buildVariantLabel(packageProduct, sanPhamRaw),
@@ -523,6 +574,17 @@ function Pricing() {
   >({});
   const [supplyRowErrors, setSupplyRowErrors] = useState<
     Record<string, string | null>
+  >({});
+  const [newSupplyRows, setNewSupplyRows] = useState<
+    Record<
+      number,
+      {
+        sourceName: string;
+        price: string;
+        error: string | null;
+        isSaving: boolean;
+      }
+    >
   >({});
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [productEditForm, setProductEditForm] =
@@ -713,16 +775,19 @@ function Pricing() {
         }
       });
       await Promise.all(
-        Array.from(cachedNames).map((name) =>
-          fetchSupplyPricesForProduct(name)
-        )
+        Array.from(cachedNames).map((name) => fetchSupplyPricesForProduct(name))
       );
     } catch (error) {
       console.error("Failed to refresh pricing data:", error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchProductPrices, fetchSupplyPricesForProduct, supplyPriceMap, isRefreshing]);
+  }, [
+    fetchProductPrices,
+    fetchSupplyPricesForProduct,
+    supplyPriceMap,
+    isRefreshing,
+  ]);
 
   const handleToggleProductDetails = (product: ProductPricingRow) => {
     const nextId = expandedProductId === product.id ? null : product.id;
@@ -909,7 +974,10 @@ function Pricing() {
           updatedMax > 0;
         if (validUpdatedMax) {
           nextHighestPrice = updatedMax;
-          if (updatedMax !== previousMax || (wasHighestSupplier && priceChanged)) {
+          if (
+            updatedMax !== previousMax ||
+            (wasHighestSupplier && priceChanged)
+          ) {
             shouldRecomputeBase = true;
           }
         } else if (wasHighestSupplier && priceChanged) {
@@ -934,11 +1002,7 @@ function Pricing() {
         );
       }
       clearSupplyRowState(rowKey);
-      try {
-        await fetchSupplyPricesForProduct(productName);
-      } catch (error) {
-        console.error("Failed to refresh supply prices:", error);
-      }
+      await fetchSupplyPricesForProduct(productName);
       if (shouldRecomputeBase) {
         try {
           await fetchProductPrices();
@@ -951,6 +1015,268 @@ function Pricing() {
         ...prev,
         [rowKey]:
           err instanceof Error ? err.message : "Không thể cập nhật giá nhập.",
+      }));
+    } finally {
+      setSavingSupplyRows((prev) => {
+        const next = { ...prev };
+        delete next[rowKey];
+        return next;
+      });
+    }
+  };
+
+  const handleStartAddSupplierRow = (productId: number) => {
+    setNewSupplyRows((prev) => {
+      if (prev[productId]) return prev;
+      return {
+        ...prev,
+        [productId]: {
+          sourceName: "",
+          price: "",
+          error: null,
+          isSaving: false,
+        },
+      };
+    });
+  };
+
+  const handleNewSupplierInputChange = (
+    productId: number,
+    field: "sourceName" | "price",
+    value: string
+  ) => {
+    setNewSupplyRows((prev) => {
+      const current = prev[productId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [productId]: { ...current, [field]: value, error: null },
+      };
+    });
+  };
+
+  const handleCancelAddSupplierRow = (productId: number) => {
+    setNewSupplyRows((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  };
+
+  const handleConfirmAddSupplierRow = async (product: ProductPricingRow) => {
+    const current = newSupplyRows[product.id];
+    if (!current) return;
+    const trimmedName = current.sourceName.trim();
+    const parsedPrice = Number(current.price);
+    if (!trimmedName) {
+      setNewSupplyRows((prev) => ({
+        ...prev,
+        [product.id]: {
+          ...current,
+          error: "Vui lòng nhập tên nguồn hợp lệ.",
+        },
+      }));
+      return;
+    }
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setNewSupplyRows((prev) => ({
+        ...prev,
+        [product.id]: {
+          ...current,
+          error: "Giá nhập phải lớn hơn 0.",
+        },
+      }));
+      return;
+    }
+
+    setNewSupplyRows((prev) => ({
+      ...prev,
+      [product.id]: { ...current, isSaving: true, error: null },
+    }));
+
+    try {
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.CREATE_SUPPLY_PRICE(product.id)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sourceName: trimmedName,
+            price: parsedPrice,
+          }),
+        }
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Không thể thêm nguồn mới.");
+      }
+      const productKey = normalizeProductKey(product.sanPhamRaw);
+      const resolvedSourceId = Number(payload?.sourceId);
+      const normalizedPrice = Number.isFinite(Number(payload?.price))
+        ? Number(payload?.price)
+        : parsedPrice;
+      let nextHighestPrice: number | null = null;
+      let shouldRecomputeBase = false;
+      setSupplyPriceMap((prev) => {
+        const currentState = prev[productKey];
+        const currentItems = currentState?.items ?? [];
+        const hasExistingRow = currentItems.some(
+          (supplier) =>
+            typeof supplier.sourceId === "number" &&
+            supplier.sourceId === resolvedSourceId
+        );
+        const nextItems = sortSupplyItems(
+          hasExistingRow
+            ? currentItems.map((supplier) =>
+                supplier.sourceId === resolvedSourceId
+                  ? { ...supplier, price: normalizedPrice }
+                  : supplier
+              )
+            : [
+                ...currentItems,
+                {
+                  sourceId:
+                    Number.isFinite(resolvedSourceId) && resolvedSourceId > 0
+                      ? resolvedSourceId
+                      : Date.now(),
+                  sourceName: trimmedName,
+                  price: normalizedPrice,
+                  lastOrderDate: null,
+                },
+              ]
+        );
+        const previousMax = computeHighestSupplyPrice(currentItems, null);
+        const updatedMax = computeHighestSupplyPrice(nextItems, null);
+        const differenceDetected =
+          typeof previousMax === "number" && typeof updatedMax === "number"
+            ? Math.abs(updatedMax - previousMax) > 0.00001
+            : previousMax !== updatedMax;
+
+        if (differenceDetected) {
+          shouldRecomputeBase = true;
+        }
+        nextHighestPrice = updatedMax;
+
+        return {
+          ...prev,
+          [productKey]: {
+            loading: currentState?.loading ?? false,
+            error: null,
+            items: nextItems,
+          },
+        };
+      });
+      if (shouldRecomputeBase) {
+        setProductPrices((prev) =>
+          prev.map((row) =>
+            row.id === product.id
+              ? applyBasePriceToProduct(row, nextHighestPrice)
+              : row
+          )
+        );
+      }
+      await fetchSupplyPricesForProduct(product.sanPhamRaw);
+      handleCancelAddSupplierRow(product.id);
+      if (shouldRecomputeBase) {
+        try {
+          await fetchProductPrices();
+        } catch (error) {
+          console.error("Failed to refresh product pricing:", error);
+        }
+      }
+    } catch (err) {
+      setNewSupplyRows((prev) => ({
+        ...prev,
+        [product.id]: {
+          ...current,
+          isSaving: false,
+          error:
+            err instanceof Error ? err.message : "Không thể thêm nguồn mới.",
+        },
+      }));
+    }
+  };
+
+  const handleDeleteSupplyRow = async (
+    productId: number,
+    sourceId: number,
+    productKey: string,
+    productName: string
+  ) => {
+    const rowKey = buildSupplyRowKey(productId, sourceId);
+    setSupplyRowErrors((prev) => ({ ...prev, [rowKey]: null }));
+    setSavingSupplyRows((prev) => ({ ...prev, [rowKey]: true }));
+    let nextHighestPrice: number | null = null;
+    let shouldRecomputeBase = false;
+
+    try {
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.DELETE_SUPPLY_PRICE(productId, sourceId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Không thể xóa nguồn này.");
+      }
+
+      setSupplyPriceMap((prev) => {
+        const currentState = prev[productKey];
+        if (!currentState) return prev;
+        const nextItems = sortSupplyItems(
+          currentState.items.filter(
+            (supplier) => supplier.sourceId !== sourceId
+          )
+        );
+        const previousMax = computeHighestSupplyPrice(currentState.items, null);
+        const updatedMax = computeHighestSupplyPrice(nextItems, null);
+        const differenceDetected =
+          typeof previousMax === "number" && typeof updatedMax === "number"
+            ? Math.abs(updatedMax - previousMax) > 0.00001
+            : previousMax !== updatedMax;
+
+        if (differenceDetected) {
+          shouldRecomputeBase = true;
+        }
+        nextHighestPrice = updatedMax;
+
+        return {
+          ...prev,
+          [productKey]: {
+            ...currentState,
+            items: nextItems,
+          },
+        };
+      });
+
+      clearSupplyRowState(rowKey);
+
+      if (shouldRecomputeBase) {
+        setProductPrices((prev) =>
+          prev.map((product) =>
+            product.id === productId
+              ? applyBasePriceToProduct(product, nextHighestPrice)
+              : product
+          )
+        );
+      }
+
+      await fetchSupplyPricesForProduct(productName);
+      if (shouldRecomputeBase) {
+        try {
+          await fetchProductPrices();
+        } catch (error) {
+          console.error("Failed to refresh product pricing:", error);
+        }
+      }
+    } catch (err) {
+      setSupplyRowErrors((prev) => ({
+        ...prev,
+        [rowKey]:
+          err instanceof Error ? err.message : "Không thể xóa nguồn này.",
       }));
     } finally {
       setSavingSupplyRows((prev) => {
@@ -1062,23 +1388,27 @@ function Pricing() {
       setProductEditError("Tỷ giá khách phải lớn hơn 0");
       return;
     }
-    if (nextPctPromo !== null && nextPctPromo < 0) {
-      setProductEditError("Tỷ giá khuyến mãi phải lớn hơn hoặc bằng 0");
-      return;
+    if (nextPctPromo !== null) {
+      if (nextPctPromo < MIN_PROMO_RATIO) {
+        setProductEditError(
+          `Tỷ giá khuyến mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
+        );
+        return;
+      }
+      const promoGap = nextPctCtv - nextPctKhach;
+      if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
+        setProductEditError(
+          "Không thể thiết lập tỷ giá khuyến mãi vì chênh lệch tỷ giá quá nhỏ"
+        );
+        return;
+      }
+      if (nextPctPromo > promoGap) {
+        setProductEditError(
+          `Tỷ giá khuyến mãi không được vượt ${promoGap.toFixed(2)}`
+        );
+        return;
+      }
     }
-    if (nextPctPromo !== null && nextPctKhach && nextPctPromo >= nextPctKhach) {
-      setProductEditError("Tỷ giá khuyến mãi phải nhỏ hơn tỷ giá khách");
-      return;
-    }
-    if (
-      nextPctPromo !== null &&
-      nextPctKhach &&
-      nextPctKhach - nextPctPromo > 1
-    ) {
-      setProductEditError("Giá khuyến mãi không được vượt giá sỉ");
-      return;
-    }
-
     setIsSavingProductEdit(true);
     setProductEditError(null);
 
@@ -1134,7 +1464,7 @@ function Pricing() {
     } catch (err) {
       console.error("Lỗi khi cập nhật giá sản phẩm:", err);
       setProductEditError(
-        err instanceof Error ? err.message : "Không thể cập nhạt giá sản phẩm"
+        err instanceof Error ? err.message : "Không thể cập nhật giá sản phẩm"
       );
     } finally {
       setIsSavingProductEdit(false);
@@ -1161,27 +1491,27 @@ function Pricing() {
       setCreateError("Tỷ giá khách phải lớn hơn 0.");
       return;
     }
-    if (pctPromoValue !== null && pctPromoValue < 0) {
-      setCreateError("Tỷ giá khuyến mãi phải lớn hơn hoặc bằng 0.");
-      return;
+    if (pctPromoValue !== null) {
+      if (pctPromoValue < MIN_PROMO_RATIO) {
+        setCreateError(
+          `Tỷ giá khuyến mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
+        );
+        return;
+      }
+      const promoGap = (pctCtvValue ?? 0) - (pctKhachValue ?? 0);
+      if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
+        setCreateError(
+          "Không thể thiết lập tỷ giá khuyến mãi vì chênh lệch tỷ giá quá nhỏ"
+        );
+        return;
+      }
+      if (pctPromoValue > promoGap) {
+        setCreateError(
+          `Tỷ giá khuyến mãi không được vượt ${promoGap.toFixed(2)}`
+        );
+        return;
+      }
     }
-    if (
-      pctPromoValue !== null &&
-      pctKhachValue &&
-      pctPromoValue >= pctKhachValue
-    ) {
-      setCreateError("Tỷ giá khuyến mãi phải nhỏ hơn tỷ giá khách.");
-      return;
-    }
-    if (
-      pctPromoValue !== null &&
-      pctKhachValue &&
-      pctKhachValue - pctPromoValue > 1
-    ) {
-      setCreateError("Giá khuyến mãi không được vượt giá sỉ.");
-      return;
-    }
-
     const normalizedSuppliers = createSuppliers.map((entry) => ({
       sourceName: entry.sourceName.trim(),
       numberBank: entry.numberBank.trim(),
@@ -1704,7 +2034,7 @@ function Pricing() {
                   onClick={handleSubmitCreateProduct}
                   disabled={isSubmittingCreate}
                 >
-                  {isSubmittingCreate ? "Dang luu..." : "Luu san pham"}
+                  {isSubmittingCreate ? "Đang lưu..." : "Lưu sản phẩm"}
                 </button>
               </div>
             </div>
@@ -1761,14 +2091,14 @@ function Pricing() {
               <option value="inactive">Tạm dừng</option>
             </select>
 
-          <GradientButton
-            className="w-full justify-center"
-            type="button"
-            onClick={handleRefreshAll}
-            disabled={isLoading || isRefreshing}
-          >
-            {isLoading || isRefreshing ? "Đang đồng bộ..." : "Đồng bộ lại"}
-          </GradientButton>
+            <GradientButton
+              className="w-full justify-center"
+              type="button"
+              onClick={handleRefreshAll}
+              disabled={isLoading || isRefreshing}
+            >
+              {isLoading || isRefreshing ? "Đang đồng bộ..." : "Đồng bộ lại"}
+            </GradientButton>
           </div>
           {error && (
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
@@ -1832,6 +2162,14 @@ function Pricing() {
                     const productKey = normalizeProductKey(item.sanPhamRaw);
                     const supplyState = supplyPriceMap[productKey];
                     const supplierItems = supplyState?.items ?? [];
+                    const pendingNewSupply = newSupplyRows[item.id] || null;
+                    const composedSupplierRows = [
+                      ...supplierItems.map((supplier) => ({
+                        kind: "existing",
+                        supplier,
+                      })),
+                      ...(pendingNewSupply ? [{ kind: "new" }] : []),
+                    ];
                     const cheapestSupplier =
                       pickCheapestSupplier(supplierItems);
                     const cheapestPrice =
@@ -1891,21 +2229,20 @@ function Pricing() {
                       ? calculatePromoPrice(
                           previewRatios.pctKhach,
                           previewRatios.pctPromo,
+                          previewRatios.pctCtv,
                           previewWholesalePrice,
                           highestSupplyPrice
                         )
                       : null;
-                    const promoRatioForPreview =
-                      previewRatios?.pctPromo ?? null;
-                    const promoDiffWithinWholesale =
-                      typeof promoRatioForPreview === "number" &&
-                      promoRatioForPreview > 0 &&
-                      typeof previewRatios?.pctKhach === "number" &&
-                      Number.isFinite(previewRatios.pctKhach) &&
-                      previewRatios.pctKhach - promoRatioForPreview <= 1;
+                    const previewPromoPercentLabel = formatPromoPercent(
+                      previewRatios?.pctPromo ?? null
+                    );
                     const showPreviewPromo =
-                      promoDiffWithinWholesale &&
-                      Number.isFinite(previewPromoPrice ?? NaN);
+                      hasValidPromoRatio(
+                        previewRatios?.pctPromo ?? null,
+                        previewRatios?.pctKhach ?? null,
+                        previewRatios?.pctCtv ?? null
+                      ) && Number.isFinite(previewPromoPrice ?? NaN);
                     const highestSupplyPriceDisplay =
                       typeof highestSupplyPrice === "number" &&
                       Number.isFinite(highestSupplyPrice) &&
@@ -1914,7 +2251,8 @@ function Pricing() {
                         : "Chưa có dữ liệu";
                     const hasPromoForRow = hasValidPromoRatio(
                       item.pctPromo,
-                      item.pctKhach
+                      item.pctKhach,
+                      item.pctCtv
                     );
                     return (
                       <React.Fragment key={item.id}>
@@ -1964,15 +2302,17 @@ function Pricing() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {hasValidPromoRatio(item.pctPromo, item.pctKhach) ? (
+                            {hasValidPromoRatio(
+                              item.pctPromo,
+                              item.pctKhach,
+                              item.pctCtv
+                            ) ? (
                               <>
                                 <div className="text-sm font-semibold text-fuchsia-600">
                                   {formatCurrencyValue(item.promoPrice)}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {item.pctPromo
-                                    ? `${item.pctPromo.toFixed(2)}x`
-                                    : "-"}
+                                  {formatPromoPercent(item.pctPromo) ?? "-"}
                                 </div>
                               </>
                             ) : (
@@ -2141,18 +2481,18 @@ function Pricing() {
                                         </span>
                                       </span>
                                     </div>
-                                  <div
-                                    className={`mt-4 grid gap-3 text-center text-sm ${
-                                      showPreviewPromo
-                                        ? "md:grid-cols-3"
-                                        : "md:grid-cols-2"
-                                    }`}
-                                  >
-                                    <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
-                                      <p className="text-xs uppercase text-gray-500">
-                                        Giá sỉ dự kiến
-                                      </p>
-                                      <p className="mt-1 text-lg font-semibold text-gray-900">
+                                    <div
+                                      className={`mt-4 grid gap-3 text-center text-sm ${
+                                        showPreviewPromo
+                                          ? "md:grid-cols-3"
+                                          : "md:grid-cols-2"
+                                      }`}
+                                    >
+                                      <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
+                                        <p className="text-xs uppercase text-gray-500">
+                                          Giá sỉ dự kiến
+                                        </p>
+                                        <p className="mt-1 text-lg font-semibold text-gray-900">
                                           {formatCurrencyValue(
                                             previewWholesalePrice
                                           )}
@@ -2163,40 +2503,38 @@ function Pricing() {
                                             : "Nhập tỷ giá CTV"}
                                         </p>
                                       </div>
-                                    <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
-                                      <p className="text-xs uppercase text-gray-500">
-                                        Giá lẻ dự kiến
-                                      </p>
-                                      <p className="mt-1 text-lg font-semibold text-gray-900">
-                                        {formatCurrencyValue(
-                                          previewRetailPrice
-                                        )}
-                                      </p>
-                                      <p className="text-[11px] text-gray-500">
-                                        {currentEditForm.pctKhach
-                                          ? `Tỷ giá: ${currentEditForm.pctKhach}`
-                                          : "Nhập tỷ giá khách"}
-                                      </p>
-                                    </div>
-                                    {showPreviewPromo && (
                                       <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
                                         <p className="text-xs uppercase text-gray-500">
-                                          Giá khuyến mãi dự kiến
+                                          Giá lẻ dự kiến
                                         </p>
                                         <p className="mt-1 text-lg font-semibold text-gray-900">
                                           {formatCurrencyValue(
-                                            previewPromoPrice
+                                            previewRetailPrice
                                           )}
                                         </p>
                                         <p className="text-[11px] text-gray-500">
-                                          {currentEditForm.pctPromo
-                                            ? `Tỷ giá: ${currentEditForm.pctPromo}`
-                                            : "Nhập tỷ giá khuyến mãi"}
+                                          {currentEditForm.pctKhach
+                                            ? `Tỷ giá: ${currentEditForm.pctKhach}`
+                                            : "Nhập tỷ giá khách"}
                                         </p>
                                       </div>
-                                    )}
+                                      {showPreviewPromo && (
+                                        <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
+                                          <p className="text-xs uppercase text-gray-500">
+                                            Giá khuyến mãi dự kiến
+                                          </p>
+                                          <p className="mt-1 text-lg font-semibold text-gray-900">
+                                            {formatCurrencyValue(
+                                              previewPromoPrice
+                                            )}
+                                          </p>
+                                          <p className="text-[11px] text-gray-500">
+                                            {previewPromoPercentLabel ?? "Nh?p t? gi� khuy?n mai"}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
                                 )}
                                 {productEditError && (
                                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
@@ -2281,10 +2619,26 @@ function Pricing() {
                                         <p className="mt-1 text-lg font-semibold text-gray-900">
                                           {formatCurrencyValue(item.promoPrice)}
                                         </p>
+                                        <p className="text-xs text-gray-500">
+                                          {formatPromoPercent(item.pctPromo) ?? "-"}
+                                        </p>
                                       </div>
                                     )}
                                   </div>
                                   <div className="rounded-2xl border border-gray-100 overflow-hidden">
+                                    <div className="flex justify-end bg-gray-50 px-4 py-2 border-b border-gray-100">
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-600 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50 disabled:opacity-50"
+                                        onClick={() =>
+                                          handleStartAddSupplierRow(item.id)
+                                        }
+                                        disabled={Boolean(pendingNewSupply)}
+                                      >
+                                        <PlusCircleIcon className="h-4 w-4" />
+                                        Thêm nguồn
+                                      </button>
+                                    </div>
                                     <table className="w-full text-sm">
                                       <thead className="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wide">
                                         <tr>
@@ -2328,141 +2682,272 @@ function Pricing() {
                                               </button>
                                             </td>
                                           </tr>
-                                        ) : supplierItems.length === 0 ? (
+                                        ) : supplierItems.length === 0 &&
+                                          composedSupplierRows.length === 0 ? (
                                           <tr>
                                             <td
                                               colSpan={4}
                                               className="px-4 py-3 text-center text-xs text-gray-500"
                                             >
                                               Chưa có dữ liệu giá nhập từ nhà
-                                              cung cấp
+                                              cung cấp.
                                             </td>
                                           </tr>
                                         ) : (
-                                          supplierItems.map((supplier) => {
-                                            const rowKey = buildSupplyRowKey(
-                                              item.id,
-                                              supplier.sourceId
-                                            );
-                                            const isRowEditing = Boolean(
-                                              editingSupplyRows[rowKey]
-                                            );
-                                            const isRowSaving = Boolean(
-                                              savingSupplyRows[rowKey]
-                                            );
-                                            const inputValue =
-                                              supplyPriceDrafts[rowKey] ??
-                                              (
-                                                supplier.price ?? ""
-                                              )?.toString();
-                                            const inputError =
-                                              supplyRowErrors[rowKey];
-                                            const inputDisabled =
-                                              !isRowEditing || isRowSaving;
-                                            return (
-                                              <tr
-                                                key={supplier.sourceId}
-                                                className="border-t border-gray-100"
-                                              >
-                                                <td className="px-4 py-3 text-sm text-gray-700 text-center">
-                                                  {supplier.sourceName}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  <div className="flex flex-col items-center">
-                                                    <div className="flex items-center gap-1">
+                                          composedSupplierRows.map((row) => {
+                                            if (
+                                              row.kind === "existing" &&
+                                              row.supplier
+                                            ) {
+                                              const supplier = row.supplier;
+                                              const rowKey = buildSupplyRowKey(
+                                                item.id,
+                                                supplier.sourceId
+                                              );
+                                              const isRowEditing = Boolean(
+                                                editingSupplyRows[rowKey]
+                                              );
+                                              const isRowSaving = Boolean(
+                                                savingSupplyRows[rowKey]
+                                              );
+                                              const inputValue =
+                                                supplyPriceDrafts[rowKey] ??
+                                                (
+                                                  supplier.price ?? ""
+                                                ).toString();
+                                              const inputError =
+                                                supplyRowErrors[rowKey];
+                                              const inputDisabled =
+                                                !isRowEditing || isRowSaving;
+
+                                              return (
+                                                <tr
+                                                  key={rowKey}
+                                                  className="border-t border-gray-100"
+                                                >
+                                                  <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                    {supplier.sourceName}
+                                                  </td>
+                                                  <td className="px-4 py-3">
+                                                    <div className="flex flex-col items-center">
+                                                      <div className="flex items-center gap-1">
+                                                        <input
+                                                          type="number"
+                                                          min={0}
+                                                          step="1000"
+                                                          value={inputValue}
+                                                          disabled={
+                                                            inputDisabled
+                                                          }
+                                                          onChange={(event) =>
+                                                            handleSupplyInputChange(
+                                                              item.id,
+                                                              supplier.sourceId,
+                                                              event.target.value
+                                                            )
+                                                          }
+                                                          className={`w-28 rounded-lg border px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 ${
+                                                            inputDisabled
+                                                              ? "border-gray-200 bg-gray-50 text-gray-500"
+                                                              : "border-blue-200 focus:border-blue-500 focus:ring-blue-200"
+                                                          } ${
+                                                            inputError
+                                                              ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                                              : ""
+                                                          }`}
+                                                        />
+                                                        <span className="text-xs text-gray-500">
+                                                          ₫
+                                                        </span>
+                                                      </div>
+                                                      {inputError && (
+                                                        <p className="mt-1 text-[11px] text-red-500">
+                                                          {inputError}
+                                                        </p>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-3 text-center text-xs text-gray-600">
+                                                    {formatProfitRange(
+                                                      supplier.price,
+                                                      item.wholesalePrice,
+                                                      item.retailPrice
+                                                    )}
+                                                  </td>
+                                                  <td className="px-4 py-3">
+                                                    {isRowEditing ? (
+                                                      <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                                                          disabled={isRowSaving}
+                                                          onClick={() =>
+                                                            handleConfirmSupplyEditing(
+                                                              item.id,
+                                                              supplier.sourceId,
+                                                              productKey,
+                                                              item.sanPhamRaw
+                                                            )
+                                                          }
+                                                        >
+                                                          <CheckIcon className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                                                          disabled={isRowSaving}
+                                                          onClick={() =>
+                                                            handleCancelSupplyEditing(
+                                                              item.id,
+                                                              supplier.sourceId
+                                                            )
+                                                          }
+                                                        >
+                                                          <XMarkIcon className="h-4 w-4" />
+                                                        </button>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 disabled:opacity-60"
+                                                          disabled={isRowSaving}
+                                                          onClick={() =>
+                                                            handleStartEditingSupply(
+                                                              item.id,
+                                                              supplier.sourceId,
+                                                              supplier.price
+                                                            )
+                                                          }
+                                                        >
+                                                          <PencilIcon className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-red-100 text-red-500 hover:border-red-200 hover:bg-red-50 disabled:opacity-60"
+                                                          disabled={isRowSaving}
+                                                          onClick={() =>
+                                                            handleDeleteSupplyRow(
+                                                              item.id,
+                                                              supplier.sourceId,
+                                                              productKey,
+                                                              item.sanPhamRaw
+                                                            )
+                                                          }
+                                                        >
+                                                          <XCircleIcon className="h-4 w-4" />
+                                                        </button>
+                                                      </div>
+                                                    )}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            }
+
+                                            if (
+                                              row.kind === "new" &&
+                                              pendingNewSupply
+                                            ) {
+                                              const draft = pendingNewSupply;
+                                              return (
+                                                <React.Fragment
+                                                  key={`new-${item.id}`}
+                                                >
+                                                  <tr className="border-t border-dashed border-sky-100 bg-sky-50/40">
+                                                    <td className="px-4 py-3">
                                                       <input
-                                                        type="number"
-                                                        min={0}
-                                                        step="1000"
-                                                        value={inputValue}
-                                                        disabled={inputDisabled}
+                                                        type="text"
+                                                        className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+                                                        placeholder="Tên nguồn"
+                                                        value={draft.sourceName}
                                                         onChange={(event) =>
-                                                          handleSupplyInputChange(
+                                                          handleNewSupplierInputChange(
                                                             item.id,
-                                                            supplier.sourceId,
+                                                            "sourceName",
                                                             event.target.value
                                                           )
                                                         }
-                                                        className={`w-28 rounded-lg border px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 ${
-                                                          inputDisabled
-                                                            ? "border-gray-200 bg-gray-50 text-gray-500"
-                                                            : "border-blue-200 focus:border-blue-500 focus:ring-blue-200"
-                                                        } ${
-                                                          inputError
-                                                            ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                                                            : ""
-                                                        }`}
+                                                        disabled={
+                                                          draft.isSaving
+                                                        }
                                                       />
-                                                      <span className="text-xs text-gray-500">
-                                                        ₫
-                                                      </span>
-                                                    </div>
-                                                    {inputError && (
-                                                      <p className="mt-1 text-[11px] text-red-500">
-                                                        {inputError}
-                                                      </p>
-                                                    )}
-                                                  </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center text-xs text-gray-600">
-                                                  {formatProfitRange(
-                                                    supplier.price,
-                                                    item.wholesalePrice,
-                                                    item.retailPrice
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                          type="number"
+                                                          min={0}
+                                                          step="1000"
+                                                          className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+                                                          placeholder="Giá nhập"
+                                                          value={draft.price}
+                                                          onChange={(event) =>
+                                                            handleNewSupplierInputChange(
+                                                              item.id,
+                                                              "price",
+                                                              event.target.value
+                                                            )
+                                                          }
+                                                          disabled={
+                                                            draft.isSaving
+                                                          }
+                                                        />
+                                                        <span className="text-xs text-gray-500">
+                                                          ₫
+                                                        </span>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-xs text-gray-500">
+                                                      -
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                      <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                                                          disabled={
+                                                            draft.isSaving
+                                                          }
+                                                          onClick={() =>
+                                                            handleConfirmAddSupplierRow(
+                                                              item
+                                                            )
+                                                          }
+                                                        >
+                                                          <CheckIcon className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                                                          disabled={
+                                                            draft.isSaving
+                                                          }
+                                                          onClick={() =>
+                                                            handleCancelAddSupplierRow(
+                                                              item.id
+                                                            )
+                                                          }
+                                                        >
+                                                          <XMarkIcon className="h-4 w-4" />
+                                                        </button>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                  {draft.error && (
+                                                    <tr>
+                                                      <td
+                                                        colSpan={4}
+                                                        className="px-4 pb-3 text-center text-xs text-red-500"
+                                                      >
+                                                        {draft.error}
+                                                      </td>
+                                                    </tr>
                                                   )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                  {isRowEditing ? (
-                                                    <div className="flex items-center justify-center gap-2">
-                                                      <button
-                                                        type="button"
-                                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
-                                                        disabled={isRowSaving}
-                                                        onClick={() =>
-                                                          handleConfirmSupplyEditing(
-                                                            item.id,
-                                                            supplier.sourceId,
-                                                            productKey,
-                                                            item.sanPhamRaw
-                                                          )
-                                                        }
-                                                      >
-                                                        <CheckIcon className="h-4 w-4" />
-                                                      </button>
-                                                      <button
-                                                        type="button"
-                                                        className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
-                                                        disabled={isRowSaving}
-                                                        onClick={() =>
-                                                          handleCancelSupplyEditing(
-                                                            item.id,
-                                                            supplier.sourceId
-                                                          )
-                                                        }
-                                                      >
-                                                        <XMarkIcon className="h-4 w-4" />
-                                                      </button>
-                                                    </div>
-                                                  ) : (
-                                                    <div className="flex items-center justify-center">
-                                                      <button
-                                                        type="button"
-                                                        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                                                        onClick={() =>
-                                                          handleStartEditingSupply(
-                                                            item.id,
-                                                            supplier.sourceId,
-                                                            supplier.price
-                                                          )
-                                                        }
-                                                      >
-                                                        <PencilIcon className="h-4 w-4" />
-                                                      </button>
-                                                    </div>
-                                                  )}
-                                                </td>
-                                              </tr>
-                                            );
+                                                </React.Fragment>
+                                              );
+                                            }
+
+                                            return null;
                                           })
                                         )}
                                       </tbody>

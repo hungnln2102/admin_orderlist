@@ -19,6 +19,10 @@ export const API_ENDPOINTS = {
 
   UPDATE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
     `/api/products/${productId}/suppliers/${sourceId}/price`,
+  CREATE_SUPPLY_PRICE: (productId: number) =>
+    `/api/product-prices/${productId}/suppliers`,
+  DELETE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
+    `/api/products/${productId}/suppliers/${sourceId}`,
 
   PAYMENT_RECEIPTS: "/api/payment-receipts",
   PURCHASE_ORDERS: "/api/purchase-orders",
