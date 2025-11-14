@@ -105,6 +105,24 @@ const getNextAccountStorageId = async(client) => {
     const nextId = Number(result.rows?.[0]?.next_id ?? 1);
     return Number.isFinite(nextId) ? nextId : 1;
 };
+
+const getNextProductPriceId = async(client) => {
+    await client.query("LOCK TABLE mavryk.product_price IN EXCLUSIVE MODE;");
+    const result = await client.query(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.product_price;`
+    );
+    const nextId = Number(result.rows?.[0]?.next_id ?? 1);
+    return Number.isFinite(nextId) ? nextId : 1;
+};
+
+const getNextSupplyPriceId = async(client) => {
+    await client.query("LOCK TABLE mavryk.supply_price IN EXCLUSIVE MODE;");
+    const result = await client.query(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.supply_price;`
+    );
+    const nextId = Number(result.rows?.[0]?.next_id ?? 1);
+    return Number.isFinite(nextId) ? nextId : 1;
+};
 const fromDbNumber = (value) => {
     if (value === undefined || value === null) return null;
     const num = Number(value);
@@ -660,6 +678,121 @@ const roundToNearestThousand = (value) => {
     return Math.max(0, Math.round(numeric / 1000) * 1000);
 };
 
+const normalizeTextInput = (value) => {
+    if (value === undefined || value === null) return "";
+    return String(value).trim();
+};
+
+const normalizeMultiplier = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 1.0;
+};
+
+const computeRoundedPriceFromSupply = (basePrice, pctCtv, pctKhach, isWholesale) => {
+    if (!Number.isFinite(basePrice) || basePrice <= 0) return 0;
+    let price = basePrice * normalizeMultiplier(pctCtv);
+    if (!isWholesale) {
+        price *= normalizeMultiplier(pctKhach);
+    }
+    return roundToNearestThousand(
+        Helpers.roundGiaBanValue(Math.max(0, price))
+    );
+};
+
+const mapDbProductPriceRow = (row) => {
+    if (!row) return null;
+    const baseSupplyPrice = Number(row.max_supply_price) || 0;
+    const pctCtv = fromDbNumber(row.pct_ctv);
+    const pctKhach = fromDbNumber(row.pct_khach);
+
+    return {
+        id: row.id,
+        package: (row.package_label || "").trim(),
+        package_product: (row.package_product_label || "").trim(),
+        san_pham: (row.san_pham_label || "").trim(),
+        pct_ctv: pctCtv,
+        pct_khach: pctKhach,
+        is_active: parseDbBoolean(row.is_active),
+        update:
+            row.update instanceof Date ?
+            row.update.toISOString() :
+            row.update,
+        computed_wholesale_price: computeRoundedPriceFromSupply(
+            baseSupplyPrice,
+            pctCtv,
+            pctKhach,
+            true
+        ),
+        computed_retail_price: computeRoundedPriceFromSupply(
+            baseSupplyPrice,
+            pctCtv,
+            pctKhach,
+            false
+        ),
+        max_supply_price: baseSupplyPrice,
+    };
+};
+
+const mapPostgresErrorToMessage = (error) => {
+    if (!error) return null;
+    switch (error.code) {
+        case "23505":
+            return "Ma san pham da ton tai. Vui long chon ma khac.";
+        case "22P02":
+            return "Ty le gia phai la so hop le.";
+        case "23503":
+            return "Khong the cap nhat san pham do du lieu lien quan khong hop le.";
+        default:
+            return null;
+    }
+};
+
+const fetchProductPriceRowById = async(client, productId) => {
+    const reloadQuery = `
+    WITH supply AS (
+      SELECT product_id, MAX(price) AS max_supply_price
+      FROM mavryk.supply_price
+      GROUP BY product_id
+    )
+    SELECT
+      pp.id,
+      COALESCE(pp.package::text, '') AS package_label,
+      COALESCE(pp.package_product::text, '') AS package_product_label,
+      COALESCE(pp.san_pham::text, '') AS san_pham_label,
+      pp.pct_ctv,
+      pp.pct_khach,
+      pp.is_active,
+      pp.update,
+      COALESCE(supply.max_supply_price, 0) AS max_supply_price
+    FROM mavryk.product_price pp
+    LEFT JOIN supply ON supply.product_id = pp.id
+    WHERE pp.id = $1
+    LIMIT 1;
+  `;
+    const reloadResult = await client.query(reloadQuery, [productId]);
+    if (!reloadResult.rows.length) {
+        return null;
+    }
+    return mapDbProductPriceRow(reloadResult.rows[0]);
+};
+
+const findSupplyIdByName = async(client, sourceName) => {
+    if (!sourceName) return null;
+    const normalized = sourceName.trim().toLowerCase();
+    if (!normalized) return null;
+    const result = await client.query(
+        `
+    SELECT id
+    FROM mavryk.supply
+    WHERE LOWER(TRIM(source_name::text)) = $1
+    ORDER BY id ASC
+    LIMIT 1;
+  `,
+        [normalized]
+    );
+    return result.rows?.[0]?.id ?? null;
+};
+
 const normalizeCheckFlagValue = (value) => {
     if (value === undefined || value === null) return null;
     if (typeof value === "boolean") return value;
@@ -1135,45 +1268,9 @@ app.get("/api/product-prices", async(_req, res) => {
     try {
         const result = await pool.query(query);
         const rows = result.rows || [];
-        const normalizeMultiplier = (value) => {
-            const numeric = Number(value);
-            return Number.isFinite(numeric) && numeric > 0 ? numeric : 1.0;
-        };
-        const computeRoundedPrice = (basePrice, pctCtv, pctKhach, isMavc) => {
-            if (!Number.isFinite(basePrice) || basePrice <= 0) return 0;
-            let price = basePrice * pctCtv;
-            if (!isMavc) {
-                price *= pctKhach;
-            }
-            return roundToNearestThousand(
-                Helpers.roundGiaBanValue(Math.max(0, price))
-            );
-        };
-        const items = rows.map((row) => ({
-            id: row.id,
-            package: (row.package_label || "").trim(),
-            package_product: (row.package_product_label || "").trim(),
-            san_pham: (row.san_pham_label || "").trim(),
-            pct_ctv: fromDbNumber(row.pct_ctv),
-            pct_khach: fromDbNumber(row.pct_khach),
-            is_active: parseDbBoolean(row.is_active),
-            update:
-                row.update instanceof Date ?
-                row.update.toISOString() :
-                row.update,
-            computed_wholesale_price: computeRoundedPrice(
-                Number(row.max_supply_price) || 0,
-                normalizeMultiplier(row.pct_ctv),
-                normalizeMultiplier(row.pct_khach),
-                true
-            ),
-            computed_retail_price: computeRoundedPrice(
-                Number(row.max_supply_price) || 0,
-                normalizeMultiplier(row.pct_ctv),
-                normalizeMultiplier(row.pct_khach),
-                false
-            ),
-        }));
+        const items = rows
+            .map(mapDbProductPriceRow)
+            .filter((row) => row !== null);
         res.json({
             items,
             count: items.length,
@@ -1183,6 +1280,249 @@ app.get("/api/product-prices", async(_req, res) => {
         res.status(500).json({
             error: "Unable to load product pricing data.",
         });
+    }
+});
+
+app.post("/api/product-prices", async(req, res) => {
+    console.log("[POST] /api/product-prices", req.body);
+    const {
+        packageName,
+        packageProduct,
+        sanPham,
+        pctCtv,
+        pctKhach,
+        suppliers,
+    } = req.body || {};
+
+    const normalizedPackageName = normalizeTextInput(packageName) || null;
+    const normalizedPackageProduct = normalizeTextInput(packageProduct) || null;
+    const normalizedSanPham = normalizeTextInput(sanPham);
+    const pctCtvValue = toNullableNumber(pctCtv);
+    const pctKhachValue = toNullableNumber(pctKhach);
+    const supplierEntries = Array.isArray(suppliers) ? suppliers : [];
+
+    if (!normalizedSanPham) {
+        return res
+            .status(400)
+            .json({ error: "Ma san pham khong duoc de trong." });
+    }
+    if (!pctCtvValue || pctCtvValue <= 0) {
+        return res
+            .status(400)
+            .json({ error: "Ty gia CTV phai lon hon 0." });
+    }
+    if (!pctKhachValue || pctKhachValue <= 0) {
+        return res
+            .status(400)
+            .json({ error: "Ty gia Khach phai lon hon 0." });
+    }
+    if (supplierEntries.length === 0) {
+        return res.status(400).json({
+            error: "Can them it nhat mot nha cung cap.",
+        });
+    }
+
+    const todayYmd = todayYMDInVietnam();
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+        const nextProductId = await getNextProductPriceId(client);
+        const productResult = await client.query(
+            `
+      INSERT INTO mavryk.product_price
+        (id, package, package_product, san_pham, pct_ctv, pct_khach, is_active, "update")
+      VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+      RETURNING id;
+    `,
+            [
+                nextProductId,
+                normalizedPackageName,
+                normalizedPackageProduct,
+                normalizedSanPham,
+                pctCtvValue,
+                pctKhachValue,
+                todayYmd,
+            ]
+        );
+        const productId = productResult.rows?.[0]?.id ?? nextProductId;
+        if (!productId) {
+            await client.query("ROLLBACK");
+            return res
+                .status(500)
+                .json({ error: "Khong the tao san pham moi." });
+        }
+
+        for (const supplier of supplierEntries) {
+            const sourceName = normalizeTextInput(supplier?.sourceName);
+            const numberBank = normalizeTextInput(supplier?.numberBank);
+            const bankBin = normalizeTextInput(supplier?.bankBin);
+            const priceValue = toNullableNumber(supplier?.price);
+
+            if (!sourceName) {
+                await client.query("ROLLBACK");
+                return res
+                    .status(400)
+                    .json({ error: "Ten nguon khong duoc bo trong." });
+            }
+            if (!bankBin) {
+                await client.query("ROLLBACK");
+                return res
+                    .status(400)
+                    .json({ error: "Vui long chon ngan hang cho nguon." });
+            }
+            if (!priceValue || priceValue <= 0) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    error: `Gia nhap cho nguon ${sourceName} phai lon hon 0.`,
+                });
+            }
+
+            let supplyId = await findSupplyIdByName(client, sourceName);
+            if (!supplyId) {
+                const statusColumn = await resolveSupplyStatusColumn();
+                const fields = ["source_name", "number_bank", "bin_bank"];
+                const values = [sourceName, numberBank || null, bankBin];
+                if (statusColumn) {
+                    fields.push(`"${statusColumn}"`);
+                    values.push("active");
+                }
+                const placeholders = values.map((_, index) => `$${index + 1}`);
+                const insertSupply = await client.query(
+                    `
+          INSERT INTO mavryk.supply (${fields.join(", ")})
+          VALUES (${placeholders.join(", ")})
+          RETURNING id;
+        `,
+                    values
+                );
+                supplyId = insertSupply.rows?.[0]?.id;
+            }
+
+            if (!supplyId) {
+                await client.query("ROLLBACK");
+                return res
+                    .status(500)
+                    .json({ error: "Khong the tao nha cung cap moi." });
+            }
+
+            const nextSupplyPriceId = await getNextSupplyPriceId(client);
+            await client.query(
+                `
+        INSERT INTO mavryk.supply_price (id, product_id, source_id, price)
+        VALUES ($1, $2, $3, $4);
+      `, [nextSupplyPriceId, productId, supplyId, priceValue]
+            );
+        }
+
+        const normalizedRow = await fetchProductPriceRowById(client, productId);
+        await client.query("COMMIT");
+        if (!normalizedRow) {
+            return res.status(201).json({ id: productId });
+        }
+        res.status(201).json(normalizedRow);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Mutation failed (POST /api/product-prices):", error);
+        const friendlyMessage = mapPostgresErrorToMessage(error);
+        res.status(friendlyMessage ? 400 : 500).json({
+            error: friendlyMessage || "Unable to create product pricing.",
+        });
+    } finally {
+        client.release();
+    }
+});
+
+app.patch("/api/product-prices/:productId", async(req, res) => {
+    const { productId } = req.params;
+    const {
+        packageName,
+        packageProduct,
+        sanPham,
+        pctCtv,
+        pctKhach
+    } = req.body || {};
+
+    const parsedId = Number(productId);
+    if (!Number.isFinite(parsedId) || parsedId <= 0) {
+        return res.status(400).json({ error: "Invalid product id." });
+    }
+
+    const normalizedPackageName = normalizeTextInput(packageName);
+    const normalizedPackageProduct = normalizeTextInput(packageProduct);
+    const normalizedSanPham = normalizeTextInput(sanPham);
+
+    if (!normalizedSanPham) {
+        return res.status(400).json({ error: "Product code (san_pham) is required." });
+    }
+
+    const pctCtvValue = toNullableNumber(pctCtv);
+    const pctKhachValue = toNullableNumber(pctKhach);
+
+    if (!Number.isFinite(pctCtvValue) || pctCtvValue <= 0) {
+        return res.status(400).json({ error: "pct_ctv must be a positive number." });
+    }
+    if (!Number.isFinite(pctKhachValue) || pctKhachValue <= 0) {
+        return res.status(400).json({ error: "pct_khach must be a positive number." });
+    }
+
+    const todayYmd = todayYMDInVietnam();
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+        const updateResult = await client.query(
+            `
+      UPDATE mavryk.product_price
+      SET package = $1,
+          package_product = $2,
+          san_pham = $3,
+          pct_ctv = $4,
+          pct_khach = $5,
+          update = $6
+      WHERE id = $7
+      RETURNING id;
+    `,
+            [
+                normalizedPackageName || null,
+                normalizedPackageProduct || null,
+                normalizedSanPham,
+                pctCtvValue,
+                pctKhachValue,
+                todayYmd,
+                parsedId,
+            ]
+        );
+
+        if (updateResult.rowCount === 0) {
+            return res
+                .status(404)
+                .json({ error: "Product pricing record not found." });
+        }
+
+        const normalizedRow = await fetchProductPriceRowById(client, parsedId);
+        await client.query("COMMIT");
+        if (!normalizedRow) {
+            return res
+                .status(404)
+                .json({ error: "Unable to load updated product pricing row." });
+        }
+        res.json(normalizedRow);
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error(
+            `Mutation failed (PATCH /api/product-prices/${productId}):`,
+            error
+        );
+        const friendlyMessage = mapPostgresErrorToMessage(error);
+        if (friendlyMessage) {
+            return res.status(400).json({ error: friendlyMessage });
+        }
+        res.status(500).json({
+            error: "Unable to update product pricing row.",
+        });
+    } finally {
+        client.release();
     }
 });
 
@@ -1793,6 +2133,71 @@ app.get("/api/products/all-prices-by-name/:productName", async(req, res) => {
         });
     }
 });
+
+app.patch(
+    "/api/products/:productId/suppliers/:sourceId/price",
+    async(req, res) => {
+        const { productId, sourceId } = req.params;
+        console.log(
+            `[PATCH] /api/products/${productId}/suppliers/${sourceId}/price`,
+            req.body
+        );
+
+        const parsedProductId = Number.parseInt(productId, 10);
+        const parsedSourceId = Number.parseInt(sourceId, 10);
+
+        if (!Number.isFinite(parsedProductId) || parsedProductId <= 0) {
+            return res
+                .status(400)
+                .json({ error: "Invalid product id for supply price update." });
+        }
+        if (!Number.isFinite(parsedSourceId) || parsedSourceId <= 0) {
+            return res
+                .status(400)
+                .json({ error: "Invalid supplier id for supply price update." });
+        }
+
+        const normalizedPrice = toNullableNumber(req.body?.price);
+        if (normalizedPrice === null || normalizedPrice < 0) {
+            return res
+                .status(400)
+                .json({ error: "Price must be a non-negative number." });
+        }
+
+        try {
+            const result = await pool.query(
+                `
+        UPDATE mavryk.supply_price
+        SET price = $1
+        WHERE product_id = $2 AND source_id = $3
+        RETURNING product_id, source_id, price;
+      `,
+                [normalizedPrice, parsedProductId, parsedSourceId]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({
+                    error: "Supply price not found for the provided ids.",
+                });
+            }
+
+            const row = result.rows[0];
+            res.json({
+                productId: Number(row.product_id),
+                sourceId: Number(row.source_id),
+                price: Number(row.price),
+            });
+        } catch (error) {
+            console.error(
+                `[PATCH] /api/products/${productId}/suppliers/${sourceId}/price failed:`,
+                error
+            );
+            res.status(500).json({
+                error: "Unable to update supply price for this product.",
+            });
+        }
+    }
+);
 
 app.get("/api/run-scheduler", async(_req, res) => {
     console.log("[GET] /api/run-scheduler");

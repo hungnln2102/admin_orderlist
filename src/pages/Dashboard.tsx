@@ -153,7 +153,7 @@ const Dashboard: React.FC = () => {
       setRevenueChartData(charts.revenueData);
       setOrderChartData(charts.orderStatusData);
     } catch (err) {
-      console.error("Loi khi lay du lieu dashboard:", err);
+      console.error("Lỗi khi lấy dữ liệu dashboard:", err);
       setErrorMessage(
         "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau."
       );

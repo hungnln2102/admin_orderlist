@@ -11,14 +11,19 @@ export const API_ENDPOINTS = {
 
   PRODUCTS_ALL: "/api/products",
   PRODUCT_PRICES: "/api/product-prices",
+  PRODUCT_PRICE_DETAIL: (productId: number) =>
+    `/api/product-prices/${productId}`,
 
   SUPPLIES_BY_PRODUCT: (productName: string) =>
     `/api/products/supplies-by-name/${encodeURIComponent(productName)}`,
 
+  UPDATE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
+    `/api/products/${productId}/suppliers/${sourceId}/price`,
+
   PAYMENT_RECEIPTS: "/api/payment-receipts",
   PURCHASE_ORDERS: "/api/purchase-orders",
   REFUNDS: "/api/refunds",
-  BANK_LIST: "/api/bank-list",
+  BANK_LIST: "/api/banks",
 };
 
 export const ORDER_FIELDS = {

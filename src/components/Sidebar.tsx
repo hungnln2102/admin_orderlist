@@ -31,7 +31,7 @@ const baseMenuItems: MenuItem[] = [
     href: "/package-products",
     icon: CubeIcon,
   },
-  { name: "Nguồn Thông Tin", href: "/sources", icon: DocumentTextIcon },
+  { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
   { name: "Bảng Giá", href: "/pricing", icon: CurrencyDollarIcon },
   { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
 ];
