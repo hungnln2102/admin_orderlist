@@ -699,11 +699,54 @@ const computeRoundedPriceFromSupply = (basePrice, pctCtv, pctKhach, isWholesale)
     );
 };
 
+const computePromoPriceFromSupply = (
+    basePrice,
+    pctCtv,
+    pctKhach,
+    pctPromo
+) => {
+    if (!Number.isFinite(basePrice) || basePrice <= 0) return 0;
+    const wholesalePrice = basePrice * normalizeMultiplier(pctCtv);
+    if (!Number.isFinite(wholesalePrice) || wholesalePrice <= 0) return 0;
+    const khachRatio = normalizeMultiplier(pctKhach);
+    const promoRatio =
+        Number.isFinite(Number(pctPromo)) && Number(pctPromo) >= 0 ?
+        Number(pctPromo) :
+        0;
+    const effectiveRatio = Math.min(
+        1,
+        Math.max(0, khachRatio - promoRatio)
+    );
+    if (effectiveRatio <= 0) return 0;
+    return roundToNearestThousand(
+        Helpers.roundGiaBanValue(Math.max(0, wholesalePrice * effectiveRatio))
+    );
+};
+
 const mapDbProductPriceRow = (row) => {
     if (!row) return null;
     const baseSupplyPrice = Number(row.max_supply_price) || 0;
     const pctCtv = fromDbNumber(row.pct_ctv);
     const pctKhach = fromDbNumber(row.pct_khach);
+    const pctPromo = fromDbNumber(row.pct_promo);
+    const computedWholesalePrice = computeRoundedPriceFromSupply(
+        baseSupplyPrice,
+        pctCtv,
+        pctKhach,
+        true
+    );
+    const computedRetailPrice = computeRoundedPriceFromSupply(
+        baseSupplyPrice,
+        pctCtv,
+        pctKhach,
+        false
+    );
+    const computedPromoPrice = computePromoPriceFromSupply(
+        baseSupplyPrice,
+        pctCtv,
+        pctKhach,
+        pctPromo
+    );
 
     return {
         id: row.id,
@@ -712,23 +755,16 @@ const mapDbProductPriceRow = (row) => {
         san_pham: (row.san_pham_label || "").trim(),
         pct_ctv: pctCtv,
         pct_khach: pctKhach,
+        pct_promo: pctPromo,
         is_active: parseDbBoolean(row.is_active),
         update:
             row.update instanceof Date ?
             row.update.toISOString() :
             row.update,
-        computed_wholesale_price: computeRoundedPriceFromSupply(
-            baseSupplyPrice,
-            pctCtv,
-            pctKhach,
-            true
-        ),
-        computed_retail_price: computeRoundedPriceFromSupply(
-            baseSupplyPrice,
-            pctCtv,
-            pctKhach,
-            false
-        ),
+        computed_wholesale_price: computedWholesalePrice,
+        computed_retail_price: computedRetailPrice,
+        computed_promo_price: computedPromoPrice,
+        promo_price: computedPromoPrice,
         max_supply_price: baseSupplyPrice,
     };
 };
@@ -761,6 +797,7 @@ const fetchProductPriceRowById = async(client, productId) => {
       COALESCE(pp.san_pham::text, '') AS san_pham_label,
       pp.pct_ctv,
       pp.pct_khach,
+      pp.pct_promo,
       pp.is_active,
       pp.update,
       COALESCE(supply.max_supply_price, 0) AS max_supply_price
@@ -1245,6 +1282,7 @@ app.get("/api/product-prices", async(_req, res) => {
         COALESCE(pp.san_pham::text, '') AS san_pham_label,
         pp.pct_ctv,
         pp.pct_khach,
+        pp.pct_promo,
         pp.is_active,
         pp.update
       FROM mavryk.product_price pp
@@ -1291,6 +1329,7 @@ app.post("/api/product-prices", async(req, res) => {
         sanPham,
         pctCtv,
         pctKhach,
+        pctPromo,
         suppliers,
     } = req.body || {};
 
@@ -1299,6 +1338,7 @@ app.post("/api/product-prices", async(req, res) => {
     const normalizedSanPham = normalizeTextInput(sanPham);
     const pctCtvValue = toNullableNumber(pctCtv);
     const pctKhachValue = toNullableNumber(pctKhach);
+    const pctPromoValue = toNullableNumber(pctPromo);
     const supplierEntries = Array.isArray(suppliers) ? suppliers : [];
 
     if (!normalizedSanPham) {
@@ -1316,6 +1356,23 @@ app.post("/api/product-prices", async(req, res) => {
             .status(400)
             .json({ error: "Ty gia Khach phai lon hon 0." });
     }
+    if (pctPromoValue !== null) {
+        if (pctPromoValue < 0) {
+            return res
+                .status(400)
+                .json({ error: "Ty gia khuyen mai phai lon hon hoac bang 0." });
+        }
+        if (pctPromoValue >= pctKhachValue) {
+            return res.status(400).json({
+                error: "Ty gia khuyen mai phai nho hon ty gia khach.",
+            });
+        }
+        if (pctKhachValue - pctPromoValue > 1) {
+            return res.status(400).json({
+                error: "Gia khuyen mai khong duoc vuot gia si.",
+            });
+        }
+    }
     if (supplierEntries.length === 0) {
         return res.status(400).json({
             error: "Can them it nhat mot nha cung cap.",
@@ -1331,8 +1388,8 @@ app.post("/api/product-prices", async(req, res) => {
         const productResult = await client.query(
             `
       INSERT INTO mavryk.product_price
-        (id, package, package_product, san_pham, pct_ctv, pct_khach, is_active, "update")
-      VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
+        (id, package, package_product, san_pham, pct_ctv, pct_khach, pct_promo, is_active, "update")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
       RETURNING id;
     `,
             [
@@ -1342,6 +1399,7 @@ app.post("/api/product-prices", async(req, res) => {
                 normalizedSanPham,
                 pctCtvValue,
                 pctKhachValue,
+                pctPromoValue,
                 todayYmd,
             ]
         );
@@ -1440,7 +1498,8 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
         packageProduct,
         sanPham,
         pctCtv,
-        pctKhach
+        pctKhach,
+        pctPromo,
     } = req.body || {};
 
     const parsedId = Number(productId);
@@ -1458,12 +1517,30 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
 
     const pctCtvValue = toNullableNumber(pctCtv);
     const pctKhachValue = toNullableNumber(pctKhach);
+    const pctPromoValue = toNullableNumber(pctPromo);
 
     if (!Number.isFinite(pctCtvValue) || pctCtvValue <= 0) {
         return res.status(400).json({ error: "pct_ctv must be a positive number." });
     }
     if (!Number.isFinite(pctKhachValue) || pctKhachValue <= 0) {
         return res.status(400).json({ error: "pct_khach must be a positive number." });
+    }
+    if (pctPromoValue !== null) {
+        if (!Number.isFinite(pctPromoValue) || pctPromoValue < 0) {
+            return res.status(400).json({
+                error: "pct_promo must be greater than or equal to 0.",
+            });
+        }
+        if (pctPromoValue >= pctKhachValue) {
+            return res.status(400).json({
+                error: "pct_promo must be less than pct_khach.",
+            });
+        }
+        if (pctKhachValue - pctPromoValue > 1) {
+            return res.status(400).json({
+                error: "Promo price cannot exceed wholesale price.",
+            });
+        }
     }
 
     const todayYmd = todayYMDInVietnam();
@@ -1479,8 +1556,9 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
           san_pham = $3,
           pct_ctv = $4,
           pct_khach = $5,
-          update = $6
-      WHERE id = $7
+          pct_promo = $6,
+          update = $7
+      WHERE id = $8
       RETURNING id;
     `,
             [
@@ -1489,6 +1567,7 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
                 normalizedSanPham,
                 pctCtvValue,
                 pctKhachValue,
+                pctPromoValue,
                 todayYmd,
                 parsedId,
             ]
