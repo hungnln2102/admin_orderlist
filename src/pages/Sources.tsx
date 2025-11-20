@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   MagnifyingGlassIcon,
   PlusIcon,
-  ChevronDownIcon,
   XMarkIcon,
   ClipboardDocumentListIcon,
   XCircleIcon,
@@ -11,12 +11,18 @@ import {
   UserGroupIcon,
   CheckCircleIcon,
   ShoppingBagIcon,
+  PowerIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import GlassPanel from "../components/GlassPanel";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
 import { apiFetch } from "../lib/api";
+import { deleteSupplyById } from "../lib/suppliesApi";
 import * as Helpers from "../lib/helpers";
+import { normalizeErrorMessage } from "../lib/textUtils";
 
 interface SupplySummaryApiItem {
   id: number;
@@ -26,6 +32,7 @@ interface SupplySummaryApiItem {
   bankName: string | null;
   status: string;
   rawStatus?: string | null;
+  isActive?: boolean | null;
   products: string[];
   monthlyOrders: number;
   monthlyImportValue: number;
@@ -49,6 +56,13 @@ interface SupplySummaryResponse {
 
 interface SupplySummaryItem extends SupplySummaryApiItem {
   products: string[];
+  isActive?: boolean;
+}
+
+interface DeleteConfirmState {
+  supply: SupplySummaryItem | null;
+  loading: boolean;
+  error: string | null;
 }
 
 const DEFAULT_STATS: SupplyStats = {
@@ -60,38 +74,49 @@ const DEFAULT_STATS: SupplyStats = {
 
 const GLASS_FIELD_CLASS =
   "w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 placeholder:text-gray-400";
+const formatCurrencyShort = Helpers.formatCurrencyShort;
+const formatCurrencyVnd = Helpers.formatCurrency;
 
-const formatCurrencyShort = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) return "₫0";
-  if (value >= 1_000_000_000) {
-    return `₫${(value / 1_000_000_000).toFixed(1)}B`;
+const ACTIVE_STATUS_LABEL = "Đang Hoạt Động";
+const INACTIVE_STATUS_LABEL = "Tạm Dừng";
+const normalizeStatusValue = (value?: string | null): "active" | "inactive" => {
+  if (!value) return "active";
+
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    ["inactive", "tam dung", "tam ngung", "pause", "paused"].includes(
+      normalized
+    )
+  ) {
+    return "inactive";
   }
-  if (value >= 1_000_000) {
-    return `₫${(value / 1_000_000).toFixed(1)}M`;
-  }
-  return `₫${Math.round(value).toLocaleString("vi-VN")}`;
+  return "active";
 };
 
-const formatCurrencyVnd = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) return "₫0";
-  return `₫${Math.round(value).toLocaleString("vi-VN")}`;
+const resolveStatusBoolean = (value?: string | boolean | null): boolean => {
+  if (typeof value === "boolean") return value;
+  return normalizeStatusValue(value) !== "inactive";
 };
 
-const formatStatusLabel = (status: string): string => {
-  if (status === "inactive") return "Tạm ngưng";
-  if (status === "active") return "Đang hoạt động";
-  return status || "Chưa xác định";
-};
+const DEFAULT_DELETE_ERROR = "Có lỗi xảy ra khi xóa nguồn. Vui lòng thử lại sau.";
+const formatDeleteErrorMessage = (raw?: string | null): string =>
+  normalizeErrorMessage(raw, {
+    fallback: DEFAULT_DELETE_ERROR,
+    blockPatterns: [/(cannot\s+delete)/i],
+  });
 
-const getStatusClasses = (status: string): string => {
-  if (status === "inactive") {
-    return "bg-yellow-100 text-yellow-800";
-  }
-  if (status === "active") {
-    return "bg-green-100 text-green-800";
-  }
-  return "bg-gray-100 text-gray-800";
-};
+const formatStatusLabel = (status: string | boolean | null | undefined) =>
+  resolveStatusBoolean(status) ? ACTIVE_STATUS_LABEL : INACTIVE_STATUS_LABEL;
+
+const getStatusClasses = (status: string | boolean | null | undefined) =>
+  resolveStatusBoolean(status)
+    ? "bg-green-100 text-green-800"
+    : "bg-yellow-100 text-yellow-800";
 
 const getFormattedDate = (value: string | null): string => {
   if (!value) return "--";
@@ -106,10 +131,17 @@ const normalizeProducts = (products?: string[]): string[] => {
 };
 
 const formatSearchValue = (value: string): string => value.trim().toLowerCase();
+const isSupplyActive = (supply: {
+  isActive?: boolean | null;
+  status?: string;
+}) =>
+  resolveStatusBoolean(
+    typeof supply.isActive === "boolean" ? supply.isActive : supply.status
+  );
 
 const STATUS_OPTIONS = [
-  { value: "active", label: "Đang Hoạt Động" },
-  { value: "inactive", label: "Tạm Ngưng" },
+  { value: "active", label: ACTIVE_STATUS_LABEL },
+  { value: "inactive", label: INACTIVE_STATUS_LABEL },
 ];
 
 const MODAL_CARD_ACCENTS = {
@@ -160,11 +192,11 @@ const compareSuppliersByPriority = (
   } else {
     const aTime = getLastOrderTimestamp(a.lastOrderDate);
     const bTime = getLastOrderTimestamp(b.lastOrderDate);
+
     if (aTime !== bTime) {
       return bTime - aTime;
     }
   }
-
   return a.sourceName.localeCompare(b.sourceName);
 };
 
@@ -179,7 +211,7 @@ interface SupplyPayment {
 interface EditFormState {
   sourceName: string;
   paymentInfo: string;
-  status: string;
+  bankBin: string;
 }
 
 interface PaymentHistoryState {
@@ -225,6 +257,7 @@ interface SupplyOverviewSupply {
   bankName: string | null;
   status: string | null;
   rawStatus?: string | null;
+  isActive?: boolean;
 }
 
 interface UnpaidPaymentCycle {
@@ -306,9 +339,18 @@ export default function Sources() {
   const [editFormValues, setEditFormValues] = useState<EditFormState>({
     sourceName: "",
     paymentInfo: "",
-    status: STATUS_OPTIONS[0].value,
+    bankBin: "",
   });
-
+  const [statusLoadingMap, setStatusLoadingMap] = useState<
+    Record<number, boolean>
+  >({});
+  const [deleteLoadingId, setDeleteLoadingId] = useState<number | null>(null);
+  const [deleteConfirmState, setDeleteConfirmState] =
+    useState<DeleteConfirmState>({
+      supply: null,
+      loading: false,
+      error: null,
+    });
   const fetchSupplySummary = useCallback(async () => {
     try {
       setLoading(true);
@@ -321,20 +363,30 @@ export default function Sources() {
       const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
         data.supplies
       )
-        ? data.supplies.map((item) => ({
-            ...item,
-            products: normalizeProducts(item.products),
-            monthlyOrders: Number(item.monthlyOrders) || 0,
-            monthlyImportValue: Number(item.monthlyImportValue) || 0,
-            totalOrders: Number(item.totalOrders) || 0,
-            totalPaidImport: Number(item.totalPaidImport) || 0,
-            totalUnpaidImport: Number(item.totalUnpaidImport) || 0,
-          }))
+        ? data.supplies.map((item) => {
+            const activeFlag =
+              typeof item.isActive === "boolean"
+                ? item.isActive
+                : normalizeStatusValue(item.status) !== "inactive";
+            return {
+              ...item,
+              isActive: activeFlag,
+              status: activeFlag ? "active" : "inactive",
+              products: normalizeProducts(item.products),
+              monthlyOrders: Number(item.monthlyOrders) || 0,
+              monthlyImportValue: Number(item.monthlyImportValue) || 0,
+              totalOrders: Number(item.totalOrders) || 0,
+              totalPaidImport: Number(item.totalPaidImport) || 0,
+              totalUnpaidImport: Number(item.totalUnpaidImport) || 0,
+            };
+          })
         : [];
       setSupplies(normalizedSupplies);
       setStats({
         totalSuppliers: Number(data.stats?.totalSuppliers) || 0,
-        activeSuppliers: Number(data.stats?.activeSuppliers) || 0,
+        activeSuppliers:
+          Number(data.stats?.activeSuppliers) ||
+          normalizedSupplies.filter((supply) => isSupplyActive(supply)).length,
         monthlyOrders: Number(data.stats?.monthlyOrders) || 0,
         totalImportValue: Number(data.stats?.totalImportValue) || 0,
       });
@@ -718,7 +770,7 @@ export default function Sources() {
     setEditFormValues({
       sourceName: supply.sourceName || "",
       paymentInfo: supply.numberBank || "",
-      status: supply.status || STATUS_OPTIONS[0].value,
+      bankBin: supply.binBank || "",
     });
   }, []);
 
@@ -736,12 +788,23 @@ export default function Sources() {
     []
   );
 
+  const bankNameByBin = useMemo(() => {
+    const map = new Map<string, string>();
+    bankOptions.forEach((bank) => {
+      if (bank.bin) {
+        map.set(bank.bin.trim(), bank.name || "");
+      }
+    });
+    return map;
+  }, [bankOptions]);
+
   const handleEditSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (editingSupplyId === null) return;
       const trimmedName = editFormValues.sourceName.trim();
       const trimmedPayment = editFormValues.paymentInfo.trim();
+      const trimmedBankBin = editFormValues.bankBin.trim();
       setSupplies((prev) =>
         prev.map((supply) =>
           supply.id === editingSupplyId
@@ -749,15 +812,140 @@ export default function Sources() {
                 ...supply,
                 sourceName: trimmedName || supply.sourceName,
                 numberBank: trimmedPayment || null,
-                status: editFormValues.status,
+                binBank: trimmedBankBin || supply.binBank,
+                bankName: trimmedBankBin
+                  ? bankNameByBin.get(trimmedBankBin) ||
+                    supply.bankName ||
+                    `BIN ${trimmedBankBin}`
+                  : supply.bankName,
               }
             : supply
         )
       );
       closeEditForm();
     },
-    [closeEditForm, editFormValues, editingSupplyId, setSupplies]
+    [bankNameByBin, closeEditForm, editFormValues, editingSupplyId, setSupplies]
   );
+
+  const handleToggleSupplyStatus = useCallback(
+    async (supply: SupplySummaryItem) => {
+      const previousState = isSupplyActive(supply);
+      const nextState = !previousState;
+      setStatusLoadingMap((prev) => ({ ...prev, [supply.id]: true }));
+      setSupplies((prev) =>
+        prev.map((row) =>
+          row.id === supply.id
+            ? {
+                ...row,
+                isActive: nextState,
+                status: nextState ? "active" : "inactive",
+              }
+            : row
+        )
+      );
+
+      try {
+        const response = await apiFetch(`/api/supplies/${supply.id}/active`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive: nextState }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            errorText || "Không thể cập nhật trạng thái nhà cung cấp."
+          );
+        }
+
+        const payload: { isActive?: boolean } = await response.json();
+        const resolvedState =
+          typeof payload?.isActive === "boolean" ? payload.isActive : nextState;
+        setSupplies((prev) =>
+          prev.map((row) =>
+            row.id === supply.id
+              ? {
+                  ...row,
+                  isActive: resolvedState,
+                  status: resolvedState ? "active" : "inactive",
+                }
+              : row
+          )
+        );
+      } catch (error) {
+        console.error("Unable to toggle supplier status:", error);
+
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Không thể cập nhật trạng thái nhà cung cấp."
+        );
+
+        setSupplies((prev) =>
+          prev.map((row) =>
+            row.id === supply.id
+              ? {
+                  ...row,
+                  isActive: previousState,
+                  status: previousState ? "active" : "inactive",
+                }
+              : row
+          )
+        );
+      } finally {
+        setStatusLoadingMap((prev) => {
+          const next = { ...prev };
+          delete next[supply.id];
+          return next;
+        });
+      }
+    },
+    []
+  );
+
+  const handleDeleteSupply = useCallback((supply: SupplySummaryItem) => {
+    setDeleteConfirmState({
+      supply,
+      loading: false,
+      error: null,
+    });
+  }, []);
+  const closeDeleteConfirm = useCallback(() => {
+    setDeleteConfirmState({
+      supply: null,
+      loading: false,
+      error: null,
+    });
+  }, []);
+
+  const confirmDeleteSupply = useCallback(async () => {
+    const supply = deleteConfirmState.supply;
+    if (!supply) return;
+    setDeleteConfirmState((prev) => ({ ...prev, loading: true, error: null }));
+    setDeleteLoadingId(supply.id);
+    try {
+      const response = await deleteSupplyById(supply.id);
+      if (!response.success) {
+        throw new Error(response.message || DEFAULT_DELETE_ERROR);
+      }
+      setSupplies((prev) =>
+        prev.filter((existingSupply) => existingSupply.id !== supply.id)
+      );
+      closeDeleteConfirm();
+    } catch (error) {
+      console.error("Không Thể Xóa Nhà Cung Cấp:", error);
+      setDeleteConfirmState((prev) => ({
+        ...prev,
+        loading: false,
+        error:
+          error instanceof Error
+            ? formatDeleteErrorMessage(error.message)
+            : DEFAULT_DELETE_ERROR,
+      }));
+    } finally {
+      setDeleteLoadingId(null);
+    }
+  }, [closeDeleteConfirm, deleteConfirmState.supply, setSupplies]);
 
   const renderPaymentRows = (rows: SupplyPayment[], initialized: boolean) => {
     if (!initialized) {
@@ -791,14 +979,14 @@ export default function Sources() {
         key={row.id}
         className="border-t border-gray-100 text-sm text-gray-800"
       >
-        <td className="px-6 py-4 font-medium text-gray-900 text-left sm:text-center">
+        <td className="px-4 py-4 font-medium text-gray-900 text-left sm:text-center">
           {row.round || "--"}
         </td>
-        <td className="px-6 py-4 text-center">
+        <td className="px-4 py-4 text-center">
           {formatCurrencyVnd(row.totalImport)}
         </td>
-        <td className="px-6 py-4 text-center">{formatCurrencyVnd(row.paid)}</td>
-        <td className="px-6 py-4 text-center text-gray-900">
+        <td className="px-4 py-4 text-center">{formatCurrencyVnd(row.paid)}</td>
+        <td className="px-4 py-4 text-center text-gray-900">
           {row.status || "--"}
         </td>
       </tr>
@@ -844,15 +1032,12 @@ export default function Sources() {
           >
             &lt;
           </button>
-
           {pageButtons}
-
           {state.hasMore && (
             <>
               <span className="text-gray-400 px-1">...</span>
             </>
           )}
-
           <button
             className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
             onClick={() => goToPage(supplyId, state.currentPage + 1)}
@@ -863,7 +1048,6 @@ export default function Sources() {
         </div>
       );
     };
-
     return (
       <div className="space-y-4">
         <div className="text-center">
@@ -911,7 +1095,6 @@ export default function Sources() {
               Chưa có chu kỳ thanh toán nào.
             </div>
           )} */}
-
         {renderPaginationControls()}
       </div>
     );
@@ -922,6 +1105,25 @@ export default function Sources() {
     const currentSupply = supplies.find(
       (supply) => supply.id === editingSupplyId
     );
+    const currentBankBinValue = editFormValues.bankBin.trim();
+    const hasCurrentBankInOptions =
+      !!currentBankBinValue &&
+      bankOptions.some(
+        (bankOption) => bankOption.bin.trim() === currentBankBinValue.trim()
+      );
+    const bankOptionsForEdit =
+      hasCurrentBankInOptions || !currentBankBinValue
+        ? bankOptions
+        : [
+            {
+              bin: currentBankBinValue,
+              name:
+                currentSupply?.bankName ||
+                bankNameByBin.get(currentBankBinValue) ||
+                `BIN ${currentBankBinValue}`,
+            },
+            ...bankOptions,
+          ];
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
@@ -961,7 +1163,7 @@ export default function Sources() {
                   handleEditInputChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhap ten nguon"
+                placeholder="Nhập tên nguồn"
                 required
               />
             </div>
@@ -977,7 +1179,7 @@ export default function Sources() {
                   handleEditInputChange("paymentInfo", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Thong tin thanh toan"
+                placeholder="Thông tin thanh toán"
               />
               {(currentSupply?.bankName ||
                 (currentSupply?.binBank
@@ -992,26 +1194,27 @@ export default function Sources() {
                 </p>
               )}
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Trạng Thái
+                Ngân Hàng
               </label>
               <select
-                value={editFormValues.status}
+                value={editFormValues.bankBin}
                 onChange={(event) =>
-                  handleEditInputChange("status", event.target.value)
+                  handleEditInputChange("bankBin", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="" disabled>
+                  Chọn Ngân Hàng
+                </option>
+                {bankOptionsForEdit.map((bank) => (
+                  <option key={bank.bin} value={bank.bin}>
+                    {bank.name || `BIN ${bank.bin}`}
                   </option>
                 ))}
               </select>
             </div>
-
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
@@ -1028,6 +1231,77 @@ export default function Sources() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    );
+  };
+  const renderDeleteConfirmModal = () => {
+    const { supply, loading, error } = deleteConfirmState;
+    if (!supply) return null;
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+        onClick={() => {
+          if (!loading) {
+            closeDeleteConfirm();
+          }
+        }}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-lg font-semibold text-gray-900">
+                Xác Nhận Xóa
+              </p>
+              <p className="text-xs text-gray-500">
+                Hành Động Này Sẽ Xóa Nguồn Khỏi Dữ Liệu.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+              onClick={closeDeleteConfirm}
+              disabled={loading}
+            >
+              &#10005;
+            </button>
+          </div>
+          <div className="space-y-3 text-sm text-gray-600">
+            <div>
+              <p className="font-semibold text-gray-900">
+                {supply.sourceName || "Nguồn Không Tên"}
+              </p>
+              <p className="text-xs text-gray-500">
+                {supply.numberBank || "Chưa Có Thông Tin Thanh Toán"}
+              </p>
+            </div>
+            <p>
+              Bạn Chắc Chắn Muốn Xóa Nguồn Này? Hành Động Không Thể Hoàn Tác Và
+              Những Danh Sách Liên Quan Cũng Sẽ Bị Cập Nhật.
+            </p>
+          </div>
+          {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              onClick={closeDeleteConfirm}
+              disabled={loading}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-60"
+              onClick={confirmDeleteSupply}
+              disabled={loading}
+            >
+              {loading ? "Đang Xóa..." : "Xóa Nguồn"}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1132,17 +1406,17 @@ export default function Sources() {
                       <div>
                         <p className="text-gray-500">Tên Nhà Cung Cấp</p>
                         <p className="text-lg font-semibold text-gray-900">
-                          {supply.sourceName || "Chua dat ten"}
+                          {supply.sourceName || "Chưa Đặt Tên"}
                         </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Trạng Thái</p>
                         <span
                           className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 ${getStatusClasses(
-                            supply.status || "unknown"
+                            supply.isActive ?? supply.status
                           )}`}
                         >
-                          {formatStatusLabel(supply.status || "Chưa Xác Định")}
+                          {formatStatusLabel(supply.isActive ?? supply.status)}
                         </span>
                       </div>
                       <div>
@@ -1274,7 +1548,8 @@ export default function Sources() {
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">So tai khoan</p>
+                                <p className="text-gray-500">Số tài khoản</p>
+
                                 <p className="font-semibold text-gray-900">
                                   {accountNumber || "Chưa Cung Cấp"}
                                 </p>
@@ -1500,22 +1775,15 @@ export default function Sources() {
         );
 
       const matchesStatus =
-        statusFilter === "all" || supply.status === statusFilter;
+        statusFilter === "all" ||
+        (statusFilter === "active"
+          ? isSupplyActive(supply)
+          : !isSupplyActive(supply));
 
       return matchesSearch && matchesStatus;
     });
     return filtered.sort(compareSuppliersByPriority);
   }, [supplies, searchTerm, statusFilter]);
-
-  const bankNameByBin = useMemo(() => {
-    const map = new Map<string, string>();
-    bankOptions.forEach((bank) => {
-      if (bank.bin) {
-        map.set(bank.bin.trim(), bank.name || "");
-      }
-    });
-    return map;
-  }, [bankOptions]);
 
   const supplierStats = useMemo(
     () => [
@@ -1614,28 +1882,35 @@ export default function Sources() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Nhà Cung Cấp
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Thanh Toán
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Đơn Trong Tháng
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Trạng Thái
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Đơn Hàng Cuối
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Đã Thanh Toán
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Chưa Thanh Toán
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap ">
+                    Trạng Thái
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Thao Tác
                   </th>
                 </tr>
@@ -1652,17 +1927,6 @@ export default function Sources() {
                   </tr>
                 )}
 
-                {!loading && filteredSupplies.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-6 py-4 text-center text-sm text-gray-500"
-                    >
-                      Không tìm thấy nhà cung cấp phù hợp.
-                    </td>
-                  </tr>
-                )}
-
                 {!loading &&
                   filteredSupplies.map((supply) => {
                     const isExpanded = expandedSupplyId === supply.id;
@@ -1672,32 +1936,29 @@ export default function Sources() {
                           className="hover:bg-gray-50 cursor-pointer"
                           onClick={() => toggleSlotDetails(supply.id)}
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                              <ChevronDownIcon
-                                className={`h-4 w-4 text-gray-400 transition-transform ${
-                                  isExpanded ? "rotate-180" : ""
-                                }`}
-                              />
-                              <span>{supply.sourceName || "Chưa đặt tên"}</span>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {supply.sourceName || "Chưa Đặt Tên"}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Tổng đơn: {supply.totalOrders}
+                              Tổng Đơn: {supply.totalOrders}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+
+                          <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {supply.numberBank || "Chưa có số tài khoản"}
+                              {supply.numberBank || "Chưa Có Tài Khoản"}
                             </div>
                             <div className="text-xs text-gray-500">
                               {supply.bankName ||
                                 (supply.binBank
                                   ? bankNameByBin.get(supply.binBank.trim()) ||
                                     `BIN ${supply.binBank}`
-                                  : "Chưa có ngân hàng")}
+                                  : "Chưa Có Ngân Hàng")}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+
+                          <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               {supply.monthlyOrders} Đơn
                             </div>
@@ -1705,48 +1966,102 @@ export default function Sources() {
                               {formatCurrencyVnd(supply.monthlyImportValue)}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(
-                                supply.status
-                              )}`}
-                            >
-                              {formatStatusLabel(supply.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {getFormattedDate(supply.lastOrderDate)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatCurrencyVnd(supply.totalPaidImport)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatCurrencyVnd(supply.totalUnpaidImport)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              className="text-blue-600 hover:text-blue-900 mr-3"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openViewModal(supply.id);
-                              }}
-                            >
-                              Xem
-                            </button>
-                            <button
-                              className="text-green-600 hover:text-green-900"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openEditForm(supply);
-                              }}
-                            >
-                              Chỉnh Sửa
-                            </button>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  handleToggleSupplyStatus(supply);
+                                }}
+                                className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
+                                  isSupplyActive(supply)
+                                    ? "border-emerald-200 bg-emerald-500 text-white"
+                                    : "border-gray-200 bg-gray-200 text-gray-500"
+                                } ${
+                                  statusLoadingMap[supply.id]
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
+                                aria-pressed={isSupplyActive(supply)}
+                                disabled={Boolean(statusLoadingMap[supply.id])}
+                                title={formatStatusLabel(
+                                  supply.isActive ?? supply.status
+                                )}
+                              >
+                                <PowerIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-3 text-sm font-medium">
+                              <button
+                                className="text-blue-600 hover:text-blue-900"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  openViewModal(supply.id);
+                                }}
+                                aria-label="Xem chi tiết"
+                              >
+                                <EyeIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Xem</span>
+                              </button>
+
+                              <button
+                                className="text-green-600 hover:text-green-900"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  openEditForm(supply);
+                                }}
+                                aria-label="Chỉnh sửa"
+                              >
+                                <PencilSquareIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Chỉnh Sửa</span>
+                              </button>
+
+                              <button
+                                className={`text-rose-500 hover:text-rose-700 ${
+                                  deleteLoadingId === supply.id
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  handleDeleteSupply(supply);
+                                }}
+                                aria-label="Xóa nguồn"
+                                disabled={deleteLoadingId === supply.id}
+                              >
+                                <TrashIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Xóa</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={8} className="px-6 pb-6">
+                            <td colSpan={8} className="px-4 pb-6">
                               <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
                                 <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
                                   {renderPaymentHistorySection(supply.id)}
@@ -1766,6 +2081,7 @@ export default function Sources() {
       {renderViewSupplierModal()}
       {renderAddSupplierModal()}
       {renderEditModal()}
+      {renderDeleteConfirmModal()}
     </React.Fragment>
   );
 }

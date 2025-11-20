@@ -53,6 +53,29 @@ export const addMonthsMinusOneDay = (
   ).padStart(2, "0")}/${dt.getFullYear()}`;
 };
 
+export const addDaysToDMY = (startDMY: string, days: number): string => {
+  if (
+    !startDMY ||
+    !Number.isFinite(days) ||
+    days === 0 ||
+    startDMY.indexOf("/") === -1
+  ) {
+    return startDMY;
+  }
+
+  const [d, m, y] = startDMY.split("/").map(Number);
+  if (![d, m, y].every((value) => Number.isFinite(value))) {
+    return startDMY;
+  }
+
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+
+  return `${String(dt.getDate()).padStart(2, "0")}/${String(
+    dt.getMonth() + 1
+  ).padStart(2, "0")}/${dt.getFullYear()}`;
+};
+
 export const inclusiveDaysBetween = (startDMY: string, endDMY: string): number => {
   const [sd, sm, sy] = startDMY.split("/").map(Number);
   const [ed, em, ey] = endDMY.split("/").map(Number);

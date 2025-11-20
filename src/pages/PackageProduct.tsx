@@ -865,10 +865,24 @@ function PackageProduct() {
     [computedRows, selectedPackage]
   );
   const filteredRows = scopedRows.filter((item) => {
-    const term = searchTerm.toLowerCase();
-    const name = (item.package || "").toLowerCase();
-    const sku = `PKG-${String(item.id).padStart(4, "0")}`.toLowerCase();
-    const matchesSearch = name.includes(term) || sku.includes(term);
+    const term = searchTerm.trim().toLowerCase();
+    const infoFields = [
+      item.information,
+      item.informationUser,
+      item.informationMail,
+      item.informationPass,
+      item.accountUser,
+      item.accountMail,
+      item.accountPass,
+      item.note,
+    ];
+    const matchesSearch =
+      term.length === 0 ||
+      infoFields.some((field) => {
+        const normalizedValue =
+          field === null || field === undefined ? "" : String(field);
+        return normalizedValue.toLowerCase().includes(term);
+      });
     const matchesCategory =
       categoryFilter === "all" || item.package === categoryFilter;
     const slotState = getSlotAvailabilityState(item.remainingSlots);
@@ -924,7 +938,7 @@ function PackageProduct() {
           accent: STAT_CARD_ACCENTS.rose,
         },
         {
-          name: "Created Today",
+          name: "Tạo Mới Hôm Nay",
           value: "0",
           icon: ArrowUpIcon,
           accent: STAT_CARD_ACCENTS.emerald,
@@ -1259,7 +1273,9 @@ function PackageProduct() {
               return (
                 <div
                   key={summary.name}
-                  className={`relative isolate rounded-3xl border ${accent.border} bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
+                  className={`relative isolate rounded-3xl border ${
+                    accent.border
+                  } bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
                     isSelected
                       ? "ring-2 ring-blue-400 shadow-[0_25px_65px_-35px_rgba(37,99,235,0.7)]"
                       : "hover:shadow-[0_30px_75px_-40px_rgba(15,23,42,0.55)]"
@@ -1338,7 +1354,7 @@ function PackageProduct() {
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search packages by name or SKU..."
+                  placeholder="Tìm kiếm gói hoặc thông tin sản phẩm"
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -2275,7 +2291,6 @@ function PackageFormModal({
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-
               </div>
             )}
           </div>

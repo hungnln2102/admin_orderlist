@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+﻿import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -58,6 +58,13 @@ const CATEGORY_OPTIONS: {
   },
 ];
 
+const QR_BANK_INFO = {
+  bankName: "VP Bank",
+  accountHolder: "NGO LE NGOC HUNG",
+  accountNumber: "9183400998",
+  bankBin: "970422",
+};
+
 export default function Invoices() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateStart, setDateStart] = useState("");
@@ -72,7 +79,65 @@ export default function Invoices() {
     null
   );
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isAmountEditing, setIsAmountEditing] = useState(false);
+  const [isNoteEditing, setIsNoteEditing] = useState(false);
+  const [qrAmount, setQrAmount] = useState("");
+  const [qrNote, setQrNote] = useState("");
+  const [qrAmountDraft, setQrAmountDraft] = useState("");
+  const [qrNoteDraft, setQrNoteDraft] = useState("");
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
+
+  const parsedAmount = useMemo(() => {
+    const digits = qrAmount.replace(/[^\d]/g, "");
+    if (!digits) return 0;
+    const value = Number(digits);
+    return Number.isFinite(value) ? value : 0;
+  }, [qrAmount]);
+
+  const formattedAmountDisplay =
+    parsedAmount > 0
+      ? `${parsedAmount.toLocaleString("vi-VN")} VND`
+      : "Chưa cập nhật";
+
+  const qrImageUrl = useMemo(() => {
+    const base = `https://img.vietqr.io/image/${QR_BANK_INFO.bankBin}-${QR_BANK_INFO.accountNumber}-qr_only.jpg`;
+    const params = new URLSearchParams({
+      accountName: QR_BANK_INFO.accountHolder,
+    });
+    if (parsedAmount > 0) {
+      params.set("amount", parsedAmount.toString());
+    }
+    if (qrNote.trim()) {
+      params.set("addInfo", qrNote.trim());
+    }
+    return `${base}?${params.toString()}`;
+  }, [parsedAmount, qrNote]);
+
+  const handleOpenQrModal = () => {
+    setIsQrModalOpen(true);
+    setQrAmountDraft(qrAmount);
+    setQrNoteDraft(qrNote);
+  };
+
+  const handleCloseQrModal = () => {
+    setIsQrModalOpen(false);
+    setIsAmountEditing(false);
+    setIsNoteEditing(false);
+  };
+
+  const commitAmount = () => {
+    const digits = qrAmountDraft.replace(/[^\d]/g, "");
+    setQrAmount(digits);
+    setIsAmountEditing(false);
+  };
+
+  const commitNote = () => {
+    setQrNote(qrNoteDraft.trim());
+    setIsNoteEditing(false);
+  };
+
+  const noteDisplay = qrNote.trim() || "Chưa có nội dung";
 
   const filteredReceipts = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -269,342 +334,544 @@ export default function Invoices() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Biên Nhận Thanh Toán
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Theo dõi giao dịch chuyển đến được lưu trong hệ thống
-          </p>
-        </div>
-        <GradientButton icon={PlusIcon} className="mt-4 sm:mt-0">
-          Thêm biên nhận
-        </GradientButton>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.name}
-            title={stat.name}
-            value={stat.value}
-            icon={stat.icon}
-            accent={stat.accent}
-          />
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-        <div className="flex flex-col lg:flex-row gap-3">
-          <div className="relative flex-1">
-            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tim ma don nguoi gui hoac ghi chu..."
-              className="w-full pl-12 pr-4 py-3 border border-gray-200 bg-gray-50/60 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-
-          <div className="relative flex items-stretch" ref={dateRangeRef}>
+    <>
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
+          <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative">
             <button
-              type="button"
-              onClick={() => setRangePickerOpen((prev) => !prev)}
-              className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition w-full lg:w-64 ${
-                rangePickerOpen
-                  ? "border-blue-500 bg-blue-50/40"
-                  : "border-gray-200 bg-gray-50/60 hover:bg-gray-100"
-              }`}
+              className="absolute right-6 top-6 text-slate-400 hover:text-white transition"
+              onClick={handleCloseQrModal}
             >
-              <div className="flex flex-col text-left">
-                <span className="text-xs uppercase tracking-wide text-gray-400">
-                  Khoảng Ngày
-                </span>
-                <span className="text-sm font-medium text-gray-800">
-                  {dateRangeDisplay}
-                </span>
-              </div>
-              <CalendarDaysIcon
-                className={`w-5 h-5 ${
-                  rangePickerOpen ? "text-blue-600" : "text-gray-400"
-                }`}
-              />
+              <XMarkIcon className="h-6 w-6" />
             </button>
-
-            {rangePickerOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-10 p-4 space-y-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
-                      Từ Ngày
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      value={toISODate(dateStart)}
-                      onChange={(event) =>
-                        setDateStart(
-                          event.target.value
-                            ? toDisplayDate(event.target.value)
-                            : ""
-                        )
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
-                      Đến Ngày
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      value={toISODate(dateEnd)}
-                      onChange={(event) =>
-                        setDateEnd(
-                          event.target.value
-                            ? toDisplayDate(event.target.value)
-                            : ""
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                  <button
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                    onClick={() => {
-                      setDateStart("");
-                      setDateEnd("");
-                    }}
-                  >
-                    Xóa Khoảng
-                  </button>
-                  <div className="flex gap-2">
-                    <button
-                      className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
-                      onClick={() => setRangePickerOpen(false)}
-                    >
-                      Đóng
-                    </button>
-                    <button
-                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                      onClick={() => setRangePickerOpen(false)}
-                    >
-                      Áp Dụng
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExportToExcel}
-            disabled={exportDisabled}
-            className={`px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold transition-colors shadow-sm ${
-              exportDisabled
-                ? "opacity-60 cursor-not-allowed"
-                : "hover:bg-gray-700"
-            }`}
-          >
-            Tải Về
-          </button>
-        </div>
-
-        {error && <div className="text-sm text-red-600">{error}</div>}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col sm:flex-row gap-3">
-        {CATEGORY_OPTIONS.map((option) => {
-          const isActive = categoryFilter === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setCategoryFilter(option.value)}
-              className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition ${
-                isActive
-                  ? "border-blue-500 bg-blue-50/70"
-                  : "border-gray-200 bg-gray-50 hover:bg-gray-100"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {option.label}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {option.description}
-                  </p>
-                </div>
-                <span className="text-lg font-semibold text-gray-900">
-                  {categoryCounts[option.value]}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Mã Đơn
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Người Gửi
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Số Tiền
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nội Dung Chuyển Khoản
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ngày Thanh Toán
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Thao Tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredReceipts.map((receipt) => (
-                <tr key={receipt.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                    {receipt.orderCode || "--"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {receipt.sender || "--"}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {formatCurrencyVnd(receipt.amount)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
-                    <span className="block truncate">
-                      {receipt.note || "--"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {receipt.paidAt
-                      ? Helpers.formatDateToDMY(receipt.paidAt)
-                      : "--"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex space-x-2 justify-end">
-                      <button
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="Xem Hóa Đơn"
-                        onClick={() => handleViewReceipt(receipt)}
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-green-600 hover:text-green-900 p-1 rounded"
-                        title="In Hóa Đơn"
-                      >
-                        <PrinterIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-purple-600 hover:text-purple-900 p-1 rounded"
-                        title="Tải Xuống"
-                      >
-                        <ArrowDownTrayIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {!loading && filteredReceipts.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">Không Có Biên Nhận</div>
-            <div className="text-gray-500">Thử từ khóa khác</div>
-          </div>
-        )}
-        {loading && (
-          <div className="text-center py-8 text-gray-500 text-sm">
-            Đang tải dữ liệu...
-          </div>
-        )}
-      </div>
-
-      {viewModalOpen && selectedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Chi tiết biên nhận
-              </h2>
-              <button
-                onClick={closeViewModal}
-                className="text-gray-400 hover:text-gray-600 transition rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-label="Dong"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500 mb-1">Mã Đơn</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedReceipt.orderCode || "--"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Ngày Thanh Toán</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedReceipt.paidAt
-                      ? Helpers.formatDateToDMY(selectedReceipt.paidAt)
-                      : "--"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Người Gửi</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedReceipt.sender || "--"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Số Tiền</p>
-                  <p className="font-semibold text-gray-900">
-                    {formatCurrencyVnd(selectedReceipt.amount)}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <p className="text-gray-500 mb-1 text-sm">
-                  Nội Dung Chuyển Khoản
+            <div className="px-6 py-10 space-y-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-semibold">
+                  Tạo Thông Tin Thanh Toán Qua QR Code
+                </h2>
+                <p className="text-sm text-slate-300">
+                  Quét mã QR để chuyển khoản nhanh chóng. Điền số tiền và nội
+                  dung để cập nhật chi tiết.
                 </p>
-                <div className="p-3 rounded-lg border border-gray-200 text-sm text-gray-800 bg-gray-50 min-h-[80px]">
-                  {selectedReceipt.note || "Khong co ghi chu"}
+              </div>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-6 flex flex-col items-center text-center space-y-4">
+                  <p className="text-lg font-semibold text-sky-200">
+                    Quét Mã QR Để Thanh Toán
+                  </p>
+                  <div className="rounded-2xl bg-white p-4">
+                    <img
+                      src={qrImageUrl}
+                      alt="QR thanh toán"
+                      className="h-64 w-64 object-contain"
+                    />
+                  </div>
+                  <a
+                    href={qrImageUrl}
+                    download
+                    className="inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400"
+                  >
+                    Tải ảnh QR
+                  </a>
+                  <div className="w-full text-left space-y-1 text-sm text-slate-200">
+                    <p>
+                      Ngân hàng:{" "}
+                      <span className="font-semibold">
+                        {QR_BANK_INFO.bankName}
+                      </span>
+                    </p>
+                    <p>
+                      Số tài khoản:{" "}
+                      <span className="font-semibold">
+                        {QR_BANK_INFO.accountNumber}
+                      </span>
+                    </p>
+                    <p>
+                      Chủ tài khoản:{" "}
+                      <span className="font-semibold uppercase">
+                        {QR_BANK_INFO.accountHolder}
+                      </span>
+                    </p>
+                    <p>
+                      Số tiền:{" "}
+                      <span className="font-semibold text-rose-200">
+                        {formattedAmountDisplay}
+                      </span>
+                    </p>
+                    <p>
+                      Nội dung:{" "}
+                      <span className="font-semibold text-violet-200">
+                        {noteDisplay}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-6 space-y-5">
+                  <div className="flex items-center space-x-3 border-b border-slate-700 pb-4">
+                    <img
+                      src="https://companieslogo.com/img/orig/VPB.VN-b0a9916f.png?t=1722928514"
+                      alt="VPBank"
+                      className="h-10 w-10 object-contain"
+                    />
+                    <div>
+                      <p className="text-sm uppercase tracking-wide text-slate-300">
+                        Ngân hàng
+                      </p>
+                      <p className="text-lg font-semibold text-white">
+                        {QR_BANK_INFO.bankName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm text-slate-300">
+                      <span>Thụ Hưởng</span>
+                      <span className="font-semibold text-white">
+                        {QR_BANK_INFO.accountHolder}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-slate-300">Số Tài Khoản</p>
+                      <div className="rounded-xl border border-slate-600 bg-slate-900/50 px-3 py-2 text-white font-semibold">
+                        {QR_BANK_INFO.accountNumber}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-5">
+                    <div>
+                      <button
+                        type="button"
+                        className="w-full rounded-xl border border-sky-400/50 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-sky-200 hover:border-sky-300 transition"
+                        onClick={() => {
+                          setIsAmountEditing(true);
+                          setQrAmountDraft(qrAmount || "");
+                        }}
+                      >
+                        + Thêm số tiền
+                      </button>
+                      {isAmountEditing && (
+                        <div className="mt-3 flex items-center gap-3">
+                          <input
+                            type="text"
+                            placeholder="Ví dụ: 65000"
+                            className="flex-1 rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-white focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
+                            value={qrAmountDraft}
+                            onChange={(event) =>
+                              setQrAmountDraft(event.target.value)
+                            }
+                            onBlur={commitAmount}
+                          />
+                          <button
+                            type="button"
+                            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white"
+                            onClick={commitAmount}
+                          >
+                            OK
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        className="w-full rounded-xl border border-violet-400/50 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:border-violet-300 transition"
+                        onClick={() => {
+                          setIsNoteEditing(true);
+                          setQrNoteDraft(qrNote || "");
+                        }}
+                      >
+                        + Thêm nội dung
+                      </button>
+                      {isNoteEditing && (
+                        <div className="mt-3 flex items-center gap-3">
+                          <input
+                            type="text"
+                            placeholder="Nhập nội dung"
+                            className="flex-1 rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-white focus:border-violet-400 focus:ring-2 focus:ring-violet-400/30"
+                            value={qrNoteDraft}
+                            onChange={(event) =>
+                              setQrNoteDraft(event.target.value)
+                            }
+                            onBlur={commitNote}
+                          />
+                          <button
+                            type="button"
+                            className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white"
+                            onClick={commitNote}
+                          >
+                            OK
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900/60 p-4 text-sm text-slate-200 space-y-2">
+                    <p>
+                      <span className="text-slate-400">Số tiền hiện tại:</span>{" "}
+                      <span className="font-semibold text-white">
+                        {formattedAmountDisplay}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Nội dung hiện tại:</span>{" "}
+                      <span className="font-semibold text-white">
+                        {noteDisplay}
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      * Nhấn OK hoặc rời khỏi ô nhập để cập nhật thông tin vào
+                      QR.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={closeViewModal}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-              >
-                Đóng
-              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Biên Nhận Thanh Toán
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Theo dõi giao dịch chuyển đến được lưu trong hệ thống
+            </p>
+          </div>
+          <GradientButton
+            icon={PlusIcon}
+            className="mt-4 sm:mt-0"
+            onClick={handleOpenQrModal}
+          >
+            Thêm biên nhận
+          </GradientButton>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {stats.map((stat) => (
+            <StatCard
+              key={stat.name}
+              title={stat.name}
+              value={stat.value}
+              icon={stat.icon}
+              accent={stat.accent}
+            />
+          ))}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="relative flex-1">
+              <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tim ma don nguoi gui hoac ghi chu..."
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 bg-gray-50/60 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+
+            <div className="relative flex items-stretch" ref={dateRangeRef}>
+              <button
+                type="button"
+                onClick={() => setRangePickerOpen((prev) => !prev)}
+                className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition w-full lg:w-64 ${
+                  rangePickerOpen
+                    ? "border-blue-500 bg-blue-50/40"
+                    : "border-gray-200 bg-gray-50/60 hover:bg-gray-100"
+                }`}
+              >
+                <div className="flex flex-col text-left">
+                  <span className="text-xs uppercase tracking-wide text-gray-400">
+                    Khoảng Ngày
+                  </span>
+                  <span className="text-sm font-medium text-gray-800">
+                    {dateRangeDisplay}
+                  </span>
+                </div>
+                <CalendarDaysIcon
+                  className={`w-5 h-5 ${
+                    rangePickerOpen ? "text-blue-600" : "text-gray-400"
+                  }`}
+                />
+              </button>
+
+              {rangePickerOpen && (
+                <div className="absolute right-0 top-[calc(100%+8px)] w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-10 p-4 space-y-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+                        Từ Ngày
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        value={toISODate(dateStart)}
+                        onChange={(event) =>
+                          setDateStart(
+                            event.target.value
+                              ? toDisplayDate(event.target.value)
+                              : ""
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+                        Đến Ngày
+                      </label>
+                      <input
+                        type="date"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        value={toISODate(dateEnd)}
+                        onChange={(event) =>
+                          setDateEnd(
+                            event.target.value
+                              ? toDisplayDate(event.target.value)
+                              : ""
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <button
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                      onClick={() => {
+                        setDateStart("");
+                        setDateEnd("");
+                      }}
+                    >
+                      Xóa Khoảng
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        onClick={() => setRangePickerOpen(false)}
+                      >
+                        Đóng
+                      </button>
+                      <button
+                        className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                        onClick={() => setRangePickerOpen(false)}
+                      >
+                        Áp Dụng
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportToExcel}
+              disabled={exportDisabled}
+              className={`px-5 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold transition-colors shadow-sm ${
+                exportDisabled
+                  ? "opacity-60 cursor-not-allowed"
+                  : "hover:bg-gray-700"
+              }`}
+            >
+              Tải Về
+            </button>
+          </div>
+
+          {error && <div className="text-sm text-red-600">{error}</div>}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col sm:flex-row gap-3">
+          {CATEGORY_OPTIONS.map((option) => {
+            const isActive = categoryFilter === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setCategoryFilter(option.value)}
+                className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition ${
+                  isActive
+                    ? "border-blue-500 bg-blue-50/70"
+                    : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {option.label}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {option.description}
+                    </p>
+                  </div>
+                  <span className="text-lg font-semibold text-gray-900">
+                    {categoryCounts[option.value]}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Mã Đơn
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Người Gửi
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Số Tiền
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nội Dung Chuyển Khoản
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ngày Thanh Toán
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Thao Tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredReceipts.map((receipt) => (
+                  <tr key={receipt.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                      {receipt.orderCode || "--"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {receipt.sender || "--"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {formatCurrencyVnd(receipt.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                      <span className="block truncate">
+                        {receipt.note || "--"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {receipt.paidAt
+                        ? Helpers.formatDateToDMY(receipt.paidAt)
+                        : "--"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex space-x-2 justify-end">
+                        <button
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                          title="Xem Hóa Đơn"
+                          onClick={() => handleViewReceipt(receipt)}
+                        >
+                          <EyeIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="text-green-600 hover:text-green-900 p-1 rounded"
+                          title="In Hóa Đơn"
+                        >
+                          <PrinterIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="text-purple-600 hover:text-purple-900 p-1 rounded"
+                          title="Tải Xuống"
+                        >
+                          <ArrowDownTrayIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {!loading && filteredReceipts.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-lg mb-2">
+                Không Có Biên Nhận
+              </div>
+              <div className="text-gray-500">Thử từ khóa khác</div>
+            </div>
+          )}
+          {loading && (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              Đang tải dữ liệu...
+            </div>
+          )}
+        </div>
+
+        {viewModalOpen && selectedReceipt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Chi tiết biên nhận
+                </h2>
+                <button
+                  onClick={closeViewModal}
+                  className="text-gray-400 hover:text-gray-600 transition rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Dong"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="px-5 py-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500 mb-1">Mã Đơn</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedReceipt.orderCode || "--"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Ngày Thanh Toán</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedReceipt.paidAt
+                        ? Helpers.formatDateToDMY(selectedReceipt.paidAt)
+                        : "--"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Người Gửi</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedReceipt.sender || "--"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Số Tiền</p>
+                    <p className="font-semibold text-gray-900">
+                      {formatCurrencyVnd(selectedReceipt.amount)}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-1 text-sm">
+                    Nội Dung Chuyển Khoản
+                  </p>
+                  <div className="p-3 rounded-lg border border-gray-200 text-sm text-gray-800 bg-gray-50 min-h-[80px]">
+                    {selectedReceipt.note || "Khong co ghi chu"}
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={closeViewModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

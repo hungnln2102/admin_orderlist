@@ -12,7 +12,9 @@ import {
   CurrencyDollarIcon,
   ChevronDownIcon,
   PowerIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
+import { deleteProductPrice } from "../lib/productPricesApi";
 import { API_ENDPOINTS } from "../constants";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
@@ -614,6 +616,15 @@ function Pricing() {
     Record<number, string>
   >({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deleteProductState, setDeleteProductState] = useState<{
+    product: ProductPricingRow | null;
+    loading: boolean;
+    error: string | null;
+  }>({
+    product: null,
+    loading: false,
+    error: null,
+  });
 
   const fetchProductPrices = useCallback(async () => {
     setIsLoading(true);
@@ -788,6 +799,72 @@ function Pricing() {
     supplyPriceMap,
     isRefreshing,
   ]);
+
+  const closeDeleteProductModal = useCallback(() => {
+    setDeleteProductState({
+      product: null,
+      loading: false,
+      error: null,
+    });
+  }, []);
+
+  const handleRequestDeleteProduct = useCallback(
+    (
+      event: React.MouseEvent<HTMLButtonElement>,
+      product: ProductPricingRow
+    ) => {
+      event.stopPropagation();
+      setDeleteProductState({
+        product,
+        loading: false,
+        error: null,
+      });
+    },
+    []
+  );
+
+  const confirmDeleteProduct = useCallback(async () => {
+    const product = deleteProductState.product;
+    if (!product) return;
+    setDeleteProductState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const response = await deleteProductPrice(product.id);
+      if (!response.success) {
+        throw new Error(
+          response.message || "Không thể xóa sản phẩm khỏi bảng giá."
+        );
+      }
+      setProductPrices((prev) =>
+        prev.filter((row) => row.id !== product.id)
+      );
+      setSupplyPriceMap((prev) => {
+        const next = { ...prev };
+        const candidates = [
+          product.sanPhamRaw,
+          product.packageName,
+          product.packageProduct,
+        ];
+        candidates.forEach((name) => {
+          const key = normalizeProductKey(name || "");
+          if (key && next[key]) {
+            delete next[key];
+          }
+        });
+        return next;
+      });
+      closeDeleteProductModal();
+    } catch (error) {
+      console.error("Failed to delete product price:", error);
+      setDeleteProductState((prev) => ({
+        ...prev,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Không thể xóa sản phẩm. Vui lòng thử lại sau.",
+      }));
+    }
+  }, [API_BASE, closeDeleteProductModal, deleteProductState.product]);
 
   const handleToggleProductDetails = (product: ProductPricingRow) => {
     const nextId = expandedProductId === product.id ? null : product.id;
@@ -1763,16 +1840,91 @@ function Pricing() {
 
   return (
     <>
+      {deleteProductState.product && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+          onClick={() => {
+            if (!deleteProductState.loading) {
+              closeDeleteProductModal();
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-lg font-semibold text-gray-900">
+                  Xác Nhận Xóa
+                </p>
+                <p className="text-xs text-gray-500">
+                  Hành động này sẽ xóa sản phẩm khỏi bảng giá.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                onClick={closeDeleteProductModal}
+                disabled={deleteProductState.loading}
+              >
+                &#10005;
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-gray-600">
+              <div>
+                <p className="font-semibold text-gray-900">
+                  {deleteProductState.product.packageName ||
+                    deleteProductState.product.packageProduct ||
+                    deleteProductState.product.sanPhamRaw ||
+                    `Sản phẩm #${deleteProductState.product.id}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Mã:{" "}
+                  {deleteProductState.product.sanPhamRaw || "Không xác định"}
+                </p>
+              </div>
+              <p>
+                Bạn có chắc chắn muốn xóa sản phẩm này? Hành động không thể hoàn
+                tác và dữ liệu liên quan sẽ được cập nhật.
+              </p>
+            </div>
+            {deleteProductState.error && (
+              <p className="mt-4 text-xs text-red-500">
+                {deleteProductState.error}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                onClick={closeDeleteProductModal}
+                disabled={deleteProductState.loading}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-60"
+                onClick={confirmDeleteProduct}
+                disabled={deleteProductState.loading}
+              >
+                {deleteProductState.loading ? "Đang Xóa..." : "Xóa Sản Phẩm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="relative w-full max-w-5xl rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-2 py-4 sm:px-4 sm:py-6">
+          <div className="relative flex w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl max-h-[95vh]">
             <button
               className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
               onClick={handleCloseCreateModal}
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
-            <div className="px-6 py-8 space-y-6">
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 sm:px-6 sm:py-8">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
                   Thêm sản phẩm mới
@@ -2341,14 +2493,33 @@ function Pricing() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              className="text-blue-600 hover:text-blue-900 mr-3"
-                              onClick={(event) =>
-                                handleStartProductEdit(event, item)
-                              }
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                className="text-blue-600 hover:text-blue-900"
+                                onClick={(event) =>
+                                  handleStartProductEdit(event, item)
+                                }
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                className={`text-rose-500 hover:text-rose-700 ${
+                                  deleteProductState.product?.id === item.id &&
+                                  deleteProductState.loading
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
+                                onClick={(event) =>
+                                  handleRequestDeleteProduct(event, item)
+                                }
+                                disabled={
+                                  deleteProductState.product?.id === item.id &&
+                                  deleteProductState.loading
+                                }
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                         {isEditingProduct && currentEditForm && (
@@ -2972,3 +3143,4 @@ function Pricing() {
 }
 
 export default Pricing;
+

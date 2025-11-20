@@ -16,6 +16,8 @@ export const API_ENDPOINTS = {
 
   SUPPLIES_BY_PRODUCT: (productName: string) =>
     `/api/products/supplies-by-name/${encodeURIComponent(productName)}`,
+  SUPPLY_PRICES_BY_PRODUCT_NAME: (productName: string) =>
+    `/api/products/all-prices-by-name/${encodeURIComponent(productName)}`,
 
   UPDATE_SUPPLY_PRICE: (productId: number, sourceId: number) =>
     `/api/products/${productId}/suppliers/${sourceId}/price`,

@@ -1,4 +1,4 @@
-// Orders.tsx - Ma da duoc lam sach va dong bo voi API Backend
+﻿// Orders.tsx - Ma da duoc lam sach va dong bo voi API Backend
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -102,30 +102,36 @@ interface Order {
 }
 
 const STATUS_DISPLAY_LABELS: Record<string, string> = {
+  // Sửa lỗi: Háº¿t Háº¡n -> Hết Hạn
   "het han": "Hết Hạn",
+  // Sửa lỗi: Cáº§n Gia Háº¡n -> Cần Gia Hạn
   "can gia han": "Cần Gia Hạn",
 };
 
 const stockStats = [
   {
+    // Sửa lỗi: Tá»•ng Ä Æ¡n HÃ ng -> Tổng Đơn Hàng
     name: "Tổng Đơn Hàng",
     value: "0",
     icon: CheckCircleIcon,
     accent: STAT_CARD_ACCENTS.sky,
   },
   {
+    // Sửa lỗi: Cáº§n Gia Háº¡n -> Cần Gia Hạn
     name: "Cần Gia Hạn",
     value: "0",
     icon: ExclamationTriangleIcon,
     accent: STAT_CARD_ACCENTS.amber,
   },
   {
+    // Sửa lỗi: Háº¿t Háº¡n -> Hết Hạn
     name: "Hết Hạn",
     value: "0",
     icon: ArrowDownIcon,
     accent: STAT_CARD_ACCENTS.rose,
   },
   {
+    // Sửa lỗi: Ä Äƒng KÃ½ HÃ´m Nay -> Đăng Ký Hôm Nay
     name: "Đăng Ký Hôm Nay",
     value: "0",
     icon: ArrowUpIcon,
@@ -156,12 +162,16 @@ const isRegisteredToday = (dateString: string): boolean => {
 const getStatusColor = (status: string) => {
   const lowerStatus = (status || "").toLowerCase();
   switch (lowerStatus) {
-    case "Đã Thanh Toán":
+    // Sửa lỗi: Ä Ã£ Thanh ToÃ¡n -> Đã Thanh Toán
+    case "đã thanh toán":
       return "bg-green-100 text-green-800";
-    case "Chưa Thanh Toán":
-    case "Cần Gia Hạn":
+    // Sửa lỗi: ChÆ°a Thanh ToÃ¡n -> Chưa Thanh Toán
+    case "chưa thanh toán":
+    // Sửa lỗi: Cáº§n Gia Háº¡n -> Cần Gia Hạn
+    case "cần gia hạn":
       return "bg-yellow-100 text-yellow-800";
-    case "Hết Hạn":
+    // Sửa lỗi: Háº¿t Háº¡n -> Hết Hạn
+    case "hết hạn":
       return "bg-red-100 text-red-800";
     default:
       return "bg-gray-100 text-gray-800";
@@ -179,10 +189,14 @@ const formatCurrency = (value: number | string) => {
 
 const getStatusPriority = (status: string): number => {
   const lowerStatus = status.toLowerCase();
-  if (lowerStatus === "Hết Hạn") return 1;
-  if (lowerStatus === "Cần Gia Hạn") return 2;
-  if (lowerStatus === "Chưa Thanh Toán") return 3;
-  if (lowerStatus === "Đã Thanh Toán") return 4;
+  // Sửa lỗi: Háº¿t Háº¡n -> Hết Hạn
+  if (lowerStatus === "hết hạn") return 1;
+  // Sửa lỗi: Cáº§n Gia Háº¡n -> Cần Gia Hạn
+  if (lowerStatus === "cần gia hạn") return 2;
+  // Sửa lỗi: ChÆ°a Thanh ToÃ¡n -> Chưa Thanh Toán
+  if (lowerStatus === "chưa thanh toán") return 3;
+  // Sửa lỗi: Ä Ã£ Thanh ToÃ¡n -> Đã Thanh Toán
+  if (lowerStatus === "đã thanh toán") return 4;
   return 5;
 };
 
@@ -200,11 +214,37 @@ const useOrdersData = () => {
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const parseErrorResponse = async (response: Response) => {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      try {
+        const data = await response.json();
+        if (data?.error) return data.error;
+        if (typeof data === "string") return data;
+        return JSON.stringify(data);
+      } catch {
+        // Sửa lỗi: Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh tá»« mÃ¡y chá»§. -> Lỗi không xác định từ máy chủ.
+        return response.statusText || "Lỗi không xác định từ máy chủ.";
+      }
+    }
+
+    try {
+      const text = await response.text();
+      // Sửa lỗi: Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh tá»« mÃ¡y chá»§. -> Lỗi không xác định từ máy chủ.
+      return text || response.statusText || "Lỗi không xác định từ máy chủ.";
+    } catch {
+      // Sửa lỗi: Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh tá»« mÃ¡y chá»§. -> Lỗi không xác định từ máy chủ.
+      return response.statusText || "Lỗi không xác định từ máy chủ.";
+    }
+  };
 
   // --- HAM FETCH DU LIEU BAN DAU ---
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`);
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
@@ -217,6 +257,13 @@ const useOrdersData = () => {
       }
     } catch (error) {
       console.error("Lỗi khi tải đơn hàng:", error);
+      const friendlyMessage =
+        error instanceof TypeError
+          ? "Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại dịch vụ backend."
+          : error instanceof Error
+          ? error.message
+          : "Lỗi không xác định khi tải đơn hàng.";
+      setFetchError(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -310,6 +357,7 @@ const useOrdersData = () => {
           ? backendRemaining
           : fallbackRemaining ?? 0;
 
+      // Sửa lỗi: ChÆ°a Thanh ToÃ¡n -> Chưa Thanh Toán
       const rawStatus =
         (order[ORDER_FIELDS.TINH_TRANG] as string | null) || "Chưa Thanh Toán";
       const trangThaiText = formatStatusDisplay(rawStatus.trim());
@@ -459,6 +507,7 @@ const useOrdersData = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
+          // Sửa lỗi: Lá»—i khi táº¡o Ä‘Æ¡n hÃ ng má»›i tá»« Server -> Lỗi khi tạo đơn hàng mới từ Server
           errorData.error || "Lỗi khi tạo đơn hàng mới từ Server"
         );
       }
@@ -467,6 +516,7 @@ const useOrdersData = () => {
       const createdOrder: Order = await response.json();
       handleViewOrder(createdOrder);
     } catch (error) {
+      // Sửa lỗi: Lá»—i khi táº¡o Ä‘Æ¡n hÃ ng: -> Lỗi khi tạo đơn hàng:
       console.error("Lỗi khi tạo đơn hàng:", error);
       alert(
         `Lỗi khi tạo đơn hàng: ${
@@ -506,16 +556,16 @@ const useOrdersData = () => {
           body: JSON.stringify(dbFields),
         }
       );
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "Lỗi khi cập nhật đơn hàng từ Server"
-        );
-      }
 
+      if (!response.ok) {
+        const errorMessage = await parseErrorResponse(response);
+        // Sửa lỗi: L-i khi c-p nh-t `n hAng t Server -> Lỗi khi cập nhật đơn hàng từ Server
+        throw new Error(errorMessage || "Lỗi khi cập nhật đơn hàng từ Server");
+      }
       // Refetch du lieu de dam bao tinh toan moi nhat
       await fetchOrders();
     } catch (error) {
+      // Sửa lỗi: Lá»—i khi cáº­p nháº­t Ä‘Æ¡n hÃ ng: -> Lỗi khi cập nhật đơn hàng:
       console.error("Lỗi khi cập nhật đơn hàng:", error);
       alert(
         `Lỗi khi cập nhật đơn hàng: ${
@@ -544,26 +594,16 @@ const useOrdersData = () => {
       );
 
       if (!response.ok) {
-        const contentType = response.headers.get("content-type") || "";
-        let errorMessage = "Lỗi khi xóa đơn hàng từ Server";
-
-        if (contentType.includes("application/json")) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } else {
-          const rawMessage = await response.text();
-          if (rawMessage) {
-            errorMessage = rawMessage;
-          }
-        }
-
-        throw new Error(errorMessage);
+        const errorMessage = await parseErrorResponse(response);
+        // Sửa lỗi: L-i khi xA3a `n hAng t Server -> Lỗi khi xóa đơn hàng từ Server
+        throw new Error(errorMessage || "Lỗi khi xóa đơn hàng từ Server");
       }
 
       setOrders((prevOrders) =>
         prevOrders.filter((order) => order.id !== orderToDelete.id)
       );
     } catch (error) {
+      // Sửa lỗi: Lá»—i khi xÃ³a Ä‘Æ¡n hÃ ng: -> Lỗi khi xóa đơn hàng:
       console.error("Lỗi khi xóa đơn hàng:", error);
       alert(
         `Lỗi khi xóa đơn hàng: ${
@@ -608,6 +648,8 @@ const useOrdersData = () => {
     handleSaveNewOrder,
     handleSaveEdit,
     confirmDelete,
+    fetchError,
+    reloadOrders: fetchOrders,
   };
 };
 
@@ -646,22 +688,47 @@ export default function Orders() {
     handleSaveNewOrder,
     handleSaveEdit,
     confirmDelete,
+    fetchError,
+    reloadOrders,
     filteredOrders, // Dung de hien thi tong so dong
   } = useOrdersData();
+
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+
+  const handleToggleDetails = (orderId: number) => {
+    setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
+  };
 
   // --- Render Giao dien (Su dung ORDER_FIELDS va VIRTUAL_FIELDS) ---
   return (
     <div className="space-y-6">
+      {fetchError && (
+        <div className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <span>{fetchError}</span>
+          <button
+            type="button"
+            onClick={reloadOrders}
+            className="rounded-md border border-red-300 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-700 transition hover:bg-red-100"
+          >
+            Thử Lại
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Đơn Hàng</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {/* Sửa lỗi: Quáº£n LÃ½ Ä Æ¡n HÃ ng -> Quản Lý Đơn Hàng */}
+            Quản Lý Đơn Hàng
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
+            {/* Sửa lỗi: Quáº£n LÃ½ VÃ  Theo DÃµi Táº¥t Cáº£ Ä Æ¡n HÃ ng Cá»§a KhÃ¡ch HÃ ng -> Quản Lý Và Theo Dõi Tất Cả Đơn Hàng Của Khách Hàng */}
             Quản Lý Và Theo Dõi Tất Cả Đơn Hàng Của Khách Hàng
           </p>
         </div>
         <div className="mt-4 sm:mt-0">
           <GradientButton icon={PlusIcon} onClick={openCreateModal}>
+            {/* Sửa lỗi: Táº¡o Ä Æ¡n HÃ ng Má»›i -> Tạo Đơn Hàng Mới */}
             Tạo Đơn Hàng Mới
           </GradientButton>
         </div>
@@ -688,7 +755,7 @@ export default function Orders() {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Tim kiem don hang, khach hang..."
+              placeholder="Tìm kiếm đơn hàng, khách hàng..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -702,10 +769,15 @@ export default function Orders() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
+              {/* Sửa lỗi: Táº¥t Cáº£ Tráº¡ng ThÃ¡i -> Tất Cả Trạng Thái */}
               <option value="all">Tất Cả Trạng Thái</option>
+              {/* Sửa lỗi: Ä Ã£ Thanh ToÃ¡n -> Đã Thanh Toán */}
               <option value="Đã Thanh Toán">Đã Thanh Toán</option>
+              {/* Sửa lỗi: ChÆ°a Thanh ToÃ¡n -> Chưa Thanh Toán */}
               <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
+              {/* Sửa lỗi: Cáº§n Gia Háº¡n -> Cần Gia Hạn */}
               <option value="Cần Gia Hạn">Cần Gia Hạn</option>
+              {/* Sửa lỗi: Háº¿t Háº¡n -> Hết Hạn */}
               <option value="Hết Hạn">Hết Hạn</option>
             </select>
           </div>
@@ -721,48 +793,25 @@ export default function Orders() {
             <thead className="bg-gray-50">
               <tr>
                 {/* 1. GOP ORDER + PRODUCT */}
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   ORDER/PRODUCT
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[160px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px] whitespace-nowrap truncate">
                   INFORMATION ORDER
                 </th>
-                {/* 2. GOP CUSTOMER + CONTACT */}
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[200px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   CUSTOMER
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] whitespace-nowrap truncate">
-                  ORDER DATE
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
+                  ORDER RANGE
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] whitespace-nowrap truncate">
-                  DAYS
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
-                  EXPIRED ORDER
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
                   REMAINING
                 </th>
-                {/* 3. GOP SUPPLY + IMPORT */}
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
-                  SUPPLY
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px] whitespace-nowrap truncate">
-                  PRICE
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[120px] whitespace-nowrap truncate">
-                  Residual Value
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[70px] whitespace-nowrap truncate">
-                  NOTE
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   STATUS
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[50px] whitespace-nowrap truncate">
-                  CHECK
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[110px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   ACTION
                 </th>
               </tr>
@@ -771,11 +820,13 @@ export default function Orders() {
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-12">
+                  <td colSpan={7} className="text-center py-12">
                     <div className="text-gray-400 text-lg mb-2">
+                      {/* Sửa lỗi: KhÃ´ng TÃ¬m Tháº¥y Ä Æ¡n HÃ ng -> Không Tìm Thấy Đơn Hàng */}
                       Không Tìm Thấy Đơn Hàng
                     </div>
                     <div className="text-gray-500">
+                      {/* Sửa lỗi: Thá»­ Thay Ä á»•i Bá»™ Lá» c TÃ¬m Kiáº¿m -> Thử Thay Đổi Bộ Lọc Tìm Kiếm */}
                       Thử Thay Đổi Bộ Lọc Tìm Kiếm
                     </div>
                   </td>
@@ -793,152 +844,214 @@ export default function Orders() {
                     order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
                   const expiryDateDisplay =
                     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
+                  const isExpanded = expandedOrderId === order.id;
+
                   return (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      {/* 1. GOP ORDER + PRODUCT */}
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 w-[180px] text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="font-bold whitespace-nowrap truncate max-w-[200px]">
-                            {order[ORDER_FIELDS.ID_DON_HANG] || ""}
-                          </span>
-                          <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[200px]">
-                            {order[ORDER_FIELDS.SAN_PHAM] || ""}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* INFORMATION + SLOT (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 w-[160px] text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="text-gray-600 text-xs whitespace-nowrap truncate max-w-[200px]">
-                            {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
-                          </span>
-                          {order[ORDER_FIELDS.SLOT] ? (
-                            <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[200px]">
-                              {order[ORDER_FIELDS.SLOT]}
+                    <React.Fragment key={order.id}>
+                      <tr
+                        onClick={() => handleToggleDetails(order.id)}
+                        className={`cursor-pointer hover:bg-gray-50 ${
+                          isExpanded ? "bg-indigo-50/60" : ""
+                        }`}
+                      >
+                        {/* 1. GOP ORDER + PRODUCT */}
+                        <td className="px-4 py-4 text-sm font-medium text-gray-900 w-[150px] text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="font-bold whitespace-nowrap truncate max-w-[150px]">
+                              {order[ORDER_FIELDS.ID_DON_HANG] || ""}
                             </span>
-                          ) : null}
-                        </div>
-                      </td>
+                            <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+                              {order[ORDER_FIELDS.SAN_PHAM] || ""}
+                            </span>
+                          </div>
+                        </td>
 
-                      {/* 2. GOP CUSTOMER + CONTACT */}
-                      <td className="px-6 py-4 text-sm text-gray-900 w-[200px] text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="font-medium whitespace-nowrap truncate max-w-[200px]">
-                            {order[ORDER_FIELDS.KHACH_HANG] || ""}
-                          </span>
+                        {/* INFORMATION + SLOT (text-center) */}
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-[140px] text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="text-gray-600 text-xs whitespace-nowrap truncate max-w-[150px]">
+                              {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
+                            </span>
+                            {order[ORDER_FIELDS.SLOT] ? (
+                              <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+                                {order[ORDER_FIELDS.SLOT]}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        {/* 2. GOP CUSTOMER + CONTACT */}
+                        <td className="px-4 py-4 text-sm text-gray-900 w-[150px] text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="font-medium whitespace-nowrap truncate max-w-[150px]">
+                              {order[ORDER_FIELDS.KHACH_HANG] || ""}
+                            </span>
+                            <span
+                              className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
+                              title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                            >
+                              {order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* ORDER RANGE (text-center) */}
+                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[150px] text-center">
+                          {orderDateDisplay && expiryDateDisplay
+                            ? `${orderDateDisplay} - ${expiryDateDisplay}`
+                            : orderDateDisplay || expiryDateDisplay || ""}
+                        </td>
+                        {/* REMAINING (text-center) */}
+                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
                           <span
-                            className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[200px]"
-                            title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                            className={
+                              soNgayConLai <= 0
+                                ? "text-red-600"
+                                : soNgayConLai <= 4
+                                ? "text-orange-500"
+                                : "text-indigo-600"
+                            }
                           >
-                            {order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                            {soNgayConLai}
                           </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* ORDER DATE (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[100px] text-center">
-                        {orderDateDisplay}
-                      </td>
-                      {/* DAYS (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[50px] text-center">
-                        {order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || ""}
-                      </td>
-                      {/* EXPIRED (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[90px] text-center">
-                        {expiryDateDisplay}
-                      </td>
-                      {/* REMAINING (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm font-bold w-[70px] text-center">
-                        <span
-                          className={
-                            soNgayConLai <= 0
-                              ? "text-red-600"
-                              : soNgayConLai <= 4
-                              ? "text-orange-500"
-                              : "text-indigo-600"
-                          }
-                        >
-                          {soNgayConLai}
-                        </span>
-                      </td>
-
-                      {/* 3. GOP SUPPLY + IMPORT */}
-                      <td className="px-6 py-4 text-sm text-gray-900 w-[150px] text-right">
-                        <div className="flex flex-col items-center">
-                          <span className="font-medium whitespace-nowrap truncate max-w-[200px]">
-                            {order[ORDER_FIELDS.NGUON] || "N/A"}
+                        {/* STATUS (text-center) */}
+                        <td className="px-4 py-4 whitespace-nowrap truncate w-[90px] text-center">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
+                              trangThaiText
+                            )}`}
+                          >
+                            {trangThaiText}
                           </span>
-                          <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[200px]">
-                            {Helpers.formatCurrency(
-                              order[ORDER_FIELDS.GIA_NHAP]
-                            )}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* PRICE (text-right) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[110px] text-right">
-                        {Helpers.formatCurrency(order[ORDER_FIELDS.GIA_BAN])}
-                      </td>
-
-                      {/* RESIDUAL VALUE (text-right) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-900 w-[120px] text-right">
-                        {Helpers.formatCurrency(giaTriConLai)}
-                      </td>
-
-                      {/* NOTE (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[70px] text-center">
-                        {order[ORDER_FIELDS.NOTE] || ""}
-                      </td>
-
-                      {/* STATUS (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate w-[100px] text-center">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
-                            trangThaiText
-                          )}`}
-                        >
-                          {trangThaiText}
-                        </span>
-                      </td>
-
-                      {/* CHECK (text-center) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-center w-[50px]">
-                        {check_flag_status !== null && (
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            checked={check_flag_status}
-                            readOnly
-                          />
-                        )}
-                      </td>
-
-                      {/* ACTION (text-right) */}
-                      <td className="px-6 py-4 whitespace-nowrap truncate text-right text-sm font-medium w-[110px]">
-                        <div className="flex space-x-2 justify-end">
-                          <button
-                            onClick={() => handleViewOrder(order)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditOrder(order)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteOrder(order)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                        {/* ACTION (text-right) */}
+                        <td className="px-4 py-4 whitespace-nowrap truncate text-right text-sm font-medium w-[90px]">
+                          <div className="flex space-x-2 justify-end">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewOrder(order);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                            >
+                              <EyeIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditOrder(order);
+                              }}
+                              className="text-green-600 hover:text-green-900 p-1 rounded"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOrder(order);
+                              }}
+                              className="text-red-600 hover:text-red-900 p-1 rounded"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-gray-50">
+                          <td colSpan={7} className="px-6 pb-6 pt-0">
+                            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 shadow-sm">
+                              <div className="mb-4 flex items-center justify-between">
+                                <p className="text-sm font-semibold text-gray-700">
+                                  {/* Sửa lỗi: Chi Tiáº¿t Thanh ToÃ¡n -> Chi Tiết Thanh Toán */}
+                                  Chi Tiết Thanh Toán
+                                </p>
+                                <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                  #{order[ORDER_FIELDS.ID_DON_HANG] || ""}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Supply
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {order[ORDER_FIELDS.NGUON] || "N/A"}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Import
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {Helpers.formatCurrency(
+                                      order[ORDER_FIELDS.GIA_NHAP]
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Price
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {Helpers.formatCurrency(
+                                      order[ORDER_FIELDS.GIA_BAN]
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Residual Value
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {Helpers.formatCurrency(giaTriConLai)}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Days
+                                  </p>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ||
+                                      0}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Note
+                                  </p>
+                                  <p className="mt-1 text-sm text-gray-700 text-center">
+                                    {/* Sửa lỗi: KhÃ´ng cÃ³ ghi chÃº. -> Không có ghi chú. */}
+                                    {order[ORDER_FIELDS.NOTE] ||
+                                      "Không có ghi chú."}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    Check
+                                  </p>
+                                  {check_flag_status === null ? (
+                                    <div className="mt-3 h-5" />
+                                  ) : (
+                                    <div className="mt-3 flex items-center justify-center">
+                                      <input
+                                        type="checkbox"
+                                        className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={check_flag_status}
+                                        readOnly
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -951,6 +1064,7 @@ export default function Orders() {
           <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
             {/* Bo chon so dong / trang */}
             <div className="flex items-center space-x-2 text-sm text-gray-700">
+              {/* Sửa lỗi: Hiá»ƒn Thá»‹ -> Hiển Thị */}
               <span>Hiển Thị</span>
               <select
                 id="rowsPerPage"
@@ -962,11 +1076,13 @@ export default function Orders() {
                 <option value={25}>25</option>
                 <option value={50}>50</option>
               </select>
+              {/* Sửa lỗi: DÃ²ng -> Dòng */}
               <span>Dòng</span>
             </div>
             {/* Nut bam chuyen trang */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-700">
+                {/* Sửa lỗi: Trang {currentPage} trÃªn {totalPages} (Tá»•ng: {filteredOrders.length} dÃ²ng) -> Trang {currentPage} trên {totalPages} (Tổng: {filteredOrders.length} dòng) */}
                 Trang {currentPage} trên {totalPages} (Tổng:{" "}
                 {filteredOrders.length} dòng)
               </span>
@@ -996,7 +1112,9 @@ export default function Orders() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onConfirm={confirmDelete}
+        // Sửa lỗi: XÃ¡c Nháº­n XÃ³a -> Xác Nhận Xóa
         title="Xác Nhận Xóa"
+        // Sửa lỗi: Báº¡n CÃ³ Cháº¯c Cháº¯n Muá»‘n XÃ³a Ä Æ¡n HÃ ng: -> Bạn Có Chắc Chắn Muốn Xóa Đơn Hàng:
         message={`Bạn Có Chắc Chắn Muốn Xóa Đơn Hàng: ${orderToDelete?.id_don_hang}?`}
       />
       <ViewOrderModal
@@ -1019,3 +1137,12 @@ export default function Orders() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
