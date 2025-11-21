@@ -1,6 +1,16 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mydtbmav
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ZAQ!xsw21122
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   backend-api:
     build:
       context: ./my-backend
@@ -9,10 +19,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
+    depends_on:
+      - postgres
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     restart: unless-stopped
 
   backend-scheduler:
@@ -22,9 +34,9 @@ services:
       - my-backend/.env
     environment:
       NODE_ENV: production
-    command: ["node", "scheduler.js"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    command: ["node", "scheduler.js"]
     depends_on:
       - backend-api
     restart: unless-stopped
@@ -34,10 +46,12 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        # Build-time API base that matches the public domain
-        VITE_API_BASE_URL: http://admin.mavrykpremium.store
+        VITE_API_BASE_URL: https://admin.mavrykpremium.store/api
     ports:
       - "80:80"
     depends_on:
       - backend-api
     restart: unless-stopped
+
+volumes:
+  postgres-data:
