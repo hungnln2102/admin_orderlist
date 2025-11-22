@@ -9,6 +9,7 @@ const Helpers = require("./helpers");
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
+const DB_SCHEMA = process.env.DB_SCHEMA || "mavryk";
 
 const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
     .split(",")
@@ -453,7 +454,7 @@ const dashStatsQuery = `
       END AS expiry_date,
       COALESCE(gia_nhap, 0) AS gia_nhap,
       COALESCE(gia_ban, 0) AS gia_ban
-    FROM mavryk.order_list
+    FROM ${DB_SCHEMA}.order_list
   )
   SELECT
     COALESCE(SUM(CASE
@@ -550,11 +551,11 @@ app.get("/api/dashboard/years", async(_req, res) => {
     console.log("[GET] /api/dashboard/years");
     const q = `
     WITH all_dates AS (
-      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_list
+      SELECT ngay_dang_ki::text AS raw_date FROM ${DB_SCHEMA}.order_list
       UNION ALL
-      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_expired
+      SELECT ngay_dang_ki::text AS raw_date FROM ${DB_SCHEMA}.order_expired
       UNION ALL
-      SELECT ngay_dang_ki::text AS raw_date FROM mavryk.order_canceled
+      SELECT ngay_dang_ki::text AS raw_date FROM ${DB_SCHEMA}.order_canceled
     ),
     normalized AS (
       SELECT DISTINCT ${normalizedYearCase} AS year_value
