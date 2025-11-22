@@ -405,16 +405,17 @@ const mapPackageProductRow = (row) => {
         accountStorageId,
         accountUser: row.account_username ?? null,
         accountPass: row.account_password ?? null,
-        accountMail: row.account_mail_2nd ?? null,
-        accountNote: row.account_note ?? null,
-        capacity: fromDbNumber(row.account_storage),
-        expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
-        slot: fromDbNumber(row.package_slot),
-        slotUsed: null,
-        capacityUsed: null,
-        match: row.package_match ?? null,
-        productCodes,
-    };
+    accountMail: row.account_mail_2nd ?? null,
+    accountNote: row.account_note ?? null,
+    capacity: fromDbNumber(row.account_storage),
+    expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
+    slot: fromDbNumber(row.package_slot),
+    slotUsed: null,
+    capacityUsed: null,
+    match: row.package_match ?? null,
+    productCodes,
+    hasCapacityField: row.account_storage !== null && row.account_storage !== undefined,
+  };
 };
 const fetchPackageProductById = async(client, id) => {
     const numericId = Number(id);

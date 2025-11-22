@@ -400,7 +400,7 @@ const enhancePackageRow = (
     row.capacity === undefined || row.capacity === null ? null : row.capacity;
   const normalizedHasCapacity =
     row.hasCapacityField === undefined
-      ? Boolean((row as any).hasCapacity)
+      ? Boolean((row as any).hasCapacity) || normalizedCapacity !== null
       : Boolean(row.hasCapacityField);
   const matchValue = row.match ?? row.matchModeValue ?? null;
   const prefKey =
