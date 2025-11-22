@@ -15,7 +15,7 @@ services:
     build:
       context: ./my-backend
     env_file:
-      - my-backend/.env
+      - my-backend/.env.docker
     environment:
       NODE_ENV: production
       PORT: 3001
