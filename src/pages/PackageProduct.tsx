@@ -289,13 +289,9 @@ const extractInfoTokens = (value: string | null | undefined): string[] => {
     .filter(Boolean);
 };
 const buildPackageLinkKeys = (row: PackageRow): string[] => {
-  // Only use the package information field for matching to avoid leaking other user/account data.
-  const combined = extractInfoTokens(row.information);
-  return Array.from(
-    new Set(
-      combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean)
-    )
-  );
+  // Chỉ dùng username (tài khoản gói) để match
+  const normalized = normalizeMatchKey(row.informationUser || "");
+  return normalized ? [normalized] : [];
 };
 const resolveOrderDisplayValue = (
   record: NormalizedOrderRecord,
