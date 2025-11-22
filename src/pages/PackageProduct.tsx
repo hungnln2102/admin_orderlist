@@ -289,25 +289,8 @@ const extractInfoTokens = (value: string | null | undefined): string[] => {
     .filter(Boolean);
 };
 const buildPackageLinkKeys = (row: PackageRow): string[] => {
-  const directCandidates: string[] = [
-    row.informationUser ?? "",
-    row.informationMail ?? "",
-    row.informationPass ?? "",
-    row.accountUser ?? "",
-    row.accountMail ?? "",
-    row.accountPass ?? "",
-  ]
-    .map(toCleanString)
-    .filter(Boolean);
-  const summaryCandidates = extractInfoTokens(row.information);
-  const noteCandidates = extractInfoTokens(row.note);
-  const accountNoteCandidates = extractInfoTokens(row.accountNote);
-  const combined = [
-    ...directCandidates,
-    ...summaryCandidates,
-    ...noteCandidates,
-    ...accountNoteCandidates,
-  ];
+  // Only use the package information field for matching to avoid leaking other user/account data.
+  const combined = extractInfoTokens(row.information);
   return Array.from(
     new Set(
       combined.map((candidate) => normalizeMatchKey(candidate)).filter(Boolean)
