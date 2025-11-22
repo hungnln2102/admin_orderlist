@@ -19,6 +19,9 @@ import {
   BoltIcon,
   PencilIcon,
   EyeIcon,
+  EyeSlashIcon,
+  TrashIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 
@@ -74,6 +77,10 @@ type PackageRow = {
   slotUsed?: string | number | null;
   slotLinkMode?: SlotLinkMode;
   hasCapacityField?: boolean;
+  match?: string | null;
+  productCodes?: string[] | null;
+  normalizedProductCodes?: string[];
+  matchModeValue?: string | null;
 };
 type OrderListItem = {
   id?: number | string | null;
@@ -104,6 +111,9 @@ type AugmentedRow = PackageRow & {
   matchedOrders: OrderListItem[];
   packageCode: string;
   hasCapacityField: boolean;
+  productCodes: string[];
+  normalizedProductCodes: string[];
+  matchModeValue?: string | null;
 };
 type NormalizedOrderRecord = {
   base: OrderListItem;
@@ -118,6 +128,7 @@ type NormalizedOrderRecord = {
   informationKey: string;
   informationMatchKey: string;
   customerDisplay: string;
+  productCodeNormalized: string;
 };
 type PackageTemplate = {
   name: string;
@@ -147,6 +158,34 @@ type EditContext = {
   initialValues: PackageFormValues;
   accountStorageId: number | null;
 };
+type ModalShellProps = {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer: React.ReactNode;
+};
+type CreatePackageModalProps = {
+  open: boolean;
+  initialName: string;
+  initialFields: PackageField[];
+  mode: "create" | "edit";
+  onClose: () => void;
+  onSubmit: (name: string, fields: PackageField[]) => void;
+};
+type PackageViewModalProps = {
+  open: boolean;
+  row: AugmentedRow | null;
+  onClose: () => void;
+};
+type PackageFormModalProps = {
+  open: boolean;
+  mode: "add" | "edit";
+  template: PackageTemplate;
+  initialValues?: PackageFormValues;
+  onClose: () => void;
+  onSubmit: (values: PackageFormValues) => void;
+};
 const EMPTY_FORM_VALUES: PackageFormValues = {
   informationUser: "",
   informationPass: "",
@@ -165,12 +204,12 @@ const EMPTY_FORM_VALUES: PackageFormValues = {
   hasCapacity: false,
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
-  { value: "information", label: "Package information" },
-  { value: "note", label: "Note" },
-  { value: "supplier", label: "Supplier" },
-  { value: "import", label: "Import price (VND)" },
-  { value: "expired", label: "Expired date" },
-  { value: "capacity", label: "Total capacity (slots)" },
+  { value: "information", label: "Thông tin gói" },
+  { value: "note", label: "Ghi chú" },
+  { value: "supplier", label: "Nhà cung cấp" },
+  { value: "import", label: "Giá nhập (VND)" },
+  { value: "expired", label: "Ngày hết hạn" },
+  { value: "capacity", label: "Tổng dung lượng (GB)" },
 ];
 const stripCapacityFields = (fields: PackageField[]): PackageField[] =>
   fields.filter((field) => field !== "capacity");
@@ -370,12 +409,51 @@ const writeSlotLinkPrefs = (prefs: SlotLinkPreferenceMap) => {
     /* ignore */
   }
 };
+const enhancePackageRow = (
+  row: PackageRow,
+  slotLinkPrefs: SlotLinkPreferenceMap
+) => {
+  const normalizedCapacity =
+    row.capacity === undefined || row.capacity === null ? null : row.capacity;
+  const normalizedHasCapacity =
+    row.hasCapacityField === undefined
+      ? Boolean((row as any).hasCapacity)
+      : Boolean(row.hasCapacityField);
+  const matchValue = row.match ?? row.matchModeValue ?? null;
+  const prefKey =
+    row.id !== undefined && row.id !== null
+      ? slotLinkPrefs[String(row.id)]
+      : undefined;
+  const slotLinkMode: SlotLinkMode = matchValue
+    ? toSlotLinkModeFromMatch(matchValue)
+    : (row.slotLinkMode as SlotLinkMode | undefined) ??
+      (prefKey === "slot" ? "slot" : "information");
+  const productCodes = Array.isArray(row.productCodes)
+    ? row.productCodes
+        .map((code) => (typeof code === "string" ? code.trim() : ""))
+        .filter((code) => Boolean(code))
+    : [];
+  const normalizedProductCodes = Array.from(
+    new Set(productCodes.map((code) => normalizeProductCodeValue(code)).filter(Boolean))
+  );
+  return {
+    ...row,
+    slot: row.slot ?? DEFAULT_SLOT_LIMIT,
+    slotUsed: row.slotUsed ?? 0,
+    capacity: normalizedCapacity,
+    hasCapacityField: normalizedHasCapacity,
+    slotLinkMode,
+    matchModeValue: matchValue,
+    productCodes,
+    normalizedProductCodes,
+  } as PackageRow;
+};
 type StatusFilter = "all" | "full" | "low" | "out";
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "All statuses" },
-  { value: "full", label: "Full" },
-  { value: "low", label: "Low (<2 slots)" },
-  { value: "out", label: "Out" },
+  { value: "all", label: "Tất cả trạng thái" },
+  { value: "full", label: "Còn nhiều" },
+  { value: "low", label: "Sắp hết" },
+  { value: "out", label: "Đã hết" },
 ];
 const SLOT_LINK_OPTIONS: Array<{
   value: SlotLinkMode;
@@ -384,15 +462,27 @@ const SLOT_LINK_OPTIONS: Array<{
 }> = [
   {
     value: "information",
-    label: "Information Order",
-    helper: "Match order information fields",
+    label: "Liên kết theo thông tin đơn hàng",
+    helper:
+      "Các gói sẽ được liên kết với đơn hàng dựa trên các trường thông tin như tên sản phẩm, thông tin sản phẩm.",
   },
   {
     value: "slot",
-    label: "Slot",
-    helper: "Match order slot identifiers",
+    label: "Liên kết theo vị trí",
+    helper:
+      "Các gói sẽ được liên kết với đơn hàng dựa trên mã định danh vị trí (slot) của đơn hàng.",
   },
 ];
+const MATCH_COLUMN_INFORMATION = "thong_tin_don_hang";
+const MATCH_COLUMN_SLOT = "slot";
+const toSlotLinkModeFromMatch = (value?: string | null): SlotLinkMode =>
+  value === MATCH_COLUMN_SLOT ? "slot" : "information";
+const toMatchColumnValue = (mode: SlotLinkMode): string =>
+  mode === "slot" ? MATCH_COLUMN_SLOT : MATCH_COLUMN_INFORMATION;
+const normalizeProductCodeValue = (value?: string | null): string => {
+  const trimmed = (value || "").trim().toLowerCase();
+  return trimmed;
+};
 const parseNumericValue = (input: unknown): number | null => {
   if (input === null || input === undefined) return null;
   if (typeof input === "number") {
@@ -417,9 +507,9 @@ const buildInformationSummary = (
 ): string => {
   return (
     [
-      user && `User: ${user}`,
-      pass && `Pass: ${pass}`,
-      mail && `Mail 2nd: ${mail}`,
+      user && `Tài khoản: ${user}`,
+      pass && `Mật khẩu: ${pass}`,
+      mail && `Mail 2FA: ${mail}`,
     ]
       .filter(Boolean)
       .join(" | ") || ""
@@ -454,7 +544,7 @@ const buildFormValuesFromRow = (
     hasCapacity: row.hasCapacityField ?? false,
   };
 };
-function PackageProduct() {
+export default function PackageProduct() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -474,11 +564,19 @@ function PackageProduct() {
   const [createInitialFields, setCreateInitialFields] = useState<
     PackageField[]
   >(PACKAGE_FIELD_OPTIONS.map((opt) => opt.value));
+  const [createModalMode, setCreateModalMode] = useState<"create" | "edit">(
+    "create"
+  );
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editContext, setEditContext] = useState<EditContext | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewRow, setViewRow] = useState<AugmentedRow | null>(null);
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteProcessing, setDeleteProcessing] = useState(false);
+  const [packagesMarkedForDeletion, setPackagesMarkedForDeletion] = useState<
+    Set<string>
+  >(new Set());
   const location = useLocation();
   const navigate = useNavigate();
   const loading = packagesLoading || ordersLoading;
@@ -511,35 +609,16 @@ function PackageProduct() {
         const data = (await res.json()) as PackageRow[];
         if (!cancelled) {
           if (Array.isArray(data)) {
-            const normalizedRows = data.map((row) => {
-              const normalizedCapacity =
-                row.capacity === undefined || row.capacity === null
-                  ? null
-                  : row.capacity;
-              const normalizedHasCapacity =
-                typeof row.hasCapacityField === "boolean"
-                  ? row.hasCapacityField
-                  : parseNumericValue(normalizedCapacity) !== null;
-              const storedMode =
-                row.id !== undefined && row.id !== null
-                  ? slotLinkPrefsRef.current[String(row.id)]
-                  : undefined;
-              return {
-                ...row,
-                slot: row.slot ?? DEFAULT_SLOT_LIMIT,
-                slotUsed: row.slotUsed ?? 0,
-                capacity: normalizedCapacity,
-                hasCapacityField: normalizedHasCapacity,
-                slotLinkMode: storedMode ?? row.slotLinkMode ?? "information",
-              };
-            });
+            const normalizedRows = data.map((row) =>
+              enhancePackageRow(row, slotLinkPrefsRef.current)
+            );
             setRows(normalizedRows);
           } else {
             setRows([]);
           }
         }
       } catch (error) {
-        console.error("Load package products failed:", error);
+        console.error("Tải sản phẩm gói thất bại:", error);
         if (!cancelled) {
           setRows([]);
         }
@@ -571,7 +650,7 @@ function PackageProduct() {
           setOrdersReady(true);
         }
       } catch (error) {
-        console.error("Load order list failed:", error);
+        console.error("Tải danh sách đơn hàng thất bại:", error);
         if (!cancelled) {
           setOrders([]);
           setOrdersReady(false);
@@ -607,6 +686,7 @@ function PackageProduct() {
         informationKey: normalizeSlotKey(order.thong_tin_san_pham),
         informationMatchKey: normalizeMatchKey(order.thong_tin_san_pham),
         customerDisplay: toCleanString(order.khach_hang as string | null),
+        productCodeNormalized: normalizeProductCodeValue(order.san_pham),
       };
     });
   }, [orders]);
@@ -659,21 +739,25 @@ function PackageProduct() {
   }, [location.search]);
   const handleCategorySelect = useCallback(
     (value: string) => {
-      setCategoryFilter(value);
-      const params = new URLSearchParams(location.search);
-      if (value === "all") {
-        params.delete("package");
-      } else {
-        params.set("package", value);
-      }
-      const search = params.toString();
-      navigate(
-        {
-          pathname: location.pathname,
-          search: search ? `?${search}` : "",
-        },
-        { replace: true }
-      );
+      setCategoryFilter((prev) => {
+        const next =
+          value === "all" ? "all" : prev === value ? "all" : value;
+        const params = new URLSearchParams(location.search);
+        if (next === "all") {
+          params.delete("package");
+        } else {
+          params.set("package", next);
+        }
+        const search = params.toString();
+        navigate(
+          {
+            pathname: location.pathname,
+            search: search ? `?${search}` : "",
+          },
+          { replace: true }
+        );
+        return next;
+      });
     },
     [location.pathname, location.search, navigate]
   );
@@ -694,9 +778,25 @@ function PackageProduct() {
           slotMode === "information" ? "slot" : "information";
         const matchColumn = displayColumn === "slot" ? "information" : "slot";
         const packageLinkKeys = buildPackageLinkKeys(item);
+        const normalizedProductCodes = item.normalizedProductCodes ?? [];
+        const productCodeSet =
+          normalizedProductCodes.length > 0
+            ? new Set(normalizedProductCodes)
+            : null;
         const shouldMatchOrders =
-          ordersReady && packageCode.length > 0 && orderMatchers.length > 0;
+          ordersReady &&
+          orderMatchers.length > 0 &&
+          (productCodeSet?.size || packageCode.length > 0);
         const matchesProductRecord = (record: NormalizedOrderRecord) => {
+          if (productCodeSet && productCodeSet.size > 0) {
+            if (
+              !record.productCodeNormalized ||
+              !productCodeSet.has(record.productCodeNormalized)
+            ) {
+              return false;
+            }
+            return true;
+          }
           if (!packageCode) return false;
           const productMatch =
             (!!record.productKey &&
@@ -845,6 +945,9 @@ function PackageProduct() {
           slotAssignments,
           matchedOrders,
           packageCode,
+          productCodes: item.productCodes ?? [],
+          normalizedProductCodes,
+          matchModeValue: item.matchModeValue ?? item.match ?? null,
         };
       }),
     [rows, orderMatchers, ordersReady]
@@ -904,13 +1007,13 @@ function PackageProduct() {
     () =>
       [
         {
-          name: "Tổng Nhóm",
+          name: "Tổng Số Gói",
           value: String(scopedRows.length),
           icon: CheckCircleIcon,
           accent: STAT_CARD_ACCENTS.sky,
         },
         {
-          name: "Gần Hết Slot",
+          name: "Gói Sắp Hết",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -924,7 +1027,7 @@ function PackageProduct() {
           accent: STAT_CARD_ACCENTS.amber,
         },
         {
-          name: "Hết Slot",
+          name: "Gói Đã Hết",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -938,7 +1041,7 @@ function PackageProduct() {
           accent: STAT_CARD_ACCENTS.rose,
         },
         {
-          name: "Tạo Mới Hôm Nay",
+          name: "Thêm Hôm Nay",
           value: "0",
           icon: ArrowUpIcon,
           accent: STAT_CARD_ACCENTS.emerald,
@@ -981,13 +1084,18 @@ function PackageProduct() {
     }));
   }, [allPackageNames, computedRows]);
   const openCreateModal = useCallback(
-    (initialName = "", initialFields?: PackageField[]) => {
-      setCreateInitialName(initialName);
+    (options?: {
+      name?: string;
+      fields?: PackageField[];
+      mode?: "create" | "edit";
+    }) => {
+      setCreateInitialName(options?.name ?? "");
       setCreateInitialFields(
-        initialFields && initialFields.length > 0
-          ? initialFields
+        options?.fields && options.fields.length > 0
+          ? options.fields
           : defaultTemplateFields
       );
+      setCreateModalMode(options?.mode ?? "create");
       setCreateModalOpen(true);
     },
     [defaultTemplateFields]
@@ -1056,7 +1164,7 @@ function PackageProduct() {
         hasCapacityField: includeAccountStorage,
         expired: includeExpired ? values.expired || null : null,
         slotLimit,
-        slotLinkMode: values.slotLinkMode,
+        matchMode: toMatchColumnValue(values.slotLinkMode),
       };
       try {
         const res = await apiFetch(`/api/package-products`, {
@@ -1066,17 +1174,20 @@ function PackageProduct() {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const created = (await res.json()) as PackageRow;
-        const mergedRow: PackageRow = {
-          ...created,
-          slot: slotLimit,
-          slotUsed: 0,
-          capacity: includeAccountStorage ? capacityLimit : created.capacity,
-          information: includePackageInfo
-            ? packageInfoSummary || null
-            : created.information,
-          slotLinkMode: values.slotLinkMode,
-          hasCapacityField: includeAccountStorage,
-        };
+        const mergedRow = enhancePackageRow(
+          {
+            ...created,
+            slot: slotLimit,
+            slotUsed: 0,
+            capacity: includeAccountStorage ? capacityLimit : created.capacity,
+            information: includePackageInfo
+              ? packageInfoSummary || null
+              : created.information,
+            match: created.match ?? toMatchColumnValue(values.slotLinkMode),
+            hasCapacityField: includeAccountStorage,
+          },
+          slotLinkPrefsRef.current
+        );
         setRows((prev) => [...prev, mergedRow]);
         if (created.id !== undefined && created.id !== null) {
           persistSlotLinkPreference(created.id, values.slotLinkMode);
@@ -1090,7 +1201,11 @@ function PackageProduct() {
   );
   const handleCreateButtonClick = () => {
     if (selectedPackage && selectedTemplate) {
-      openCreateModal(selectedPackage, selectedTemplate.fields);
+      openCreateModal({
+        name: selectedPackage,
+        fields: selectedTemplate.fields,
+        mode: "edit",
+      });
       return;
     }
     openCreateModal();
@@ -1098,11 +1213,90 @@ function PackageProduct() {
   const handleAddButtonClick = () => {
     if (!selectedPackage) return;
     if (!selectedTemplate) {
-      openCreateModal(selectedPackage, defaultTemplateFields);
+      openCreateModal({
+        name: selectedPackage,
+        fields: defaultTemplateFields,
+        mode: "create",
+      });
       return;
     }
     setAddModalOpen(true);
   };
+  const handleEditTemplateFields = useCallback(
+    (packageName: string) => {
+      const template =
+        templates.find((tpl) => tpl.name === packageName) ?? null;
+      openCreateModal({
+        name: packageName,
+        fields: template?.fields ?? defaultTemplateFields,
+        mode: "edit",
+      });
+    },
+    [templates, openCreateModal, defaultTemplateFields]
+  );
+  const resetDeleteSelection = useCallback(() => {
+    setDeleteMode(false);
+    setPackagesMarkedForDeletion(new Set());
+  }, []);
+
+  const togglePackageMarked = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setPackagesMarkedForDeletion((prev) => {
+      const next = new Set(prev);
+      if (next.has(trimmed)) next.delete(trimmed);
+      else next.add(trimmed);
+      return next;
+    });
+  }, []);
+
+  const handleConfirmDeletePackages = useCallback(async () => {
+    if (packagesMarkedForDeletion.size === 0) {
+      resetDeleteSelection();
+      return;
+    }
+    setDeleteProcessing(true);
+    const packages = Array.from(packagesMarkedForDeletion);
+    try {
+      const res = await apiFetch(`/api/package-products/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packages }),
+      });
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || `HTTP ${res.status}`);
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        deletedNames?: string[];
+      };
+      const deletedNames = Array.isArray(data.deletedNames)
+        ? data.deletedNames
+        : packages;
+
+      setRows((prev) =>
+        prev.filter(
+          (row) => !deletedNames.includes((row.package || "").trim())
+        )
+      );
+      setTemplates((prev) =>
+        prev.filter((tpl) => !deletedNames.includes(tpl.name))
+      );
+      if (selectedPackage && deletedNames.includes(selectedPackage)) {
+        handleCategorySelect("all");
+      }
+    } catch (error) {
+      console.error("Xóa nhóm thất bại:", error);
+      alert(
+        `Xóa nhóm thất bại: ${
+          error instanceof Error ? error.message : "Lỗi không xác định"
+        }`
+      );
+    } finally {
+      setDeleteProcessing(false);
+      resetDeleteSelection();
+    }
+  }, [packagesMarkedForDeletion, resetDeleteSelection, selectedPackage, handleCategorySelect]);
   const openEditModal = useCallback(
     (row: AugmentedRow) => {
       const template = templates.find((tpl) => tpl.name === row.package) ?? {
@@ -1187,7 +1381,7 @@ function PackageProduct() {
         accountNote: includeAccountStorage ? values.accountNote || null : null,
         capacity: includeAccountStorage ? capacityLimit : null,
         hasCapacityField: includeAccountStorage,
-        slotLinkMode: values.slotLinkMode,
+        matchMode: toMatchColumnValue(values.slotLinkMode),
       };
       try {
         const res = await apiFetch(`/api/package-products/${rowId}`, {
@@ -1197,16 +1391,19 @@ function PackageProduct() {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const updated = (await res.json()) as PackageRow;
-        const mergedRow: PackageRow = {
-          ...updated,
-          slot: slotLimit,
-          capacity: includeAccountStorage ? capacityLimit : updated.capacity,
-          information: includePackageInfo
-            ? packageInfoSummary || null
-            : updated.information,
-          slotLinkMode: values.slotLinkMode,
-          hasCapacityField: includeAccountStorage,
-        };
+        const mergedRow = enhancePackageRow(
+          {
+            ...updated,
+            slot: slotLimit,
+            capacity: includeAccountStorage ? capacityLimit : updated.capacity,
+            information: includePackageInfo
+              ? packageInfoSummary || null
+              : updated.information,
+            match: updated.match ?? toMatchColumnValue(values.slotLinkMode),
+            hasCapacityField: includeAccountStorage,
+          },
+          slotLinkPrefsRef.current
+        );
         setRows((prev) =>
           prev.map((row) => (row.id === rowId ? mergedRow : row))
         );
@@ -1222,25 +1419,58 @@ function PackageProduct() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gói Sản Phẩm</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Gói Sản Phẩm</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý các Gói Sản Phẩm và các mục nhập gói riêng
+            Quản lý các loại gói sản phẩm và các gói con.
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
+                <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
+          {!deleteMode ? (
+            <GradientButton
+              icon={TrashIcon}
+              onClick={() => {
+                setDeleteMode(true);
+                setPackagesMarkedForDeletion(new Set());
+              }}
+              disabled={deleteProcessing}
+            >
+              Xóa Loại Gói
+            </GradientButton>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleConfirmDeletePackages}
+                className="flex items-center justify-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-600 transition disabled:opacity-60"
+                disabled={deleteProcessing}
+                title="Xác nhận xóa"
+              >
+                <CheckIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={resetDeleteSelection}
+                className="flex items-center justify-center gap-1 rounded-lg bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 shadow hover:bg-gray-300 transition disabled:opacity-60"
+                disabled={deleteProcessing}
+                title="Hủy xóa"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+          )}
           <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick}>
-            Tạo Nhóm Mới
+            Tạo Loại Gói
           </GradientButton>
           <GradientButton
             icon={PlusIcon}
             onClick={handleAddButtonClick}
             disabled={!selectedPackage}
           >
-            Thêm Gói Mới
+            Thêm Gói
           </GradientButton>
         </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {slotStats.map((stat) => (
           <StatCard
             key={stat.name}
@@ -1255,27 +1485,28 @@ function PackageProduct() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Tổng Quan Về Gói
+              Tổng Quan Gói Sản Phẩm
             </h2>
             <p className="text-sm text-gray-500">
-              Chọn một gói bên dưới để xem chi tiết
+              Chọn một loại gói để xem chi tiết hoặc xóa.
             </p>
           </div>
         </div>
         {packageSummaries.length === 0 ? (
-          <p className="mt-6 text-sm text-gray-500">Không có dữ liệu gói.</p>
+          <p className="mt-6 text-sm text-gray-500">Không có loại gói nào để hiển thị.</p>
         ) : (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {packageSummaries.map((summary, index) => {
               const isSelected = summary.name === selectedPackage;
               const accent =
                 SUMMARY_CARD_ACCENTS[index % SUMMARY_CARD_ACCENTS.length];
+              const isMarkedForDeletion = packagesMarkedForDeletion.has(
+                summary.name.trim()
+              );
               return (
                 <div
                   key={summary.name}
-                  className={`relative isolate rounded-3xl border ${
-                    accent.border
-                  } bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
+                  className={`relative isolate rounded-3xl border ${accent.border} bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
                     isSelected
                       ? "ring-2 ring-blue-400 shadow-[0_25px_65px_-35px_rgba(37,99,235,0.7)]"
                       : "hover:shadow-[0_30px_75px_-40px_rgba(15,23,42,0.55)]"
@@ -1287,31 +1518,49 @@ function PackageProduct() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                        Tổng Quan
+                        Loại Gói
                       </p>
                       <h3 className="text-lg font-semibold text-gray-900">
                         {summary.name}
                       </h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Tổng số gói: {summary.total}
+                        Số lượng gói: {summary.total}
                       </p>
                     </div>
-                    {isSelected ? (
-                      <button
-                        type="button"
-                        onClick={() => handleCategorySelect("all")}
-                        className="text-sm font-semibold text-rose-600 hover:text-rose-700 transition"
-                      >
-                        Hủy
-                      </button>
+                    {deleteMode ? (
+                      <label className="flex items-center gap-2 text-sm font-semibold text-rose-600">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-400"
+                          checked={isMarkedForDeletion}
+                          disabled={deleteProcessing}
+                          onChange={() => togglePackageMarked(summary.name)}
+                        />
+                        Chọn để xóa
+                      </label>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleCategorySelect(summary.name)}
-                        className={`text-sm font-semibold ${accent.link} transition`}
-                      >
-                        Xem Chi Tiết
-                      </button>
+                      <div className="flex flex-col items-end gap-1 text-sm font-semibold">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCategorySelect(summary.name)}
+                            className={`p-2 rounded-full hover:bg-blue-50 transition ${
+                              isSelected ? "text-blue-600" : "text-gray-500"
+                            }`}
+                            title="Xem & quản lý"
+                          >
+                            <EyeIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditTemplateFields(summary.name)}
+                            className="p-2 rounded-full hover:bg-indigo-50 text-indigo-500 transition"
+                            title="Chỉnh sửa Loại Gói"
+                          >
+                            <PencilIcon className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                   <dl className="mt-5 grid grid-cols-3 gap-4 text-sm">
@@ -1325,7 +1574,7 @@ function PackageProduct() {
                     </div>
                     <div className="rounded-2xl border border-amber-100/70 bg-amber-50/60 p-3 text-center shadow-inner">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-amber-600">
-                        Thấp
+                        Sắp hết
                       </dt>
                       <dd className="mt-1 text-2xl font-bold text-amber-500">
                         {summary.low}
@@ -1354,7 +1603,7 @@ function PackageProduct() {
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Tìm kiếm gói hoặc thông tin sản phẩm"
+                  placeholder={`Tìm kiếm trong các gói của ${selectedPackage}...`}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1381,15 +1630,13 @@ function PackageProduct() {
                 }`}
                 disabled={!filteredRows.length}
               >
-                {selectedPackage
-                  ? `Export ${selectedPackage}`
-                  : "Export report"}
+                Xuất tệp
               </button>
             </div>
             <div className="text-sm text-gray-500">
-              Đang Xem:{" "}
+              Đang xem loại gói:{" "}
               <span className="font-medium text-gray-900">
-                {selectedPackage ?? "All packages"}
+                {selectedPackage ?? "Tất cả"}
               </span>
               {statusFilter !== "all" && (
                 <>
@@ -1412,16 +1659,16 @@ function PackageProduct() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gói
+                      Tên Gói
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Thông Tin
+                      Thông Tin Gói
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ghi Chú
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Slot
+                      Vị Trí
                     </th>
                     {showCapacityColumn && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1429,16 +1676,16 @@ function PackageProduct() {
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nhà Cung Cấp
+                      Nguồn
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Giá Nhập
+                      Giá
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hết Hạn
+                      Ngày Hết Hạn
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hành Động
+                      Thao Tác
                     </th>
                   </tr>
                 </thead>
@@ -1449,7 +1696,7 @@ function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        Đang Tải...
+                        Đang tải dữ liệu...
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
@@ -1458,7 +1705,7 @@ function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        Không Có Dữ Liệu
+                        Không có gói nào.
                       </td>
                     </tr>
                   ) : (
@@ -1536,7 +1783,7 @@ function PackageProduct() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 <span className="font-medium">{slotUsed}</span>{" "}
-                                / {totalSlots} slots
+                                / {totalSlots} vị trí
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                 <div
@@ -1545,7 +1792,7 @@ function PackageProduct() {
                                 />
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                Còn lại: {remainingSlots}
+                                Còn trống: {remainingSlots}
                               </div>
                             </td>
                             {showCapacityColumn && (
@@ -1556,7 +1803,7 @@ function PackageProduct() {
                                       <span className="font-medium">
                                         {capacityUsed}
                                       </span>{" "}
-                                      / {capacityLimit}
+                                      / {capacityLimit} GB
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                       <div
@@ -1567,12 +1814,12 @@ function PackageProduct() {
                                       />
                                     </div>
                                     <div className="text-xs text-gray-500 mt-1">
-                                      Còn lại: {remainingCapacity}
+                                      Còn trống: {remainingCapacity} GB
                                     </div>
                                   </>
                                 ) : (
                                   <div className="text-sm text-gray-400 italic">
-                                    Dung Lượng trống
+                                    Không có
                                   </div>
                                 )}
                               </td>
@@ -1591,7 +1838,7 @@ function PackageProduct() {
                               <button
                                 className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                                 type="button"
-                                aria-label="Edit package"
+                                aria-label="Sửa"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openEditModal(item);
@@ -1602,7 +1849,7 @@ function PackageProduct() {
                               <button
                                 className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
                                 type="button"
-                                aria-label="Show package details"
+                                aria-label="Xem"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openViewModal(item);
@@ -1621,11 +1868,11 @@ function PackageProduct() {
                                 <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-4 text-center">
                                   <div>
                                     <p className="text-sm font-semibold text-gray-900">
-                                      Chi tiết slot
+                                      Chi Tiết Các Vị Trí
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      Hiển Thị {totalSlots} slots — {slotUsed}{" "}
-                                      Sử Dụng, {remainingSlots} Khả Dụng
+                                      Hiển thị {totalSlots} vị trí — {slotUsed}{" "}
+                                      đã dùng, {remainingSlots} còn trống
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap justify-center gap-3">
@@ -1654,7 +1901,7 @@ function PackageProduct() {
                                           <span className="text-sm font-semibold text-gray-900">
                                             {slot.assignment?.slotLabel
                                               ? slot.assignment.slotLabel
-                                              : `Slot ${slot.slotNumber}`}
+                                              : `Vị trí ${slot.slotNumber}`}
                                           </span>
                                         </div>
                                         <p
@@ -1669,8 +1916,8 @@ function PackageProduct() {
                                                 slot.assignment.capacityUnits
                                               )
                                             : slot.isUsed
-                                            ? "Used"
-                                            : "Available"}
+                                            ? "Đã dùng"
+                                            : "Còn trống"}
                                         </p>
                                       </div>
                                     ))}
@@ -1693,6 +1940,7 @@ function PackageProduct() {
         open={createModalOpen}
         initialName={createInitialName}
         initialFields={createInitialFields}
+        mode={createModalMode}
         onClose={() => setCreateModalOpen(false)}
         onSubmit={handleCreateTemplate}
       />
@@ -1723,13 +1971,7 @@ function PackageProduct() {
     </div>
   );
 }
-type ModalShellProps = {
-  open: boolean;
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-};
+
 function ModalShell({
   open,
   title,
@@ -1750,7 +1992,7 @@ function ModalShell({
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition"
-            aria-label="Close"
+            aria-label="Đóng"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
@@ -1763,19 +2005,13 @@ function ModalShell({
     </div>
   );
 }
-type CreatePackageModalProps = {
-  open: boolean;
-  initialName: string;
-  initialFields: PackageField[];
-  onClose: () => void;
-  onSubmit: (name: string, fields: PackageField[]) => void;
-};
 function CreatePackageModal({
   open,
   initialName,
   initialFields,
   onClose,
   onSubmit,
+  mode,
 }: CreatePackageModalProps) {
   const [name, setName] = useState(initialName);
   const [fields, setFields] = useState<Set<PackageField>>(
@@ -1807,11 +2043,11 @@ function CreatePackageModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Vui lòng nhập tên gói.");
+      setError("Vui lòng nhập tên loại gói.");
       return;
     }
     if (fields.size === 0) {
-      setError("Vui lòng chọn ít nhất một trường.");
+      setError("Vui lòng chọn ít nhất một trường dữ liệu.");
       return;
     }
     onSubmit(trimmed, Array.from(fields));
@@ -1819,7 +2055,11 @@ function CreatePackageModal({
   return (
     <ModalShell
       open={open}
-      title="Tạo gói mới"
+      title={
+        mode === "edit" && initialName
+          ? `Chỉnh sửa loại gói: ${initialName}`
+          : "Tạo loại gói mới"
+      }
       onClose={onClose}
       footer={
         <>
@@ -1841,20 +2081,28 @@ function CreatePackageModal({
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tên Gói
+            Tên Loại Gói
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Example: Google One"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Ví dụ: Google One, Netflix, Spotify..."
+            className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 ${
+              mode === "edit" ? "bg-gray-100 cursor-not-allowed" : ""
+            }`}
+            disabled={mode === "edit"}
           />
+          {mode === "edit" && (
+            <p className="text-xs text-gray-500 mt-1">
+              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ nguyên.
+            </p>
+          )}
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Chọn Các Trường Dưới Đây
+              Các trường dữ liệu của loại gói này
             </label>
             <div className="flex items-center gap-3 text-xs">
               <button
@@ -1862,30 +2110,36 @@ function CreatePackageModal({
                 onClick={selectAll}
                 className="text-blue-600 hover:text-blue-700"
               >
-                Chọn Tất Cả
+                Chọn hết
               </button>
               <button
                 type="button"
                 onClick={clearAll}
-                className="text-gray-500 hover:text-gray-600"
+                className="text-rose-600 hover:text-rose-700"
               >
-                Làm Mới
+                Bỏ hết
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {PACKAGE_FIELD_OPTIONS.map((option) => (
               <label
                 key={option.value}
-                className="flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 hover:border-blue-300 transition"
+                className={`flex items-center gap-3 rounded-lg border p-3 transition cursor-pointer ${
+                  fields.has(option.value)
+                    ? "bg-blue-50 border-blue-200 ring-1 ring-blue-300"
+                    : "bg-white border-gray-200 hover:bg-gray-50"
+                }`}
               >
                 <input
                   type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   checked={fields.has(option.value)}
                   onChange={() => toggleField(option.value)}
-                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <span className="text-sm text-gray-700">{option.label}</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {option.label}
+                </span>
               </label>
             ))}
           </div>
@@ -1895,27 +2149,22 @@ function CreatePackageModal({
     </ModalShell>
   );
 }
-type PackageViewModalProps = {
-  open: boolean;
-  row: AugmentedRow | null;
-  onClose: () => void;
-};
 function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   if (!open || !row) return null;
   const packageDetails = [
-    { label: "User", value: row.informationUser },
-    { label: "Pass", value: row.informationPass },
-    { label: "Mail 2nd", value: row.informationMail },
-    { label: "Note", value: row.note },
-    { label: "Supplier", value: row.supplier },
-    { label: "Import", value: row.import },
-    { label: "Expired", value: formatDisplayDate(row.expired) },
+    { label: "Tài khoản", value: row.informationUser },
+    { label: "Mật khẩu", value: row.informationPass },
+    { label: "Mail 2FA", value: row.informationMail },
+    { label: "Ghi chú", value: row.note },
+    { label: "Nguồn", value: row.supplier },
+    { label: "Giá nhập", value: row.import },
+    { label: "Ngày hết hạn", value: formatDisplayDate(row.expired) },
   ];
   const accountDetails = [
-    { label: "Account user", value: row.accountUser },
-    { label: "Account pass", value: row.accountPass },
-    { label: "Mail 2nd", value: row.accountMail },
-    { label: "Account note", value: row.accountNote },
+    { label: "Tài khoản", value: row.accountUser },
+    { label: "Mật khẩu", value: row.accountPass },
+    { label: "Mail 2FA", value: row.accountMail },
+    { label: "Ghi chú tài khoản", value: row.accountNote },
   ];
   const showAccountStorage = !!row.hasCapacityField;
   const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
@@ -1938,7 +2187,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   return (
     <ModalShell
       open={open}
-      title={`Package Details - ${row.package}`}
+      title={`Chi tiết gói - ${row.package}`}
       onClose={onClose}
       footer={
         <button
@@ -1956,9 +2205,9 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
       >
         <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Tên Gói</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Thông tin gói</h3>
             <p className="text-xs text-gray-500">
-              Đã lưu trữ các trường mô tả cho gói này.
+              Các trường dữ liệu được lưu cho gói này.
             </p>
           </div>
           <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -1982,10 +2231,10 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
           <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
-                Tài Khoản Dung Lượng
+                Tài khoản dung lượng
               </h3>
               <p className="text-xs text-gray-500">
-                Tổng quan về tài khoản dung lượng
+                Tổng quan về tài khoản dung lượng.
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -2007,7 +2256,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
             <div className="space-y-1">
               <div className="text-sm text-gray-900">
                 <span className="font-semibold">{capacityUsed}</span> /{" "}
-                {capacityLimit} Dung Lượng
+                {capacityLimit} GB
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
@@ -2016,7 +2265,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
                 />
               </div>
               <div className="text-xs text-gray-500">
-                Khả Dụng: {remainingCapacity}
+                Còn trống: {remainingCapacity} GB
               </div>
             </div>
           </section>
@@ -2025,14 +2274,6 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
     </ModalShell>
   );
 }
-type PackageFormModalProps = {
-  open: boolean;
-  mode: "add" | "edit";
-  template: PackageTemplate;
-  initialValues?: PackageFormValues;
-  onClose: () => void;
-  onSubmit: (values: PackageFormValues) => void;
-};
 function PackageFormModal({
   open,
   mode,
@@ -2086,7 +2327,7 @@ function PackageFormModal({
   return (
     <ModalShell
       open={open}
-      title={`${mode === "add" ? "Add" : "Edit"} Package - ${template.name}`}
+      title={`${mode === "add" ? "Thêm" : "Sửa"} gói - ${template.name}`}
       onClose={onClose}
       footer={
         <>
@@ -2100,7 +2341,7 @@ function PackageFormModal({
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            {mode === "add" ? "Save Package" : "Save Changes"}
+            {mode === "add" ? "Lưu gói" : "Lưu thay đổi"}
           </button>
         </>
       }
@@ -2116,7 +2357,7 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Tên Gói
+                    Chi tiết gói
                   </h3>
                   <p className="text-xs text-gray-500">
                     Nhập các trường mô tả liên quan đến gói này.
@@ -2127,14 +2368,14 @@ function PackageFormModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tài Khoản
+                          Tài khoản
                         </label>
                         <input
                           type="text"
                           value={values.informationUser}
                           onChange={(e) => handleChange("informationUser", e)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="username"
+                          placeholder="tên đăng nhập"
                         />
                       </div>
                       <div>
@@ -2146,20 +2387,20 @@ function PackageFormModal({
                           value={values.informationPass}
                           onChange={(e) => handleChange("informationPass", e)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="password"
+                          placeholder="mật khẩu"
                         />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Mail Dự phòng
+                        Mail 2FA
                       </label>
                       <input
                         type="email"
                         value={values.informationMail}
                         onChange={(e) => handleChange("informationMail", e)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="secondary email"
+                        placeholder="mail@example.com"
                       />
                     </div>
                   </div>
@@ -2167,21 +2408,21 @@ function PackageFormModal({
                 {template.fields.includes("note") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ghi Chú
+                      Ghi chú
                     </label>
                     <input
                       type="text"
                       value={values.note}
                       onChange={(e) => handleChange("note", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Optional note"
+                      placeholder="Ghi chú cho gói này"
                     />
                   </div>
                 )}
                 {template.fields.includes("supplier") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nhà Cung Cấp
+                      Nhà cung cấp
                     </label>
                     <input
                       type="text"
@@ -2194,7 +2435,7 @@ function PackageFormModal({
                 {template.fields.includes("import") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Giá Nhập
+                      Giá nhập (VND)
                     </label>
                     <input
                       type="number"
@@ -2207,7 +2448,7 @@ function PackageFormModal({
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ngày Hết Hạn
+                    Ngày hết hạn
                   </label>
                   <input
                     type="date"
@@ -2222,23 +2463,23 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Tài Khoản Dung Lượng
+                    Tài khoản dung lượng
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Cung cấp thông tin tài khoản dung lượng
+                    Cung cấp thông tin tài khoản dung lượng.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tài Khoản
+                      Tài khoản
                     </label>
                     <input
                       type="text"
                       value={values.accountUser}
                       onChange={(e) => handleChange("accountUser", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="username"
+                      placeholder="tên đăng nhập"
                     />
                   </div>
                   <div>
@@ -2250,19 +2491,19 @@ function PackageFormModal({
                       value={values.accountPass}
                       onChange={(e) => handleChange("accountPass", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="password"
+                      placeholder="mật khẩu"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Mail dự phòng
+                      Mail 2FA
                     </label>
                     <input
                       type="email"
                       value={values.accountMail}
                       onChange={(e) => handleChange("accountMail", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="secondary email"
+                      placeholder="mail@example.com"
                     />
                   </div>
                 </div>
@@ -2275,19 +2516,19 @@ function PackageFormModal({
                     onChange={(e) => handleChange("accountNote", e)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
-                    placeholder="Account details note"
+                    placeholder="Ghi chú cho tài khoản dung lượng"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dung Lượng
+                    Dung lượng (GB)
                   </label>
                   <input
                     type="number"
                     min={0}
                     value={values.capacity}
                     onChange={(e) => handleChange("capacity", e)}
-                    placeholder={`Default ${DEFAULT_CAPACITY_LIMIT}`}
+                    placeholder={`Mặc định: ${DEFAULT_CAPACITY_LIMIT}`}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -2297,14 +2538,14 @@ function PackageFormModal({
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Slot limit
+            Số vị trí (slot)
           </label>
           <input
             type="number"
             min={0}
             value={values.slot}
             onChange={(e) => handleChange("slot", e)}
-            placeholder={`Default ${DEFAULT_SLOT_LIMIT}`}
+            placeholder={`Mặc định: ${DEFAULT_SLOT_LIMIT}`}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -2312,10 +2553,10 @@ function PackageFormModal({
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium text-gray-700">
-                Package ↔ Order matching
+                Cơ chế khớp lệnh
               </p>
               <p className="text-xs text-gray-500">
-                Choose how slots are counted from orders.
+                Chọn cách các vị trí được tính từ đơn hàng.
               </p>
             </div>
           </div>
@@ -2344,17 +2585,16 @@ function PackageFormModal({
             })}
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            Information Order: compare package Information with order details.
-            Slot: compare package Information with order slot references.
+            <b>Liên kết theo thông tin đơn hàng:</b> So khớp thông tin của gói này (tài khoản, mail, v.v.) với các chi tiết trong đơn hàng của khách.<br />
+            <b>Liên kết theo vị trí:</b> So khớp thông tin của gói này với một mã vị trí (slot) cụ thể được chỉ định trong đơn hàng.
           </p>
         </div>
         {template.fields.length === 0 && (
           <p className="text-sm text-gray-500">
-            This template does not have any configured fields.
+            Loại gói này không có trường dữ liệu nào được định cấu hình.
           </p>
         )}
       </form>
     </ModalShell>
   );
 }
-export default PackageProduct;

@@ -129,12 +129,22 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           }
         );
 
+        const { data, rawText } =
+          await Helpers.readJsonOrText<CalculatedPriceResult>(response);
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Lỗi tính toán giá từ server.");
+          const message =
+            (data as { error?: string } | null)?.error ||
+            rawText ||
+            "Loi tinh toan gia tu server.";
+          throw new Error(message);
         }
 
-        const result: CalculatedPriceResult = await response.json();
+        if (!data) {
+          throw new Error("Phan hoi khong hop le tu server.");
+        }
+
+        const result: CalculatedPriceResult = data;
 
         setFormData((prev) => {
           if (!prev) return null;
@@ -195,10 +205,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           };
         });
       } catch (error) {
-        console.error("Lỗi khi tính toán giá:", error);
+        console.error("Loi khi tinh toan gia:", error);
         alert(
-          `Lỗi khi tính toán giá: ${
-            error instanceof Error ? error.message : "Lỗi không xác định"
+          `Loi khi tinh toan gia: ${
+            error instanceof Error ? error.message : "Loi khong xac dinh"
           }`
         );
       }
@@ -608,3 +618,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 };
 
 export default EditOrderModal;
+
+
+

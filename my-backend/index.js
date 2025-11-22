@@ -356,16 +356,25 @@ const PACKAGE_PRODUCTS_SELECT = `
     pp.slot AS package_slot,
     pp.expired AS package_expired,
     pp.expired::text AS package_expired_raw,
+    pp.match AS package_match,
     acc.id AS account_id,
     acc.username AS account_username,
     acc.password AS account_password,
     acc."Mail 2nd" AS account_mail_2nd,
     acc.note AS account_note,
     acc.storage AS account_storage,
-    acc."Mail Family" AS account_mail_family
+    acc."Mail Family" AS account_mail_family,
+    COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
   FROM mavryk.package_product pp
   LEFT JOIN mavryk.account_storage acc
     ON acc."Mail Family" = pp.username
+  LEFT JOIN (
+    SELECT
+      LOWER(TRIM(package::text)) AS package_key,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(san_pham::text), '')), NULL) AS product_codes
+    FROM mavryk.product_price
+    GROUP BY LOWER(TRIM(package::text))
+  ) product_codes ON product_codes.package_key = LOWER(TRIM(pp.package::text))
 `;
 const mapPackageProductRow = (row) => {
     const packageId = getRowId(row, "package_id", "id", "ID");
@@ -378,6 +387,10 @@ const mapPackageProductRow = (row) => {
         informationMail
     );
     const accountStorageId = getRowId(row, "account_id", "account_storage_id");
+    const productCodes = Array.isArray(row.package_products) ?
+        row.package_products
+        .map((code) => (typeof code === "string" ? code.trim() : ""))
+        .filter((code) => Boolean(code)) : [];
     return {
         id: packageId,
         package: row.package_name || "",
@@ -398,6 +411,8 @@ const mapPackageProductRow = (row) => {
         slot: fromDbNumber(row.package_slot),
         slotUsed: null,
         capacityUsed: null,
+        match: row.package_match ?? null,
+        productCodes,
     };
 };
 const fetchPackageProductById = async(client, id) => {
@@ -1049,39 +1064,113 @@ const ARCHIVE_COLUMNS_CANCELED = [
 ];
 
 const buildArchiveInsert = (tableName, columns, row, overrides = {}) => {
-    const columnList = columns.map((col) => `"${col}"`).join(", ");
-    const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(", ");
-    const values = columns.map((col) => {
-        if (Object.prototype.hasOwnProperty.call(overrides, col)) {
-            return overrides[col];
-        }
-        return row[col] ?? null;
-    });
-    const sql = `INSERT INTO ${tableName} (${columnList}) VALUES (${placeholders})`;
-    return { sql, values };
+  const columnList = columns.map((col) => `"${col}"`).join(", ");
+  const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(", ");
+  const values = columns.map((col) => {
+    if (Object.prototype.hasOwnProperty.call(overrides, col)) {
+      return overrides[col];
+    }
+    return row[col] ?? null;
+  });
+  const sql = `INSERT INTO ${tableName} (${columnList}) VALUES (${placeholders})`;
+  return { sql, values };
 };
 
-app.get("/api/orders", async(_req, res) => {
-    console.log("[GET] /api/orders");
-    // Fetch raw values without casting to DATE to avoid timezone effects
-    const q = `
+const fetchOrdersFromTable = async (tableName) => {
+  const query = `
     SELECT *,
            ngay_dang_ki::text AS ngay_dang_ki_raw,
            het_han::text      AS het_han_raw
-    FROM mavryk.order_list;
+    FROM ${tableName};
   `;
+  const result = await pool.query(query);
+  const todayYmd = todayYMDInVietnam();
+  return result.rows.map((row) => normalizeOrderRow(row, todayYmd));
+};
+app.get("/api/orders", async (req, res) => {
+  console.log("[GET] /api/orders");
+  const scope = String(req.query.scope || "").trim().toLowerCase();
 
-    try {
-        const result = await pool.query(q);
-        const todayYmd = todayYMDInVietnam();
-        const mapped = result.rows.map((row) => normalizeOrderRow(row, todayYmd));
-        res.json(mapped);
-    } catch (error) {
-        console.error("Query failed (GET /api/orders):", error);
-        res.status(500).json({
-            error: "Unable to load order list.",
-        });
+  const table =
+    scope === "expired"
+      ? "mavryk.order_expired"
+      : scope === "canceled" || scope === "cancelled"
+      ? "mavryk.order_canceled"
+      : "mavryk.order_list";
+
+  try {
+    const rows = await fetchOrdersFromTable(table);
+    res.json(rows);
+  } catch (error) {
+    console.error("Query failed (GET /api/orders):", error);
+    res.status(500).json({
+      error: "Unable to load order list.",
+    });
+  }
+});
+
+app.get("/api/orders/expired", async (_req, res) => {
+  console.log("[GET] /api/orders/expired");
+  try {
+    const rows = await fetchOrdersFromTable("mavryk.order_expired");
+    res.json(rows);
+  } catch (error) {
+    console.error("Query failed (GET /api/orders/expired):", error);
+    res.status(500).json({
+      error: "Unable to load expired orders.",
+    });
+  }
+});
+
+app.get("/api/orders/canceled", async (_req, res) => {
+  console.log("[GET] /api/orders/canceled");
+  try {
+    const rows = await fetchOrdersFromTable("mavryk.order_canceled");
+    res.json(rows);
+  } catch (error) {
+    console.error("Query failed (GET /api/orders/canceled):", error);
+    res.status(500).json({
+      error: "Unable to load canceled orders.",
+    });
+  }
+});
+
+app.patch("/api/orders/canceled/:id/refund", async (req, res) => {
+  const { id } = req.params;
+  console.log(`[PATCH] /api/orders/canceled/${id}/refund`);
+
+  const parsedId = Number(id);
+  if (!Number.isInteger(parsedId) || parsedId <= 0) {
+    return res.status(400).json({ error: "Invalid canceled order id." });
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE mavryk.order_canceled
+        SET tinh_trang = 'Da Hoan',
+            check_flag = FALSE
+        WHERE id = $1
+        RETURNING id, id_don_hang;
+      `,
+      [parsedId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Canceled order not found." });
     }
+
+    res.json({
+      success: true,
+      id: parsedId,
+      id_don_hang: result.rows[0].id_don_hang,
+      status: "Da Hoan",
+      check_flag: false,
+    });
+  } catch (error) {
+    console.error(`[PATCH] /api/orders/canceled/${id}/refund failed:`, error);
+    res.status(500).json({ error: "Unable to mark order as refunded." });
+  }
 });
 
 // New endpoint: Purchase Orders (table mavryk.purchase_order)
@@ -2928,6 +3017,7 @@ app.post("/api/package-products", async(req, res) => {
         capacity,
         expired,
         hasCapacityField,
+        matchMode,
     } = req.body || {};
     if (!packageName || typeof packageName !== "string") {
         return res.status(400).json({ error: "Package name is required." });
@@ -2939,13 +3029,14 @@ app.post("/api/package-products", async(req, res) => {
     const client = await pool.connect();
     const normalizedExpired = normalizeDateInput(expired);
     const normalizedSlotLimit = toNullableNumber(slotLimit);
+    const normalizedMatchMode = matchMode === "slot" ? "slot" : "thong_tin_don_hang";
     try {
         await client.query("BEGIN");
         const pkgResult = await client.query(
             `
         INSERT INTO mavryk.package_product
-          (package, username, password, "mail 2nd", note, supplier, "Import", expired, slot)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (package, username, password, "mail 2nd", note, supplier, "Import", expired, slot, "match")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id;
       `, [
                 trimmedPackageName,
@@ -2957,6 +3048,7 @@ app.post("/api/package-products", async(req, res) => {
                 toNullableNumber(importPrice),
                 normalizedExpired,
                 normalizedSlotLimit,
+                normalizedMatchMode,
             ]
         );
         if (!pkgResult.rows.length) {
@@ -3007,7 +3099,7 @@ app.post("/api/package-products", async(req, res) => {
                 package_import: toNullableNumber(importPrice),
                 package_expired: normalizedExpired,
                 package_slot: normalizedSlotLimit,
-                package_slot: normalizedSlotLimit,
+                package_match: normalizedMatchMode,
                 account_id: createdAccountStorageId,
                 account_username: accountUser || null,
                 account_password: accountPass || null,
@@ -3016,6 +3108,7 @@ app.post("/api/package-products", async(req, res) => {
                 account_storage: toNullableNumber(capacity),
                 account_mail_family: mailFamily,
                 has_capacity_field: Boolean(hasCapacityField),
+                package_products: [],
             });
             return res.status(201).json(fallbackRow);
         }
@@ -3054,6 +3147,7 @@ app.put("/api/package-products/:id", async(req, res) => {
         capacity,
         expired,
         hasCapacityField,
+        matchMode,
     } = req.body || {};
     if (!packageName || typeof packageName !== "string") {
         return res.status(400).json({ error: "Package name is required." });
@@ -3070,6 +3164,7 @@ app.put("/api/package-products/:id", async(req, res) => {
     const client = await pool.connect();
     const normalizedExpired = normalizeDateInput(expired);
     const normalizedSlotLimit = toNullableNumber(slotLimit);
+    const normalizedMatchMode = matchMode === "slot" ? "slot" : "thong_tin_don_hang";
     try {
         await client.query("BEGIN");
         const pkgResult = await client.query(
@@ -3083,8 +3178,9 @@ app.put("/api/package-products/:id", async(req, res) => {
             supplier = $6,
             "Import" = $7,
             expired = $8,
-            slot = $9
-        WHERE id = $10
+            slot = $9,
+            "match" = $10
+        WHERE id = $11
         RETURNING id;
       `, [
                 trimmedPackageName,
@@ -3096,6 +3192,7 @@ app.put("/api/package-products/:id", async(req, res) => {
                 toNullableNumber(importPrice),
                 normalizedExpired,
                 normalizedSlotLimit,
+                normalizedMatchMode,
                 id,
             ]
         );
@@ -3173,6 +3270,8 @@ app.put("/api/package-products/:id", async(req, res) => {
                 account_storage: toNullableNumber(capacity),
                 account_mail_family: mailFamily,
                 has_capacity_field: Boolean(hasCapacityField),
+                package_match: normalizedMatchMode,
+                package_products: [],
             });
             return res.json(fallbackRow);
         }
@@ -3188,3 +3287,40 @@ app.put("/api/package-products/:id", async(req, res) => {
         client.release();
     }
 });
+const handleBulkDeletePackages = async(req, res) => {
+    console.log(`[${req.method}] /api/package-products/bulk-delete`);
+    const { packages } = req.body || {};
+    if (!Array.isArray(packages)) {
+        return res.status(400).json({ error: "packages must be an array." });
+    }
+    const names = Array.from(
+        new Set(
+            packages
+            .map((name) => (typeof name === "string" ? name.trim() : ""))
+            .filter(Boolean)
+        )
+    );
+    if (!names.length) {
+        return res.status(400).json({ error: "No package names provided." });
+    }
+    const client = await pool.connect();
+    try {
+        const deleteResult = await client.query(
+            `DELETE FROM mavryk.package_product WHERE package = ANY($1::text[]) RETURNING package;`, [names]
+        );
+        const deletedNames = deleteResult.rows
+            .map((row) => row.package)
+            .filter(Boolean);
+        res.json({
+            deleted: deleteResult.rowCount || 0,
+            deletedNames,
+        });
+    } catch (error) {
+        console.error(`Delete failed (${req.method} /api/package-products/bulk-delete):`, error);
+        res.status(500).json({ error: "Unable to delete package products." });
+    } finally {
+        client.release();
+    }
+};
+app.delete("/api/package-products/bulk-delete", handleBulkDeletePackages);
+app.post("/api/package-products/bulk-delete", handleBulkDeletePackages);

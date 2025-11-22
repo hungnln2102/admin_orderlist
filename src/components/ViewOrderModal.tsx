@@ -98,16 +98,20 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           }
         );
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(
-            errorText || `Server responded with ${response.status}`
+        const { data, rawText } =
+          await Helpers.readJsonOrText<{ gia_ban?: number; error?: string }>(
+            response
           );
+
+        if (!response.ok) {
+          const message =
+            (data?.error as string | undefined) ||
+            rawText ||
+            `Server responded with ${response.status}`;
+          throw new Error(message);
         }
 
-        const result = (await response.json()) as {
-          gia_ban?: number;
-        };
+        const result = data || {};
 
         if (!ignore) {
           const backendPrice = Number(result?.gia_ban);

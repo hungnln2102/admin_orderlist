@@ -33,6 +33,11 @@ const formatCurrencyVnd = (value: number): string => {
   return `VND ${Math.round(value).toLocaleString("vi-VN")}`;
 };
 
+const formatCurrencyVndFull = (value: number): string => {
+  if (!Number.isFinite(value)) return "0\u0111";
+  return `${Math.round(value).toLocaleString("vi-VN")}\u0111`;
+};
+
 const determineReceiptCategory = (
   orderCode: string | null | undefined
 ): ReceiptCategory => {
@@ -194,7 +199,7 @@ export default function Invoices() {
       },
       {
         name: "Tổng Số Tiền",
-        value: Helpers.formatCurrencyShort(totalAmount),
+        value: formatCurrencyVndFull(totalAmount),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.emerald,
       },
@@ -424,7 +429,7 @@ export default function Invoices() {
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm text-slate-300">
-                      <span>Thụ Hưởng</span>
+                      <span>Thẻ Hưởng</span>
                       <span className="font-semibold text-white">
                         {QR_BANK_INFO.accountHolder}
                       </span>
@@ -566,7 +571,7 @@ export default function Invoices() {
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tim ma don nguoi gui hoac ghi chu..."
+                placeholder="Tìm mã đơn người gửi hoặc ghi chú..."
                 className="w-full pl-12 pr-4 py-3 border border-gray-200 bg-gray-50/60 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
@@ -723,7 +728,7 @@ export default function Invoices() {
                     Mã Đơn
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Người Gửi
+                    Người Nhận
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Số Tiền
@@ -817,7 +822,7 @@ export default function Invoices() {
                 <button
                   onClick={closeViewModal}
                   className="text-gray-400 hover:text-gray-600 transition rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  aria-label="Dong"
+                  aria-label="Đóng"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
@@ -856,7 +861,7 @@ export default function Invoices() {
                     Nội Dung Chuyển Khoản
                   </p>
                   <div className="p-3 rounded-lg border border-gray-200 text-sm text-gray-800 bg-gray-50 min-h-[80px]">
-                    {selectedReceipt.note || "Khong co ghi chu"}
+                    {selectedReceipt.note || "Không có ghi chú"}
                   </div>
                 </div>
               </div>

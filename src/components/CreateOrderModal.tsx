@@ -1,4 +1,4 @@
-﻿// CreateOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
+// CreateOrderModal.tsx - M� d� du?c l�m s?ch v� d?ng b? v?i DB DATE/YMD
 
 import React, {
   useState,
@@ -21,7 +21,7 @@ const API_BASE =
   "http://localhost:3001";
 
 // =======================================================
-// 1. INTERFACES (Cấu trúc dữ liệu)
+// 1. INTERFACES (C?u tr�c d? li?u)
 // =======================================================
 interface Order {
   id: number;
@@ -71,9 +71,9 @@ interface CreateOrderModalProps {
 // =======================================================
 
 /**
- * FIX: Chuyển đổi định dạng DD/MM/YYYY sang YYYY-MM-DD cho Backend.
- * @param {string} dmyString - Ngày ở định dạng DD/MM/YYYY
- * @returns {string} Ngày ở định dạng YYYY-MM-DD
+ * FIX: Chuy?n d?i d?nh d?ng DD/MM/YYYY sang YYYY-MM-DD cho Backend.
+ * @param {string} dmyString - Ng�y ? d?nh d?ng DD/MM/YYYY
+ * @returns {string} Ng�y ? d?nh d?ng YYYY-MM-DD
  */
 const convertDMYToYMD = (dmyString: string): string => {
   if (!dmyString || dmyString.indexOf("/") === -1) return dmyString;
@@ -82,7 +82,7 @@ const convertDMYToYMD = (dmyString: string): string => {
   return dmyString;
 };
 
-// Hàm Helper để tính Ngày Hết Hạn (Tạm thời dùng trên Frontend cho chế độ Custom)
+// H�m Helper d? t�nh Ng�y H?t H?n (T?m th?i d�ng tr�n Frontend cho ch? d? Custom)
 const calculateExpirationDate = (
   registerDateStr: string,
   days: number
@@ -97,7 +97,7 @@ const calculateExpirationDate = (
   const year = parseInt(parts[2], 10);
 
   const date = new Date(year, month - 1, day);
-  // -1 vì ngày đăng ký là ngày đầu tiên
+  // -1 v� ng�y dang k� l� ng�y d?u ti�n
   date.setDate(date.getDate() + days - 1);
 
   const newDay = String(date.getDate()).padStart(2, "0");
@@ -108,7 +108,7 @@ const calculateExpirationDate = (
 };
 
 const formatCurrency = (value: number) => {
-  return (Number(value) || 0).toLocaleString("vi-VN") + " đ";
+  return (Number(value) || 0).toLocaleString("vi-VN") + " d";
 };
 
 const generateRandomId = (length: number) => {
@@ -130,7 +130,7 @@ const getTodayDMY = () => {
   ).padStart(2, "0")}/${date.getFullYear()}`;
 };
 
-// ... (Các hàm parseMonthsFromInfo, daysFromMonths, addMonthsMinusOneDay, inclusiveDaysBetween giữ nguyên)
+// ... (C�c h�m parseMonthsFromInfo, daysFromMonths, addMonthsMinusOneDay, inclusiveDaysBetween gi? nguy�n)
 const parseMonthsFromInfo = (info?: string): number => {
   if (!info) return 0;
   const m = info.match(/--(\d+)m/i);
@@ -177,7 +177,7 @@ const INITIAL_FORM_DATA: Partial<Order> = {
   [ORDER_FIELDS.GIA_NHAP]: 0,
   [ORDER_FIELDS.GIA_BAN]: 0,
   [ORDER_FIELDS.NOTE]: "",
-  [ORDER_FIELDS.TINH_TRANG]: "Chưa Thanh Toán",
+  [ORDER_FIELDS.TINH_TRANG]: "Chua Thanh To�n",
   [ORDER_FIELDS.CHECK_FLAG]: null,
 };
 
@@ -187,7 +187,7 @@ const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 const readOnlyClass = "bg-gray-100 cursor-not-allowed";
 
 interface UseCreateOrderLogicResult {
-  // ... (Giao diện giữ nguyên)
+  // ... (Giao di?n gi? nguy�n)
   formData: Partial<Order>;
   supplies: Supply[];
   products: Product[];
@@ -242,11 +242,11 @@ const useCreateOrderLogic = (
   const fetchProducts = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}${API_ENDPOINTS.PRODUCTS_ALL}`);
-      if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
+      if (!response.ok) throw new Error("L?i t?i danh s�ch s?n ph?m.");
       const data: Product[] = await response.json();
       setProducts(data);
     } catch (error) {
-      console.error("Lỗi khi fetch products:", error);
+      console.error("L?i khi fetch products:", error);
     }
   }, []);
 
@@ -255,11 +255,11 @@ const useCreateOrderLogic = (
       const response = await fetch(
         `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
       );
-      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
+      if (!response.ok) throw new Error("L?i t?i danh s�ch ngu?n.");
       const data: Supply[] = await response.json();
       setSupplies(data);
     } catch (error) {
-      console.error("Lỗi khi fetch supplies:", error);
+      console.error("L?i khi fetch supplies:", error);
       setSupplies([]);
     }
   }, []);
@@ -271,16 +271,16 @@ const useCreateOrderLogic = (
           productName
         )}`
       );
-      if (!response.ok) throw new Error("Lỗi tính giá nhập của nguồn.");
+      if (!response.ok) throw new Error("L?i t�nh gi� nh?p c?a ngu?n.");
       const data: SupplyPrice[] = await response.json();
       setSupplyPrices(data);
     } catch (error) {
-      console.error("Lỗi khi fetch all supply prices:", error);
+      console.error("L?i khi fetch all supply prices:", error);
       setSupplyPrices([]);
     }
   }, []);
 
-  const calculatePrice = useCallback(
+    const calculatePrice = useCallback(
     async (
       supplyId: number,
       productName: string,
@@ -296,7 +296,7 @@ const useCreateOrderLogic = (
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              // Backend chỉ cần các thông số này để tính giá bán và ngày hết hạn
+              // Backend chi can cac thong so nay de tinh gia ban va ngay het han
               supply_id: supplyId,
               san_pham_name: productName,
               id_don_hang: orderId,
@@ -304,28 +304,35 @@ const useCreateOrderLogic = (
           }
         );
 
+        const { data, rawText } =
+          await Helpers.readJsonOrText<CalculatedPriceResult>(response);
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Lỗi tính giá tại Server.");
+          const message =
+            (data as { error?: string } | null)?.error ||
+            rawText ||
+            "Loi tinh gia tai Server.";
+          throw new Error(message);
         }
 
-        const result: CalculatedPriceResult = await response.json();
+        if (!data) {
+          throw new Error("Phan hoi khong hop le tu server.");
+        }
 
-        // FIX: Xóa logic tính ngày hết hạn ở Frontend
-        // Ngày hết hạn đã được tính và trả về từ Backend (dạng YYYY-MM-DD hoặc tương tự)
+        const result: CalculatedPriceResult = data;
 
         return {
           gia_nhap: result.gia_nhap,
           gia_ban: result.gia_ban,
           so_ngay_da_dang_ki: result.so_ngay_da_dang_ki,
-          het_han: result.het_han, // Lấy trực tiếp từ Backend
+          het_han: result.het_han,
         } as CalculatedPriceResult;
       } catch (error) {
-        console.error("Lỗi khi tính giá:", error);
+        console.error("Loi khi tinh gia:", error);
         setIsDataLoaded(false);
         alert(
-          `Tính giá thất bại: ${
-            error instanceof Error ? error.message : "Lỗi không xác nhận"
+          `Tinh gia that bai: ${
+            error instanceof Error ? error.message : "Loi khong xac nhan"
           }`
         );
         return undefined;
@@ -381,7 +388,7 @@ const useCreateOrderLogic = (
       return;
     }
 
-    // Trigger tính giá lại khi loại khách hàng thay đổi
+    // Trigger t�nh gi� l?i khi lo?i kh�ch h�ng thay d?i
     calculatePrice(0, productName, orderId, registerDate).then((result) => {
       if (result) {
         setFormData((prev) => ({
@@ -392,7 +399,7 @@ const useCreateOrderLogic = (
     });
   }, [customerType, calculatePrice]);
   const handleProductSelect = (productName: string) => {
-    // ... (logic giữ nguyên)
+    // ... (logic gi? nguy�n)
     const selectedProduct = products.find((p) => p.san_pham === productName);
 
     setSelectedProductId(selectedProduct?.id || null);
@@ -426,7 +433,7 @@ const useCreateOrderLogic = (
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
               ),
-              [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy Hết Hạn từ Backend
+              [ORDER_FIELDS.HET_HAN]: result.het_han, // L?y H?t H?n t? Backend
             }));
             // readiness now derived from required fields only
           }
@@ -508,7 +515,7 @@ const useCreateOrderLogic = (
               [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
                 result.so_ngay_da_dang_ki
               ),
-              [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy Hết Hạn từ Backend
+              [ORDER_FIELDS.HET_HAN]: result.het_han, // L?y H?t H?n t? Backend
             }));
             // readiness now derived from required fields only
           }
@@ -620,7 +627,7 @@ const useCreateOrderLogic = (
       onSave(dataToSave as Order);
       return true;
     } else {
-      alert("Vui lòng điền đầy đủ các thông tin");
+      alert("Vui l�ng di?n d?y d? c�c th�ng tin");
       return false;
     }
   };
@@ -648,7 +655,7 @@ const useCreateOrderLogic = (
 type SSOption = { value: string | number; label: string };
 
 interface SearchableSelectProps {
-  // ... (Giao diện giữ nguyên)
+  // ... (Giao di?n gi? nguy�n)
   name?: string;
   value: string | number | null | undefined;
   options: SSOption[];
@@ -659,7 +666,7 @@ interface SearchableSelectProps {
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
-  // ... (Component giữ nguyên)
+  // ... (Component gi? nguy�n)
   name,
   value,
   options,
@@ -730,7 +737,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           aria-label="Clear"
         >
-          ×
+          �
         </button>
       )}
 
@@ -738,7 +745,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {open && !disabled && (
         <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500">Không có kết quả</div>
+            <div className="px-3 py-2 text-sm text-gray-500">Kh�ng c� k?t qu?</div>
           ) : (
             filtered.map((opt) => (
               <div
@@ -786,7 +793,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     handleCustomerTypeChange,
     handleSubmit,
   } = useCreateOrderLogic(isOpen, onSave);
-  // Toggle nhập mới: phải khai báo trước early-return
+  // Toggle nh?p m?i: ph?i khai b�o tru?c early-return
   const [customMode, setCustomMode] = useState(false);
 
   const handlePriceInput = useCallback(
@@ -879,7 +886,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         {/* Header Modal */}
         <div className="p-5 border-b border-gray-200 sticky top-0 bg-white z-10 flex justify-between items-center">
           <h3 className="text-xl font-semibold text-gray-900">
-            Tạo Đơn Hàng Mới
+            T?o �on H�ng M?i
           </h3>
           <button
             type="button"
@@ -894,25 +901,25 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           {/* Form */}
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
-              {/* Phần 1: Mã đơn & Khách Hàng */}
+              {/* Ph?n 1: M� don & Kh�ch H�ng */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-lg bg-gray-50">
-                {/* Loại Khách Hàng */}
+                {/* Lo?i Kh�ch H�ng */}
                 <div>
-                  <label className={labelClass}>Loại Khách Hàng</label>
+                  <label className={labelClass}>Lo?i Kh�ch H�ng</label>
                   <select
                     name="customer_type"
                     value={customerType}
                     onChange={handleCustomerTypeChange}
                     className={inputClass}
                   >
-                    <option value="MAVC">Cộng Tác Viên</option>
-                    <option value="MAVL">Khách Lẻ</option>
-                    <option value="MAVK">Khuyến Mãi</option>
+                    <option value="MAVC">C?ng T�c Vi�n</option>
+                    <option value="MAVL">Kh�ch L?</option>
+                    <option value="MAVK">Khuy?n M�i</option>
                   </select>
                 </div>
-                {/* Mã Đơn Hàng */}
+                {/* M� �on H�ng */}
                 <div>
-                  <label className={labelClass}>Mã Đơn Hàng</label>
+                  <label className={labelClass}>M� �on H�ng</label>
                   <input
                     type="text"
                     name={ORDER_FIELDS.ID_DON_HANG}
@@ -922,10 +929,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   />
                 </div>
 
-                {/* Tên Khách Hàng */}
+                {/* T�n Kh�ch H�ng */}
                 <div>
                   <label className={labelClass}>
-                    Tên Khách Hàng <span className="text-red-500">*</span>
+                    T�n Kh�ch H�ng <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -936,9 +943,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     required
                   />
                 </div>
-                {/* Link Liên Hệ */}
+                {/* Link Li�n H? */}
                 <div>
-                  <label className={labelClass}>Link Liên Hệ</label>
+                  <label className={labelClass}>Link Li�n H?</label>
                   <input
                     type="url"
                     name={ORDER_FIELDS.LINK_LIEN_HE}
@@ -949,12 +956,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
               </div>
 
-              {/* Phần 2: Sản Phẩm & Nguồn */}
+              {/* Ph?n 2: S?n Ph?m & Ngu?n */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 border p-4 rounded-lg items-end">
-                {/* 1. SẢN PHẨM */}
+                {/* 1. S?N PH?M */}
                 <div className="md:col-span-5">
                   <label className={labelClass}>
-                    Sản Phẩm <span className="text-red-500">*</span>
+                    S?n Ph?m <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
                     name={ORDER_FIELDS.SAN_PHAM}
@@ -963,17 +970,17 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       value: p.san_pham,
                       label: p.san_pham,
                     }))}
-                    placeholder="-- Chọn --"
+                    placeholder="-- Ch?n --"
                     onChange={(val) => handleProductSelect(String(val))}
                     onClear={() => handleProductSelect("")}
                     disabled={customMode}
                   />
                 </div>
 
-                {/* 2. NGUỒN */}
+                {/* 2. NGU?N */}
                 <div className="md:col-span-5">
                   <label className={labelClass}>
-                    Nguồn <span className="text-red-500">*</span>
+                    Ngu?n <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
                     name={ORDER_FIELDS.NGUON}
@@ -982,14 +989,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       value: s.id,
                       label: s.source_name,
                     }))}
-                    placeholder="-- Chọn --"
+                    placeholder="-- Ch?n --"
                     disabled={customMode || !formData[ORDER_FIELDS.SAN_PHAM]}
                     onChange={(val) => handleSourceSelect(Number(val))}
                     onClear={() => handleSourceSelect(0)}
                   />
                 </div>
 
-                {/* 3. Nút Thêm (+) ở cuối hàng */}
+                {/* 3. N�t Th�m (+) ? cu?i h�ng */}
                 <div className="md:col-span-2 flex md:justify-end">
                   <button
                     type="button"
@@ -1013,7 +1020,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 {customMode && (
                   <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className={labelClass}>Sản Phẩm Mới</label>
+                      <label className={labelClass}>S?n Ph?m M?i</label>
                       <input
                         type="text"
                         name={ORDER_FIELDS.SAN_PHAM}
@@ -1022,27 +1029,27 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         }
                         onChange={handleChange}
                         className={inputClass}
-                        placeholder="Nhập Tên Sản Phẩm Mới"
+                        placeholder="Nh?p T�n S?n Ph?m M?i"
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>Nguồn Mới</label>
+                      <label className={labelClass}>Ngu?n M?i</label>
                       <input
                         type="text"
                         name={ORDER_FIELDS.NGUON}
                         value={(formData[ORDER_FIELDS.NGUON] as string) || ""}
                         onChange={handleChange}
                         className={inputClass}
-                        placeholder="Nhập Tên Nguồn Mới"
+                        placeholder="Nh?p T�n Ngu?n M?i"
                       />
                     </div>
                   </div>
                 )}
 
-                {/* 4b. Thông Tin Sản Phẩm: next row but same block */}
+                {/* 4b. Th�ng Tin S?n Ph?m: next row but same block */}
                 <div className="md:col-span-12">
                   <label className={labelClass}>
-                    Thông Tin Sản Phẩm <span className="text-red-500">*</span>
+                    Th�ng Tin S?n Ph?m <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1054,12 +1061,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   />
                 </div>
               </div>
-              {/* Phần 3: Thời Gian & Giá Tiền */}
+              {/* Ph?n 3: Th?i Gian & Gi� Ti?n */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6">
-                  {/* Ngày Đăng Ký */}
+                  {/* Ng�y �ang K� */}
                   <div>
-                    <label className={labelClass}>Ngày Đăng Ký</label>
+                    <label className={labelClass}>Ng�y �ang K�</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.NGAY_DANG_KI}
@@ -1068,9 +1075,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} ${readOnlyClass}`}
                     />
                   </div>
-                  {/* Số Ngày Đăng Ký */}
+                  {/* S? Ng�y �ang K� */}
                   <div>
-                    <label className={labelClass}>Số Ngày Đăng Ký</label>
+                    <label className={labelClass}>S? Ng�y �ang K�</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
@@ -1079,9 +1086,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       className={`${inputClass} ${readOnlyClass}`}
                     />
                   </div>
-                  {/* Ngày Hết Hạn */}
+                  {/* Ng�y H?t H?n */}
                   <div>
-                    <label className={labelClass}>Ngày Hết Hạn</label>
+                    <label className={labelClass}>Ng�y H?t H?n</label>
                     <input
                       type="text"
                       name={ORDER_FIELDS.HET_HAN}
@@ -1104,9 +1111,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 </div>
 
                 <div className="space-y-6">
-                  {/* Giá Nhập (Sẽ hiển thị giá của Nguồn được chọn) */}
+                  {/* Gi� Nh?p (S? hi?n th? gi� c?a Ngu?n du?c ch?n) */}
                   <div>
-                    <label className={labelClass}>Giá Nhập</label>
+                    <label className={labelClass}>Gi� Nh?p</label>
                     {customMode ? (
                       <input
                         type="text"
@@ -1130,9 +1137,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       />
                     )}
                   </div>
-                  {/* Giá Bán (Sẽ hiển thị giá tính toán từ giá nhập cao nhất) */}
+                  {/* Gi� B�n (S? hi?n th? gi� t�nh to�n t? gi� nh?p cao nh?t) */}
                   <div>
-                    <label className={labelClass}>Giá Bán</label>
+                    <label className={labelClass}>Gi� B�n</label>
                     {customMode ? (
                       <input
                         type="text"
@@ -1161,9 +1168,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     )}
                   </div>
 
-                  {/* Ghi Chú */}
+                  {/* Ghi Ch� */}
                   <div>
-                    <label className={labelClass}>Ghi Chú</label>
+                    <label className={labelClass}>Ghi Ch�</label>
                     <textarea
                       name={ORDER_FIELDS.NOTE}
                       value={formData[ORDER_FIELDS.NOTE]}
@@ -1178,14 +1185,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </form>
         </div>
 
-        {/* Footer Modal - Nút hành động */}
+        {/* Footer Modal - N�t h�nh d?ng */}
         <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end sticky bottom-0 z-10">
           <button
             type="button"
             onClick={onClose}
             className="px-6 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors shadow-sm mr-3"
           >
-            Hủy
+            H?y
           </button>
           <button
             type="submit"
@@ -1197,7 +1204,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             }`}
             disabled={!isFormComplete || isLoading}
           >
-            {isLoading ? "Đang Tính Giá..." : "Tạo Đơn Hàng"}
+            {isLoading ? "�ang T�nh Gi�..." : "T?o �on H�ng"}
           </button>
         </div>
       </div>
@@ -1206,5 +1213,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 };
 
 export default CreateOrderModal;
+
 
 
