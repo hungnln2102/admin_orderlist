@@ -13,11 +13,18 @@ function normalizeBaseUrl(value: string): string {
 
 export const API_BASE_URL: string = normalizeBaseUrl(RAW_API_BASE);
 
+const buildUrl = (input: string): string => {
+  if (input.startsWith("http")) return input;
+  const base = API_BASE_URL.replace(/\/+$/, "");
+  const path = input.replace(/^\/+/, "");
+  return `${base}/${path}`;
+};
+
 export async function apiFetch(
   input: string,
   init?: RequestInit
 ): Promise<Response> {
-  const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
+  const url = buildUrl(input);
   try {
     return await fetch(url, init);
   } catch (err) {
