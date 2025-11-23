@@ -4,6 +4,7 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   XMarkIcon,
+  CheckIcon,
   ClipboardDocumentListIcon,
   XCircleIcon,
   CalendarDaysIcon,
@@ -230,6 +231,14 @@ interface PaymentHistoryResponse {
   nextOffset?: number;
 }
 
+interface PaymentDraftState {
+  round: string;
+  totalImport: string;
+  paid: string;
+  status: string;
+  isEditing: boolean;
+}
+
 interface BankOption {
   bin: string;
   name: string;
@@ -318,6 +327,20 @@ export default function Sources() {
   const [paymentHistory, setPaymentHistory] = useState<
     Record<number, PaymentHistoryState>
   >({});
+  const [paymentDrafts, setPaymentDrafts] = useState<
+    Record<number, PaymentDraftState>
+  >({});
+  const [paymentSubmittingMap, setPaymentSubmittingMap] = useState<
+    Record<number, boolean>
+  >({});
+
+  const formatMoneyInput = (raw: string): string => {
+    const digits = (raw || "").replace(/[^\d]/g, "");
+    if (!digits) return "";
+    const num = Number(digits);
+    if (!Number.isFinite(num)) return digits;
+    return num.toLocaleString("vi-VN");
+  };
   const [bankOptions, setBankOptions] = useState<BankOption[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addModalError, setAddModalError] = useState<string | null>(null);
@@ -561,6 +584,150 @@ export default function Sources() {
       }
     },
     [paymentHistory, loadMorePayments, updatePaymentState]
+  );
+
+  const startAddPaymentCycle = useCallback((supplyId: number) => {
+    setPaymentDrafts((prev) => ({
+      ...prev,
+      [supplyId]: {
+        round: prev[supplyId]?.round || "",
+        totalImport: prev[supplyId]?.totalImport || "",
+        paid: prev[supplyId]?.paid || "",
+        status: prev[supplyId]?.status || "Chưa Thanh Toán",
+        isEditing: true,
+      },
+    }));
+  }, []);
+
+  const cancelAddPaymentCycle = useCallback((supplyId: number) => {
+    setPaymentDrafts((prev) => ({
+      ...prev,
+      [supplyId]: {
+        round: "",
+        totalImport: "",
+        paid: "",
+        status: "Chưa Thanh Toán",
+        isEditing: false,
+      },
+    }));
+  }, []);
+
+  const handlePaymentDraftChange = useCallback(
+    (
+      supplyId: number,
+      field: keyof Omit<PaymentDraftState, "isEditing">,
+      value: string
+    ) => {
+      setPaymentDrafts((prev) => ({
+        ...prev,
+        [supplyId]: {
+          round: prev[supplyId]?.round || "",
+          totalImport: prev[supplyId]?.totalImport || "",
+          paid: prev[supplyId]?.paid || "",
+          status: prev[supplyId]?.status || "Chưa Thanh Toán",
+          isEditing: true,
+          [field]: value,
+        },
+      }));
+    },
+    []
+  );
+
+  const handleMoneyDraftChange = useCallback(
+    (
+      supplyId: number,
+      field: "totalImport" | "paid",
+      rawValue: string
+    ) => {
+      const formatted = formatMoneyInput(rawValue);
+      const rawDigits = formatted.replace(/[^\d]/g, "");
+      handlePaymentDraftChange(supplyId, field, rawDigits);
+    },
+    [handlePaymentDraftChange]
+  );
+
+  const confirmAddPaymentCycle = useCallback(
+    async (supplyId: number) => {
+      const draft = paymentDrafts[supplyId];
+      if (!draft || !draft.isEditing) return;
+
+      const parsedTotal = Number(
+        (draft.totalImport || "").replace(/[^\d.-]/g, "")
+      );
+      const parsedPaid = Number((draft.paid || "").replace(/[^\d.-]/g, ""));
+
+      const payload = {
+        round: draft.round.trim() || "Chu kỳ mới",
+        totalImport: Number.isFinite(parsedTotal) ? parsedTotal : 0,
+        paid: Number.isFinite(parsedPaid) ? parsedPaid : 0,
+        status: draft.status.trim() || "Chưa Thanh Toán",
+      };
+
+      setPaymentSubmittingMap((prev) => ({ ...prev, [supplyId]: true }));
+      updatePaymentState(supplyId, (prev) => ({ ...prev, error: null }));
+
+      try {
+        const response = await apiFetch(`/api/supplies/${supplyId}/payments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || "Không thể thêm chu kỳ thanh toán.");
+        }
+        const data = await response.json();
+        const newPayment: SupplyPayment = {
+          id: data.id ?? Date.now(),
+          round: data.round ?? payload.round,
+          totalImport: Number(data.totalImport) || payload.totalImport,
+          paid: Number(data.paid) || payload.paid,
+          status: data.status ?? payload.status,
+        };
+
+        updatePaymentState(supplyId, (prev) => {
+          const pages = prev.pages.length
+            ? prev.pages.map((page) => [...page])
+            : [[]];
+          const firstPage = pages[0] ? [...pages[0]] : [];
+          pages[0] = [newPayment, ...firstPage];
+          return {
+            ...prev,
+            pages,
+            currentPage: 0,
+            initialized: true,
+            error: null,
+          };
+        });
+
+        setPaymentDrafts((prev) => ({
+          ...prev,
+          [supplyId]: {
+            round: "",
+            totalImport: "",
+            paid: "",
+            status: "Chưa Thanh Toán",
+            isEditing: false,
+          },
+        }));
+      } catch (error) {
+        console.error(error);
+        updatePaymentState(supplyId, (prev) => ({
+          ...prev,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Không thể thêm chu kỳ thanh toán.",
+        }));
+      } finally {
+        setPaymentSubmittingMap((prev) => {
+          const next = { ...prev };
+          delete next[supplyId];
+          return next;
+        });
+      }
+    },
+    [paymentDrafts, updatePaymentState]
   );
 
   const openAddSupplierModal = useCallback(() => {
@@ -947,31 +1114,50 @@ export default function Sources() {
     }
   }, [closeDeleteConfirm, deleteConfirmState.supply, setSupplies]);
 
-  const renderPaymentRows = (rows: SupplyPayment[], initialized: boolean) => {
-    if (!initialized) {
+  const renderPaymentRows = (
+    rows: SupplyPayment[],
+    initialized: boolean,
+    hasDraftRow = false,
+    supplyId?: number
+  ) => {
+    if (!initialized && !hasDraftRow) {
       return (
         <tr>
           <td
             colSpan={4}
             className="px-6 py-4 text-sm text-gray-500 text-center"
           >
-            Đang tải dữ liệu thuật toán...
+            Đang tải dữ liệu thanh toán...
           </td>
         </tr>
       );
     }
 
-    if (!rows.length) {
+    if (!rows.length && !hasDraftRow) {
       return (
         <tr>
           <td
-            colSpan={4}
+            colSpan={3}
             className="px-6 py-4 text-sm text-gray-500 text-center"
           >
             Chưa có dữ liệu chu kỳ thanh toán.
           </td>
+          <td className="px-4 py-4 text-center">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600 transition"
+              title="Thêm chu kỳ thanh toán"
+              onClick={() => supplyId !== undefined && startAddPaymentCycle(supplyId)}
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+          </td>
         </tr>
       );
+    }
+
+    if (!rows.length && hasDraftRow) {
+      return null;
     }
 
     return rows.map((row) => (
@@ -993,12 +1179,105 @@ export default function Sources() {
     ));
   };
 
+  const renderAddPaymentRow = (
+    supplyId: number,
+    draft?: PaymentDraftState
+  ) => {
+    if (!draft || !draft.isEditing) return null;
+    const isSubmitting = paymentSubmittingMap[supplyId] === true;
+    return (
+      <tr className="border-t border-gray-100 text-sm text-gray-800 bg-gray-50/60">
+        <td className="px-4 py-3">
+          <input
+            type="text"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+            placeholder="VD: Chu kỳ 1"
+            value={draft.round}
+            disabled={isSubmitting}
+            onChange={(event) =>
+              handlePaymentDraftChange(supplyId, "round", event.target.value)
+            }
+          />
+        </td>
+        <td className="px-4 py-3">
+          <input
+            type="text"
+            inputMode="numeric"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+            placeholder="Tổng tiền thanh toán"
+            value={formatMoneyInput(draft.totalImport)}
+            disabled={isSubmitting}
+            onChange={(event) =>
+              handleMoneyDraftChange(
+                supplyId,
+                "totalImport",
+                event.target.value
+              )
+            }
+          />
+        </td>
+        <td className="px-4 py-3">
+          <input
+            type="text"
+            inputMode="numeric"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+            placeholder="Đã thanh toán"
+            value={formatMoneyInput(draft.paid)}
+            disabled={isSubmitting}
+            onChange={(event) =>
+              handleMoneyDraftChange(supplyId, "paid", event.target.value)
+            }
+          />
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <select
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+              value={draft.status}
+              disabled={isSubmitting}
+              onChange={(event) =>
+                handlePaymentDraftChange(supplyId, "status", event.target.value)
+              }
+            >
+              <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
+              <option value="Đã Thanh Toán">Đã Thanh Toán</option>
+              <option value="Cần Gia Hạn">Cần Gia Hạn</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="h-9 w-9 rounded-full bg-emerald-500 text-white shadow hover:bg-emerald-600 transition"
+                title="Xác nhận thêm chu kỳ"
+                disabled={isSubmitting}
+                onClick={() => confirmAddPaymentCycle(supplyId)}
+              >
+                <CheckIcon className="h-5 w-5 mx-auto" />
+              </button>
+              <button
+                type="button"
+                className="h-9 w-9 rounded-full bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition"
+                title="Hủy thêm chu kỳ"
+                disabled={isSubmitting}
+                onClick={() => cancelAddPaymentCycle(supplyId)}
+              >
+                <XMarkIcon className="h-5 w-5 mx-auto" />
+              </button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   const renderPaymentHistorySection = (supplyId: number) => {
     const state = paymentHistory[supplyId];
     const currentRows =
       state && state.pages[state.currentPage]
         ? state.pages[state.currentPage]
         : [];
+    const draft = paymentDrafts[supplyId];
+    const addRow = renderAddPaymentRow(supplyId, draft);
+    const hasDraftRow = Boolean(addRow);
 
     const renderPaginationControls = () => {
       if (!state || !state.initialized) return null;
@@ -1050,13 +1329,15 @@ export default function Sources() {
     };
     return (
       <div className="space-y-4">
-        <div className="text-center">
-          <p className="text-sm font-semibold text-gray-900">
-            Lịch sử thanh toán
-          </p>
-          <p className="text-xs text-gray-500">
-            Theo dõi chu kỳ thanh toán của nhà cung cấp.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 text-center">
+            <p className="text-sm font-semibold text-gray-900">
+              Lịch sử thanh toán
+            </p>
+            <p className="text-xs text-gray-500">
+              Theo dõi chu kỳ thanh toán của nhà cung cấp.
+            </p>
+          </div>
         </div>
         {state?.loading && (
           <div className="text-center text-xs text-blue-600">Đang tải...</div>
@@ -1080,7 +1361,13 @@ export default function Sources() {
                 </tr>
               </thead>
               <tbody>
-                {renderPaymentRows(currentRows, Boolean(state?.initialized))}
+                {addRow}
+                {renderPaymentRows(
+                  currentRows,
+                  Boolean(state?.initialized),
+                  hasDraftRow,
+                  supplyId
+                )}
               </tbody>
             </table>
           </div>

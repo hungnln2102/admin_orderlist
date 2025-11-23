@@ -1871,18 +1871,26 @@ export default function PackageProduct() {
                                       >
                                         <div className="flex items-center gap-2">
                                           <BoltIcon
-                                            className={`h-5 w-5 ${
-                                              slot.isUsed
-                                                ? "text-yellow-500"
-                                                : "text-green-500"
-                                            }`}
-                                          />
-                                          <span className="text-sm font-semibold text-gray-900">
-                                            {slot.assignment?.slotLabel
-                                              ? slot.assignment.slotLabel
-                                              : `Vị trí ${slot.slotNumber}`}
-                                          </span>
-                                        </div>
+                                        className={`h-5 w-5 ${
+                                          slot.isUsed
+                                            ? "text-yellow-500"
+                                            : "text-green-500"
+                                        }`}
+                                      />
+                                      <span
+                                        className="text-sm font-semibold text-gray-900 max-w-[170px] truncate"
+                                        title={
+                                          slot.assignment?.slotLabel ||
+                                          (slot.assignment
+                                            ? undefined
+                                            : `Vị trí ${slot.slotNumber}`)
+                                        }
+                                      >
+                                        {slot.assignment?.slotLabel
+                                          ? slot.assignment.slotLabel
+                                          : `Vị trí ${slot.slotNumber}`}
+                                      </span>
+                                    </div>
                                         <p
                                           className={`text-xs mt-1 ${
                                             slot.isUsed

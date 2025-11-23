@@ -753,6 +753,10 @@ const formatYMDToDMY = (value) => {
 const roundToNearestThousand = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 0;
+    if (numeric % 1000 === 0) {
+        // Nếu đã tròn nghìn thì giữ nguyên (tránh làm tròn lại)
+        return Math.max(0, numeric);
+    }
     return Math.max(0, Math.round(numeric / 1000) * 1000);
 };
 
@@ -1448,6 +1452,75 @@ app.get("/api/supplies/:supplyId/payments", async(req, res) => {
         console.error("Query failed (GET /api/supplies/:id/payments):", error);
         res.status(500).json({
             error: "Unable to load payment history for this supplier.",
+        });
+    }
+});
+
+app.post("/api/supplies/:supplyId/payments", async(req, res) => {
+    const { supplyId } = req.params;
+    console.log(`[POST] /api/supplies/${supplyId}/payments`, req.body);
+
+    const parsedSupplyId = Number.parseInt(supplyId, 10);
+    if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
+        return res.status(400).json({
+            error: "Invalid supply id.",
+        });
+    }
+
+    const parseMoney = (value, fallback = 0) => {
+        if (value === null || value === undefined) return fallback;
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+            return value;
+        }
+        const cleaned = String(value).replace(/[^0-9]/g, "");
+        if (!cleaned) return fallback;
+        const num = Number(cleaned);
+        return Number.isFinite(num) && num >= 0 ? num : fallback;
+    };
+
+    const roundLabel =
+        (typeof req.body?.round === "string" && req.body.round.trim()) ||
+        "Chu kỳ mới";
+    const totalImport = parseMoney(req.body?.totalImport, 0);
+    const paid = parseMoney(req.body?.paid, 0);
+    const statusLabel =
+        (typeof req.body?.status === "string" && req.body.status.trim()) ||
+        "Chưa Thanh Toán";
+
+    try {
+        const insertQuery = `
+      INSERT INTO mavryk.payment_supply (source_id, import, paid, round, status)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, source_id, import, paid, round, status;
+    `;
+        const result = await pool.query(insertQuery, [
+            parsedSupplyId,
+            totalImport,
+            paid,
+            roundLabel,
+            statusLabel,
+        ]);
+        if (!result.rows.length) {
+            return res.status(500).json({
+                error: "Failed to insert payment cycle.",
+            });
+        }
+        const row = result.rows[0];
+        res.status(201).json({
+            id: row.id,
+            sourceId: row.source_id,
+            totalImport: Number(row.import) || 0,
+            paid: Number(row.paid) || 0,
+            round: row.round || "",
+            status: row.status || "",
+        });
+    } catch (error) {
+        console.error(
+            `Mutation failed (POST /api/supplies/${supplyId}/payments):`,
+            error
+        );
+        res.status(500).json({
+            error: "Unable to create payment cycle.",
         });
     }
 });

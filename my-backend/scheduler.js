@@ -15,6 +15,10 @@ const cronExpression = process.env.CRON_SCHEDULE || "1 0 * * *";
 const runOnStart = process.env.RUN_CRON_ON_START === "true";
 let lastRunAt = null;
 
+const STATUS_EXPIRED = "Hết Hạn";
+const STATUS_RENEW = "Cần Gia Hạn";
+const STATUS_PAID = "Đã Thanh Toán";
+
 // Normalize mixed-format date columns to a proper DATE in SQL
 const normalizeDateSQL = (column) => `
   CASE
@@ -60,7 +64,7 @@ const getSqlCurrentDate = () => {
  * Cron: 00:01 hang ngay
  * - Move expired orders (< 0 days) to table order_expired
  * - Remove them from order_list after moving
- * - Update status "Can Gia Han" for orders with 1..4 days left
+ * - Update status "Cần Gia Hạn" for orders with 1..4 days left
  */
 const updateDatabaseTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
@@ -150,16 +154,18 @@ const updateDatabaseTask = async (trigger = "cron") => {
       );
     }
 
-    // 2a) Update 0 ngay con lai -> 'Het Han'
+    // 2a) Update 0 ngay con lai -> 'Hết Hạn'
     const dueToday = await client.query(`
       UPDATE mavryk.order_list
-      SET tinh_trang = 'Het Han',
+      SET tinh_trang = '${STATUS_EXPIRED}',
           check_flag = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
-        AND (tinh_trang IS DISTINCT FROM 'Het Han');
+        AND (tinh_trang IS DISTINCT FROM '${STATUS_PAID}')
+        AND (tinh_trang IS DISTINCT FROM '${STATUS_EXPIRED}');
     `);
-    console.log(`  - Cap nhat ${dueToday.rowCount} don sang 'Het Han' (0 ngay).`);
+    console.log(
+      `  - Cap nhat ${dueToday.rowCount} don sang '${STATUS_EXPIRED}' (0 ngay).`
+    );
 
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const del = await client.query(`
@@ -174,18 +180,19 @@ const updateDatabaseTask = async (trigger = "cron") => {
       );
     }
 
-    // 2) Update "Can Gia Han" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
-    // 2b) Update 1..4 ngay -> 'Can Gia Han'
+    // 2) Update "Cần Gia Hạn" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
+    // 2b) Update 1..4 ngay -> 'Cần Gia Hạn'
     const soon = await client.query(`
       UPDATE mavryk.order_list
-      SET tinh_trang = 'Can Gia Han',
+      SET tinh_trang = '${STATUS_RENEW}',
           check_flag = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
-        AND (tinh_trang IS DISTINCT FROM 'Da Thanh Toan')
-        AND (tinh_trang IS DISTINCT FROM 'Het Han');
+        AND (tinh_trang IS DISTINCT FROM '${STATUS_PAID}')
+        AND (tinh_trang IS DISTINCT FROM '${STATUS_EXPIRED}')
+        AND (tinh_trang IS DISTINCT FROM '${STATUS_RENEW}');
     `);
     console.log(
-      `  - Cap nhat ${soon.rowCount} don sang 'Can Gia Han' (1..4 ngay).`
+      `  - Cap nhat ${soon.rowCount} don sang '${STATUS_RENEW}' (1..4 ngay).`
     );
 
     await client.query("COMMIT");
