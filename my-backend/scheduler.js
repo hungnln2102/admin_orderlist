@@ -124,7 +124,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
         note,
         tinh_trang,
         check_flag
-      )
+      ) 
       SELECT 
         id_don_hang,
         san_pham,
@@ -142,7 +142,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
         tinh_trang,
         check_flag
       FROM expired
-      ON CONFLICT (id_don_hang) DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING id_don_hang;
     `);
     console.log(`  - Da chuyen ${transfer.rowCount} don het han (< 0 ngay).`);

@@ -262,7 +262,13 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       setLoading(true);
       setFetchError(null);
       const endpoint = ORDER_DATASET_CONFIG[dataset].endpoint;
-      const response = await fetch(`${API_BASE}${endpoint}`);
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        credentials: "include",
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
       if (!response.ok) {
         throw new Error(`Lỗi máy chủ: ${response.status}`);
       }
@@ -625,6 +631,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(newOrderData),
       });
       if (!response.ok) {
@@ -655,6 +662,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
         }
       );
       if (!response.ok) {
@@ -699,6 +707,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify(dbFields),
         }
       );
@@ -729,6 +738,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             can_hoan: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],
             gia_tri_con_lai: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],

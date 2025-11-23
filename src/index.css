@@ -5,3 +5,68 @@
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
+
+.app-aurora {
+  background: radial-gradient(
+      circle at 20% 15%,
+      rgba(120, 63, 255, 0.18),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(44, 186, 255, 0.14),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 30% 80%,
+      rgba(255, 120, 180, 0.12),
+      transparent 32%
+    ),
+    linear-gradient(135deg, #050410, #0a0c1f 45%, #0b0a1a);
+  min-height: 100vh;
+}
+
+/* Dark, mystical surfaces for dashboard cards/forms */
+
+.app-aurora .bg-white,
+.app-aurora .bg-white\/90,
+.app-aurora .bg-white\/80,
+.app-aurora .bg-white\/70,
+.app-aurora .bg-white\/60,
+.app-aurora .bg-gray-50,
+.app-aurora .shadow-sm,
+.app-aurora .shadow-lg,
+.app-aurora .shadow-xl,
+.app-aurora .shadow-2xl {
+  background: rgb(122 95 251 / 58%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: none;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(120, 90, 190, 0.28);
+  color: #f7f7ff;
+  border-radius: 18px;
+}
+
+.app-aurora .text-gray-700,
+.app-aurora .text-gray-600,
+.app-aurora .text-gray-500 {
+  color: #e0e5ff !important;
+}
+
+.app-aurora input,
+.app-aurora textarea,
+.app-aurora select {
+  background: rgba(24, 20, 45, 0.82);
+  border: 1px solid rgba(110, 94, 165, 0.75);
+  color: #f2f4ff;
+}
+
+.app-aurora input::placeholder,
+.app-aurora textarea::placeholder {
+  color: rgba(240, 242, 255, 0.55);
+}
+
+/* Custom gradient stop override for active dataset button */
+.to-green-50 {
+  --tw-gradient-to: #7e67d98c var(--tw-gradient-to-position);
+}

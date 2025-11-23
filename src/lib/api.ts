@@ -25,15 +25,19 @@ export async function apiFetch(
   init?: RequestInit
 ): Promise<Response> {
   const url = buildUrl(input);
+  const finalInit: RequestInit = {
+    credentials: init?.credentials ?? "include",
+    ...init,
+  };
   try {
-    return await fetch(url, init);
+    return await fetch(url, finalInit);
   } catch (err) {
     if (!input.startsWith("http")) {
       try {
-        return await fetch(`http://127.0.0.1:3001${input}`, init);
+        return await fetch(`http://127.0.0.1:3001${input}`, finalInit);
       } catch {}
       try {
-        return await fetch(input, init);
+        return await fetch(input, finalInit);
       } catch {}
     }
     throw err as any;

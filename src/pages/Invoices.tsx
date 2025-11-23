@@ -739,9 +739,6 @@ export default function Invoices() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ngày Thanh Toán
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Thao Tác
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -767,29 +764,6 @@ export default function Invoices() {
                       {receipt.paidAt
                         ? Helpers.formatDateToDMY(receipt.paidAt)
                         : "--"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex space-x-2 justify-end">
-                        <button
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                          title="Xem Hóa Đơn"
-                          onClick={() => handleViewReceipt(receipt)}
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-900 p-1 rounded"
-                          title="In Hóa Đơn"
-                        >
-                          <PrinterIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          className="text-purple-600 hover:text-purple-900 p-1 rounded"
-                          title="Tải Xuống"
-                        >
-                          <ArrowDownTrayIcon className="h-4 w-4" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}

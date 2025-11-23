@@ -3,6 +3,8 @@
 const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
 
 const { updateDatabaseTask, getSchedulerStatus } = require("./scheduler");
 const Helpers = require("./helpers");
@@ -300,10 +302,105 @@ app.use(
             }
             return callback(new Error(`CORS blocked request from ${origin}`));
         },
+        credentials: true,
     })
 );
 
 app.use(express.json());
+app.use(
+    session({
+        name: process.env.SESSION_NAME || "mavryk.sid",
+        secret: process.env.SESSION_SECRET || "change_this_secret",
+        resave: false,
+        saveUninitialized: false,
+        rolling: true,
+        cookie: {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 1000 * 60 * 60 * 1, // 1 hour inactivity
+        },
+    })
+);
+
+const AUTH_OPEN_PATHS = new Set(["/api/auth/login", "/api/auth/logout"]);
+AUTH_OPEN_PATHS.add("/api/auth/me");
+
+// Auth routes
+app.post("/api/auth/login", async(req, res) => {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+        return res.status(400).json({ error: "Username và password là bắt buộc." });
+    }
+    const normalizedUsername = String(username).trim().toLowerCase();
+    try {
+        const result = await pool.query(
+            `
+        SELECT userid, username, passwordhash, passwordsalt, role
+        FROM mavryk.users
+        WHERE LOWER(username) = $1
+        LIMIT 1;
+      `, [normalizedUsername]
+        );
+        if (!result.rows.length) {
+            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu." });
+        }
+        const user = result.rows[0];
+        const storedHash = user.passwordhash;
+        const hashString =
+            storedHash instanceof Buffer ?
+            storedHash.toString() :
+            String(storedHash || "");
+        const isMatch = await bcrypt.compare(password, hashString);
+        if (!isMatch) {
+            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu." });
+        }
+        req.session.user = {
+            id: user.userid,
+            username: user.username,
+            role: user.role || "user",
+        };
+        res.json({
+            user: {
+                id: user.userid,
+                username: user.username,
+                role: user.role || "user",
+            },
+        });
+    } catch (error) {
+        console.error("Login failed:", error);
+        res.status(500).json({ error: "Không thể đăng nhập, thử lại sau." });
+    }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+    if (req.session) {
+        req.session.destroy(() => {
+            res.clearCookie(process.env.SESSION_NAME || "mavryk.sid");
+            res.json({ success: true });
+        });
+    } else {
+        res.json({ success: true });
+    }
+});
+
+app.get("/api/auth/me", (req, res) => {
+    if (!req.session || !req.session.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    res.json({ user: req.session.user });
+});
+
+// Protect all API routes except auth
+app.use((req, res, next) => {
+    if (AUTH_OPEN_PATHS.has(req.path) || req.path.startsWith("/api/auth/")) {
+        return next();
+    }
+    if (!req.session || !req.session.user) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    return next();
+});
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,

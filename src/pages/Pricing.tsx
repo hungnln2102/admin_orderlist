@@ -631,8 +631,13 @@ function Pricing() {
     setError(null);
     try {
       const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`
+        `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`,
+        { credentials: "include" }
       );
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
       if (!response.ok) {
         throw new Error("Không thể tải dữ liệu product_price từ máy chủ.");
       }

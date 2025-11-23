@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ChartBarIcon,
@@ -10,6 +10,8 @@ import {
   XMarkIcon,
   Bars3Icon,
 } from "@heroicons/react/24/outline";
+import { useAuth } from "../AuthContext";
+import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -60,6 +62,19 @@ const matchesHref = (
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
   const computedMenu = baseMenuItems;
+  const { user, setUser } = useAuth();
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    } finally {
+      setUser(null);
+      window.location.href = "/login";
+    }
+  };
 
   return (
     <>
@@ -133,20 +148,55 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             })}
           </nav>
 
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
-                <span className="text-white text-sm font-bold">A</span>
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  Mavryk Admin
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  admink@mavrykpremium.store
-                </p>
-              </div>
+          <div className="relative p-4 border-t border-gray-200 bg-gray-50">
+            <div className="w-full flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowAccountMenu((prev) => !prev)}
+                className="flex items-center flex-1"
+              >
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
+                  <span className="text-white text-sm font-bold">
+                    {(user?.username || "A").slice(0, 1).toUpperCase()}
+                  </span>
+                </div>
+                <div className="ml-3 flex-1 text-left">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.username || "Tài khoản"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user?.role ? `Role: ${user.role}` : "Đã đăng nhập"}
+                  </p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="ml-3 w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 transition"
+                title="Đăng xuất"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+              </button>
             </div>
+            {showAccountMenu && (
+              <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-gray-200 bg-white shadow-lg z-10">
+                <ul className="py-2 text-sm text-gray-700 space-y-1">
+                  {["Thông tin", "Thêm Admin", "Thêm Quyền", "Đổi Mật Khẩu"].map(
+                    (label) => (
+                      <li key={label}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                          onClick={() => setShowAccountMenu(false)}
+                        >
+                          {label}
+                        </button>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </div>
