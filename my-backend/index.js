@@ -333,9 +333,18 @@ AUTH_OPEN_PATHS.add("/api/auth/me");
 app.post("/api/auth/login", async(req, res) => {
     const { username, password } = req.body || {};
     if (!username || !password) {
-        return res.status(400).json({ error: "Username và password là bắt buộc." });
+        return res.status(400).json({ error: "Username v? password l? b?t bu?c." });
     }
     const normalizedUsername = String(username).trim().toLowerCase();
+
+    // Emergency fallback: allow env-based login if configured
+    const fallbackUser = (process.env.DEFAULT_ADMIN_USER || "").trim().toLowerCase();
+    const fallbackPass = (process.env.DEFAULT_ADMIN_PASS || "").trim();
+    if (fallbackUser && fallbackPass && normalizedUsername === fallbackUser && password === fallbackPass) {
+        req.session.user = { id: -1, username, role: "admin" };
+        return res.json({ user: req.session.user, fallback: true });
+    }
+
     try {
         const result = await pool.query(
             `
@@ -346,7 +355,7 @@ app.post("/api/auth/login", async(req, res) => {
       `, [normalizedUsername]
         );
         if (!result.rows.length) {
-            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu." });
+            return res.status(401).json({ error: "Sai t?i kho?n ho?c m?t kh?u." });
         }
         const user = result.rows[0];
         const storedHash = user.passwordhash;
@@ -362,25 +371,20 @@ app.post("/api/auth/login", async(req, res) => {
             isMatch = password === hashString || password === hashString?.trim();
         }
         if (!isMatch) {
-            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu." });
+            return res.status(401).json({ error: "Sai t?i kho?n ho?c m?t kh?u." });
         }
         req.session.user = {
             id: user.userid,
             username: user.username,
             role: user.role || "user",
         };
-        res.json({
-            user: {
-                id: user.userid,
-                username: user.username,
-                role: user.role || "user",
-            },
-        });
+        res.json({ user: req.session.user });
     } catch (error) {
         console.error("Login failed:", error);
-        res.status(500).json({ error: "Không thể đăng nhập, thử lại sau." });
+        res.status(500).json({ error: "Kh?ng th? ??ng nh?p, th? l?i sau." });
     }
 });
+;
 
 app.post("/api/auth/logout", (req, res) => {
     if (req.session) {
@@ -414,6 +418,39 @@ app.use((req, res, next) => {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
+
+// Create a default admin user from env (useful for first-run or legacy data)
+const ensureDefaultAdmin = async() => {
+    const usernameEnv = (process.env.DEFAULT_ADMIN_USER || "").trim();
+    const passwordEnv = (process.env.DEFAULT_ADMIN_PASS || "").trim();
+    if (!usernameEnv || !passwordEnv) return;
+
+    const client = await pool.connect();
+    try {
+        const normalizedUsername = usernameEnv.toLowerCase();
+        const existing = await client.query(
+            `SELECT userid FROM ${DB_SCHEMA}.users WHERE LOWER(username) = $1 LIMIT 1`,
+            [normalizedUsername]
+        );
+        if (existing.rows.length) {
+            return;
+        }
+        const hash = await bcrypt.hash(passwordEnv, 10);
+        await client.query(
+            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, role) VALUES ($1, $2, $3)`,
+            [usernameEnv, hash, "admin"]
+        );
+        console.log(`[AUTH] Created default admin user '${usernameEnv}'`);
+    } catch (err) {
+        console.error("[AUTH] Failed to ensure default admin:", err);
+    } finally {
+        client.release();
+    }
+};
+
+ensureDefaultAdmin().catch((err) =>
+    console.error("[AUTH] ensureDefaultAdmin failed:", err)
+);
 
 const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "is_active"];
 let supplyStatusColumnNameCache = null;
