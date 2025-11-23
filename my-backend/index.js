@@ -1261,13 +1261,7 @@ app.get("/api/supply-insights", async(_req, res) => {
     payment_summary AS (
       SELECT
         ps.source_id,
-        SUM(
-          CASE
-            WHEN ${paymentStatusKey} = 'da thanh toan'
-              THEN COALESCE(ps.import, 0)
-            ELSE 0
-          END
-        ) AS total_paid_import,
+        SUM(COALESCE(ps.paid, 0)) AS total_paid_import,
         SUM(
           CASE
             WHEN ${paymentStatusKey} = 'chua thanh toan'
@@ -2489,30 +2483,124 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
     }
 
     const paidAmountRaw = req.body?.paidAmount;
-    const paidAmountNumber = Number(paidAmountRaw);
-    const hasPaidAmount = Number.isFinite(paidAmountNumber) && paidAmountNumber >= 0;
+    const parsePaid = (value) => {
+        if (value === null || value === undefined) return null;
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+            return value;
+        }
+        const cleaned = String(value).replace(/[^0-9]/g, "");
+        if (!cleaned) return null;
+        const num = Number(cleaned);
+        return Number.isFinite(num) && num >= 0 ? num : null;
+    };
+    const paidAmountNumber = parsePaid(paidAmountRaw);
+    const hasPaidAmount = paidAmountNumber !== null;
 
     try {
+        await pool.query("BEGIN");
+
+        const paymentResult = await pool.query(
+            `
+        SELECT id, source_id, import, paid, round, status
+        FROM mavryk.payment_supply
+        WHERE id = $1
+        LIMIT 1;
+      `, [parsedPaymentId]
+        );
+        if (!paymentResult.rows.length) {
+            await pool.query("ROLLBACK");
+            return res.status(404).json({ error: "Payment record not found." });
+        }
+        const paymentRow = paymentResult.rows[0];
+        const sourceId = Number(paymentRow.source_id);
+        const normalizedPaidAmount =
+            hasPaidAmount && paidAmountNumber !== null ?
+            paidAmountNumber :
+            Number(paymentRow.import) || 0;
+
+        // Lấy tên nguồn để map với order_list.nguon
+        const supplyResult = await pool.query(
+            `SELECT source_name FROM mavryk.supply WHERE id = $1 LIMIT 1;`, [sourceId]
+        );
+        const sourceName = supplyResult.rows?.[0]?.source_name || "";
+        const normalizedSourceKey = sourceName ?
+            sourceName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase() :
+            "";
+
+        // Đơn chưa thanh toán của nguồn này (lấy từ cũ đến mới)
+        const unpaidResult = await pool.query(
+            `
+        SELECT
+          id,
+          COALESCE(gia_nhap, 0) AS gia_nhap,
+          ${createDateNormalization("ngay_dang_ki")} AS ngay_dang_ki
+        FROM ${DB_SCHEMA}.order_list
+        WHERE ${createVietnameseStatusKey("tinh_trang")} = 'chua thanh toan'
+          AND COALESCE(check_flag, FALSE) = FALSE
+          AND ${createSourceKey("nguon")} = $1
+        ORDER BY ngay_dang_ki ASC NULLS FIRST, id ASC;
+      `, [normalizedSourceKey]
+        );
+
+        const unpaidRows = unpaidResult.rows || [];
+        let runningSum = 0;
+        const orderIdsToMark = [];
+        for (const row of unpaidRows) {
+            if (runningSum >= normalizedPaidAmount) break;
+            const giaNhap = Number(row.gia_nhap) || 0;
+            runningSum += giaNhap;
+            orderIdsToMark.push(row.id);
+        }
+
+        if (orderIdsToMark.length) {
+            await pool.query(
+                `
+          UPDATE ${DB_SCHEMA}.order_list
+          SET tinh_trang = 'Đã Thanh Toán',
+              check_flag = TRUE
+          WHERE id = ANY($1::int[]);
+        `, [orderIdsToMark]
+            );
+        }
+
+        const totalUnpaidImport = unpaidRows.reduce(
+            (acc, row) => acc + (Number(row.gia_nhap) || 0),
+            0
+        );
+        const remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
+
+        // Nếu còn dư thì tạo chu kỳ mới "Chưa Thanh Toán" với ghi chú ngày hiện tại
+        if (remainingImport > 0 && sourceId) {
+            const now = new Date();
+            const day = String(now.getUTCDate()).padStart(2, "0");
+            const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+            const year = now.getUTCFullYear();
+            const dmyNote = `${day}/${month}/${year}`;
+
+            await pool.query(
+                `
+          INSERT INTO mavryk.payment_supply (source_id, import, paid, round, status)
+          VALUES ($1, $2, 0, $3, 'Chưa Thanh Toán');
+        `, [sourceId, remainingImport, dmyNote]
+            );
+        }
+
         const updateQuery = `
       UPDATE mavryk.payment_supply
       SET status = 'Đã Thanh Toán',
-          paid = CASE
-            WHEN $2::numeric IS NOT NULL AND $2::numeric >= 0
-              THEN $2::numeric
-            ELSE COALESCE(import, 0)
-          END
+          paid = $2
       WHERE id = $1
       RETURNING id, source_id, import, paid, status, round;
     `;
         const result = await pool.query(updateQuery, [
             parsedPaymentId,
-            hasPaidAmount ? paidAmountNumber : null,
+            normalizedPaidAmount,
         ]);
-        if (!result.rows.length) {
-            return res.status(404).json({ error: "Payment record not found." });
-        }
+
+        await pool.query("COMMIT");
         res.json(result.rows[0]);
     } catch (error) {
+        await pool.query("ROLLBACK");
         console.error(
             `Mutation failed (POST /api/payment-supply/${paymentId}/confirm):`,
             error
@@ -2765,6 +2853,17 @@ app.put("/api/orders/:id", async(req, res) => {
 
     const setClauses = fields.map((column, index) => `"${column}" = $${index + 1}`);
     const values = fields.map((column) => payload[column]);
+
+    // Nếu trạng thái set về "Đã Thanh Toán" thì tự động bật check_flag = TRUE
+    if (
+        payload.tinh_trang &&
+        typeof payload.tinh_trang === "string" &&
+        payload.tinh_trang.trim() === "Đã Thanh Toán" &&
+        !fields.includes("check_flag")
+    ) {
+        setClauses.push(`"check_flag" = $${values.length + 1}`);
+        values.push(true);
+    }
 
     const q = `
     UPDATE mavryk.order_list

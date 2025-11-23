@@ -413,7 +413,11 @@ const enhancePackageRow = (
         .filter((code) => Boolean(code))
     : [];
   const normalizedProductCodes = Array.from(
-    new Set(productCodes.map((code) => normalizeProductCodeValue(code)).filter(Boolean))
+    new Set(
+      productCodes
+        .map((code) => normalizeProductCodeValue(code))
+        .filter(Boolean)
+    )
   );
   return {
     ...row,
@@ -719,8 +723,7 @@ export default function PackageProduct() {
   const handleCategorySelect = useCallback(
     (value: string) => {
       setCategoryFilter((prev) => {
-        const next =
-          value === "all" ? "all" : prev === value ? "all" : value;
+        const next = value === "all" ? "all" : prev === value ? "all" : value;
         const params = new URLSearchParams(location.search);
         if (next === "all") {
           params.delete("package");
@@ -1254,9 +1257,7 @@ export default function PackageProduct() {
         : packages;
 
       setRows((prev) =>
-        prev.filter(
-          (row) => !deletedNames.includes((row.package || "").trim())
-        )
+        prev.filter((row) => !deletedNames.includes((row.package || "").trim()))
       );
       setTemplates((prev) =>
         prev.filter((tpl) => !deletedNames.includes(tpl.name))
@@ -1275,7 +1276,12 @@ export default function PackageProduct() {
       setDeleteProcessing(false);
       resetDeleteSelection();
     }
-  }, [packagesMarkedForDeletion, resetDeleteSelection, selectedPackage, handleCategorySelect]);
+  }, [
+    packagesMarkedForDeletion,
+    resetDeleteSelection,
+    selectedPackage,
+    handleCategorySelect,
+  ]);
   const openEditModal = useCallback(
     (row: AugmentedRow) => {
       const template = templates.find((tpl) => tpl.name === row.package) ?? {
@@ -1398,12 +1404,14 @@ export default function PackageProduct() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Gói Sản Phẩm</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Quản Lý Gói Sản Phẩm
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
             Quản lý các loại gói sản phẩm và các gói con.
           </p>
         </div>
-                <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
+        <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
           {!deleteMode ? (
             <GradientButton
               icon={TrashIcon}
@@ -1448,8 +1456,8 @@ export default function PackageProduct() {
             Thêm Gói
           </GradientButton>
         </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {slotStats.map((stat) => (
           <StatCard
             key={stat.name}
@@ -1472,7 +1480,9 @@ export default function PackageProduct() {
           </div>
         </div>
         {packageSummaries.length === 0 ? (
-          <p className="mt-6 text-sm text-gray-500">Không có loại gói nào để hiển thị.</p>
+          <p className="mt-6 text-sm text-gray-500">
+            Không có loại gói nào để hiển thị.
+          </p>
         ) : (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {packageSummaries.map((summary, index) => {
@@ -1485,7 +1495,9 @@ export default function PackageProduct() {
               return (
                 <div
                   key={summary.name}
-                  className={`relative isolate rounded-3xl border ${accent.border} bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
+                  className={`relative isolate rounded-3xl border ${
+                    accent.border
+                  } bg-white/80 p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
                     isSelected
                       ? "ring-2 ring-blue-400 shadow-[0_25px_65px_-35px_rgba(37,99,235,0.7)]"
                       : "hover:shadow-[0_30px_75px_-40px_rgba(15,23,42,0.55)]"
@@ -1532,7 +1544,9 @@ export default function PackageProduct() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleEditTemplateFields(summary.name)}
+                            onClick={() =>
+                              handleEditTemplateFields(summary.name)
+                            }
                             className="p-2 rounded-full hover:bg-indigo-50 text-indigo-500 transition"
                             title="Chỉnh sửa Loại Gói"
                           >
@@ -1644,9 +1658,6 @@ export default function PackageProduct() {
                       Thông Tin Gói
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ghi Chú
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Vị Trí
                     </th>
                     {showCapacityColumn && (
@@ -1662,6 +1673,9 @@ export default function PackageProduct() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ngày Hết Hạn
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ghi Chú
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Thao Tác
@@ -1750,20 +1764,17 @@ export default function PackageProduct() {
                               isExpanded ? "bg-gray-50" : ""
                             } cursor-pointer`}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {item.package}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {item.informationUser || ""}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {item.note || ""}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                <span className="font-medium">{slotUsed}</span>{" "}
-                                / {totalSlots} vị trí
-                              </div>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.package}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.informationUser || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              <span className="font-medium">{slotUsed}</span>{" "}
+                              / {totalSlots} vị trí
+                            </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                 <div
                                   className={`h-2 rounded-full ${slotColorClass}`}
@@ -1810,13 +1821,16 @@ export default function PackageProduct() {
                               {Number(item.import || 0).toLocaleString("vi-VN")}{" "}
                               VND
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatDisplayDate(item.expired)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                              <button
-                                className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
-                                type="button"
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDisplayDate(item.expired)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.note || ""}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                            <button
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                              type="button"
                                 aria-label="Sửa"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1871,26 +1885,26 @@ export default function PackageProduct() {
                                       >
                                         <div className="flex items-center gap-2">
                                           <BoltIcon
-                                        className={`h-5 w-5 ${
-                                          slot.isUsed
-                                            ? "text-yellow-500"
-                                            : "text-green-500"
-                                        }`}
-                                      />
-                                      <span
-                                        className="text-sm font-semibold text-gray-900 max-w-[170px] truncate"
-                                        title={
-                                          slot.assignment?.slotLabel ||
-                                          (slot.assignment
-                                            ? undefined
-                                            : `Vị trí ${slot.slotNumber}`)
-                                        }
-                                      >
-                                        {slot.assignment?.slotLabel
-                                          ? slot.assignment.slotLabel
-                                          : `Vị trí ${slot.slotNumber}`}
-                                      </span>
-                                    </div>
+                                            className={`h-5 w-5 ${
+                                              slot.isUsed
+                                                ? "text-yellow-500"
+                                                : "text-green-500"
+                                            }`}
+                                          />
+                                          <span
+                                            className="text-sm font-semibold text-gray-900 max-w-[170px] truncate"
+                                            title={
+                                              slot.assignment?.slotLabel ||
+                                              (slot.assignment
+                                                ? undefined
+                                                : `Vị trí ${slot.slotNumber}`)
+                                            }
+                                          >
+                                            {slot.assignment?.slotLabel
+                                              ? slot.assignment.slotLabel
+                                              : `Vị trí ${slot.slotNumber}`}
+                                          </span>
+                                        </div>
                                         <p
                                           className={`text-xs mt-1 ${
                                             slot.isUsed
@@ -2082,7 +2096,8 @@ function CreatePackageModal({
           />
           {mode === "edit" && (
             <p className="text-xs text-gray-500 mt-1">
-              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ nguyên.
+              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ
+              nguyên.
             </p>
           )}
         </div>
@@ -2192,7 +2207,9 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
       >
         <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Thông tin gói</h3>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Thông tin gói
+            </h3>
             <p className="text-xs text-gray-500">
               Các trường dữ liệu được lưu cho gói này.
             </p>
@@ -2572,8 +2589,12 @@ function PackageFormModal({
             })}
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            <b>Liên kết theo thông tin đơn hàng:</b> So khớp thông tin của gói này (tài khoản, mail, v.v.) với các chi tiết trong đơn hàng của khách.<br />
-            <b>Liên kết theo vị trí:</b> So khớp thông tin của gói này với một mã vị trí (slot) cụ thể được chỉ định trong đơn hàng.
+            <b>Liên kết theo thông tin đơn hàng:</b> So khớp thông tin của gói
+            này (tài khoản, mail, v.v.) với các chi tiết trong đơn hàng của
+            khách.
+            <br />
+            <b>Liên kết theo vị trí:</b> So khớp thông tin của gói này với một
+            mã vị trí (slot) cụ thể được chỉ định trong đơn hàng.
           </p>
         </div>
         {template.fields.length === 0 && (

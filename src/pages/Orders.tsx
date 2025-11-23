@@ -94,6 +94,7 @@ interface Order {
   note: string;
   tinh_trang: string;
   check_flag: boolean | null;
+  can_hoan?: number | string;
   so_ngay_con_lai: number | null;
 
   [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
@@ -463,6 +464,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       const daysForValue = Math.max(0, effectiveRemaining);
       const giaTriConLai =
         soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
+      const canHoanValue = parseNumeric((order as any).can_hoan);
 
       return {
         ...order,
@@ -472,6 +474,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
         [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: formattedOrderDate,
         [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: formattedExpiryDate,
+        can_hoan: canHoanValue,
       } as Order;
     });
 
@@ -858,6 +861,11 @@ export default function Orders() {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
+  const showRemainingColumn = datasetKey !== "expired";
+  const isCanceled = datasetKey === "canceled";
+  const remainingLabel = isCanceled ? "Giá Trị Còn Lại" : "Còn Lại";
+  const totalColumns = showRemainingColumn ? 7 : 6;
+
   // --- Render Giao diện (Sử dụng ORDER_FIELDS và VIRTUAL_FIELDS) ---
   return (
     <div className="space-y-6">
@@ -1008,9 +1016,11 @@ export default function Orders() {
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   HẠN ĐƠN HÀNG
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
-                  CÒN LẠI
-                </th>
+                {showRemainingColumn && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
+                    {remainingLabel}
+                  </th>
+                )}
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   TRẠNG THÁI
                 </th>
@@ -1023,7 +1033,7 @@ export default function Orders() {
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12">
+                  <td colSpan={totalColumns} className="text-center py-12">
                     <div className="text-gray-400 text-lg mb-2">
                       Không tìm thấy đơn hàng
                     </div>
@@ -1110,20 +1120,28 @@ export default function Orders() {
                             ? `${orderDateDisplay} - ${expiryDateDisplay}`
                             : orderDateDisplay || expiryDateDisplay || ""}
                         </td>
-                        {/* REMAINING (text-center) */}
-                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
-                          <span
-                            className={
-                              soNgayConLai <= 0
-                                ? "text-red-600"
-                                : soNgayConLai <= 4
-                                ? "text-orange-500"
-                                : "text-indigo-600"
-                            }
-                          >
-                            {soNgayConLai}
-                          </span>
-                        </td>
+                        {showRemainingColumn && (
+                          <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
+                            <span
+                              className={
+                                isCanceled
+                                  ? "text-indigo-600"
+                                  : soNgayConLai <= 0
+                                  ? "text-red-600"
+                                  : soNgayConLai <= 4
+                                  ? "text-orange-500"
+                                  : "text-indigo-600"
+                              }
+                            >
+                              {isCanceled
+                                ? Helpers.formatCurrency(
+                                    order.can_hoan ?? 0,
+                                    false
+                                  )
+                                : soNgayConLai}
+                            </span>
+                          </td>
+                        )}
 
                         {/* STATUS (text-center) */}
                         <td className="px-4 py-4 whitespace-nowrap truncate w-[90px] text-center">
@@ -1186,7 +1204,7 @@ export default function Orders() {
                       </tr>
                       {isExpanded && (
                         <tr className="bg-gray-50">
-                          <td colSpan={7} className="px-6 pb-6 pt-0">
+                          <td colSpan={totalColumns} className="px-6 pb-6 pt-0">
                             <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 shadow-sm">
                               <div className="mb-4 flex items-center justify-between">
                                 <p className="text-sm font-semibold text-gray-700">
