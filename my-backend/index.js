@@ -357,7 +357,7 @@ app.post("/api/auth/login", async(req, res) => {
     try {
         const result = await pool.query(
             `
-        SELECT userid, username, passwordhash, passwordsalt, role
+        SELECT userid, username, passwordhash, role
         FROM mavryk.users
         WHERE LOWER(username) = $1
         LIMIT 1;
@@ -444,11 +444,9 @@ const ensureDefaultAdmin = async() => {
         if (existing.rows.length) {
             return;
         }
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(passwordEnv, salt);
         await client.query(
-            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, passwordsalt, role) VALUES ($1, $2, $3, $4)`,
-            [usernameEnv, hash, salt, "admin"]
+            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, role) VALUES ($1, $2, $3)`,
+            [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
         );
         console.log(`[AUTH] Created default admin user '${usernameEnv}'`);
     } catch (err) {
