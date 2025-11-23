@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -351,7 +351,13 @@ app.post("/api/auth/login", async(req, res) => {
             storedHash instanceof Buffer ?
             storedHash.toString() :
             String(storedHash || "");
-        const isMatch = await bcrypt.compare(password, hashString);
+        let isMatch = false;
+        if (hashString.startsWith("$2")) {
+            isMatch = await bcrypt.compare(password, hashString);
+        } else {
+            // Fallback: plain-text match for legacy rows
+            isMatch = password === hashString || password === hashString?.trim();
+        }
         if (!isMatch) {
             return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu." });
         }
