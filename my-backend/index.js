@@ -14,7 +14,7 @@ const port = Number(process.env.PORT) || 3001;
 const DB_SCHEMA = process.env.DB_SCHEMA || "mavryk";
 
 // Trust proxy so secure cookies work behind reverse proxy/HTTPS
-app.set("trust proxy", 1);
+app.set("trust proxy", true);
 
 const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
     .split(",")
