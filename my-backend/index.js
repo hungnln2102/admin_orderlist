@@ -310,6 +310,15 @@ app.use(
 );
 
 app.use(express.json());
+
+const isProd = process.env.NODE_ENV === "production";
+const cookieSecureEnv = (process.env.COOKIE_SECURE || "").toLowerCase();
+const cookieSecure =
+    cookieSecureEnv === "true" ||
+    cookieSecureEnv === "1" ||
+    (!cookieSecureEnv && isProd);
+const cookieSameSite = cookieSecure ? "none" : "lax";
+
 app.use(
     session({
         name: process.env.SESSION_NAME || "mavryk.sid",
@@ -319,8 +328,8 @@ app.use(
         rolling: true,
         cookie: {
             httpOnly: true,
-            sameSite: "none",
-            secure: true,
+            sameSite: cookieSameSite,
+            secure: cookieSecure,
             maxAge: 1000 * 60 * 60 * 1, // 1 hour inactivity
         },
     })
