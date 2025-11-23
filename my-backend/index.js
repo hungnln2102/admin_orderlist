@@ -444,10 +444,11 @@ const ensureDefaultAdmin = async() => {
         if (existing.rows.length) {
             return;
         }
-        const hash = await bcrypt.hash(passwordEnv, 10);
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(passwordEnv, salt);
         await client.query(
-            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, role) VALUES ($1, $2, $3)`,
-            [usernameEnv, hash, "admin"]
+            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, passwordsalt, role) VALUES ($1, $2, $3, $4)`,
+            [usernameEnv, hash, salt, "admin"]
         );
         console.log(`[AUTH] Created default admin user '${usernameEnv}'`);
     } catch (err) {
