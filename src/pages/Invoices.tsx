@@ -264,13 +264,13 @@ export default function Invoices() {
 
     const headerRow = [
       "#",
-      "Ma don",
-      "Nguoi gui",
-      "So tien goc",
-      "So tien dinh dang",
-      "Noi dung chuyen khoan",
-      "Ngay thanh toan",
-      "Nhom",
+      "Mã đơn",
+      "Người gửi",
+      "Số tiền gốc",
+      "Số tiền định dạng",
+      "Nội dung chuyển khoản",
+      "Ngày thanh toán",
+      "Nhóm",
     ];
 
     const dataRows = filteredReceipts.map((receipt, index) => [
@@ -282,8 +282,8 @@ export default function Invoices() {
       receipt.note || "",
       receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "",
       determineReceiptCategory(receipt.orderCode) === "receipt"
-        ? "Bien nhan"
-        : "Hoan tien",
+        ? "Biên nhận"
+        : "Hoàn tiền",
     ]);
 
     const worksheet = XLSXUtils.aoa_to_sheet([headerRow, ...dataRows]);
@@ -299,7 +299,7 @@ export default function Invoices() {
     ];
 
     const workbook = XLSXUtils.book_new();
-    XLSXUtils.book_append_sheet(workbook, worksheet, "Bien nhan thanh toan");
+    XLSXUtils.book_append_sheet(workbook, worksheet, "Biên nhận thanh toán");
     const isoDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     writeXLSXFile(workbook, `payment_receipts_${isoDate}.xlsx`);
   };
@@ -537,10 +537,10 @@ export default function Invoices() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-white drop-shadow-sm">
               Biên Nhận Thanh Toán
             </h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-white/80">
               Theo dõi giao dịch chuyển đến được lưu trong hệ thống
             </p>
           </div>
@@ -567,7 +567,7 @@ export default function Invoices() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4 relative z-50">
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -580,33 +580,33 @@ export default function Invoices() {
               />
             </div>
 
-            <div className="relative flex items-stretch" ref={dateRangeRef}>
+            <div
+              className="relative z-[120] flex items-stretch"
+              ref={dateRangeRef}
+            >
               <button
                 type="button"
                 onClick={() => setRangePickerOpen((prev) => !prev)}
                 className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition w-full lg:w-64 ${
                   rangePickerOpen
-                    ? "border-blue-500 bg-blue-50/40"
-                    : "border-gray-200 bg-gray-50/60 hover:bg-indigo-500/15"
-                }`}
+                    ? "border-indigo-400/70 bg-indigo-900/60 shadow-[0_10px_30px_-18px_rgba(79,70,229,0.65)]"
+                    : "border-white/15 bg-slate-900/70 text-white hover:bg-slate-800/70 shadow-[0_10px_26px_-18px_rgba(0,0,0,0.65)]"
+                } text-white`}
               >
                 <div className="flex flex-col text-left">
-                  <span className="text-xs uppercase tracking-wide text-gray-400">
-                    Khoảng Ngày
-                  </span>
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-sm font-medium">
                     {dateRangeDisplay}
                   </span>
                 </div>
                 <CalendarDaysIcon
                   className={`w-5 h-5 ${
-                    rangePickerOpen ? "text-blue-600" : "text-gray-400"
+                    rangePickerOpen ? "text-indigo-300" : "text-slate-200"
                   }`}
                 />
               </button>
 
               {rangePickerOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-10 p-4 space-y-4">
+                <div className="absolute right-0 top-[calc(100%+8px)] w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-[150] p-4 space-y-4">
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
@@ -614,6 +614,7 @@ export default function Invoices() {
                       </label>
                       <input
                         type="date"
+                        inputMode="numeric"
                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         value={toISODate(dateStart)}
                         onChange={(event) =>
@@ -631,6 +632,7 @@ export default function Invoices() {
                       </label>
                       <input
                         type="date"
+                        inputMode="numeric"
                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         value={toISODate(dateEnd)}
                         onChange={(event) =>
@@ -689,7 +691,7 @@ export default function Invoices() {
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 flex flex-col sm:flex-row gap-3">
+        <div className="rounded-[28px] bg-gradient-to-br from-slate-800/75 via-slate-800/60 to-slate-900/80 border border-white/12 p-4 shadow-[0_20px_55px_-32px_rgba(0,0,0,0.8),0_14px_36px_-28px_rgba(255,255,255,0.18)] backdrop-blur-sm flex flex-col sm:flex-row gap-3 text-slate-200">
           {CATEGORY_OPTIONS.map((option) => {
             const isActive = categoryFilter === option.value;
             return (
@@ -697,22 +699,26 @@ export default function Invoices() {
                 key={option.value}
                 type="button"
                 onClick={() => setCategoryFilter(option.value)}
-                className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition ${
+                className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition shadow-[0_12px_28px_-18px_rgba(0,0,0,0.65)] ${
                   isActive
-                    ? "border-blue-500 bg-blue-50/70"
-                    : "border-gray-200 bg-gray-50 hover:bg-indigo-500/15"
+                    ? "bg-gradient-to-r from-indigo-500 to-violet-500 text-white border-white/50 shadow-[0_16px_45px_-22px_rgba(79,70,229,0.65)]"
+                    : "bg-slate-800/70 text-slate-100 border-white/12 hover:bg-slate-700/70 hover:border-white/20"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold drop-shadow-sm">
                       {option.label}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-300 mt-1">
                       {option.description}
                     </p>
                   </div>
-                  <span className="text-lg font-semibold text-gray-900">
+                  <span
+                    className={`text-lg font-semibold ${
+                      isActive ? "text-white" : "text-slate-100"
+                    }`}
+                  >
                     {categoryCounts[option.value]}
                   </span>
                 </div>
@@ -721,48 +727,53 @@ export default function Invoices() {
           })}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="rounded-[18px] bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 border border-white/12 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-white/10 text-white">
+              <thead className="bg-slate-900/90">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Mã Đơn
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Người Nhận
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Số Tiền
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Nội Dung Chuyển Khoản
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Ngày Thanh Toán
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id} className="hover:bg-indigo-500/10">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+              <tbody className="divide-y divide-white/10">
+                {filteredReceipts.map((receipt, index) => (
+                  <tr
+                    key={receipt.id}
+                    className={`transition ${
+                      index % 2 === 0 ? "bg-slate-900/55" : "bg-indigo-950/40"
+                    } hover:bg-indigo-600/25`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">
                       {receipt.orderCode || "--"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-white">
                         {receipt.sender || "--"}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
                       {formatCurrencyVnd(receipt.amount)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
-                      <span className="block truncate">
+                    <td className="px-6 py-4 text-sm text-white/90 max-w-xs">
+                      <span className="block truncate text-white/90">
                         {receipt.note || "--"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">
                       {receipt.paidAt
                         ? Helpers.formatDateToDMY(receipt.paidAt)
                         : "--"}
@@ -775,14 +786,14 @@ export default function Invoices() {
 
           {!loading && filteredReceipts.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-gray-400 text-lg mb-2">
+              <div className="text-white/70 text-lg mb-2">
                 Không Có Biên Nhận
               </div>
-              <div className="text-gray-500">Thử từ khóa khác</div>
+              <div className="text-white/60">Thử từ khóa khác</div>
             </div>
           )}
           {loading && (
-            <div className="text-center py-8 text-gray-500 text-sm">
+            <div className="text-center py-8 text-white/60 text-sm">
               Đang tải dữ liệu...
             </div>
           )}

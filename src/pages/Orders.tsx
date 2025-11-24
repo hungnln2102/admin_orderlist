@@ -928,53 +928,53 @@ export default function Orders() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="rounded-[18px] bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 border border-white/12 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <table className="min-w-full divide-y divide-white/10 table-fixed text-white">
             {/* thead: Áp dụng width cố định, whitespace-nowrap và truncate, text-center */}
-            <thead className="bg-indigo-500/5">
+            <thead className="bg-slate-900/90">
               <tr>
                 {/* 1. GỘP ORDER + PRODUCT */}
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   ĐƠN HÀNG/SẢN PHẨM
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[140px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[140px] whitespace-nowrap truncate">
                   THÔNG TIN ĐƠN HÀNG
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   KHÁCH HÀNG
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
                   HẠN ĐƠN HÀNG
                 </th>
                 {showRemainingColumn && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
+                  <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
                     {remainingLabel}
                   </th>
                 )}
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   TRẠNG THÁI
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
+                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
                   THAO TÁC
                 </th>
               </tr>
             </thead>
             {/* tbody: Áp dụng text-center và text-right cho các cột cụ thể */}
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-white/10">
               {currentOrders.length === 0 ? (
                 <tr>
                   <td colSpan={totalColumns} className="text-center py-12">
-                    <div className="text-gray-400 text-lg mb-2">
+                    <div className="text-white/70 text-lg mb-2">
                       Không tìm thấy đơn hàng
                     </div>
-                    <div className="text-gray-500">
+                    <div className="text-white/60">
                       Thử thay đổi bộ lọc tìm kiếm
                     </div>
                   </td>
                 </tr>
               ) : (
-                currentOrders.map((order) => {
+                currentOrders.map((order, index) => {
                   const {
                     [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
                     [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
@@ -1000,30 +1000,30 @@ export default function Orders() {
                     <React.Fragment key={order.id}>
                       <tr
                         onClick={() => handleToggleDetails(order.id)}
-                        className={`cursor-pointer hover:bg-indigo-500/10 ${
-                          isExpanded ? "bg-indigo-500/20" : ""
-                        }`}
+                        className={`cursor-pointer transition ${
+                          index % 2 === 0 ? "bg-slate-900/55" : "bg-indigo-950/40"
+                        } ${isExpanded ? "bg-indigo-700/25" : ""} hover:bg-indigo-600/25`}
                       >
                         {/* 1. GỘP ORDER + PRODUCT */}
-                        <td className="px-4 py-4 text-sm font-medium text-gray-900 w-[150px] text-center">
+                        <td className="px-4 py-4 text-sm font-medium text-white w-[150px] text-center">
                           <div className="flex flex-col items-center">
                             <span className="font-bold whitespace-nowrap truncate max-w-[150px]">
                               {order[ORDER_FIELDS.ID_DON_HANG] || ""}
                             </span>
-                            <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+                            <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
                               {order[ORDER_FIELDS.SAN_PHAM] || ""}
                             </span>
                           </div>
                         </td>
 
                         {/* INFORMATION + SLOT (text-center) */}
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-[140px] text-center">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-white w-[140px] text-center">
                           <div className="flex flex-col items-center">
-                            <span className="text-gray-600 text-xs whitespace-nowrap truncate max-w-[150px]">
+                            <span className="text-white/80 text-xs whitespace-nowrap truncate max-w-[150px]">
                               {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
                             </span>
                             {order[ORDER_FIELDS.SLOT] ? (
-                              <span className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+                              <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
                                 {order[ORDER_FIELDS.SLOT]}
                               </span>
                             ) : null}
@@ -1031,13 +1031,13 @@ export default function Orders() {
                         </td>
 
                         {/* 2. GỘP CUSTOMER + CONTACT */}
-                        <td className="px-4 py-4 text-sm text-gray-900 w-[150px] text-center">
+                        <td className="px-4 py-4 text-sm text-white w-[150px] text-center">
                           <div className="flex flex-col items-center">
                             <span className="font-medium whitespace-nowrap truncate max-w-[150px]">
                               {order[ORDER_FIELDS.KHACH_HANG] || ""}
                             </span>
                             <span
-                              className="text-gray-500 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
+                              className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
                               title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
                             >
                               {order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
@@ -1046,7 +1046,7 @@ export default function Orders() {
                         </td>
 
                         {/* ORDER RANGE (text-center) */}
-                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-gray-200 w-[150px] text-center">
+                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-white w-[150px] text-center">
                           {orderDateDisplay && expiryDateDisplay
                             ? `${orderDateDisplay} - ${expiryDateDisplay}`
                             : orderDateDisplay || expiryDateDisplay || ""}
@@ -1134,7 +1134,7 @@ export default function Orders() {
                         </td>
                       </tr>
                       {isExpanded && (
-                        <tr className="bg-indigo-500/5">
+                        <tr className="bg-indigo-900/40">
                           <td colSpan={totalColumns} className="px-6 pb-6 pt-0">
                             <div className="rounded-2xl border border-dashed border-indigo-200/60 bg-indigo-600/20 p-5 shadow-lg shadow-indigo-900/30">
                               <div className="mb-4 flex items-center justify-between">
@@ -1233,15 +1233,15 @@ export default function Orders() {
 
         {/* Thanh phân trang */}
         {filteredOrders.length > 0 && (
-          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between border-t border-white/10 bg-slate-900/85 text-white px-4 py-3 sm:px-6">
             {/* Bộ chọn số dòng / trang */}
-            <div className="flex items-center space-x-2 text-sm text-gray-700">
+            <div className="flex items-center space-x-2 text-sm text-white/80">
               <span>Hiển thị</span>
               <select
                 id="rowsPerPage"
                 value={rowsPerPage}
                 onChange={(e) => setRowsPerPage(Number(e.target.value))}
-                className="rounded-md border border-gray-300 py-1 pl-2 pr-7 text-gray-700 focus:border-blue-500 focus:ring-blue-500"
+                className="rounded-md border border-white/20 bg-slate-900/70 py-1 pl-2 pr-7 text-white focus:border-indigo-400 focus:ring-indigo-400"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -1251,14 +1251,14 @@ export default function Orders() {
             </div>
             {/* Nút bấm chuyển trang */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-white/80">
                 Trang {currentPage} của {totalPages} (Tổng:{" "}
                 {filteredOrders.length} kết quả)
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="rounded p-1 text-gray-500 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded p-1 text-white/70 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
@@ -1267,7 +1267,7 @@ export default function Orders() {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="rounded p-1 text-gray-500 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded p-1 text-white/70 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRightIcon className="h-5 w-5" />
               </button>
