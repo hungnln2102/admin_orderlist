@@ -1,4 +1,4 @@
-﻿// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
+// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -817,9 +817,9 @@ export default function Orders() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản Lý Đơn Hàng</h1>
+          <h1 className="text-2xl font-bold text-white">Quản Lý Đơn Hàng</h1>
 
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-200">
             Quản lý và theo dõi tất cả các đơn hàng của khách hàng
           </p>
         </div>
@@ -835,7 +835,7 @@ export default function Orders() {
 
       {/* Dataset Switcher */}
 
-      <div className="rounded-[28px] bg-gradient-to-r from-indigo-900/70 via-indigo-800/70 to-slate-900/80 p-4 shadow-[0_25px_55px_-28px_rgba(0,0,0,0.8),0_16px_38px_-26px_rgba(88,28,135,0.55)] border border-white/10">
+      <div className="rounded-[28px] bg-gradient-to-r from-indigo-200/60 via-indigo-300/55 to-slate-200/45 p-4 shadow-[0_20px_50px_-28px_rgba(0,0,0,0.5),0_14px_32px_-24px_rgba(255,255,255,0.25)] border border-white/20">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {ORDER_DATASET_SEQUENCE.map((key) => {
             const config = ORDER_DATASET_CONFIG[key];
@@ -860,7 +860,9 @@ export default function Orders() {
                     {config.label}
                   </p>
 
-                  <p className="text-xs text-indigo-100/80">{config.description}</p>
+                  <p className="text-xs text-indigo-100/80">
+                    {config.description}
+                  </p>
                 </div>
 
                 <div className="text-2xl font-bold text-lime-200 drop-shadow">
@@ -874,7 +876,7 @@ export default function Orders() {
 
       {/* Stats */}
 
-      <div className="rounded-[32px] bg-gradient-to-br from-white/5 via-indigo-900/35 to-indigo-950/55 border border-white/10 p-6 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {updatedStats.map((stat) => (
             <StatCard
@@ -911,8 +913,12 @@ export default function Orders() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value={ORDER_STATUSES.DA_THANH_TOAN}>Đã thanh toán</option>
-              <option value={ORDER_STATUSES.CHUA_THANH_TOAN}>Chưa thanh toán</option>
+              <option value={ORDER_STATUSES.DA_THANH_TOAN}>
+                Đã thanh toán
+              </option>
+              <option value={ORDER_STATUSES.CHUA_THANH_TOAN}>
+                Chưa thanh toán
+              </option>
               <option value={ORDER_STATUSES.CAN_GIA_HAN}>Cần gia hạn</option>
               <option value={ORDER_STATUSES.HET_HAN}>Hết hạn</option>
             </select>
@@ -1040,7 +1046,7 @@ export default function Orders() {
                         </td>
 
                         {/* ORDER RANGE (text-center) */}
-                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-gray-500 w-[150px] text-center">
+                        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-gray-200 w-[150px] text-center">
                           {orderDateDisplay && expiryDateDisplay
                             ? `${orderDateDisplay} - ${expiryDateDisplay}`
                             : orderDateDisplay || expiryDateDisplay || ""}

@@ -354,9 +354,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   };
 
   const inputClass =
-    "mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm";
-  const readOnlyClass = `bg-gray-200 cursor-not-allowed`;
-  const labelClass = "block text-sm font-medium text-gray-700";
+    "mt-1 block w-full px-3 py-2 border border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-400 rounded-md shadow-sm focus:outline-none focus:ring-sky-400 focus:border-sky-400 sm:text-sm";
+  const readOnlyClass = `bg-slate-800/60 cursor-not-allowed`;
+  const labelClass = "block text-sm font-medium text-slate-200";
 
   const isReadOnly = (fieldName: string) =>
     READ_ONLY_FIELDS.includes(fieldName);
@@ -370,12 +370,12 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-gray-200 flex justify-center items-center bg-gray-50 sticky top-0 z-10">
-          <h3 className="text-2xl font-bold text-gray-800">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-900/90 border border-white/10 rounded-xl shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col text-slate-100">
+        <div className="p-5 border-b border-slate-700 flex justify-center items-center bg-slate-800/80 sticky top-0 z-10">
+          <h3 className="text-2xl font-bold text-white">
             Chỉnh sửa Đơn hàng:{" "}
-            <span className="text-blue-600">
+            <span className="text-sky-400">
               {formData[ORDER_FIELDS.ID_DON_HANG]}
             </span>
           </h3>

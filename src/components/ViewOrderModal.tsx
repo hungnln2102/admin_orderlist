@@ -194,12 +194,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     `&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 transition-opacity duration-300 px-4 py-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 px-4 py-6">
       {/* Modal container */}
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden">
+      <div className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="flex justify-center items-center p-4 border-b bg-gray-50 rounded-t-lg sticky top-0 z-10">
-          <h3 className="text-xl font-semibold text-gray-800">
+        <div className="flex justify-center items-center p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
+          <h3 className="text-xl font-semibold text-white">
             Chi Tiết Đơn Hàng:{" "}
             <span className="text-blue-600">{order.id_don_hang}</span>
           </h3>
@@ -219,37 +219,37 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             {/* Left */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">ID Đơn:</dt>
-                <dd className="text-gray-900 font-semibold w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">ID Đơn:</dt>
+                <dd className="text-slate-100 font-semibold w-2/3 text-right">
                   {order.id_don_hang}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Sản Phẩm:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">Sản Phẩm:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">
                   {order.san_pham}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">
+                <dt className="font-medium text-slate-400 w-1/3">
                   Thông Tin Sản Phẩm:
                 </dt>
-                <dd className="text-gray-900 w-2/3 text-right break-words">
+                <dd className="text-slate-100 w-2/3 text-right break-words">
                   {order.thong_tin_san_pham}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Slot:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">{order.slot}</dd>
+                <dt className="font-medium text-slate-400 w-1/3">Slot:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">{order.slot}</dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ghi Chú:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">Ghi Chú:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">
                   {order.note || "-"}
                 </dd>
               </div>
               <div className="flex justify-between pt-1 pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Trạng Thái:</dt>
+                <dt className="font-medium text-slate-400 w-1/3">Trạng Thái:</dt>
                 <dd className="w-2/3 text-right">
                   <span
                     className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
@@ -265,13 +265,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             {/* Right */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Khách Hàng:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">Khách Hàng:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">
                   {order.khach_hang}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1 items-start">
-                <dt className="font-medium text-gray-500 w-1/3 shrink-0">
+                <dt className="font-medium text-slate-400 w-1/3 shrink-0">
                   Liên Hệ:
                 </dt>
                 <dd className="w-2/3 text-right break-all">
@@ -286,27 +286,27 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Ngày Order:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">Ngày Order:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">
                   {registrationDisplay}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">Số Ngày:</dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dt className="font-medium text-slate-400 w-1/3">Số Ngày:</dt>
+                <dd className="text-slate-100 w-2/3 text-right">
                   {order.so_ngay_da_dang_ki}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">
+                <dt className="font-medium text-slate-400 w-1/3">
                   Ngày Hết Hạn:
                 </dt>
-                <dd className="text-gray-900 w-2/3 text-right">
+                <dd className="text-slate-100 w-2/3 text-right">
                   {expiryDisplay}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-gray-500 w-1/3">
+                <dt className="font-medium text-slate-400 w-1/3">
                   Số Ngày Còn Lại:
                 </dt>
                 <dd className="text-indigo-600 font-bold w-2/3 text-right">
@@ -321,7 +321,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
           {/* QR Code */}
           <div className="text-center bg-gradient-to-b from-gray-50 to-white p-4 rounded-md border border-gray-200 shadow-inner">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">
+            <h4 className="text-lg font-semibold text-white mb-3">
               Quét Mã QR Để Thanh Toán (VietQR)
             </h4>
             {qrCodeImageUrl ? (

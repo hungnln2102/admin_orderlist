@@ -9,17 +9,17 @@
 .app-aurora {
   background: radial-gradient(
       circle at 20% 15%,
-      rgba(120, 63, 255, 0.18),
+      rgba(120, 63, 255, 0.12),
       transparent 28%
     ),
     radial-gradient(
       circle at 80% 10%,
-      rgba(44, 186, 255, 0.14),
+      rgba(44, 186, 255, 0.1),
       transparent 26%
     ),
     radial-gradient(
       circle at 30% 80%,
-      rgba(255, 120, 180, 0.12),
+      rgba(255, 120, 180, 0.08),
       transparent 32%
     ),
     linear-gradient(135deg, #050410, #0a0c1f 45%, #0b0a1a);
@@ -38,12 +38,12 @@
 .app-aurora .shadow-lg,
 .app-aurora .shadow-xl,
 .app-aurora .shadow-2xl {
-  background: rgb(122 95 251 / 58%);
+  background: rgba(60, 54, 115, 0.48);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: none;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(120, 90, 190, 0.28);
-  color: #f7f7ff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 16px rgba(90, 72, 150, 0.18);
+  color: #e9ebff;
   border-radius: 18px;
 }
 
@@ -57,7 +57,7 @@
 .app-aurora textarea,
 .app-aurora select {
   background: rgba(24, 20, 45, 0.82);
-  border: 1px solid rgba(110, 94, 165, 0.75);
+  border: 1px solid rgba(110, 94, 165, 0.5);
   color: #f2f4ff;
 }
 

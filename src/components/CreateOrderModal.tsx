@@ -734,7 +734,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             onClear();
             setOpen(false);
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white"
           aria-label="Clear"
         >
           ×
@@ -881,17 +881,17 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300">
+      <div className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col text-slate-100">
         {/* Header Modal */}
-        <div className="p-5 border-b border-gray-200 sticky top-0 bg-white z-10 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-gray-900">
+        <div className="p-5 border-b border-slate-700 sticky top-0 bg-slate-800/80 z-10 flex justify-between items-center">
+          <h3 className="text-xl font-semibold text-white">
             Tạo Đơn Hàng Mới
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-slate-300 hover:text-white transition-colors"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>

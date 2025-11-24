@@ -16,8 +16,6 @@ import {
 
 } from "@heroicons/react/24/outline";
 
-import GlassPanel from "../components/GlassPanel";
-
 import StatCard, {
 
   STAT_CARD_ACCENTS,
@@ -416,7 +414,7 @@ const Dashboard: React.FC = () => {
 
 
 
-      <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statsData.map((item, index) => (
             <StatCard
@@ -458,7 +456,7 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
-        <GlassPanel glow="sky" className="p-6">
+        <div className="relative rounded-3xl border border-white/20 bg-gradient-to-br from-indigo-200/40 via-indigo-300/35 to-slate-200/40 p-6 shadow-[0_20px_55px_-28px_rgba(0,0,0,0.65),0_14px_36px_-24px_rgba(255,255,255,0.2)] backdrop-blur">
 
           <div className="mb-6 flex items-center justify-between">
 
@@ -506,22 +504,20 @@ const Dashboard: React.FC = () => {
 
               <LineChart data={revenueChartData}>
 
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e166" />
 
-                <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+                <XAxis
+                  dataKey="month"
+                  stroke="#e5e7eb"
+                  tick={{ fill: "#e5e7eb", fontSize: 12 }}
+                />
 
                 <YAxis
-
-                  stroke="#6b7280"
-
-                  fontSize={12}
-
+                  stroke="#e5e7eb"
+                  tick={{ fill: "#e5e7eb", fontSize: 12 }}
                   tickFormatter={(value) =>
-
                     `${Math.round((value as number) / 1_000_000)}M`
-
                   }
-
                 />
 
                 <Tooltip
@@ -560,11 +556,11 @@ const Dashboard: React.FC = () => {
 
           </div>
 
-        </GlassPanel>
+        </div>
 
 
 
-        <GlassPanel glow="violet" className="p-6">
+          <div className="relative rounded-3xl border border-white/20 bg-gradient-to-br from-indigo-200/40 via-indigo-300/35 to-slate-200/40 p-6 shadow-[0_20px_55px_-28px_rgba(0,0,0,0.65),0_14px_36px_-24px_rgba(255,255,255,0.2)] backdrop-blur">
 
           <h3 className="mb-6 text-lg font-semibold text-gray-900">
 
@@ -578,11 +574,18 @@ const Dashboard: React.FC = () => {
 
               <BarChart data={orderChartData}>
 
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e166" />
 
-                <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
+                <XAxis
+                  dataKey="month"
+                  stroke="#e5e7eb"
+                  tick={{ fill: "#e5e7eb", fontSize: 12 }}
+                />
 
-                <YAxis stroke="#6b7280" fontSize={12} />
+                <YAxis
+                  stroke="#e5e7eb"
+                  tick={{ fill: "#e5e7eb", fontSize: 12 }}
+                />
 
                 <Tooltip
 
@@ -628,7 +631,7 @@ const Dashboard: React.FC = () => {
 
           </div>
 
-        </GlassPanel>
+        </div>
 
       </div>
 

@@ -187,7 +187,6 @@ const updateDatabaseTask = async (trigger = "cron") => {
       SET tinh_trang = '${STATUS_RENEW}',
           check_flag = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
-        AND (tinh_trang IS DISTINCT FROM '${STATUS_PAID}')
         AND (tinh_trang IS DISTINCT FROM '${STATUS_EXPIRED}')
         AND (tinh_trang IS DISTINCT FROM '${STATUS_RENEW}');
     `);
