@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useState,
   useEffect,
   useCallback,
@@ -88,12 +88,12 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
       );
       if (!response.ok)
-        throw new Error("L?i t?i danh s?ch ngu?n theo s?n ph?m.");
+        throw new Error("Lỗi tải danh sách nguồn theo sản phẩm.");
       const data: Supply[] = await response.json();
       setSupplies(data);
       return data;
     } catch (error) {
-      console.error("L?i t?i ngu?n theo s?n ph?m:", error);
+      console.error("Lỗi tải nguồn theo sản phẩm:", error);
       setSupplies([]);
       return [];
     }
@@ -136,12 +136,12 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           const message =
             (data as { error?: string } | null)?.error ||
             rawText ||
-            "Loi tinh toan gia tu server.";
+            "Lỗi tính toán giá từ server.";
           throw new Error(message);
         }
 
         if (!data) {
-          throw new Error("Phan hoi khong hop le tu server.");
+          throw new Error("Phản hồi không hợp lệ từ server.");
         }
 
         const result: CalculatedPriceResult = data;
@@ -205,10 +205,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           };
         });
       } catch (error) {
-        console.error("Loi khi tinh toan gia:", error);
+        console.error("Lỗi khi tính toán giá:", error);
         alert(
-          `Loi khi tinh toan gia: ${
-            error instanceof Error ? error.message : "Loi khong xac dinh"
+          `Lỗi khi tính toán giá: ${
+            error instanceof Error ? error.message : "Lỗi không xác định"
           }`
         );
       }
@@ -464,154 +464,219 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               </div>
 
               <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                  Thông tin Sản phẩm & Ngày
-                </h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Sản Phẩm</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.SAN_PHAM}
-                      value={formData?.[ORDER_FIELDS.SAN_PHAM] ?? ""}
-                      readOnly
-                      className={`${inputClass} ${readOnlyClass}`}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Sản phẩm đã được khóa, vui lòng thay đổi nguồn cho phù hợp.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Thông Tin Sản Phẩm</label>
-                    <textarea
-                      name={ORDER_FIELDS.THONG_TIN_SAN_PHAM}
-                      value={formData?.[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ?? ""}
-                      onChange={handleChange}
-                      rows={3}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Slot</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.SLOT}
-                      value={formData?.[ORDER_FIELDS.SLOT] ?? ""}
-                      onChange={handleChange}
-                      className={inputClass}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Ngày Đăng Ký</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.NGAY_DANG_KI}
-                      value={displayDate(formData[ORDER_FIELDS.NGAY_DANG_KI])}
-                      readOnly={isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)}
-                      className={`${inputClass} ${
-                        isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)
-                          ? readOnlyClass
-                          : ""
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Số Ngày Đăng Ký</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
-                      value={formData?.[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ?? ""}
-                      readOnly={isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)}
-                      className={`${inputClass} ${
-                        isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)
-                          ? readOnlyClass
-                          : ""
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Ngày Hết Hạn</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.HET_HAN}
-                      value={displayDate(formData[ORDER_FIELDS.HET_HAN])}
-                      readOnly={isReadOnly(ORDER_FIELDS.HET_HAN)}
-                      className={`${inputClass} ${
-                        isReadOnly(ORDER_FIELDS.HET_HAN) ? readOnlyClass : ""
-                      }`}
-                    />
-                  </div>
-                </div>
+                                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
+                                  Thông tin Sản phẩm & Ngày
+                                </h4>
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className={labelClass}>Sản Phẩm</label>
+                                    <input
+                                      type="text"
+                                      name={ORDER_FIELDS.SAN_PHAM}
+                                      value={formData?.[ORDER_FIELDS.SAN_PHAM] ?? ""}
+                                      readOnly
+                                      className={`${inputClass} ${readOnlyClass}`}
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Sản phẩm đã được khóa, vui lòng thay đổi nguồn cho phù hợp.
+                                    </p>
+                                  </div>
+                
+                                  <div>
+                                    <label className={labelClass}>Thông Tin Sản Phẩm</label>
+                                    <textarea
+                                      name={ORDER_FIELDS.THONG_TIN_SAN_PHAM}
+                                      value={formData?.[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ?? ""}
+                                      onChange={handleChange}
+                                      rows={3}
+                                      className={inputClass}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={labelClass}>Slot</label>
+                                    <input
+                                      type="text"
+                                      name={ORDER_FIELDS.SLOT}
+                                      value={formData?.[ORDER_FIELDS.SLOT] ?? ""}
+                                      onChange={handleChange}
+                                      className={inputClass}
+                                    />
+                                  </div>
+                
+                                  <div>
+                                    <label className={labelClass}>Ngày Đăng Ký</label>
+                                    <input
+                                      type="text"
+                                      name={ORDER_FIELDS.NGAY_DANG_KI}
+                                      value={displayDate(formData[ORDER_FIELDS.NGAY_DANG_KI])}
+                                      readOnly={isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)}
+                                      className={`${inputClass} ${
+                                        isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)
+                                          ? readOnlyClass
+                                          : ""
+                                      }`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={labelClass}>Số Ngày Đăng Ký</label>
+                                    <input
+                                      type="text"
+                                      name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
+                                      value={formData?.[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ?? ""}
+                                      readOnly={isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)}
+                                      className={`${inputClass} ${
+                                        isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)
+                                          ? readOnlyClass
+                                          : ""
+                                      }`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={labelClass}>Ngày Hết Hạn</label>
+                                    <input
+                                      type="text"
+                                      name={ORDER_FIELDS.HET_HAN}
+                                      value={displayDate(formData[ORDER_FIELDS.HET_HAN])}
+                                      readOnly={isReadOnly(ORDER_FIELDS.HET_HAN)}
+                                      className={`${inputClass} ${
+                                        isReadOnly(ORDER_FIELDS.HET_HAN) ? readOnlyClass : ""
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
               </div>
 
-              <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                  Thông tin Tài chính & Ghi chú
-                </h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Giá Nhập (đ)</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.GIA_NHAP}
-                      value={Helpers.formatCurrency(
-                        formData[ORDER_FIELDS.GIA_NHAP]
-                      )}
-                      readOnly={isReadOnly(ORDER_FIELDS.GIA_NHAP)}
-                      className={`${inputClass} font-semibold text-blue-700 ${
-                        isReadOnly(ORDER_FIELDS.GIA_NHAP) ? readOnlyClass : ""
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Giá Bán (đ)</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.GIA_BAN}
-                      value={Helpers.formatCurrency(
-                        formData[ORDER_FIELDS.GIA_BAN]
-                      )}
-                      readOnly={isReadOnly(ORDER_FIELDS.GIA_BAN)}
-                      className={`${inputClass} font-semibold text-green-700 ${
-                        isReadOnly(ORDER_FIELDS.GIA_BAN) ? readOnlyClass : ""
-                      }`}
-                    />
-                  </div>
+                            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
 
-                  <div>
-                    <label className={labelClass}>Ghi Chú</label>
-                    <textarea
-                      name={ORDER_FIELDS.NOTE}
-                      value={formData?.[ORDER_FIELDS.NOTE] ?? ""}
-                      onChange={handleChange}
-                      rows={8}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </form>
-        </div>
+                              <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
 
-        <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end sticky bottom-0 z-10">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors shadow-sm mr-3"
-          >
-            Hủy
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            className="px-6 py-2 text-base font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-          >
-            Lưu Thay Đổi
-          </button>
-        </div>
+                                Thông tin Tài chính & Ghi chú
+
+                              </h4>
+
+                              <div className="space-y-4">
+
+                                <div>
+
+                                  <label className={labelClass}>Giá Nhập (đ)</label>
+
+                                  <input
+
+                                    type="text"
+
+                                    name={ORDER_FIELDS.GIA_NHAP}
+
+                                    value={Helpers.formatCurrency(
+
+                                      formData[ORDER_FIELDS.GIA_NHAP]
+
+                                    )}
+
+                                    readOnly={isReadOnly(ORDER_FIELDS.GIA_NHAP)}
+
+                                    className={`${inputClass} font-semibold text-blue-700 ${
+
+                                      isReadOnly(ORDER_FIELDS.GIA_NHAP) ? readOnlyClass : ""
+
+                                    }`}
+
+                                  />
+
+                                </div>
+
+                                <div>
+
+                                  <label className={labelClass}>Giá Bán (đ)</label>
+
+                                  <input
+
+                                    type="text"
+
+                                    name={ORDER_FIELDS.GIA_BAN}
+
+                                    value={Helpers.formatCurrency(
+
+                                      formData[ORDER_FIELDS.GIA_BAN]
+
+                                    )}
+
+                                    readOnly={isReadOnly(ORDER_FIELDS.GIA_BAN)}
+
+                                    className={`${inputClass} font-semibold text-green-700 ${
+
+                                      isReadOnly(ORDER_FIELDS.GIA_BAN) ? readOnlyClass : ""
+
+                                    }`}
+
+                                  />
+
+                                </div>
+
+              
+
+                                <div>
+
+                                  <label className={labelClass}>Ghi Chú</label>
+
+                                  <textarea
+
+                                    name={ORDER_FIELDS.NOTE}
+
+                                    value={formData?.[ORDER_FIELDS.NOTE] ?? ""}
+
+                                    onChange={handleChange}
+
+                                    rows={8}
+
+                                    className={inputClass}
+
+                                  />
+
+                                </div>
+
+                              </div>
+
+                            </div>
+
+                          </div>
+
+                        </form>
+
+                      </div>
+
+              
+
+                      <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end sticky bottom-0 z-10">
+
+                        <button
+
+                          type="button"
+
+                          onClick={onClose}
+
+                          className="px-6 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-indigo-500/15 transition-colors shadow-sm mr-3"
+
+                        >
+
+                          Hủy
+
+                        </button>
+
+                        <button
+
+                          type="submit"
+
+                          onClick={handleSubmit}
+
+                          className="px-6 py-2 text-base font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+
+                        >
+
+                          Lưu Thay Đổi
+
+                        </button>
+
+                      </div>
       </div>
     </div>
   );

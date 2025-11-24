@@ -416,74 +416,42 @@ const Dashboard: React.FC = () => {
 
 
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        {statsData.map((item, index) => (
-
-          <StatCard
-
-            key={`${item.name}-${index}`}
-
-            title={item.name}
-
-            value={item.value}
-
-            icon={item.icon}
-
-            accent={item.accent}
-
-          >
-
-            <div
-
-              className={`flex items-center text-sm font-semibold ${
-
-                item.changeType === "increase"
-
-                  ? "text-emerald-600"
-
-                  : item.changeType === "decrease"
-
-                  ? "text-rose-600"
-
-                  : "text-amber-600"
-
-              }`}
-
+      <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {statsData.map((item, index) => (
+            <StatCard
+              key={`${item.name}-${index}`}
+              title={item.name}
+              value={item.value}
+              icon={item.icon}
+              accent={item.accent}
             >
-
-              {item.changeType === "alert" ? (
-
-                <span className="uppercase tracking-wide">Alert</span>
-
-              ) : item.changeType === "increase" ? (
-
-                <>
-
-                  <ArrowUpIcon className="mr-1 h-4 w-4" />
-
-                  {item.change}
-
-                </>
-
-              ) : (
-
-                <>
-
-                  <ArrowDownIcon className="mr-1 h-4 w-4" />
-
-                  {item.change}
-
-                </>
-
-              )}
-
-            </div>
-
-          </StatCard>
-
-        ))}
-
+              <div
+                className={`flex items-center text-sm font-semibold ${
+                  item.changeType === "increase"
+                    ? "text-emerald-200"
+                    : item.changeType === "decrease"
+                    ? "text-rose-200"
+                    : "text-amber-200"
+                }`}
+              >
+                {item.changeType === "alert" ? (
+                  <span className="uppercase tracking-wide">Alert</span>
+                ) : item.changeType === "increase" ? (
+                  <>
+                    <ArrowUpIcon className="mr-1 h-4 w-4" />
+                    {item.change}
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownIcon className="mr-1 h-4 w-4" />
+                    {item.change}
+                  </>
+                )}
+              </div>
+            </StatCard>
+          ))}
+        </div>
       </div>
 
 

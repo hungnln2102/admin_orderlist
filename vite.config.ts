@@ -36,6 +36,12 @@ export default defineConfig(({ mode }) => {
     build,
     esbuild,
     define,
+    server: {
+      watch: {
+        usePolling: true,
+        interval: 300,
+      },
+    },
     resolve: {
       alias: {
         "@": "/src",

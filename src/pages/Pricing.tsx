@@ -1902,7 +1902,7 @@ function Pricing() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10 disabled:opacity-50"
                 onClick={closeDeleteProductModal}
                 disabled={deleteProductState.loading}
               >
@@ -2212,17 +2212,19 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pricingStats.map((stat) => (
-            <StatCard
-              key={stat.name}
-              title={stat.name}
-              value={stat.value}
-              icon={stat.icon}
-              subtitle={stat.subtitle}
-              accent={STAT_CARD_ACCENTS[stat.accent]}
-            />
-          ))}
+        <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pricingStats.map((stat) => (
+              <StatCard
+                key={stat.name}
+                title={stat.name}
+                value={stat.value}
+                icon={stat.icon}
+                subtitle={stat.subtitle}
+                accent={STAT_CARD_ACCENTS[stat.accent]}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -2414,7 +2416,7 @@ function Pricing() {
                     return (
                       <React.Fragment key={item.id}>
                         <tr
-                          className="hover:bg-gray-50 cursor-pointer"
+                          className="hover:bg-indigo-500/10 cursor-pointer"
                           onClick={() => handleToggleProductDetails(item)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">

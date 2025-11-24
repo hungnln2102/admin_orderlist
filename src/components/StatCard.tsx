@@ -70,23 +70,23 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => {
   return (
     <div
-      className={`relative isolate overflow-hidden rounded-3xl border ${accent.border} bg-white/90 p-6 shadow-[0_18px_45px_-25px_rgba(15,23,42,0.7)] transition-shadow hover:shadow-[0_35px_65px_-35px_rgba(15,23,42,0.45)]`}
+      className={`relative isolate overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-br from-indigo-300/85 via-indigo-400/85 to-violet-500/85 p-6 shadow-[0_18px_45px_-22px_rgba(0,0,0,0.65),0_18px_42px_-24px_rgba(255,255,255,0.28)] transition-all hover:shadow-[0_24px_58px_-22px_rgba(0,0,0,0.7),0_22px_55px_-24px_rgba(255,255,255,0.32)]`}
     >
       <div
         className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${accent.glow} opacity-80 blur-2xl`}
       />
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
+          <p className="text-sm font-semibold text-white drop-shadow">{title}</p>
+          <p className="mt-2 text-2xl font-semibold text-white drop-shadow-sm">{value}</p>
           {subtitle && (
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-indigo-100/85">
               {subtitle}
             </p>
           )}
         </div>
         <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-inner ${accent.iconBg}`}
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 border border-white/35 shadow-inner shadow-black/25 text-white`}
         >
           <Icon className={iconClassName} />
         </div>

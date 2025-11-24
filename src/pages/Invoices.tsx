@@ -344,7 +344,7 @@ export default function Invoices() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
           <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative">
             <button
-              className="absolute right-6 top-6 text-slate-400 hover:text-white transition"
+              className="absolute right-6 top-6 text-slate-400 hover:text-indigo-100 transition"
               onClick={handleCloseQrModal}
             >
               <XMarkIcon className="h-6 w-6" />
@@ -553,16 +553,18 @@ export default function Invoices() {
           </GradientButton>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {stats.map((stat) => (
-            <StatCard
-              key={stat.name}
-              title={stat.name}
-              value={stat.value}
-              icon={stat.icon}
-              accent={stat.accent}
-            />
-          ))}
+        <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {stats.map((stat) => (
+              <StatCard
+                key={stat.name}
+                title={stat.name}
+                value={stat.value}
+                icon={stat.icon}
+                accent={stat.accent}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
@@ -585,7 +587,7 @@ export default function Invoices() {
                 className={`flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition w-full lg:w-64 ${
                   rangePickerOpen
                     ? "border-blue-500 bg-blue-50/40"
-                    : "border-gray-200 bg-gray-50/60 hover:bg-gray-100"
+                    : "border-gray-200 bg-gray-50/60 hover:bg-indigo-500/15"
                 }`}
               >
                 <div className="flex flex-col text-left">
@@ -653,7 +655,7 @@ export default function Invoices() {
                     </button>
                     <div className="flex gap-2">
                       <button
-                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-indigo-500/10"
                         onClick={() => setRangePickerOpen(false)}
                       >
                         Đóng
@@ -698,7 +700,7 @@ export default function Invoices() {
                 className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition ${
                   isActive
                     ? "border-blue-500 bg-blue-50/70"
-                    : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                    : "border-gray-200 bg-gray-50 hover:bg-indigo-500/15"
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -743,7 +745,7 @@ export default function Invoices() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id} className="hover:bg-gray-50">
+                  <tr key={receipt.id} className="hover:bg-indigo-500/10">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                       {receipt.orderCode || "--"}
                     </td>
@@ -842,7 +844,7 @@ export default function Invoices() {
               <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
                 <button
                   onClick={closeViewModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-indigo-500/10 transition"
                 >
                   Đóng
                 </button>

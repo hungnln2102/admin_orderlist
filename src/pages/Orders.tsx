@@ -1,4 +1,4 @@
-// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
+﻿// Orders.tsx - Mã đã được làm sạch và đồng bộ với API Backend
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -16,7 +16,7 @@ import {
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
 import GradientButton from "../components/GradientButton";
-import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+import StatCard from "../components/StatCard";
 
 // Import Modal tùy chỉnh
 import ConfirmModal from "../components/ConfirmModal";
@@ -35,136 +35,16 @@ const API_BASE =
 // 1. INTERFACES VÀ CONSTANTS
 // =======================================================
 
-// Khai báo lại các constants
-const API_ENDPOINTS = {
-  ORDERS: "/api/orders",
-  ORDERS_EXPIRED: "/api/orders?scope=expired",
-  ORDERS_CANCELED: "/api/orders?scope=canceled",
-  ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
-  ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
-  // ... (Thêm các endpoints khác nếu cần)
-};
-
-const ORDER_FIELDS = {
-  ID_DON_HANG: "id_don_hang",
-  SAN_PHAM: "san_pham",
-  THONG_TIN_SAN_PHAM: "thong_tin_san_pham",
-  KHACH_HANG: "khach_hang",
-  LINK_LIEN_HE: "link_lien_he",
-  SLOT: "slot",
-  NGAY_DANG_KI: "ngay_dang_ki",
-  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
-  HET_HAN: "het_han",
-  NGUON: "nguon",
-  GIA_NHAP: "gia_nhap",
-  GIA_BAN: "gia_ban",
-  NOTE: "note",
-  TINH_TRANG: "tinh_trang",
-  CHECK_FLAG: "check_flag",
-};
-
-const VIRTUAL_FIELDS = {
-  SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
-  GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
-  TRANG_THAI_TEXT: "trang_thai_text_virtual",
-  CHECK_FLAG_STATUS: "check_flag_status_virtual",
-  ORDER_DATE_DISPLAY: "order_date_display_virtual",
-  EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
-};
-
-// Interface Order (dựa trên DB + trường ảo)
-interface Order {
-  id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
-  slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
-  registration_date?: string;
-  expiry_date?: string;
-  registration_date_display?: string;
-  expiry_date_display?: string;
-  nguon: string;
-  gia_nhap: string;
-  gia_ban: string;
-  note: string;
-  tinh_trang: string;
-  check_flag: boolean | null;
-  can_hoan?: number | string;
-  so_ngay_con_lai: number | null;
-
-  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
-  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
-  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
-  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
-  [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
-  [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
-}
-
-const STATUS_DISPLAY_LABELS: Record<string, string> = {
-  "het han": "Hết Hạn",
-  "can gia han": "Cần Gia Hạn",
-};
-
-const stockStats = [
-  {
-    name: "Tổng Đơn Hàng",
-    value: "0",
-    icon: CheckCircleIcon,
-    accent: STAT_CARD_ACCENTS.sky,
-  },
-  {
-    name: "Cần Gia Hạn",
-    value: "0",
-    icon: ExclamationTriangleIcon,
-    accent: STAT_CARD_ACCENTS.amber,
-  },
-  {
-    name: "Hết Hạn",
-    value: "0",
-    icon: ArrowDownIcon,
-    accent: STAT_CARD_ACCENTS.rose,
-  },
-  {
-    name: "Đăng Ký Hôm Nay",
-    value: "0",
-    icon: ArrowUpIcon,
-    accent: STAT_CARD_ACCENTS.emerald,
-  },
-];
-
-type OrderDatasetKey = "active" | "expired" | "canceled";
-
-const ORDER_DATASET_CONFIG: Record<
+import {
+  API_ENDPOINTS,
+  ORDER_FIELDS,
+  VIRTUAL_FIELDS,
+  ORDER_STATUSES,
+  STAT_CARD_ACCENTS,
+  ORDER_DATASET_CONFIG,
+  ORDER_DATASET_SEQUENCE,
   OrderDatasetKey,
-  { label: string; description: string; endpoint: string }
-> = {
-  active: {
-    label: "Đơn Hàng",
-    description: "Danh sách đơn đang hoạt động",
-    endpoint: API_ENDPOINTS.ORDERS,
-  },
-  expired: {
-    label: "Hết Hạn",
-    description: "Danh sách các đơn hàng đã hết hạn",
-    endpoint: API_ENDPOINTS.ORDERS_EXPIRED,
-  },
-  canceled: {
-    label: "Hoàn Tiền",
-    description: "Đơn đã hủy/hoàn tiền",
-    endpoint: API_ENDPOINTS.ORDERS_CANCELED,
-  },
-};
-
-const ORDER_DATASET_SEQUENCE: OrderDatasetKey[] = [
-  "active",
-  "expired",
-  "canceled",
-];
+} from "../constants";
 
 const isRegisteredToday = (dateString: string): boolean => {
   if (!dateString) return false;
@@ -235,25 +115,36 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const parseErrorResponse = async (response: Response) => {
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      try {
-        const data = await response.json();
-        if (data?.error) return data.error;
-        if (typeof data === "string") return data;
-        return JSON.stringify(data);
-      } catch {
-        return response.statusText || "Lỗi không xác định từ máy chủ.";
-      }
-    }
+  const stockStats = [
+    {
+      name: "Tổng Đơn Hàng",
+      value: "0",
+      icon: CheckCircleIcon,
+      accent: STAT_CARD_ACCENTS.sky,
+    },
+    {
+      name: "Cần Gia Hạn",
+      value: "0",
+      icon: ExclamationTriangleIcon,
+      accent: STAT_CARD_ACCENTS.amber,
+    },
+    {
+      name: "Hết Hạn",
+      value: "0",
+      icon: ArrowDownIcon,
+      accent: STAT_CARD_ACCENTS.rose,
+    },
+    {
+      name: "Đăng Ký Hôm Nay",
+      value: "0",
+      icon: ArrowUpIcon,
+      accent: STAT_CARD_ACCENTS.emerald,
+    },
+  ];
 
-    try {
-      const text = await response.text();
-      return text || response.statusText || "Lỗi không xác định từ máy chủ.";
-    } catch {
-      return response.statusText || "Lỗi không xác định từ máy chủ.";
-    }
+  const STATUS_DISPLAY_LABELS: Record<string, string> = {
+    "het han": ORDER_STATUSES.HET_HAN,
+    "can gia han": ORDER_STATUSES.CAN_GIA_HAN,
   };
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
@@ -310,8 +201,37 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     setOrderToEdit(null);
   }, [dataset]);
 
-  // --- LOGIC TÍNH TOÁN CÁC TRƯỜNG ẢO VÀ LỌC ---
   const calculatedData = useMemo(() => {
+    const stockStats = [
+      {
+        name: "Tổng Đơn Hàng",
+        value: "0",
+        icon: CheckCircleIcon,
+        accent: STAT_CARD_ACCENTS.sky,
+      },
+      {
+        name: "Cần Gia Hạn",
+        value: "0",
+        icon: ExclamationTriangleIcon,
+        accent: STAT_CARD_ACCENTS.amber,
+      },
+      {
+        name: "Hết Hạn",
+        value: "0",
+        icon: ArrowDownIcon,
+        accent: STAT_CARD_ACCENTS.rose,
+      },
+      {
+        name: "Đăng Ký Hôm Nay",
+        value: "0",
+        icon: ArrowUpIcon,
+        accent: STAT_CARD_ACCENTS.emerald,
+      },
+    ];
+    const STATUS_DISPLAY_LABELS: Record<string, string> = {
+      "het han": ORDER_STATUSES.HET_HAN,
+      "can gia han": ORDER_STATUSES.CAN_GIA_HAN,
+    };
     const resolveDateDisplay = (
       displayValue: unknown,
       fallbackValue: unknown
@@ -667,7 +587,9 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       );
       if (!response.ok) {
         const errorMessage = await parseErrorResponse(response);
-        throw new Error(errorMessage || "Lỗi khi xác nhận hoàn tiền từ máy chủ");
+        throw new Error(
+          errorMessage || "Lỗi khi xác nhận hoàn tiền từ máy chủ"
+        );
       }
       await fetchOrders();
     } catch (error) {
@@ -913,8 +835,8 @@ export default function Orders() {
 
       {/* Dataset Switcher */}
 
-      <div className="bg-white rounded-xl shadow-sm p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="rounded-[28px] bg-gradient-to-r from-indigo-900/70 via-indigo-800/70 to-slate-900/80 p-4 shadow-[0_25px_55px_-28px_rgba(0,0,0,0.8),0_16px_38px_-26px_rgba(88,28,135,0.55)] border border-white/10">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {ORDER_DATASET_SEQUENCE.map((key) => {
             const config = ORDER_DATASET_CONFIG[key];
 
@@ -927,29 +849,21 @@ export default function Orders() {
                 key={key}
                 type="button"
                 onClick={() => setDatasetKey(key)}
-                className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                className={`flex items-center justify-between rounded-2xl px-5 py-4 text-left transition shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65),0_8px_22px_-18px_rgba(255,255,255,0.12)] ${
                   isActive
-                    ? "border-transparent bg-gradient-to-r from-indigo-50 to-green-50 shadow-md"
-                    : "border-gray-200 bg-white hover:border-indigo-200"
+                    ? "bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500 text-white ring-1 ring-white/25"
+                    : "bg-indigo-700/70 text-indigo-100 hover:bg-indigo-600/80 ring-1 ring-white/10"
                 }`}
               >
                 <div>
-                  <p
-                    className={`text-sm font-semibold ${
-                      isActive ? "text-indigo-600" : "text-gray-700"
-                    }`}
-                  >
+                  <p className="text-sm font-semibold text-white drop-shadow">
                     {config.label}
                   </p>
 
-                  <p className="text-xs text-gray-500">{config.description}</p>
+                  <p className="text-xs text-indigo-100/80">{config.description}</p>
                 </div>
 
-                <div
-                  className={`text-2xl font-bold ${
-                    isActive ? "text-indigo-600" : "text-gray-400"
-                  }`}
-                >
+                <div className="text-2xl font-bold text-lime-200 drop-shadow">
                   {count.toLocaleString("vi-VN")}
                 </div>
               </button>
@@ -960,17 +874,18 @@ export default function Orders() {
 
       {/* Stats */}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {updatedStats.map((stat) => (
-          <StatCard
-            key={stat.name}
-            title={stat.name}
-            value={stat.value}
-            icon={stat.icon}
-            accent={stat.accent}
-          />
-        ))}
+      <div className="rounded-[32px] bg-gradient-to-br from-white/5 via-indigo-900/35 to-indigo-950/55 border border-white/10 p-6 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {updatedStats.map((stat) => (
+            <StatCard
+              key={stat.name}
+              title={stat.name}
+              value={stat.value}
+              icon={stat.icon}
+              accent={stat.accent}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Filters */}
@@ -996,10 +911,10 @@ export default function Orders() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Tất cả trạng thái</option>
-              <option value="Đã Thanh Toán">Đã thanh toán</option>
-              <option value="Chưa Thanh Toán">Chưa thanh toán</option>
-              <option value="Cần Gia Hạn">Cần gia hạn</option>
-              <option value="Hết Hạn">Hết hạn</option>
+              <option value={ORDER_STATUSES.DA_THANH_TOAN}>Đã thanh toán</option>
+              <option value={ORDER_STATUSES.CHUA_THANH_TOAN}>Chưa thanh toán</option>
+              <option value={ORDER_STATUSES.CAN_GIA_HAN}>Cần gia hạn</option>
+              <option value={ORDER_STATUSES.HET_HAN}>Hết hạn</option>
             </select>
           </div>
           {/* Date Range removed as requested */}
@@ -1011,7 +926,7 @@ export default function Orders() {
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 table-fixed">
             {/* thead: Áp dụng width cố định, whitespace-nowrap và truncate, text-center */}
-            <thead className="bg-gray-50">
+            <thead className="bg-indigo-500/5">
               <tr>
                 {/* 1. GỘP ORDER + PRODUCT */}
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
@@ -1079,8 +994,8 @@ export default function Orders() {
                     <React.Fragment key={order.id}>
                       <tr
                         onClick={() => handleToggleDetails(order.id)}
-                        className={`cursor-pointer hover:bg-gray-50 ${
-                          isExpanded ? "bg-indigo-50/60" : ""
+                        className={`cursor-pointer hover:bg-indigo-500/10 ${
+                          isExpanded ? "bg-indigo-500/20" : ""
                         }`}
                       >
                         {/* 1. GỘP ORDER + PRODUCT */}
@@ -1213,74 +1128,74 @@ export default function Orders() {
                         </td>
                       </tr>
                       {isExpanded && (
-                        <tr className="bg-gray-50">
+                        <tr className="bg-indigo-500/5">
                           <td colSpan={totalColumns} className="px-6 pb-6 pt-0">
-                            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-5 shadow-sm">
+                            <div className="rounded-2xl border border-dashed border-indigo-200/60 bg-indigo-600/20 p-5 shadow-lg shadow-indigo-900/30">
                               <div className="mb-4 flex items-center justify-between">
-                                <p className="text-sm font-semibold text-gray-700">
+                                <p className="text-sm font-semibold text-indigo-50">
                                   Chi tiết thanh toán
                                 </p>
-                                <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                <span className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                   #{order[ORDER_FIELDS.ID_DON_HANG] || ""}
                                 </span>
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Nguồn
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="mt-1 text-sm font-semibold text-white">
                                     {order[ORDER_FIELDS.NGUON] || "N/A"}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Giá nhập
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="mt-1 text-sm font-semibold text-white">
                                     {Helpers.formatCurrency(
                                       order[ORDER_FIELDS.GIA_NHAP]
                                     )}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Giá bán
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="mt-1 text-sm font-semibold text-white">
                                     {Helpers.formatCurrency(
                                       order[ORDER_FIELDS.GIA_BAN]
                                     )}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Giá trị còn lại
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="mt-1 text-sm font-semibold text-white">
                                     {Helpers.formatCurrency(giaTriConLai)}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Số ngày
                                   </p>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="mt-1 text-sm font-semibold text-white">
                                     {order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ||
                                       0}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Ghi chú
                                   </p>
-                                  <p className="mt-1 text-sm text-gray-700 text-center">
+                                  <p className="mt-1 text-sm text-indigo-50 text-center">
                                     {order[ORDER_FIELDS.NOTE] ||
                                       "Không có ghi chú."}
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
                                     Kiểm tra
                                   </p>
                                   {check_flag_status === null ? (
@@ -1337,7 +1252,7 @@ export default function Orders() {
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded p-1 text-gray-500 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
@@ -1346,7 +1261,7 @@ export default function Orders() {
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded p-1 text-gray-500 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRightIcon className="h-5 w-5" />
               </button>

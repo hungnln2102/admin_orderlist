@@ -133,10 +133,12 @@ export const BANK_LIST_FIELDS = {
 };
 
 export const VIRTUAL_FIELDS = {
-  SO_NGAY_CON_LAI: "soNgayConLai",
-  GIA_TRI_CON_LAI: "giaTriConLai",
-  TRANG_THAI_TEXT: "trangThaiText",
-  CHECK_FLAG_STATUS: "check_flag_status",
+  SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
+  GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
+  TRANG_THAI_TEXT: "trang_thai_text_virtual",
+  CHECK_FLAG_STATUS: "check_flag_status_virtual",
+  ORDER_DATE_DISPLAY: "order_date_display_virtual",
+  EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
 
 export const CALCULATED_FIELDS = {
@@ -145,3 +147,103 @@ export const CALCULATED_FIELDS = {
   SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
   HET_HAN: "het_han",
 };
+
+export const ORDER_STATUSES = {
+  HET_HAN: "Hết Hạn",
+  CAN_GIA_HAN: "Cần Gia Hạn",
+  CHUA_THANH_TOAN: "Chưa Thanh Toán",
+  DA_THANH_TOAN: "Đã Thanh Toán",
+};
+
+export const STAT_CARD_ACCENTS = {
+  sky: "sky",
+  amber: "amber",
+  rose: "rose",
+  emerald: "emerald",
+};
+
+export const ORDER_DATASET_CONFIG = {
+  active: {
+    label: "Đơn Hàng",
+    description: "Danh sách đơn đang hoạt động",
+    endpoint: API_ENDPOINTS.ORDERS,
+  },
+  expired: {
+    label: "Hết Hạn",
+    description: "Danh sách các đơn hàng đã hết hạn",
+    endpoint: API_ENDPOINTS.ORDERS_EXPIRED,
+  },
+  canceled: {
+    label: "Hoàn Tiền",
+    description: "Đơn đã hủy/hoàn tiền",
+    endpoint: API_ENDPOINTS.ORDERS_CANCELED,
+  },
+};
+
+export const ORDER_DATASET_SEQUENCE = ["active", "expired", "canceled"];
+
+export type OrderDatasetKey = "active" | "expired" | "canceled";
+
+export interface Order {
+  id: number;
+  id_don_hang: string;
+  san_pham: string;
+  thong_tin_san_pham: string;
+  khach_hang: string;
+  link_lien_he: string;
+  slot: string;
+  ngay_dang_ki: string;
+  so_ngay_da_dang_ki: string;
+  het_han: string;
+  registration_date?: string;
+  expiry_date?: string;
+  registration_date_display?: string;
+  expiry_date_display?: string;
+  nguon: string;
+  gia_nhap: string;
+  gia_ban: string;
+  note: string;
+  tinh_trang: string;
+  check_flag: boolean | null;
+  can_hoan?: number | string;
+  so_ngay_con_lai: number | null;
+
+  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
+  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
+  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
+  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
+  [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
+  [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
+}
+
+export interface Order {
+  id: number;
+  id_don_hang: string;
+  san_pham: string;
+  thong_tin_san_pham: string;
+  khach_hang: string;
+  link_lien_he: string;
+  slot: string;
+  ngay_dang_ki: string;
+  so_ngay_da_dang_ki: string;
+  het_han: string;
+  registration_date?: string;
+  expiry_date?: string;
+  registration_date_display?: string;
+  expiry_date_display?: string;
+  nguon: string;
+  gia_nhap: string;
+  gia_ban: string;
+  note: string;
+  tinh_trang: string;
+  check_flag: boolean | null;
+  can_hoan?: number | string;
+  so_ngay_con_lai: number | null;
+
+  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
+  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
+  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
+  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
+  [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
+  [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
+}

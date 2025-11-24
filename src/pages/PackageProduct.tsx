@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -204,12 +204,12 @@ const EMPTY_FORM_VALUES: PackageFormValues = {
   hasCapacity: false,
 };
 const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> = [
-  { value: "information", label: "Thông tin gói" },
-  { value: "note", label: "Ghi chú" },
-  { value: "supplier", label: "Nhà cung cấp" },
-  { value: "import", label: "Giá nhập (VND)" },
-  { value: "expired", label: "Ngày hết hạn" },
-  { value: "capacity", label: "Tổng dung lượng (GB)" },
+  { value: "information", label: "ThÃ´ng tin gÃ³i" },
+  { value: "note", label: "Ghi chÃº" },
+  { value: "supplier", label: "NhÃ  cung cáº¥p" },
+  { value: "import", label: "GiÃ¡ nháº­p (VND)" },
+  { value: "expired", label: "NgÃ y háº¿t háº¡n" },
+  { value: "capacity", label: "Tá»•ng dung lÆ°á»£ng (GB)" },
 ];
 const stripCapacityFields = (fields: PackageField[]): PackageField[] =>
   fields.filter((field) => field !== "capacity");
@@ -289,7 +289,7 @@ const extractInfoTokens = (value: string | null | undefined): string[] => {
     .filter(Boolean);
 };
 const buildPackageLinkKeys = (row: PackageRow): string[] => {
-  // Chỉ dùng username (tài khoản gói) để match
+  // Chá»‰ dÃ¹ng username (tÃ i khoáº£n gÃ³i) Ä‘á»ƒ match
   const normalized = normalizeMatchKey(row.informationUser || "");
   return normalized ? [normalized] : [];
 };
@@ -433,10 +433,10 @@ const enhancePackageRow = (
 };
 type StatusFilter = "all" | "full" | "low" | "out";
 const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "Tất cả trạng thái" },
-  { value: "full", label: "Còn nhiều" },
-  { value: "low", label: "Sắp hết" },
-  { value: "out", label: "Đã hết" },
+  { value: "all", label: "Táº¥t cáº£ tráº¡ng thÃ¡i" },
+  { value: "full", label: "CÃ²n nhiá»u" },
+  { value: "low", label: "Sáº¯p háº¿t" },
+  { value: "out", label: "ÄÃ£ háº¿t" },
 ];
 const SLOT_LINK_OPTIONS: Array<{
   value: SlotLinkMode;
@@ -445,15 +445,15 @@ const SLOT_LINK_OPTIONS: Array<{
 }> = [
   {
     value: "information",
-    label: "Liên kết theo thông tin đơn hàng",
+    label: "LiÃªn káº¿t theo thÃ´ng tin Ä‘Æ¡n hÃ ng",
     helper:
-      "Các gói sẽ được liên kết với đơn hàng dựa trên các trường thông tin như tên sản phẩm, thông tin sản phẩm.",
+      "CÃ¡c gÃ³i sáº½ Ä‘Æ°á»£c liÃªn káº¿t vá»›i Ä‘Æ¡n hÃ ng dá»±a trÃªn cÃ¡c trÆ°á»ng thÃ´ng tin nhÆ° tÃªn sáº£n pháº©m, thÃ´ng tin sáº£n pháº©m.",
   },
   {
     value: "slot",
-    label: "Liên kết theo vị trí",
+    label: "LiÃªn káº¿t theo vá»‹ trÃ­",
     helper:
-      "Các gói sẽ được liên kết với đơn hàng dựa trên mã định danh vị trí (slot) của đơn hàng.",
+      "CÃ¡c gÃ³i sáº½ Ä‘Æ°á»£c liÃªn káº¿t vá»›i Ä‘Æ¡n hÃ ng dá»±a trÃªn mÃ£ Ä‘á»‹nh danh vá»‹ trÃ­ (slot) cá»§a Ä‘Æ¡n hÃ ng.",
   },
 ];
 const MATCH_COLUMN_INFORMATION = "thong_tin_don_hang";
@@ -490,8 +490,8 @@ const buildInformationSummary = (
 ): string => {
   return (
     [
-      user && `Tài khoản: ${user}`,
-      pass && `Mật khẩu: ${pass}`,
+      user && `TÃ i khoáº£n: ${user}`,
+      pass && `Máº­t kháº©u: ${pass}`,
       mail && `Mail 2FA: ${mail}`,
     ]
       .filter(Boolean)
@@ -601,7 +601,7 @@ export default function PackageProduct() {
           }
         }
       } catch (error) {
-        console.error("Tải sản phẩm gói thất bại:", error);
+        console.error("Táº£i sáº£n pháº©m gÃ³i tháº¥t báº¡i:", error);
         if (!cancelled) {
           setRows([]);
         }
@@ -633,7 +633,7 @@ export default function PackageProduct() {
           setOrdersReady(true);
         }
       } catch (error) {
-        console.error("Tải danh sách đơn hàng thất bại:", error);
+        console.error("Táº£i danh sÃ¡ch Ä‘Æ¡n hÃ ng tháº¥t báº¡i:", error);
         if (!cancelled) {
           setOrders([]);
           setOrdersReady(false);
@@ -989,13 +989,13 @@ export default function PackageProduct() {
     () =>
       [
         {
-          name: "Tổng Số Gói",
+          name: "Tá»•ng Sá»‘ GÃ³i",
           value: String(scopedRows.length),
           icon: CheckCircleIcon,
           accent: STAT_CARD_ACCENTS.sky,
         },
         {
-          name: "Gói Sắp Hết",
+          name: "GÃ³i Sáº¯p Háº¿t",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -1009,7 +1009,7 @@ export default function PackageProduct() {
           accent: STAT_CARD_ACCENTS.amber,
         },
         {
-          name: "Gói Đã Hết",
+          name: "GÃ³i ÄÃ£ Háº¿t",
           value: String(
             scopedRows.reduce(
               (total, row) =>
@@ -1023,7 +1023,7 @@ export default function PackageProduct() {
           accent: STAT_CARD_ACCENTS.rose,
         },
         {
-          name: "Thêm Hôm Nay",
+          name: "ThÃªm HÃ´m Nay",
           value: "0",
           icon: ArrowUpIcon,
           accent: STAT_CARD_ACCENTS.emerald,
@@ -1176,7 +1176,7 @@ export default function PackageProduct() {
         }
         setAddModalOpen(false);
       } catch (error) {
-        console.error("Lỗi khi tạo gói sản phẩm:", error);
+        console.error("Lá»—i khi táº¡o gÃ³i sáº£n pháº©m:", error);
       }
     },
     [persistSlotLinkPreference, selectedTemplate]
@@ -1266,10 +1266,10 @@ export default function PackageProduct() {
         handleCategorySelect("all");
       }
     } catch (error) {
-      console.error("Xóa nhóm thất bại:", error);
+      console.error("XÃ³a nhÃ³m tháº¥t báº¡i:", error);
       alert(
-        `Xóa nhóm thất bại: ${
-          error instanceof Error ? error.message : "Lỗi không xác định"
+        `XÃ³a nhÃ³m tháº¥t báº¡i: ${
+          error instanceof Error ? error.message : "Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh"
         }`
       );
     } finally {
@@ -1395,7 +1395,7 @@ export default function PackageProduct() {
         persistSlotLinkPreference(rowId, values.slotLinkMode);
         closeEditModal();
       } catch (error) {
-        console.error(`Cập nhật Gói Sản Phẩm ${rowId} Lỗi:`, error);
+        console.error(`Cáº­p nháº­t GÃ³i Sáº£n Pháº©m ${rowId} Lá»—i:`, error);
       }
     },
     [editContext, closeEditModal, persistSlotLinkPreference]
@@ -1405,10 +1405,10 @@ export default function PackageProduct() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Quản Lý Gói Sản Phẩm
+            Quáº£n LÃ½ GÃ³i Sáº£n Pháº©m
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý các loại gói sản phẩm và các gói con.
+            Quáº£n lÃ½ cÃ¡c loáº¡i gÃ³i sáº£n pháº©m vÃ  cÃ¡c gÃ³i con.
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
@@ -1421,7 +1421,7 @@ export default function PackageProduct() {
               }}
               disabled={deleteProcessing}
             >
-              Xóa Loại Gói
+              XÃ³a Loáº¡i GÃ³i
             </GradientButton>
           ) : (
             <div className="flex items-center gap-2">
@@ -1430,7 +1430,7 @@ export default function PackageProduct() {
                 onClick={handleConfirmDeletePackages}
                 className="flex items-center justify-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-600 transition disabled:opacity-60"
                 disabled={deleteProcessing}
-                title="Xác nhận xóa"
+                title="XÃ¡c nháº­n xÃ³a"
               >
                 <CheckIcon className="h-5 w-5" />
               </button>
@@ -1439,49 +1439,51 @@ export default function PackageProduct() {
                 onClick={resetDeleteSelection}
                 className="flex items-center justify-center gap-1 rounded-lg bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 shadow hover:bg-gray-300 transition disabled:opacity-60"
                 disabled={deleteProcessing}
-                title="Hủy xóa"
+                title="Há»§y xÃ³a"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
             </div>
           )}
           <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick}>
-            Tạo Loại Gói
+            Táº¡o Loáº¡i GÃ³i
           </GradientButton>
           <GradientButton
             icon={PlusIcon}
             onClick={handleAddButtonClick}
             disabled={!selectedPackage}
           >
-            Thêm Gói
+            ThÃªm GÃ³i
           </GradientButton>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {slotStats.map((stat) => (
-          <StatCard
-            key={stat.name}
-            title={stat.name}
-            value={stat.value}
-            icon={stat.icon}
-            accent={stat.accent}
-          />
-        ))}
+      <div className="rounded-[32px] bg-gradient-to-br from-white/5 via-indigo-900/35 to-indigo-950/55 border border-white/10 p-6 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {slotStats.map((stat) => (
+            <StatCard
+              key={stat.name}
+              title={stat.name}
+              value={stat.value}
+              icon={stat.icon}
+              accent={stat.accent}
+            />
+          ))}
+        </div>
       </div>
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Tổng Quan Gói Sản Phẩm
+              Tá»•ng Quan GÃ³i Sáº£n Pháº©m
             </h2>
             <p className="text-sm text-gray-500">
-              Chọn một loại gói để xem chi tiết hoặc xóa.
+              Chá»n má»™t loáº¡i gÃ³i Ä‘á»ƒ xem chi tiáº¿t hoáº·c xÃ³a.
             </p>
           </div>
         </div>
         {packageSummaries.length === 0 ? (
           <p className="mt-6 text-sm text-gray-500">
-            Không có loại gói nào để hiển thị.
+            KhÃ´ng cÃ³ loáº¡i gÃ³i nÃ o Ä‘á»ƒ hiá»ƒn thá»‹.
           </p>
         ) : (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1509,13 +1511,13 @@ export default function PackageProduct() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
-                        Loại Gói
+                        Loáº¡i GÃ³i
                       </p>
                       <h3 className="text-lg font-semibold text-gray-900">
                         {summary.name}
                       </h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Số lượng gói: {summary.total}
+                        Sá»‘ lÆ°á»£ng gÃ³i: {summary.total}
                       </p>
                     </div>
                     {deleteMode ? (
@@ -1527,7 +1529,7 @@ export default function PackageProduct() {
                           disabled={deleteProcessing}
                           onChange={() => togglePackageMarked(summary.name)}
                         />
-                        Chọn để xóa
+                        Chá»n Ä‘á»ƒ xÃ³a
                       </label>
                     ) : (
                       <div className="flex flex-col items-end gap-1 text-sm font-semibold">
@@ -1538,7 +1540,7 @@ export default function PackageProduct() {
                             className={`p-2 rounded-full hover:bg-blue-50 transition ${
                               isSelected ? "text-blue-600" : "text-gray-500"
                             }`}
-                            title="Xem & quản lý"
+                            title="Xem & quáº£n lÃ½"
                           >
                             <EyeIcon className="h-5 w-5" />
                           </button>
@@ -1548,7 +1550,7 @@ export default function PackageProduct() {
                               handleEditTemplateFields(summary.name)
                             }
                             className="p-2 rounded-full hover:bg-indigo-50 text-indigo-500 transition"
-                            title="Chỉnh sửa Loại Gói"
+                            title="Chá»‰nh sá»­a Loáº¡i GÃ³i"
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
@@ -1559,7 +1561,7 @@ export default function PackageProduct() {
                   <dl className="mt-5 grid grid-cols-3 gap-4 text-sm">
                     <div className="rounded-2xl border border-white/60 bg-white/70 p-3 text-center shadow-inner">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Tổng
+                        Tá»•ng
                       </dt>
                       <dd className="mt-1 text-2xl font-bold text-slate-900">
                         {summary.total}
@@ -1567,7 +1569,7 @@ export default function PackageProduct() {
                     </div>
                     <div className="rounded-2xl border border-amber-100/70 bg-amber-50/60 p-3 text-center shadow-inner">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-amber-600">
-                        Sắp hết
+                        Sáº¯p háº¿t
                       </dt>
                       <dd className="mt-1 text-2xl font-bold text-amber-500">
                         {summary.low}
@@ -1575,7 +1577,7 @@ export default function PackageProduct() {
                     </div>
                     <div className="rounded-2xl border border-rose-100/70 bg-rose-50/60 p-3 text-center shadow-inner">
                       <dt className="text-xs font-semibold uppercase tracking-wide text-rose-600">
-                        Hết
+                        Háº¿t
                       </dt>
                       <dd className="mt-1 text-2xl font-bold text-rose-500">
                         {summary.out}
@@ -1596,7 +1598,7 @@ export default function PackageProduct() {
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder={`Tìm kiếm trong các gói của ${selectedPackage}...`}
+                  placeholder={`TÃ¬m kiáº¿m trong cÃ¡c gÃ³i cá»§a ${selectedPackage}...`}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1618,23 +1620,23 @@ export default function PackageProduct() {
               <button
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   filteredRows.length
-                    ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-gray-100 text-gray-700 hover:bg-indigo-500/20"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}
                 disabled={!filteredRows.length}
               >
-                Xuất tệp
+                Xuáº¥t tá»‡p
               </button>
             </div>
             <div className="text-sm text-gray-500">
-              Đang xem loại gói:{" "}
+              Äang xem loáº¡i gÃ³i:{" "}
               <span className="font-medium text-gray-900">
-                {selectedPackage ?? "Tất cả"}
+                {selectedPackage ?? "Táº¥t cáº£"}
               </span>
               {statusFilter !== "all" && (
                 <>
                   {" "}
-                  •{" "}
+                  â€¢{" "}
                   <span className="font-medium text-gray-900">
                     {
                       STATUS_FILTERS.find(
@@ -1652,33 +1654,33 @@ export default function PackageProduct() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tên Gói
+                      TÃªn GÃ³i
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Thông Tin Gói
+                      ThÃ´ng Tin GÃ³i
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vị Trí
+                      Vá»‹ TrÃ­
                     </th>
                     {showCapacityColumn && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Dung Lượng
+                        Dung LÆ°á»£ng
                       </th>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nguồn
+                      Nguá»“n
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Giá
+                      GiÃ¡
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ngày Hết Hạn
+                      NgÃ y Háº¿t Háº¡n
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ghi Chú
+                      Ghi ChÃº
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Thao Tác
+                      Thao TÃ¡c
                     </th>
                   </tr>
                 </thead>
@@ -1689,7 +1691,7 @@ export default function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        Đang tải dữ liệu...
+                        Äang táº£i dá»¯ liá»‡u...
                       </td>
                     </tr>
                   ) : filteredRows.length === 0 ? (
@@ -1698,7 +1700,7 @@ export default function PackageProduct() {
                         colSpan={tableColumnCount}
                         className="px-6 py-8 text-center text-gray-500 text-sm"
                       >
-                        Không có gói nào.
+                        KhÃ´ng cÃ³ gÃ³i nÃ o.
                       </td>
                     </tr>
                   ) : (
@@ -1760,7 +1762,7 @@ export default function PackageProduct() {
                         <React.Fragment key={`${item.id}-${idx}`}>
                           <tr
                             onClick={() => handleRowToggle(item.id)}
-                            className={`hover:bg-gray-50 ${
+                            className={`hover:bg-indigo-500/10 ${
                               isExpanded ? "bg-gray-50" : ""
                             } cursor-pointer`}
                           >
@@ -1773,7 +1775,7 @@ export default function PackageProduct() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               <span className="font-medium">{slotUsed}</span>{" "}
-                              / {totalSlots} vị trí
+                              / {totalSlots} vá»‹ trÃ­
                             </div>
                               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                 <div
@@ -1782,7 +1784,7 @@ export default function PackageProduct() {
                                 />
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                Còn trống: {remainingSlots}
+                                CÃ²n trá»‘ng: {remainingSlots}
                               </div>
                             </td>
                             {showCapacityColumn && (
@@ -1804,12 +1806,12 @@ export default function PackageProduct() {
                                       />
                                     </div>
                                     <div className="text-xs text-gray-500 mt-1">
-                                      Còn trống: {remainingCapacity} GB
+                                      CÃ²n trá»‘ng: {remainingCapacity} GB
                                     </div>
                                   </>
                                 ) : (
                                   <div className="text-sm text-gray-400 italic">
-                                    Không có
+                                    KhÃ´ng cÃ³
                                   </div>
                                 )}
                               </td>
@@ -1831,7 +1833,7 @@ export default function PackageProduct() {
                             <button
                               className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                               type="button"
-                                aria-label="Sửa"
+                                aria-label="Sá»­a"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openEditModal(item);
@@ -1861,11 +1863,11 @@ export default function PackageProduct() {
                                 <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-4 text-center">
                                   <div>
                                     <p className="text-sm font-semibold text-gray-900">
-                                      Chi Tiết Các Vị Trí
+                                      Chi Tiáº¿t CÃ¡c Vá»‹ TrÃ­
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      Hiển thị {totalSlots} vị trí — {slotUsed}{" "}
-                                      đã dùng, {remainingSlots} còn trống
+                                      Hiá»ƒn thá»‹ {totalSlots} vá»‹ trÃ­ â€” {slotUsed}{" "}
+                                      Ä‘Ã£ dÃ¹ng, {remainingSlots} cÃ²n trá»‘ng
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap justify-center gap-3">
@@ -1897,12 +1899,12 @@ export default function PackageProduct() {
                                               slot.assignment?.slotLabel ||
                                               (slot.assignment
                                                 ? undefined
-                                                : `Vị trí ${slot.slotNumber}`)
+                                                : `Vá»‹ trÃ­ ${slot.slotNumber}`)
                                             }
                                           >
                                             {slot.assignment?.slotLabel
                                               ? slot.assignment.slotLabel
-                                              : `Vị trí ${slot.slotNumber}`}
+                                              : `Vá»‹ trÃ­ ${slot.slotNumber}`}
                                           </span>
                                         </div>
                                         <p
@@ -1917,8 +1919,8 @@ export default function PackageProduct() {
                                                 slot.assignment.capacityUnits
                                               )
                                             : slot.isUsed
-                                            ? "Đã dùng"
-                                            : "Còn trống"}
+                                            ? "ÄÃ£ dÃ¹ng"
+                                            : "CÃ²n trá»‘ng"}
                                         </p>
                                       </div>
                                     ))}
@@ -1993,7 +1995,7 @@ function ModalShell({
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition"
-            aria-label="Đóng"
+            aria-label="ÄÃ³ng"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
@@ -2044,11 +2046,11 @@ function CreatePackageModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Vui lòng nhập tên loại gói.");
+      setError("Vui lÃ²ng nháº­p tÃªn loáº¡i gÃ³i.");
       return;
     }
     if (fields.size === 0) {
-      setError("Vui lòng chọn ít nhất một trường dữ liệu.");
+      setError("Vui lÃ²ng chá»n Ã­t nháº¥t má»™t trÆ°á»ng dá»¯ liá»‡u.");
       return;
     }
     onSubmit(trimmed, Array.from(fields));
@@ -2058,23 +2060,23 @@ function CreatePackageModal({
       open={open}
       title={
         mode === "edit" && initialName
-          ? `Chỉnh sửa loại gói: ${initialName}`
-          : "Tạo loại gói mới"
+          ? `Chá»‰nh sá»­a loáº¡i gÃ³i: ${initialName}`
+          : "Táº¡o loáº¡i gÃ³i má»›i"
       }
       onClose={onClose}
       footer={
         <>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-indigo-500/15 transition"
           >
-            Hủy
+            Há»§y
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            Lưu
+            LÆ°u
           </button>
         </>
       }
@@ -2082,13 +2084,13 @@ function CreatePackageModal({
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tên Loại Gói
+            TÃªn Loáº¡i GÃ³i
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ví dụ: Google One, Netflix, Spotify..."
+            placeholder="VÃ­ dá»¥: Google One, Netflix, Spotify..."
             className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 ${
               mode === "edit" ? "bg-gray-100 cursor-not-allowed" : ""
             }`}
@@ -2096,15 +2098,15 @@ function CreatePackageModal({
           />
           {mode === "edit" && (
             <p className="text-xs text-gray-500 mt-1">
-              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ
-              nguyên.
+              Báº¡n chá»‰ cÃ³ thá»ƒ chá»‰nh sá»­a cÃ¡c trÆ°á»ng dá»¯ liá»‡u, tÃªn loáº¡i gÃ³i giá»¯
+              nguyÃªn.
             </p>
           )}
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Các trường dữ liệu của loại gói này
+              CÃ¡c trÆ°á»ng dá»¯ liá»‡u cá»§a loáº¡i gÃ³i nÃ y
             </label>
             <div className="flex items-center gap-3 text-xs">
               <button
@@ -2112,14 +2114,14 @@ function CreatePackageModal({
                 onClick={selectAll}
                 className="text-blue-600 hover:text-blue-700"
               >
-                Chọn hết
+                Chá»n háº¿t
               </button>
               <button
                 type="button"
                 onClick={clearAll}
                 className="text-rose-600 hover:text-rose-700"
               >
-                Bỏ hết
+                Bá» háº¿t
               </button>
             </div>
           </div>
@@ -2130,7 +2132,7 @@ function CreatePackageModal({
                 className={`flex items-center gap-3 rounded-lg border p-3 transition cursor-pointer ${
                   fields.has(option.value)
                     ? "bg-blue-50 border-blue-200 ring-1 ring-blue-300"
-                    : "bg-white border-gray-200 hover:bg-gray-50"
+                    : "bg-white border-gray-200 hover:bg-indigo-500/10"
                 }`}
               >
                 <input
@@ -2154,19 +2156,19 @@ function CreatePackageModal({
 function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   if (!open || !row) return null;
   const packageDetails = [
-    { label: "Tài khoản", value: row.informationUser },
-    { label: "Mật khẩu", value: row.informationPass },
+    { label: "TÃ i khoáº£n", value: row.informationUser },
+    { label: "Máº­t kháº©u", value: row.informationPass },
     { label: "Mail 2FA", value: row.informationMail },
-    { label: "Ghi chú", value: row.note },
-    { label: "Nguồn", value: row.supplier },
-    { label: "Giá nhập", value: row.import },
-    { label: "Ngày hết hạn", value: formatDisplayDate(row.expired) },
+    { label: "Ghi chÃº", value: row.note },
+    { label: "Nguá»“n", value: row.supplier },
+    { label: "GiÃ¡ nháº­p", value: row.import },
+    { label: "NgÃ y háº¿t háº¡n", value: formatDisplayDate(row.expired) },
   ];
   const accountDetails = [
-    { label: "Tài khoản", value: row.accountUser },
-    { label: "Mật khẩu", value: row.accountPass },
+    { label: "TÃ i khoáº£n", value: row.accountUser },
+    { label: "Máº­t kháº©u", value: row.accountPass },
     { label: "Mail 2FA", value: row.accountMail },
-    { label: "Ghi chú tài khoản", value: row.accountNote },
+    { label: "Ghi chÃº tÃ i khoáº£n", value: row.accountNote },
   ];
   const showAccountStorage = !!row.hasCapacityField;
   const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
@@ -2189,14 +2191,14 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   return (
     <ModalShell
       open={open}
-      title={`Chi tiết gói - ${row.package}`}
+      title={`Chi tiáº¿t gÃ³i - ${row.package}`}
       onClose={onClose}
       footer={
         <button
           onClick={onClose}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
         >
-          Đóng
+          ÄÃ³ng
         </button>
       }
     >
@@ -2208,10 +2210,10 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
         <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">
-              Thông tin gói
+              ThÃ´ng tin gÃ³i
             </h3>
             <p className="text-xs text-gray-500">
-              Các trường dữ liệu được lưu cho gói này.
+              CÃ¡c trÆ°á»ng dá»¯ liá»‡u Ä‘Æ°á»£c lÆ°u cho gÃ³i nÃ y.
             </p>
           </div>
           <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -2235,10 +2237,10 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
           <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">
-                Tài khoản dung lượng
+                TÃ i khoáº£n dung lÆ°á»£ng
               </h3>
               <p className="text-xs text-gray-500">
-                Tổng quan về tài khoản dung lượng.
+                Tá»•ng quan vá» tÃ i khoáº£n dung lÆ°á»£ng.
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -2269,7 +2271,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
                 />
               </div>
               <div className="text-xs text-gray-500">
-                Còn trống: {remainingCapacity} GB
+                CÃ²n trá»‘ng: {remainingCapacity} GB
               </div>
             </div>
           </section>
@@ -2331,21 +2333,21 @@ function PackageFormModal({
   return (
     <ModalShell
       open={open}
-      title={`${mode === "add" ? "Thêm" : "Sửa"} gói - ${template.name}`}
+      title={`${mode === "add" ? "ThÃªm" : "Sá»­a"} gÃ³i - ${template.name}`}
       onClose={onClose}
       footer={
         <>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-indigo-500/15 transition"
           >
-            Hủy
+            Há»§y
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            {mode === "add" ? "Lưu gói" : "Lưu thay đổi"}
+            {mode === "add" ? "LÆ°u gÃ³i" : "LÆ°u thay Ä‘á»•i"}
           </button>
         </>
       }
@@ -2361,10 +2363,10 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Chi tiết gói
+                    Chi tiáº¿t gÃ³i
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Nhập các trường mô tả liên quan đến gói này.
+                    Nháº­p cÃ¡c trÆ°á»ng mÃ´ táº£ liÃªn quan Ä‘áº¿n gÃ³i nÃ y.
                   </p>
                 </div>
                 {template.fields.includes("information") && (
@@ -2372,26 +2374,26 @@ function PackageFormModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tài khoản
+                          TÃ i khoáº£n
                         </label>
                         <input
                           type="text"
                           value={values.informationUser}
                           onChange={(e) => handleChange("informationUser", e)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="tên đăng nhập"
+                          placeholder="tÃªn Ä‘Äƒng nháº­p"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Mật khẩu
+                          Máº­t kháº©u
                         </label>
                         <input
                           type="text"
                           value={values.informationPass}
                           onChange={(e) => handleChange("informationPass", e)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="mật khẩu"
+                          placeholder="máº­t kháº©u"
                         />
                       </div>
                     </div>
@@ -2412,21 +2414,21 @@ function PackageFormModal({
                 {template.fields.includes("note") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ghi chú
+                      Ghi chÃº
                     </label>
                     <input
                       type="text"
                       value={values.note}
                       onChange={(e) => handleChange("note", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Ghi chú cho gói này"
+                      placeholder="Ghi chÃº cho gÃ³i nÃ y"
                     />
                   </div>
                 )}
                 {template.fields.includes("supplier") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nhà cung cấp
+                      NhÃ  cung cáº¥p
                     </label>
                     <input
                       type="text"
@@ -2439,7 +2441,7 @@ function PackageFormModal({
                 {template.fields.includes("import") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Giá nhập (VND)
+                      GiÃ¡ nháº­p (VND)
                     </label>
                     <input
                       type="number"
@@ -2452,7 +2454,7 @@ function PackageFormModal({
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ngày hết hạn
+                    NgÃ y háº¿t háº¡n
                   </label>
                   <input
                     type="date"
@@ -2467,35 +2469,35 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Tài khoản dung lượng
+                    TÃ i khoáº£n dung lÆ°á»£ng
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Cung cấp thông tin tài khoản dung lượng.
+                    Cung cáº¥p thÃ´ng tin tÃ i khoáº£n dung lÆ°á»£ng.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tài khoản
+                      TÃ i khoáº£n
                     </label>
                     <input
                       type="text"
                       value={values.accountUser}
                       onChange={(e) => handleChange("accountUser", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="tên đăng nhập"
+                      placeholder="tÃªn Ä‘Äƒng nháº­p"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Mật khẩu
+                      Máº­t kháº©u
                     </label>
                     <input
                       type="text"
                       value={values.accountPass}
                       onChange={(e) => handleChange("accountPass", e)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="mật khẩu"
+                      placeholder="máº­t kháº©u"
                     />
                   </div>
                   <div>
@@ -2513,26 +2515,26 @@ function PackageFormModal({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ghi chú
+                    Ghi chÃº
                   </label>
                   <textarea
                     value={values.accountNote}
                     onChange={(e) => handleChange("accountNote", e)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
-                    placeholder="Ghi chú cho tài khoản dung lượng"
+                    placeholder="Ghi chÃº cho tÃ i khoáº£n dung lÆ°á»£ng"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dung lượng (GB)
+                    Dung lÆ°á»£ng (GB)
                   </label>
                   <input
                     type="number"
                     min={0}
                     value={values.capacity}
                     onChange={(e) => handleChange("capacity", e)}
-                    placeholder={`Mặc định: ${DEFAULT_CAPACITY_LIMIT}`}
+                    placeholder={`Máº·c Ä‘á»‹nh: ${DEFAULT_CAPACITY_LIMIT}`}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -2542,14 +2544,14 @@ function PackageFormModal({
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Số vị trí (slot)
+            Sá»‘ vá»‹ trÃ­ (slot)
           </label>
           <input
             type="number"
             min={0}
             value={values.slot}
             onChange={(e) => handleChange("slot", e)}
-            placeholder={`Mặc định: ${DEFAULT_SLOT_LIMIT}`}
+            placeholder={`Máº·c Ä‘á»‹nh: ${DEFAULT_SLOT_LIMIT}`}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -2557,10 +2559,10 @@ function PackageFormModal({
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium text-gray-700">
-                Cơ chế khớp lệnh
+                CÆ¡ cháº¿ khá»›p lá»‡nh
               </p>
               <p className="text-xs text-gray-500">
-                Chọn cách các vị trí được tính từ đơn hàng.
+                Chá»n cÃ¡ch cÃ¡c vá»‹ trÃ­ Ä‘Æ°á»£c tÃ­nh tá»« Ä‘Æ¡n hÃ ng.
               </p>
             </div>
           </div>
@@ -2589,17 +2591,17 @@ function PackageFormModal({
             })}
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            <b>Liên kết theo thông tin đơn hàng:</b> So khớp thông tin của gói
-            này (tài khoản, mail, v.v.) với các chi tiết trong đơn hàng của
-            khách.
+            <b>LiÃªn káº¿t theo thÃ´ng tin Ä‘Æ¡n hÃ ng:</b> So khá»›p thÃ´ng tin cá»§a gÃ³i
+            nÃ y (tÃ i khoáº£n, mail, v.v.) vá»›i cÃ¡c chi tiáº¿t trong Ä‘Æ¡n hÃ ng cá»§a
+            khÃ¡ch.
             <br />
-            <b>Liên kết theo vị trí:</b> So khớp thông tin của gói này với một
-            mã vị trí (slot) cụ thể được chỉ định trong đơn hàng.
+            <b>LiÃªn káº¿t theo vá»‹ trÃ­:</b> So khá»›p thÃ´ng tin cá»§a gÃ³i nÃ y vá»›i má»™t
+            mÃ£ vá»‹ trÃ­ (slot) cá»¥ thá»ƒ Ä‘Æ°á»£c chá»‰ Ä‘á»‹nh trong Ä‘Æ¡n hÃ ng.
           </p>
         </div>
         {template.fields.length === 0 && (
           <p className="text-sm text-gray-500">
-            Loại gói này không có trường dữ liệu nào được định cấu hình.
+            Loáº¡i gÃ³i nÃ y khÃ´ng cÃ³ trÆ°á»ng dá»¯ liá»‡u nÃ o Ä‘Æ°á»£c Ä‘á»‹nh cáº¥u hÃ¬nh.
           </p>
         )}
       </form>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   MagnifyingGlassIcon,
@@ -78,8 +78,8 @@ const GLASS_FIELD_CLASS =
 const formatCurrencyShort = Helpers.formatCurrencyShort;
 const formatCurrencyVnd = Helpers.formatCurrency;
 
-const ACTIVE_STATUS_LABEL = "Đang Hoạt Động";
-const INACTIVE_STATUS_LABEL = "Tạm Dừng";
+const ACTIVE_STATUS_LABEL = "Äang Hoáº¡t Äá»™ng";
+const INACTIVE_STATUS_LABEL = "Táº¡m Dá»«ng";
 const normalizeStatusValue = (value?: string | null): "active" | "inactive" => {
   if (!value) return "active";
 
@@ -104,7 +104,7 @@ const resolveStatusBoolean = (value?: string | boolean | null): boolean => {
   return normalizeStatusValue(value) !== "inactive";
 };
 
-const DEFAULT_DELETE_ERROR = "Có lỗi xảy ra khi xóa nguồn. Vui lòng thử lại sau.";
+const DEFAULT_DELETE_ERROR = "CÃ³ lá»—i xáº£y ra khi xÃ³a nguá»“n. Vui lÃ²ng thá»­ láº¡i sau.";
 const formatDeleteErrorMessage = (raw?: string | null): string =>
   normalizeErrorMessage(raw, {
     fallback: DEFAULT_DELETE_ERROR,
@@ -380,7 +380,7 @@ export default function Sources() {
       setError(null);
       const response = await apiFetch("/api/supply-insights");
       if (!response.ok) {
-        throw new Error("Không thể tải dữ liệu nguồn");
+        throw new Error("KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u nguá»“n");
       }
       const data: SupplySummaryResponse = await response.json();
       const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
@@ -416,7 +416,7 @@ export default function Sources() {
     } catch (err) {
       console.error(err);
       setError(
-        err instanceof Error ? err.message : "Có lỗi xảy ra khi tải dữ liệu."
+        err instanceof Error ? err.message : "CÃ³ lá»—i xáº£y ra khi táº£i dá»¯ liá»‡u."
       );
     } finally {
       setLoading(false);
@@ -461,7 +461,7 @@ export default function Sources() {
         `/api/supplies/${supplyId}/payments?${params.toString()}`
       );
       if (!response.ok) {
-        throw new Error("Không thể tải lịch sử thanh toán.");
+        throw new Error("KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.");
       }
       return response.json();
     },
@@ -499,7 +499,7 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "Không thể tải lịch sử thanh toán.",
+              : "KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.",
         }));
       }
     },
@@ -547,7 +547,7 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "Không thể tải lịch sử thanh toán.",
+              : "KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.",
         }));
       }
     },
@@ -593,7 +593,7 @@ export default function Sources() {
         round: prev[supplyId]?.round || "",
         totalImport: prev[supplyId]?.totalImport || "",
         paid: prev[supplyId]?.paid || "",
-        status: prev[supplyId]?.status || "Chưa Thanh Toán",
+        status: prev[supplyId]?.status || "ChÆ°a Thanh ToÃ¡n",
         isEditing: true,
       },
     }));
@@ -606,7 +606,7 @@ export default function Sources() {
         round: "",
         totalImport: "",
         paid: "",
-        status: "Chưa Thanh Toán",
+        status: "ChÆ°a Thanh ToÃ¡n",
         isEditing: false,
       },
     }));
@@ -624,7 +624,7 @@ export default function Sources() {
           round: prev[supplyId]?.round || "",
           totalImport: prev[supplyId]?.totalImport || "",
           paid: prev[supplyId]?.paid || "",
-          status: prev[supplyId]?.status || "Chưa Thanh Toán",
+          status: prev[supplyId]?.status || "ChÆ°a Thanh ToÃ¡n",
           isEditing: true,
           [field]: value,
         },
@@ -657,10 +657,10 @@ export default function Sources() {
       const parsedPaid = Number((draft.paid || "").replace(/[^\d.-]/g, ""));
 
       const payload = {
-        round: draft.round.trim() || "Chu kỳ mới",
+        round: draft.round.trim() || "Chu ká»³ má»›i",
         totalImport: Number.isFinite(parsedTotal) ? parsedTotal : 0,
         paid: Number.isFinite(parsedPaid) ? parsedPaid : 0,
-        status: draft.status.trim() || "Chưa Thanh Toán",
+        status: draft.status.trim() || "ChÆ°a Thanh ToÃ¡n",
       };
 
       setPaymentSubmittingMap((prev) => ({ ...prev, [supplyId]: true }));
@@ -674,7 +674,7 @@ export default function Sources() {
         });
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(text || "Không thể thêm chu kỳ thanh toán.");
+          throw new Error(text || "KhÃ´ng thá»ƒ thÃªm chu ká»³ thanh toÃ¡n.");
         }
         const data = await response.json();
         const newPayment: SupplyPayment = {
@@ -706,7 +706,7 @@ export default function Sources() {
             round: "",
             totalImport: "",
             paid: "",
-            status: "Chưa Thanh Toán",
+            status: "ChÆ°a Thanh ToÃ¡n",
             isEditing: false,
           },
         }));
@@ -717,7 +717,7 @@ export default function Sources() {
           error:
             error instanceof Error
               ? error.message
-              : "Không thể thêm chu kỳ thanh toán.",
+              : "KhÃ´ng thá»ƒ thÃªm chu ká»³ thanh toÃ¡n.",
         }));
       } finally {
         setPaymentSubmittingMap((prev) => {
@@ -761,11 +761,11 @@ export default function Sources() {
       event.preventDefault();
       const trimmedName = newSupplierForm.sourceName.trim();
       if (!trimmedName) {
-        setAddModalError("Vui lòng nhập tên nhà cung cấp");
+        setAddModalError("Vui lÃ²ng nháº­p tÃªn nhÃ  cung cáº¥p");
         return;
       }
       if (!newSupplierForm.bankBin) {
-        setAddModalError("Vui lòng chọn ngân hàng");
+        setAddModalError("Vui lÃ²ng chá»n ngÃ¢n hÃ ng");
         return;
       }
       setIsCreatingSupplier(true);
@@ -785,7 +785,7 @@ export default function Sources() {
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
-          let message = "Không thể tạo nhà cung cấp.";
+          let message = "KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p.";
           try {
             const data = await response.json();
             if (data?.error) message = data.error;
@@ -799,7 +799,7 @@ export default function Sources() {
       } catch (error) {
         console.error(error);
         setAddModalError(
-          error instanceof Error ? error.message : "Không thể tạo nhà cung cấp"
+          error instanceof Error ? error.message : "KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p"
         );
       } finally {
         setIsCreatingSupplier(false);
@@ -819,7 +819,7 @@ export default function Sources() {
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          errorText || "Không thể tải thông tin chi tiết nhà cung cấp"
+          errorText || "KhÃ´ng thá»ƒ táº£i thÃ´ng tin chi tiáº¿t nhÃ  cung cáº¥p"
         );
       }
       const data: SupplyOverviewResponse = await response.json();
@@ -837,7 +837,7 @@ export default function Sources() {
         error:
           error instanceof Error
             ? error.message
-            : "Không thể tải thông tin chi tiết nhà cung cấp",
+            : "KhÃ´ng thá»ƒ táº£i thÃ´ng tin chi tiáº¿t nhÃ  cung cáº¥p",
       }));
     }
   }, []);
@@ -893,13 +893,13 @@ export default function Sources() {
         !viewModalState.data ||
         !viewModalState.selectedPaymentId
       ) {
-        throw new Error("Không tìm thấy chu kỳ thanh toán");
+        throw new Error("KhÃ´ng tÃ¬m tháº¥y chu ká»³ thanh toÃ¡n");
       }
       const payment = viewModalState.data.unpaidPayments.find(
         (item) => item.id === viewModalState.selectedPaymentId
       );
       if (!payment) {
-        throw new Error("Không tìm thấy chu kỳ thanh toán");
+        throw new Error("KhÃ´ng tÃ¬m tháº¥y chu ká»³ thanh toÃ¡n");
       }
       const response = await apiFetch(
         `/api/payment-supply/${payment.id}/confirm`,
@@ -911,7 +911,7 @@ export default function Sources() {
       );
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || "Không thể xác nhận thanh toán.");
+        throw new Error(errorText || "KhÃ´ng thá»ƒ xÃ¡c nháº­n thanh toÃ¡n.");
       }
       await fetchSupplyOverview(currentId);
       await fetchSupplySummary();
@@ -922,7 +922,7 @@ export default function Sources() {
         confirmError:
           error instanceof Error
             ? error.message
-            : "Không thể xác nhận thanh toán.",
+            : "KhÃ´ng thá»ƒ xÃ¡c nháº­n thanh toÃ¡n.",
       }));
     } finally {
       setViewModalState((prev) => ({
@@ -1021,7 +1021,7 @@ export default function Sources() {
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(
-            errorText || "Không thể cập nhật trạng thái nhà cung cấp."
+            errorText || "KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i nhÃ  cung cáº¥p."
           );
         }
 
@@ -1045,7 +1045,7 @@ export default function Sources() {
         alert(
           error instanceof Error
             ? error.message
-            : "Không thể cập nhật trạng thái nhà cung cấp."
+            : "KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i nhÃ  cung cáº¥p."
         );
 
         setSupplies((prev) =>
@@ -1100,7 +1100,7 @@ export default function Sources() {
       );
       closeDeleteConfirm();
     } catch (error) {
-      console.error("Không Thể Xóa Nhà Cung Cấp:", error);
+      console.error("KhÃ´ng Thá»ƒ XÃ³a NhÃ  Cung Cáº¥p:", error);
       setDeleteConfirmState((prev) => ({
         ...prev,
         loading: false,
@@ -1127,7 +1127,7 @@ export default function Sources() {
             colSpan={4}
             className="px-6 py-4 text-sm text-gray-500 text-center"
           >
-            Đang tải dữ liệu thanh toán...
+            Äang táº£i dá»¯ liá»‡u thanh toÃ¡n...
           </td>
         </tr>
       );
@@ -1140,13 +1140,13 @@ export default function Sources() {
             colSpan={3}
             className="px-6 py-4 text-sm text-gray-500 text-center"
           >
-            Chưa có dữ liệu chu kỳ thanh toán.
+            ChÆ°a cÃ³ dá»¯ liá»‡u chu ká»³ thanh toÃ¡n.
           </td>
           <td className="px-4 py-4 text-center">
             <button
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600 transition"
-              title="Thêm chu kỳ thanh toán"
+              title="ThÃªm chu ká»³ thanh toÃ¡n"
               onClick={() => supplyId !== undefined && startAddPaymentCycle(supplyId)}
             >
               <PlusIcon className="h-5 w-5" />
@@ -1191,7 +1191,7 @@ export default function Sources() {
           <input
             type="text"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="VD: Chu kỳ 1"
+            placeholder="VD: Chu ká»³ 1"
             value={draft.round}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1204,7 +1204,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="Tổng tiền thanh toán"
+            placeholder="Tá»•ng tiá»n thanh toÃ¡n"
             value={formatMoneyInput(draft.totalImport)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1221,7 +1221,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="Đã thanh toán"
+            placeholder="ÄÃ£ thanh toÃ¡n"
             value={formatMoneyInput(draft.paid)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1239,15 +1239,15 @@ export default function Sources() {
                 handlePaymentDraftChange(supplyId, "status", event.target.value)
               }
             >
-              <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
-              <option value="Đã Thanh Toán">Đã Thanh Toán</option>
-              <option value="Cần Gia Hạn">Cần Gia Hạn</option>
+              <option value="ChÆ°a Thanh ToÃ¡n">ChÆ°a Thanh ToÃ¡n</option>
+              <option value="ÄÃ£ Thanh ToÃ¡n">ÄÃ£ Thanh ToÃ¡n</option>
+              <option value="Cáº§n Gia Háº¡n">Cáº§n Gia Háº¡n</option>
             </select>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-emerald-500 text-white shadow hover:bg-emerald-600 transition"
-                title="Xác nhận thêm chu kỳ"
+                title="XÃ¡c nháº­n thÃªm chu ká»³"
                 disabled={isSubmitting}
                 onClick={() => confirmAddPaymentCycle(supplyId)}
               >
@@ -1256,7 +1256,7 @@ export default function Sources() {
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition"
-                title="Hủy thêm chu kỳ"
+                title="Há»§y thÃªm chu ká»³"
                 disabled={isSubmitting}
                 onClick={() => cancelAddPaymentCycle(supplyId)}
               >
@@ -1293,7 +1293,7 @@ export default function Sources() {
           className={`w-9 h-9 rounded-lg text-sm font-medium transition ${
             state.currentPage === index
               ? "bg-orange-500 text-white"
-              : "text-gray-600 hover:bg-gray-100"
+              : "text-gray-600 hover:bg-indigo-500/15"
           }`}
           onClick={() => goToPage(supplyId, index)}
           disabled={state.loading && state.currentPage === index}
@@ -1305,7 +1305,7 @@ export default function Sources() {
       return (
         <div className="flex items-center justify-center gap-2 pt-4">
           <button
-            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-indigo-500/15 disabled:opacity-40"
             onClick={() => goToPage(supplyId, state.currentPage - 1)}
             disabled={!canGoPrev}
           >
@@ -1318,7 +1318,7 @@ export default function Sources() {
             </>
           )}
           <button
-            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            className="w-9 h-9 rounded-lg text-gray-500 hover:bg-indigo-500/15 disabled:opacity-40"
             onClick={() => goToPage(supplyId, state.currentPage + 1)}
             disabled={!canGoNext}
           >
@@ -1332,15 +1332,15 @@ export default function Sources() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 text-center">
             <p className="text-sm font-semibold text-gray-900">
-              Lịch sử thanh toán
+              Lá»‹ch sá»­ thanh toÃ¡n
             </p>
             <p className="text-xs text-gray-500">
-              Theo dõi chu kỳ thanh toán của nhà cung cấp.
+              Theo dÃµi chu ká»³ thanh toÃ¡n cá»§a nhÃ  cung cáº¥p.
             </p>
           </div>
         </div>
         {state?.loading && (
-          <div className="text-center text-xs text-blue-600">Đang tải...</div>
+          <div className="text-center text-xs text-blue-600">Äang táº£i...</div>
         )}
 
         {state?.error && (
@@ -1352,12 +1352,12 @@ export default function Sources() {
             <table className="w-full">
               <thead className="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wide">
                 <tr>
-                  <th className="px-6 py-3 text-left sm:text-center">Chu kỳ</th>
+                  <th className="px-6 py-3 text-left sm:text-center">Chu ká»³</th>
                   <th className="px-6 py-3 text-center">
-                    Tổng tiền thanh toán
+                    Tá»•ng tiá»n thanh toÃ¡n
                   </th>
-                  <th className="px-6 py-3 text-center">Đã Thanh Toán</th>
-                  <th className="px-6 py-3 text-center">Tình Trạng</th>
+                  <th className="px-6 py-3 text-center">ÄÃ£ Thanh ToÃ¡n</th>
+                  <th className="px-6 py-3 text-center">TÃ¬nh Tráº¡ng</th>
                 </tr>
               </thead>
               <tbody>
@@ -1379,7 +1379,7 @@ export default function Sources() {
           !state.loading &&
           !state.error && (
             <div className="text-center text-xs text-gray-500">
-              Chưa có chu kỳ thanh toán nào.
+              ChÆ°a cÃ³ chu ká»³ thanh toÃ¡n nÃ o.
             </div>
           )} */}
         {renderPaginationControls()}
@@ -1423,10 +1423,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Chỉnh sửa nhà cung cấp
+                Chá»‰nh sá»­a nhÃ  cung cáº¥p
               </p>
               <p className="text-xs text-gray-500">
-                Cập nhật thông tin thanh toán và trạng thái nhà cung cấp.
+                Cáº­p nháº­t thÃ´ng tin thanh toÃ¡n vÃ  tráº¡ng thÃ¡i nhÃ  cung cáº¥p.
               </p>
             </div>
             <button
@@ -1441,7 +1441,7 @@ export default function Sources() {
           <form className="space-y-4" onSubmit={handleEditSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tên Nguồn
+                TÃªn Nguá»“n
               </label>
               <input
                 type="text"
@@ -1450,14 +1450,14 @@ export default function Sources() {
                   handleEditInputChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập tên nguồn"
+                placeholder="Nháº­p tÃªn nguá»“n"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Thanh Toán
+                Thanh ToÃ¡n
               </label>
               <input
                 type="text"
@@ -1466,14 +1466,14 @@ export default function Sources() {
                   handleEditInputChange("paymentInfo", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Thông tin thanh toán"
+                placeholder="ThÃ´ng tin thanh toÃ¡n"
               />
               {(currentSupply?.bankName ||
                 (currentSupply?.binBank
                   ? bankNameByBin.get(currentSupply.binBank.trim())
                   : null)) && (
                 <p className="mt-1 text-xs text-gray-500">
-                  Ngân hàng hiện tại:{" "}
+                  NgÃ¢n hÃ ng hiá»‡n táº¡i:{" "}
                   {currentSupply?.bankName ||
                     (currentSupply?.binBank
                       ? bankNameByBin.get(currentSupply.binBank.trim())
@@ -1483,7 +1483,7 @@ export default function Sources() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ngân Hàng
+                NgÃ¢n HÃ ng
               </label>
               <select
                 value={editFormValues.bankBin}
@@ -1493,7 +1493,7 @@ export default function Sources() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="" disabled>
-                  Chọn Ngân Hàng
+                  Chá»n NgÃ¢n HÃ ng
                 </option>
                 {bankOptionsForEdit.map((bank) => (
                   <option key={bank.bin} value={bank.bin}>
@@ -1505,16 +1505,16 @@ export default function Sources() {
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10"
                 onClick={closeEditForm}
               >
-                Hủy
+                Há»§y
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
               >
-                Lưu Thông Tin
+                LÆ°u ThÃ´ng Tin
               </button>
             </div>
           </form>
@@ -1541,10 +1541,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Xác Nhận Xóa
+                XÃ¡c Nháº­n XÃ³a
               </p>
               <p className="text-xs text-gray-500">
-                Hành Động Này Sẽ Xóa Nguồn Khỏi Dữ Liệu.
+                HÃ nh Äá»™ng NÃ y Sáº½ XÃ³a Nguá»“n Khá»i Dá»¯ Liá»‡u.
               </p>
             </div>
             <button
@@ -1559,26 +1559,26 @@ export default function Sources() {
           <div className="space-y-3 text-sm text-gray-600">
             <div>
               <p className="font-semibold text-gray-900">
-                {supply.sourceName || "Nguồn Không Tên"}
+                {supply.sourceName || "Nguá»“n KhÃ´ng TÃªn"}
               </p>
               <p className="text-xs text-gray-500">
-                {supply.numberBank || "Chưa Có Thông Tin Thanh Toán"}
+                {supply.numberBank || "ChÆ°a CÃ³ ThÃ´ng Tin Thanh ToÃ¡n"}
               </p>
             </div>
             <p>
-              Bạn Chắc Chắn Muốn Xóa Nguồn Này? Hành Động Không Thể Hoàn Tác Và
-              Những Danh Sách Liên Quan Cũng Sẽ Bị Cập Nhật.
+              Báº¡n Cháº¯c Cháº¯n Muá»‘n XÃ³a Nguá»“n NÃ y? HÃ nh Äá»™ng KhÃ´ng Thá»ƒ HoÃ n TÃ¡c VÃ 
+              Nhá»¯ng Danh SÃ¡ch LiÃªn Quan CÅ©ng Sáº½ Bá»‹ Cáº­p Nháº­t.
             </p>
           </div>
           {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
-              className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10 disabled:opacity-50"
               onClick={closeDeleteConfirm}
               disabled={loading}
             >
-              Hủy
+              Há»§y
             </button>
             <button
               type="button"
@@ -1586,7 +1586,7 @@ export default function Sources() {
               onClick={confirmDeleteSupply}
               disabled={loading}
             >
-              {loading ? "Đang Xóa..." : "Xóa Nguồn"}
+              {loading ? "Äang XÃ³a..." : "XÃ³a Nguá»“n"}
             </button>
           </div>
         </div>
@@ -1607,7 +1607,7 @@ export default function Sources() {
       supply?.bankName ||
       (supply?.binBank
         ? bankNameByBin.get(supply.binBank.trim()) || `BIN ${supply.binBank}`
-        : "Chưa có ngân hàng");
+        : "ChÆ°a cÃ³ ngÃ¢n hÃ ng");
     const accountNumber = supply?.numberBank || "";
     const accountName = supply?.sourceName || "";
     const bankBin = supply?.binBank || "";
@@ -1624,25 +1624,25 @@ export default function Sources() {
 
     const statCards = [
       {
-        title: "Tổng Đơn Hàng",
+        title: "Tá»•ng ÄÆ¡n HÃ ng",
         value: stats?.totalOrders ?? 0,
         accent: "sky" as const,
         Icon: ClipboardDocumentListIcon,
       },
       {
-        title: "Đơn Hàng Hủy",
+        title: "ÄÆ¡n HÃ ng Há»§y",
         value: stats?.canceledOrders ?? 0,
         accent: "rose" as const,
         Icon: XCircleIcon,
       },
       {
-        title: "Đơn Tháng Này",
+        title: "ÄÆ¡n ThÃ¡ng NÃ y",
         value: stats?.monthlyOrders ?? 0,
         accent: "violet" as const,
         Icon: CalendarDaysIcon,
       },
       {
-        title: "Tổng Tiền Đã Thanh Toán",
+        title: "Tá»•ng Tiá»n ÄÃ£ Thanh ToÃ¡n",
         value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
         accent: "emerald" as const,
         Icon: CurrencyDollarIcon,
@@ -1655,7 +1655,7 @@ export default function Sources() {
           <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Thông Tin Nhà Cung Cấp
+                ThÃ´ng Tin NhÃ  Cung Cáº¥p
               </p>
               {supply && (
                 <p className="text-xs text-gray-500">
@@ -1675,7 +1675,7 @@ export default function Sources() {
           <div className="px-6 py-5 overflow-y-auto space-y-6">
             {viewModalState.loading && (
               <div className="text-center text-sm text-gray-500">
-                Đang Tải Thông Tin...
+                Äang Táº£i ThÃ´ng Tin...
               </div>
             )}
 
@@ -1691,13 +1691,13 @@ export default function Sources() {
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
                     <div className="flex-1 bg-white rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-2 border-gray-200 shadow-md">
                       <div>
-                        <p className="text-gray-500">Tên Nhà Cung Cấp</p>
+                        <p className="text-gray-500">TÃªn NhÃ  Cung Cáº¥p</p>
                         <p className="text-lg font-semibold text-gray-900">
-                          {supply.sourceName || "Chưa Đặt Tên"}
+                          {supply.sourceName || "ChÆ°a Äáº·t TÃªn"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Trạng Thái</p>
+                        <p className="text-gray-500">Tráº¡ng ThÃ¡i</p>
                         <span
                           className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 ${getStatusClasses(
                             supply.isActive ?? supply.status
@@ -1707,13 +1707,13 @@ export default function Sources() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-gray-500">Số Tài Khoản</p>
+                        <p className="text-gray-500">Sá»‘ TÃ i Khoáº£n</p>
                         <p className="text-base font-semibold text-gray-900">
-                          {accountNumber || "Chưa Cung Cấp"}
+                          {accountNumber || "ChÆ°a Cung Cáº¥p"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Ngân Hàng</p>
+                        <p className="text-gray-500">NgÃ¢n HÃ ng</p>
                         <p className="text-base font-semibold text-gray-900">
                           {bankLabel}
                         </p>
@@ -1763,17 +1763,17 @@ export default function Sources() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">
-                        Chu Kỳ Thanh Toán
+                        Chu Ká»³ Thanh ToÃ¡n
                       </p>
                       <p className="text-xs text-gray-500">
-                        Chọn chu kỳ để hiện thông tin thanh toán và QR
+                        Chá»n chu ká»³ Ä‘á»ƒ hiá»‡n thÃ´ng tin thanh toÃ¡n vÃ  QR
                       </p>
                     </div>
                   </div>
 
                   {unpaidPayments.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                      Tất cả chu kỳ đã được thanh toán
+                      Táº¥t cáº£ chu ká»³ Ä‘Ã£ Ä‘Æ°á»£c thanh toÃ¡n
                     </div>
                   ) : (
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -1789,10 +1789,10 @@ export default function Sources() {
                             onClick={() => handleSelectPaymentCycle(payment.id)}
                           >
                             <p className="text-sm font-semibold text-gray-900">
-                              {payment.round || "Chu kỳ không tên"}
+                              {payment.round || "Chu ká»³ khÃ´ng tÃªn"}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Tổng Tiền:{" "}
+                              Tá»•ng Tiá»n:{" "}
                               {formatCurrencyVnd(payment.totalImport)}
                             </p>
                           </button>
@@ -1804,56 +1804,56 @@ export default function Sources() {
                           <div className="border border-gray-200 rounded-2xl p-6 space-y-4 bg-white shadow-sm">
                             <div>
                               <p className="text-sm text-gray-600">
-                                Thông Tin Chu Kỳ
+                                ThÃ´ng Tin Chu Ká»³
                               </p>
                               <p className="text-lg font-semibold text-gray-900">
-                                {selectedPayment.round || "Chu Kỳ Không Tên"}
+                                {selectedPayment.round || "Chu Ká»³ KhÃ´ng TÃªn"}
                               </p>
                             </div>
                             {qrImageUrl ? (
                               <div className="flex flex-col items-center space-y-3">
                                 <img
                                   src={qrImageUrl}
-                                  alt="QR Thanh Toán"
+                                  alt="QR Thanh ToÃ¡n"
                                   className="w-60 h-auto"
                                 />
                                 <p className="text-xs text-gray-500">
-                                  Quét Mã QR Để Thanh Toán
+                                  QuÃ©t MÃ£ QR Äá»ƒ Thanh ToÃ¡n
                                 </p>
                               </div>
                             ) : (
                               <div className="text-sm text-gray-500 text-center">
-                                Không có dữ liệu tạo mã QR (Thiếu thông tin tài
-                                khoản hoặc ngân hàng).
+                                KhÃ´ng cÃ³ dá»¯ liá»‡u táº¡o mÃ£ QR (Thiáº¿u thÃ´ng tin tÃ i
+                                khoáº£n hoáº·c ngÃ¢n hÃ ng).
                               </div>
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                               <div>
-                                <p className="text-gray-500">Ngân Hàng</p>
+                                <p className="text-gray-500">NgÃ¢n HÃ ng</p>
                                 <p className="font-semibold text-gray-900">
                                   {bankLabel}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Số tài khoản</p>
+                                <p className="text-gray-500">Sá»‘ tÃ i khoáº£n</p>
 
                                 <p className="font-semibold text-gray-900">
-                                  {accountNumber || "Chưa Cung Cấp"}
+                                  {accountNumber || "ChÆ°a Cung Cáº¥p"}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-500">
-                                  Chủ tài khoản / Nội dung
+                                  Chá»§ tÃ i khoáº£n / Ná»™i dung
                                 </p>
                                 <p className="font-semibold text-gray-900">
                                   {accountName}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  Nội dung: {qrMessage}
+                                  Ná»™i dung: {qrMessage}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Số Tiền</p>
+                                <p className="text-gray-500">Sá»‘ Tiá»n</p>
                                 <p className="font-semibold text-red-600">
                                   {formatCurrencyVnd(qrAmount)}
                                 </p>
@@ -1871,14 +1871,14 @@ export default function Sources() {
                                 disabled={viewModalState.confirming}
                               >
                                 {viewModalState.confirming
-                                  ? "Đang xác nhận..."
-                                  : "Xác nhận thanh toán"}
+                                  ? "Äang xÃ¡c nháº­n..."
+                                  : "XÃ¡c nháº­n thanh toÃ¡n"}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div className="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-sm text-gray-500">
-                            Chọn một chu kỳ để xem thông tin thanh toán
+                            Chá»n má»™t chu ká»³ Ä‘á»ƒ xem thÃ´ng tin thanh toÃ¡n
                           </div>
                         )}
                       </div>
@@ -1907,10 +1907,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Thêm nhà cung cấp
+                ThÃªm nhÃ  cung cáº¥p
               </p>
               <p className="text-xs text-gray-500">
-                Nhập thông tin nhà cung cấp mới
+                Nháº­p thÃ´ng tin nhÃ  cung cáº¥p má»›i
               </p>
             </div>
             <button
@@ -1925,7 +1925,7 @@ export default function Sources() {
           <form className="space-y-4" onSubmit={handleCreateSupplierSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tên nhà cung cấp
+                TÃªn nhÃ  cung cáº¥p
               </label>
               <input
                 type="text"
@@ -1934,14 +1934,14 @@ export default function Sources() {
                   handleNewSupplierChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập tên nhà cung cấp"
+                placeholder="Nháº­p tÃªn nhÃ  cung cáº¥p"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Số tài khoản
+                Sá»‘ tÃ i khoáº£n
               </label>
               <input
                 type="text"
@@ -1950,13 +1950,13 @@ export default function Sources() {
                   handleNewSupplierChange("numberBank", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập số tài khoản"
+                placeholder="Nháº­p sá»‘ tÃ i khoáº£n"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ngân Hàng
+                NgÃ¢n HÃ ng
               </label>
               <select
                 value={newSupplierForm.bankBin}
@@ -1966,7 +1966,7 @@ export default function Sources() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="" disabled>
-                  Chọn Ngân hàng
+                  Chá»n NgÃ¢n hÃ ng
                 </option>
                 {bankOptions.map((bank) => {
                   const label = bank.name || `BIN ${bank.bin}`;
@@ -1981,7 +1981,7 @@ export default function Sources() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Trạng Thái
+                Tráº¡ng ThÃ¡i
               </label>
               <select
                 value={newSupplierForm.status}
@@ -2005,18 +2005,18 @@ export default function Sources() {
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10"
                 onClick={closeAddSupplierModal}
                 disabled={isCreatingSupplier}
               >
-                Hủy
+                Há»§y
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70"
                 disabled={isCreatingSupplier}
               >
-                {isCreatingSupplier ? "Đang Lưu..." : "Thêm Nhà Cung Cấp"}
+                {isCreatingSupplier ? "Äang LÆ°u..." : "ThÃªm NhÃ  Cung Cáº¥p"}
               </button>
             </div>
           </form>
@@ -2034,7 +2034,7 @@ export default function Sources() {
       try {
         const response = await apiFetch("/api/banks");
         if (!response.ok) {
-          throw new Error("Không thể tải danh sách ngân hàng");
+          throw new Error("KhÃ´ng thá»ƒ táº£i danh sÃ¡ch ngÃ¢n hÃ ng");
         }
         const data: BankOption[] = await response.json();
         setBankOptions(data);
@@ -2075,25 +2075,25 @@ export default function Sources() {
   const supplierStats = useMemo(
     () => [
       {
-        name: "Tổng Nhà Cung Cấp",
+        name: "Tá»•ng NhÃ  Cung Cáº¥p",
         value: stats.totalSuppliers.toString(),
         accent: STAT_CARD_ACCENTS.sky,
         Icon: UserGroupIcon,
       },
       {
-        name: "Đang Hoạt Động",
+        name: "Äang Hoáº¡t Äá»™ng",
         value: stats.activeSuppliers.toString(),
         accent: STAT_CARD_ACCENTS.emerald,
         Icon: CheckCircleIcon,
       },
       {
-        name: "Đơn Hàng Tháng Này",
+        name: "ÄÆ¡n HÃ ng ThÃ¡ng NÃ y",
         value: stats.monthlyOrders.toString(),
         accent: STAT_CARD_ACCENTS.violet,
         Icon: ShoppingBagIcon,
       },
       {
-        name: "Giá Trị Nhập Hàng",
+        name: "GiÃ¡ Trá»‹ Nháº­p HÃ ng",
         value: formatCurrencyShort(stats.totalImportValue),
         accent: STAT_CARD_ACCENTS.amber,
         Icon: CurrencyDollarIcon,
@@ -2108,29 +2108,31 @@ export default function Sources() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Bảng Thông Tin Nguồn
+              Báº£ng ThÃ´ng Tin Nguá»“n
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              Quản lý thông tin nhà cung cấp và đối tác
+              Quáº£n lÃ½ thÃ´ng tin nhÃ  cung cáº¥p vÃ  Ä‘á»‘i tÃ¡c
             </p>
           </div>
           <div className="mt-4 sm:mt-0">
             <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
-              Thêm Nhà Cung Cấp
+              ThÃªm NhÃ  Cung Cáº¥p
             </GradientButton>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {supplierStats.map((stat) => (
-            <StatCard
-              key={stat.name}
-              title={stat.name}
-              value={stat.value}
-              icon={stat.Icon}
-              accent={stat.accent}
-            />
-          ))}
+        <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {supplierStats.map((stat) => (
+              <StatCard
+                key={stat.name}
+                title={stat.name}
+                value={stat.value}
+                icon={stat.Icon}
+                accent={stat.accent}
+              />
+            ))}
+          </div>
         </div>
 
         <GlassPanel className="p-6 space-y-4" glow="neutral">
@@ -2139,7 +2141,7 @@ export default function Sources() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm kiếm nhà cung cấp..."
+                placeholder="TÃ¬m kiáº¿m nhÃ  cung cáº¥p..."
                 className={`${GLASS_FIELD_CLASS} pl-10`}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
@@ -2151,13 +2153,13 @@ export default function Sources() {
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang Hoạt Động</option>
-              <option value="inactive">Tạm Ngưng</option>
+              <option value="all">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
+              <option value="active">Äang Hoáº¡t Äá»™ng</option>
+              <option value="inactive">Táº¡m NgÆ°ng</option>
             </select>
 
             <GradientButton className="w-full justify-center" type="button">
-              Xuất Danh Sách
+              Xuáº¥t Danh SÃ¡ch
             </GradientButton>
           </div>
 
@@ -2170,35 +2172,35 @@ export default function Sources() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Nhà Cung Cấp
+                    NhÃ  Cung Cáº¥p
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Thanh Toán
+                    Thanh ToÃ¡n
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Đơn Trong Tháng
+                    ÄÆ¡n Trong ThÃ¡ng
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Đơn Hàng Cuối
+                    ÄÆ¡n HÃ ng Cuá»‘i
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Đã Thanh Toán
+                    ÄÃ£ Thanh ToÃ¡n
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Chưa Thanh Toán
+                    ChÆ°a Thanh ToÃ¡n
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap ">
-                    Trạng Thái
+                    Tráº¡ng ThÃ¡i
                   </th>
 
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Thao Tác
+                    Thao TÃ¡c
                   </th>
                 </tr>
               </thead>
@@ -2209,7 +2211,7 @@ export default function Sources() {
                       colSpan={8}
                       className="px-6 py-4 text-center text-sm text-gray-500"
                     >
-                      Đang Tải Dữ Liệu
+                      Äang Táº£i Dá»¯ Liá»‡u
                     </td>
                   </tr>
                 )}
@@ -2220,34 +2222,34 @@ export default function Sources() {
                     return (
                       <React.Fragment key={supply.id}>
                         <tr
-                          className="hover:bg-gray-50 cursor-pointer"
+                          className="hover:bg-indigo-500/10 cursor-pointer"
                           onClick={() => toggleSlotDetails(supply.id)}
                         >
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
-                              {supply.sourceName || "Chưa Đặt Tên"}
+                              {supply.sourceName || "ChÆ°a Äáº·t TÃªn"}
                             </div>
                             <div className="text-xs text-gray-500">
-                              Tổng Đơn: {supply.totalOrders}
+                              Tá»•ng ÄÆ¡n: {supply.totalOrders}
                             </div>
                           </td>
 
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {supply.numberBank || "Chưa Có Tài Khoản"}
+                              {supply.numberBank || "ChÆ°a CÃ³ TÃ i Khoáº£n"}
                             </div>
                             <div className="text-xs text-gray-500">
                               {supply.bankName ||
                                 (supply.binBank
                                   ? bankNameByBin.get(supply.binBank.trim()) ||
                                     `BIN ${supply.binBank}`
-                                  : "Chưa Có Ngân Hàng")}
+                                  : "ChÆ°a CÃ³ NgÃ¢n HÃ ng")}
                             </div>
                           </td>
 
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {supply.monthlyOrders} Đơn
+                              {supply.monthlyOrders} ÄÆ¡n
                             </div>
                             <div className="text-xs text-gray-500">
                               {formatCurrencyVnd(supply.monthlyImportValue)}
@@ -2304,7 +2306,7 @@ export default function Sources() {
 
                                   openViewModal(supply.id);
                                 }}
-                                aria-label="Xem chi tiết"
+                                aria-label="Xem chi tiáº¿t"
                               >
                                 <EyeIcon className="h-5 w-5" />
 
@@ -2318,11 +2320,11 @@ export default function Sources() {
 
                                   openEditForm(supply);
                                 }}
-                                aria-label="Chỉnh sửa"
+                                aria-label="Chá»‰nh sá»­a"
                               >
                                 <PencilSquareIcon className="h-5 w-5" />
 
-                                <span className="sr-only">Chỉnh Sửa</span>
+                                <span className="sr-only">Chá»‰nh Sá»­a</span>
                               </button>
 
                               <button
@@ -2336,12 +2338,12 @@ export default function Sources() {
 
                                   handleDeleteSupply(supply);
                                 }}
-                                aria-label="Xóa nguồn"
+                                aria-label="XÃ³a nguá»“n"
                                 disabled={deleteLoadingId === supply.id}
                               >
                                 <TrashIcon className="h-5 w-5" />
 
-                                <span className="sr-only">Xóa</span>
+                                <span className="sr-only">XÃ³a</span>
                               </button>
                             </div>
                           </td>

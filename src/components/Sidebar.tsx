@@ -121,13 +121,13 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <Link
                     to={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`
+                      className={`
                       flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200
                       group relative
                       ${
                         isActive
                           ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105"
-                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                          : "text-indigo-50 hover:bg-indigo-500/15 hover:text-indigo-50"
                       }
                     `}
                   >
@@ -135,7 +135,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       className={`mr-3 h-5 w-5 ${
                         isActive
                           ? "text-white"
-                          : "text-gray-500 group-hover:text-gray-700"
+                          : "text-indigo-200 group-hover:text-indigo-50"
                       }`}
                     />
                     {item.name}
@@ -186,7 +186,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       <li key={label}>
                         <button
                           type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                          className="w-full text-left px-4 py-2 hover:bg-indigo-500/10"
                           onClick={() => setShowAccountMenu(false)}
                         >
                           {label}
