@@ -2803,99 +2803,97 @@ app.post("/api/calculate-price", async(req, res) => {
         const normalizedCustomerType = String(customer_type || "")
             .trim()
             .toUpperCase();
-        const isMavc =
-            normalizedId.startsWith("MAVC") || normalizedCustomerType === "MAVC";
+        const typeFromPrefix = normalizedId.startsWith("MAVK") ?
+            "MAVK" :
+            normalizedId.startsWith("MAVL") ?
+            "MAVL" :
+            normalizedId.startsWith("MAVC") ?
+            "MAVC" :
+            "";
+
+        const normalizedType =
+            normalizedCustomerType === "MAVK" ||
+            normalizedCustomerType === "MAVL" ||
+            normalizedCustomerType === "MAVC" ?
+            normalizedCustomerType :
+            "";
+
+        const customerLabel = normalizedType || typeFromPrefix;
 
         const pctCtvRaw = Number(productPricing?.pct_ctv);
         const pctKhachRaw = Number(productPricing?.pct_khach);
         const pctCtv =
             Number.isFinite(pctCtvRaw) && pctCtvRaw > 0 ? pctCtvRaw : 1.0;
-        const pctKhach =
-            Number.isFinite(pctKhachRaw) && pctKhachRaw > 0 ? pctKhachRaw : 1.0;
+        const pctKhachValid =
+            Number.isFinite(pctKhachRaw) && pctKhachRaw > 0;
+        const pctKhach = pctKhachValid ? pctKhachRaw : 1.0;
 
-        const computeSalePrice = (baseValue) => {
-            if (!Number.isFinite(baseValue) || baseValue <= 0) return null;
-            let price = baseValue * pctCtv;
-            if (!isMavc) {
-                price *= pctKhach;
+        const supplyPriceRows =
+            productPricing ?
+            (
+                await pool.query(productSupplyPricesQuery, [productPricing.id])
+            ).rows || [] :
+            [];
+
+        const highestSupplyPrice = supplyPriceRows.reduce((max, row) => {
+            const price = Number(row.price);
+            return Number.isFinite(price) && price > max ? price : max;
+        }, 0);
+
+        let baseImport = null;
+
+        if (
+            Number.isFinite(parsedSupplyId) &&
+            parsedSupplyId > 0 &&
+            supplyPriceRows.length
+        ) {
+            const matched = supplyPriceRows.find(
+                (row) => Number(row.source_id) === parsedSupplyId
+            );
+            if (matched && Number.isFinite(Number(matched.price))) {
+                baseImport = Number(matched.price);
             }
-            return Helpers.roundGiaBanValue(Math.max(0, price));
+        }
+
+        if (baseImport === null && Number.isFinite(highestSupplyPrice) && highestSupplyPrice > 0) {
+            baseImport = highestSupplyPrice;
+        }
+
+        if (baseImport === null && Number.isFinite(currentOrderImport) && currentOrderImport > 0) {
+            baseImport = currentOrderImport;
+        }
+
+        if (baseImport === null && Number.isFinite(currentOrderPrice) && currentOrderPrice > 0) {
+            baseImport = currentOrderPrice;
+        }
+
+        if (customerLabel === "MAVL" && !pctKhachValid) {
+            return res.status(400).json({
+                error: "Sản phẩm chưa thiết lập pct_khach để tính giá MAVL.",
+            });
+        }
+
+        const computeByType = (baseValue) => {
+            if (!Number.isFinite(baseValue) || baseValue <= 0) return null;
+            if (customerLabel === "MAVK") {
+                return Helpers.roundGiaBanValue(baseValue);
+            }
+            if (customerLabel === "MAVC" || !customerLabel) {
+                return Helpers.roundGiaBanValue(baseValue * pctCtv);
+            }
+            if (customerLabel === "MAVL") {
+                return Helpers.roundGiaBanValue(baseValue * pctCtv * pctKhach);
+            }
+            return Helpers.roundGiaBanValue(baseValue * pctCtv);
         };
 
-        let basePrice =
-            Number.isFinite(currentOrderPrice) && currentOrderPrice > 0 ?
-            currentOrderPrice :
-            0;
-        let giaNhap =
-            Number.isFinite(currentOrderImport) && currentOrderImport > 0 ?
-            currentOrderImport :
-            null;
-        let finalPrice = null;
+        const computedPrice = computeByType(baseImport);
 
-        if (productPricing) {
-            const isActive =
-                productPricing.is_active === true ||
-                (typeof productPricing.is_active === "string" &&
-                    productPricing.is_active.trim().toLowerCase() === "true");
-
-            const supplyPriceRows = productPricing ?
-                (
-                    await pool.query(productSupplyPricesQuery, [productPricing.id])
-                ).rows || [] : [];
-
-            const maxPrice = supplyPriceRows.reduce((max, row) => {
-                const price = Number(row.price);
-                return Number.isFinite(price) && price > max ? price : max;
-            }, 0);
-
-            if (
-                Number.isFinite(parsedSupplyId) &&
-                parsedSupplyId > 0 &&
-                supplyPriceRows.length
-            ) {
-                const matched = supplyPriceRows.find(
-                    (row) => Number(row.source_id) === parsedSupplyId
-                );
-                if (matched && Number.isFinite(Number(matched.price))) {
-                    giaNhap = Number(matched.price);
-                }
-            }
-
-            if (
-                (giaNhap === null || !Number.isFinite(giaNhap)) &&
-                Number.isFinite(maxPrice) &&
-                maxPrice > 0
-            ) {
-                giaNhap = maxPrice;
-            }
-
-            if (Number.isFinite(maxPrice) && maxPrice > 0) {
-                basePrice = maxPrice;
-            }
-
-            const computed = computeSalePrice(basePrice);
-            if (computed !== null) {
-                finalPrice = computed;
-            }
-
-            if (!isActive && finalPrice === null) {
-                finalPrice = Helpers.roundGiaBanValue(Math.max(0, basePrice));
-            }
-        }
-
-        if (finalPrice === null) {
-            if (!Number.isFinite(basePrice) || basePrice <= 0) {
-                basePrice =
-                    Number.isFinite(currentOrderPrice) && currentOrderPrice > 0 ?
-                    currentOrderPrice :
-                    0;
-            }
-            finalPrice = Helpers.roundGiaBanValue(Math.max(0, basePrice));
-        }
-
-        if (!Number.isFinite(giaNhap) || giaNhap === null) {
-            giaNhap = Number.isFinite(basePrice) ? basePrice : 0;
-        }
+        let giaNhap = Number.isFinite(baseImport) ? baseImport : 0;
+        let finalPrice =
+            computedPrice !== null ?
+            computedPrice :
+            Helpers.roundGiaBanValue(Math.max(0, Number(currentOrderPrice) || 0));
 
         const months = Helpers.monthsFromString(san_pham_name);
         const days = Helpers.daysFromMonths(months) || 30;

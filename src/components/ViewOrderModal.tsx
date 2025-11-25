@@ -94,6 +94,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify(payload),
           }
         );
@@ -195,9 +196,15 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 px-4 py-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 px-4 py-6"
+      onClick={onClose}
+    >
       {/* Modal container */}
-      <div className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden text-slate-100">
+      <div
+        className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden text-slate-100"
+        onClick={(event) => event.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex justify-center items-center p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-white">
@@ -369,16 +376,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end p-4 border-t bg-gray-100 rounded-b-lg sticky bottom-0 z-10">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-          >
-            Đóng
-          </button>
-        </div>
       </div>
     </div>
   );
