@@ -721,6 +721,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     handleDeleteOrder,
     handleSaveNewOrder,
     handleSaveEdit,
+    handleConfirmRefund,
     confirmDelete,
     fetchError,
     reloadOrders: fetchOrders,
@@ -769,6 +770,7 @@ export default function Orders() {
     handleDeleteOrder,
     handleSaveNewOrder,
     handleSaveEdit,
+    handleConfirmRefund,
     confirmDelete,
     fetchError,
     reloadOrders,
@@ -984,11 +986,11 @@ export default function Orders() {
                   const normalizedStatus = (trangThaiText || "")
                     .normalize("NFD")
                     .replace(/[\u0300-\u036f]/g, "")
-                    .toLowerCase();
+                    .toLowerCase()
+                    .trim();
                   const canConfirmRefund =
                     datasetKey === "canceled" &&
-                    !normalizedStatus.includes("hoàn") &&
-                    !normalizedStatus.includes("hoàn tiền");
+                    normalizedStatus.includes("chua hoan");
 
                   const orderDateDisplay =
                     order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";

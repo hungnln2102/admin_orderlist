@@ -342,7 +342,7 @@ AUTH_OPEN_PATHS.add("/api/auth/me");
 app.post("/api/auth/login", async(req, res) => {
     const { username, password } = req.body || {};
     if (!username || !password) {
-        return res.status(400).json({ error: "Username v? password l? b?t bu?c." });
+        return res.status(400).json({ error: "Username và Password là Bắt Buộc" });
     }
     const normalizedUsername = String(username).trim().toLowerCase();
 
@@ -364,7 +364,7 @@ app.post("/api/auth/login", async(req, res) => {
       `, [normalizedUsername]
         );
         if (!result.rows.length) {
-            return res.status(401).json({ error: "Sai t?i kho?n ho?c m?t kh?u." });
+            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
         }
         const user = result.rows[0];
         const storedHash = user.passwordhash;
@@ -377,10 +377,10 @@ app.post("/api/auth/login", async(req, res) => {
             isMatch = await bcrypt.compare(password, hashString);
         } else {
             // Fallback: plain-text match for legacy rows
-            isMatch = password === hashString || password === hashString?.trim();
+            isMatch = password === hashString || password === hashString.trim();
         }
         if (!isMatch) {
-            return res.status(401).json({ error: "Sai t?i kho?n ho?c m?t kh?u." });
+            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
         }
         req.session.user = {
             id: user.userid,
@@ -390,10 +390,9 @@ app.post("/api/auth/login", async(req, res) => {
         res.json({ user: req.session.user });
     } catch (error) {
         console.error("Login failed:", error);
-        res.status(500).json({ error: "Kh?ng th? ??ng nh?p, th? l?i sau." });
+        res.status(500).json({ error: "Không Thể Đăng nhập, thử lại sau" });
     }
-});
-;
+});;
 
 app.post("/api/auth/logout", (req, res) => {
     if (req.session) {
@@ -438,15 +437,13 @@ const ensureDefaultAdmin = async() => {
     try {
         const normalizedUsername = usernameEnv.toLowerCase();
         const existing = await client.query(
-            `SELECT userid FROM ${DB_SCHEMA}.users WHERE LOWER(username) = $1 LIMIT 1`,
-            [normalizedUsername]
+            `SELECT userid FROM ${DB_SCHEMA}.users WHERE LOWER(username) = $1 LIMIT 1`, [normalizedUsername]
         );
         if (existing.rows.length) {
             return;
         }
         await client.query(
-            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, role) VALUES ($1, $2, $3)`,
-            [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
+            `INSERT INTO ${DB_SCHEMA}.users (username, passwordhash, role) VALUES ($1, $2, $3)`, [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
         );
         console.log(`[AUTH] Created default admin user '${usernameEnv}'`);
     } catch (err) {
@@ -556,17 +553,17 @@ const mapPackageProductRow = (row) => {
         accountStorageId,
         accountUser: row.account_username ?? null,
         accountPass: row.account_password ?? null,
-    accountMail: row.account_mail_2nd ?? null,
-    accountNote: row.account_note ?? null,
-    capacity: fromDbNumber(row.account_storage),
-    expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
-    slot: fromDbNumber(row.package_slot),
-    slotUsed: null,
-    capacityUsed: null,
-    match: row.package_match ?? null,
-    productCodes,
-    hasCapacityField: row.account_storage !== null && row.account_storage !== undefined,
-  };
+        accountMail: row.account_mail_2nd ?? null,
+        accountNote: row.account_note ?? null,
+        capacity: fromDbNumber(row.account_storage),
+        expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
+        slot: fromDbNumber(row.package_slot),
+        slotUsed: null,
+        capacityUsed: null,
+        match: row.package_match ?? null,
+        productCodes,
+        hasCapacityField: row.account_storage !== null && row.account_storage !== undefined,
+    };
 };
 const fetchPackageProductById = async(client, id) => {
     const numericId = Number(id);
@@ -1221,113 +1218,112 @@ const ARCHIVE_COLUMNS_CANCELED = [
 ];
 
 const buildArchiveInsert = (tableName, columns, row, overrides = {}) => {
-  const columnList = columns.map((col) => `"${col}"`).join(", ");
-  const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(", ");
-  const values = columns.map((col) => {
+    const columnList = columns.map((col) => `"${col}"`).join(", ");
+    const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(", ");
+    const values = columns.map((col) => {
     if (Object.prototype.hasOwnProperty.call(overrides, col)) {
-      return overrides[col];
+        return overrides[col];
     }
     return row[col] ?? null;
-  });
-  const sql = `INSERT INTO ${tableName} (${columnList}) VALUES (${placeholders})`;
-  return { sql, values };
+});
+    const sql = `INSERT INTO ${tableName} (${columnList}) VALUES (${placeholders})`;
+    return { sql, values };
 };
 
-const fetchOrdersFromTable = async (tableName) => {
-  const query = `
+const fetchOrdersFromTable = async(tableName) => {
+    const query = `
     SELECT *,
            ngay_dang_ki::text AS ngay_dang_ki_raw,
            het_han::text      AS het_han_raw
     FROM ${tableName};
   `;
-  const result = await pool.query(query);
-  const todayYmd = todayYMDInVietnam();
-  return result.rows.map((row) => normalizeOrderRow(row, todayYmd));
+    const result = await pool.query(query);
+    const todayYmd = todayYMDInVietnam();
+    return result.rows.map((row) => normalizeOrderRow(row, todayYmd));
 };
-app.get("/api/orders", async (req, res) => {
-  console.log("[GET] /api/orders");
-  const scope = String(req.query.scope || "").trim().toLowerCase();
+app.get("/api/orders", async(req, res) => {
+    console.log("[GET] /api/orders");
+    const scope = String(req.query.scope || "").trim().toLowerCase();
 
-  const table =
-    scope === "expired"
-      ? "mavryk.order_expired"
-      : scope === "canceled" || scope === "cancelled"
-      ? "mavryk.order_canceled"
-      : "mavryk.order_list";
+    const table =
+        scope === "expired" ?
+        "mavryk.order_expired" :
+        scope === "canceled" || scope === "cancelled" ?
+        "mavryk.order_canceled" :
+        "mavryk.order_list";
 
-  try {
-    const rows = await fetchOrdersFromTable(table);
-    res.json(rows);
-  } catch (error) {
-    console.error("Query failed (GET /api/orders):", error);
-    res.status(500).json({
-      error: "Unable to load order list.",
-    });
-  }
+    try {
+        const rows = await fetchOrdersFromTable(table);
+        res.json(rows);
+    } catch (error) {
+        console.error("Query failed (GET /api/orders):", error);
+        res.status(500).json({
+            error: "Unable to load order list.",
+        });
+    }
 });
 
-app.get("/api/orders/expired", async (_req, res) => {
-  console.log("[GET] /api/orders/expired");
-  try {
-    const rows = await fetchOrdersFromTable("mavryk.order_expired");
-    res.json(rows);
-  } catch (error) {
-    console.error("Query failed (GET /api/orders/expired):", error);
-    res.status(500).json({
-      error: "Unable to load expired orders.",
-    });
-  }
+app.get("/api/orders/expired", async(_req, res) => {
+    console.log("[GET] /api/orders/expired");
+    try {
+        const rows = await fetchOrdersFromTable("mavryk.order_expired");
+        res.json(rows);
+    } catch (error) {
+        console.error("Query failed (GET /api/orders/expired):", error);
+        res.status(500).json({
+            error: "Unable to load expired orders.",
+        });
+    }
 });
 
-app.get("/api/orders/canceled", async (_req, res) => {
-  console.log("[GET] /api/orders/canceled");
-  try {
-    const rows = await fetchOrdersFromTable("mavryk.order_canceled");
-    res.json(rows);
-  } catch (error) {
-    console.error("Query failed (GET /api/orders/canceled):", error);
-    res.status(500).json({
-      error: "Unable to load canceled orders.",
-    });
-  }
+app.get("/api/orders/canceled", async(_req, res) => {
+    console.log("[GET] /api/orders/canceled");
+    try {
+        const rows = await fetchOrdersFromTable("mavryk.order_canceled");
+        res.json(rows);
+    } catch (error) {
+        console.error("Query failed (GET /api/orders/canceled):", error);
+        res.status(500).json({
+            error: "Unable to load canceled orders.",
+        });
+    }
 });
 
-app.patch("/api/orders/canceled/:id/refund", async (req, res) => {
-  const { id } = req.params;
-  console.log(`[PATCH] /api/orders/canceled/${id}/refund`);
+app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
+    const { id } = req.params;
+    console.log(`[PATCH] /api/orders/canceled/${id}/refund`);
 
-  const parsedId = Number(id);
-  if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "Invalid canceled order id." });
-  }
+    const parsedId = Number(id);
+    if (!Number.isInteger(parsedId) || parsedId <= 0) {
+        return res.status(400).json({ error: "Invalid canceled order id." });
+    }
 
-  try {
-    const result = await pool.query(
-      `
+    try {
+        const result = await pool.query(
+            `
         UPDATE mavryk.order_canceled
-        SET tinh_trang = 'Da Hoan',
+        SET tinh_trang = 'Đã Hoàn',
             check_flag = FALSE
         WHERE id = $1
         RETURNING id, id_don_hang;
-      `,
-      [parsedId]
-    );
+      `, [parsedId]
+        );
 
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "Canceled order not found." });
+        if (!result.rows.length) {
+            return res.status(404).json({ error: "Canceled order not found." });
+        }
+
+        res.json({
+            success: true,
+            id: parsedId,
+            id_don_hang: result.rows[0].id_don_hang,
+            status: "Da Hoan",
+            check_flag: false,
+        });
+    } catch (error) {
+        console.error(`[PATCH] /api/orders/canceled/${id}/refund failed:`, error);
+        res.status(500).json({ error: "Unable to mark order as refunded." });
     }
-
-    res.json({
-      success: true,
-      id: parsedId,
-      id_don_hang: result.rows[0].id_don_hang,
-      status: "Da Hoan",
-      check_flag: false,
-    });
-  } catch (error) {
-    console.error(`[PATCH] /api/orders/canceled/${id}/refund failed:`, error);
-    res.status(500).json({ error: "Unable to mark order as refunded." });
-  }
 });
 
 // New endpoint: Purchase Orders (table mavryk.purchase_order)
@@ -2338,8 +2334,7 @@ app.patch("/api/supplies/:supplyId/active", async(req, res) => {
     try {
         const statusColumn = await resolveSupplyStatusColumn();
         const statusLabel = isActive ? "Đang Hoạt Động" : "Tạm Dừng";
-        const params = statusColumn ?
-            [isActive, statusLabel, parsedSupplyId] : [isActive, parsedSupplyId];
+        const params = statusColumn ? [isActive, statusLabel, parsedSupplyId] : [isActive, parsedSupplyId];
         const updateQuery = statusColumn ?
             `
       UPDATE mavryk.supply
@@ -2599,8 +2594,7 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
                 binBank: supplyRow.bin_bank || null,
                 bankName: supplyRow.bank_name || null,
                 status: supplyRow.active_supply === false ?
-                    "inactive" :
-                    normalizeSupplyStatus(supplyRow.raw_status),
+                    "inactive" : normalizeSupplyStatus(supplyRow.raw_status),
                 rawStatus: supplyRow.raw_status || null,
                 isActive: supplyRow.active_supply === true,
             },

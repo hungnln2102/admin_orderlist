@@ -317,11 +317,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           </div>
 
           {/* Divider */}
-          <hr className="my-4 border-gray-300" />
+          <hr className="my-4 border-white/10" />
 
           {/* QR Code */}
-          <div className="text-center bg-gradient-to-b from-gray-50 to-white p-4 rounded-md border border-gray-200 shadow-inner">
-            <h4 className="text-lg font-semibold text-white mb-3">
+          <div className="text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
+            <h4 className="text-lg font-semibold text-indigo-100 mb-3">
               Quét Mã QR Để Thanh Toán (VietQR)
             </h4>
             {qrCodeImageUrl ? (
@@ -329,7 +329,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <img
                   src={qrCodeImageUrl}
                   alt={`QR Code thanh toan ${order.id_don_hang}`}
-                  className="border-2 border-gray-300 rounded-lg p-1 bg-white shadow-md"
+                  className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40"
                   width={280}
                   height={280}
                 />
@@ -339,15 +339,15 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 Không Thể Tạo Mã QR. Vui Lòng Kiểm Tra Lại Cấu Hình
               </p>
             )}
-            <div className="text-sm text-gray-700 space-y-1">
+            <div className="text-sm text-slate-100 space-y-1">
               <p>
-                Ngân Hàng: <strong>VP Bank</strong>
+                Ngân Hàng: <strong className="text-indigo-100">VP Bank</strong>
               </p>
               <p>
-                Số Tài Khoản: <strong>{ACCOUNT_NO}</strong>
+                Số Tài Khoản: <strong className="text-indigo-100">{ACCOUNT_NO}</strong>
               </p>
               <p>
-                Chủ Tài Khoản: <strong>{ACCOUNT_NAME}</strong>
+                Chủ Tài Khoản: <strong className="text-indigo-100">{ACCOUNT_NAME}</strong>
               </p>
               <p>
                 Số Tiền:{" "}
@@ -361,7 +361,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <p className="text-xs text-red-500">{priceError}</p>
               )}
               <p>
-                Nội Dung: <strong className="text-blue-600">{qrMessage}</strong>{" "}
+                Nội Dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
                 (Vui Lòng Điền Đúng)
               </p>
             </div>

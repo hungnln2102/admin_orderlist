@@ -4,6 +4,7 @@ export const API_ENDPOINTS = {
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",
+  ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
 
   SUPPLIES: "/api/supplies",
   PRODUCTS_BY_SUPPLY: (supplyId: number) =>
