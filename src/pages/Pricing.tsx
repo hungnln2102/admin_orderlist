@@ -690,11 +690,10 @@ function Pricing() {
       }));
 
       try {
-        const response = await fetch(
-          `${API_BASE}/api/products/all-prices-by-name/${encodeURIComponent(
-            productName
-          )}`
-        );
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(productName)}`,
+        { credentials: "include" }
+      );
         if (!response.ok) {
           throw new Error("Không thể tải giá nhà cung cấp cho sản phẩm");
         }
@@ -748,7 +747,9 @@ function Pricing() {
     if (isLoadingBanks || bankOptions.length > 0) return;
     setIsLoadingBanks(true);
     try {
-      const response = await fetch(`${API_BASE}${API_ENDPOINTS.BANK_LIST}`);
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.BANK_LIST}`, {
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error("Không thể tải danh sách ngân hàng.");
       }
@@ -1014,6 +1015,7 @@ function Pricing() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ price: parsedValue }),
+          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);
@@ -1188,6 +1190,7 @@ function Pricing() {
             sourceName: trimmedName,
             price: parsedPrice,
           }),
+          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);
@@ -1298,6 +1301,7 @@ function Pricing() {
         `${API_BASE}${API_ENDPOINTS.DELETE_SUPPLY_PRICE(productId, sourceId)}`,
         {
           method: "DELETE",
+          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);
@@ -1510,6 +1514,7 @@ function Pricing() {
             pctKhach: nextPctKhach,
             pctPromo: nextPctPromo,
           }),
+          credentials: "include",
         }
       );
       const rawBody = await response.text();
@@ -1636,6 +1641,7 @@ function Pricing() {
             pctPromo: pctPromoValue,
             suppliers: normalizedSuppliers,
           }),
+          credentials: "include",
         }
       );
       const rawBody = await response.text();
@@ -1698,6 +1704,7 @@ function Pricing() {
           body: JSON.stringify({
             is_active: nextStatus,
           }),
+          credentials: "include",
         }
       );
 
@@ -1860,31 +1867,31 @@ function Pricing() {
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-lg font-semibold text-gray-900">
+                <p className="text-lg font-semibold text-white">
                   Xác Nhận Xóa
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-white/70">
                   Hành động này sẽ xóa sản phẩm khỏi bảng giá.
                 </p>
               </div>
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                className="text-white/60 hover:text-white/70 disabled:opacity-50"
                 onClick={closeDeleteProductModal}
                 disabled={deleteProductState.loading}
               >
                 &#10005;
               </button>
             </div>
-            <div className="space-y-3 text-sm text-gray-600">
+            <div className="space-y-3 text-sm text-white/70">
               <div>
-                <p className="font-semibold text-gray-900">
+                <p className="font-semibold text-white">
                   {deleteProductState.product.packageName ||
                     deleteProductState.product.packageProduct ||
                     deleteProductState.product.sanPhamRaw ||
                     `Sản phẩm #${deleteProductState.product.id}`}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-white/70">
                   Mã:{" "}
                   {deleteProductState.product.sanPhamRaw || "Không xác định"}
                 </p>
@@ -1902,7 +1909,7 @@ function Pricing() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white/70 rounded-lg border border-gray-200 hover:bg-indigo-500/10 disabled:opacity-50"
                 onClick={closeDeleteProductModal}
                 disabled={deleteProductState.loading}
               >
@@ -1924,17 +1931,17 @@ function Pricing() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-2 py-4 sm:px-4 sm:py-6">
           <div className="relative flex w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl max-h-[95vh]">
             <button
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+              className="absolute right-4 top-4 text-white/60 hover:text-white/70"
               onClick={handleCloseCreateModal}
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 sm:px-6 sm:py-8">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-white">
                   Thêm sản phẩm mới
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-white/70">
                   Nhập thông tin sản phẩm, nhà cung cấp, tỷ giá
                 </p>
               </div>
@@ -1945,12 +1952,12 @@ function Pricing() {
                   </p>
                   <div className="mt-4 space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Sản Phẩm
                       </label>
                       <input
                         type="text"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                         value={createForm.packageName}
                         onChange={(event) =>
                           handleCreateFormChange(
@@ -1961,12 +1968,12 @@ function Pricing() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Gói Sản Phẩm
                       </label>
                       <input
                         type="text"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                         value={createForm.packageProduct}
                         onChange={(event) =>
                           handleCreateFormChange(
@@ -1977,12 +1984,12 @@ function Pricing() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Mã Sản Phẩm
                       </label>
                       <input
                         type="text"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                         value={createForm.sanPham}
                         onChange={(event) =>
                           handleCreateFormChange("sanPham", event.target.value)
@@ -1997,14 +2004,14 @@ function Pricing() {
                   </p>
                   <div className="mt-4 space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Tỷ Giá CTV
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                         value={createForm.pctCtv}
                         onChange={(event) =>
                           handleCreateFormChange("pctCtv", event.target.value)
@@ -2012,14 +2019,14 @@ function Pricing() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Tỷ Giá Khách
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                         value={createForm.pctKhach}
                         onChange={(event) =>
                           handleCreateFormChange("pctKhach", event.target.value)
@@ -2027,14 +2034,14 @@ function Pricing() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                         Tỷ Giá Khuyến Mãi
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                         value={createForm.pctPromo}
                         onChange={(event) =>
                           handleCreateFormChange("pctPromo", event.target.value)
@@ -2047,7 +2054,7 @@ function Pricing() {
 
               <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white via-gray-50 to-gray-100/40 p-5 shadow-sm">
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
                     Thông Tin Nhà Cung Cấp
                   </p>
                   <div className="space-y-4">
@@ -2057,7 +2064,7 @@ function Pricing() {
                         className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-inner"
                       >
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-semibold text-gray-700">
+                          <p className="text-sm font-semibold text-white">
                             Nhà Cung Cấp #{index + 1}
                           </p>
                           {createSuppliers.length > 1 && (
@@ -2074,7 +2081,7 @@ function Pricing() {
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
-                            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Tên Nhà Cung Cấp
                             </label>
                             <input
@@ -2091,7 +2098,7 @@ function Pricing() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Giá Nhập
                             </label>
                             <input
@@ -2110,7 +2117,7 @@ function Pricing() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Số Tài Khoản
                             </label>
                             <input
@@ -2127,7 +2134,7 @@ function Pricing() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Ngân hàng
                             </label>
                             <select
@@ -2149,7 +2156,7 @@ function Pricing() {
                               ))}
                             </select>
                             {isLoadingBanks && (
-                              <p className="mt-1 text-[11px] text-gray-400">
+                              <p className="mt-1 text-[11px] text-white/60">
                                 Đang Tải Danh Sách Ngân Hàng...
                               </p>
                             )}
@@ -2179,7 +2186,7 @@ function Pricing() {
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 shadow hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-white shadow hover:opacity-90 disabled:opacity-60"
                   onClick={handleCloseCreateModal}
                   disabled={isSubmittingCreate}
                 >
@@ -2201,7 +2208,7 @@ function Pricing() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-white">
               Bảng giá sản phẩm
             </h1>
           </div>
@@ -2227,21 +2234,21 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="bg-gradient-to-br from-indigo-950/70 via-slate-900/60 to-indigo-950/70 border border-white/10 rounded-2xl shadow-lg p-6 text-white backdrop-blur">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative md:col-span-2">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
               <input
                 type="text"
                 placeholder="Tìm kiếm sản phẩm..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder:text-white/60 focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400/60"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
             <select
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400/60"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             >
@@ -2260,46 +2267,46 @@ function Pricing() {
             </GradientButton>
           </div>
           {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+            <div className="mt-4 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white/10 border border-white/10 rounded-2xl shadow-lg overflow-hidden backdrop-blur">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-white/10 text-white">
+              <thead className="bg-white/5">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Sản Phẩm
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Giá Sỉ
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Giá Lẻ
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Giá Khuyến Mãi
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Tình Trạng
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Cập Nhật
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase">
                     Thao Tác
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white/5 divide-y divide-white/10">
                 {isLoading ? (
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
+                      className="px-6 py-8 text-center text-sm text-white/80"
                     >
                       Đang tải dữ liệu...
                     </td>
@@ -2308,7 +2315,7 @@ function Pricing() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
+                      className="px-6 py-8 text-center text-sm text-white/80"
                     >
                       {error
                         ? "Không thể tải dữ liệu. Vui lòng thử lại."
@@ -2416,31 +2423,31 @@ function Pricing() {
                     return (
                       <React.Fragment key={item.id}>
                         <tr
-                          className="hover:bg-indigo-500/10 cursor-pointer"
+                          className="bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70 cursor-pointer transition"
                           onClick={() => handleToggleProductDetails(item)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-start gap-3">
                               <ChevronDownIcon
-                                className={`mt-1 h-4 w-4 text-gray-400 transition-transform ${
+                                className={`mt-1 h-4 w-4 text-white/60 transition-transform ${
                                   isExpanded ? "rotate-180" : ""
                                 }`}
                               />
                               <div>
-                                <div className="text-sm font-semibold text-gray-900">
+                                <div className="text-sm font-semibold text-white">
                                   {item.packageName}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-white/70">
                                   {item.variantLabel}
                                 </div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-gray-900">
+                            <div className="text-sm font-semibold text-white">
                               {formatCurrencyValue(item.wholesalePrice)}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-white/70">
                               {formatRateDescription({
                                 multiplier: item.pctCtv,
                                 price: item.wholesalePrice,
@@ -2449,10 +2456,10 @@ function Pricing() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-blue-600">
+                            <div className="text-sm font-semibold text-amber-300">
                               {formatCurrencyValue(item.retailPrice)}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-white/70">
                               {formatRateDescription({
                                 multiplier: item.pctKhach,
                                 price: item.retailPrice,
@@ -2467,15 +2474,15 @@ function Pricing() {
                               item.pctCtv
                             ) ? (
                               <>
-                                <div className="text-sm font-semibold text-fuchsia-600">
+                                <div className="text-sm font-semibold text-pink-200">
                                   {formatCurrencyValue(item.promoPrice)}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-white/70">
                                   {formatPromoPercent(item.pctPromo) ?? "-"}
                                 </div>
                               </>
                             ) : (
-                              <div className="text-sm text-gray-400">-</div>
+                              <div className="text-sm text-white/60">-</div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -2486,7 +2493,7 @@ function Pricing() {
                                 className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
                                   resolvedIsActive
                                     ? "border-emerald-200 bg-emerald-500 text-white"
-                                    : "border-gray-200 bg-gray-200 text-gray-500"
+                                    : "border-white/20 bg-white/10 text-white/60"
                                 }`}
                                 aria-pressed={resolvedIsActive}
                               >
@@ -2495,14 +2502,14 @@ function Pricing() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm text-white">
                               {formattedUpdated}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end gap-3">
                               <button
-                                className="text-blue-600 hover:text-blue-900"
+                                className="text-blue-300 hover:text-blue-200"
                                 onClick={(event) =>
                                   handleStartProductEdit(event, item)
                                 }
@@ -2510,7 +2517,7 @@ function Pricing() {
                                 <PencilIcon className="h-4 w-4" />
                               </button>
                               <button
-                                className={`text-rose-500 hover:text-rose-700 ${
+                                className={`text-rose-400 hover:text-rose-300 ${
                                   deleteProductState.product?.id === item.id &&
                                   deleteProductState.loading
                                     ? "opacity-60 cursor-not-allowed"
@@ -2532,20 +2539,20 @@ function Pricing() {
                         {isEditingProduct && currentEditForm && (
                           <tr>
                             <td colSpan={7} className="px-6 pb-6">
-                              <div className="rounded-2xl border border-indigo-50 bg-white shadow-sm px-6 py-5 space-y-6">
+                              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 shadow-lg px-6 py-5 space-y-6 text-white">
                                 <div className="grid gap-4 md:grid-cols-2">
-                                  <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-sky-100/40 p-5 shadow-sm">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">
+                                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">
                                       Thông Tin Sản Phẩm
                                     </p>
                                     <div className="mt-4 space-y-4">
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Tên Sản Phẩm
                                         </label>
                                         <input
                                           type="text"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                                           value={currentEditForm.packageName}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2556,12 +2563,12 @@ function Pricing() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Gói Sản Phẩm
                                         </label>
                                         <input
                                           type="text"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                                           value={currentEditForm.packageProduct}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2572,12 +2579,12 @@ function Pricing() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Mã Sản Phẩm
                                         </label>
                                         <input
                                           type="text"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-sky-300 focus:ring-2 focus:ring-sky-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
                                           value={currentEditForm.sanPham}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2589,19 +2596,19 @@ function Pricing() {
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-white via-purple-50 to-purple-100/40 p-5 shadow-sm">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-purple-200">
                                       Tỷ Giá
                                     </p>
                                     <div className="mt-4 space-y-4">
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Tỷ Giá CTV
                                         </label>
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                                           value={currentEditForm.pctCtv}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2612,13 +2619,13 @@ function Pricing() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Tỷ Giá Khách
                                         </label>
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                                           value={currentEditForm.pctKhach}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2629,13 +2636,13 @@ function Pricing() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                                           Tỷ Giá Khuyến Mãi
                                         </label>
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-purple-300 focus:ring-2 focus:ring-purple-200"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                                           value={currentEditForm.pctPromo}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2667,30 +2674,30 @@ function Pricing() {
                                       }`}
                                     >
                                       <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
-                                        <p className="text-xs uppercase text-gray-500">
+                                        <p className="text-xs uppercase text-white/70">
                                           Giá sỉ dự kiến
                                         </p>
-                                        <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        <p className="mt-1 text-lg font-semibold text-white">
                                           {formatCurrencyValue(
                                             previewWholesalePrice
                                           )}
                                         </p>
-                                        <p className="text-[11px] text-gray-500">
+                                        <p className="text-[11px] text-white/70">
                                           {currentEditForm.pctCtv
                                             ? `Tỷ giá: ${currentEditForm.pctCtv}`
                                             : "Nhập tỷ giá CTV"}
                                         </p>
                                       </div>
                                       <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
-                                        <p className="text-xs uppercase text-gray-500">
+                                        <p className="text-xs uppercase text-white/70">
                                           Giá lẻ dự kiến
                                         </p>
-                                        <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        <p className="mt-1 text-lg font-semibold text-white">
                                           {formatCurrencyValue(
                                             previewRetailPrice
                                           )}
                                         </p>
-                                        <p className="text-[11px] text-gray-500">
+                                        <p className="text-[11px] text-white/70">
                                           {currentEditForm.pctKhach
                                             ? `Tỷ giá: ${currentEditForm.pctKhach}`
                                             : "Nhập tỷ giá khách"}
@@ -2698,15 +2705,15 @@ function Pricing() {
                                       </div>
                                       {showPreviewPromo && (
                                         <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
-                                          <p className="text-xs uppercase text-gray-500">
+                                          <p className="text-xs uppercase text-white/70">
                                             Giá khuyến mãi dự kiến
                                           </p>
-                                          <p className="mt-1 text-lg font-semibold text-gray-900">
+                                          <p className="mt-1 text-lg font-semibold text-white">
                                             {formatCurrencyValue(
                                               previewPromoPrice
                                             )}
                                           </p>
-                                          <p className="text-[11px] text-gray-500">
+                                          <p className="text-[11px] text-white/70">
                                             {previewPromoPercentLabel ?? "Nh?p t? gi� khuy?n mai"}
                                           </p>
                                         </div>
@@ -2722,7 +2729,7 @@ function Pricing() {
                                 <div className="flex flex-wrap justify-end gap-3">
                                   <button
                                     type="button"
-                                    className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 shadow hover:opacity-90 disabled:opacity-60"
+                                    className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-white shadow hover:opacity-90 disabled:opacity-60"
                                     onClick={handleCancelProductEdit}
                                     disabled={isSavingProductEdit}
                                   >
@@ -2746,10 +2753,10 @@ function Pricing() {
                         {isExpanded && (
                           <tr>
                             <td colSpan={7} className="px-6 pb-6">
-                              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5 space-y-4">
+                              <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 text-white p-4">
+                                <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 shadow-lg text-white px-6 py-5 space-y-4">
                                   <div className="text-center">
-                                    <p className="text-sm font-semibold text-gray-900">
+                                    <p className="text-sm font-semibold text-white">
                                       Chi tiết giá sản phẩm
                                     </p>
                                   </div>
@@ -2760,54 +2767,54 @@ function Pricing() {
                                         : "md:grid-cols-3"
                                     }`}
                                   >
-                                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
-                                      <p className="text-xs uppercase text-gray-500">
+                                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 flex flex-col items-center">
+                                      <p className="text-xs uppercase text-white/70">
                                         Giá Nguồn Thấp Nhất
                                       </p>
-                                      <p className="mt-1 text-lg font-semibold text-gray-900">
+                                      <p className="mt-1 text-lg font-semibold text-white">
                                         {formatCurrencyValue(cheapestPrice)}
                                       </p>
-                                      <p className="text-xs text-gray-500">
+                                      <p className="text-xs text-white/70">
                                         {cheapestSupplierName}
                                       </p>
                                     </div>
-                                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
-                                      <p className="text-xs uppercase text-gray-500">
+                                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 flex flex-col items-center">
+                                      <p className="text-xs uppercase text-white/70">
                                         Giá Sỉ Hiện Tại
                                       </p>
-                                      <p className="mt-1 text-lg font-semibold text-gray-900">
+                                      <p className="mt-1 text-lg font-semibold text-white">
                                         {formatCurrencyValue(
                                           item.wholesalePrice
                                         )}
                                       </p>
                                     </div>
-                                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
-                                      <p className="text-xs uppercase text-gray-500">
+                                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 flex flex-col items-center">
+                                      <p className="text-xs uppercase text-white/70">
                                         Giá Khách Hiện Tại
                                       </p>
-                                      <p className="mt-1 text-lg font-semibold text-gray-900">
+                                      <p className="mt-1 text-lg font-semibold text-white">
                                         {formatCurrencyValue(item.retailPrice)}
                                       </p>
                                     </div>
                                     {hasPromoForRow && (
-                                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex flex-col items-center">
-                                        <p className="text-xs uppercase text-gray-500">
+                                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 flex flex-col items-center">
+                                        <p className="text-xs uppercase text-white/70">
                                           Giá Khuyến Mãi Hiện Tại
                                         </p>
-                                        <p className="mt-1 text-lg font-semibold text-gray-900">
+                                        <p className="mt-1 text-lg font-semibold text-white">
                                           {formatCurrencyValue(item.promoPrice)}
                                         </p>
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-white/70">
                                           {formatPromoPercent(item.pctPromo) ?? "-"}
                                         </p>
                                       </div>
                                     )}
                                   </div>
-                                  <div className="rounded-2xl border border-gray-100 overflow-hidden">
-                                    <div className="flex justify-end bg-gray-50 px-4 py-2 border-b border-gray-100">
+                                  <div className="rounded-2xl border border-white/15 overflow-hidden">
+                                    <div className="flex justify-end bg-white/5 px-4 py-2 border-b border-white/10">
                                       <button
                                         type="button"
-                                        className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-blue-600 shadow-sm ring-1 ring-blue-100 hover:bg-blue-50 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-white/20 hover:bg-white/15 disabled:opacity-50"
                                         onClick={() =>
                                           handleStartAddSupplierRow(item.id)
                                         }
@@ -2818,7 +2825,7 @@ function Pricing() {
                                       </button>
                                     </div>
                                     <table className="w-full text-sm">
-                                      <thead className="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wide">
+                                      <thead className="bg-white/5 text-[11px] uppercase text-white/70 tracking-wide">
                                         <tr>
                                           <th className="px-4 py-2 text-left">
                                             Nhà Cung Cấp
@@ -2839,7 +2846,7 @@ function Pricing() {
                                           <tr>
                                             <td
                                               colSpan={4}
-                                              className="px-4 py-3 text-center text-xs text-gray-500"
+                                              className="px-4 py-3 text-center text-xs text-white/70"
                                             >
                                               Đang Tải Giá Nhập Từ Nhà Cung Cấp
                                             </td>
@@ -2848,12 +2855,12 @@ function Pricing() {
                                           <tr>
                                             <td
                                               colSpan={4}
-                                              className="px-4 py-3 text-center text-xs text-red-500 space-x-2"
+                                              className="px-4 py-3 text-center text-xs text-white space-x-2"
                                             >
                                               <span>{supplyState.error}</span>
                                               <button
                                                 type="button"
-                                                className="text-blue-600 hover:underline text-xs"
+                                                className="text-red-400 hover:text-red-200 hover:underline text-xs"
                                                 onClick={handleReloadSupply}
                                               >
                                                 Thử Lại
@@ -2865,7 +2872,7 @@ function Pricing() {
                                           <tr>
                                             <td
                                               colSpan={4}
-                                              className="px-4 py-3 text-center text-xs text-gray-500"
+                                              className="px-4 py-3 text-center text-xs text-white/70"
                                             >
                                               Chưa có dữ liệu giá nhập từ nhà
                                               cung cấp.
@@ -2897,55 +2904,67 @@ function Pricing() {
                                                 supplyRowErrors[rowKey];
                                               const inputDisabled =
                                                 !isRowEditing || isRowSaving;
+                                              const displayPrice =
+                                                formatCurrencyValue(
+                                                  supplier.price
+                                                );
 
                                               return (
                                                 <tr
                                                   key={rowKey}
-                                                  className="border-t border-gray-100"
+                                                  className="border-t border-white/15"
                                                 >
-                                                  <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                                                  <td className="px-4 py-3 text-sm text-white text-center">
                                                     {supplier.sourceName}
                                                   </td>
                                                   <td className="px-4 py-3">
-                                                    <div className="flex flex-col items-center">
-                                                      <div className="flex items-center gap-1">
-                                                        <input
-                                                          type="number"
-                                                          min={0}
-                                                          step="1000"
-                                                          value={inputValue}
-                                                          disabled={
-                                                            inputDisabled
-                                                          }
-                                                          onChange={(event) =>
-                                                            handleSupplyInputChange(
-                                                              item.id,
-                                                              supplier.sourceId,
-                                                              event.target.value
-                                                            )
-                                                          }
-                                                          className={`w-28 rounded-lg border px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 ${
-                                                            inputDisabled
-                                                              ? "border-gray-200 bg-gray-50 text-gray-500"
-                                                              : "border-blue-200 focus:border-blue-500 focus:ring-blue-200"
-                                                          } ${
-                                                            inputError
-                                                              ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-                                                              : ""
-                                                          }`}
-                                                        />
-                                                        <span className="text-xs text-gray-500">
-                                                          ₫
+                                                    {isRowEditing ? (
+                                                      <div className="flex flex-col items-center">
+                                                        <div className="flex items-center gap-1">
+                                                          <input
+                                                            type="number"
+                                                            min={0}
+                                                            step="1000"
+                                                            value={inputValue}
+                                                            disabled={
+                                                              inputDisabled
+                                                            }
+                                                            onChange={(event) =>
+                                                              handleSupplyInputChange(
+                                                                item.id,
+                                                                supplier.sourceId,
+                                                                event.target.value
+                                                              )
+                                                            }
+                                                            className={`w-28 rounded-lg border px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                                                              inputDisabled
+                                                                ? "border-white/25 bg-white/10 text-white/70"
+                                                                : "border-blue-300/50 focus:border-blue-400 focus:ring-blue-300/40"
+                                                            } ${
+                                                              inputError
+                                                                ? "border-red-400 focus:border-red-500 focus:ring-red-200"
+                                                                : ""
+                                                            }`}
+                                                          />
+                                                          <span className="text-xs text-white/70">
+                                                            ₫
+                                                          </span>
+                                                        </div>
+                                                        {inputError && (
+                                                          <p className="mt-1 text-[11px] text-red-500">
+                                                            {inputError}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    ) : (
+                                                      <div className="flex justify-center">
+                                                        <span className="inline-flex min-w-[112px] justify-center rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white">
+                                                          {displayPrice}
                                                         </span>
                                                       </div>
-                                                      {inputError && (
-                                                        <p className="mt-1 text-[11px] text-red-500">
-                                                          {inputError}
-                                                        </p>
-                                                      )}
-                                                    </div>
+                                                    )}
                                                   </td>
-                                                  <td className="px-4 py-3 text-center text-xs text-gray-600">
+                                                  <td className="px-4 py-3 text-center text-xs text-white/70">
                                                     {formatProfitRange(
                                                       supplier.price,
                                                       item.wholesalePrice,
@@ -2957,7 +2976,7 @@ function Pricing() {
                                                       <div className="flex items-center justify-center gap-2">
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600/20 text-green-200 hover:bg-green-500/30 disabled:opacity-60"
                                                           disabled={isRowSaving}
                                                           onClick={() =>
                                                             handleConfirmSupplyEditing(
@@ -2972,7 +2991,7 @@ function Pricing() {
                                                         </button>
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/20 text-red-200 hover:bg-red-500/30 disabled:opacity-60"
                                                           disabled={isRowSaving}
                                                           onClick={() =>
                                                             handleCancelSupplyEditing(
@@ -2988,7 +3007,7 @@ function Pricing() {
                                                       <div className="flex items-center justify-center gap-2">
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/25 text-white/80 hover:border-white/40 hover:text-white disabled:opacity-60"
                                                           disabled={isRowSaving}
                                                           onClick={() =>
                                                             handleStartEditingSupply(
@@ -3002,7 +3021,7 @@ function Pricing() {
                                                         </button>
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-red-100 text-red-500 hover:border-red-200 hover:bg-red-50 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full border border-red-200/60 text-red-200 hover:border-red-200 hover:bg-red-500/10 disabled:opacity-60"
                                                           disabled={isRowSaving}
                                                           onClick={() =>
                                                             handleDeleteSupplyRow(
@@ -3056,7 +3075,7 @@ function Pricing() {
                                                           type="number"
                                                           min={0}
                                                           step="1000"
-                                                          className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
+                                                          className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                           placeholder="Giá nhập"
                                                           value={draft.price}
                                                           onChange={(event) =>
@@ -3070,19 +3089,19 @@ function Pricing() {
                                                             draft.isSaving
                                                           }
                                                         />
-                                                        <span className="text-xs text-gray-500">
+                                                        <span className="text-xs text-white/70">
                                                           ₫
                                                         </span>
                                                       </div>
                                                     </td>
-                                                    <td className="px-4 py-3 text-center text-xs text-gray-500">
+                                                    <td className="px-4 py-3 text-center text-xs text-white/70">
                                                       -
                                                     </td>
                                                     <td className="px-4 py-3">
                                                       <div className="flex items-center justify-center gap-2">
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600/20 text-green-200 hover:bg-green-500/30 disabled:opacity-60"
                                                           disabled={
                                                             draft.isSaving
                                                           }
@@ -3096,7 +3115,7 @@ function Pricing() {
                                                         </button>
                                                         <button
                                                           type="button"
-                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600/20 text-red-200 hover:bg-red-500/30 disabled:opacity-60"
                                                           disabled={
                                                             draft.isSaving
                                                           }
@@ -3115,7 +3134,7 @@ function Pricing() {
                                                     <tr>
                                                       <td
                                                         colSpan={4}
-                                                        className="px-4 pb-3 text-center text-xs text-red-500"
+                                                        className="px-4 pb-3 text-center text-xs text-red-200"
                                                       >
                                                         {draft.error}
                                                       </td>

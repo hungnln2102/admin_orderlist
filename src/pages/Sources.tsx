@@ -78,8 +78,8 @@ const GLASS_FIELD_CLASS =
 const formatCurrencyShort = Helpers.formatCurrencyShort;
 const formatCurrencyVnd = Helpers.formatCurrency;
 
-const ACTIVE_STATUS_LABEL = "Äang Hoáº¡t Äá»™ng";
-const INACTIVE_STATUS_LABEL = "Táº¡m Dá»«ng";
+const ACTIVE_STATUS_LABEL = "Đang Hoạt Động";
+const INACTIVE_STATUS_LABEL = "Tạm Dừng";
 const normalizeStatusValue = (value?: string | null): "active" | "inactive" => {
   if (!value) return "active";
 
@@ -104,7 +104,7 @@ const resolveStatusBoolean = (value?: string | boolean | null): boolean => {
   return normalizeStatusValue(value) !== "inactive";
 };
 
-const DEFAULT_DELETE_ERROR = "CÃ³ lá»—i xáº£y ra khi xÃ³a nguá»“n. Vui lÃ²ng thá»­ láº¡i sau.";
+const DEFAULT_DELETE_ERROR = "Có lỗi xảy ra khi xóa nguồn. Vui lòng thử lại sau.";
 const formatDeleteErrorMessage = (raw?: string | null): string =>
   normalizeErrorMessage(raw, {
     fallback: DEFAULT_DELETE_ERROR,
@@ -380,7 +380,7 @@ export default function Sources() {
       setError(null);
       const response = await apiFetch("/api/supply-insights");
       if (!response.ok) {
-        throw new Error("KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u nguá»“n");
+        throw new Error("Không thể tải dữ liệu nguồn");
       }
       const data: SupplySummaryResponse = await response.json();
       const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
@@ -416,7 +416,7 @@ export default function Sources() {
     } catch (err) {
       console.error(err);
       setError(
-        err instanceof Error ? err.message : "CÃ³ lá»—i xáº£y ra khi táº£i dá»¯ liá»‡u."
+        err instanceof Error ? err.message : "Có lỗi xảy ra khi tải dữ liệu."
       );
     } finally {
       setLoading(false);
@@ -461,7 +461,7 @@ export default function Sources() {
         `/api/supplies/${supplyId}/payments?${params.toString()}`
       );
       if (!response.ok) {
-        throw new Error("KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.");
+        throw new Error("Không thể tải lịch sử thanh toán.");
       }
       return response.json();
     },
@@ -499,7 +499,7 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.",
+              : "Không thể tải lịch sử thanh toán.",
         }));
       }
     },
@@ -547,7 +547,7 @@ export default function Sources() {
           error:
             err instanceof Error
               ? err.message
-              : "KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ thanh toÃ¡n.",
+              : "Không thể tải lịch sử thanh toán.",
         }));
       }
     },
@@ -593,7 +593,7 @@ export default function Sources() {
         round: prev[supplyId]?.round || "",
         totalImport: prev[supplyId]?.totalImport || "",
         paid: prev[supplyId]?.paid || "",
-        status: prev[supplyId]?.status || "ChÆ°a Thanh ToÃ¡n",
+        status: prev[supplyId]?.status || "Chưa trả",
         isEditing: true,
       },
     }));
@@ -606,7 +606,7 @@ export default function Sources() {
         round: "",
         totalImport: "",
         paid: "",
-        status: "ChÆ°a Thanh ToÃ¡n",
+        status: "Chưa trả",
         isEditing: false,
       },
     }));
@@ -624,7 +624,7 @@ export default function Sources() {
           round: prev[supplyId]?.round || "",
           totalImport: prev[supplyId]?.totalImport || "",
           paid: prev[supplyId]?.paid || "",
-          status: prev[supplyId]?.status || "ChÆ°a Thanh ToÃ¡n",
+          status: prev[supplyId]?.status || "Chưa trả",
           isEditing: true,
           [field]: value,
         },
@@ -657,10 +657,10 @@ export default function Sources() {
       const parsedPaid = Number((draft.paid || "").replace(/[^\d.-]/g, ""));
 
       const payload = {
-        round: draft.round.trim() || "Chu ká»³ má»›i",
+        round: draft.round.trim() || "Chu kỳ mới",
         totalImport: Number.isFinite(parsedTotal) ? parsedTotal : 0,
         paid: Number.isFinite(parsedPaid) ? parsedPaid : 0,
-        status: draft.status.trim() || "ChÆ°a Thanh ToÃ¡n",
+        status: draft.status.trim() || "Chưa trả",
       };
 
       setPaymentSubmittingMap((prev) => ({ ...prev, [supplyId]: true }));
@@ -674,7 +674,7 @@ export default function Sources() {
         });
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(text || "KhÃ´ng thá»ƒ thÃªm chu ká»³ thanh toÃ¡n.");
+          throw new Error(text || "Không thể thêm chu kỳ thanh toán.");
         }
         const data = await response.json();
         const newPayment: SupplyPayment = {
@@ -706,7 +706,7 @@ export default function Sources() {
             round: "",
             totalImport: "",
             paid: "",
-            status: "ChÆ°a Thanh ToÃ¡n",
+            status: "Chưa trả",
             isEditing: false,
           },
         }));
@@ -717,7 +717,7 @@ export default function Sources() {
           error:
             error instanceof Error
               ? error.message
-              : "KhÃ´ng thá»ƒ thÃªm chu ká»³ thanh toÃ¡n.",
+              : "Không thể thêm chu kỳ thanh toán.",
         }));
       } finally {
         setPaymentSubmittingMap((prev) => {
@@ -761,11 +761,11 @@ export default function Sources() {
       event.preventDefault();
       const trimmedName = newSupplierForm.sourceName.trim();
       if (!trimmedName) {
-        setAddModalError("Vui lÃ²ng nháº­p tÃªn nhÃ  cung cáº¥p");
+        setAddModalError("Vui lòng nhập tên nhà cung cấp");
         return;
       }
       if (!newSupplierForm.bankBin) {
-        setAddModalError("Vui lÃ²ng chá»n ngÃ¢n hÃ ng");
+        setAddModalError("Vui lòng chọn ngân hàng");
         return;
       }
       setIsCreatingSupplier(true);
@@ -785,7 +785,7 @@ export default function Sources() {
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
-          let message = "KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p.";
+          let message = "Không thể tạo nhà cung cấp.";
           try {
             const data = await response.json();
             if (data?.error) message = data.error;
@@ -799,7 +799,7 @@ export default function Sources() {
       } catch (error) {
         console.error(error);
         setAddModalError(
-          error instanceof Error ? error.message : "KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p"
+          error instanceof Error ? error.message : "Không thể tạo nhà cung cấp"
         );
       } finally {
         setIsCreatingSupplier(false);
@@ -819,7 +819,7 @@ export default function Sources() {
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          errorText || "KhÃ´ng thá»ƒ táº£i thÃ´ng tin chi tiáº¿t nhÃ  cung cáº¥p"
+          errorText || "Không thể tải thông tin chi tiết nhà cung cấp"
         );
       }
       const data: SupplyOverviewResponse = await response.json();
@@ -837,7 +837,7 @@ export default function Sources() {
         error:
           error instanceof Error
             ? error.message
-            : "KhÃ´ng thá»ƒ táº£i thÃ´ng tin chi tiáº¿t nhÃ  cung cáº¥p",
+            : "Không thể tải thông tin chi tiết nhà cung cấp",
       }));
     }
   }, []);
@@ -893,13 +893,13 @@ export default function Sources() {
         !viewModalState.data ||
         !viewModalState.selectedPaymentId
       ) {
-        throw new Error("KhÃ´ng tÃ¬m tháº¥y chu ká»³ thanh toÃ¡n");
+        throw new Error("Không tìm thấy chu kỳ thanh toán");
       }
       const payment = viewModalState.data.unpaidPayments.find(
         (item) => item.id === viewModalState.selectedPaymentId
       );
       if (!payment) {
-        throw new Error("KhÃ´ng tÃ¬m tháº¥y chu ká»³ thanh toÃ¡n");
+        throw new Error("Không tìm thấy chu kỳ thanh toán");
       }
       const response = await apiFetch(
         `/api/payment-supply/${payment.id}/confirm`,
@@ -911,7 +911,7 @@ export default function Sources() {
       );
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || "KhÃ´ng thá»ƒ xÃ¡c nháº­n thanh toÃ¡n.");
+        throw new Error(errorText || "Không thể xác nhận đã trả.");
       }
       await fetchSupplyOverview(currentId);
       await fetchSupplySummary();
@@ -922,7 +922,7 @@ export default function Sources() {
         confirmError:
           error instanceof Error
             ? error.message
-            : "KhÃ´ng thá»ƒ xÃ¡c nháº­n thanh toÃ¡n.",
+            : "Không thể xác nhận đã trả.",
       }));
     } finally {
       setViewModalState((prev) => ({
@@ -1021,7 +1021,7 @@ export default function Sources() {
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(
-            errorText || "KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i nhÃ  cung cáº¥p."
+            errorText || "Không thể cập nhật trạng thái nhà cung cấp."
           );
         }
 
@@ -1045,7 +1045,7 @@ export default function Sources() {
         alert(
           error instanceof Error
             ? error.message
-            : "KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i nhÃ  cung cáº¥p."
+            : "Không thể cập nhật trạng thái nhà cung cấp."
         );
 
         setSupplies((prev) =>
@@ -1100,7 +1100,7 @@ export default function Sources() {
       );
       closeDeleteConfirm();
     } catch (error) {
-      console.error("KhÃ´ng Thá»ƒ XÃ³a NhÃ  Cung Cáº¥p:", error);
+      console.error("Không thể xóa nhà cung cấp:", error);
       setDeleteConfirmState((prev) => ({
         ...prev,
         loading: false,
@@ -1125,9 +1125,9 @@ export default function Sources() {
         <tr>
           <td
             colSpan={4}
-            className="px-6 py-4 text-sm text-gray-500 text-center"
+            className="px-6 py-4 text-sm text-white/80 text-center"
           >
-            Äang táº£i dá»¯ liá»‡u thanh toÃ¡n...
+            Đang tải dữ liệu thanh toán...
           </td>
         </tr>
       );
@@ -1138,15 +1138,15 @@ export default function Sources() {
         <tr>
           <td
             colSpan={3}
-            className="px-6 py-4 text-sm text-gray-500 text-center"
+            className="px-6 py-4 text-sm text-white/80 text-center"
           >
-            ChÆ°a cÃ³ dá»¯ liá»‡u chu ká»³ thanh toÃ¡n.
+            Chưa có dữ liệu chu kỳ thanh toán.
           </td>
           <td className="px-4 py-4 text-center">
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600 transition"
-              title="ThÃªm chu ká»³ thanh toÃ¡n"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-white/40 text-white/80 hover:border-blue-400 hover:text-blue-200 transition"
+              title="Thêm chu kỳ thanh toán"
               onClick={() => supplyId !== undefined && startAddPaymentCycle(supplyId)}
             >
               <PlusIcon className="h-5 w-5" />
@@ -1163,16 +1163,16 @@ export default function Sources() {
     return rows.map((row) => (
       <tr
         key={row.id}
-        className="border-t border-gray-100 text-sm text-gray-800"
+        className="border-t border-white/10 text-sm text-white"
       >
-        <td className="px-4 py-4 font-medium text-gray-900 text-left sm:text-center">
+        <td className="px-4 py-4 font-medium text-white text-left sm:text-center">
           {row.round || "--"}
         </td>
         <td className="px-4 py-4 text-center">
           {formatCurrencyVnd(row.totalImport)}
         </td>
         <td className="px-4 py-4 text-center">{formatCurrencyVnd(row.paid)}</td>
-        <td className="px-4 py-4 text-center text-gray-900">
+        <td className="px-4 py-4 text-center text-white">
           {row.status || "--"}
         </td>
       </tr>
@@ -1186,12 +1186,12 @@ export default function Sources() {
     if (!draft || !draft.isEditing) return null;
     const isSubmitting = paymentSubmittingMap[supplyId] === true;
     return (
-      <tr className="border-t border-gray-100 text-sm text-gray-800 bg-gray-50/60">
+      <tr className="border-t border-white/10 text-sm text-white bg-gray-50/60">
         <td className="px-4 py-3">
           <input
             type="text"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="VD: Chu ká»³ 1"
+            placeholder="VD: Chu kỳ 1"
             value={draft.round}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1204,7 +1204,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="Tá»•ng tiá»n thanh toÃ¡n"
+            Tổng tiền nhập
             value={formatMoneyInput(draft.totalImport)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1221,7 +1221,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="ÄÃ£ thanh toÃ¡n"
+            placeholder="Đã trả"
             value={formatMoneyInput(draft.paid)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1239,15 +1239,15 @@ export default function Sources() {
                 handlePaymentDraftChange(supplyId, "status", event.target.value)
               }
             >
-              <option value="ChÆ°a Thanh ToÃ¡n">ChÆ°a Thanh ToÃ¡n</option>
-              <option value="ÄÃ£ Thanh ToÃ¡n">ÄÃ£ Thanh ToÃ¡n</option>
-              <option value="Cáº§n Gia Háº¡n">Cáº§n Gia Háº¡n</option>
+              <option value="Chưa trả">Chưa trả</option>
+              <option value="Đã trả">Đã trả</option>
+              <option value="Cần Gia Hạn">Cần Gia Hạn</option>
             </select>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-emerald-500 text-white shadow hover:bg-emerald-600 transition"
-                title="XÃ¡c nháº­n thÃªm chu ká»³"
+                title="Xác nhận thêm chu kỳ"
                 disabled={isSubmitting}
                 onClick={() => confirmAddPaymentCycle(supplyId)}
               >
@@ -1256,7 +1256,7 @@ export default function Sources() {
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition"
-                title="Há»§y thÃªm chu ká»³"
+                title="Hủy thêm chu kỳ"
                 disabled={isSubmitting}
                 onClick={() => cancelAddPaymentCycle(supplyId)}
               >
@@ -1330,34 +1330,34 @@ export default function Sources() {
     return (
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 text-center">
-            <p className="text-sm font-semibold text-gray-900">
-              Lá»‹ch sá»­ thanh toÃ¡n
+          <div className="flex-1 text-center text-white">
+            <p className="text-sm font-semibold text-white">
+              Lịch sử thanh toán
             </p>
-            <p className="text-xs text-gray-500">
-              Theo dÃµi chu ká»³ thanh toÃ¡n cá»§a nhÃ  cung cáº¥p.
+            <p className="text-xs text-white/80">
+              Theo dõi chu kỳ thanh toán của nhà cung cấp.
             </p>
           </div>
         </div>
         {state?.loading && (
-          <div className="text-center text-xs text-blue-600">Äang táº£i...</div>
+          <div className="text-center text-xs text-white/80">Đang tải...</div>
         )}
 
         {state?.error && (
-          <div className="text-center text-xs text-red-500">{state.error}</div>
+          <div className="text-center text-xs text-red-200">{state.error}</div>
         )}
 
         <div className="flex justify-center">
-          <div className="w-full max-w-4xl rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="w-full max-w-4xl rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 shadow-lg overflow-hidden text-white backdrop-blur">
             <table className="w-full">
-              <thead className="bg-gray-50 text-[11px] uppercase text-gray-500 tracking-wide">
+              <thead className="bg-white/5 text-[11px] uppercase text-white/80 tracking-wide">
                 <tr>
-                  <th className="px-6 py-3 text-left sm:text-center">Chu ká»³</th>
+                  <th className="px-6 py-3 text-left sm:text-center">Chu kỳ</th>
                   <th className="px-6 py-3 text-center">
-                    Tá»•ng tiá»n thanh toÃ¡n
+                    Tổng tiền nhập
                   </th>
-                  <th className="px-6 py-3 text-center">ÄÃ£ Thanh ToÃ¡n</th>
-                  <th className="px-6 py-3 text-center">TÃ¬nh Tráº¡ng</th>
+                  <th className="px-6 py-3 text-center">Đã trả</th>
+                  <th className="px-6 py-3 text-center">Tình Trạng</th>
                 </tr>
               </thead>
               <tbody>
@@ -1378,8 +1378,8 @@ export default function Sources() {
           !currentRows.length &&
           !state.loading &&
           !state.error && (
-            <div className="text-center text-xs text-gray-500">
-              ChÆ°a cÃ³ chu ká»³ thanh toÃ¡n nÃ o.
+            <div className="text-center text-xs text-white/80">
+              Chưa có chu kỳ thanh toán nào.
             </div>
           )} */}
         {renderPaginationControls()}
@@ -1423,10 +1423,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Chá»‰nh sá»­a nhÃ  cung cáº¥p
+                Chỉnh sửa nhà cung cấp
               </p>
-              <p className="text-xs text-gray-500">
-                Cáº­p nháº­t thÃ´ng tin thanh toÃ¡n vÃ  tráº¡ng thÃ¡i nhÃ  cung cáº¥p.
+              <p className="text-xs text-white/80">
+                Cập nhật thông tin thanh toán và trạng thái nhà cung cấp.
               </p>
             </div>
             <button
@@ -1441,7 +1441,7 @@ export default function Sources() {
           <form className="space-y-4" onSubmit={handleEditSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                TÃªn Nguá»“n
+                Tên Nguồn
               </label>
               <input
                 type="text"
@@ -1450,14 +1450,14 @@ export default function Sources() {
                   handleEditInputChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nháº­p tÃªn nguá»“n"
+                placeholder="Nhập tên nguồn"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Thanh ToÃ¡n
+                Thanh Toán
               </label>
               <input
                 type="text"
@@ -1466,14 +1466,14 @@ export default function Sources() {
                   handleEditInputChange("paymentInfo", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="ThÃ´ng tin thanh toÃ¡n"
+                placeholder="Thông tin thanh toán"
               />
               {(currentSupply?.bankName ||
                 (currentSupply?.binBank
                   ? bankNameByBin.get(currentSupply.binBank.trim())
                   : null)) && (
-                <p className="mt-1 text-xs text-gray-500">
-                  NgÃ¢n hÃ ng hiá»‡n táº¡i:{" "}
+                <p className="mt-1 text-xs text-white/80">
+                  Ngân hàng hiện tại:{" "}
                   {currentSupply?.bankName ||
                     (currentSupply?.binBank
                       ? bankNameByBin.get(currentSupply.binBank.trim())
@@ -1483,7 +1483,7 @@ export default function Sources() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                NgÃ¢n HÃ ng
+                Ngân Hàng
               </label>
               <select
                 value={editFormValues.bankBin}
@@ -1493,7 +1493,7 @@ export default function Sources() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="" disabled>
-                  Chá»n NgÃ¢n HÃ ng
+                  Chọn Ngân Hàng
                 </option>
                 {bankOptionsForEdit.map((bank) => (
                   <option key={bank.bin} value={bank.bin}>
@@ -1508,13 +1508,13 @@ export default function Sources() {
                 className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10"
                 onClick={closeEditForm}
               >
-                Há»§y
+                Hủy
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
               >
-                LÆ°u ThÃ´ng Tin
+                Lưu Thông Tin
               </button>
             </div>
           </form>
@@ -1541,10 +1541,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                XÃ¡c Nháº­n XÃ³a
+                Xác Nhận Xóa
               </p>
-              <p className="text-xs text-gray-500">
-                HÃ nh Äá»™ng NÃ y Sáº½ XÃ³a Nguá»“n Khá»i Dá»¯ Liá»‡u.
+              <p className="text-xs text-white/80">
+                Hành Động Này Sẽ Xóa Nguồn Khỏi Dữ Liệu.
               </p>
             </div>
             <button
@@ -1559,15 +1559,15 @@ export default function Sources() {
           <div className="space-y-3 text-sm text-gray-600">
             <div>
               <p className="font-semibold text-gray-900">
-                {supply.sourceName || "Nguá»“n KhÃ´ng TÃªn"}
+                {supply.sourceName || "Nguồn Không Tên"}
               </p>
-              <p className="text-xs text-gray-500">
-                {supply.numberBank || "ChÆ°a CÃ³ ThÃ´ng Tin Thanh ToÃ¡n"}
+              <p className="text-xs text-white/80">
+                {supply.numberBank || "Chưa Có Thông Tin Thanh Toán"}
               </p>
             </div>
             <p>
-              Báº¡n Cháº¯c Cháº¯n Muá»‘n XÃ³a Nguá»“n NÃ y? HÃ nh Äá»™ng KhÃ´ng Thá»ƒ HoÃ n TÃ¡c VÃ 
-              Nhá»¯ng Danh SÃ¡ch LiÃªn Quan CÅ©ng Sáº½ Bá»‹ Cáº­p Nháº­t.
+              Bạn Chắc Chắn Muốn Xóa Nguồn Này? Hành Động Không Thể Hoàn Tác Và
+              Những Danh Sách Liên Quan Cũng Sẽ Bị Cập Nhật.
             </p>
           </div>
           {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
@@ -1578,7 +1578,7 @@ export default function Sources() {
               onClick={closeDeleteConfirm}
               disabled={loading}
             >
-              Há»§y
+              Hủy
             </button>
             <button
               type="button"
@@ -1586,7 +1586,7 @@ export default function Sources() {
               onClick={confirmDeleteSupply}
               disabled={loading}
             >
-              {loading ? "Äang XÃ³a..." : "XÃ³a Nguá»“n"}
+              {loading ? "Đang Xóa..." : "Xóa Nguồn"}
             </button>
           </div>
         </div>
@@ -1607,7 +1607,7 @@ export default function Sources() {
       supply?.bankName ||
       (supply?.binBank
         ? bankNameByBin.get(supply.binBank.trim()) || `BIN ${supply.binBank}`
-        : "ChÆ°a cÃ³ ngÃ¢n hÃ ng");
+        : "Chưa có ngân hàng");
     const accountNumber = supply?.numberBank || "";
     const accountName = supply?.sourceName || "";
     const bankBin = supply?.binBank || "";
@@ -1625,25 +1625,25 @@ export default function Sources() {
 
     const statCards = [
       {
-        title: "Tá»•ng ÄÆ¡n HÃ ng",
+        title: "Tổng Đơn Hàng",
         value: stats?.totalOrders ?? 0,
         accent: "sky" as const,
         Icon: ClipboardDocumentListIcon,
       },
       {
-        title: "ÄÆ¡n HÃ ng Há»§y",
+        title: "Đơn Hàng Hủy",
         value: stats?.canceledOrders ?? 0,
         accent: "rose" as const,
         Icon: XCircleIcon,
       },
       {
-        title: "ÄÆ¡n ThÃ¡ng NÃ y",
+        title: "Đơn Tháng Này",
         value: stats?.monthlyOrders ?? 0,
         accent: "violet" as const,
         Icon: CalendarDaysIcon,
       },
       {
-        title: "Tá»•ng Tiá»n ÄÃ£ Thanh ToÃ¡n",
+        title: "Tổng tiền đã trả",
         value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
         accent: "emerald" as const,
         Icon: CurrencyDollarIcon,
@@ -1656,10 +1656,10 @@ export default function Sources() {
           <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                ThÃ´ng Tin NhÃ  Cung Cáº¥p
+                Thông Tin Nhà Cung Cấp
               </p>
               {supply && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-white/80">
                   ID: {supply.id} | {supply.sourceName}
                 </p>
               )}
@@ -1676,7 +1676,7 @@ export default function Sources() {
           <div className="px-6 py-5 overflow-y-auto space-y-6">
             {viewModalState.loading && (
               <div className="text-center text-sm text-gray-500">
-                Äang Táº£i ThÃ´ng Tin...
+                Đang Tải Thông Tin...
               </div>
             )}
 
@@ -1692,13 +1692,13 @@ export default function Sources() {
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
                     <div className="flex-1 bg-white rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-2 border-gray-200 shadow-md">
                       <div>
-                        <p className="text-gray-500">TÃªn NhÃ  Cung Cáº¥p</p>
+                        <p className="text-gray-500">Tên Nhà Cung Cấp</p>
                         <p className="text-lg font-semibold text-gray-900">
-                          {supply.sourceName || "ChÆ°a Äáº·t TÃªn"}
+                          {supply.sourceName || "Chưa Đặt Tên"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Tráº¡ng ThÃ¡i</p>
+                        <p className="text-gray-500">Trạng Thái</p>
                         <span
                           className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 ${getStatusClasses(
                             supply.isActive ?? supply.status
@@ -1708,13 +1708,13 @@ export default function Sources() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-gray-500">Sá»‘ TÃ i Khoáº£n</p>
+                        <p className="text-gray-500">Số Tài Khoản</p>
                         <p className="text-base font-semibold text-gray-900">
-                          {accountNumber || "ChÆ°a Cung Cáº¥p"}
+                          {accountNumber || "Chưa Cung Cấp"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">NgÃ¢n HÃ ng</p>
+                        <p className="text-gray-500">Ngân Hàng</p>
                         <p className="text-base font-semibold text-gray-900">
                           {bankLabel}
                         </p>
@@ -1763,18 +1763,18 @@ export default function Sources() {
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Chu Ká»³ Thanh ToÃ¡n
+                      <p className="text-sm font-semibold text-white">
+                        Chu Kỳ Thanh Toán
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Chá»n chu ká»³ Ä‘á»ƒ hiá»‡n thÃ´ng tin thanh toÃ¡n vÃ  QR
+                      <p className="text-xs text-white/80">
+                        Chọn chu kỳ để hiện thông tin thanh toán và QR
                       </p>
                     </div>
                   </div>
 
                   {unpaidPayments.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                      Táº¥t cáº£ chu ká»³ Ä‘Ã£ Ä‘Æ°á»£c thanh toÃ¡n
+                      Tất cả chu kỳ đã được thanh toán
                     </div>
                   ) : (
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -1789,11 +1789,11 @@ export default function Sources() {
                             }`}
                             onClick={() => handleSelectPaymentCycle(payment.id)}
                           >
-                            <p className="text-sm font-semibold text-gray-900">
-                              {payment.round || "Chu ká»³ khÃ´ng tÃªn"}
+                            <p className="text-sm font-semibold text-white">
+                              {payment.round || "Chu kỳ không tên"}
                             </p>
-                            <p className="text-xs text-gray-500">
-                              Tá»•ng Tiá»n:{" "}
+                            <p className="text-xs text-white/80">
+                              Tiền nhập:{" "}
                               {formatCurrencyVnd(payment.totalImport)}
                             </p>
                           </button>
@@ -1805,56 +1805,56 @@ export default function Sources() {
                           <div className="border border-gray-200 rounded-2xl p-6 space-y-4 bg-white shadow-sm">
                             <div>
                               <p className="text-sm text-gray-600">
-                                ThÃ´ng Tin Chu Ká»³
+                                Thông Tin Chu Kỳ
                               </p>
                               <p className="text-lg font-semibold text-gray-900">
-                                {selectedPayment.round || "Chu Ká»³ KhÃ´ng TÃªn"}
+                                {selectedPayment.round || "Chu Kỳ Không Tên"}
                               </p>
                             </div>
                             {qrImageUrl ? (
                               <div className="flex flex-col items-center space-y-3">
                                 <img
                                   src={qrImageUrl}
-                                  alt="QR Thanh ToÃ¡n"
+                                  alt="QR Thanh Toán"
                                   className="w-60 h-auto"
                                 />
-                                <p className="text-xs text-gray-500">
-                                  QuÃ©t MÃ£ QR Äá»ƒ Thanh ToÃ¡n
+                                <p className="text-xs text-white/80">
+                                  Quét Mã QR Để Thanh Toán
                                 </p>
                               </div>
                             ) : (
                               <div className="text-sm text-gray-500 text-center">
-                                KhÃ´ng cÃ³ dá»¯ liá»‡u táº¡o mÃ£ QR (Thiáº¿u thÃ´ng tin tÃ i
-                                khoáº£n hoáº·c ngÃ¢n hÃ ng).
+                                Không có dữ liệu tạo mã QR (Thiếu thông tin tài
+                                khoản hoặc ngân hàng).
                               </div>
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                               <div>
-                                <p className="text-gray-500">NgÃ¢n HÃ ng</p>
+                                <p className="text-gray-500">Ngân Hàng</p>
                                 <p className="font-semibold text-gray-900">
                                   {bankLabel}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Sá»‘ tÃ i khoáº£n</p>
+                                <p className="text-gray-500">Số tài khoản</p>
 
                                 <p className="font-semibold text-gray-900">
-                                  {accountNumber || "ChÆ°a Cung Cáº¥p"}
+                                  {accountNumber || "Chưa Cung Cấp"}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-500">
-                                  Chá»§ tÃ i khoáº£n / Ná»™i dung
+                                  Chủ tài khoản / Nội dung
                                 </p>
                                 <p className="font-semibold text-gray-900">
                                   {accountName}
                                 </p>
-                                <p className="text-xs text-gray-500">
-                                  Ná»™i dung: {qrMessage}
+                                <p className="text-xs text-white/80">
+                                  Nội dung: {qrMessage}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Sá»‘ Tiá»n</p>
+                                <p className="text-gray-500">Tiền cần trả</p>
                                 <p className="font-semibold text-red-600">
                                   {formatCurrencyVnd(qrAmount)}
                                 </p>
@@ -1872,14 +1872,14 @@ export default function Sources() {
                                 disabled={viewModalState.confirming}
                               >
                                 {viewModalState.confirming
-                                  ? "Äang xÃ¡c nháº­n..."
-                                  : "XÃ¡c nháº­n thanh toÃ¡n"}
+                                  ? "Đang xác nhận..."
+                                  : "Xác nhận đã trả"}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div className="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-sm text-gray-500">
-                            Chá»n má»™t chu ká»³ Ä‘á»ƒ xem thÃ´ng tin thanh toÃ¡n
+                            Chọn một chu kỳ để xem thông tin thanh toán
                           </div>
                         )}
                       </div>
@@ -1908,10 +1908,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                ThÃªm nhÃ  cung cáº¥p
+                Thêm nhà cung cấp
               </p>
-              <p className="text-xs text-gray-500">
-                Nháº­p thÃ´ng tin nhÃ  cung cáº¥p má»›i
+              <p className="text-xs text-white/80">
+                Nhập thông tin nhà cung cấp mới
               </p>
             </div>
             <button
@@ -1926,7 +1926,7 @@ export default function Sources() {
           <form className="space-y-4" onSubmit={handleCreateSupplierSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                TÃªn nhÃ  cung cáº¥p
+                Tên nhà cung cấp
               </label>
               <input
                 type="text"
@@ -1935,14 +1935,14 @@ export default function Sources() {
                   handleNewSupplierChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nháº­p tÃªn nhÃ  cung cáº¥p"
+                placeholder="Nhập tên nhà cung cấp"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sá»‘ tÃ i khoáº£n
+                Số tài khoản
               </label>
               <input
                 type="text"
@@ -1951,13 +1951,13 @@ export default function Sources() {
                   handleNewSupplierChange("numberBank", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nháº­p sá»‘ tÃ i khoáº£n"
+                placeholder="Nhập số tài khoản"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                NgÃ¢n HÃ ng
+                Ngân Hàng
               </label>
               <select
                 value={newSupplierForm.bankBin}
@@ -1967,7 +1967,7 @@ export default function Sources() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="" disabled>
-                  Chá»n NgÃ¢n hÃ ng
+                  Chọn Ngân hàng
                 </option>
                 {bankOptions.map((bank) => {
                   const label = bank.name || `BIN ${bank.bin}`;
@@ -1982,7 +1982,7 @@ export default function Sources() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tráº¡ng ThÃ¡i
+                Trạng Thái
               </label>
               <select
                 value={newSupplierForm.status}
@@ -2010,14 +2010,14 @@ export default function Sources() {
                 onClick={closeAddSupplierModal}
                 disabled={isCreatingSupplier}
               >
-                Há»§y
+                Hủy
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70"
                 disabled={isCreatingSupplier}
               >
-                {isCreatingSupplier ? "Äang LÆ°u..." : "ThÃªm NhÃ  Cung Cáº¥p"}
+                {isCreatingSupplier ? "Đang Lưu..." : "Thêm Nhà Cung Cấp"}
               </button>
             </div>
           </form>
@@ -2035,7 +2035,7 @@ export default function Sources() {
       try {
         const response = await apiFetch("/api/banks");
         if (!response.ok) {
-          throw new Error("KhÃ´ng thá»ƒ táº£i danh sÃ¡ch ngÃ¢n hÃ ng");
+          throw new Error("Không thể tải danh sách ngân hàng");
         }
         const data: BankOption[] = await response.json();
         setBankOptions(data);
@@ -2073,305 +2073,620 @@ export default function Sources() {
     return filtered.sort(compareSuppliersByPriority);
   }, [supplies, searchTerm, statusFilter]);
 
-  const supplierStats = useMemo(
-    () => [
-      {
-        name: "Tá»•ng NhÃ  Cung Cáº¥p",
-        value: stats.totalSuppliers.toString(),
-        accent: STAT_CARD_ACCENTS.sky,
-        Icon: UserGroupIcon,
-      },
-      {
-        name: "Äang Hoáº¡t Äá»™ng",
-        value: stats.activeSuppliers.toString(),
-        accent: STAT_CARD_ACCENTS.emerald,
-        Icon: CheckCircleIcon,
-      },
-      {
-        name: "ÄÆ¡n HÃ ng ThÃ¡ng NÃ y",
-        value: stats.monthlyOrders.toString(),
-        accent: STAT_CARD_ACCENTS.violet,
-        Icon: ShoppingBagIcon,
-      },
-      {
-        name: "GiÃ¡ Trá»‹ Nháº­p HÃ ng",
-        value: formatCurrencyShort(stats.totalImportValue),
-        accent: STAT_CARD_ACCENTS.amber,
-        Icon: CurrencyDollarIcon,
-      },
-    ],
-    [stats]
-  );
+      const supplierStats = useMemo(
 
-  return (
-    <React.Fragment>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Báº£ng ThÃ´ng Tin Nguá»“n
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Quáº£n lÃ½ thÃ´ng tin nhÃ  cung cáº¥p vÃ  Ä‘á»‘i tÃ¡c
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
-              ThÃªm NhÃ  Cung Cáº¥p
-            </GradientButton>
-          </div>
-        </div>
+        () => [
 
-        <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {supplierStats.map((stat) => (
-              <StatCard
-                key={stat.name}
-                title={stat.name}
-                value={stat.value}
-                icon={stat.Icon}
-                accent={stat.accent}
-              />
-            ))}
-          </div>
-        </div>
+          {
 
-        <GlassPanel className="p-6 space-y-4" glow="neutral">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="TÃ¬m kiáº¿m nhÃ  cung cáº¥p..."
-                className={`${GLASS_FIELD_CLASS} pl-10`}
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
+            name: "Tổng",
+
+            value: stats.totalSuppliers.toString(),
+
+            accent: STAT_CARD_ACCENTS.sky,
+
+            Icon: UserGroupIcon,
+
+          },
+
+          {
+
+            name: "H.động",
+
+            value: stats.activeSuppliers.toString(),
+
+            accent: STAT_CARD_ACCENTS.emerald,
+
+            Icon: CheckCircleIcon,
+
+          },
+
+          {
+
+            name: "Đơn",
+
+            value: stats.monthlyOrders.toString(),
+
+            accent: STAT_CARD_ACCENTS.violet,
+
+            Icon: ShoppingBagIcon,
+
+          },
+
+          {
+
+            name: "Nhập",
+
+            value: formatCurrencyShort(stats.totalImportValue),
+
+            accent: STAT_CARD_ACCENTS.amber,
+
+            Icon: CurrencyDollarIcon,
+
+          },
+
+        ],
+
+        [stats]
+
+      );
+
+    
+
+      return (
+
+        <React.Fragment>
+
+          <div className="space-y-6">
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+
+              <div>
+
+                <h1 className="text-2xl font-bold text-white">
+
+                  Bảng Thông Tin Nguồn
+
+                </h1>
+
+                <p className="mt-1 text-sm text-white/80">
+
+                  Quản lý thông tin nhà cung cấp và đối tác
+
+                </p>
+
+              </div>
+
+              <div className="mt-4 sm:mt-0">
+
+                <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
+
+                  Thêm Nhà Cung Cấp
+
+                </GradientButton>
+
+              </div>
+
             </div>
 
-            <select
-              className={GLASS_FIELD_CLASS}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="all">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
-              <option value="active">Äang Hoáº¡t Äá»™ng</option>
-              <option value="inactive">Táº¡m NgÆ°ng</option>
-            </select>
+    
 
-            <GradientButton className="w-full justify-center" type="button">
-              Xuáº¥t Danh SÃ¡ch
-            </GradientButton>
-          </div>
+            <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
 
-          {error && <div className="text-sm text-red-600">{error}</div>}
-        </GlassPanel>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden max-w-6xl mx-auto">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    NhÃ  Cung Cáº¥p
-                  </th>
+                {supplierStats.map((stat) => (
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Thanh ToÃ¡n
-                  </th>
+                  <StatCard
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    ÄÆ¡n Trong ThÃ¡ng
-                  </th>
+                    key={stat.name}
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    ÄÆ¡n HÃ ng Cuá»‘i
-                  </th>
+                    title={stat.name}
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    ÄÃ£ Thanh ToÃ¡n
-                  </th>
+                    value={stat.value}
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    ChÆ°a Thanh ToÃ¡n
-                  </th>
+                    icon={stat.Icon}
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap ">
-                    Tráº¡ng ThÃ¡i
-                  </th>
+                    accent={stat.accent}
 
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Thao TÃ¡c
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-6 py-4 text-center text-sm text-gray-500"
-                    >
-                      Äang Táº£i Dá»¯ Liá»‡u
-                    </td>
-                  </tr>
-                )}
+                  />
 
-                {!loading &&
-                  filteredSupplies.map((supply) => {
-                    const isExpanded = expandedSupplyId === supply.id;
-                    return (
-                      <React.Fragment key={supply.id}>
-                        <tr
-                          className="hover:bg-indigo-500/10 cursor-pointer"
-                          onClick={() => toggleSlotDetails(supply.id)}
-                        >
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {supply.sourceName || "ChÆ°a Äáº·t TÃªn"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Tá»•ng ÄÆ¡n: {supply.totalOrders}
-                            </div>
-                          </td>
+                ))}
 
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {supply.numberBank || "ChÆ°a CÃ³ TÃ i Khoáº£n"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {supply.bankName ||
-                                (supply.binBank
-                                  ? bankNameByBin.get(supply.binBank.trim()) ||
-                                    `BIN ${supply.binBank}`
-                                  : "ChÆ°a CÃ³ NgÃ¢n HÃ ng")}
-                            </div>
-                          </td>
+              </div>
 
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {supply.monthlyOrders} ÄÆ¡n
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {formatCurrencyVnd(supply.monthlyImportValue)}
-                            </div>
-                          </td>
+            </div>
 
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {getFormattedDate(supply.lastOrderDate)}
-                          </td>
+    
 
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrencyVnd(supply.totalPaidImport)}
-                          </td>
+            <GlassPanel className="p-6 space-y-4" glow="neutral">
 
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrencyVnd(supply.totalUnpaidImport)}
-                          </td>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
+                <div className="relative">
 
-                                  handleToggleSupplyStatus(supply);
-                                }}
-                                className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
-                                  isSupplyActive(supply)
-                                    ? "border-emerald-200 bg-emerald-500 text-white"
-                                    : "border-gray-200 bg-gray-200 text-gray-500"
-                                } ${
-                                  statusLoadingMap[supply.id]
-                                    ? "opacity-60 cursor-not-allowed"
-                                    : ""
-                                }`}
-                                aria-pressed={isSupplyActive(supply)}
-                                disabled={Boolean(statusLoadingMap[supply.id])}
-                                title={formatStatusLabel(
-                                  supply.isActive ?? supply.status
-                                )}
-                              >
-                                <PowerIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-3 text-sm font-medium">
-                              <button
-                                className="text-blue-600 hover:text-blue-900"
-                                onClick={(event) => {
-                                  event.stopPropagation();
+                  <input
 
-                                  openViewModal(supply.id);
-                                }}
-                                aria-label="Xem chi tiáº¿t"
-                              >
-                                <EyeIcon className="h-5 w-5" />
+                    type="text"
 
-                                <span className="sr-only">Xem</span>
-                              </button>
+                    placeholder="Tìm kiếm nhà cung cấp..."
 
-                              <button
-                                className="text-green-600 hover:text-green-900"
-                                onClick={(event) => {
-                                  event.stopPropagation();
+                    className={`${GLASS_FIELD_CLASS} pl-10`}
 
-                                  openEditForm(supply);
-                                }}
-                                aria-label="Chá»‰nh sá»­a"
-                              >
-                                <PencilSquareIcon className="h-5 w-5" />
+                    value={searchTerm}
 
-                                <span className="sr-only">Chá»‰nh Sá»­a</span>
-                              </button>
+                    onChange={(event) => setSearchTerm(event.target.value)}
 
-                              <button
-                                className={`text-rose-500 hover:text-rose-700 ${
-                                  deleteLoadingId === supply.id
-                                    ? "opacity-60 cursor-not-allowed"
-                                    : ""
-                                }`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
+                  />
 
-                                  handleDeleteSupply(supply);
-                                }}
-                                aria-label="XÃ³a nguá»“n"
-                                disabled={deleteLoadingId === supply.id}
-                              >
-                                <TrashIcon className="h-5 w-5" />
+                </div>
 
-                                <span className="sr-only">XÃ³a</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={8} className="px-4 pb-6">
-                              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
-                                  {renderPaymentHistorySection(supply.id)}
-                                </div>
+    
+
+                <select
+
+                  className={GLASS_FIELD_CLASS}
+
+                  value={statusFilter}
+
+                  onChange={(event) => setStatusFilter(event.target.value)}
+
+                >
+
+                  <option value="all">Tất cả trạng thái</option>
+
+                  <option value="active">Đang Hoạt Động</option>
+
+                  <option value="inactive">Tạm Ngưng</option>
+
+                </select>
+
+    
+
+                <GradientButton className="w-full justify-center" type="button">
+
+                  Xuất Danh Sách
+
+                </GradientButton>
+
+              </div>
+
+    
+
+              {error && <div className="text-sm text-red-600">{error}</div>}
+
+            </GlassPanel>
+
+    
+
+            <div className="bg-white/10 border border-white/10 rounded-xl shadow-lg overflow-hidden max-w-6xl mx-auto backdrop-blur">
+
+              <div className="overflow-x-auto">
+
+                <table className="min-w-full divide-y divide-white/10 text-white">
+
+                                <thead className="bg-white/5">
+
+                                  <tr>
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                                      Nhà Cung Cấp
+
+                                    </th>
+
+                  
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                                      Tài khoản
+
+                                    </th>
+
+                  
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                                      Đơn tháng
+
+                                    </th>
+
+                  
+
+                                                      <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                  
+
+                                                        Đơn hàng cuối
+
+                  
+
+                                                      </th>
+
+                  
+
+                                    
+
+                  
+
+                                                      <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                  
+
+                                                        Đã trả
+
+                  
+
+                                                      </th>
+
+                  
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                                      Còn nợ
+
+                                    </th>
+
+                  
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap ">
+
+                                      
+
+                                    </th>
+
+                  
+
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+
+                                      Thao tác
+
+                                    </th>
+
+                                  </tr>
+
+                                </thead>
+
+                <tbody className="bg-white/5 divide-y divide-white/10">
+
+                  {loading && (
+
+                    <tr>
+
+                      <td
+
+                        colSpan={8}
+
+                        className="px-6 py-4 text-center text-sm text-white/80"
+
+                      >
+
+                        Đang Tải Dữ Liệu
+
+                      </td>
+
+                    </tr>
+
+                  )}
+
+  
+
+                  {!loading &&
+
+                    filteredSupplies.map((supply) => {
+
+                      const isExpanded = expandedSupplyId === supply.id;
+
+                      return (
+
+                        <React.Fragment key={supply.id}>
+
+                                                  <tr
+
+                                                    className="bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70 cursor-pointer transition"
+
+                                                    onClick={() => toggleSlotDetails(supply.id)}
+
+                                                  >
+
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+
+                                                      <div className="text-sm font-medium text-white">
+
+                                                        {supply.sourceName || "Chưa Đặt Tên"}
+
+                                                      </div>
+
+                                                      <div className="text-xs text-white/70">
+
+                                                        Tổng đơn: {supply.totalOrders}
+
+                                                      </div>
+
+                                                    </td>
+
+                          
+
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+
+                                                      <div className="text-sm text-white">
+
+                                                        {supply.numberBank || "Chưa có TK"}
+
+                                                      </div>
+
+                                                      <div className="text-xs text-white/70">
+
+                                                        {supply.bankName ||
+
+                                                          (supply.binBank
+
+                                                            ? bankNameByBin.get(supply.binBank.trim()) ||
+
+                                                              `BIN ${supply.binBank}`
+
+                                                            : "Chưa có NH")}
+
+                                                      </div>
+
+                                                    </td>
+
+                          
+
+                                                    <td className="px-4 py-4 whitespace-nowrap">
+
+                                                      <div className="text-sm text-white">
+
+                                                        {supply.monthlyOrders} đơn
+
+                                                      </div>
+
+                              <div className="text-xs text-white/70">
+
+                                {formatCurrencyVnd(supply.monthlyImportValue)}
+
                               </div>
+
                             </td>
+
+  
+
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+
+                              {getFormattedDate(supply.lastOrderDate)}
+
+                            </td>
+
+  
+
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+
+                              {formatCurrencyVnd(supply.totalPaidImport)}
+
+                            </td>
+
+  
+
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+
+                              {formatCurrencyVnd(supply.totalUnpaidImport)}
+
+                            </td>
+
+  
+
+                            <td className="px-4 py-4 whitespace-nowrap">
+
+                              <div className="flex justify-center">
+
+                                <button
+
+                                  type="button"
+
+                                  onClick={(event) => {
+
+                                    event.stopPropagation();
+
+  
+
+                                    handleToggleSupplyStatus(supply);
+
+                                  }}
+
+                                  className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
+
+                                    isSupplyActive(supply)
+
+                                      ? "border-emerald-200 bg-emerald-500 text-white"
+
+                                      : "border-gray-200 bg-gray-200 text-gray-500"
+
+                                  } ${
+
+                                    statusLoadingMap[supply.id]
+
+                                      ? "opacity-60 cursor-not-allowed"
+
+                                      : ""
+
+                                  }`}
+
+                                  aria-pressed={isSupplyActive(supply)}
+
+                                  disabled={Boolean(statusLoadingMap[supply.id])}
+
+                                  title={formatStatusLabel(
+
+                                    supply.isActive ?? supply.status
+
+                                  )}
+
+                                >
+
+                                  <PowerIcon className="h-4 w-4" />
+
+                                </button>
+
+                              </div>
+
+                            </td>
+
+  
+
+                            <td className="px-4 py-4 whitespace-nowrap">
+
+                              <div className="flex items-center justify-end gap-3 text-sm font-medium">
+
+                                <button
+
+                                  className="text-blue-600 hover:text-blue-900"
+
+                                  onClick={(event) => {
+
+                                    event.stopPropagation();
+
+  
+
+                                    openViewModal(supply.id);
+
+                                  }}
+
+                                  aria-label="Xem chi tiết"
+
+                                >
+
+                                  <EyeIcon className="h-5 w-5" />
+
+  
+
+                                  <span className="sr-only">Xem</span>
+
+                                </button>
+
+  
+
+                                <button
+
+                                  className="text-green-600 hover:text-green-900"
+
+                                  onClick={(event) => {
+
+                                    event.stopPropagation();
+
+  
+
+                                    openEditForm(supply);
+
+                                  }}
+
+                                  aria-label="Chỉnh sửa"
+
+                                >
+
+                                  <PencilSquareIcon className="h-5 w-5" />
+
+  
+
+                                  <span className="sr-only">Chỉnh Sửa</span>
+
+                                </button>
+
+  
+
+                                <button
+
+                                  className={`text-rose-500 hover:text-rose-700 ${
+
+                                    deleteLoadingId === supply.id
+
+                                      ? "opacity-60 cursor-not-allowed"
+
+                                      : ""
+
+                                  }`}
+
+                                  onClick={(event) => {
+
+                                    event.stopPropagation();
+
+  
+
+                                    handleDeleteSupply(supply);
+
+                                  }}
+
+                                  aria-label="Xóa nguồn"
+
+                                  disabled={deleteLoadingId === supply.id}
+
+                                >
+
+                                  <TrashIcon className="h-5 w-5" />
+
+  
+
+                                  <span className="sr-only">Xóa</span>
+
+                                </button>
+
+                              </div>
+
+                            </td>
+
                           </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-              </tbody>
-            </table>
+
+                          {isExpanded && (
+
+                            <tr>
+
+                              <td colSpan={8} className="px-4 pb-6">
+
+                                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+
+                                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
+
+                                    {renderPaymentHistorySection(supply.id)}
+
+                                  </div>
+
+                                </div>
+
+                              </td>
+
+                            </tr>
+
+                          )}
+
+                        </React.Fragment>
+
+                      );
+
+                    })}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
           </div>
+
         </div>
-      </div>
-      {renderViewSupplierModal()}
-      {renderAddSupplierModal()}
-      {renderEditModal()}
-      {renderDeleteConfirmModal()}
-    </React.Fragment>
-  );
-}
+
+        {renderViewSupplierModal()}
+
+        {renderAddSupplierModal()}
+
+        {renderEditModal()}
+
+        {renderDeleteConfirmModal()}
+
+      </React.Fragment>
+
+    );
+
+  }
+
+  
