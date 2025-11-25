@@ -38,6 +38,17 @@ const formatCurrencyVndFull = (value: number): string => {
   return `${Math.round(value).toLocaleString("vi-VN")}\u0111`;
 };
 
+const extractSenderFromNote = (note?: string | null): string | null => {
+  if (!note) return null;
+  const match = note.match(/nhan tu\s+(.+?)\s+trace/i);
+  if (!match) return null;
+  const sender = match[1].trim();
+  return sender || null;
+};
+
+const resolveSender = (receipt: PaymentReceipt): string =>
+  extractSenderFromNote(receipt.note) || receipt.sender || "";
+
 const determineReceiptCategory = (
   orderCode: string | null | undefined
 ): ReceiptCategory => {
@@ -87,6 +98,9 @@ export default function Invoices() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isAmountEditing, setIsAmountEditing] = useState(false);
   const [isNoteEditing, setIsNoteEditing] = useState(false);
+  const [expandedReceiptId, setExpandedReceiptId] = useState<number | null>(
+    null
+  );
   const [qrAmount, setQrAmount] = useState("");
   const [qrNote, setQrNote] = useState("");
   const [qrAmountDraft, setQrAmountDraft] = useState("");
@@ -156,7 +170,7 @@ export default function Invoices() {
       const recordCategory = determineReceiptCategory(item.orderCode);
       const matchesSearch =
         !normalized ||
-        [item.orderCode, item.note, item.sender]
+        [item.orderCode, item.note, resolveSender(item)]
           .map((value) => value?.toLowerCase() ?? "")
           .some((value) => value.includes(normalized));
 
@@ -249,6 +263,12 @@ export default function Invoices() {
     setViewModalOpen(true);
   };
 
+  const toggleRowDetails = (receiptId: number) => {
+    setExpandedReceiptId((current) =>
+      current === receiptId ? null : receiptId
+    );
+  };
+
   const closeViewModal = () => {
     setSelectedReceipt(null);
     setViewModalOpen(false);
@@ -271,7 +291,7 @@ export default function Invoices() {
     const dataRows = filteredReceipts.map((receipt, index) => [
       index + 1,
       receipt.orderCode || "",
-      receipt.sender || "",
+      resolveSender(receipt),
       receipt.amount,
       formatCurrencyVnd(receipt.amount),
       receipt.note || "",
@@ -731,6 +751,9 @@ export default function Invoices() {
                     Mã Đơn
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
+                    Người Gửi
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                     Người Nhận
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
@@ -745,36 +768,104 @@ export default function Invoices() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
-                {filteredReceipts.map((receipt, index) => (
-                  <tr
-                    key={receipt.id}
-                    className={`transition ${
-                      index % 2 === 0 ? "bg-slate-900/55" : "bg-indigo-950/40"
-                    } hover:bg-indigo-600/25`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">
-                      {receipt.orderCode || "--"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-white">
-                        {receipt.sender || "--"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
-                      {formatCurrencyVnd(receipt.amount)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-white/90 max-w-xs">
-                      <span className="block truncate text-white/90">
-                        {receipt.note || "--"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">
-                      {receipt.paidAt
-                        ? Helpers.formatDateToDMY(receipt.paidAt)
-                        : "--"}
-                    </td>
-                  </tr>
-                ))}
+                {filteredReceipts.map((receipt, index) => {
+                  const isExpanded = expandedReceiptId === receipt.id;
+                  return (
+                    <React.Fragment key={receipt.id}>
+                      <tr
+                        className={`transition ${
+                          index % 2 === 0
+                            ? "bg-slate-900/55"
+                            : "bg-indigo-950/40"
+                        } hover:bg-indigo-600/25 ${
+                          isExpanded ? "ring-2 ring-indigo-400/60" : ""
+                        } cursor-pointer`}
+                        onClick={() => toggleRowDetails(receipt.id)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">
+                          {receipt.orderCode || "--"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-white">
+                            {resolveSender(receipt) || "--"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-white">
+                            {QR_BANK_INFO.accountNumber}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
+                          {formatCurrencyVnd(receipt.amount)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-white/90 max-w-xs">
+                          <span className="block truncate text-white/90">
+                            {receipt.note || "--"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">
+                          {receipt.paidAt
+                            ? Helpers.formatDateToDMY(receipt.paidAt)
+                            : "--"}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-indigo-900/35">
+                          <td colSpan={6} className="px-6 pb-5 pt-2">
+                            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-sm text-white/90 space-y-2">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                  <p className="text-xs text-white/60">Mã đơn</p>
+                                  <p className="font-semibold text-white">
+                                    {receipt.orderCode || "--"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-white/60">Người gửi</p>
+                                  <p className="font-semibold text-white">
+                                    {resolveSender(receipt) || "--"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-white/60">
+                                    Người nhận
+                                  </p>
+                                  <p className="font-semibold text-white">
+                                    {QR_BANK_INFO.accountNumber}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-white/60">Số tiền</p>
+                                  <p className="font-semibold text-emerald-200">
+                                    {formatCurrencyVnd(receipt.amount)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-white/60">
+                                    Ngày thanh toán
+                                  </p>
+                                  <p className="font-semibold text-white">
+                                    {receipt.paidAt
+                                      ? Helpers.formatDateToDMY(receipt.paidAt)
+                                      : "--"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs text-white/60">
+                                  Nội dung chuyển khoản
+                                </p>
+                                <p className="mt-1 rounded-xl bg-white/5 px-3 py-2 text-white">
+                                  {receipt.note || "Không có ghi chú"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -828,7 +919,7 @@ export default function Invoices() {
                   <div>
                     <p className="text-gray-500 mb-1">Người Gửi</p>
                     <p className="font-semibold text-gray-900">
-                      {selectedReceipt.sender || "--"}
+                      {resolveSender(selectedReceipt) || "--"}
                     </p>
                   </div>
                   <div>
