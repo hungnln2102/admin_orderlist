@@ -241,7 +241,9 @@ const useCreateOrderLogic = (
 
   const fetchProducts = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}${API_ENDPOINTS.PRODUCTS_ALL}`);
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.PRODUCTS_ALL}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
       const data: Product[] = await response.json();
       setProducts(data);
@@ -253,7 +255,8 @@ const useCreateOrderLogic = (
   const fetchSuppliesByProduct = useCallback(async (productName: string) => {
     try {
       const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
+        `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`,
+        { credentials: "include" }
       );
       if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
       const data: Supply[] = await response.json();
@@ -295,6 +298,7 @@ const useCreateOrderLogic = (
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({
               // Backend chi can cac thong so nay de tinh gia ban va ngay het han
               supply_id: supplyId,

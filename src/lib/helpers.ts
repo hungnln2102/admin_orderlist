@@ -254,6 +254,40 @@ export const getStatusPriority = (status: string): number => {
   return 5;
 };
 
+export interface SepayQrOptions {
+  accountNumber: string;
+  bankCode: string;
+  amount?: number | null;
+  description?: string;
+}
+
+export const buildSepayQrUrl = ({
+  accountNumber,
+  bankCode,
+  amount,
+  description,
+}: SepayQrOptions): string => {
+  const acc = (accountNumber || "").trim();
+  const bank = (bankCode || "").trim();
+  if (!acc || !bank) return "";
+
+  const params = new URLSearchParams();
+  params.set("acc", acc);
+  params.set("bank", bank);
+
+  const numericAmount = Number(amount);
+  if (Number.isFinite(numericAmount) && numericAmount > 0) {
+    params.set("amount", Math.round(numericAmount).toString());
+  }
+
+  const desc = (description || "").trim();
+  if (desc) {
+    params.set("des", desc);
+  }
+
+  return `https://qr.sepay.vn/img?${params.toString()}`;
+};
+
 /**
  * Read a fetch response once and try to parse JSON, but gracefully fall back to raw text.
  * Helps avoid "Unexpected token '<'" errors when servers return HTML error pages.

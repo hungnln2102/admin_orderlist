@@ -106,17 +106,12 @@ export default function Invoices() {
       : "Chưa cập nhật";
 
   const qrImageUrl = useMemo(() => {
-    const base = `https://img.vietqr.io/image/${QR_BANK_INFO.bankBin}-${QR_BANK_INFO.accountNumber}-qr_only.jpg`;
-    const params = new URLSearchParams({
-      accountName: QR_BANK_INFO.accountHolder,
+    return Helpers.buildSepayQrUrl({
+      accountNumber: QR_BANK_INFO.accountNumber,
+      bankCode: QR_BANK_INFO.bankBin,
+      amount: parsedAmount,
+      description: qrNote.trim(),
     });
-    if (parsedAmount > 0) {
-      params.set("amount", parsedAmount.toString());
-    }
-    if (qrNote.trim()) {
-      params.set("addInfo", qrNote.trim());
-    }
-    return `${base}?${params.toString()}`;
   }, [parsedAmount, qrNote]);
 
   const handleOpenQrModal = () => {

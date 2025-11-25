@@ -1615,11 +1615,12 @@ export default function Sources() {
     const qrMessage = selectedPayment?.round || `SUPPLIER-${supply?.id ?? ""}`;
     const qrImageUrl =
       accountNumber && bankBin
-        ? `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact2.png?amount=${Math.round(
-            Math.max(0, qrAmount)
-          )}&addInfo=${encodeURIComponent(
-            qrMessage
-          )}&accountName=${encodeURIComponent(accountName)}`
+        ? Helpers.buildSepayQrUrl({
+            accountNumber,
+            bankCode: bankBin,
+            amount: Math.max(0, qrAmount),
+            description: qrMessage,
+          })
         : null;
 
     const statCards = [

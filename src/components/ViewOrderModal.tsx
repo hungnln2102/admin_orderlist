@@ -187,11 +187,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   const qrMessage = order.id_don_hang;
   const normalizedAmount = Math.max(0, Number(qrAmount) || 0);
   const safeQrAmount = Helpers.roundGiaBanValue(normalizedAmount);
-  const qrCodeImageUrl =
-    `https://img.vietqr.io/image/${BANK_SHORT_CODE}-${ACCOUNT_NO}-compact2.png` +
-    `?amount=${safeQrAmount}` +
-    `&addInfo=${encodeURIComponent(qrMessage)}` +
-    `&accountName=${encodeURIComponent(ACCOUNT_NAME)}`;
+  const qrCodeImageUrl = Helpers.buildSepayQrUrl({
+    accountNumber: ACCOUNT_NO,
+    bankCode: BANK_SHORT_CODE,
+    amount: safeQrAmount,
+    description: qrMessage,
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 px-4 py-6">

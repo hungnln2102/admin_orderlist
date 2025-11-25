@@ -119,6 +119,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({
               supply_id: supplyId,
               san_pham_name: productName,
@@ -384,8 +385,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
         <div className="p-6 flex-grow overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
+              <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm">
+                <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
                   Chi tiết Khách hàng & Đơn
                 </h4>
                 <div className="space-y-4">
@@ -463,10 +464,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 </div>
               </div>
 
-              <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                                <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                                  Thông tin Sản phẩm & Ngày
-                                </h4>
+              <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm text-white">
+                <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
+                  Thông tin Sản phẩm & Ngày
+                </h4>
                                 <div className="space-y-4">
                                   <div>
                                     <label className={labelClass}>Sản Phẩm</label>
@@ -546,12 +547,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                                 </div>
               </div>
 
-                            <div className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-
-                              <h4 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-
+                            <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm text-white">
+                              <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
                                 Thông tin Tài chính & Ghi chú
-
                               </h4>
 
                               <div className="space-y-4">

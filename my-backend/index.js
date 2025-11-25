@@ -998,11 +998,11 @@ const mapPostgresErrorToMessage = (error) => {
     if (!error) return null;
     switch (error.code) {
         case "23505":
-            return "MÃ£ Sáº£n Pháº©m ÄÃ£ Tá»“n Táº¡i, Vui LÃ²ng Chá»n MÃ£ Sáº£n Pháº©m KhÃ¡c";
+            return "Mã Sản Phẩm Đã Tồn Tại, Vui Lòng Chọn Mã Sản Phẩm Khác";
         case "22P02":
-            return "Tá»· Lá»‡ GiÃ¡ Pháº£i LÃ  Sá»‘ Há»£p Lá»‡";
+            return "Tỷ Lệ Giá Phải Là Số Hợp Lệ";
         case "23503":
-            return "KhÃ´ng thá»ƒ cáº­p nháº­t sáº£n pháº©m do dá»¯ liá»‡u liÃªn quan khÃ´ng há»£p lá»‡.";
+            return "Không thể cập nhật sản phẩm do dữ liệu liên quan không hợp lệ.";
         default:
             return null;
     }
@@ -2665,12 +2665,11 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
 
         // Lấy tên nguồn để map với order_list.nguon
         const supplyResult = await pool.query(
-            `SELECT source_name FROM mavryk.supply WHERE id = $1 LIMIT 1;`, [sourceId]
+            `SELECT source_name FROM mavryk.supply WHERE id = $1 LIMIT 1;`,
+            [sourceId]
         );
         const sourceName = supplyResult.rows?.[0]?.source_name || "";
-        const normalizedSourceKey = sourceName ?
-            sourceName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase() :
-            "";
+        const trimmedSourceName = sourceName.trim();
 
         // Đơn chưa thanh toán của nguồn này (lấy từ cũ đến mới)
         const unpaidResult = await pool.query(
@@ -2682,9 +2681,10 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
         FROM ${DB_SCHEMA}.order_list
         WHERE ${createVietnameseStatusKey("tinh_trang")} = 'chua thanh toan'
           AND COALESCE(check_flag, FALSE) = FALSE
-          AND ${createSourceKey("nguon")} = $1
+          AND TRIM(nguon::text) = TRIM($1)
         ORDER BY ngay_dang_ki ASC NULLS FIRST, id ASC;
-      `, [normalizedSourceKey]
+      `,
+            [trimmedSourceName]
         );
 
         const unpaidRows = unpaidResult.rows || [];
