@@ -1,4 +1,3 @@
-﻿
 import { apiFetch } from "./api";
 import { normalizeErrorMessage } from "./textUtils";
 

@@ -1,6 +1,16 @@
-const RAW_API_BASE: string = (
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) as string
-) || ((process.env.VITE_API_BASE_URL as string) || "http://localhost:3001");
+const RAW_API_BASE: string = (() => {
+  const metaBase =
+    typeof import.meta !== "undefined"
+      ? ((import.meta as any).env?.VITE_API_BASE_URL as string) || ""
+      : "";
+  if (metaBase) return metaBase;
+  const envBase =
+    typeof process !== "undefined"
+      ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
+      : "";
+  if (envBase) return envBase;
+  return "http://localhost:3001";
+})();
 
 function normalizeBaseUrl(value: string): string {
   const v = (value || "").trim();
@@ -44,7 +54,6 @@ export async function apiFetch(
   }
 }
 
-// Ã„ÂÃ¡Â»â€¹nh nghÃ„Â©a kiÃ¡Â»Æ’u dÃ¡Â»Â¯ liÃ¡Â»â€¡u cho Charts API
 export interface RevenueData {
   month: string;
   total_sales: number;
@@ -64,10 +73,9 @@ export interface YearsApiResponse {
   years: number[];
 }
 
-
 /**
- * LÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u biÃ¡Â»Æ’u Ã„â€˜Ã¡Â»â€œ Doanh thu vÃƒÂ  TrÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã†Â¡n hÃƒÂ ng.
- * @param year NÃ„Æ’m cÃ¡ÂºÂ§n lÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u
+ * Lấy dữ liệu biểu đồ Doanh thu và Trạng thái đơn hàng.
+ * @param year Năm cần lấy dữ liệu
  * @returns {ChartsApiResponse}
  */
 export async function fetchChartData(
@@ -75,18 +83,18 @@ export async function fetchChartData(
 ): Promise<ChartsApiResponse> {
   const response = await apiFetch(`/api/dashboard/charts?year=${year}`);
   if (!response.ok) {
-    throw new Error("Failed to fetch chart data");
+    throw new Error("Lỗi khi tải dữ liệu biểu đồ");
   }
   return response.json();
 }
 /**
- * Lay danh sach nam co du lieu trong database.
+ * Lấy danh sách năm có dữ liệu trong database.
  */
 
 export async function fetchAvailableYears(): Promise<number[]> {
   const response = await apiFetch("/api/dashboard/years");
   if (!response.ok) {
-    throw new Error("Failed to fetch available years");
+    throw new Error("Lỗi khi tải danh sách năm");
   }
   const data: YearsApiResponse = await response.json();
   if (!data || !Array.isArray(data.years)) {
@@ -96,13 +104,3 @@ export async function fetchAvailableYears(): Promise<number[]> {
     .map((year) => Number(year))
     .filter((year) => Number.isFinite(year));
 }
-
-
-
-
-
-
-
-
-
-

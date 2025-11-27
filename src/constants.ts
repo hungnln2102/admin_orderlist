@@ -1,3 +1,15 @@
+import {
+  ORDER_FIELD_MAP,
+  ORDER_EXPIRED_FIELD_MAP,
+  PRODUCT_PRICE_FIELD_MAP,
+  SUPPLY_FIELD_MAP,
+  SUPPLY_PRICE_FIELD_MAP,
+  PAYMENT_RECEIPT_FIELD_MAP,
+  PURCHASE_ORDER_FIELD_MAP,
+  REFUND_FIELD_MAP,
+  BANK_LIST_FIELD_MAP,
+} from "./lib/fieldMapper";
+
 export const API_ENDPOINTS = {
   ORDERS: "/api/orders",
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
@@ -35,105 +47,17 @@ export const API_ENDPOINTS = {
   BANK_LIST: "/api/banks",
 };
 
-export const ORDER_FIELDS = {
-  ID: "id",
-
-  SAN_PHAM: "san_pham",
-  NGUON: "nguon",
-  LINK_LIEN_HE: "link_lien_he",
-  KHACH_HANG: "khach_hang",
-  THONG_TIN_SAN_PHAM: "thong_tin_san_pham",
-  SLOT: "slot",
-  NOTE: "note",
-  CHECK_FLAG: "check_flag",
-
-  ID_DON_HANG: "id_don_hang",
-  TINH_TRANG: "tinh_trang",
-  NGAY_DANG_KI: "ngay_dang_ki",
-  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
-  HET_HAN: "het_han",
-  GIA_NHAP: "gia_nhap",
-  GIA_BAN: "gia_ban",
-};
-
-export const ORDER_EXPRIED_FIELDS = {
-  ID: "id",
-  ID_DON_HANG: "id_don_hang",
-  SAN_PHAM: "san_pham",
-  THONG_TIN_SAN_PHAM: "thong_tin_san_pham",
-  KHACH_HANG: "khach_hang",
-  LINK_LIEN_HE: "link_lien_he",
-  SLOT: "slot",
-  NGAY_DANG_KI: "ngay_dang_ki",
-  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
-  HET_HAN: "het_han",
-  NGUON: "nguon",
-  GIA_NHAP: "gia_nhap",
-  GIA_BAN: "gia_ban",
-  NOTE: "note",
-  TINH_TRANG: "tinh_trang",
-  CHECK_FLAG: "check_flag",
-
-  ARCHIVED_AT: "archived_at",
-};
-
-export const PRODUCT_PRICE_FIELDS = {
-  ID: "id",
-  SAN_PHAM: "san_pham",
-  PCT_CTV: "pct_ctv",
-  PCT_KHACH: "pct_khach",
-  IS_ACTIVE: "is_active",
-};
-
-export const SUPPLY_FIELDS = {
-  ID: "id",
-  SOURCE_NAME: "source_name",
-  NUMBER_BANK: "number_bank",
-  BIN_BANK: "bin_bank",
-};
-
-export const SUPPLY_PRICE_FIELDS = {
-  ID: "id",
-  PRODUCT_ID: "product_id",
-  SOURCE_ID: "source_id",
-  PRICE: "price",
-};
-
-export const PAYMENT_RECEIPT_FIELDS = {
-  ID: "id",
-  MA_DON_HANG: "ma_don_hang",
-  NGAY_THANH_TOAN: "ngay_thanh_toan",
-  SO_TIEN: "so_tien",
-  NGUOI_GUI: "nguoi_gui",
-  NOI_DUNG_CK: "noi_dung_ck",
-};
-
-export const PURCHASE_ORDER_FIELDS = {
-  ID: "id",
-  ID_DON_HANG: "id_don_hang",
-  SAN_PHAM: "san_pham",
-  THONG_TIN_SAN_PHAM: "thong_tin_san_pham",
-  SLOT: "slot",
-  NGAY_DANG_KI: "ngay_dang_ki",
-  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
-  HET_HAN: "het_han",
-  NGUON: "nguon",
-  GIA_NHAP: "gia_nhap",
-  TINH_TRANG: "tinh_trang",
-  CHECK_FLAG: "check_flag",
-};
-
-export const REFUND_FIELDS = {
-  ID: "id",
-  MA_DON_HANG: "ma_don_hang",
-  NGAY_THU_HOI: "ngay_thanh_toan",
-  SO_TIEN: "so_tien",
-};
-
-export const BANK_LIST_FIELDS = {
-  BIN: "bin",
-  BANK_NAME: "bank_name",
-};
+// Keep UI aliases stable; values now sourced from tableSql via fieldMapper.
+export const ORDER_FIELDS = ORDER_FIELD_MAP;
+// Typo kept for backward compatibility with existing imports.
+export const ORDER_EXPRIED_FIELDS = ORDER_EXPIRED_FIELD_MAP;
+export const PRODUCT_PRICE_FIELDS = PRODUCT_PRICE_FIELD_MAP;
+export const SUPPLY_FIELDS = SUPPLY_FIELD_MAP;
+export const SUPPLY_PRICE_FIELDS = SUPPLY_PRICE_FIELD_MAP;
+export const PAYMENT_RECEIPT_FIELDS = PAYMENT_RECEIPT_FIELD_MAP;
+export const PURCHASE_ORDER_FIELDS = PURCHASE_ORDER_FIELD_MAP;
+export const REFUND_FIELDS = REFUND_FIELD_MAP;
+export const BANK_LIST_FIELDS = BANK_LIST_FIELD_MAP;
 
 export const VIRTUAL_FIELDS = {
   SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
@@ -145,14 +69,14 @@ export const VIRTUAL_FIELDS = {
 };
 
 export const CALCULATED_FIELDS = {
-  GIA_NHAP: "gia_nhap",
-  GIA_BAN: "gia_ban",
-  SO_NGAY_DA_DANG_KI: "so_ngay_da_dang_ki",
-  HET_HAN: "het_han",
+  COST: "cost",
+  PRICE: "price",
+  DAYS: "days",
+  ORDER_EXPIRED: "order_expired",
 };
 
 export const ORDER_STATUSES = {
-  HET_HAN: "Hết Hạn",
+  ORDER_EXPIRED: "Hết Hạn",
   CAN_GIA_HAN: "Cần Gia Hạn",
   CHUA_THANH_TOAN: "Chưa Thanh Toán",
   DA_THANH_TOAN: "Đã Thanh Toán",
@@ -189,24 +113,24 @@ export type OrderDatasetKey = "active" | "expired" | "canceled";
 
 export interface Order {
   id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
+  id_order: string;
+  id_product: string;
+  information_order: string;
+  customer: string;
+  contact: string;
   slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
+  order_date: string;
+  days: string;
+  order_expired: string;
   registration_date?: string;
   expiry_date?: string;
   registration_date_display?: string;
   expiry_date_display?: string;
-  nguon: string;
-  gia_nhap: string;
-  gia_ban: string;
+  supply: string;
+  cost: string;
+  price: string;
   note: string;
-  tinh_trang: string;
+  status: string;
   check_flag: boolean | null;
   can_hoan?: number | string;
   so_ngay_con_lai: number | null;
@@ -221,24 +145,24 @@ export interface Order {
 
 export interface Order {
   id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
+  id_order: string;
+  id_product: string;
+  information_order: string;
+  customer: string;
+  contact: string;
   slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
+  order_date: string;
+  days: string;
+  order_expired: string;
   registration_date?: string;
   expiry_date?: string;
   registration_date_display?: string;
   expiry_date_display?: string;
-  nguon: string;
-  gia_nhap: string;
-  gia_ban: string;
+  supply: string;
+  cost: string;
+  price: string;
   note: string;
-  tinh_trang: string;
+  status: string;
   check_flag: boolean | null;
   can_hoan?: number | string;
   so_ngay_con_lai: number | null;

@@ -1,9 +1,5 @@
-// Frontend-safe schema constants (mirrors my-backend/schema/tables.js)
-// Keep in sync with backend when columns change.
-
-type ColumnDict = Record<string, string>;
-
-export const ORDER_COLS: ColumnDict = {
+// Centralized schema definitions for core tables
+const ORDER_COLS = {
   id: "id",
   idOrder: "id_order",
   idProduct: "id_product",
@@ -23,7 +19,7 @@ export const ORDER_COLS: ColumnDict = {
   refund: "refund",
 };
 
-export const ACCOUNT_STORAGE_COLS: ColumnDict = {
+const ACCOUNT_STORAGE_COLS = {
   id: "id",
   username: "username",
   password: "password",
@@ -33,12 +29,12 @@ export const ACCOUNT_STORAGE_COLS: ColumnDict = {
   mailFamily: "Mail Family",
 };
 
-export const BANK_LIST_COLS: ColumnDict = {
+const BANK_LIST_COLS = {
   bin: "bin",
   bankName: "bank_name",
 };
 
-export const PACKAGE_PRODUCT_COLS: ColumnDict = {
+const PACKAGE_PRODUCT_COLS = {
   id: "id",
   package: "package",
   username: "username",
@@ -52,7 +48,7 @@ export const PACKAGE_PRODUCT_COLS: ColumnDict = {
   match: "match",
 };
 
-export const PAYMENT_RECEIPT_COLS: ColumnDict = {
+const PAYMENT_RECEIPT_COLS = {
   id: "id",
   orderCode: "ma_don_hang",
   paidDate: "ngay_thanh_toan",
@@ -61,7 +57,7 @@ export const PAYMENT_RECEIPT_COLS: ColumnDict = {
   note: "noi_dung_ck",
 };
 
-export const PAYMENT_SUPPLY_COLS: ColumnDict = {
+const PAYMENT_SUPPLY_COLS = {
   id: "id",
   sourceId: "source_id",
   importValue: "import",
@@ -70,7 +66,7 @@ export const PAYMENT_SUPPLY_COLS: ColumnDict = {
   paid: "paid",
 };
 
-export const PRODUCT_PRICE_COLS: ColumnDict = {
+const PRODUCT_PRICE_COLS = {
   id: "id",
   product: "san_pham",
   pctCtv: "pct_ctv",
@@ -82,14 +78,14 @@ export const PRODUCT_PRICE_COLS: ColumnDict = {
   pctPromo: "pct_promo",
 };
 
-export const REFUND_COLS: ColumnDict = {
+const REFUND_COLS = {
   id: "id",
   orderCode: "ma_don_hang",
   paidDate: "ngay_thanh_toan",
   amount: "so_tien",
 };
 
-export const SUPPLY_COLS: ColumnDict = {
+const SUPPLY_COLS = {
   id: "id",
   sourceName: "source_name",
   numberBank: "number_bank",
@@ -97,14 +93,14 @@ export const SUPPLY_COLS: ColumnDict = {
   activeSupply: "active_supply",
 };
 
-export const SUPPLY_PRICE_COLS: ColumnDict = {
+const SUPPLY_PRICE_COLS = {
   id: "id",
   productId: "product_id",
   sourceId: "source_id",
   price: "price",
 };
 
-export const USERS_COLS: ColumnDict = {
+const USERS_COLS = {
   userId: "userid",
   username: "username",
   passwordHash: "passwordhash",
@@ -112,7 +108,7 @@ export const USERS_COLS: ColumnDict = {
   createdAt: "createdat",
 };
 
-export const SCHEMA_TABLES = {
+module.exports = {
   ORDER_COLS,
   ACCOUNT_STORAGE_COLS,
   BANK_LIST_COLS,
@@ -125,5 +121,3 @@ export const SCHEMA_TABLES = {
   SUPPLY_PRICE_COLS,
   USERS_COLS,
 };
-
-export type SchemaTables = typeof SCHEMA_TABLES;

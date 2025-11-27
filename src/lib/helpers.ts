@@ -1,4 +1,4 @@
-﻿// Date format helpers
+// Date format helpers
 export const convertDMYToYMD = (dmyString: string): string => {
   if (!dmyString || dmyString.indexOf("/") === -1) return dmyString;
   const parts = dmyString.split("/");
@@ -48,29 +48,6 @@ export const addMonthsMinusOneDay = (
   if (Number.isFinite(forceDay) && forceDay! >= 1 && forceDay! <= 31) {
     dt.setDate(forceDay!);
   }
-  return `${String(dt.getDate()).padStart(2, "0")}/${String(
-    dt.getMonth() + 1
-  ).padStart(2, "0")}/${dt.getFullYear()}`;
-};
-
-export const addDaysToDMY = (startDMY: string, days: number): string => {
-  if (
-    !startDMY ||
-    !Number.isFinite(days) ||
-    days === 0 ||
-    startDMY.indexOf("/") === -1
-  ) {
-    return startDMY;
-  }
-
-  const [d, m, y] = startDMY.split("/").map(Number);
-  if (![d, m, y].every((value) => Number.isFinite(value))) {
-    return startDMY;
-  }
-
-  const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + days);
-
   return `${String(dt.getDate()).padStart(2, "0")}/${String(
     dt.getMonth() + 1
   ).padStart(2, "0")}/${dt.getFullYear()}`;
@@ -138,6 +115,17 @@ export const formatDateToDMY = (
   return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
 };
 
+export const isRegisteredToday = (
+  value: string | number | Date | null | undefined
+): boolean => {
+  const date = parseFlexibleDate(value);
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime() === today.getTime();
+};
+
 export const daysUntilDate = (
   value: string | number | Date | null | undefined
 ): number | null => {
@@ -178,7 +166,7 @@ export const roundGiaBanValue = (value: number | string): number => {
 // Currency helpers
 export const formatCurrency = (value: number | string): string => {
   const rounded = roundGiaBanValue(value);
-  return rounded.toLocaleString("vi-VN") + " ₫";
+  return `${rounded.toLocaleString("vi-VN")} ₫`;
 };
 
 export const formatCurrencyPlain = (value: number): string => {
@@ -200,25 +188,59 @@ export const formatCurrencyShort = (value: number): string => {
   return `₫${Math.round(value).toLocaleString("vi-VN")}`;
 };
 
+export type SupplyLike = Partial<{
+  [SUPPLY_COLS.id]: number;
+  [SUPPLY_COLS.sourceName]: string;
+  name: string;
+}>;
+
+export type SupplyPriceLike = Partial<{
+  [SUPPLY_PRICE_COLS.sourceId]: number;
+  [SUPPLY_PRICE_COLS.price]: number;
+  [SUPPLY_COLS.sourceName]: string;
+}>;
+
+/**
+ * Find import price (gia nhap) for a given supply name using the supplied price list.
+ * Looks up by supply id first (via supplies list), then falls back to name matching.
+ */
+export const getImportPriceBySupplyName = (
+  supplyName: string,
+  supplyPrices: SupplyPriceLike[],
+  supplies: SupplyLike[] = []
+): number | undefined => {
+  const normalizedName = (supplyName || "").trim().toLowerCase();
+  if (!normalizedName) return undefined;
+
+  const supplyId =
+    supplies.find(
+      (s) =>
+        (s[SUPPLY_COLS.sourceName] || s.name || "")
+          .trim()
+          .toLowerCase() === normalizedName
+    )?.[SUPPLY_COLS.id] ?? null;
+
+  if (supplyId !== null) {
+    const priceById = supplyPrices.find(
+      (p) => p[SUPPLY_PRICE_COLS.sourceId] === supplyId
+    );
+    const priceValue = priceById?.[SUPPLY_PRICE_COLS.price];
+    if (Number.isFinite(priceValue)) {
+      return Number(priceValue);
+    }
+  }
+
+  const priceByName = supplyPrices.find(
+    (p) =>
+      (p[SUPPLY_COLS.sourceName] || "").trim().toLowerCase() === normalizedName
+  );
+  const priceValue = priceByName?.[SUPPLY_PRICE_COLS.price];
+  return Number.isFinite(priceValue) ? Number(priceValue) : undefined;
+};
+
 // Misc helpers
 export const generateRandomId = (length: number): string => {
   return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
-};
-
-export const isRegisteredToday = (dateString: string): boolean => {
-  if (!dateString) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let registerDate: Date;
-  if (dateString.includes("-")) {
-    registerDate = new Date(dateString);
-  } else {
-    const [day, month, year] = dateString.split("/").map(Number);
-    if (!day || !month || !year) return false;
-    registerDate = new Date(year, month - 1, day);
-  }
-  registerDate.setHours(0, 0, 0, 0);
-  return registerDate.getTime() === today.getTime();
 };
 
 const normalizeStatus = (status: string): string => {
@@ -233,15 +255,16 @@ const normalizeStatus = (status: string): string => {
 export const getStatusColor = (status: string): string => {
   const normalized = normalizeStatus(status);
   switch (normalized) {
-    case "đa thanh toan":
-      return "bg-green-100 text-green-800";
+    case "da thanh toan":
+      return "bg-green-600 text-white";
     case "chua thanh toan":
+      return "bg-yellow-500 text-slate-900";
     case "can gia han":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-orange-500 text-white";
     case "het han":
-      return "bg-red-100 text-red-800";
+      return "bg-red-600 text-white";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-slate-600 text-white";
   }
 };
 
@@ -313,3 +336,4 @@ export const readJsonOrText = async <T = unknown>(
 
 
 
+import { SUPPLY_COLS, SUPPLY_PRICE_COLS } from "./tableSql";

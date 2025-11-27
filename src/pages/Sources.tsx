@@ -20,6 +20,7 @@ import {
 import GlassPanel from "../components/GlassPanel";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
+import { SUPPLY_COLS, BANK_LIST_COLS } from "../lib/tableSql";
 import { apiFetch } from "../lib/api";
 import { deleteSupplyById } from "../lib/suppliesApi";
 import * as Helpers from "../lib/helpers";
@@ -104,7 +105,8 @@ const resolveStatusBoolean = (value?: string | boolean | null): boolean => {
   return normalizeStatusValue(value) !== "inactive";
 };
 
-const DEFAULT_DELETE_ERROR = "Có lỗi xảy ra khi xóa nguồn. Vui lòng thử lại sau.";
+const DEFAULT_DELETE_ERROR =
+  "Có lỗi xảy ra khi xóa nguồn, Vui lòng thử lại sau.";
 const formatDeleteErrorMessage = (raw?: string | null): string =>
   normalizeErrorMessage(raw, {
     fallback: DEFAULT_DELETE_ERROR,
@@ -380,28 +382,46 @@ export default function Sources() {
       setError(null);
       const response = await apiFetch("/api/supply-insights");
       if (!response.ok) {
-        throw new Error("Không thể tải dữ liệu nguồn");
+        throw new Error("Không thể tải dữ liệu nhà cung cấp");
       }
       const data: SupplySummaryResponse = await response.json();
       const normalizedSupplies: SupplySummaryItem[] = Array.isArray(
         data.supplies
       )
         ? data.supplies.map((item) => {
+            const sourceName =
+              item.sourceName ?? item[SUPPLY_COLS.sourceName] ?? "";
+            const numberBank =
+              item.numberBank ?? item[SUPPLY_COLS.numberBank] ?? null;
+            const binBank = item.binBank ?? item[SUPPLY_COLS.binBank] ?? null;
+            const bankName =
+              item.bankName ?? item[BANK_LIST_COLS.bankName] ?? null;
+            const rawStatus = item.rawStatus ?? item.status ?? null;
             const activeFlag =
               typeof item.isActive === "boolean"
                 ? item.isActive
-                : normalizeStatusValue(item.status) !== "inactive";
+                : normalizeStatusValue(rawStatus) !== "inactive";
             return {
               ...item,
+              sourceName,
+              numberBank,
+              binBank,
+              bankName,
+              rawStatus,
               isActive: activeFlag,
               status: activeFlag ? "active" : "inactive",
               products: normalizeProducts(item.products),
-              monthlyOrders: Number(item.monthlyOrders) || 0,
-              monthlyImportValue: Number(item.monthlyImportValue) || 0,
-              totalOrders: Number(item.totalOrders) || 0,
-              totalPaidImport: Number(item.totalPaidImport) || 0,
-              totalUnpaidImport: Number(item.totalUnpaidImport) || 0,
-            };
+              monthlyOrders:
+                Number(item.monthlyOrders ?? item.monthly_orders) || 0,
+              monthlyImportValue:
+                Number(item.monthlyImportValue ?? item.monthly_import_value) ||
+                0,
+              totalOrders: Number(item.totalOrders ?? item.total_orders) || 0,
+              totalPaidImport:
+                Number(item.totalPaidImport ?? item.total_paid_import) || 0,
+              totalUnpaidImport:
+                Number(item.totalUnpaidImport ?? item.total_unpaid_import) || 0,
+            } as SupplySummaryItem;
           })
         : [];
       setSupplies(normalizedSupplies);
@@ -461,7 +481,10 @@ export default function Sources() {
         `/api/supplies/${supplyId}/payments?${params.toString()}`
       );
       if (!response.ok) {
-        throw new Error("Không thể tải lịch sử thanh toán.");
+        const errorData = await response.json().catch(() => null);
+        const message =
+          (errorData as any)?.error || "Không thể tải lịch sử thanh toán.";
+        throw new Error(message);
       }
       return response.json();
     },
@@ -536,7 +559,6 @@ export default function Sources() {
             hasMore: Boolean(data.hasMore),
             loading: false,
             error: null,
-            initialized: true,
           };
         });
       } catch (err) {
@@ -553,7 +575,6 @@ export default function Sources() {
     },
     [fetchPayments, paymentHistory, updatePaymentState]
   );
-
   useEffect(() => {
     if (expandedSupplyId === null) return;
     if (!paymentHistory[expandedSupplyId]) {
@@ -593,7 +614,7 @@ export default function Sources() {
         round: prev[supplyId]?.round || "",
         totalImport: prev[supplyId]?.totalImport || "",
         paid: prev[supplyId]?.paid || "",
-        status: prev[supplyId]?.status || "Chưa trả",
+        status: prev[supplyId]?.status || "Chưa Thanh Toán",
         isEditing: true,
       },
     }));
@@ -606,7 +627,7 @@ export default function Sources() {
         round: "",
         totalImport: "",
         paid: "",
-        status: "Chưa trả",
+        status: "Chưa Thanh Toán",
         isEditing: false,
       },
     }));
@@ -624,7 +645,7 @@ export default function Sources() {
           round: prev[supplyId]?.round || "",
           totalImport: prev[supplyId]?.totalImport || "",
           paid: prev[supplyId]?.paid || "",
-          status: prev[supplyId]?.status || "Chưa trả",
+          status: prev[supplyId]?.status || "Chưa Thanh Toán",
           isEditing: true,
           [field]: value,
         },
@@ -634,11 +655,7 @@ export default function Sources() {
   );
 
   const handleMoneyDraftChange = useCallback(
-    (
-      supplyId: number,
-      field: "totalImport" | "paid",
-      rawValue: string
-    ) => {
+    (supplyId: number, field: "totalImport" | "paid", rawValue: string) => {
       const formatted = formatMoneyInput(rawValue);
       const rawDigits = formatted.replace(/[^\d]/g, "");
       handlePaymentDraftChange(supplyId, field, rawDigits);
@@ -657,10 +674,10 @@ export default function Sources() {
       const parsedPaid = Number((draft.paid || "").replace(/[^\d.-]/g, ""));
 
       const payload = {
-        round: draft.round.trim() || "Chu kỳ mới",
+        round: draft.round.trim() || "Chu Kỳ Mới",
         totalImport: Number.isFinite(parsedTotal) ? parsedTotal : 0,
         paid: Number.isFinite(parsedPaid) ? parsedPaid : 0,
-        status: draft.status.trim() || "Chưa trả",
+        status: draft.status.trim() || "Chưa Thanh Toán",
       };
 
       setPaymentSubmittingMap((prev) => ({ ...prev, [supplyId]: true }));
@@ -673,8 +690,10 @@ export default function Sources() {
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text || "Không thể thêm chu kỳ thanh toán.");
+          const errorText = await response.text().catch(() => "");
+          throw new Error(
+            errorText?.trim() || "Không thể tải lịch sử thanh toán."
+          );
         }
         const data = await response.json();
         const newPayment: SupplyPayment = {
@@ -706,7 +725,7 @@ export default function Sources() {
             round: "",
             totalImport: "",
             paid: "",
-            status: "Chưa trả",
+            status: "Chưa Thanh Toán",
             isEditing: false,
           },
         }));
@@ -717,7 +736,7 @@ export default function Sources() {
           error:
             error instanceof Error
               ? error.message
-              : "Không thể thêm chu kỳ thanh toán.",
+              : "Không thể tải lịch sử thanh toán.",
         }));
       } finally {
         setPaymentSubmittingMap((prev) => {
@@ -886,20 +905,17 @@ export default function Sources() {
       confirmError: null,
       confirming: true,
     }));
+    const confirmFallbackMessage = "Không thể tải lịch sử thanh toán.";
     try {
-      const currentId = viewModalState.supplyId;
-      if (
-        !currentId ||
-        !viewModalState.data ||
-        !viewModalState.selectedPaymentId
-      ) {
-        throw new Error("Không tìm thấy chu kỳ thanh toán");
+      const { supplyId, data, selectedPaymentId } = viewModalState;
+      if (!supplyId || !data || !selectedPaymentId) {
+        throw new Error(confirmFallbackMessage);
       }
-      const payment = viewModalState.data.unpaidPayments.find(
-        (item) => item.id === viewModalState.selectedPaymentId
+      const payment = data.unpaidPayments.find(
+        (item) => item.id === selectedPaymentId
       );
       if (!payment) {
-        throw new Error("Không tìm thấy chu kỳ thanh toán");
+        throw new Error(confirmFallbackMessage);
       }
       const response = await apiFetch(
         `/api/payment-supply/${payment.id}/confirm`,
@@ -911,9 +927,9 @@ export default function Sources() {
       );
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || "Không thể xác nhận đã trả.");
+        throw new Error(errorText || "Không thể xác nhận đã thanh toán");
       }
-      await fetchSupplyOverview(currentId);
+      await fetchSupplyOverview(supplyId);
       await fetchSupplySummary();
     } catch (error) {
       console.error(error);
@@ -922,7 +938,7 @@ export default function Sources() {
         confirmError:
           error instanceof Error
             ? error.message
-            : "Không thể xác nhận đã trả.",
+            : "Không thể xác nhận đã thanh toán",
       }));
     } finally {
       setViewModalState((prev) => ({
@@ -1020,9 +1036,7 @@ export default function Sources() {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(
-            errorText || "Không thể cập nhật trạng thái nhà cung cấp."
-          );
+          throw new Error(errorText || "Không thể cập nhật trạng thái");
         }
 
         const payload: { isActive?: boolean } = await response.json();
@@ -1040,14 +1054,13 @@ export default function Sources() {
           )
         );
       } catch (error) {
-        console.error("Unable to toggle supplier status:", error);
+        console.error("Không thể thay đổi trạng thái:", error);
 
         alert(
           error instanceof Error
             ? error.message
-            : "Không thể cập nhật trạng thái nhà cung cấp."
+            : "Không thể cập nhật trạng thái"
         );
-
         setSupplies((prev) =>
           prev.map((row) =>
             row.id === supply.id
@@ -1100,7 +1113,7 @@ export default function Sources() {
       );
       closeDeleteConfirm();
     } catch (error) {
-      console.error("Không thể xóa nhà cung cấp:", error);
+      console.error("Không thể xóa:", error);
       setDeleteConfirmState((prev) => ({
         ...prev,
         loading: false,
@@ -1127,7 +1140,7 @@ export default function Sources() {
             colSpan={4}
             className="px-6 py-4 text-sm text-white/80 text-center"
           >
-            Đang tải dữ liệu thanh toán...
+            Đang tải lịch sử thanh toán...
           </td>
         </tr>
       );
@@ -1140,14 +1153,16 @@ export default function Sources() {
             colSpan={3}
             className="px-6 py-4 text-sm text-white/80 text-center"
           >
-            Chưa có dữ liệu chu kỳ thanh toán.
+            Chưa có lịch sử thanh toán.
           </td>
           <td className="px-4 py-4 text-center">
             <button
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-white/40 text-white/80 hover:border-blue-400 hover:text-blue-200 transition"
               title="Thêm chu kỳ thanh toán"
-              onClick={() => supplyId !== undefined && startAddPaymentCycle(supplyId)}
+              onClick={() =>
+                supplyId !== undefined && startAddPaymentCycle(supplyId)
+              }
             >
               <PlusIcon className="h-5 w-5" />
             </button>
@@ -1161,10 +1176,7 @@ export default function Sources() {
     }
 
     return rows.map((row) => (
-      <tr
-        key={row.id}
-        className="border-t border-white/10 text-sm text-white"
-      >
+      <tr key={row.id} className="border-t border-white/10 text-sm text-white">
         <td className="px-4 py-4 font-medium text-white text-left sm:text-center">
           {row.round || "--"}
         </td>
@@ -1179,10 +1191,7 @@ export default function Sources() {
     ));
   };
 
-  const renderAddPaymentRow = (
-    supplyId: number,
-    draft?: PaymentDraftState
-  ) => {
+  const renderAddPaymentRow = (supplyId: number, draft?: PaymentDraftState) => {
     if (!draft || !draft.isEditing) return null;
     const isSubmitting = paymentSubmittingMap[supplyId] === true;
     return (
@@ -1191,7 +1200,7 @@ export default function Sources() {
           <input
             type="text"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="VD: Chu kỳ 1"
+            placeholder="VD: Chu Kỳ 1"
             value={draft.round}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1204,7 +1213,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            Tổng tiền nhập
+            placeholder="Tổng Tiền Nhập"
             value={formatMoneyInput(draft.totalImport)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1221,7 +1230,7 @@ export default function Sources() {
             type="text"
             inputMode="numeric"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-            placeholder="Đã trả"
+            placeholder="Đã Thanh Toán"
             value={formatMoneyInput(draft.paid)}
             disabled={isSubmitting}
             onChange={(event) =>
@@ -1239,15 +1248,15 @@ export default function Sources() {
                 handlePaymentDraftChange(supplyId, "status", event.target.value)
               }
             >
-              <option value="Chưa trả">Chưa trả</option>
-              <option value="Đã trả">Đã trả</option>
+              <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
+              <option value="Đã Thanh Toán">Đã Thanh Toán</option>
               <option value="Cần Gia Hạn">Cần Gia Hạn</option>
             </select>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-emerald-500 text-white shadow hover:bg-emerald-600 transition"
-                title="Xác nhận thêm chu kỳ"
+                title="Xác Nhận"
                 disabled={isSubmitting}
                 onClick={() => confirmAddPaymentCycle(supplyId)}
               >
@@ -1256,7 +1265,7 @@ export default function Sources() {
               <button
                 type="button"
                 className="h-9 w-9 rounded-full bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition"
-                title="Hủy thêm chu kỳ"
+                title="Hủy"
                 disabled={isSubmitting}
                 onClick={() => cancelAddPaymentCycle(supplyId)}
               >
@@ -1335,7 +1344,7 @@ export default function Sources() {
               Lịch sử thanh toán
             </p>
             <p className="text-xs text-white/80">
-              Theo dõi chu kỳ thanh toán của nhà cung cấp.
+              Theo dõi các chu kỳ thanh toán của nhà cung cấp
             </p>
           </div>
         </div>
@@ -1352,12 +1361,10 @@ export default function Sources() {
             <table className="w-full">
               <thead className="bg-white/5 text-[11px] uppercase text-white/80 tracking-wide">
                 <tr>
-                  <th className="px-6 py-3 text-left sm:text-center">Chu kỳ</th>
-                  <th className="px-6 py-3 text-center">
-                    Tổng tiền nhập
-                  </th>
-                  <th className="px-6 py-3 text-center">Đã trả</th>
-                  <th className="px-6 py-3 text-center">Tình Trạng</th>
+                  <th className="px-6 py-3 text-left sm:text-center">Chu Kỳ</th>
+                  <th className="px-6 py-3 text-center">Tổng Tiền Nhập</th>
+                  <th className="px-6 py-3 text-center">Đã Thanh Toán</th>
+                  <th className="px-6 py-3 text-center">Trạng Thái</th>
                 </tr>
               </thead>
               <tbody>
@@ -1373,15 +1380,6 @@ export default function Sources() {
           </div>
         </div>
 
-        {/* {state &&
-          state.initialized &&
-          !currentRows.length &&
-          !state.loading &&
-          !state.error && (
-            <div className="text-center text-xs text-white/80">
-              Chưa có chu kỳ thanh toán nào.
-            </div>
-          )} */}
         {renderPaginationControls()}
       </div>
     );
@@ -1423,10 +1421,10 @@ export default function Sources() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Chỉnh sửa nhà cung cấp
+                Chỉnh Sửa Nhà Cung Cấp
               </p>
               <p className="text-xs text-white/80">
-                Cập nhật thông tin thanh toán và trạng thái nhà cung cấp.
+                Cập nhật tên, tài khoản và ngân hàng
               </p>
             </div>
             <button
@@ -1450,14 +1448,14 @@ export default function Sources() {
                   handleEditInputChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập tên nguồn"
+                placeholder="Nhập Tên Nguồn"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Thanh Toán
+                Số Tài Khoản
               </label>
               <input
                 type="text"
@@ -1466,14 +1464,14 @@ export default function Sources() {
                   handleEditInputChange("paymentInfo", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Thông tin thanh toán"
+                placeholder="Nhập Số Tài Khoản"
               />
               {(currentSupply?.bankName ||
                 (currentSupply?.binBank
                   ? bankNameByBin.get(currentSupply.binBank.trim())
                   : null)) && (
                 <p className="mt-1 text-xs text-white/80">
-                  Ngân hàng hiện tại:{" "}
+                  Ngân Hàng:{" "}
                   {currentSupply?.bankName ||
                     (currentSupply?.binBank
                       ? bankNameByBin.get(currentSupply.binBank.trim())
@@ -1544,7 +1542,7 @@ export default function Sources() {
                 Xác Nhận Xóa
               </p>
               <p className="text-xs text-white/80">
-                Hành Động Này Sẽ Xóa Nguồn Khỏi Dữ Liệu.
+                Hành động này sẽ xóa nguồn khỏi dữ liệu.
               </p>
             </div>
             <button
@@ -1562,12 +1560,14 @@ export default function Sources() {
                 {supply.sourceName || "Nguồn Không Tên"}
               </p>
               <p className="text-xs text-white/80">
-                {supply.numberBank || "Chưa Có Thông Tin Thanh Toán"}
+                {supply.numberBank
+                  ? `Số Tài Khoản: ${supply.numberBank}`
+                  : "Chưa Có Thông Tin Thanh Toán"}
               </p>
             </div>
             <p>
-              Bạn Chắc Chắn Muốn Xóa Nguồn Này? Hành Động Không Thể Hoàn Tác Và
-              Những Danh Sách Liên Quan Cũng Sẽ Bị Cập Nhật.
+              Bạn chắc chắn muốn xóa nguồn này? Hành động không thể hoàn tác và
+              những danh sách liên quan cũng sẽ bị cập nhật.
             </p>
           </div>
           {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
@@ -1579,14 +1579,14 @@ export default function Sources() {
               disabled={loading}
             >
               Hủy
-            </button>
+            </button>{" "}
             <button
               type="button"
               className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-60"
               onClick={confirmDeleteSupply}
               disabled={loading}
             >
-              {loading ? "Đang Xóa..." : "Xóa Nguồn"}
+              {loading ? "Đang Xóa..." : "Xóa NCC"}
             </button>
           </div>
         </div>
@@ -1607,7 +1607,7 @@ export default function Sources() {
       supply?.bankName ||
       (supply?.binBank
         ? bankNameByBin.get(supply.binBank.trim()) || `BIN ${supply.binBank}`
-        : "Chưa có ngân hàng");
+        : "Chưa Có Ngân Hàng");
     const accountNumber = supply?.numberBank || "";
     const accountName = supply?.sourceName || "";
     const bankBin = supply?.binBank || "";
@@ -1643,7 +1643,7 @@ export default function Sources() {
         Icon: CalendarDaysIcon,
       },
       {
-        title: "Tổng tiền đã trả",
+        title: "Tổng tiền Thanh Toán",
         value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
         accent: "emerald" as const,
         Icon: CurrencyDollarIcon,
@@ -1656,7 +1656,7 @@ export default function Sources() {
           <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
             <div>
               <p className="text-lg font-semibold text-gray-900">
-                Thông Tin Nhà Cung Cấp
+                Thông tin NCC
               </p>
               {supply && (
                 <p className="text-xs text-white/80">
@@ -1676,7 +1676,7 @@ export default function Sources() {
           <div className="px-6 py-5 overflow-y-auto space-y-6">
             {viewModalState.loading && (
               <div className="text-center text-sm text-gray-500">
-                Đang Tải Thông Tin...
+                Đang tải thông tin...
               </div>
             )}
 
@@ -1692,7 +1692,7 @@ export default function Sources() {
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
                     <div className="flex-1 bg-white rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-2 border-gray-200 shadow-md">
                       <div>
-                        <p className="text-gray-500">Tên Nhà Cung Cấp</p>
+                        <p className="text-gray-500">Tên NCC</p>
                         <p className="text-lg font-semibold text-gray-900">
                           {supply.sourceName || "Chưa Đặt Tên"}
                         </p>
@@ -1764,17 +1764,17 @@ export default function Sources() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-white">
-                        Chu Kỳ Thanh Toán
+                        Chu kỳ chưa thanh toán
                       </p>
                       <p className="text-xs text-white/80">
-                        Chọn chu kỳ để hiện thông tin thanh toán và QR
+                        Chọn một chu kỳ để xem chi tiết và xác nhận
                       </p>
                     </div>
                   </div>
 
                   {unpaidPayments.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                      Tất cả chu kỳ đã được thanh toán
+                      Không có chu kỳ chưa thanh toán.
                     </div>
                   ) : (
                     <div className="grid lg:grid-cols-3 gap-6">
@@ -1793,7 +1793,7 @@ export default function Sources() {
                               {payment.round || "Chu kỳ không tên"}
                             </p>
                             <p className="text-xs text-white/80">
-                              Tiền nhập:{" "}
+                              Tiền Nhập:{" "}
                               {formatCurrencyVnd(payment.totalImport)}
                             </p>
                           </button>
@@ -1805,21 +1805,21 @@ export default function Sources() {
                           <div className="border border-gray-200 rounded-2xl p-6 space-y-4 bg-white shadow-sm">
                             <div>
                               <p className="text-sm text-gray-600">
-                                Thông Tin Chu Kỳ
+                                Thông tin chu kỳ
                               </p>
                               <p className="text-lg font-semibold text-gray-900">
-                                {selectedPayment.round || "Chu Kỳ Không Tên"}
+                                {selectedPayment.round || "Chu kỳ không tên"}
                               </p>
                             </div>
                             {qrImageUrl ? (
                               <div className="flex flex-col items-center space-y-3">
                                 <img
                                   src={qrImageUrl}
-                                  alt="QR Thanh Toán"
+                                  alt="Mã QR Thanh Toán"
                                   className="w-60 h-auto"
                                 />
                                 <p className="text-xs text-white/80">
-                                  Quét Mã QR Để Thanh Toán
+                                  Quét mã QR để thanh toán
                                 </p>
                               </div>
                             ) : (
@@ -1836,7 +1836,7 @@ export default function Sources() {
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Số tài khoản</p>
+                                <p className="text-gray-500">Số Tài Khoản</p>
 
                                 <p className="font-semibold text-gray-900">
                                   {accountNumber || "Chưa Cung Cấp"}
@@ -1850,11 +1850,11 @@ export default function Sources() {
                                   {accountName}
                                 </p>
                                 <p className="text-xs text-white/80">
-                                  Nội dung: {qrMessage}
+                                  Nội Dung: {qrMessage}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Tiền cần trả</p>
+                                <p className="text-gray-500">Tổng Thanh Toán</p>
                                 <p className="font-semibold text-red-600">
                                   {formatCurrencyVnd(qrAmount)}
                                 </p>
@@ -1872,14 +1872,14 @@ export default function Sources() {
                                 disabled={viewModalState.confirming}
                               >
                                 {viewModalState.confirming
-                                  ? "Đang xác nhận..."
-                                  : "Xác nhận đã trả"}
+                                  ? "Đang Xác Nhận..."
+                                  : "Xác nhận Thanh Toán"}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <div className="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-sm text-gray-500">
-                            Chọn một chu kỳ để xem thông tin thanh toán
+                            Chọn một chu kỳ thanh toán để xem chi tiết.
                           </div>
                         )}
                       </div>
@@ -1907,12 +1907,8 @@ export default function Sources() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-lg font-semibold text-gray-900">
-                Thêm nhà cung cấp
-              </p>
-              <p className="text-xs text-white/80">
-                Nhập thông tin nhà cung cấp mới
-              </p>
+              <p className="text-lg font-semibold text-gray-900">Thêm NCC</p>
+              <p className="text-xs text-white/80">Nhập thông tin NCC mới</p>
             </div>
             <button
               type="button"
@@ -1926,7 +1922,7 @@ export default function Sources() {
           <form className="space-y-4" onSubmit={handleCreateSupplierSubmit}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tên nhà cung cấp
+                Tên NCC
               </label>
               <input
                 type="text"
@@ -1935,14 +1931,14 @@ export default function Sources() {
                   handleNewSupplierChange("sourceName", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập tên nhà cung cấp"
+                placeholder="Nhập Tên NCC"
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Số tài khoản
+                Số Tài Khoản
               </label>
               <input
                 type="text"
@@ -1951,7 +1947,7 @@ export default function Sources() {
                   handleNewSupplierChange("numberBank", event.target.value)
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Nhập số tài khoản"
+                placeholder="Nhập Số Tài Khoản"
               />
             </div>
 
@@ -1967,7 +1963,7 @@ export default function Sources() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="" disabled>
-                  Chọn Ngân hàng
+                  Chọn Ngân Hàng
                 </option>
                 {bankOptions.map((bank) => {
                   const label = bank.name || `BIN ${bank.bin}`;
@@ -2017,7 +2013,7 @@ export default function Sources() {
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70"
                 disabled={isCreatingSupplier}
               >
-                {isCreatingSupplier ? "Đang Lưu..." : "Thêm Nhà Cung Cấp"}
+                {isCreatingSupplier ? "Đang Lưu..." : "Thêm NCC"}
               </button>
             </div>
           </form>
@@ -2038,10 +2034,16 @@ export default function Sources() {
           throw new Error("Không thể tải danh sách ngân hàng");
         }
         const data: BankOption[] = await response.json();
-        setBankOptions(data);
+        const normalized = Array.isArray(data)
+          ? data.map((row) => ({
+              bin: row.bin ?? (row as any)?.[BANK_LIST_COLS.bin] ?? "",
+              name: row.name ?? (row as any)?.[BANK_LIST_COLS.bankName] ?? "",
+            }))
+          : [];
+        setBankOptions(normalized);
         setNewSupplierForm((prev) => ({
           ...prev,
-          bankBin: prev.bankBin || data[0]?.bin || "",
+          bankBin: prev.bankBin || normalized[0]?.bin || "",
         }));
       } catch (error) {
         console.error(error);
@@ -2073,620 +2075,334 @@ export default function Sources() {
     return filtered.sort(compareSuppliersByPriority);
   }, [supplies, searchTerm, statusFilter]);
 
-      const supplierStats = useMemo(
+  const supplierStats = useMemo(
+    () => [
+      {
+        name: "Tổng",
 
-        () => [
+        value: stats.totalSuppliers.toString(),
 
-          {
+        accent: STAT_CARD_ACCENTS.sky,
 
-            name: "Tổng",
+        Icon: UserGroupIcon,
+      },
 
-            value: stats.totalSuppliers.toString(),
+      {
+        name: "Hành Động",
 
-            accent: STAT_CARD_ACCENTS.sky,
+        value: stats.activeSuppliers.toString(),
 
-            Icon: UserGroupIcon,
+        accent: STAT_CARD_ACCENTS.emerald,
 
-          },
+        Icon: CheckCircleIcon,
+      },
 
-          {
+      {
+        name: "Tổng Đơn",
 
-            name: "H.động",
+        value: stats.monthlyOrders.toString(),
 
-            value: stats.activeSuppliers.toString(),
+        accent: STAT_CARD_ACCENTS.violet,
 
-            accent: STAT_CARD_ACCENTS.emerald,
+        Icon: ShoppingBagIcon,
+      },
 
-            Icon: CheckCircleIcon,
+      {
+        name: "Tổng Thanh Toán",
 
-          },
+        value: formatCurrencyShort(stats.totalImportValue),
 
-          {
+        accent: STAT_CARD_ACCENTS.amber,
 
-            name: "Đơn",
+        Icon: CurrencyDollarIcon,
+      },
+    ],
 
-            value: stats.monthlyOrders.toString(),
+    [stats]
+  );
 
-            accent: STAT_CARD_ACCENTS.violet,
+  return (
+    <React.Fragment>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              Bảng Thông Tin Nguồn
+            </h1>
 
-            Icon: ShoppingBagIcon,
-
-          },
-
-          {
-
-            name: "Nhập",
-
-            value: formatCurrencyShort(stats.totalImportValue),
-
-            accent: STAT_CARD_ACCENTS.amber,
-
-            Icon: CurrencyDollarIcon,
-
-          },
-
-        ],
-
-        [stats]
-
-      );
-
-    
-
-      return (
-
-        <React.Fragment>
-
-          <div className="space-y-6">
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-
-              <div>
-
-                <h1 className="text-2xl font-bold text-white">
-
-                  Bảng Thông Tin Nguồn
-
-                </h1>
-
-                <p className="mt-1 text-sm text-white/80">
-
-                  Quản lý thông tin nhà cung cấp và đối tác
-
-                </p>
-
-              </div>
-
-              <div className="mt-4 sm:mt-0">
-
-                <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
-
-                  Thêm Nhà Cung Cấp
-
-                </GradientButton>
-
-              </div>
-
-            </div>
-
-    
-
-            <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-                {supplierStats.map((stat) => (
-
-                  <StatCard
-
-                    key={stat.name}
-
-                    title={stat.name}
-
-                    value={stat.value}
-
-                    icon={stat.Icon}
-
-                    accent={stat.accent}
-
-                  />
-
-                ))}
-
-              </div>
-
-            </div>
-
-    
-
-            <GlassPanel className="p-6 space-y-4" glow="neutral">
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                <div className="relative">
-
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-
-                  <input
-
-                    type="text"
-
-                    placeholder="Tìm kiếm nhà cung cấp..."
-
-                    className={`${GLASS_FIELD_CLASS} pl-10`}
-
-                    value={searchTerm}
-
-                    onChange={(event) => setSearchTerm(event.target.value)}
-
-                  />
-
-                </div>
-
-    
-
-                <select
-
-                  className={GLASS_FIELD_CLASS}
-
-                  value={statusFilter}
-
-                  onChange={(event) => setStatusFilter(event.target.value)}
-
-                >
-
-                  <option value="all">Tất cả trạng thái</option>
-
-                  <option value="active">Đang Hoạt Động</option>
-
-                  <option value="inactive">Tạm Ngưng</option>
-
-                </select>
-
-    
-
-                <GradientButton className="w-full justify-center" type="button">
-
-                  Xuất Danh Sách
-
-                </GradientButton>
-
-              </div>
-
-    
-
-              {error && <div className="text-sm text-red-600">{error}</div>}
-
-            </GlassPanel>
-
-    
-
-            <div className="bg-white/10 border border-white/10 rounded-xl shadow-lg overflow-hidden max-w-6xl mx-auto backdrop-blur">
-
-              <div className="overflow-x-auto">
-
-                <table className="min-w-full divide-y divide-white/10 text-white">
-
-                                <thead className="bg-white/5">
-
-                                  <tr>
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                                      Nhà Cung Cấp
-
-                                    </th>
-
-                  
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                                      Tài khoản
-
-                                    </th>
-
-                  
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                                      Đơn tháng
-
-                                    </th>
-
-                  
-
-                                                      <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                  
-
-                                                        Đơn hàng cuối
-
-                  
-
-                                                      </th>
-
-                  
-
-                                    
-
-                  
-
-                                                      <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                  
-
-                                                        Đã trả
-
-                  
-
-                                                      </th>
-
-                  
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                                      Còn nợ
-
-                                    </th>
-
-                  
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap ">
-
-                                      
-
-                                    </th>
-
-                  
-
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
-
-                                      Thao tác
-
-                                    </th>
-
-                                  </tr>
-
-                                </thead>
-
-                <tbody className="bg-white/5 divide-y divide-white/10">
-
-                  {loading && (
-
-                    <tr>
-
-                      <td
-
-                        colSpan={8}
-
-                        className="px-6 py-4 text-center text-sm text-white/80"
-
-                      >
-
-                        Đang Tải Dữ Liệu
-
-                      </td>
-
-                    </tr>
-
-                  )}
-
-  
-
-                  {!loading &&
-
-                    filteredSupplies.map((supply) => {
-
-                      const isExpanded = expandedSupplyId === supply.id;
-
-                      return (
-
-                        <React.Fragment key={supply.id}>
-
-                                                  <tr
-
-                                                    className="bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70 cursor-pointer transition"
-
-                                                    onClick={() => toggleSlotDetails(supply.id)}
-
-                                                  >
-
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-
-                                                      <div className="text-sm font-medium text-white">
-
-                                                        {supply.sourceName || "Chưa Đặt Tên"}
-
-                                                      </div>
-
-                                                      <div className="text-xs text-white/70">
-
-                                                        Tổng đơn: {supply.totalOrders}
-
-                                                      </div>
-
-                                                    </td>
-
-                          
-
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-
-                                                      <div className="text-sm text-white">
-
-                                                        {supply.numberBank || "Chưa có TK"}
-
-                                                      </div>
-
-                                                      <div className="text-xs text-white/70">
-
-                                                        {supply.bankName ||
-
-                                                          (supply.binBank
-
-                                                            ? bankNameByBin.get(supply.binBank.trim()) ||
-
-                                                              `BIN ${supply.binBank}`
-
-                                                            : "Chưa có NH")}
-
-                                                      </div>
-
-                                                    </td>
-
-                          
-
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-
-                                                      <div className="text-sm text-white">
-
-                                                        {supply.monthlyOrders} đơn
-
-                                                      </div>
-
-                              <div className="text-xs text-white/70">
-
-                                {formatCurrencyVnd(supply.monthlyImportValue)}
-
-                              </div>
-
-                            </td>
-
-  
-
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
-
-                              {getFormattedDate(supply.lastOrderDate)}
-
-                            </td>
-
-  
-
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
-
-                              {formatCurrencyVnd(supply.totalPaidImport)}
-
-                            </td>
-
-  
-
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
-
-                              {formatCurrencyVnd(supply.totalUnpaidImport)}
-
-                            </td>
-
-  
-
-                            <td className="px-4 py-4 whitespace-nowrap">
-
-                              <div className="flex justify-center">
-
-                                <button
-
-                                  type="button"
-
-                                  onClick={(event) => {
-
-                                    event.stopPropagation();
-
-  
-
-                                    handleToggleSupplyStatus(supply);
-
-                                  }}
-
-                                  className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
-
-                                    isSupplyActive(supply)
-
-                                      ? "border-emerald-200 bg-emerald-500 text-white"
-
-                                      : "border-gray-200 bg-gray-200 text-gray-500"
-
-                                  } ${
-
-                                    statusLoadingMap[supply.id]
-
-                                      ? "opacity-60 cursor-not-allowed"
-
-                                      : ""
-
-                                  }`}
-
-                                  aria-pressed={isSupplyActive(supply)}
-
-                                  disabled={Boolean(statusLoadingMap[supply.id])}
-
-                                  title={formatStatusLabel(
-
-                                    supply.isActive ?? supply.status
-
-                                  )}
-
-                                >
-
-                                  <PowerIcon className="h-4 w-4" />
-
-                                </button>
-
-                              </div>
-
-                            </td>
-
-  
-
-                            <td className="px-4 py-4 whitespace-nowrap">
-
-                              <div className="flex items-center justify-end gap-3 text-sm font-medium">
-
-                                <button
-
-                                  className="text-blue-600 hover:text-blue-900"
-
-                                  onClick={(event) => {
-
-                                    event.stopPropagation();
-
-  
-
-                                    openViewModal(supply.id);
-
-                                  }}
-
-                                  aria-label="Xem chi tiết"
-
-                                >
-
-                                  <EyeIcon className="h-5 w-5" />
-
-  
-
-                                  <span className="sr-only">Xem</span>
-
-                                </button>
-
-  
-
-                                <button
-
-                                  className="text-green-600 hover:text-green-900"
-
-                                  onClick={(event) => {
-
-                                    event.stopPropagation();
-
-  
-
-                                    openEditForm(supply);
-
-                                  }}
-
-                                  aria-label="Chỉnh sửa"
-
-                                >
-
-                                  <PencilSquareIcon className="h-5 w-5" />
-
-  
-
-                                  <span className="sr-only">Chỉnh Sửa</span>
-
-                                </button>
-
-  
-
-                                <button
-
-                                  className={`text-rose-500 hover:text-rose-700 ${
-
-                                    deleteLoadingId === supply.id
-
-                                      ? "opacity-60 cursor-not-allowed"
-
-                                      : ""
-
-                                  }`}
-
-                                  onClick={(event) => {
-
-                                    event.stopPropagation();
-
-  
-
-                                    handleDeleteSupply(supply);
-
-                                  }}
-
-                                  aria-label="Xóa nguồn"
-
-                                  disabled={deleteLoadingId === supply.id}
-
-                                >
-
-                                  <TrashIcon className="h-5 w-5" />
-
-  
-
-                                  <span className="sr-only">Xóa</span>
-
-                                </button>
-
-                              </div>
-
-                            </td>
-
-                          </tr>
-
-                          {isExpanded && (
-
-                            <tr>
-
-                              <td colSpan={8} className="px-4 pb-6">
-
-                                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
-
-                                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
-
-                                    {renderPaymentHistorySection(supply.id)}
-
-                                  </div>
-
-                                </div>
-
-                              </td>
-
-                            </tr>
-
-                          )}
-
-                        </React.Fragment>
-
-                      );
-
-                    })}
-
-                </tbody>
-
-              </table>
-
-            </div>
-
+            <p className="mt-1 text-sm text-white/80">
+              Quản lý thông tin nhà cung cấp
+            </p>
           </div>
 
+          <div className="mt-4 sm:mt-0">
+            <GradientButton icon={PlusIcon} onClick={openAddSupplierModal}>
+              Thêm NCC
+            </GradientButton>
+          </div>
         </div>
 
-        {renderViewSupplierModal()}
+        <div className="rounded-[28px] bg-gradient-to-br from-white/6 via-indigo-400/25 to-indigo-900/40 border border-white/10 p-5 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {supplierStats.map((stat) => (
+              <StatCard
+                key={stat.name}
+                title={stat.name}
+                value={stat.value}
+                icon={stat.Icon}
+                accent={stat.accent}
+              />
+            ))}
+          </div>
+        </div>
 
-        {renderAddSupplierModal()}
+        <GlassPanel className="p-6 space-y-4" glow="neutral">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 
-        {renderEditModal()}
+              <input
+                type="text"
+                placeholder="Tìm Kiếm Nhà Cung Cấp..."
+                className={`${GLASS_FIELD_CLASS} pl-10`}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
 
-        {renderDeleteConfirmModal()}
+            <select
+              className={GLASS_FIELD_CLASS}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="all">Trạng Thái</option>
 
-      </React.Fragment>
+              <option value="active">Đang Hoạt Động</option>
 
-    );
+              <option value="inactive">Tạm Dừng</option>
+            </select>
 
-  }
+            <GradientButton className="w-full justify-center" type="button">
+              Xuất Danh Sách
+            </GradientButton>
+          </div>
 
-  
+          {error && <div className="text-sm text-red-600">{error}</div>}
+        </GlassPanel>
+
+        <div className="bg-white/10 border border-white/10 rounded-xl shadow-lg overflow-hidden max-w-6xl mx-auto backdrop-blur">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10 text-white">
+              <thead className="bg-white/5">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Nhà Cung Cấp
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Tài Khoản
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Số đơn tháng
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Đơn hàng cuối
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Đã Thanh Toán
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Còn Nợ
+                  </th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap "></th>
+
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider whitespace-nowrap">
+                    Thao Tác
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="bg-white/5 divide-y divide-white/10">
+                {loading && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-6 py-4 text-center text-sm text-white/80"
+                    >
+                      Đang tải dữ liệu
+                    </td>
+                  </tr>
+                )}
+
+                {!loading &&
+                  filteredSupplies.map((supply) => {
+                    const isExpanded = expandedSupplyId === supply.id;
+
+                    return (
+                      <React.Fragment key={supply.id}>
+                        <tr
+                          className="bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70 cursor-pointer transition"
+                          onClick={() => toggleSlotDetails(supply.id)}
+                        >
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-white">
+                              {supply.sourceName || "ChÆ°a Ä‘áº·t tÃªn"}
+                            </div>
+
+                            <div className="text-xs text-white/70">
+                              Tổng đơn: {supply.totalOrders}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-white">
+                              {supply.numberBank || "ChÆ°a cÃ³ Tài Khoản"}
+                            </div>
+
+                            <div className="text-xs text-white/70">
+                              {supply.bankName ||
+                                (supply.binBank
+                                  ? bankNameByBin.get(supply.binBank.trim()) ||
+                                    `BIN ${supply.binBank}`
+                                  : "ChÆ°a cÃ³ Ngân Hàng")}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-white">
+                              {supply.monthlyOrders} Đơn
+                            </div>
+
+                            <div className="text-xs text-white/70">
+                              {formatCurrencyVnd(supply.monthlyImportValue)}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+                            {getFormattedDate(supply.lastOrderDate)}
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+                            {formatCurrencyVnd(supply.totalPaidImport)}
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-white/80">
+                            {formatCurrencyVnd(supply.totalUnpaidImport)}
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  handleToggleSupplyStatus(supply);
+                                }}
+                                className={`relative flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-inner transition ${
+                                  isSupplyActive(supply)
+                                    ? "border-emerald-200 bg-emerald-500 text-white"
+                                    : "border-gray-200 bg-gray-200 text-gray-500"
+                                } ${
+                                  statusLoadingMap[supply.id]
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
+                                aria-pressed={isSupplyActive(supply)}
+                                disabled={Boolean(statusLoadingMap[supply.id])}
+                                title={formatStatusLabel(
+                                  supply.isActive ?? supply.status
+                                )}
+                              >
+                                <PowerIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-3 text-sm font-medium">
+                              <button
+                                className="text-blue-600 hover:text-blue-900"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  openViewModal(supply.id);
+                                }}
+                                aria-label="Xem chi tiáº¿t"
+                              >
+                                <EyeIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Xem</span>
+                              </button>
+
+                              <button
+                                className="text-green-600 hover:text-green-900"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  openEditForm(supply);
+                                }}
+                                aria-label="Chỉnh Sửa"
+                              >
+                                <PencilSquareIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Chỉnh Sửa</span>
+                              </button>
+
+                              <button
+                                className={`text-rose-500 hover:text-rose-700 ${
+                                  deleteLoadingId === supply.id
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+
+                                  handleDeleteSupply(supply);
+                                }}
+                                aria-label="Xóa Nhà Cung Cấp"
+                                disabled={deleteLoadingId === supply.id}
+                              >
+                                <TrashIcon className="h-5 w-5" />
+
+                                <span className="sr-only">Xóa</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={8} className="px-4 pb-6">
+                              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4">
+                                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm px-6 py-5">
+                                  {renderPaymentHistorySection(supply.id)}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {renderViewSupplierModal()}
+
+      {renderAddSupplierModal()}
+
+      {renderEditModal()}
+
+      {renderDeleteConfirmModal()}
+    </React.Fragment>
+  );
+}

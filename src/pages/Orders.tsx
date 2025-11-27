@@ -31,6 +31,42 @@ const API_BASE =
   (process.env.VITE_API_BASE_URL as string) ||
   "http://localhost:3001";
 
+const STATUS_DISPLAY_LABELS: Record<string, string> = {
+  "h?t h?n": ORDER_STATUSES.ORDER_EXPIRED,
+  "c?n gia h?n": ORDER_STATUSES.CAN_GIA_HAN,
+  "chua thanh toan": ORDER_STATUSES.CHUA_THANH_TOAN,
+  "da thanh toan": ORDER_STATUSES.DA_THANH_TOAN,
+  "chua hoan": "Chưa Hoàn",
+  "da hoan": "Đã Hoàn",
+};
+
+const BASE_STOCK_STATS = [
+  {
+    name: "Tổng Đơn Hàng",
+    value: "0",
+    icon: CheckCircleIcon,
+    accent: STAT_CARD_ACCENTS.sky,
+  },
+  {
+    name: "Cần Gia Hạn",
+    value: "0",
+    icon: ExclamationTriangleIcon,
+    accent: STAT_CARD_ACCENTS.amber,
+  },
+  {
+    name: "Hết Hạn",
+    value: "0",
+    icon: ArrowDownIcon,
+    accent: STAT_CARD_ACCENTS.rose,
+  },
+  {
+    name: "Đăng Ký Hôm Nay",
+    value: "0",
+    icon: ArrowUpIcon,
+    accent: STAT_CARD_ACCENTS.emerald,
+  },
+] as const;
+
 // =======================================================
 // 1. INTERFACES VÀ CONSTANTS
 // =======================================================
@@ -44,65 +80,32 @@ import {
   ORDER_DATASET_CONFIG,
   ORDER_DATASET_SEQUENCE,
   OrderDatasetKey,
+  Order,
 } from "../constants";
-
-const isRegisteredToday = (dateString: string): boolean => {
-  if (!dateString) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let registerDate: Date;
-
-  if (dateString.includes("-")) {
-    registerDate = new Date(dateString);
-  } else {
-    const [day, month, year] = dateString.split("/").map(Number);
-    if (!day || !month || !year) return false;
-    registerDate = new Date(year, month - 1, day);
-  }
-
-  registerDate.setHours(0, 0, 0, 0);
-  return registerDate.getTime() === today.getTime();
-};
-
-const getStatusColor = (status: string) => {
-  const lowerStatus = (status || "").toLowerCase();
-  switch (lowerStatus) {
-    case "đã thanh toán":
-      return "bg-green-100 text-green-800";
-    case "chưa thanh toán":
-    case "cần gia hạn":
-      return "bg-yellow-100 text-yellow-800";
-    case "hết hạn":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
 
 const formatCurrency = (value: number | string) => {
   const roundedNum = Helpers.roundGiaBanValue(value);
   return roundedNum.toLocaleString("vi-VN") + " VND";
 };
 
+const SEARCH_FIELD_OPTIONS = [
+  { value: "all", label: "Tất cả cột" },
+  { value: ORDER_FIELDS.ID_ORDER, label: "Mã Đơn Hàng" },
+  { value: ORDER_FIELDS.INFORMATION_ORDER, label: "Thông tin" },
+  { value: ORDER_FIELDS.CUSTOMER, label: "Khách Hàng" },
+  { value: ORDER_FIELDS.SLOT, label: "Slot" },
+  { value: ORDER_FIELDS.SUPPLY, label: "Nguồn" },
+] as const;
+
 // =======================================================
 // 2. CUSTOM HOOK: useOrdersData
 // =======================================================
-
-const getStatusPriority = (status: string): number => {
-  const lowerStatus = status.toLowerCase();
-  if (lowerStatus === "hết hạn") return 1;
-  if (lowerStatus === "cần gia hạn") return 2;
-  if (lowerStatus === "chưa thanh toán") return 3;
-  if (lowerStatus === "đã thanh toán") return 4;
-  return 5;
-};
 
 const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -114,38 +117,6 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  const stockStats = [
-    {
-      name: "Tổng Đơn Hàng",
-      value: "0",
-      icon: CheckCircleIcon,
-      accent: STAT_CARD_ACCENTS.sky,
-    },
-    {
-      name: "Cần Gia Hạn",
-      value: "0",
-      icon: ExclamationTriangleIcon,
-      accent: STAT_CARD_ACCENTS.amber,
-    },
-    {
-      name: "Hết Hạn",
-      value: "0",
-      icon: ArrowDownIcon,
-      accent: STAT_CARD_ACCENTS.rose,
-    },
-    {
-      name: "Đăng Ký Hôm Nay",
-      value: "0",
-      icon: ArrowUpIcon,
-      accent: STAT_CARD_ACCENTS.emerald,
-    },
-  ];
-
-  const STATUS_DISPLAY_LABELS: Record<string, string> = {
-    "het han": ORDER_STATUSES.HET_HAN,
-    "can gia han": ORDER_STATUSES.CAN_GIA_HAN,
-  };
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
   const fetchOrders = useCallback(async () => {
@@ -200,38 +171,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     setOrderToDelete(null);
     setOrderToEdit(null);
   }, [dataset]);
-
   const calculatedData = useMemo(() => {
-    const stockStats = [
-      {
-        name: "Tổng Đơn Hàng",
-        value: "0",
-        icon: CheckCircleIcon,
-        accent: STAT_CARD_ACCENTS.sky,
-      },
-      {
-        name: "Cần Gia Hạn",
-        value: "0",
-        icon: ExclamationTriangleIcon,
-        accent: STAT_CARD_ACCENTS.amber,
-      },
-      {
-        name: "Hết Hạn",
-        value: "0",
-        icon: ArrowDownIcon,
-        accent: STAT_CARD_ACCENTS.rose,
-      },
-      {
-        name: "Đăng Ký Hôm Nay",
-        value: "0",
-        icon: ArrowUpIcon,
-        accent: STAT_CARD_ACCENTS.emerald,
-      },
-    ];
-    const STATUS_DISPLAY_LABELS: Record<string, string> = {
-      "het han": ORDER_STATUSES.HET_HAN,
-      "can gia han": ORDER_STATUSES.CAN_GIA_HAN,
-    };
     const resolveDateDisplay = (
       displayValue: unknown,
       fallbackValue: unknown
@@ -289,74 +229,11 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       return value;
     };
 
-    const getDayStartTimestamp = (value: unknown): number | null => {
-      if (value === null || value === undefined) return null;
-
-      if (value instanceof Date && !Number.isNaN(value.getTime())) {
-        const copy = new Date(
-          value.getFullYear(),
-          value.getMonth(),
-          value.getDate()
-        );
-        copy.setHours(0, 0, 0, 0);
-        return copy.getTime();
-      }
-
-      const raw = String(value).trim();
-      if (!raw) return null;
-
-      let year: number | undefined;
-      let month: number | undefined;
-      let day: number | undefined;
-
-      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        [year, month, day] = raw.split("-").map(Number);
-      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-        const [d, m, y] = raw.split("/").map(Number);
-        year = y;
-        month = m;
-        day = d;
-      } else if (/^\d{4}\/\d{2}\/\d{2}$/.test(raw)) {
-        [year, month, day] = raw.split("/").map(Number);
-      } else if (/^\d{2}-\d{2}-\d{4}$/.test(raw)) {
-        const [d, m, y] = raw.split("-").map(Number);
-        year = y;
-        month = m;
-        day = d;
-      }
-
-      if (
-        year === undefined ||
-        month === undefined ||
-        day === undefined ||
-        !Number.isFinite(year) ||
-        !Number.isFinite(month) ||
-        !Number.isFinite(day)
-      ) {
-        return null;
-      }
-
-      const result = new Date(year, month - 1, day);
-      result.setHours(0, 0, 0, 0);
-      return Number.isNaN(result.getTime()) ? null : result.getTime();
-    };
-
-    const registrationTimestampForOrder = (order: Order): number | null => {
-      const rawValue =
-        order.registration_date ||
-        (order as any).registration_date_display ||
-        order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY];
-      return getDayStartTimestamp(rawValue);
-    };
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayStartTimestamp = todayStart.getTime();
-
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
       const registrationSource =
-        order.registration_date ?? order[ORDER_FIELDS.NGAY_DANG_KI];
-      const expirySource = order.expiry_date ?? order[ORDER_FIELDS.HET_HAN];
+        order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE];
+      const expirySource =
+        order.expiry_date ?? order[ORDER_FIELDS.ORDER_EXPIRED];
 
       const formattedOrderDate = resolveDateDisplay(
         order.registration_date_display,
@@ -379,14 +256,14 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
           : fallbackRemaining ?? 0;
 
       const rawStatus =
-        (order[ORDER_FIELDS.TINH_TRANG] as string | null) || "Chưa Thanh Toán";
+        (order[ORDER_FIELDS.STATUS] as string | null) || "Chưa Thanh Toán";
       const trangThaiText = formatStatusDisplay(rawStatus.trim());
       const checkFlagStatus = normalizeCheckFlag(
         order[ORDER_FIELDS.CHECK_FLAG]
       );
 
-      const giaBan = Helpers.roundGiaBanValue(order[ORDER_FIELDS.GIA_BAN]);
-      const soNgayDangKy = Number(order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
+      const giaBan = Helpers.roundGiaBanValue(order[ORDER_FIELDS.PRICE]);
+      const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
       const daysForValue = Math.max(0, effectiveRemaining);
       const giaTriConLai =
         soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
@@ -405,19 +282,24 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     });
 
     const lowerSearchTerm = searchTerm.toLowerCase();
+    const searchableFields =
+      searchField === "all"
+        ? [
+            ORDER_FIELDS.CUSTOMER,
+            ORDER_FIELDS.ID_ORDER,
+            ORDER_FIELDS.INFORMATION_ORDER,
+            ORDER_FIELDS.SUPPLY,
+            ORDER_FIELDS.CONTACT,
+          ]
+        : [searchField];
     const normalizedStatusFilter =
       statusFilter === "all" ? "" : normalizeStatusValue(statusFilter);
     const filteredOrders = ordersWithVirtualFields.filter((order) => {
       const matchesSearch =
-        (order[ORDER_FIELDS.KHACH_HANG] || "")
-          .toLowerCase()
-          .includes(lowerSearchTerm) ||
-        (order[ORDER_FIELDS.ID_DON_HANG] || "")
-          .toLowerCase()
-          .includes(lowerSearchTerm) ||
-        (order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || "")
-          .toLowerCase()
-          .includes(lowerSearchTerm);
+        !lowerSearchTerm ||
+        searchableFields.some((field) =>
+          String(order[field] || "").toLowerCase().includes(lowerSearchTerm)
+        );
 
       const matchesStatus =
         statusFilter === "all" ||
@@ -446,8 +328,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         return remainingA - remainingB;
       }
 
-      const idA = a[ORDER_FIELDS.ID_DON_HANG] || "";
-      const idB = b[ORDER_FIELDS.ID_DON_HANG] || "";
+      const idA = a[ORDER_FIELDS.ID_ORDER] || "";
+      const idB = b[ORDER_FIELDS.ID_ORDER] || "";
 
       if (idA < idB) return -1;
       if (idA > idB) return 1;
@@ -465,36 +347,21 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
     ).length;
 
-    const maxHistoricalIdBeforeToday = ordersWithVirtualFields.reduce(
-      (maxId, order) => {
-        const registrationTs = registrationTimestampForOrder(order);
-        if (
-          registrationTs !== null &&
-          registrationTs < todayStartTimestamp &&
-          Number.isFinite(order.id)
-        ) {
-          return Math.max(maxId, Number(order.id) || 0);
-        }
-        return maxId;
-      },
-      0
-    );
-
     const registeredTodayCount = ordersWithVirtualFields.filter((order) => {
-      const registrationTs = registrationTimestampForOrder(order);
-      if (registrationTs === null) return false;
-      return (
-        registrationTs === todayStartTimestamp &&
-        Number(order.id) > maxHistoricalIdBeforeToday
-      );
+      const registrationSource =
+        order.registration_date ||
+        (order as any).registration_date_display ||
+        order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+        order[ORDER_FIELDS.ORDER_DATE];
+      return Helpers.isRegisteredToday(registrationSource);
     }).length;
 
     // Cập nhật mảng stats
     const updatedStats = [
-      { ...stockStats[0], value: String(totalOrders) },
-      { ...stockStats[1], value: String(needsRenewal) },
-      { ...stockStats[2], value: String(expiredOrders) },
-      { ...stockStats[3], value: String(registeredTodayCount) },
+      { ...BASE_STOCK_STATS[0], value: String(totalOrders) },
+      { ...BASE_STOCK_STATS[1], value: String(needsRenewal) },
+      { ...BASE_STOCK_STATS[2], value: String(expiredOrders) },
+      { ...BASE_STOCK_STATS[3], value: String(registeredTodayCount) },
     ];
 
     // Phân trang
@@ -510,11 +377,11 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       updatedStats,
       totalRecords: totalOrders,
     };
-  }, [orders, searchTerm, statusFilter, rowsPerPage, currentPage]);
+  }, [orders, searchTerm, searchField, statusFilter, rowsPerPage, currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, rowsPerPage]);
+  }, [searchTerm, searchField, statusFilter, rowsPerPage]);
 
   // --- HÀM XỬ LÝ MODAL VÀ CRUD (giữ nguyên) ---
 
@@ -605,21 +472,19 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   const handleSaveEdit = async (updatedOrder: Order) => {
     closeEditModal();
 
+    // Ngày đăng ký / hết hạn là trường khóa, không gửi lên để giữ nguyên giá trị
     const dbFields: Partial<Order> = {
-      [ORDER_FIELDS.ID_DON_HANG]: updatedOrder.id_don_hang,
-      [ORDER_FIELDS.SAN_PHAM]: updatedOrder.san_pham,
-      [ORDER_FIELDS.THONG_TIN_SAN_PHAM]: updatedOrder.thong_tin_san_pham,
-      [ORDER_FIELDS.KHACH_HANG]: updatedOrder.khach_hang,
-      [ORDER_FIELDS.LINK_LIEN_HE]: updatedOrder.link_lien_he,
+      [ORDER_FIELDS.ID_ORDER]: updatedOrder.id_order,
+      [ORDER_FIELDS.ID_PRODUCT]: updatedOrder.id_product,
+      [ORDER_FIELDS.INFORMATION_ORDER]: updatedOrder.information_order,
+      [ORDER_FIELDS.CUSTOMER]: updatedOrder.customer,
+      [ORDER_FIELDS.CONTACT]: updatedOrder.contact,
       [ORDER_FIELDS.SLOT]: updatedOrder.slot,
-      [ORDER_FIELDS.NGAY_DANG_KI]: updatedOrder.ngay_dang_ki,
-      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: updatedOrder.so_ngay_da_dang_ki,
-      [ORDER_FIELDS.HET_HAN]: updatedOrder.het_han,
-      [ORDER_FIELDS.NGUON]: updatedOrder.nguon,
-      [ORDER_FIELDS.GIA_NHAP]: updatedOrder.gia_nhap,
-      [ORDER_FIELDS.GIA_BAN]: updatedOrder.gia_ban,
+      [ORDER_FIELDS.SUPPLY]: updatedOrder.supply,
+      [ORDER_FIELDS.COST]: updatedOrder.cost,
+      [ORDER_FIELDS.PRICE]: updatedOrder.price,
       [ORDER_FIELDS.NOTE]: updatedOrder.note,
-      [ORDER_FIELDS.TINH_TRANG]: updatedOrder.tinh_trang,
+      [ORDER_FIELDS.STATUS]: updatedOrder.status,
       [ORDER_FIELDS.CHECK_FLAG]: updatedOrder.check_flag,
     };
 
@@ -694,6 +559,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     ...calculatedData,
     searchTerm,
     setSearchTerm,
+    searchField,
+    setSearchField,
     statusFilter,
     setStatusFilter,
     currentPage,
@@ -747,6 +614,8 @@ export default function Orders() {
     updatedStats,
     searchTerm,
     setSearchTerm,
+    searchField,
+    setSearchField,
     statusFilter,
     setStatusFilter,
     currentPage,
@@ -820,12 +689,10 @@ export default function Orders() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Quản Lý Đơn Hàng</h1>
-
           <p className="mt-1 text-sm text-gray-200">
             Quản lý và theo dõi tất cả các đơn hàng của khách hàng
           </p>
         </div>
-
         <div className="mt-4 sm:mt-0">
           {isActiveDataset && (
             <GradientButton icon={PlusIcon} onClick={openCreateModal}>
@@ -894,18 +761,32 @@ export default function Orders() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Search */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+          {/* Search + inline field selector */}
           <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Tìm kiếm đơn hàng, khách hàng..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-44 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <select
+                className="min-w-[140px] md:min-w-[180px] px-3 py-1.5 border border-gray-300 rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value)}
+              >
+                {SEARCH_FIELD_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
           {/* Status Filter */}
           <div className="relative">
             <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -922,7 +803,7 @@ export default function Orders() {
                 Chưa thanh toán
               </option>
               <option value={ORDER_STATUSES.CAN_GIA_HAN}>Cần gia hạn</option>
-              <option value={ORDER_STATUSES.HET_HAN}>Hết hạn</option>
+              <option value={ORDER_STATUSES.ORDER_EXPIRED}>Hết hạn</option>
             </select>
           </div>
           {/* Date Range removed as requested */}
@@ -938,7 +819,7 @@ export default function Orders() {
               <tr>
                 {/* 1. GỘP ORDER + PRODUCT */}
                 <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
-                  ĐƠN HÀNG/SẢN PHẨM
+                  ORDER/SẢN PHẨM
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[140px] whitespace-nowrap truncate">
                   THÔNG TIN ĐƠN HÀNG
@@ -1003,17 +884,21 @@ export default function Orders() {
                       <tr
                         onClick={() => handleToggleDetails(order.id)}
                         className={`cursor-pointer transition ${
-                          index % 2 === 0 ? "bg-slate-900/55" : "bg-indigo-950/40"
-                        } ${isExpanded ? "bg-indigo-700/25" : ""} hover:bg-indigo-600/25`}
+                          index % 2 === 0
+                            ? "bg-slate-900/55"
+                            : "bg-indigo-950/40"
+                        } ${
+                          isExpanded ? "bg-indigo-700/25" : ""
+                        } hover:bg-indigo-600/25`}
                       >
                         {/* 1. GỘP ORDER + PRODUCT */}
                         <td className="px-4 py-4 text-sm font-medium text-white w-[150px] text-center">
                           <div className="flex flex-col items-center">
                             <span className="font-bold whitespace-nowrap truncate max-w-[150px]">
-                              {order[ORDER_FIELDS.ID_DON_HANG] || ""}
+                              {order[ORDER_FIELDS.ID_ORDER] || ""}
                             </span>
                             <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
-                              {order[ORDER_FIELDS.SAN_PHAM] || ""}
+                              {order[ORDER_FIELDS.ID_PRODUCT] || ""}
                             </span>
                           </div>
                         </td>
@@ -1022,7 +907,7 @@ export default function Orders() {
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-white w-[140px] text-center">
                           <div className="flex flex-col items-center">
                             <span className="text-white/80 text-xs whitespace-nowrap truncate max-w-[150px]">
-                              {order[ORDER_FIELDS.THONG_TIN_SAN_PHAM] || ""}
+                              {order[ORDER_FIELDS.INFORMATION_ORDER] || ""}
                             </span>
                             {order[ORDER_FIELDS.SLOT] ? (
                               <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
@@ -1036,13 +921,13 @@ export default function Orders() {
                         <td className="px-4 py-4 text-sm text-white w-[150px] text-center">
                           <div className="flex flex-col items-center">
                             <span className="font-medium whitespace-nowrap truncate max-w-[150px]">
-                              {order[ORDER_FIELDS.KHACH_HANG] || ""}
+                              {order[ORDER_FIELDS.CUSTOMER] || ""}
                             </span>
                             <span
                               className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
-                              title={order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                              title={order[ORDER_FIELDS.CONTACT] || ""}
                             >
-                              {order[ORDER_FIELDS.LINK_LIEN_HE] || ""}
+                              {order[ORDER_FIELDS.CONTACT] || ""}
                             </span>
                           </div>
                         </td>
@@ -1063,7 +948,7 @@ export default function Orders() {
                                   ? "text-red-600"
                                   : soNgayConLai <= 4
                                   ? "text-orange-500"
-                                  : "text-indigo-600"
+                                  : "text-green-500"
                               }
                             >
                               {isCanceled
@@ -1144,7 +1029,7 @@ export default function Orders() {
                                   Chi tiết thanh toán
                                 </p>
                                 <span className="text-xs font-medium uppercase tracking-wide text-indigo-200">
-                                  #{order[ORDER_FIELDS.ID_DON_HANG] || ""}
+                                  #{order[ORDER_FIELDS.ID_ORDER] || ""}
                                 </span>
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -1153,7 +1038,7 @@ export default function Orders() {
                                     Nguồn
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
-                                    {order[ORDER_FIELDS.NGUON] || "N/A"}
+                                    {order[ORDER_FIELDS.SUPPLY] || "N/A"}
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
@@ -1162,7 +1047,7 @@ export default function Orders() {
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
                                     {Helpers.formatCurrency(
-                                      order[ORDER_FIELDS.GIA_NHAP]
+                                      order[ORDER_FIELDS.COST]
                                     )}
                                   </p>
                                 </div>
@@ -1172,7 +1057,7 @@ export default function Orders() {
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
                                     {Helpers.formatCurrency(
-                                      order[ORDER_FIELDS.GIA_BAN]
+                                      order[ORDER_FIELDS.PRICE]
                                     )}
                                   </p>
                                 </div>
@@ -1189,8 +1074,7 @@ export default function Orders() {
                                     Số ngày
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
-                                    {order[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ||
-                                      0}
+                                    {order[ORDER_FIELDS.DAYS] || 0}
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
@@ -1284,7 +1168,7 @@ export default function Orders() {
         onClose={closeModal}
         onConfirm={confirmDelete}
         title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa đơn hàng: ${orderToDelete?.id_don_hang}?`}
+        message={`Bạn có chắc chắn muốn xóa đơn hàng: ${orderToDelete?.id_order}?`}
       />
       <ViewOrderModal
         isOpen={isViewModalOpen}

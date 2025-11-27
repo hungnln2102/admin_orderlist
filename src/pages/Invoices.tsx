@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -15,6 +15,7 @@ import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
 import * as Helpers from "../lib/helpers";
 import { apiFetch } from "../lib/api";
+import { PAYMENT_RECEIPT_COLS } from "../lib/tableSql";
 import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
 
 interface PaymentReceipt {
@@ -34,8 +35,8 @@ const formatCurrencyVnd = (value: number): string => {
 };
 
 const formatCurrencyVndFull = (value: number): string => {
-  if (!Number.isFinite(value)) return "0\u0111";
-  return `${Math.round(value).toLocaleString("vi-VN")}\u0111`;
+  if (!Number.isFinite(value)) return "0đ";
+  return `${Math.round(value).toLocaleString("vi-VN")}đ`;
 };
 
 const extractSenderFromNote = (note?: string | null): string | null => {
@@ -244,7 +245,23 @@ export default function Invoices() {
           throw new Error("Không thể tải biên nhận.");
         }
         const data = await response.json();
-        setReceipts(Array.isArray(data.receipts) ? data.receipts : []);
+        const normalizeReceiptRow = (row: any): PaymentReceipt => ({
+          id: Number(row?.id) || 0,
+          orderCode:
+            row?.orderCode ?? row?.[PAYMENT_RECEIPT_COLS.orderCode] ?? "",
+          paidAt:
+            row?.paidAt ?? row?.[PAYMENT_RECEIPT_COLS.paidDate] ?? "",
+          amount:
+            Number(row?.amount ?? row?.[PAYMENT_RECEIPT_COLS.amount]) || 0,
+          sender: row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender] ?? "",
+          note: row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note] ?? "",
+        });
+        const rawList = Array.isArray(data?.receipts)
+          ? data.receipts
+          : Array.isArray(data)
+          ? data
+          : [];
+        setReceipts(rawList.map(normalizeReceiptRow));
       } catch (err) {
         console.error(err);
         setError(
@@ -444,7 +461,7 @@ export default function Invoices() {
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm text-slate-300">
-                      <span>Thẻ Hưởng</span>
+                      <span>Thụ Hưởng</span>
                       <span className="font-semibold text-white">
                         {QR_BANK_INFO.accountHolder}
                       </span>

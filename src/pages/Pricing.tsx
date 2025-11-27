@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -18,6 +18,11 @@ import { deleteProductPrice } from "../lib/productPricesApi";
 import { API_ENDPOINTS } from "../constants";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
+import {
+  PRODUCT_PRICE_COLS,
+  SUPPLY_PRICE_COLS,
+  SUPPLY_COLS,
+} from "../lib/tableSql";
 
 const API_BASE =
   (typeof import.meta !== "undefined" &&
@@ -305,30 +310,8 @@ const formatRateDescription = ({
   price,
   basePrice,
 }: RateDescriptionInput): string => {
-  let effectiveRatio: number | null = null;
-  if (
-    typeof multiplier === "number" &&
-    Number.isFinite(multiplier) &&
-    multiplier > 0
-  ) {
-    effectiveRatio = multiplier;
-  } else if (
-    typeof price === "number" &&
-    Number.isFinite(price) &&
-    price > 0 &&
-    typeof basePrice === "number" &&
-    Number.isFinite(basePrice) &&
-    basePrice > 0
-  ) {
-    effectiveRatio = price / basePrice;
-  }
-
-  if (!effectiveRatio || !Number.isFinite(effectiveRatio)) {
-    return "-";
-  }
-
-  const percent = effectiveRatio * 100;
-  return `${percent.toFixed(1)}%`;
+  // Hide percentage display while keeping layout spacing intact.
+  return "";
 };
 
 const formatCurrencyValue = (value?: number | null): string => {
@@ -508,24 +491,31 @@ const mapProductPriceRow = (
   row: any,
   fallbackId: number
 ): ProductPricingRow => {
-  const packageName = cleanupLabel(row?.package ?? row?.package_label);
-  const packageProduct = cleanupLabel(
-    row?.package_product ?? row?.package_product_label
+  const packageName = cleanupLabel(
+    row?.[PRODUCT_PRICE_COLS.package] ?? row?.package_label
   );
-  const sanPhamRaw = (row?.san_pham_label ?? row?.san_pham ?? "")
+  const packageProduct = cleanupLabel(
+    row?.[PRODUCT_PRICE_COLS.packageProduct] ?? row?.package_product_label
+  );
+  const sanPhamRaw = (
+    row?.[PRODUCT_PRICE_COLS.product] ??
+    row?.id_product_label ??
+    row?.id_product ??
+    ""
+  )
     .toString()
     .trim();
 
   return {
     id: Number.isFinite(Number(row?.id)) ? Number(row?.id) : fallbackId,
-    packageName: packageName || "Không Xác Định",
+    packageName: packageName || "Không xác định",
     packageProduct,
     sanPhamRaw,
     variantLabel: buildVariantLabel(packageProduct, sanPhamRaw),
-    pctCtv: toNumberOrNull(row?.pct_ctv),
-    pctKhach: toNumberOrNull(row?.pct_khach),
-    pctPromo: toNumberOrNull(row?.pct_promo),
-    isActive: parseBoolean(row?.is_active),
+    pctCtv: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctCtv]),
+    pctKhach: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctKhach]),
+    pctPromo: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctPromo]),
+    isActive: parseBoolean(row?.[PRODUCT_PRICE_COLS.isActive]),
     baseSupplyPrice: toNumberOrNull(row?.max_supply_price),
     wholesalePrice: toNumberOrNull(
       row?.computed_wholesale_price ??
@@ -543,8 +533,8 @@ const mapProductPriceRow = (
         row?.gia_km
     ),
     lastUpdated:
-      typeof row?.update === "string"
-        ? row.update
+      typeof row?.[PRODUCT_PRICE_COLS.updateDate] === "string"
+        ? row[PRODUCT_PRICE_COLS.updateDate]
         : typeof row?.updated_at === "string"
         ? row.updated_at
         : typeof row?.updatedAt === "string"
@@ -639,7 +629,7 @@ function Pricing() {
         return;
       }
       if (!response.ok) {
-        throw new Error("Không thể tải dữ liệu product_price từ máy chủ.");
+        throw new Error("Không thể tải dữ liệu sản phẩm.");
       }
       const payload = await response.json();
       const rows: any[] = Array.isArray(payload)
@@ -663,7 +653,7 @@ function Pricing() {
       setStatusOverrides({});
       setUpdatedTimestampMap(initialUpdatedMap);
     } catch (err) {
-      console.error("Lỗi khi tải product_price:", err);
+      console.error("Lỗi khi tải dữ liệu:", err);
       setProductPrices([]);
       setError(
         err instanceof Error
@@ -690,24 +680,30 @@ function Pricing() {
       }));
 
       try {
-      const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(productName)}`,
-        { credentials: "include" }
-      );
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(
+            productName
+          )}`,
+          { credentials: "include" }
+        );
         if (!response.ok) {
-          throw new Error("Không thể tải giá nhà cung cấp cho sản phẩm");
+          throw new Error("Không thể tải giá nhập");
         }
         const payload = await response.json();
         const items: SupplyPriceItem[] = Array.isArray(payload)
           ? sortSupplyItems(
               payload.map((entry: any, index: number) => ({
-                sourceId: Number.isFinite(Number(entry?.source_id))
-                  ? Number(entry.source_id)
+                sourceId: Number.isFinite(
+                  Number(entry?.[SUPPLY_PRICE_COLS.sourceId])
+                )
+                  ? Number(entry[SUPPLY_PRICE_COLS.sourceId])
                   : index,
                 sourceName:
-                  cleanupLabel(entry?.source_name) ||
-                  `Nhà cung cấp #${Number(entry?.source_id) || index + 1}`,
-                price: toNumberOrNull(entry?.price),
+                  cleanupLabel(entry?.[SUPPLY_COLS.sourceName]) ||
+                  `Nhà Cung Cấp #${
+                    Number(entry?.[SUPPLY_PRICE_COLS.sourceId]) || index + 1
+                  }`,
+                price: toNumberOrNull(entry?.[SUPPLY_PRICE_COLS.price]),
                 lastOrderDate:
                   typeof entry?.last_order_date === "string"
                     ? entry.last_order_date
@@ -734,7 +730,7 @@ function Pricing() {
             error:
               err instanceof Error
                 ? err.message
-                : "Không thể tải giá cho nhà cung cấp",
+                : "Không thể tải giá nhập của NCC",
             productName: prev[key]?.productName ?? productName,
           },
         }));
@@ -836,13 +832,9 @@ function Pricing() {
     try {
       const response = await deleteProductPrice(product.id);
       if (!response.success) {
-        throw new Error(
-          response.message || "Không thể xóa sản phẩm khỏi bảng giá."
-        );
+        throw new Error(response.message || "Không thể xóa sản phẩm.");
       }
-      setProductPrices((prev) =>
-        prev.filter((row) => row.id !== product.id)
-      );
+      setProductPrices((prev) => prev.filter((row) => row.id !== product.id));
       setSupplyPriceMap((prev) => {
         const next = { ...prev };
         const candidates = [
@@ -867,7 +859,7 @@ function Pricing() {
         error:
           error instanceof Error
             ? error.message
-            : "Không thể xóa sản phẩm. Vui lòng thử lại sau.",
+            : "Không thể xóa sản phẩm. Vui lòng thử lại.",
       }));
     }
   }, [API_BASE, closeDeleteProductModal, deleteProductState.product]);
@@ -999,7 +991,7 @@ function Pricing() {
     if (!Number.isFinite(parsedValue) || parsedValue < 0) {
       setSupplyRowErrors((prev) => ({
         ...prev,
-        [rowKey]: "Giá nhập không phải là số âm.",
+        [rowKey]: "Giá nhập không được thấp hơn 0.",
       }));
       return;
     }
@@ -1471,20 +1463,20 @@ function Pricing() {
       return;
     }
     if (!nextPctKhach || nextPctKhach <= 0) {
-      setProductEditError("Tỷ giá khách phải lớn hơn 0");
+      setProductEditError("Tỷ giá Khách phải lớn hơn 0");
       return;
     }
     if (nextPctPromo !== null) {
       if (nextPctPromo < MIN_PROMO_RATIO) {
         setProductEditError(
-          `Tỷ giá khuyến mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
+          `Tỷ Giá Khuyến Mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
         );
         return;
       }
       const promoGap = nextPctCtv - nextPctKhach;
       if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
         setProductEditError(
-          "Không thể thiết lập tỷ giá khuyến mãi vì chênh lệch tỷ giá quá nhỏ"
+          "Không thể thiết lập từ giá khuyến mãi vì chênh lệch từ giá quá nhỏ."
         );
         return;
       }
@@ -1588,7 +1580,7 @@ function Pricing() {
       const promoGap = (pctCtvValue ?? 0) - (pctKhachValue ?? 0);
       if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
         setCreateError(
-          "Không thể thiết lập tỷ giá khuyến mãi vì chênh lệch tỷ giá quá nhỏ"
+          "Không thể thiết lập từ giá khuyến mãi vì chênh lệch từ giá quá nhỏ."
         );
         return;
       }
@@ -1608,15 +1600,15 @@ function Pricing() {
 
     for (const supplier of normalizedSuppliers) {
       if (!supplier.sourceName) {
-        setCreateError("Mỗi nhà cung cấp phải có tên hợp lệ.");
+        setCreateError("Mỗi NCC phải có tên hợp lệ.");
         return;
       }
       if (!supplier.bankBin) {
-        setCreateError("Mỗi nhà cung cấp phải chọn ngân hàng");
+        setCreateError("Mỗi NCC phải chọn ngân hàng");
         return;
       }
       if (!Number.isFinite(supplier.price) || supplier.price <= 0) {
-        setCreateError("Giá nhập của nhà cung cấp phải lớn hơn 0");
+        setCreateError("Giá nhập của NCC phải lớn hơn 0");
         return;
       }
     }
@@ -1709,7 +1701,7 @@ function Pricing() {
       );
 
       if (!response.ok) {
-        throw new Error("Lỗi khi cập nhật trạng thái sản phẩm");
+        throw new Error("Lỗi khi cập nhật trạng thái");
       }
 
       const payload: {
@@ -1774,7 +1766,7 @@ function Pricing() {
         }
         return next;
       });
-      alert("Cập nhật tình trạng thất bại. Vui lòng thử lại");
+      alert("Cập nhật thất bại. Vui lòng thử lại");
     }
   };
 
@@ -1830,7 +1822,7 @@ function Pricing() {
 
     return [
       {
-        name: "Tổng số mã sản phẩm",
+        name: "Tổng Sản Phẩm",
         value: total.toString(),
         icon: CurrencyDollarIcon,
         accent: "emerald",
@@ -1867,11 +1859,9 @@ function Pricing() {
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-lg font-semibold text-white">
-                  Xác Nhận Xóa
-                </p>
+                <p className="text-lg font-semibold text-white">xác định Xóa</p>
                 <p className="text-xs text-white/70">
-                  Hành động này sẽ xóa sản phẩm khỏi bảng giá.
+                  Hành động này sẽ Xóa Sản Phẩm khỏi bảng Giá.
                 </p>
               </div>
               <button
@@ -1889,7 +1879,7 @@ function Pricing() {
                   {deleteProductState.product.packageName ||
                     deleteProductState.product.packageProduct ||
                     deleteProductState.product.sanPhamRaw ||
-                    `Sản phẩm #${deleteProductState.product.id}`}
+                    `Sản Phẩm #${deleteProductState.product.id}`}
                 </p>
                 <p className="text-xs text-white/70">
                   Mã:{" "}
@@ -1939,10 +1929,10 @@ function Pricing() {
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 sm:px-6 sm:py-8">
               <div>
                 <h2 className="text-xl font-semibold text-white">
-                  Thêm sản phẩm mới
+                  Thêm Sản Phẩm mới
                 </h2>
                 <p className="text-sm text-white/70">
-                  Nhập thông tin sản phẩm, nhà cung cấp, tỷ giá
+                  Nhập Thông tin Sản Phẩm, Nhà Cung Cấp, Tỷ Giá
                 </p>
               </div>
               <div className="grid gap-5 md:grid-cols-2">
@@ -2011,7 +2001,7 @@ function Pricing() {
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         value={createForm.pctCtv}
                         onChange={(event) =>
                           handleCreateFormChange("pctCtv", event.target.value)
@@ -2026,7 +2016,7 @@ function Pricing() {
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         value={createForm.pctKhach}
                         onChange={(event) =>
                           handleCreateFormChange("pctKhach", event.target.value)
@@ -2041,7 +2031,7 @@ function Pricing() {
                         type="number"
                         step="0.01"
                         min="0"
-                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                        className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         value={createForm.pctPromo}
                         onChange={(event) =>
                           handleCreateFormChange("pctPromo", event.target.value)
@@ -2082,7 +2072,7 @@ function Pricing() {
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                              Tên Nhà Cung Cấp
+                              Tên NCC
                             </label>
                             <input
                               type="text"
@@ -2135,7 +2125,7 @@ function Pricing() {
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                              Ngân hàng
+                              Ngân Hàng
                             </label>
                             <select
                               className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
@@ -2172,7 +2162,7 @@ function Pricing() {
                       onClick={handleAddSupplierRow}
                     >
                       <UserPlusIcon className="mr-2 h-4 w-4" />
-                      Thêm Nhà Cung Cấp
+                      Thêm NCC
                     </button>
                   </div>
                 </div>
@@ -2198,7 +2188,7 @@ function Pricing() {
                   onClick={handleSubmitCreateProduct}
                   disabled={isSubmittingCreate}
                 >
-                  {isSubmittingCreate ? "Đang lưu..." : "Lưu sản phẩm"}
+                  {isSubmittingCreate ? "Đang Lưu..." : "Luu Sản Phẩm"}
                 </button>
               </div>
             </div>
@@ -2208,9 +2198,7 @@ function Pricing() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">
-              Bảng giá sản phẩm
-            </h1>
+            <h1 className="text-2xl font-bold text-white">B?ng Giá Sỉn ph?m</h1>
           </div>
           <div className="mt-4 sm:mt-0">
             <GradientButton icon={PlusIcon} onClick={handleOpenCreateModal}>
@@ -2240,7 +2228,7 @@ function Pricing() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
               <input
                 type="text"
-                placeholder="Tìm kiếm sản phẩm..."
+                placeholder="Tìm Kiếm Sản Phẩm..."
                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-white/20 bg-white/10 text-white placeholder:text-white/60 focus:ring-2 focus:ring-blue-500/60 focus:border-blue-400/60"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -2252,9 +2240,9 @@ function Pricing() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang hoạt động</option>
-              <option value="inactive">Tạm dừng</option>
+              <option value="all">Trạng Thái</option>
+              <option value="active">Đang Hoạt Động</option>
+              <option value="inactive">Tạm Dừng</option>
             </select>
 
             <GradientButton
@@ -2263,7 +2251,7 @@ function Pricing() {
               onClick={handleRefreshAll}
               disabled={isLoading || isRefreshing}
             >
-              {isLoading || isRefreshing ? "Đang đồng bộ..." : "Đồng bộ lại"}
+              {isLoading || isRefreshing ? "Đang Đồng Bộ..." : "Đồng Bộ Lỗi"}
             </GradientButton>
           </div>
           {error && (
@@ -2319,7 +2307,7 @@ function Pricing() {
                     >
                       {error
                         ? "Không thể tải dữ liệu. Vui lòng thử lại."
-                        : "Không có sản phẩm nào phù hợp bộ lọc."}
+                        : "Không có sản phẩm."}
                     </td>
                   </tr>
                 ) : (
@@ -2420,6 +2408,9 @@ function Pricing() {
                       item.pctKhach,
                       item.pctCtv
                     );
+                    const isDeletingCurrent =
+                      deleteProductState.product?.id === item.id &&
+                      deleteProductState.loading;
                     return (
                       <React.Fragment key={item.id}>
                         <tr
@@ -2518,18 +2509,14 @@ function Pricing() {
                               </button>
                               <button
                                 className={`text-rose-400 hover:text-rose-300 ${
-                                  deleteProductState.product?.id === item.id &&
-                                  deleteProductState.loading
+                                  isDeletingCurrent
                                     ? "opacity-60 cursor-not-allowed"
                                     : ""
                                 }`}
                                 onClick={(event) =>
                                   handleRequestDeleteProduct(event, item)
                                 }
-                                disabled={
-                                  deleteProductState.product?.id === item.id &&
-                                  deleteProductState.loading
-                                }
+                                disabled={isDeletingCurrent}
                               >
                                 <TrashIcon className="h-4 w-4" />
                               </button>
@@ -2608,7 +2595,7 @@ function Pricing() {
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                           value={currentEditForm.pctCtv}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2625,7 +2612,7 @@ function Pricing() {
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                           value={currentEditForm.pctKhach}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2637,12 +2624,12 @@ function Pricing() {
                                       </div>
                                       <div>
                                         <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                                          Tỷ Giá Khuyến Mãi
+                                          Tỷ giá khuyến mãi
                                         </label>
                                         <input
                                           type="number"
                                           step="0.01"
-                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                                          className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                           value={currentEditForm.pctPromo}
                                           onChange={(event) =>
                                             handleProductEditChange(
@@ -2656,10 +2643,10 @@ function Pricing() {
                                   </div>
                                 </div>
                                 {currentEditForm && (
-                                  <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-white via-amber-50 to-amber-100/40 p-4 shadow-inner">
-                                    <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-amber-700 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/70 via-slate-900/70 to-indigo-950/80 p-4 shadow-lg backdrop-blur">
+                                    <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-white/80 sm:flex-row sm:items-center sm:justify-between">
                                       <span>Giá dự kiến theo tỷ giá</span>
-                                      <span className="text-amber-600 normal-case font-medium">
+                                      <span className="text-amber-200 normal-case font-medium">
                                         Giá nguồn cao nhất:{" "}
                                         <span className="font-semibold">
                                           {highestSupplyPriceDisplay}
@@ -2673,9 +2660,9 @@ function Pricing() {
                                           : "md:grid-cols-2"
                                       }`}
                                     >
-                                      <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
+                                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
                                         <p className="text-xs uppercase text-white/70">
-                                          Giá sỉ dự kiến
+                                          Giá Sỉ dự kiến
                                         </p>
                                         <p className="mt-1 text-lg font-semibold text-white">
                                           {formatCurrencyValue(
@@ -2688,9 +2675,9 @@ function Pricing() {
                                             : "Nhập tỷ giá CTV"}
                                         </p>
                                       </div>
-                                      <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
+                                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
                                         <p className="text-xs uppercase text-white/70">
-                                          Giá lẻ dự kiến
+                                          Giá Khách dự kiến
                                         </p>
                                         <p className="mt-1 text-lg font-semibold text-white">
                                           {formatCurrencyValue(
@@ -2704,9 +2691,9 @@ function Pricing() {
                                         </p>
                                       </div>
                                       {showPreviewPromo && (
-                                        <div className="rounded-xl border border-white/70 bg-white/90 px-4 py-3 shadow-sm">
+                                        <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
                                           <p className="text-xs uppercase text-white/70">
-                                            Giá khuyến mãi dự kiến
+                                            Giá Khuyến mãi dự kiến
                                           </p>
                                           <p className="mt-1 text-lg font-semibold text-white">
                                             {formatCurrencyValue(
@@ -2714,7 +2701,8 @@ function Pricing() {
                                             )}
                                           </p>
                                           <p className="text-[11px] text-white/70">
-                                            {previewPromoPercentLabel ?? "Nh?p t? gi� khuy?n mai"}
+                                            {previewPromoPercentLabel ??
+                                              "Nhập tỷ giá khuyến mãi"}
                                           </p>
                                         </div>
                                       )}
@@ -2757,7 +2745,7 @@ function Pricing() {
                                 <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 shadow-lg text-white px-6 py-5 space-y-4">
                                   <div className="text-center">
                                     <p className="text-sm font-semibold text-white">
-                                      Chi tiết giá sản phẩm
+                                      Chi tiết Giá Sản Phẩm
                                     </p>
                                   </div>
                                   <div
@@ -2805,7 +2793,8 @@ function Pricing() {
                                           {formatCurrencyValue(item.promoPrice)}
                                         </p>
                                         <p className="text-xs text-white/70">
-                                          {formatPromoPercent(item.pctPromo) ?? "-"}
+                                          {formatPromoPercent(item.pctPromo) ??
+                                            "-"}
                                         </p>
                                       </div>
                                     )}
@@ -2821,14 +2810,14 @@ function Pricing() {
                                         disabled={Boolean(pendingNewSupply)}
                                       >
                                         <PlusCircleIcon className="h-4 w-4" />
-                                        Thêm nguồn
+                                        Thêm Nguồn
                                       </button>
                                     </div>
                                     <table className="w-full text-sm">
                                       <thead className="bg-white/5 text-[11px] uppercase text-white/70 tracking-wide">
                                         <tr>
                                           <th className="px-4 py-2 text-left">
-                                            Nhà Cung Cấp
+                                            NCC
                                           </th>
                                           <th className="px-4 py-2 text-center">
                                             Giá Nhập
@@ -2848,7 +2837,7 @@ function Pricing() {
                                               colSpan={4}
                                               className="px-4 py-3 text-center text-xs text-white/70"
                                             >
-                                              Đang Tải Giá Nhập Từ Nhà Cung Cấp
+                                              Đang Tải Dữ Liệu
                                             </td>
                                           </tr>
                                         ) : supplyState?.error ? (
@@ -2874,8 +2863,7 @@ function Pricing() {
                                               colSpan={4}
                                               className="px-4 py-3 text-center text-xs text-white/70"
                                             >
-                                              Chưa có dữ liệu giá nhập từ nhà
-                                              cung cấp.
+                                              Chưa có dữ liệu từ NCC
                                             </td>
                                           </tr>
                                         ) : (
@@ -2933,7 +2921,8 @@ function Pricing() {
                                                               handleSupplyInputChange(
                                                                 item.id,
                                                                 supplier.sourceId,
-                                                                event.target.value
+                                                                event.target
+                                                                  .value
                                                               )
                                                             }
                                                             className={`w-28 rounded-lg border px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
@@ -2947,7 +2936,7 @@ function Pricing() {
                                                             }`}
                                                           />
                                                           <span className="text-xs text-white/70">
-                                                            ₫
+                                                            ?
                                                           </span>
                                                         </div>
                                                         {inputError && (
@@ -3055,7 +3044,7 @@ function Pricing() {
                                                       <input
                                                         type="text"
                                                         className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
-                                                        placeholder="Tên nguồn"
+                                                        placeholder="Tên Nguồn"
                                                         value={draft.sourceName}
                                                         onChange={(event) =>
                                                           handleNewSupplierInputChange(
@@ -3076,7 +3065,7 @@ function Pricing() {
                                                           min={0}
                                                           step="1000"
                                                           className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                                          placeholder="Giá nhập"
+                                                          placeholder="Giá Nhập"
                                                           value={draft.price}
                                                           onChange={(event) =>
                                                             handleNewSupplierInputChange(
@@ -3090,7 +3079,7 @@ function Pricing() {
                                                           }
                                                         />
                                                         <span className="text-xs text-white/70">
-                                                          ₫
+                                                          ?
                                                         </span>
                                                       </div>
                                                     </td>
@@ -3169,4 +3158,3 @@ function Pricing() {
 }
 
 export default Pricing;
-

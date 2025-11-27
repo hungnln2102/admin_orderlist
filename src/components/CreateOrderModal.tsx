@@ -25,20 +25,20 @@ const API_BASE =
 // =======================================================
 interface Order {
   id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
+  id_order: string;
+  id_product: string;
+  information_order: string;
+  customer: string;
+  contact: string;
   slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
-  nguon: string;
-  gia_nhap: number;
-  gia_ban: number;
+  order_date: string;
+  days: string;
+  order_expired: string;
+  supply: string;
+  cost: number;
+  price: number;
   note: string;
-  tinh_trang: string;
+  status: string;
   check_flag: boolean | null;
 }
 interface Supply {
@@ -54,11 +54,21 @@ interface SupplyPrice {
   price: number;
 }
 interface CalculatedPriceResult {
+  cost: number;
+  price: number;
+  days: number;
+  order_expired: string;
+}
+type RawCalculatedPriceResult = Partial<{
   gia_nhap: number;
   gia_ban: number;
   so_ngay_da_dang_ki: number;
   het_han: string;
-}
+  cost: number;
+  price: number;
+  days: number;
+  order_expired: string;
+}>;
 type CustomerType = "MAVC" | "MAVL" | "MAVK";
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -164,20 +174,20 @@ const inclusiveDaysBetween = (startDMY: string, endDMY: string): number => {
 // ...
 
 const INITIAL_FORM_DATA: Partial<Order> = {
-  [ORDER_FIELDS.ID_DON_HANG]: "",
-  [ORDER_FIELDS.SAN_PHAM]: "",
-  [ORDER_FIELDS.THONG_TIN_SAN_PHAM]: "",
-  [ORDER_FIELDS.KHACH_HANG]: "",
-  [ORDER_FIELDS.LINK_LIEN_HE]: "",
+  [ORDER_FIELDS.ID_ORDER]: "",
+  [ORDER_FIELDS.ID_PRODUCT]: "",
+  [ORDER_FIELDS.INFORMATION_ORDER]: "",
+  [ORDER_FIELDS.CUSTOMER]: "",
+  [ORDER_FIELDS.CONTACT]: "",
   [ORDER_FIELDS.SLOT]: "",
-  [ORDER_FIELDS.NGAY_DANG_KI]: "",
-  [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
-  [ORDER_FIELDS.HET_HAN]: "",
-  [ORDER_FIELDS.NGUON]: "",
-  [ORDER_FIELDS.GIA_NHAP]: 0,
-  [ORDER_FIELDS.GIA_BAN]: 0,
+  [ORDER_FIELDS.ORDER_DATE]: "",
+  [ORDER_FIELDS.DAYS]: "0",
+  [ORDER_FIELDS.ORDER_EXPIRED]: "",
+  [ORDER_FIELDS.SUPPLY]: "",
+  [ORDER_FIELDS.COST]: 0,
+  [ORDER_FIELDS.PRICE]: 0,
   [ORDER_FIELDS.NOTE]: "",
-  [ORDER_FIELDS.TINH_TRANG]: "Chưa Thanh Toán",
+  [ORDER_FIELDS.STATUS]: "Chưa Thanh Toán",
   [ORDER_FIELDS.CHECK_FLAG]: null,
 };
 
@@ -187,9 +197,10 @@ const labelClass = "block text-sm font-medium text-gray-700 mb-1";
 const readOnlyClass = "bg-gray-100 cursor-not-allowed";
 
 interface UseCreateOrderLogicResult {
-  // ... (Giao di?n gi? nguyên)
+  // ... (Giao diện giữ nguyên)
   formData: Partial<Order>;
   supplies: Supply[];
+  allSupplies: Supply[];
   products: Product[];
   isLoading: boolean;
   isDataLoaded: boolean;
@@ -197,6 +208,8 @@ interface UseCreateOrderLogicResult {
   customerType: CustomerType;
   updateForm: (patch: Partial<Order>) => void;
   setIsDataLoaded: (v: boolean) => void;
+  customProductTouched: boolean;
+  setCustomProductTouched: React.Dispatch<React.SetStateAction<boolean>>;
   handleChange: (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -204,7 +217,6 @@ interface UseCreateOrderLogicResult {
   ) => void;
   handleProductSelect: (productName: string) => void;
   handleSourceSelect: (sourceId: number) => void;
-  handleSourceChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleProductChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: (e: React.FormEvent) => boolean;
@@ -212,11 +224,13 @@ interface UseCreateOrderLogicResult {
 
 const useCreateOrderLogic = (
   isOpen: boolean,
-  onSave: (newOrderData: Partial<Order> | Order) => void
+  onSave: (newOrderData: Partial<Order> | Order) => void,
+  customMode: boolean
 ): UseCreateOrderLogicResult => {
   const [formData, setFormData] = useState<Partial<Order>>(INITIAL_FORM_DATA);
   const [customerType, setCustomerType] = useState<CustomerType>("MAVC");
 
+  const [allSupplies, setAllSupplies] = useState<Supply[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -228,6 +242,7 @@ const useCreateOrderLogic = (
     null
   );
   const [selectedSupplyId, setSelectedSupplyId] = useState<number | null>(null);
+  const [customProductTouched, setCustomProductTouched] = useState(false);
 
   const currentOrderId = useMemo(
     () => customerType + Helpers.generateRandomId(5),
@@ -252,7 +267,26 @@ const useCreateOrderLogic = (
     }
   }, []);
 
+  const fetchAllSupplies = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.SUPPLIES}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
+      const data: Supply[] = await response.json();
+      setAllSupplies(data);
+      setSupplies((prev) => (prev.length ? prev : data));
+    } catch (error) {
+      console.error("Lỗi khi fetch all supplies:", error);
+      setAllSupplies([]);
+    }
+  }, []);
+
   const fetchSuppliesByProduct = useCallback(async (productName: string) => {
+    if (!productName) {
+      setSupplies((prev) => (prev.length ? prev : allSupplies));
+      return;
+    }
     try {
       const response = await fetch(
         `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`,
@@ -263,16 +297,17 @@ const useCreateOrderLogic = (
       setSupplies(data);
     } catch (error) {
       console.error("Lỗi khi fetch supplies:", error);
-      setSupplies([]);
+      setSupplies(allSupplies);
     }
-  }, []);
+  }, [allSupplies]);
 
   const fetchAllSupplyPrices = useCallback(async (productName: string) => {
     try {
       const response = await fetch(
         `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(
           productName
-        )}`
+        )}`,
+        { credentials: "include" }
       );
       if (!response.ok) throw new Error("Lỗi tính giá nhập của nguồn.");
       const data: SupplyPrice[] = await response.json();
@@ -283,7 +318,7 @@ const useCreateOrderLogic = (
     }
   }, []);
 
-    const calculatePrice = useCallback(
+  const calculatePrice = useCallback(
     async (
       supplyId: number,
       productName: string,
@@ -293,6 +328,8 @@ const useCreateOrderLogic = (
       setIsLoading(true);
       setIsDataLoaded(false);
       try {
+        const normalizedOrderDate =
+          convertDMYToYMD(registerDateStr) || registerDateStr || null;
         const response = await fetch(
           `${API_BASE}${API_ENDPOINTS.CALCULATE_PRICE}`,
           {
@@ -303,13 +340,16 @@ const useCreateOrderLogic = (
               // Backend chi can cac thong so nay de tinh gia ban va ngay het han
               supply_id: supplyId,
               san_pham_name: productName,
-              id_don_hang: orderId,
+              id_product: productName,
+              id_order: orderId,
+              order_date: normalizedOrderDate,
+              customer_type: customerType,
             }),
           }
         );
 
         const { data, rawText } =
-          await Helpers.readJsonOrText<CalculatedPriceResult>(response);
+          await Helpers.readJsonOrText<RawCalculatedPriceResult>(response);
 
         if (!response.ok) {
           const message =
@@ -323,14 +363,30 @@ const useCreateOrderLogic = (
           throw new Error("Phản hồi không hợp lệ từ server.");
         }
 
-        const result: CalculatedPriceResult = data;
+        const raw = (data || {}) as RawCalculatedPriceResult;
+        const normalizedRegisterDMY =
+          Helpers.formatDateToDMY(registerDateStr) ||
+          registerDateStr ||
+          Helpers.getTodayDMY();
 
-        return {
-          gia_nhap: result.gia_nhap,
-          gia_ban: result.gia_ban,
-          so_ngay_da_dang_ki: result.so_ngay_da_dang_ki,
-          het_han: result.het_han,
-        } as CalculatedPriceResult;
+        const mapped: CalculatedPriceResult = {
+          cost: Math.max(0, Number(raw.gia_nhap ?? raw.cost ?? 0) || 0),
+          price: Math.max(0, Number(raw.gia_ban ?? raw.price ?? 0) || 0),
+          days: Number(raw.so_ngay_da_dang_ki ?? raw.days ?? 0) || 0,
+          order_expired: "",
+        };
+
+        const expiryRaw = (raw.order_expired ?? raw.het_han ?? "").trim();
+        const expiryDMY =
+          Helpers.formatDateToDMY(expiryRaw) ||
+          expiryRaw ||
+          (mapped.days > 0
+            ? calculateExpirationDate(normalizedRegisterDMY, mapped.days)
+            : "");
+
+        mapped.order_expired = expiryDMY;
+
+        return mapped;
       } catch (error) {
         console.error("Lỗi khi tính giá:", error);
         setIsDataLoaded(false);
@@ -344,7 +400,84 @@ const useCreateOrderLogic = (
         setIsLoading(false);
       }
     },
-    []
+    [customerType]
+  );
+
+  const applyCalculationResult = useCallback(
+    (
+      result: CalculatedPriceResult | undefined,
+      registerDMY: string,
+      fallbackImport?: number,
+      options?: { updateCost?: boolean }
+    ) => {
+      if (!result) return;
+
+      const safeRegister =
+        Helpers.formatDateToDMY(registerDMY) ||
+        registerDMY ||
+        Helpers.getTodayDMY();
+      const days = Number(result.days || 0) || 0;
+      const expiry =
+        result.order_expired ||
+        (days > 0 ? calculateExpirationDate(safeRegister, days) : "");
+
+      setFormData((prev) => {
+        const prevGiaNhap = Number(prev[ORDER_FIELDS.COST] || 0);
+        const giaNhapFromResult =
+          Number.isFinite(result.cost) && result.cost > 0
+            ? result.cost
+            : undefined;
+        const shouldUpdateCost = options?.updateCost ?? true;
+        const giaNhap = shouldUpdateCost
+          ? giaNhapFromResult ??
+            Number(fallbackImport ?? prevGiaNhap ?? 0) ??
+            0
+          : prevGiaNhap;
+
+        const prevGiaBan = Number(prev[ORDER_FIELDS.PRICE] || 0);
+        const giaBanFromResult =
+          Number.isFinite(result.price) && result.price > 0
+            ? result.price
+            : undefined;
+        const giaBan =
+          customerType === "MAVK"
+            ? giaNhap
+            : giaBanFromResult ?? prevGiaBan ?? 0;
+
+        return {
+          ...prev,
+          [ORDER_FIELDS.COST]: giaNhap,
+          [ORDER_FIELDS.PRICE]: giaBan,
+          [ORDER_FIELDS.DAYS]:
+            days > 0
+              ? String(days)
+              : String(prev[ORDER_FIELDS.DAYS] || "0"),
+          [ORDER_FIELDS.ORDER_EXPIRED]:
+            expiry || (prev[ORDER_FIELDS.ORDER_EXPIRED] as string) || "",
+        };
+      });
+
+      setIsDataLoaded(true);
+    },
+    [customerType]
+  );
+
+  const recalcPrice = useCallback(
+    (
+      supplyId: number,
+      productName: string,
+      orderId: string,
+      registerDate: string,
+      fallbackImport?: number,
+      options?: { updateCost?: boolean }
+    ) => {
+      if (!productName || !orderId || !registerDate) return;
+      calculatePrice(supplyId, productName, orderId, registerDate).then(
+        (result) =>
+          applyCalculationResult(result, registerDate, fallbackImport, options)
+      );
+    },
+    [calculatePrice, applyCalculationResult]
   );
 
   useEffect(() => {
@@ -356,9 +489,9 @@ const useCreateOrderLogic = (
       setCustomerType(initialType);
       setFormData({
         ...INITIAL_FORM_DATA,
-        [ORDER_FIELDS.ID_DON_HANG]: initialID,
-        [ORDER_FIELDS.NGAY_DANG_KI]: initialDate,
-        [ORDER_FIELDS.HET_HAN]: initialDate,
+        [ORDER_FIELDS.ID_ORDER]: initialID,
+        [ORDER_FIELDS.ORDER_DATE]: initialDate,
+        [ORDER_FIELDS.ORDER_EXPIRED]: initialDate,
       });
       setIsDataLoaded(false);
       setSelectedProductId(null);
@@ -366,57 +499,64 @@ const useCreateOrderLogic = (
       setSupplies([]);
       setSupplyPrices([]);
       fetchProducts();
+      fetchAllSupplies();
     }
-  }, [isOpen, fetchProducts]);
+  }, [isOpen, fetchProducts, fetchAllSupplies]);
 
   useEffect(() => {
     if (isOpen) {
       setFormData((prev) => ({
         ...prev,
-        [ORDER_FIELDS.ID_DON_HANG]: currentOrderId,
+        [ORDER_FIELDS.ID_ORDER]: currentOrderId,
       }));
     }
   }, [currentOrderId, isOpen]);
 
   useEffect(() => {
-    const productName = formData[ORDER_FIELDS.SAN_PHAM] as string;
-    const orderId = formData[ORDER_FIELDS.ID_DON_HANG] as string;
-    const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI] as string;
+    const productName = formData[ORDER_FIELDS.ID_PRODUCT] as string;
+    const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
+    const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
     if (!productName || !orderId || !registerDate) return;
+    if (customMode) return;
 
     if (customerType === "MAVK") {
       setFormData((prev) => ({
         ...prev,
-        [ORDER_FIELDS.GIA_BAN]: prev[ORDER_FIELDS.GIA_NHAP] || 0,
+        [ORDER_FIELDS.PRICE]: prev[ORDER_FIELDS.COST] || 0,
       }));
       return;
     }
 
     // Trigger tính giá lại khi loại khách hàng thay đổi
-    calculatePrice(0, productName, orderId, registerDate).then((result) => {
-      if (result) {
-        setFormData((prev) => ({
-          ...prev,
-          [ORDER_FIELDS.GIA_BAN]: result.gia_ban,
-        }));
-      }
+    const supplyId = selectedSupplyId ?? 0;
+    recalcPrice(supplyId, productName, orderId, registerDate, undefined, {
+      updateCost: Boolean(supplyId),
     });
-  }, [customerType, calculatePrice]);
+  }, [
+    customerType,
+    recalcPrice,
+    formData[ORDER_FIELDS.ID_PRODUCT],
+    formData[ORDER_FIELDS.ID_ORDER],
+    formData[ORDER_FIELDS.ORDER_DATE],
+    selectedSupplyId,
+    customMode,
+  ]);
   const handleProductSelect = (productName: string) => {
     // ... (logic giữ nguyên)
     const selectedProduct = products.find((p) => p.san_pham === productName);
 
     setSelectedProductId(selectedProduct?.id || null);
     setSelectedSupplyId(null);
+    setCustomProductTouched(false);
 
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: productName,
-      [ORDER_FIELDS.NGUON]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0,
-      [ORDER_FIELDS.GIA_BAN]: 0,
-      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
-      [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
+      [ORDER_FIELDS.ID_PRODUCT]: productName,
+      [ORDER_FIELDS.SUPPLY]: "",
+      [ORDER_FIELDS.COST]: 0,
+      [ORDER_FIELDS.PRICE]: 0,
+      [ORDER_FIELDS.DAYS]: "0",
+      [ORDER_FIELDS.ORDER_EXPIRED]: prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
     }));
     setSupplies([]);
     setSupplyPrices([]);
@@ -425,51 +565,79 @@ const useCreateOrderLogic = (
       fetchSuppliesByProduct(productName);
       fetchAllSupplyPrices(productName);
 
-      const orderId = formData[ORDER_FIELDS.ID_DON_HANG] as string;
-      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI] as string;
+      const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
+      const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
 
       if (orderId && registerDate) {
-        calculatePrice(0, productName, orderId, registerDate).then((result) => {
-          if (result) {
-            setFormData((prev) => ({
-              ...prev,
-              [ORDER_FIELDS.GIA_BAN]: customerType === "MAVK" ? 0 : result.gia_ban,
-              [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
-                result.so_ngay_da_dang_ki
-              ),
-              [ORDER_FIELDS.HET_HAN]: result.het_han, // Lấy Hết Hạn từ Backend
-            }));
-            // readiness now derived from required fields only
-          }
-        });
+        if (!customMode) {
+          const supplyId = selectedSupplyId ?? 0;
+          recalcPrice(supplyId, productName, orderId, registerDate, undefined, {
+            updateCost: Boolean(supplyId),
+          });
+        }
       }
     } else {
+      setSupplies(allSupplies);
       setIsDataLoaded(false);
     }
   };
 
+  const getSupplyImportPrice = useCallback(
+    (sourceId: number, supplyName: string, fallbackCost: number) => {
+      const priceByName = Helpers.getImportPriceBySupplyName(
+        supplyName,
+        supplyPrices,
+        supplies
+      );
+      const normalizedByName = Number(priceByName);
+      if (Number.isFinite(normalizedByName)) {
+        return normalizedByName;
+      }
+      if (sourceId !== 0) {
+        const byId = supplyPrices.find((p) => p.source_id === sourceId)?.price;
+        const normalizedById = Number(byId);
+        if (Number.isFinite(normalizedById)) {
+          return normalizedById;
+        }
+      }
+      return fallbackCost;
+    },
+    [supplies, supplyPrices]
+  );
+
   const handleSourceSelect = (sourceId: number) => {
     const selectedSupply = supplies.find((s) => s.id === sourceId);
-    let newBasePrice = 0;
-    if (sourceId !== 0 && selectedSupply) {
-      newBasePrice =
-        supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
-    }
+    const fallbackCost = Number(formData[ORDER_FIELDS.COST] || 0);
+    const supplyName = selectedSupply?.source_name || "";
+    const newBasePrice = getSupplyImportPrice(
+      sourceId,
+      supplyName,
+      fallbackCost
+    );
     setSelectedSupplyId(sourceId === 0 ? null : sourceId);
     setFormData((prev) => {
       const updated: Partial<Order> = {
         ...prev,
-        [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-        [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
+        [ORDER_FIELDS.SUPPLY]: selectedSupply ? selectedSupply.source_name : "",
+        [ORDER_FIELDS.COST]: newBasePrice,
       };
       if (customerType === "MAVK") {
-        updated[ORDER_FIELDS.GIA_BAN] = newBasePrice;
+        updated[ORDER_FIELDS.PRICE] = newBasePrice;
       }
       return updated;
     });
-    if (!selectedSupply || sourceId === 0) {
+
+    const productName = formData[ORDER_FIELDS.ID_PRODUCT] as string;
+    const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
+    const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
+    if (!productName || !orderId || !registerDate) {
       setIsDataLoaded(false);
+      return;
     }
+
+    recalcPrice(sourceId, productName, orderId, registerDate, newBasePrice, {
+      updateCost: true,
+    });
   };
 
   const handleChange = (
@@ -490,15 +658,16 @@ const useCreateOrderLogic = (
 
     setSelectedProductId(selectedProduct?.id || null);
     setSelectedSupplyId(null);
+    setCustomProductTouched(false);
 
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: productName,
-      [ORDER_FIELDS.NGUON]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0,
-      [ORDER_FIELDS.GIA_BAN]: 0,
-      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
-      [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || todayDate,
+      [ORDER_FIELDS.ID_PRODUCT]: productName,
+      [ORDER_FIELDS.SUPPLY]: "",
+      [ORDER_FIELDS.COST]: 0,
+      [ORDER_FIELDS.PRICE]: 0,
+      [ORDER_FIELDS.DAYS]: "0",
+      [ORDER_FIELDS.ORDER_EXPIRED]: prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
     }));
     setSupplies([]);
     setSupplyPrices([]);
@@ -507,52 +676,20 @@ const useCreateOrderLogic = (
       fetchSuppliesByProduct(productName);
       fetchAllSupplyPrices(productName);
 
-      const orderId = formData[ORDER_FIELDS.ID_DON_HANG];
-      const registerDate = formData[ORDER_FIELDS.NGAY_DANG_KI];
+      const orderId = formData[ORDER_FIELDS.ID_ORDER];
+      const registerDate = formData[ORDER_FIELDS.ORDER_DATE];
 
       if (orderId && registerDate) {
-        calculatePrice(0, productName, orderId, registerDate).then((result) => {
-          if (result) {
-            setFormData((prev) => ({
-              ...prev,
-              [ORDER_FIELDS.GIA_BAN]: customerType === "MAVK" ? 0 : result.gia_ban,
-              [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(
-                result.so_ngay_da_dang_ki
-              ),
-              [ORDER_FIELDS.HET_HAN]: result.het_han, // L?y H?t H?n t? Backend
-            }));
-            // readiness now derived from required fields only
-          }
-        });
+        if (!customMode) {
+          const supplyId = selectedSupplyId ?? 0;
+          recalcPrice(supplyId, productName, orderId, registerDate, undefined, {
+            updateCost: Boolean(supplyId),
+          });
+        }
       }
     } else {
       setIsDataLoaded(false);
     }
-  };
-
-  const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sourceId = Number(e.target.value);
-    const selectedSupply = supplies.find((s) => s.id === sourceId);
-
-    let newBasePrice = 0;
-    if (sourceId !== 0 && selectedSupply) {
-      newBasePrice =
-        supplyPrices.find((p) => p.source_id === sourceId)?.price || 0;
-    }
-
-    setSelectedSupplyId(sourceId);
-
-    setFormData((prev) => {
-      const updated: Partial<Order> = {
-        ...prev,
-        [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-        [ORDER_FIELDS.GIA_NHAP]: newBasePrice,
-      };
-      if (customerType === "MAVK") {
-        updated[ORDER_FIELDS.GIA_BAN] = newBasePrice;
-      }
-      return updated;
-    });
   };
 
   const handleCustomerTypeChange = (
@@ -567,12 +704,12 @@ const useCreateOrderLogic = (
     setIsDataLoaded(false);
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.SAN_PHAM]: "",
-      [ORDER_FIELDS.NGUON]: "",
-      [ORDER_FIELDS.GIA_NHAP]: 0,
-      [ORDER_FIELDS.GIA_BAN]: 0,
-      [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: "0",
-      [ORDER_FIELDS.HET_HAN]: prev[ORDER_FIELDS.NGAY_DANG_KI] || Helpers.getTodayDMY(),
+      [ORDER_FIELDS.ID_PRODUCT]: "",
+      [ORDER_FIELDS.SUPPLY]: "",
+      [ORDER_FIELDS.COST]: 0,
+      [ORDER_FIELDS.PRICE]: 0,
+      [ORDER_FIELDS.DAYS]: "0",
+      [ORDER_FIELDS.ORDER_EXPIRED]: prev[ORDER_FIELDS.ORDER_DATE] || Helpers.getTodayDMY(),
     }));
   };
 
@@ -581,33 +718,33 @@ const useCreateOrderLogic = (
 
     const requiredFieldsFilled =
       formData &&
-      formData[ORDER_FIELDS.SAN_PHAM] &&
-      formData[ORDER_FIELDS.NGUON] &&
-      formData[ORDER_FIELDS.KHACH_HANG] &&
-      formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM];
+      formData[ORDER_FIELDS.ID_PRODUCT] &&
+      formData[ORDER_FIELDS.SUPPLY] &&
+      formData[ORDER_FIELDS.CUSTOMER] &&
+      formData[ORDER_FIELDS.INFORMATION_ORDER];
 
     if (requiredFieldsFilled && !isLoading) {
       const registerDMY =
         Helpers.formatDateToDMY(
-          formData[ORDER_FIELDS.NGAY_DANG_KI] as string
+          formData[ORDER_FIELDS.ORDER_DATE] as string
         ) ||
-        (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) ||
+        (formData[ORDER_FIELDS.ORDER_DATE] as string) ||
         Helpers.getTodayDMY();
 
       const currentExpiryDMY =
-        Helpers.formatDateToDMY(formData[ORDER_FIELDS.HET_HAN] as string) ||
-        (formData[ORDER_FIELDS.HET_HAN] as string) ||
+        Helpers.formatDateToDMY(formData[ORDER_FIELDS.ORDER_EXPIRED] as string) ||
+        (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) ||
         "";
 
       const totalDays =
-        Number(formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || 0) || 0;
+        Number(formData[ORDER_FIELDS.DAYS] || 0) || 0;
 
       let expiryDMY = currentExpiryDMY;
       if (!expiryDMY && registerDMY && totalDays > 0) {
         const computed = calculateExpirationDate(registerDMY, totalDays);
         if (computed && computed !== "N/A") {
           expiryDMY = computed;
-          updateForm({ [ORDER_FIELDS.HET_HAN]: expiryDMY } as any);
+          updateForm({ [ORDER_FIELDS.ORDER_EXPIRED]: expiryDMY } as any);
         }
       }
 
@@ -618,12 +755,12 @@ const useCreateOrderLogic = (
 
       const dataToSave = {
         ...formData,
-        [ORDER_FIELDS.GIA_NHAP]: Number(formData[ORDER_FIELDS.GIA_NHAP]),
-        [ORDER_FIELDS.GIA_BAN]: Number(formData[ORDER_FIELDS.GIA_BAN]),
-        [ORDER_FIELDS.NGAY_DANG_KI]: normalizedRegister,
-        [ORDER_FIELDS.HET_HAN]: normalizedExpiry,
-        [ORDER_FIELDS.LINK_LIEN_HE]:
-          formData[ORDER_FIELDS.LINK_LIEN_HE] || null,
+        [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
+        [ORDER_FIELDS.PRICE]: Number(formData[ORDER_FIELDS.PRICE]),
+        [ORDER_FIELDS.ORDER_DATE]: normalizedRegister,
+        [ORDER_FIELDS.ORDER_EXPIRED]: normalizedExpiry,
+        [ORDER_FIELDS.CONTACT]:
+          formData[ORDER_FIELDS.CONTACT] || null,
         [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
         [ORDER_FIELDS.NOTE]: formData[ORDER_FIELDS.NOTE] || null,
       };
@@ -639,6 +776,7 @@ const useCreateOrderLogic = (
   return {
     formData,
     supplies,
+    allSupplies,
     products,
     isLoading,
     isDataLoaded,
@@ -646,10 +784,11 @@ const useCreateOrderLogic = (
     customerType,
     updateForm,
     setIsDataLoaded,
+    customProductTouched,
+    setCustomProductTouched,
     handleChange,
     handleProductSelect,
     handleSourceSelect,
-    handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
     handleSubmit,
@@ -659,7 +798,7 @@ const useCreateOrderLogic = (
 type SSOption = { value: string | number; label: string };
 
 interface SearchableSelectProps {
-  // ... (Giao di?n gi? nguyên)
+  // ... (Giao diện giữ nguyên)
   name?: string;
   value: string | number | null | undefined;
   options: SSOption[];
@@ -670,7 +809,7 @@ interface SearchableSelectProps {
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
-  // ... (Component gi? nguyên)
+  // ... (Component giữ nguyên)
   name,
   value,
   options,
@@ -779,26 +918,27 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const [customMode, setCustomMode] = useState(false);
   const {
     formData,
     updateForm,
     supplies,
+    allSupplies,
     products,
     isLoading,
     isDataLoaded,
     selectedSupplyId,
     customerType,
     setIsDataLoaded,
+    customProductTouched,
+    setCustomProductTouched,
     handleChange,
     handleProductSelect,
     handleSourceSelect,
-    handleSourceChange,
     handleProductChange,
     handleCustomerTypeChange,
     handleSubmit,
-  } = useCreateOrderLogic(isOpen, onSave);
-  // Toggle nhập mới: phải khai báo trước early-return
-  const [customMode, setCustomMode] = useState(false);
+  } = useCreateOrderLogic(isOpen, onSave, customMode);
 
   const handlePriceInput = useCallback(
     (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -811,77 +951,78 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
 
   // When custom mode is on, compute expiry using --xm by adding months then -1 day.
-  // Also compute exact day count inclusively between start and end.
+  // Only run after user leaves the custom product input (onBlur).
   useEffect(() => {
-    if (!customMode) return;
-    const infoA = (formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM] as string) || "";
-    const infoB = (formData[ORDER_FIELDS.SAN_PHAM] as string) || "";
+    if (!customMode || !customProductTouched) return;
+    const infoA = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
+    const infoB = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
     const months = Helpers.parseMonthsFromInfo(infoA) || Helpers.parseMonthsFromInfo(infoB);
     const registerDate =
-      (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) || Helpers.getTodayDMY();
+      (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
 
     if (months > 0) {
       const end = Helpers.addMonthsMinusOneDay(registerDate, months);
       const days = Helpers.inclusiveDaysBetween(registerDate, end);
       updateForm({
-        [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(days),
-        [ORDER_FIELDS.HET_HAN]: end,
+        [ORDER_FIELDS.DAYS]: String(days),
+        [ORDER_FIELDS.ORDER_EXPIRED]: end,
       } as any);
     }
   }, [
     customMode,
-    formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM],
-    formData[ORDER_FIELDS.SAN_PHAM],
-    formData[ORDER_FIELDS.NGAY_DANG_KI],
+    customProductTouched,
+    formData[ORDER_FIELDS.INFORMATION_ORDER],
+    formData[ORDER_FIELDS.ID_PRODUCT],
+    formData[ORDER_FIELDS.ORDER_DATE],
   ]);
 
   // Ensure expiry date is populated and formatted.
   // If backend doesn't return it, compute from register date + days.
   useEffect(() => {
-    const rawExpiry = (formData[ORDER_FIELDS.HET_HAN] as string) || "";
+    const rawExpiry = (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || "";
     const registerDMY =
-      (formData[ORDER_FIELDS.NGAY_DANG_KI] as string) || Helpers.getTodayDMY();
-    const days = Number(formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] || 0) || 0;
+      (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+    const days = Number(formData[ORDER_FIELDS.DAYS] || 0) || 0;
 
     const normalized = Helpers.formatDateToDMY(rawExpiry);
 
     if (!normalized && registerDMY && days > 0) {
       const computed = calculateExpirationDate(registerDMY, days);
       if (computed && computed !== "N/A") {
-        updateForm({ [ORDER_FIELDS.HET_HAN]: computed } as any);
+        updateForm({ [ORDER_FIELDS.ORDER_EXPIRED]: computed } as any);
       }
     } else if (normalized && normalized !== rawExpiry) {
-      updateForm({ [ORDER_FIELDS.HET_HAN]: normalized } as any);
+      updateForm({ [ORDER_FIELDS.ORDER_EXPIRED]: normalized } as any);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    formData[ORDER_FIELDS.HET_HAN],
-    formData[ORDER_FIELDS.NGAY_DANG_KI],
-    formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI],
+    formData[ORDER_FIELDS.ORDER_EXPIRED],
+    formData[ORDER_FIELDS.ORDER_DATE],
+    formData[ORDER_FIELDS.DAYS],
   ]);
 
   // Mark data as ready when 4 required fields are filled
   useEffect(() => {
-    const prod = (formData[ORDER_FIELDS.SAN_PHAM] as string) || "";
-    const src = (formData[ORDER_FIELDS.NGUON] as string) || "";
-    const info = (formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM] as string) || "";
-    const customer = (formData[ORDER_FIELDS.KHACH_HANG] as string) || "";
+    const prod = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
+    const src = (formData[ORDER_FIELDS.SUPPLY] as string) || "";
+    const info = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
+    const customer = (formData[ORDER_FIELDS.CUSTOMER] as string) || "";
     const ready = !!prod && !!src && !!info && !!customer;
     setIsDataLoaded(ready);
   }, [
-    formData[ORDER_FIELDS.SAN_PHAM],
-    formData[ORDER_FIELDS.NGUON],
-    formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM],
-    formData[ORDER_FIELDS.KHACH_HANG],
+    formData[ORDER_FIELDS.ID_PRODUCT],
+    formData[ORDER_FIELDS.SUPPLY],
+    formData[ORDER_FIELDS.INFORMATION_ORDER],
+    formData[ORDER_FIELDS.CUSTOMER],
   ]);
 
   if (!isOpen) return null;
 
   const isFormComplete = Boolean(
-    formData[ORDER_FIELDS.KHACH_HANG] &&
-    formData[ORDER_FIELDS.SAN_PHAM] &&
-    formData[ORDER_FIELDS.NGUON] &&
-    formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM]
+    formData[ORDER_FIELDS.CUSTOMER] &&
+    formData[ORDER_FIELDS.ID_PRODUCT] &&
+    formData[ORDER_FIELDS.SUPPLY] &&
+    formData[ORDER_FIELDS.INFORMATION_ORDER]
   );
 
   return (
@@ -926,8 +1067,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <label className={labelClass}>Mã Đơn Hàng</label>
                   <input
                     type="text"
-                    name={ORDER_FIELDS.ID_DON_HANG}
-                    value={formData[ORDER_FIELDS.ID_DON_HANG]}
+                    name={ORDER_FIELDS.ID_ORDER}
+                    value={formData[ORDER_FIELDS.ID_ORDER] || ""}
                     readOnly
                     className={`${inputClass} font-semibold ${readOnlyClass}`}
                   />
@@ -940,20 +1081,20 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    name={ORDER_FIELDS.KHACH_HANG}
-                    value={formData[ORDER_FIELDS.KHACH_HANG]}
+                    name={ORDER_FIELDS.CUSTOMER}
+                    value={formData[ORDER_FIELDS.CUSTOMER] || ""}
                     onChange={handleChange}
                     className={inputClass}
                     required
                   />
                 </div>
-                {/* Link Liên H? */}
+                {/* Link Liên Hệ */}
                 <div>
-                  <label className={labelClass}>Link Liên H?</label>
+                  <label className={labelClass}>Link Liên Hệ</label>
                   <input
                     type="url"
-                    name={ORDER_FIELDS.LINK_LIEN_HE}
-                    value={formData[ORDER_FIELDS.LINK_LIEN_HE]}
+                    name={ORDER_FIELDS.CONTACT}
+                    value={formData[ORDER_FIELDS.CONTACT] || ""}
                     onChange={handleChange}
                     className={inputClass}
                   />
@@ -968,8 +1109,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     Sản Phẩm <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
-                    name={ORDER_FIELDS.SAN_PHAM}
-                    value={formData[ORDER_FIELDS.SAN_PHAM] as string}
+                    name={ORDER_FIELDS.ID_PRODUCT}
+                    value={(formData[ORDER_FIELDS.ID_PRODUCT] as string) || ""}
                     options={products.map((p) => ({
                       value: p.san_pham,
                       label: p.san_pham,
@@ -987,25 +1128,30 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     Nguồn <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
-                    name={ORDER_FIELDS.NGUON}
+                    name={ORDER_FIELDS.SUPPLY}
                     value={selectedSupplyId ?? ""}
                     options={supplies.map((s) => ({
                       value: s.id,
                       label: s.source_name,
                     }))}
                     placeholder="-- Chọn --"
-                    disabled={customMode || !formData[ORDER_FIELDS.SAN_PHAM]}
+                    disabled={
+                      customMode || !formData[ORDER_FIELDS.ID_PRODUCT]
+                    }
                     onChange={(val) => handleSourceSelect(Number(val))}
                     onClear={() => handleSourceSelect(0)}
                   />
                 </div>
 
                 {/* 3. Nút Thêm (+) ở cuối hàng */}
-                <div className="md:col-span-2 flex md:justify-end">
+                <div className="md:col-span-2 flex items-end md:justify-end">
                   <button
                     type="button"
                     aria-label="Toggle"
-                    onClick={() => setCustomMode((v) => !v)}
+                    onClick={() => {
+                      setCustomProductTouched(false);
+                      setCustomMode((v) => !v);
+                    }}
                     className={`mt-6 md:mt-0 inline-flex items-center justify-center w-10 h-10 rounded-md text-white ${
                       customMode
                         ? "bg-red-500 hover:bg-red-600"
@@ -1027,11 +1173,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <label className={labelClass}>Sản Phẩm Mới</label>
                       <input
                         type="text"
-                        name={ORDER_FIELDS.SAN_PHAM}
-                        value={
-                          (formData[ORDER_FIELDS.SAN_PHAM] as string) || ""
-                        }
+                        name={ORDER_FIELDS.ID_PRODUCT}
+                        value={(formData[ORDER_FIELDS.ID_PRODUCT] as string) || ""}
                         onChange={handleChange}
+                        onBlur={() => setCustomProductTouched(true)}
                         className={inputClass}
                         placeholder="Nhập Tên Sản Phẩm Mới"
                       />
@@ -1040,8 +1185,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <label className={labelClass}>Nguồn Mới</label>
                       <input
                         type="text"
-                        name={ORDER_FIELDS.NGUON}
-                        value={(formData[ORDER_FIELDS.NGUON] as string) || ""}
+                        name={ORDER_FIELDS.SUPPLY}
+                        value={(formData[ORDER_FIELDS.SUPPLY] as string) || ""}
                         onChange={handleChange}
                         className={inputClass}
                         placeholder="Nhập Tên Nguồn Mới"
@@ -1057,8 +1202,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </label>
                   <input
                     type="text"
-                    name={ORDER_FIELDS.THONG_TIN_SAN_PHAM}
-                    value={formData[ORDER_FIELDS.THONG_TIN_SAN_PHAM]}
+                    name={ORDER_FIELDS.INFORMATION_ORDER}
+                    value={formData[ORDER_FIELDS.INFORMATION_ORDER] || ""}
                     onChange={handleChange}
                     className={inputClass}
                     required
@@ -1073,8 +1218,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Ngày Đăng Ký</label>
                     <input
                       type="text"
-                      name={ORDER_FIELDS.NGAY_DANG_KI}
-                      value={formData[ORDER_FIELDS.NGAY_DANG_KI]}
+                      name={ORDER_FIELDS.ORDER_DATE}
+                      value={formData[ORDER_FIELDS.ORDER_DATE] || ""}
                       readOnly
                       className={`${inputClass} ${readOnlyClass}`}
                     />
@@ -1084,8 +1229,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Số Ngày Đăng Ký</label>
                     <input
                       type="text"
-                      name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
-                      value={formData[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]}
+                      name={ORDER_FIELDS.DAYS}
+                      value={formData[ORDER_FIELDS.DAYS] || ""}
                       readOnly
                       className={`${inputClass} ${readOnlyClass}`}
                     />
@@ -1095,8 +1240,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Ngày Hết Hạn</label>
                     <input
                       type="text"
-                      name={ORDER_FIELDS.HET_HAN}
-                      value={formData[ORDER_FIELDS.HET_HAN]}
+                      name={ORDER_FIELDS.ORDER_EXPIRED}
+                      value={formData[ORDER_FIELDS.ORDER_EXPIRED] || ""}
                       readOnly
                       className={`${inputClass} font-medium text-red-600 ${readOnlyClass}`}
                     />
@@ -1107,7 +1252,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <input
                       type="text"
                       name={ORDER_FIELDS.SLOT}
-                      value={formData[ORDER_FIELDS.SLOT]}
+                      value={formData[ORDER_FIELDS.SLOT] || ""}
                       onChange={handleChange}
                       className={inputClass}
                     />
@@ -1122,19 +1267,19 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <input
                         type="text"
                         inputMode="numeric"
-                        name={ORDER_FIELDS.GIA_NHAP}
+                        name={ORDER_FIELDS.COST}
                         value={Helpers.formatCurrencyPlain(
-                          Number(formData[ORDER_FIELDS.GIA_NHAP] || 0)
+                          Number(formData[ORDER_FIELDS.COST] || 0)
                         )}
-                        onChange={handlePriceInput(ORDER_FIELDS.GIA_NHAP)}
+                        onChange={handlePriceInput(ORDER_FIELDS.COST)}
                         className={`${inputClass} font-semibold`}
                       />
                     ) : (
                       <input
                         type="text"
-                        name={ORDER_FIELDS.GIA_NHAP}
+                        name={ORDER_FIELDS.COST}
                         value={Helpers.formatCurrency(
-                          formData[ORDER_FIELDS.GIA_NHAP] || 0
+                          formData[ORDER_FIELDS.COST] || 0
                         )}
                         readOnly
                         className={`${inputClass} font-semibold ${readOnlyClass}`}
@@ -1148,22 +1293,22 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <input
                         type="text"
                         inputMode="numeric"
-                        name={ORDER_FIELDS.GIA_BAN}
+                        name={ORDER_FIELDS.PRICE}
                         value={Helpers.formatCurrencyPlain(
-                          Number(formData[ORDER_FIELDS.GIA_BAN] || 0)
+                          Number(formData[ORDER_FIELDS.PRICE] || 0)
                         )}
-                        onChange={handlePriceInput(ORDER_FIELDS.GIA_BAN)}
+                        onChange={handlePriceInput(ORDER_FIELDS.PRICE)}
                         className={`${inputClass} font-semibold text-green-700`}
                       />
                     ) : (
                       <input
                         type="text"
-                        name={ORDER_FIELDS.GIA_BAN}
+                        name={ORDER_FIELDS.PRICE}
                         value={
                           customerType === "MAVK" && !selectedSupplyId
                             ? ""
                             : Helpers.formatCurrency(
-                                formData[ORDER_FIELDS.GIA_BAN] || 0
+                                formData[ORDER_FIELDS.PRICE] || 0
                               )
                         }
                         readOnly
@@ -1177,7 +1322,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Ghi Chú</label>
                     <textarea
                       name={ORDER_FIELDS.NOTE}
-                      value={formData[ORDER_FIELDS.NOTE]}
+                      value={formData[ORDER_FIELDS.NOTE] || ""}
                       onChange={handleChange}
                       rows={8}
                       className={inputClass}

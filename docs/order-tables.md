@@ -30,20 +30,20 @@ Tài liệu này tổng hợp cấu trúc các bảng chính liên quan tới đ
 | Cột                  | Kiểu dữ liệu    | Ghi chú                                       |
 | -------------------- | --------------- | --------------------------------------------- |
 | `id`                 | `int4`          | Khóa chính tự tăng.                           |
-| `id_don_hang`        | `text`          | Mã đơn bị hủy.                                |
-| `san_pham`           | `text`          | Tên sản phẩm.                                 |
-| `thong_tin_san_pham` | `text`          | Mô tả sản phẩm.                               |
-| `khach_hang`         | `text`          | Khách hàng.                                   |
-| `link_lien_he`       | `text`          | Link liên hệ/nhóm.                            |
+| `id_order`           | `text`          | Mã đơn bị hủy.                                |
+| `id_product`         | `text`          | ID sản phẩm.                                  |
+| `information_order`  | `text`          | Mô tả/thông tin sản phẩm.                     |
+| `customer`           | `text`          | Khách hàng.                                   |
+| `contact`            | `text`          | Link liên hệ/nhóm.                            |
 | `slot`               | `text`          | Slot chiến dịch.                              |
-| `ngay_dang_ki`       | `date`          | Ngày đăng ký ban đầu.                         |
-| `so_ngay_da_dang_ki` | `int4`          | Số ngày đã đăng ký trước khi hủy.             |
-| `het_han`            | `date`          | Ngày hết hạn hợp đồng.                        |
-| `nguon`              | `text`          | Nguồn đơn.                                    |
-| `gia_nhap`           | `numeric(15,2)` | Giá nhập (chi phí).                           |
-| `gia_ban`            | `numeric(15,2)` | Giá bán (doanh thu kỳ vọng).                  |
-| `can_hoan`           | `numeric(15,2)` | Số tiền cần hoàn trả (nếu có).                |
-| `tinh_trang`         | `text`          | Trạng thái hiện tại (đã hoàn, đang xử lý...). |
+| `order_date`         | `date`          | Ngày đăng ký ban đầu.                         |
+| `days`               | `int4`          | Số ngày đã đăng ký trước khi hủy.             |
+| `order_expired`      | `date`          | Ngày hết hạn hợp đồng.                        |
+| `supply`             | `text`          | Nguồn đơn.                                    |
+| `cost`               | `numeric(15,2)` | Giá nhập (chi phí).                           |
+| `price`              | `numeric(15,2)` | Giá bán (doanh thu kỳ vọng).                  |
+| `refund`             | `numeric(15,2)` | Số tiền cần hoàn trả (nếu có).                |
+| `status`             | `text`          | Trạng thái hiện tại (đã hoàn, đang xử lý...). |
 | `check_flag`         | `bool`          | Đánh dấu đã kiểm tra.                         |
 
 ## `mavryk.order_expired`
@@ -90,22 +90,22 @@ bank_name character varying(255) NOT NULL
 );
 
 CREATE TABLE mavryk.order_canceled (
-id integer NOT NULL,
-id_don_hang text,
-san_pham text,
-thong_tin_san_pham text,
-khach_hang text,
-link_lien_he text,
-slot text,
-ngay_dang_ki date,
-so_ngay_da_dang_ki text,
-het_han date,
-nguon text,
-gia_nhap numeric(15,2),
-gia_ban numeric(15,2),
-can_hoan numeric(15,2),
-tinh_trang text,
-check_flag boolean
+  id integer NOT NULL,
+  id_order text,
+  id_product text,
+  information_order text,
+  customer text,
+  contact text,
+  slot text,
+  order_date date,
+  days text,
+  order_expired date,
+  supply text,
+  cost numeric(15,2),
+  price numeric(15,2),
+  refund numeric(15,2),
+  status text,
+  check_flag boolean
 );
 
 CREATE TABLE mavryk.order_expired (

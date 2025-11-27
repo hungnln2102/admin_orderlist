@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -24,6 +24,7 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
+import { ORDER_COLS } from "../lib/tableSql";
 
 const SUMMARY_CARD_ACCENTS = [
   {
@@ -84,11 +85,11 @@ type PackageRow = {
 };
 type OrderListItem = {
   id?: number | string | null;
-  id_don_hang?: string | number | null;
-  san_pham?: string | null;
-  thong_tin_san_pham?: string | null;
+  id_order?: string | number | null;
+  id_product?: string | null;
+  information_order?: string | null;
   slot?: string | null;
-  khach_hang?: string | null;
+  customer?: string | null;
   [key: string]: unknown;
 };
 type PackageSlotAssignment = {
@@ -356,7 +357,7 @@ const extractCapacityUnitsFromOrder = (
   }
   const normalizedValue = extractDigitsValue(remainder);
   if (normalizedValue) return normalizedValue;
-  const fallbackNormalized = normalizeIdentifier(record.base?.san_pham ?? "");
+  const fallbackNormalized = normalizeIdentifier(record.base?.id_product ?? "");
   return extractDigitsValue(fallbackNormalized);
 };
 const formatCapacityLabel = (units?: number | null): string => {
@@ -456,8 +457,8 @@ const SLOT_LINK_OPTIONS: Array<{
       "Các gói sẽ được liên kết với đơn hàng dựa trên mã định danh vị trí (slot) của đơn hàng.",
   },
 ];
-const MATCH_COLUMN_INFORMATION = "thong_tin_don_hang";
-const MATCH_COLUMN_SLOT = "slot";
+const MATCH_COLUMN_INFORMATION = ORDER_COLS.informationOrder;
+const MATCH_COLUMN_SLOT = ORDER_COLS.slot;
 const toSlotLinkModeFromMatch = (value?: string | null): SlotLinkMode =>
   value === MATCH_COLUMN_SLOT ? "slot" : "information";
 const toMatchColumnValue = (mode: SlotLinkMode): string =>
@@ -654,8 +655,8 @@ export default function PackageProduct() {
   );
   const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
     return orders.map((order) => {
-      const productKeys = buildIdentifierKeys(order.san_pham ?? "");
-      const infoKeys = buildIdentifierKeys(order.thong_tin_san_pham ?? "");
+      const productKeys = buildIdentifierKeys(order.id_product ?? "");
+      const infoKeys = buildIdentifierKeys(order.information_order ?? "");
       return {
         base: order,
         productKey: productKeys.normalized,
@@ -665,11 +666,11 @@ export default function PackageProduct() {
         slotDisplay: toCleanString(order.slot),
         slotKey: normalizeSlotKey(order.slot),
         slotMatchKey: normalizeMatchKey(order.slot),
-        informationDisplay: toCleanString(order.thong_tin_san_pham),
-        informationKey: normalizeSlotKey(order.thong_tin_san_pham),
-        informationMatchKey: normalizeMatchKey(order.thong_tin_san_pham),
-        customerDisplay: toCleanString(order.khach_hang as string | null),
-        productCodeNormalized: normalizeProductCodeValue(order.san_pham),
+        informationDisplay: toCleanString(order.information_order),
+        informationKey: normalizeSlotKey(order.information_order),
+        informationMatchKey: normalizeMatchKey(order.information_order),
+        customerDisplay: toCleanString(order.customer as string | null),
+        productCodeNormalized: normalizeProductCodeValue(order.id_product),
       };
     });
   }, [orders]);
@@ -720,28 +721,31 @@ export default function PackageProduct() {
       setCategoryFilter("all");
     }
   }, [location.search]);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (categoryFilter === "all") {
+      params.delete("package");
+    } else {
+      params.set("package", categoryFilter);
+    }
+    const search = params.toString();
+    const nextSearch = search ? `?${search}` : "";
+    if (nextSearch === location.search) return;
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch,
+      },
+      { replace: true }
+    );
+  }, [categoryFilter, location.pathname, location.search, navigate]);
   const handleCategorySelect = useCallback(
     (value: string) => {
-      setCategoryFilter((prev) => {
-        const next = value === "all" ? "all" : prev === value ? "all" : value;
-        const params = new URLSearchParams(location.search);
-        if (next === "all") {
-          params.delete("package");
-        } else {
-          params.set("package", next);
-        }
-        const search = params.toString();
-        navigate(
-          {
-            pathname: location.pathname,
-            search: search ? `?${search}` : "",
-          },
-          { replace: true }
-        );
-        return next;
-      });
+      setCategoryFilter((prev) =>
+        value === "all" ? "all" : prev === value ? "all" : value
+      );
     },
-    [location.pathname, location.search, navigate]
+    []
   );
   const computedRows: AugmentedRow[] = useMemo(
     () =>
@@ -836,9 +840,9 @@ export default function PackageProduct() {
               orderRecord.base?.id !== undefined &&
               orderRecord.base?.id !== null
                 ? `id:${orderRecord.base.id}`
-                : orderRecord.base?.id_don_hang !== undefined &&
-                  orderRecord.base?.id_don_hang !== null
-                ? `code:${orderRecord.base.id_don_hang}`
+                : orderRecord.base?.id_order !== undefined &&
+                  orderRecord.base?.id_order !== null
+                ? `code:${orderRecord.base.id_order}`
                 : `${matchValue}-${slotAssignments.length}`;
             if (seenOrderIds.has(uniqueKey)) return;
             seenOrderIds.add(uniqueKey);
@@ -860,7 +864,7 @@ export default function PackageProduct() {
                 matchValue: matchValue || resolvedLabel,
                 sourceOrderId: orderRecord.base?.id ?? null,
                 sourceOrderCode:
-                  (orderRecord.base?.id_don_hang as string | number | null) ??
+                  (orderRecord.base?.id_order as string | number | null) ??
                   null,
                 displayColumn,
                 matchColumn,
@@ -1863,7 +1867,7 @@ export default function PackageProduct() {
                                       Chi Tiết Các vị trí
                                     </p>
                                     <p className="text-xs text-white/80">
-                                      Hiển thị {totalSlots} vị trí — {slotUsed}{" "}
+                                      Hiển thị {totalSlots} vị trí  {slotUsed}{" "}
                                       đã dùng, {remainingSlots} còn trống
                                     </p>
                                   </div>
@@ -2043,11 +2047,11 @@ function CreatePackageModal({
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("Vui lòng nh?p tên lo?i gói.");
+      setError("Vui lòng nhập tên loại gói.");
       return;
     }
     if (fields.size === 0) {
-      setError("Vui lòng ch?n ít nh?t m?t tru?ng d? li?u.");
+      setError("Vui lòng chọn ít nhất một trường dữ liệu.");
       return;
     }
     onSubmit(trimmed, Array.from(fields));
@@ -2057,8 +2061,8 @@ function CreatePackageModal({
       open={open}
       title={
         mode === "edit" && initialName
-          ? `Ch?nh s?a lo?i gói: ${initialName}`
-          : "T?o lo?i gói s?n ph?m m?i"
+          ? `Chỉnh sửa loại gói: ${initialName}`
+          : "Tạo loại gói sản phẩm mới"
       }
       onClose={onClose}
       footer={
@@ -2067,13 +2071,13 @@ function CreatePackageModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-indigo-500/15 transition"
           >
-            H?y b?
+            Hủy bỏ
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            {mode === 'create' ? 'T?o Lo?i' : 'Luu Thay Ð?i'}
+            {mode === 'create' ? 'Tạo Loại' : 'Lưu Thay Đổi'}
           </button>
         </>
       }
@@ -2081,13 +2085,13 @@ function CreatePackageModal({
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tên Lo?i Gói
+            Tên Loại Gói
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ví d?: Google One, Netflix, Spotify..."
+            placeholder="Ví dụ: Google One, Netflix, Spotify..."
             className={`w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 ${
               mode === "edit" ? "bg-gray-100 cursor-not-allowed" : ""
             }`}
@@ -2095,15 +2099,14 @@ function CreatePackageModal({
           />
           {mode === "edit" && (
             <p className="text-xs text-white/70 mt-1">
-              B?n ch? có th? ch?nh s?a các tru?ng d? li?u, tên lo?i gói gi?
-              nguyên.
+              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ nguyên.
             </p>
           )}
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Các tru?ng d? li?u c?a lo?i gói này
+              Các trường dữ liệu của loại gói này
             </label>
             <div className="flex items-center gap-3 text-xs">
               <button
@@ -2111,14 +2114,14 @@ function CreatePackageModal({
                 onClick={selectAll}
                 className="text-blue-600 hover:text-blue-700"
               >
-                Ch?n t?t c?
+                Chọn tất cả
               </button>
               <button
                 type="button"
                 onClick={clearAll}
                 className="text-rose-600 hover:text-rose-700"
               >
-                B? ch?n t?t c?
+                Bỏ chọn tất cả
               </button>
             </div>
           </div>
@@ -2153,17 +2156,17 @@ function CreatePackageModal({
 function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   if (!open || !row) return null;
   const packageDetails = [
-    { label: "Tài kho?n", value: row.informationUser },
-    { label: "M?t kh?u", value: row.informationPass },
+    { label: "Tài khoản", value: row.informationUser },
+    { label: "Mật khẩu", value: row.informationPass },
     { label: "Mail 2FA", value: row.informationMail },
     { label: "Ghi chú", value: row.note },
-    { label: "Ngu?n", value: row.supplier },
-    { label: "Giá nh?p", value: row.import },
-    { label: "Ngày h?t h?n", value: formatDisplayDate(row.expired) },
+    { label: "Nguồn", value: row.supplier },
+    { label: "Giá nhập", value: row.import },
+    { label: "Ngày hết hạn", value: formatDisplayDate(row.expired) },
   ];
   const accountDetails = [
-    { label: "Tài kho?n", value: row.accountUser },
-    { label: "M?t kh?u", value: row.accountPass },
+    { label: "Tài khoản", value: row.accountUser },
+    { label: "Mật khẩu", value: row.accountPass },
     { label: "Mail 2FA", value: row.accountMail },
     { label: "Ghi chú", value: row.accountNote },
   ];
@@ -2188,14 +2191,14 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
   return (
     <ModalShell
       open={open}
-      title={`Chi Ti?t Gói: ${row.package}`}
+      title={`Chi Tiết Gói: ${row.package}`}
       onClose={onClose}
       footer={
         <button
           onClick={onClose}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
         >
-          Ðóng
+          Đóng
         </button>
       }
     >
@@ -2210,7 +2213,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
               Thông tin gói
             </h3>
             <p className="text-xs text-white/80">
-              Các tru?ng d? li?u du?c luu cho gói này.
+              Các trường dữ liệu được lưu cho gói này.
             </p>
           </div>
           <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -2234,10 +2237,10 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
           <section className="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
             <div>
               <h3 className="text-sm font-semibold text-white">
-                Tài kho?n dung lu?ng
+                Tài khoản dung lượng
               </h3>
               <p className="text-xs text-white/80">
-                T?ng quan v? tài kho?n dung lu?ng.
+                Tổng quan về tài khoản dung lượng.
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-3 text-sm">
@@ -2268,7 +2271,7 @@ function PackageViewModal({ open, row, onClose }: PackageViewModalProps) {
                 />
               </div>
               <div className="text-xs text-white/80">
-                Còn tr?ng: {remainingCapacity} GB
+                Còn trống: {remainingCapacity} GB
               </div>
             </div>
           </section>
@@ -2330,7 +2333,7 @@ function PackageFormModal({
   return (
     <ModalShell
       open={open}
-      title={`${mode === "add" ? "Thêm Gói" : "S?a Gói"} - ${template.name}`}
+      title={`${mode === "add" ? "Thêm Gói" : "Sửa Gói"} - ${template.name}`}
       onClose={onClose}
       footer={
         <>
@@ -2338,13 +2341,13 @@ function PackageFormModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-indigo-500/15 transition"
           >
-            H?y
+            Hủy
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            {mode === "add" ? "Luu gói" : "Luu thay d?i"}
+            {mode === "add" ? "Lưu gói" : "Lưu thay đổi"}
           </button>
         </>
       }
@@ -2360,10 +2363,10 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-white">
-                    Chi ti?t gói
+                    Chi tiết gói
                   </h3>
                   <p className="text-xs text-white/80">
-                    Nh?p các tru?ng mô t? liên quan d?n gói này.
+                    Nhập các trường mô tả liên quan đến gói này.
                   </p>
                 </div>
                 {template.fields.includes("information") && (
@@ -2371,26 +2374,26 @@ function PackageFormModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tài kho?n
+                          Tài khoản
                         </label>
                         <input
                           type="text"
                           value={values.informationUser}
                           onChange={(e) => handleChange("informationUser", e)}
                           className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="tên dang nh?p"
+                          placeholder="tên đăng nhập"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          M?t kh?u
+                          Mật khẩu
                         </label>
                         <input
                           type="text"
                           value={values.informationPass}
                           onChange={(e) => handleChange("informationPass", e)}
                           className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="m?t kh?u"
+                          placeholder="mật khẩu"
                         />
                       </div>
                     </div>
@@ -2425,7 +2428,7 @@ function PackageFormModal({
                 {template.fields.includes("supplier") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nhà cung c?p
+                      Nhà cung cấp
                     </label>
                     <input
                       type="text"
@@ -2438,7 +2441,7 @@ function PackageFormModal({
                 {template.fields.includes("import") && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Giá nh?p (VND)
+                      Giá nhập (VND)
                     </label>
                     <input
                       type="number"
@@ -2451,7 +2454,7 @@ function PackageFormModal({
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ngày h?t h?n
+                    Ngày hết hạn
                   </label>
                   <input
                     type="date"
@@ -2466,35 +2469,35 @@ function PackageFormModal({
               <div className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-white">
-                    Tài kho?n dung lu?ng
+                    Tài khoản dung lượng
                   </h3>
                   <p className="text-xs text-white/80">
-                    Cung c?p thông tin tài kho?n dung lu?ng.
+                    Cung cấp thông tin tài khoản dung lượng.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tài kho?n
+                      Tài khoản
                     </label>
                     <input
                       type="text"
                       value={values.accountUser}
                       onChange={(e) => handleChange("accountUser", e)}
                       className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="tên dang nh?p"
+                      placeholder="tên đăng nhập"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      M?t kh?u
+                      Mật khẩu
                     </label>
                     <input
                       type="text"
                       value={values.accountPass}
                       onChange={(e) => handleChange("accountPass", e)}
                       className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="m?t kh?u"
+                      placeholder="mật khẩu"
                     />
                   </div>
                   <div>
@@ -2519,19 +2522,19 @@ function PackageFormModal({
                     onChange={(e) => handleChange("accountNote", e)}
                     className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                     rows={3}
-                    placeholder="Ghi chú cho tài kho?n dung lu?ng"
+                    placeholder="Ghi chú cho tài khoản dung lượng"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dung lu?ng (GB)
+                    Dung lượng (GB)
                   </label>
                   <input
                     type="number"
                     min={0}
                     value={values.capacity}
                     onChange={(e) => handleChange("capacity", e)}
-                    placeholder={`M?c d?nh: ${DEFAULT_CAPACITY_LIMIT}`}
+                    placeholder={`Mặc định: ${DEFAULT_CAPACITY_LIMIT}`}
                     className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -2541,14 +2544,14 @@ function PackageFormModal({
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            S? vi tri (slot)
+            Số vị trí (slot)
           </label>
           <input
             type="number"
             min={0}
             value={values.slot}
             onChange={(e) => handleChange("slot", e)}
-            placeholder={`M?c d?nh: ${DEFAULT_SLOT_LIMIT}`}
+            placeholder={`Mặc định: ${DEFAULT_SLOT_LIMIT}`}
             className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -2556,10 +2559,10 @@ function PackageFormModal({
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-sm font-medium text-gray-700">
-                Co ch? kh?p l?nh
+                Cơ chế khớp lệnh
               </p>
               <p className="text-xs text-white/80">
-                Ch?n cách các vi tri du?c tính t? don hàng.
+                Chọn cách các vị trí được tính từ đơn hàng.
               </p>
             </div>
           </div>
@@ -2573,8 +2576,8 @@ function PackageFormModal({
                   onClick={() => handleSlotLinkModeChange(option.value)}
                   className={`border rounded-lg p-3 text-left transition ${
                     isSelected
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 hover:border-blue-300 text-gray-700"
+                      ? "border-white/40 bg-white/10 text-white shadow-md"
+                      : "border-white/20 bg-white/0 text-white/80 hover:border-white/40 hover:bg-white/5"
                   }`}
                 >
                   <span className="block text-sm font-semibold">
@@ -2588,17 +2591,18 @@ function PackageFormModal({
             })}
           </div>
           <p className="text-xs text-white/80 mt-2">
-            <b>Liên k?t theo thông tin don hàng:</b> So kh?p thông tin c?a gói
-            này (tài kho?n, mail, v.v.) v?i các chi ti?t trong don hàng c?a
+            <b>Liên kết theo thông tin đơn hàng:</b> So khớp thông tin của gói
+            này (tài khoản, mail, v.v.) với các chi tiết trong đơn hàng của
             khách.
             <br />
-            <b>Liên k?t theo vi tri:</b> So kh?p thông tin c?a gói này v?i m?t
-            mã vi tri (slot) c? th? du?c ch? d?nh trong don hàng.
+            <b>Liên kết theo vị trí:</b> So khớp thông tin của gói này với một
+            mã vị trí (slot) cụ thể được chỉ định trong đơn hàng.
+            <br />
           </p>
         </div>
         {template.fields.length === 0 && (
           <p className="text-sm text-white/80">
-            Lo?i gói này không có tru?ng d? li?u nào du?c d?nh c?u hình.
+            Loại gói này không có trường dữ liệu nào được cấu hình.
           </p>
         )}
       </form>

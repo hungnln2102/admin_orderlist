@@ -1,39 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as Helpers from "../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { API_ENDPOINTS } from "../constants";
+import { API_ENDPOINTS, ORDER_FIELDS, VIRTUAL_FIELDS, Order } from "../constants";
 
-interface Order {
-  id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
-  slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
-  registration_date?: string;
-  expiry_date?: string;
-  registration_date_display?: string;
-  expiry_date_display?: string;
-  nguon: string;
-  gia_nhap: number;
-  gia_ban: number;
-  note: string;
-  tinh_trang: string;
-  check_flag?: boolean | null;
-  so_ngay_con_lai?: number;
-  giaTriConLai?: number;
-  trangThaiText?: string;
+type OrderView = Order & {
   customer_type?: string | null;
-}
+  trangThaiText?: string | null;
+  giaTriConLai?: number | null;
+};
 
 interface ViewOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  order: Order | null;
+  order: OrderView | null;
   formatCurrency: (value: number | string) => string;
 }
 
@@ -66,20 +45,38 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     }
 
     let ignore = false;
-    const basePrice = Number(order.gia_ban) || 0;
+    const basePrice = Number(order[ORDER_FIELDS.PRICE]) || 0;
     setCalculatedPrice(basePrice);
 
-    if (!order.san_pham || !order.id_don_hang) {
+    const productName = order[ORDER_FIELDS.ID_PRODUCT];
+    const orderId = order[ORDER_FIELDS.ID_ORDER];
+
+    if (!productName || !orderId) {
       setPriceLoading(false);
       return;
     }
 
+    const orderDateRaw =
+      order.registration_date ||
+      (order[ORDER_FIELDS.ORDER_DATE] as string) ||
+      "";
+    const normalizedOrderDate =
+      Helpers.convertDMYToYMD(
+        Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
+      ) || null;
+
     const payload: Record<string, unknown> = {
-      san_pham_name: order.san_pham,
-      id_don_hang: order.id_don_hang,
+      san_pham_name: productName,
+      id_product: productName,
+      id_order: orderId,
     };
 
-    const customerType = order.customer_type || order.nguon;
+    if (normalizedOrderDate) {
+      payload.order_date = normalizedOrderDate;
+    }
+
+    const customerType =
+      order.customer_type || (order[ORDER_FIELDS.SUPPLY] as string);
     if (customerType) {
       payload.customer_type = customerType;
     }
@@ -144,30 +141,38 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     };
   }, [
     isOpen,
-    order?.id_don_hang,
-    order?.san_pham,
-    order?.nguon,
+    order?.[ORDER_FIELDS.ID_ORDER],
+    order?.[ORDER_FIELDS.ID_PRODUCT],
+    order?.[ORDER_FIELDS.SUPPLY],
     order?.customer_type,
-    order?.gia_ban,
+    order?.[ORDER_FIELDS.PRICE],
   ]);
 
   const effectiveAmount = useMemo(() => {
     if (!order) return 0;
-    const fallback = Number(order.gia_ban) || 0;
+    const fallback = Number(order[ORDER_FIELDS.PRICE]) || 0;
     return Math.max(0, calculatedPrice ?? fallback);
   }, [order, calculatedPrice]);
 
   if (!isOpen || !order) return null;
 
   const displayStatus =
-    (order.trangThaiText || order.tinh_trang || "").trim() || "Chua Thanh Toan";
+    (order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] ||
+      order.trangThaiText ||
+      order[ORDER_FIELDS.STATUS] ||
+      "").trim() || "Chua Thanh Toan";
 
   const remainingFromBackend =
-    order.so_ngay_con_lai !== undefined && order.so_ngay_con_lai !== null
-      ? Number(order.so_ngay_con_lai)
+    order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== undefined &&
+    order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== null
+      ? Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI])
       : null;
   const fallbackRemaining = Helpers.daysUntilDate(
-    order.expiry_date || order.expiry_date_display || order.het_han || null
+    order.expiry_date ||
+      order.expiry_date_display ||
+      order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
+      (order[ORDER_FIELDS.ORDER_EXPIRED] as string) ||
+      null
   );
   const displayRemainingDays =
     remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
@@ -176,16 +181,22 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
   const registrationDisplay =
     order.registration_date_display ||
-    Helpers.formatDateToDMY(order.registration_date || order.ngay_dang_ki) ||
-    String(order.ngay_dang_ki || "");
+    order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+    Helpers.formatDateToDMY(
+      order.registration_date || (order[ORDER_FIELDS.ORDER_DATE] as string)
+    ) ||
+    String((order[ORDER_FIELDS.ORDER_DATE] as string) || "");
   const expiryDisplay =
     order.expiry_date_display ||
-    Helpers.formatDateToDMY(order.expiry_date || order.het_han) ||
-    String(order.het_han || "");
+    order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
+    Helpers.formatDateToDMY(
+      order.expiry_date || (order[ORDER_FIELDS.ORDER_EXPIRED] as string)
+    ) ||
+    String((order[ORDER_FIELDS.ORDER_EXPIRED] as string) || "");
 
   // VietQR
   const qrAmount = effectiveAmount;
-  const qrMessage = order.id_don_hang;
+  const qrMessage = order[ORDER_FIELDS.ID_ORDER];
   const normalizedAmount = Math.max(0, Number(qrAmount) || 0);
   const safeQrAmount = Helpers.roundGiaBanValue(normalizedAmount);
   const qrCodeImageUrl = Helpers.buildSepayQrUrl({
@@ -209,7 +220,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         <div className="flex justify-center items-center p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-white">
             Chi Tiết Đơn Hàng:{" "}
-            <span className="text-blue-600">{order.id_don_hang}</span>
+            <span className="text-blue-600">{order[ORDER_FIELDS.ID_ORDER]}</span>
           </h3>
           <button
             type="button"
@@ -229,13 +240,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">ID Đơn:</dt>
                 <dd className="text-slate-100 font-semibold w-2/3 text-right">
-                  {order.id_don_hang}
+                  {order[ORDER_FIELDS.ID_ORDER]}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">Sản Phẩm:</dt>
                 <dd className="text-slate-100 w-2/3 text-right">
-                  {order.san_pham}
+                  {order[ORDER_FIELDS.ID_PRODUCT]}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
@@ -243,17 +254,19 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                   Thông Tin Sản Phẩm:
                 </dt>
                 <dd className="text-slate-100 w-2/3 text-right break-words">
-                  {order.thong_tin_san_pham}
+                  {order[ORDER_FIELDS.INFORMATION_ORDER]}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">Slot:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">{order.slot}</dd>
+                <dd className="text-slate-100 w-2/3 text-right">
+                  {order[ORDER_FIELDS.SLOT]}
+                </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">Ghi Chú:</dt>
                 <dd className="text-slate-100 w-2/3 text-right">
-                  {order.note || "-"}
+                  {order[ORDER_FIELDS.NOTE] || "-"}
                 </dd>
               </div>
               <div className="flex justify-between pt-1 pb-1">
@@ -275,7 +288,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">Khách Hàng:</dt>
                 <dd className="text-slate-100 w-2/3 text-right">
-                  {order.khach_hang}
+                  {order[ORDER_FIELDS.CUSTOMER]}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1 items-start">
@@ -284,12 +297,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 </dt>
                 <dd className="w-2/3 text-right break-all">
                   <a
-                    href={order.link_lien_he}
+                    href={order[ORDER_FIELDS.CONTACT] as string}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    {order.link_lien_he || "-"}
+                    {order[ORDER_FIELDS.CONTACT] || "-"}
                   </a>
                 </dd>
               </div>
@@ -302,7 +315,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <div className="flex justify-between border-b pb-1">
                 <dt className="font-medium text-slate-400 w-1/3">Số Ngày:</dt>
                 <dd className="text-slate-100 w-2/3 text-right">
-                  {order.so_ngay_da_dang_ki}
+                  {order[ORDER_FIELDS.DAYS]}
                 </dd>
               </div>
               <div className="flex justify-between border-b pb-1">
@@ -336,7 +349,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <div className="flex justify-center mb-3">
                 <img
                   src={qrCodeImageUrl}
-                  alt={`QR Code thanh toan ${order.id_don_hang}`}
+                  alt={`QR Code thanh toan ${order[ORDER_FIELDS.ID_ORDER]}`}
                   className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40"
                   width={280}
                   height={280}

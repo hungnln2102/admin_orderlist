@@ -1,10 +1,11 @@
-﻿import React, {
+import React, {
   useState,
   useEffect,
   useCallback,
   useMemo,
   useRef,
 } from "react";
+import { XMarkIcon, PlusCircleIcon, MinusCircleIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
 import * as Helpers from "../lib/helpers";
 
@@ -16,21 +17,25 @@ const API_BASE =
 
 interface Order {
   id: number;
-  id_don_hang: string;
-  san_pham: string;
-  thong_tin_san_pham: string;
-  khach_hang: string;
-  link_lien_he: string;
+  id_order: string;
+  id_product: string;
+  information_order: string;
+  customer: string;
+  contact: string;
   slot: string;
-  ngay_dang_ki: string;
-  so_ngay_da_dang_ki: string;
-  het_han: string;
-  nguon: string;
-  gia_nhap: number;
-  gia_ban: number;
+  order_date: string;
+  days: string;
+  order_expired: string;
+  registration_date?: string;
+  expiry_date?: string;
+  registration_date_display?: string;
+  expiry_date_display?: string;
+  supply: string;
+  cost: number;
+  price: number;
   note: string;
-  tinh_trang: string;
-  check_flag: boolean;
+  status: string;
+  check_flag: boolean | null;
 }
 
 interface Supply {
@@ -38,296 +43,234 @@ interface Supply {
   source_name: string;
 }
 
-interface CalculatedPriceResult {
-  gia_nhap: number;
-  gia_ban: number;
-  so_ngay_da_dang_ki: number;
-  het_han: string;
-  thong_tin_san_pham?: string;
+interface SupplyPrice {
+  source_id: number;
+  price: number;
 }
 
 interface EditOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
-  onSave: (updatedOrder: Order) => void;
+  onSave: (updatedOrder: Order) => Promise<void> | void;
 }
 
-const READ_ONLY_FIELDS = [
-  ORDER_FIELDS.ID_DON_HANG,
-  ORDER_FIELDS.NGAY_DANG_KI,
-  ORDER_FIELDS.SO_NGAY_DA_DANG_KI,
-  ORDER_FIELDS.HET_HAN,
-  ORDER_FIELDS.GIA_NHAP,
-  ORDER_FIELDS.GIA_BAN,
-];
+const inputClass =
+  "w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all";
+const labelClass = "block text-sm font-medium text-gray-700 mb-1";
+const readOnlyClass = "bg-gray-100 cursor-not-allowed text-gray-500";
 
-const formatCurrency = (value: number) => {
-  return (Number(value) || 0).toLocaleString("vi-VN") + " đ";
-};
-const guessCustomerType = (orderCode?: string | null) => {
-  if (!orderCode) return undefined;
-  const normalized = orderCode.trim().toUpperCase();
-  if (normalized.startsWith("MAVC")) return "MAVC";
-  if (normalized.startsWith("MAVL")) return "MAVL";
-  if (normalized.startsWith("MAVK")) return "MAVK";
-  return undefined;
+const formatCurrency = (value: number | string) => {
+  const num = Number(value) || 0;
+  return num.toLocaleString("vi-VN") + " d";
 };
 
 const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
-  const [formData, setFormData] = useState<Order | null>(order);
+  const [formData, setFormData] = useState<Order | null>(null);
   const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [supplyPrices, setSupplyPrices] = useState<SupplyPrice[]>([]);
   const baseOrderRef = useRef<Order | null>(order);
+  const [isCustomSupply, setIsCustomSupply] = useState(false);
+
+  const getCurrentSupplyOption = useCallback((): Supply | null => {
+    const currentSupplyName =
+      (baseOrderRef.current?.[ORDER_FIELDS.SUPPLY as keyof Order] as string) ||
+      "";
+    if (!currentSupplyName.trim()) return null;
+    return { id: -1, source_name: currentSupplyName };
+  }, []);
+
+  const mergeCurrentSupply = useCallback(
+    (list: Supply[]): Supply[] => {
+      const currentSupply = getCurrentSupplyOption();
+      if (currentSupply) {
+        const exists = list.some(
+          (item) => item.source_name === currentSupply.source_name
+        );
+        if (!exists) {
+          return [currentSupply, ...list];
+        }
+      }
+      return list;
+    },
+    [getCurrentSupplyOption]
+  );
+
   const fetchSuppliesForProduct = useCallback(async (productName: string) => {
     if (!productName) {
-      setSupplies([]);
-      return [];
+      const merged = mergeCurrentSupply([]);
+      setSupplies(merged);
+      return merged;
     }
     try {
       const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`
+        `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`,
+        { credentials: "include" }
       );
-      if (!response.ok)
-        throw new Error("Lỗi tải danh sách nguồn theo sản phẩm.");
+      if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
       const data: Supply[] = await response.json();
-      setSupplies(data);
-      return data;
+      const merged = mergeCurrentSupply(data);
+      setSupplies(merged);
+      return merged;
     } catch (error) {
-      console.error("Lỗi tải nguồn theo sản phẩm:", error);
-      setSupplies([]);
-      return [];
+      console.error("Lỗi khi fetch supplies cho sản phẩm:", error);
+      const merged = mergeCurrentSupply([]);
+      setSupplies(merged);
+      return merged;
     }
-  }, []);
+  }, [mergeCurrentSupply]);
 
-  const calculatePrice = useCallback(
-    async (
-      supplyId: number,
-      productName: string,
-      orderIdDonHang: string,
-      registerDate?: string
-    ) => {
-      if (!productName || !orderIdDonHang) return;
-
-      const normalizedRegisterDate = registerDate
-        ? Helpers.formatDateToDMY(registerDate)
-        : undefined;
-
+  const fetchSupplyPricesForProduct = useCallback(
+    async (productName: string) => {
+      if (!productName) {
+        setSupplyPrices([]);
+        return [];
+      }
       try {
-        const customerType = guessCustomerType(orderIdDonHang);
         const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.CALCULATE_PRICE}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              supply_id: supplyId,
-              san_pham_name: productName,
-              id_don_hang: orderIdDonHang,
-              register_date: normalizedRegisterDate,
-              customer_type: customerType,
-            }),
-          }
+          `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(
+            productName
+          )}`,
+          { credentials: "include" }
         );
-
-        const { data, rawText } =
-          await Helpers.readJsonOrText<CalculatedPriceResult>(response);
-
-        if (!response.ok) {
-          const message =
-            (data as { error?: string } | null)?.error ||
-            rawText ||
-            "Lỗi tính toán giá từ server.";
-          throw new Error(message);
-        }
-
-        if (!data) {
-          throw new Error("Phản hồi không hợp lệ từ server.");
-        }
-
-        const result: CalculatedPriceResult = data;
-
-        setFormData((prev) => {
-          if (!prev) return null;
-
-          const calculatedDays = Number(result.so_ngay_da_dang_ki);
-          const fallbackDays =
-            Number(prev[ORDER_FIELDS.SO_NGAY_DA_DANG_KI]) || 0;
-          const registerDMY = Helpers.formatDateToDMY(
-            prev[ORDER_FIELDS.NGAY_DANG_KI]
-          );
-          const productInfo =
-            result.thong_tin_san_pham ??
-            prev[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ??
-            "";
-          const inferredMonths = Helpers.parseMonthsFromInfo(productInfo);
-
-          let effectiveDays = Number.isFinite(calculatedDays)
-            ? calculatedDays
-            : fallbackDays;
-
-          if ((!effectiveDays || effectiveDays <= 0) && inferredMonths > 0) {
-            effectiveDays = Helpers.daysFromMonths(inferredMonths);
-          }
-
-          let nextExpiry = result.het_han?.trim();
-          if (nextExpiry) {
-            const normalized = Helpers.convertDMYToYMD(nextExpiry);
-            nextExpiry = normalized || nextExpiry;
-          }
-          if (!nextExpiry && registerDMY) {
-            if (inferredMonths > 0) {
-              const expiryDMY = Helpers.addMonthsMinusOneDay(
-                registerDMY,
-                inferredMonths
-              );
-              if (expiryDMY) {
-                nextExpiry = Helpers.convertDMYToYMD(expiryDMY);
-              }
-            }
-          }
-
-          if (!nextExpiry && registerDMY && effectiveDays > 0) {
-            const expiryDMY = Helpers.calculateExpirationDate(
-              registerDMY,
-              effectiveDays
-            );
-            if (expiryDMY && expiryDMY !== "N/A") {
-              nextExpiry = Helpers.convertDMYToYMD(expiryDMY);
-            }
-          }
-
-          return {
-            ...prev,
-            [ORDER_FIELDS.GIA_NHAP]: Number(result.gia_nhap),
-            [ORDER_FIELDS.GIA_BAN]: Number(result.gia_ban),
-            [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]: String(effectiveDays || 0),
-            [ORDER_FIELDS.HET_HAN]: nextExpiry || prev[ORDER_FIELDS.HET_HAN],
-          };
-        });
+        if (!response.ok) throw new Error("Lỗi tải danh sách giá nguồn.");
+        const data: SupplyPrice[] = await response.json();
+        setSupplyPrices(data);
+        return data;
       } catch (error) {
-        console.error("Lỗi khi tính toán giá:", error);
-        alert(
-          `Lỗi khi tính toán giá: ${
-            error instanceof Error ? error.message : "Lỗi không xác định"
-          }`
-        );
+        console.error("Lỗi khi fetch giá nguồn cho sản phẩm:", error);
+        setSupplyPrices([]);
+        return [];
       }
     },
     []
   );
 
   useEffect(() => {
-    if (!isOpen || !order) return;
-
-    let isMounted = true;
-
-    const loadInitialData = async () => {
-      baseOrderRef.current = order;
-      const fetchedSupplies = await fetchSuppliesForProduct(order.san_pham);
-
-      if (!isMounted) return;
-
-      const normalizedFormData = {
+    if (isOpen && order) {
+      const normalized: Order = {
         ...order,
-        [ORDER_FIELDS.GIA_NHAP]: Number(order.gia_nhap) || 0,
-        [ORDER_FIELDS.GIA_BAN]: Number(order.gia_ban) || 0,
-        [ORDER_FIELDS.SO_NGAY_DA_DANG_KI]:
-          String(order.so_ngay_da_dang_ki) || "",
-      } as Order;
+        cost: Number(order.cost ?? 0),
+        price: Number(order.price ?? 0),
+      };
+      setFormData(normalized);
+      baseOrderRef.current = normalized;
+      setSupplies((prev) => mergeCurrentSupply(prev));
+      if (order.id_product) {
+        fetchSuppliesForProduct(order.id_product);
+        fetchSupplyPricesForProduct(order.id_product);
+      }
+      setIsCustomSupply(false);
+    } else if (!isOpen) {
+      setFormData(null);
+      setSupplies([]);
+      setSupplyPrices([]);
+      setIsCustomSupply(false);
+    }
+  }, [
+    isOpen,
+    order,
+    fetchSuppliesForProduct,
+    fetchSupplyPricesForProduct,
+    mergeCurrentSupply,
+  ]);
 
-      setFormData(normalizedFormData);
+  useEffect(() => {
+    if (!isOpen || !formData?.id_product) return;
+    fetchSuppliesForProduct(formData.id_product);
+    fetchSupplyPricesForProduct(formData.id_product);
+  }, [
+    isOpen,
+    formData?.id_product,
+    fetchSuppliesForProduct,
+    fetchSupplyPricesForProduct,
+  ]);
 
-      const initialSupply = fetchedSupplies.find(
-        (s) => s.source_name === order.nguon
+  const setFieldValue = useCallback(
+    <K extends keyof Order>(key: K, value: Order[K]) => {
+      setFormData((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    []
+  );
+
+  const handleSupplySelect = useCallback(
+    (supplyId: number) => {
+      const selected = supplies.find((s) => s.id === supplyId);
+      const supplyName =
+        selected?.source_name ||
+        (formData?.[ORDER_FIELDS.SUPPLY as keyof Order] as string) ||
+        "";
+      setIsCustomSupply(false);
+      setFieldValue(
+        ORDER_FIELDS.SUPPLY as keyof Order,
+        (supplyName || "") as Order[keyof Order]
       );
-
-      const registerDate = order[ORDER_FIELDS.NGAY_DANG_KI];
-      if (order.id_don_hang && order.san_pham) {
-        await calculatePrice(
-          initialSupply?.id ?? 0,
-          order.san_pham,
-          order.id_don_hang,
-          registerDate
+      const matchedPrice =
+        Helpers.getImportPriceBySupplyName(
+          supplyName,
+          supplyPrices,
+          supplies
+        ) ??
+        supplyPrices.find((p) => p.source_id === supplyId)?.price ??
+        null;
+      const normalizedPrice = Number(matchedPrice);
+      if (Number.isFinite(normalizedPrice)) {
+        setFieldValue(
+          ORDER_FIELDS.COST as keyof Order,
+          normalizedPrice as any
+        );
+      } else if (baseOrderRef.current) {
+        const fallbackCost = Number(
+          baseOrderRef.current[ORDER_FIELDS.COST as keyof Order] || 0
+        );
+        setFieldValue(
+          ORDER_FIELDS.COST as keyof Order,
+          fallbackCost as any
         );
       }
-    };
+    },
+    [formData, setFieldValue, supplies, supplyPrices]
+  );
 
-    loadInitialData();
+  const handleCustomSupplyChange = useCallback(
+    (value: string) => {
+      setIsCustomSupply(true);
+      setFieldValue(
+        ORDER_FIELDS.SUPPLY as keyof Order,
+        value as Order[keyof Order]
+      );
+    },
+    [setFieldValue]
+  );
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, order, fetchSuppliesForProduct, calculatePrice]);
-
-  const handleSourceChange = async (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const selectedValue = event.target.value;
-    const parsedId = Number(selectedValue);
-    const sourceId = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : null;
-    const selectedSupply = supplies.find((s) => s.id === sourceId);
-
-    const productName =
-      formData?.[ORDER_FIELDS.SAN_PHAM] || baseOrderRef.current?.san_pham || "";
-    const orderId =
-      formData?.id_don_hang || baseOrderRef.current?.id_don_hang || "";
-    const registerDate =
-      formData?.[ORDER_FIELDS.NGAY_DANG_KI] ||
-      baseOrderRef.current?.[ORDER_FIELDS.NGAY_DANG_KI];
-
-    setFormData((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        [ORDER_FIELDS.NGUON]: selectedSupply ? selectedSupply.source_name : "",
-      };
+  const toggleCustomSupply = useCallback(() => {
+    setIsCustomSupply((prev) => {
+      const next = !prev;
+      if (!next) {
+        setFieldValue(ORDER_FIELDS.SUPPLY as keyof Order, "" as any);
+      }
+      return next;
     });
+  }, [setFieldValue]);
 
-    if (sourceId && productName && orderId) {
-      await calculatePrice(sourceId, productName, orderId, registerDate);
-    } else if (!sourceId) {
-      setFormData((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          [ORDER_FIELDS.NGUON]: "",
-          [ORDER_FIELDS.GIA_NHAP]: 0,
-          [ORDER_FIELDS.GIA_BAN]: 0,
-        };
-      });
+  const resetForm = useCallback(() => {
+    setFormData(baseOrderRef.current);
+    if (baseOrderRef.current?.id_product) {
+      fetchSuppliesForProduct(baseOrderRef.current.id_product);
+      fetchSupplyPricesForProduct(baseOrderRef.current.id_product);
     }
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    const { name, value } = e.target;
-
-    if (READ_ONLY_FIELDS.includes(name)) return;
-
-    setFormData((prev) => {
-      if (!prev) return null;
-
-      return {
-        ...prev,
-        [name]: value,
-      };
-    });
-  };
-
-  const currentSupplyId =
-    supplies.find((s) => s.source_name === formData?.[ORDER_FIELDS.NGUON])
-      ?.id || "";
+  }, [fetchSuppliesForProduct, fetchSupplyPricesForProduct]);
 
   return {
     formData,
     supplies,
-    currentSupplyId,
-    handleChange,
-    handleSourceChange,
+    isCustomSupply,
+    supplyPrices,
+    handleSupplySelect,
+    resetForm,
+    setFieldValue,
+    handleCustomSupplyChange,
+    toggleCustomSupply,
   };
 };
 
@@ -340,347 +283,336 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const {
     formData,
     supplies,
-    currentSupplyId,
-    handleChange,
-    handleSourceChange,
+    isCustomSupply,
+    handleSupplySelect,
+    resetForm,
+    setFieldValue,
+    handleCustomSupplyChange,
+    toggleCustomSupply,
   } = useEditOrderLogic(order, isOpen);
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (!isOpen || !formData) return null;
+  const handleInputChange = useCallback(
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >
+    ) => {
+      const { name, value, type, checked } = e.target;
+      const nextValue =
+        type === "checkbox" ? (checked as unknown as Order[keyof Order]) : (value as unknown as Order[keyof Order]);
+      setFieldValue(name as keyof Order, nextValue);
+    },
+    [setFieldValue]
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const supplySelectValue = useMemo(() => {
+    if (!formData) return "";
+    const found = supplies.find(
+      (s) => s.source_name === formData[ORDER_FIELDS.SUPPLY]
+    );
+    return found ? String(found.id) : "";
+  }, [formData, supplies]);
+
+  const orderDateDisplay = useMemo(() => {
+    if (!formData) return "";
+    const raw =
+      formData.registration_date_display ||
+      formData.registration_date ||
+      formData[ORDER_FIELDS.ORDER_DATE];
+    return Helpers.formatDateToDMY(raw) || String(raw || "");
+  }, [formData]);
+
+  const orderExpiredDisplay = useMemo(() => {
+    if (!formData) return "";
+    const raw =
+      formData.expiry_date_display ||
+      formData.expiry_date ||
+      formData[ORDER_FIELDS.ORDER_EXPIRED];
+    return Helpers.formatDateToDMY(raw) || String(raw || "");
+  }, [formData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData) {
-      onSave(formData);
+    if (!formData) return;
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const inputClass =
-    "mt-1 block w-full px-3 py-2 border border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-400 rounded-md shadow-sm focus:outline-none focus:ring-sky-400 focus:border-sky-400 sm:text-sm";
-  const readOnlyClass = `bg-slate-800/60 cursor-not-allowed`;
-  const labelClass = "block text-sm font-medium text-slate-200";
-
-  const isReadOnly = (fieldName: string) =>
-    READ_ONLY_FIELDS.includes(fieldName);
-
-  const displayDate = (dateStr: string) => {
-    if (!dateStr || dateStr.length < 10 || dateStr.indexOf("-") === -1)
-      return dateStr;
-    const parts = dateStr.substring(0, 10).split("-");
-    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    return dateStr;
-  };
+  if (!isOpen || !formData) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900/90 border border-white/10 rounded-xl shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col text-slate-100">
-        <div className="p-5 border-b border-slate-700 flex justify-center items-center bg-slate-800/80 sticky top-0 z-10">
-          <h3 className="text-2xl font-bold text-white">
-            Chỉnh sửa Đơn hàng:{" "}
-            <span className="text-sky-400">
-              {formData[ORDER_FIELDS.ID_DON_HANG]}
-            </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="bg-slate-900/90 border border-white/10 text-slate-100 w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4 sticky top-0 bg-slate-800/80 z-10">
+          <h3 className="text-lg font-semibold text-white">
+            Chỉnh sửa đơn hàng
           </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-300 hover:text-white"
+            aria-label="Đóng"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
         </div>
 
-        <div className="p-6 flex-grow overflow-y-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm">
-                <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
-                  Chi tiết Khách hàng & Đơn
-                </h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>ID Đơn Hàng</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.ID_DON_HANG}
-                      value={formData?.[ORDER_FIELDS.ID_DON_HANG] ?? ""}
-                      readOnly={isReadOnly(ORDER_FIELDS.ID_DON_HANG)}
-                      className={`${inputClass} ${
-                        isReadOnly(ORDER_FIELDS.ID_DON_HANG)
-                          ? readOnlyClass
-                          : ""
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Khách Hàng</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.KHACH_HANG}
-                      value={formData?.[ORDER_FIELDS.KHACH_HANG] ?? ""}
-                      onChange={handleChange}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Link Liên Hệ</label>
-                    <input
-                      type="text"
-                      name={ORDER_FIELDS.LINK_LIEN_HE}
-                      value={formData?.[ORDER_FIELDS.LINK_LIEN_HE] ?? ""}
-                      onChange={handleChange}
-                      className={inputClass}
-                    />
-                  </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Mã đơn hàng</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.ID_ORDER}
+                value={formData[ORDER_FIELDS.ID_ORDER] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Khách hàng</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.CUSTOMER}
+                value={formData[ORDER_FIELDS.CUSTOMER] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Liên hệ</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.CONTACT}
+                value={formData[ORDER_FIELDS.CONTACT] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Slot</label>
+              <input
+                type="text"
+              name={ORDER_FIELDS.SLOT}
+              value={formData[ORDER_FIELDS.SLOT] || ""}
+              onChange={handleInputChange}
+              className={inputClass}
+              />
+            </div>
+          </div>
 
-                  <div>
-                    <label className={labelClass}>Nguồn</label>
-                    <select
-                      name={ORDER_FIELDS.NGUON}
-                      value={currentSupplyId || ""}
-                      onChange={handleSourceChange}
-                      className={inputClass}
-                    >
-                      <option value="">Chọn Nguồn</option>
-                      {supplies.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.source_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Trạng Thái</label>
-                    <select
-                      name={ORDER_FIELDS.TINH_TRANG}
-                      value={formData?.[ORDER_FIELDS.TINH_TRANG] ?? ""}
-                      onChange={handleChange}
-                      readOnly={isReadOnly(ORDER_FIELDS.TINH_TRANG)}
-                      disabled={isReadOnly(ORDER_FIELDS.TINH_TRANG)}
-                      className={`${inputClass} ${
-                        isReadOnly(ORDER_FIELDS.TINH_TRANG) ? readOnlyClass : ""
-                      }`}
-                    >
-                      <option value="Đã Thanh Toán">Đã Thanh Toán</option>
-                      <option value="Chưa Thanh Toán">Chưa Thanh Toán</option>
-                      <option value="Hết Hạn" disabled>
-                        Hết Hạn (Hệ thống)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Sản phẩm</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.ID_PRODUCT}
+                value={formData[ORDER_FIELDS.ID_PRODUCT] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Nguồn</label>
+              <div className="flex items-center gap-2">
+                {isCustomSupply ? (
+                  <input
+                    type="text"
+                    name={ORDER_FIELDS.SUPPLY}
+                    value={formData[ORDER_FIELDS.SUPPLY] || ""}
+                    onChange={(e) => handleCustomSupplyChange(e.target.value)}
+                    className={inputClass}
+                    placeholder="Nhập nguồn mới"
+                  />
+                ) : (
+                  <select
+                    name={ORDER_FIELDS.SUPPLY}
+                    value={supplySelectValue}
+                    onChange={(e) => handleSupplySelect(Number(e.target.value))}
+                    className={inputClass}
+                  >
+                    <option value="">-- Giữ nguyên hoặc chọn --</option>
+                    {supplies.map((supply) => (
+                      <option key={supply.id} value={supply.id}>
+                        {supply.source_name}
                       </option>
-                    </select>
-                  </div>
-                </div>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleCustomSupply}
+                  className={`inline-flex items-center justify-center w-10 h-10 rounded-md text-white ${
+                    isCustomSupply
+                      ? "bg-red-500 hover:bg-red-600"
+                      : "bg-green-500 hover:bg-green-600"
+                  }`}
+                  aria-label={isCustomSupply ? "Tắt nhập nguồn mới" : "Nhập nguồn mới"}
+                >
+                  {isCustomSupply ? (
+                    <MinusCircleIcon className="h-6 w-6" aria-hidden="true" />
+                  ) : (
+                    <PlusCircleIcon className="h-6 w-6" aria-hidden="true" />
+                  )}
+                </button>
               </div>
-
-              <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm text-white">
-                <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
-                  Thông tin Sản phẩm & Ngày
-                </h4>
-                                <div className="space-y-4">
-                                  <div>
-                                    <label className={labelClass}>Sản Phẩm</label>
-                                    <input
-                                      type="text"
-                                      name={ORDER_FIELDS.SAN_PHAM}
-                                      value={formData?.[ORDER_FIELDS.SAN_PHAM] ?? ""}
-                                      readOnly
-                                      className={`${inputClass} ${readOnlyClass}`}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      Sản phẩm đã được khóa, vui lòng thay đổi nguồn cho phù hợp.
-                                    </p>
-                                  </div>
-                
-                                  <div>
-                                    <label className={labelClass}>Thông Tin Sản Phẩm</label>
-                                    <textarea
-                                      name={ORDER_FIELDS.THONG_TIN_SAN_PHAM}
-                                      value={formData?.[ORDER_FIELDS.THONG_TIN_SAN_PHAM] ?? ""}
-                                      onChange={handleChange}
-                                      rows={3}
-                                      className={inputClass}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className={labelClass}>Slot</label>
-                                    <input
-                                      type="text"
-                                      name={ORDER_FIELDS.SLOT}
-                                      value={formData?.[ORDER_FIELDS.SLOT] ?? ""}
-                                      onChange={handleChange}
-                                      className={inputClass}
-                                    />
-                                  </div>
-                
-                                  <div>
-                                    <label className={labelClass}>Ngày Đăng Ký</label>
-                                    <input
-                                      type="text"
-                                      name={ORDER_FIELDS.NGAY_DANG_KI}
-                                      value={displayDate(formData[ORDER_FIELDS.NGAY_DANG_KI])}
-                                      readOnly={isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)}
-                                      className={`${inputClass} ${
-                                        isReadOnly(ORDER_FIELDS.NGAY_DANG_KI)
-                                          ? readOnlyClass
-                                          : ""
-                                      }`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className={labelClass}>Số Ngày Đăng Ký</label>
-                                    <input
-                                      type="text"
-                                      name={ORDER_FIELDS.SO_NGAY_DA_DANG_KI}
-                                      value={formData?.[ORDER_FIELDS.SO_NGAY_DA_DANG_KI] ?? ""}
-                                      readOnly={isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)}
-                                      className={`${inputClass} ${
-                                        isReadOnly(ORDER_FIELDS.SO_NGAY_DA_DANG_KI)
-                                          ? readOnlyClass
-                                          : ""
-                                      }`}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className={labelClass}>Ngày Hết Hạn</label>
-                                    <input
-                                      type="text"
-                                      name={ORDER_FIELDS.HET_HAN}
-                                      value={displayDate(formData[ORDER_FIELDS.HET_HAN])}
-                                      readOnly={isReadOnly(ORDER_FIELDS.HET_HAN)}
-                                      className={`${inputClass} ${
-                                        isReadOnly(ORDER_FIELDS.HET_HAN) ? readOnlyClass : ""
-                                      }`}
-                                    />
-                                  </div>
-                                </div>
-              </div>
-
-                            <div className="bg-slate-800/80 p-5 rounded-lg border border-white/10 shadow-sm text-white">
-                              <h4 className="text-xl font-semibold text-white mb-4 border-b border-white/10 pb-2">
-                                Thông tin Tài chính & Ghi chú
-                              </h4>
-
-                              <div className="space-y-4">
-
-                                <div>
-
-                                  <label className={labelClass}>Giá Nhập (đ)</label>
-
-                                  <input
-
-                                    type="text"
-
-                                    name={ORDER_FIELDS.GIA_NHAP}
-
-                                    value={Helpers.formatCurrency(
-
-                                      formData[ORDER_FIELDS.GIA_NHAP]
-
-                                    )}
-
-                                    readOnly={isReadOnly(ORDER_FIELDS.GIA_NHAP)}
-
-                                    className={`${inputClass} font-semibold text-blue-700 ${
-
-                                      isReadOnly(ORDER_FIELDS.GIA_NHAP) ? readOnlyClass : ""
-
-                                    }`}
-
-                                  />
-
-                                </div>
-
-                                <div>
-
-                                  <label className={labelClass}>Giá Bán (đ)</label>
-
-                                  <input
-
-                                    type="text"
-
-                                    name={ORDER_FIELDS.GIA_BAN}
-
-                                    value={Helpers.formatCurrency(
-
-                                      formData[ORDER_FIELDS.GIA_BAN]
-
-                                    )}
-
-                                    readOnly={isReadOnly(ORDER_FIELDS.GIA_BAN)}
-
-                                    className={`${inputClass} font-semibold text-green-700 ${
-
-                                      isReadOnly(ORDER_FIELDS.GIA_BAN) ? readOnlyClass : ""
-
-                                    }`}
-
-                                  />
-
-                                </div>
-
-              
-
-                                <div>
-
-                                  <label className={labelClass}>Ghi Chú</label>
-
-                                  <textarea
-
-                                    name={ORDER_FIELDS.NOTE}
-
-                                    value={formData?.[ORDER_FIELDS.NOTE] ?? ""}
-
-                                    onChange={handleChange}
-
-                                    rows={8}
-
-                                    className={inputClass}
-
-                                  />
-
-                                </div>
-
-                              </div>
-
-                            </div>
-
-                          </div>
-
-                        </form>
-
-                      </div>
-
-              
-
-                      <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end sticky bottom-0 z-10">
-
-                        <button
-
-                          type="button"
-
-                          onClick={onClose}
-
-                          className="px-6 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-indigo-500/15 transition-colors shadow-sm mr-3"
-
-                        >
-
-                          Hủy
-
-                        </button>
-
-                        <button
-
-                          type="submit"
-
-                          onClick={handleSubmit}
-
-                          className="px-6 py-2 text-base font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-
-                        >
-
-                          Lưu Thay Đổi
-
-                        </button>
-
-                      </div>
+              {!supplies.length && !isCustomSupply && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Không có danh sách nguồn cho sản phẩm hiện tại.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Thông tin đơn hàng</label>
+            <input
+              type="text"
+              name={ORDER_FIELDS.INFORMATION_ORDER}
+              value={formData[ORDER_FIELDS.INFORMATION_ORDER] || ""}
+              onChange={handleInputChange}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className={labelClass}>Ngày đăng ký</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.ORDER_DATE}
+                value={orderDateDisplay}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Số ngày</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.DAYS}
+                value={formData[ORDER_FIELDS.DAYS] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Ngày hết hạn</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.ORDER_EXPIRED}
+                value={orderExpiredDisplay}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Giá nhập</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.COST}
+                value={formatCurrency(formData[ORDER_FIELDS.COST] || 0)}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass} font-semibold`}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Giá bán</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.PRICE}
+                value={formatCurrency(formData[ORDER_FIELDS.PRICE] || 0)}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass} font-semibold text-green-700`}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div>
+              <label className={labelClass}>Trạng thái</label>
+              <input
+                type="text"
+                name={ORDER_FIELDS.STATUS}
+                value={formData[ORDER_FIELDS.STATUS] || ""}
+                readOnly
+                disabled
+                className={`${inputClass} ${readOnlyClass}`}
+              />
+            </div>
+            <div className="flex items-center gap-3 mt-6 md:mt-8">
+              <label className="text-sm font-medium text-gray-700 mb-0">
+                Kiểm tra
+              </label>
+              <input
+                type="checkbox"
+                className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={Boolean(formData[ORDER_FIELDS.CHECK_FLAG])}
+                disabled
+                readOnly
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Ghi chú</label>
+            <textarea
+              name={ORDER_FIELDS.NOTE}
+              value={formData[ORDER_FIELDS.NOTE] || ""}
+              rows={4}
+              onChange={handleInputChange}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Hoàn tác
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Đóng
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className={`px-5 py-2 rounded-lg text-white font-medium transition-colors ${
+                isSaving
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
+            >
+              {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
 export default EditOrderModal;
-
-
-

@@ -1,8 +1,13 @@
 // scheduler.js - Logic tự động chuyển đơn hàng hết hạn và cập nhật trạng thái
 
-require("dotenv").config();
+const path = require("path");
+
+// Always load env from this directory, regardless of current working directory
+const envPath = path.join(__dirname, ".env");
+require("dotenv").config({ path: envPath });
 const { Pool } = require("pg");
 const cron = require("node-cron");
+const { ORDER_COLS } = require("./schema/tables");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
@@ -18,6 +23,28 @@ let lastRunAt = null;
 const STATUS_EXPIRED = "Hết Hạn";
 const STATUS_RENEW = "Cần Gia Hạn";
 const STATUS_PAID = "Đã Thanh Toán";
+
+// Quote SQL identifiers safely
+const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
+
+// Centralized column names (aligned with schema/tables.js)
+const COL = {
+  idOrder: quoteIdent(ORDER_COLS.idOrder),
+  idProduct: quoteIdent(ORDER_COLS.idProduct),
+  informationOrder: quoteIdent(ORDER_COLS.informationOrder),
+  customer: quoteIdent(ORDER_COLS.customer),
+  contact: quoteIdent(ORDER_COLS.contact),
+  slot: quoteIdent(ORDER_COLS.slot),
+  orderDate: quoteIdent(ORDER_COLS.orderDate),
+  days: quoteIdent(ORDER_COLS.days),
+  orderExpired: quoteIdent(ORDER_COLS.orderExpired),
+  supply: quoteIdent(ORDER_COLS.supply),
+  cost: quoteIdent(ORDER_COLS.cost),
+  price: quoteIdent(ORDER_COLS.price),
+  note: quoteIdent(ORDER_COLS.note),
+  status: quoteIdent(ORDER_COLS.status),
+  checkFlag: quoteIdent(ORDER_COLS.checkFlag),
+};
 
 // Normalize mixed-format date columns to a proper DATE in SQL
 const normalizeDateSQL = (column) => `
@@ -41,8 +68,8 @@ const intFromTextSQL = (column) => `
 // Expiry date with fallback: normalized het_han, else ngay_dang_ki + days - 1
 const expiryDateSQL = () => `
   COALESCE(
-    ${normalizeDateSQL('het_han')},
-    (${normalizeDateSQL('ngay_dang_ki')} + (COALESCE(${intFromTextSQL('so_ngay_da_dang_ki')}, 0) - 1))
+    ${normalizeDateSQL(COL.orderExpired)},
+    (${normalizeDateSQL(COL.orderDate)} + (COALESCE(${intFromTextSQL(COL.days)}, 0) - 1))
   )
 `;
 
@@ -88,68 +115,72 @@ const updateDatabaseTask = async (trigger = "cron") => {
     const transfer = await client.query(`
       WITH expired AS (
         SELECT
-          id_don_hang,
-          san_pham,
-          thong_tin_san_pham,
-          khach_hang,
-          link_lien_he,
-          slot,
+          ${COL.idOrder},
+          ${COL.idProduct},
+          ${COL.informationOrder},
+          ${COL.customer},
+          ${COL.contact},
+          ${COL.slot},
           -- CHUYỂN ĐỔI TỪ TEXT SANG DATE VÀ INTEGER CHO CÁC CỘT NGÀY/SỐ NGÀY
-          ${normalizeDateSQL('ngay_dang_ki')} AS ngay_dang_ki, 
-          ${intFromTextSQL('so_ngay_da_dang_ki')} AS so_ngay_da_dang_ki, 
-          ${expiryDateSQL()} AS het_han, 
+          ${normalizeDateSQL(COL.orderDate)} AS ${COL.orderDate},
+          ${intFromTextSQL(COL.days)} AS ${COL.days},
+          ${expiryDateSQL()} AS ${COL.orderExpired},
           -- KẾT THÚC CHUYỂN ĐỔI
-          nguon,
-          gia_nhap,
-          gia_ban,
-          note,
-          tinh_trang,
-          check_flag
+          ${COL.supply},
+          ${COL.cost},
+          ${COL.price},
+          ${COL.note},
+          ${COL.status},
+          ${COL.checkFlag}
         FROM mavryk.order_list
         WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       )
       INSERT INTO mavryk.order_expired (
-        id_don_hang,
-        san_pham,
-        thong_tin_san_pham,
-        khach_hang,
-        link_lien_he,
-        slot,
-        ngay_dang_ki,
-        so_ngay_da_dang_ki,
-        het_han,
-        nguon,
-        gia_nhap,
-        gia_ban,
-        note,
-        tinh_trang,
-        check_flag
-      ) 
-      SELECT 
-        id_don_hang,
-        san_pham,
-        thong_tin_san_pham,
-        khach_hang,
-        link_lien_he,
-        slot,
-        ngay_dang_ki,
-        so_ngay_da_dang_ki,
-        het_han,
-        nguon,
-        gia_nhap,
-        gia_ban,
-        note,
-        tinh_trang,
-        check_flag
+        ${[
+          COL.idOrder,
+          COL.idProduct,
+          COL.informationOrder,
+          COL.customer,
+          COL.contact,
+          COL.slot,
+          COL.orderDate,
+          COL.days,
+          COL.orderExpired,
+          COL.supply,
+          COL.cost,
+          COL.price,
+          COL.note,
+          COL.status,
+          COL.checkFlag,
+        ].join(", ")}
+      )
+      SELECT
+        ${COL.idOrder},
+        ${COL.idProduct},
+        ${COL.informationOrder},
+        ${COL.customer},
+        ${COL.contact},
+        ${COL.slot},
+        ${COL.orderDate},
+        ${COL.days},
+        ${COL.orderExpired},
+        ${COL.supply},
+        ${COL.cost},
+        ${COL.price},
+        ${COL.note},
+        ${COL.status},
+        ${COL.checkFlag}
       FROM expired
       ON CONFLICT DO NOTHING
-      RETURNING id_don_hang;
+      RETURNING ${COL.idOrder};
     `);
     console.log(`  - Da chuyen ${transfer.rowCount} don het han (< 0 ngay).`);
     if (transfer.rows.length) {
+      const idKey = ORDER_COLS.idOrder;
       console.log(
         `    -> ID da luu: ${transfer.rows
-          .map((r) => r.id_don_hang)
+          .map((r) => r[idKey])
+          .filter(Boolean)
           .join(", ")}`
       );
     }
@@ -157,11 +188,11 @@ const updateDatabaseTask = async (trigger = "cron") => {
     // 2a) Update 0 ngay con lai -> 'Hết Hạn'
     const dueToday = await client.query(`
       UPDATE mavryk.order_list
-      SET tinh_trang = '${STATUS_EXPIRED}',
-          check_flag = NULL
+      SET ${COL.status} = '${STATUS_EXPIRED}',
+          ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (tinh_trang IS DISTINCT FROM '${STATUS_PAID}')
-        AND (tinh_trang IS DISTINCT FROM '${STATUS_EXPIRED}');
+        AND (${COL.status} IS DISTINCT FROM '${STATUS_PAID}')
+        AND (${COL.status} IS DISTINCT FROM '${STATUS_EXPIRED}');
     `);
     console.log(
       `  - Cap nhat ${dueToday.rowCount} don sang '${STATUS_EXPIRED}' (0 ngay).`
@@ -171,12 +202,16 @@ const updateDatabaseTask = async (trigger = "cron") => {
     const del = await client.query(`
       DELETE FROM mavryk.order_list
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
-      RETURNING id_don_hang;
+      RETURNING ${COL.idOrder};
     `);
     console.log(`  - Da xoa ${del.rowCount} don khoi order_list.`);
     if (del.rows.length) {
+      const idKey = ORDER_COLS.idOrder;
       console.log(
-        `    -> ID da xoa: ${del.rows.map((r) => r.id_don_hang).join(", ")}`
+        `    -> ID da xoa: ${del.rows
+          .map((r) => r[idKey])
+          .filter(Boolean)
+          .join(", ")}`
       );
     }
 
@@ -184,11 +219,11 @@ const updateDatabaseTask = async (trigger = "cron") => {
     // 2b) Update 1..4 ngay -> 'Cần Gia Hạn'
     const soon = await client.query(`
       UPDATE mavryk.order_list
-      SET tinh_trang = '${STATUS_RENEW}',
-          check_flag = NULL
+      SET ${COL.status} = '${STATUS_RENEW}',
+          ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
-        AND (tinh_trang IS DISTINCT FROM '${STATUS_EXPIRED}')
-        AND (tinh_trang IS DISTINCT FROM '${STATUS_RENEW}');
+        AND (${COL.status} IS DISTINCT FROM '${STATUS_EXPIRED}')
+        AND (${COL.status} IS DISTINCT FROM '${STATUS_RENEW}');
     `);
     console.log(
       `  - Cap nhat ${soon.rowCount} don sang '${STATUS_RENEW}' (1..4 ngay).`
@@ -210,6 +245,11 @@ const runCronSafe = (source) =>
   updateDatabaseTask(source).catch((err) =>
     console.error(`[CRON] Failed during ${source}:`, err)
   );
+
+// Allow manual trigger when this file is required directly (useful for debugging)
+if (require.main === module && process.argv.includes("--run-once")) {
+  runCronSafe("manual");
+}
 
 cron.schedule(
   cronExpression,
