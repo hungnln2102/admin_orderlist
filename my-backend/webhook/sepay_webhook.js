@@ -782,6 +782,14 @@ app.get(SEPAY_WEBHOOK_PATH, (_req, res) => {
 });
 
 app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
+  console.log("Incoming Sepay webhook headers:", {
+    authorization: req.get("Authorization"),
+    xApiKey: req.get("X-API-KEY"),
+    xSepaySignature: req.get("X-SEPAY-SIGNATURE"),
+    signature: req.get("Signature"),
+    querySignature: req.query?.signature,
+  });
+
   const signature = resolveSepaySignature(req);
   const hasValidSignature = verifySepaySignature(req.rawBody, signature);
   const hasValidApiKey = isValidApiKey(req);
