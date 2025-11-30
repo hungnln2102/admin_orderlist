@@ -737,6 +737,11 @@ app.get("/", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// Health check for webhook endpoint
+app.get(SEPAY_WEBHOOK_PATH, (_req, res) => {
+  res.json({ message: "Sepay webhook endpoint. Use POST with signature." });
+});
+
 app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
   const signature = req.get("X-SEPAY-SIGNATURE");
   if (!verifySepaySignature(req.rawBody, signature)) {
