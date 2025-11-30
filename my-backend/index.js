@@ -21,10 +21,13 @@ const {
     SUPPLY_PRICE_COLS,
     USERS_COLS,
 } = require("./schema/tables");
+const sepayWebhookApp = require("./webhook/sepay_webhook");
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
 const DB_SCHEMA = process.env.DB_SCHEMA || "mavryk";
+const SEPAY_PORT = Number(process.env.SEPAY_PORT) || 5000;
+const SEPAY_HOST = process.env.SEPAY_HOST || "0.0.0.0";
 
 // Trust proxy so secure cookies work behind reverse proxy/HTTPS
 app.set("trust proxy", true);
@@ -3913,6 +3916,13 @@ app.get("/api/scheduler/status", (_req, res) => {
 
 app.listen(port, () => {
     console.log(`Backend server running at http://localhost:${port}`);
+});
+
+// Start Sepay webhook server alongside backend API
+sepayWebhookApp.listen(SEPAY_PORT, SEPAY_HOST, () => {
+    console.log(
+        `Sepay webhook listening at http://${SEPAY_HOST}:${SEPAY_PORT}/api/payment/notify`
+    );
 });
 
 // Package products: export data with account storage details
