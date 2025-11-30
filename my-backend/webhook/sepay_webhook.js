@@ -71,16 +71,31 @@ const SUPPLY_TABLE = `${DB_SCHEMA}.supply`;
 const SUPPLY_PRICE_TABLE = `${DB_SCHEMA}.supply_price`;
 const PAYMENT_SUPPLY_TABLE = `${DB_SCHEMA}.payment_supply`;
 
+const resolveSepaySignature = (req) => {
+  return (
+    req.get("X-SEPAY-SIGNATURE") ||
+    req.get("X-Signature") ||
+    req.get("Signature") ||
+    req.get("X-Webhook-Signature") ||
+    req.query?.signature ||
+    req.query?.sign
+  );
+};
+
 const verifySepaySignature = (rawBody, signature) => {
-    if (!SEPAY_WEBHOOK_SECRET || !signature || !rawBody) return false;
-    const expected = crypto
-        .createHmac("sha256", SEPAY_WEBHOOK_SECRET)
-        .update(rawBody)
-        .digest("hex");
+  if (!SEPAY_WEBHOOK_SECRET || !signature || !rawBody) return false;
+  const expected = crypto
+    .createHmac("sha256", SEPAY_WEBHOOK_SECRET)
+    .update(rawBody)
+    .digest("hex");
+  try {
     return crypto.timingSafeEqual(
-        Buffer.from(expected, "hex"),
-        Buffer.from(signature, "hex")
+      Buffer.from(expected, "hex"),
+      Buffer.from(String(signature).trim(), "hex")
     );
+  } catch {
+    return false;
+  }
 };
 
 const splitTransactionContent = (content) => {
@@ -743,7 +758,7 @@ app.get(SEPAY_WEBHOOK_PATH, (_req, res) => {
 });
 
 app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
-  const signature = req.get("X-SEPAY-SIGNATURE");
+  const signature = resolveSepaySignature(req);
   if (!verifySepaySignature(req.rawBody, signature)) {
     return res.status(403).json({ message: "Invalid Signature" });
   }
