@@ -21,6 +21,7 @@ const DB_SCHEMA = process.env.DB_SCHEMA || "mavryk";
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
     process.env.SEPAY_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || "";
+const SEPAY_API_KEY = process.env.SEPAY_API_KEY || "";
 const HOST = process.env.SEPAY_HOST || "0.0.0.0";
 const PORT = Number(process.env.SEPAY_PORT) || 5000;
 
@@ -92,6 +93,29 @@ const verifySepaySignature = (rawBody, signature) => {
     return crypto.timingSafeEqual(
       Buffer.from(expected, "hex"),
       Buffer.from(String(signature).trim(), "hex")
+    );
+  } catch {
+    return false;
+  }
+};
+
+const extractApiKey = (req) => {
+  const auth = req.get("Authorization") || req.get("X-API-KEY") || "";
+  const trimmed = String(auth || "").trim();
+  const match = trimmed.match(/^Apikey\\s+(.+)$/i);
+  if (match && match[1]) return match[1].trim();
+  if (trimmed && !trimmed.toLowerCase().startsWith("apikey")) return trimmed;
+  return "";
+};
+
+const isValidApiKey = (req) => {
+  if (!SEPAY_API_KEY) return false;
+  const incoming = extractApiKey(req);
+  if (!incoming) return false;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(incoming),
+      Buffer.from(SEPAY_API_KEY)
     );
   } catch {
     return false;
@@ -759,7 +783,9 @@ app.get(SEPAY_WEBHOOK_PATH, (_req, res) => {
 
 app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
   const signature = resolveSepaySignature(req);
-  if (!verifySepaySignature(req.rawBody, signature)) {
+  const hasValidSignature = verifySepaySignature(req.rawBody, signature);
+  const hasValidApiKey = isValidApiKey(req);
+  if (!(hasValidSignature || hasValidApiKey)) {
     return res.status(403).json({ message: "Invalid Signature" });
   }
 
