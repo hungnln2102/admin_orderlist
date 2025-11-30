@@ -1025,12 +1025,20 @@ export default function Orders() {
                           <td colSpan={totalColumns} className="px-6 pb-6 pt-0">
                             <div className="rounded-2xl border border-dashed border-indigo-200/60 bg-indigo-600/20 p-5 shadow-lg shadow-indigo-900/30">
                               <div className="mb-4 flex items-center justify-between">
-                                <p className="text-sm font-semibold text-indigo-50">
-                                  Chi tiết thanh toán
-                                </p>
-                                <span className="text-xs font-medium uppercase tracking-wide text-indigo-200">
-                                  #{order[ORDER_FIELDS.ID_ORDER] || ""}
-                                </span>
+                                <div className="flex-1 text-center">
+                                  <p className="text-sm font-semibold text-indigo-50">
+                                    Chi tiết đơn hàng
+                                  </p>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">
+                                    #{order[ORDER_FIELDS.ID_ORDER] || ""}
+                                  </p>
+                                </div>
+                                <button
+                                  className="ml-4 rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Gia hạn
+                                </button>
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">

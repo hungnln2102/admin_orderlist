@@ -14,6 +14,8 @@ import Sources from "./pages/Sources";
 import Pricing from "./pages/Pricing";
 import Invoices from "./pages/Invoices";
 import RetroLogin from "./pages/RetroLogin";
+import ProductInfo from "./pages/ProductInfo";
+import Stats from "./pages/Stats";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,12 +47,14 @@ function App() {
                   <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
                   <div className="transition-all duration-300 ease-in-out lg:ml-64">
                     <div className="h-16 lg:hidden"></div>
-                    <main className="p-4 sm:p-6 lg:p-8 max-w-[1230px] mx-auto">
+                    <main className="p-0 max-w-none">
                       <Routes>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/package-products" element={<PackageProduct />} />
+                        <Route path="/product-info" element={<ProductInfo />} />
+                        <Route path="/stats" element={<Stats />} />
                         <Route path="/sources" element={<Sources />} />
                         <Route path="/pricing" element={<Pricing />} />
                         <Route path="/invoices" element={<Invoices />} />

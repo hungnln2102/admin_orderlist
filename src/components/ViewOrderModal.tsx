@@ -97,9 +97,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         );
 
         const { data, rawText } =
-          await Helpers.readJsonOrText<{ gia_ban?: number; error?: string }>(
-            response
-          );
+          await Helpers.readJsonOrText<{
+            gia_ban?: number;
+            price?: number;
+            error?: string;
+          }>(response);
 
         if (!response.ok) {
           const message =
@@ -112,7 +114,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         const result = data || {};
 
         if (!ignore) {
-          const backendPrice = Number(result?.gia_ban);
+          const backendPrice = Number(
+            (result as any)?.price ?? result?.gia_ban
+          );
           setCalculatedPrice(
             Number.isFinite(backendPrice) && backendPrice >= 0
               ? backendPrice

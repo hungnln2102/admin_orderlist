@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ChartBarIcon,
@@ -9,6 +9,9 @@ import {
   DocumentIcon,
   XMarkIcon,
   Bars3Icon,
+  InformationCircleIcon,
+  ChartPieIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../AuthContext";
 import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
@@ -22,20 +25,39 @@ type MenuItem = {
   name: string;
   href: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  children?: { name: string; href: string }[];
 };
 
-const baseMenuItems: MenuItem[] = [
-  { name: "Tổng Quan", href: "/dashboard", icon: ChartBarIcon },
-  { name: "Đơn Hàng", href: "/orders", icon: ShoppingBagIcon },
+type MenuSection = {
+  title: string;
+  items: MenuItem[];
+};
+
+const menuSections: MenuSection[] = [
   {
-    name: "Sản Phẩm Gói",
-    href: "/package-products",
-    icon: CubeIcon,
+    title: "Tổng Quan",
+    items: [{ name: "Tổng Quan", href: "/dashboard", icon: ChartBarIcon }],
   },
-  { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
-  { name: "Bảng Giá", href: "/pricing", icon: CurrencyDollarIcon },
-  { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
+  {
+    title: "Sản Phẩm",
+    items: [
+      { name: "Đơn Hàng", href: "/orders", icon: ShoppingBagIcon },
+      { name: "Gói", href: "/package-products", icon: CubeIcon },
+      { name: "Bảng Giá", href: "/pricing", icon: CurrencyDollarIcon },
+      {
+        name: "Thông Tin Sản Phẩm",
+        href: "/product-info",
+        icon: InformationCircleIcon,
+      },
+    ],
+  },
+  {
+    title: "Cá Nhân",
+    items: [
+      { name: "Thống Kê", href: "/stats", icon: ChartPieIcon },
+      { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
+      { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
+    ],
+  },
 ];
 
 const normalizeSearch = (input: string) => {
@@ -61,13 +83,23 @@ const matchesHref = (
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
-  const computedMenu = baseMenuItems;
   const { user, setUser } = useAuth();
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(menuSections.map((section) => [section.title, true]))
+  );
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {
       /* ignore */
     } finally {
@@ -100,100 +132,185 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
       <div
         className={`
-          fixed top-0 left-0 z-40 w-64 h-full bg-white shadow-xl border-r border-gray-200
+          fixed top-0 left-0 z-40 w-64 h-full bg-gradient-to-b from-[#0c1230] via-[#141a3c] to-[#0a0e24] shadow-2xl border-r border-white/10
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0
         `}
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-center h-16 px-4 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
-            <h1 className="text-xl font-bold text-white">Admin Orderlist</h1>
+          <div className="px-4 pt-6 pb-4">
+            <div className="rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 shadow-lg shadow-indigo-900/50 text-center border border-white/10">
+              <h1 className="text-lg font-bold text-white tracking-wide">
+                Admin Orderlist
+              </h1>
+              <p className="text-[11px] text-indigo-100/90 mt-1 font-medium uppercase tracking-[0.08em]">
+                Control Panel
+              </p>
+            </div>
           </div>
 
-          <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
-            {computedMenu.map((item) => {
-              const isActive =
-                location.pathname === item.href ||
-                matchesHref(location.pathname, location.search, item.href);
+          <nav className="flex-1 px-3 pb-6 overflow-y-auto space-y-2">
+            {menuSections.map((section) => {
+              const isOpenSection = openSections[section.title] ?? true;
+              const isStaticSection = section.title === menuSections[0].title;
+              const isSectionActive = section.items.some(
+                (item) =>
+                  location.pathname === item.href ||
+                  matchesHref(location.pathname, location.search, item.href)
+              );
               return (
-                <div key={item.name} className="space-y-2">
-                  <Link
-                    to={item.href}
-                    onClick={() => setIsOpen(false)}
-                      className={`
-                      flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200
-                      group relative
-                      ${
-                        isActive
-                          ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105"
-                          : "text-indigo-50 hover:bg-indigo-500/15 hover:text-indigo-50"
-                      }
-                    `}
-                  >
-                    <item.icon
-                      className={`mr-3 h-5 w-5 ${
-                        isActive
-                          ? "text-white"
-                          : "text-indigo-200 group-hover:text-indigo-50"
-                      }`}
-                    />
-                    {item.name}
-                    {isActive && (
-                      <div className="absolute right-2 w-2 h-2 bg-white rounded-full" />
-                    )}
-                  </Link>
+                <div
+                  key={section.title}
+                  className={`w-full rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm mb-3 ${
+                    isSectionActive ? "ring-2 ring-indigo-500/40" : ""
+                  }`}
+                >
+                  {isStaticSection ? (
+                    <div className="space-y-1 px-2 py-1">
+                      {section.items.map((item) => {
+                        const isActive =
+                          location.pathname === item.href ||
+                          matchesHref(
+                            location.pathname,
+                            location.search,
+                            item.href
+                          );
+                        return (
+                          <div key={item.name} className="space-y-2">
+                            <Link
+                              to={item.href}
+                              onClick={() => setIsOpen(false)}
+                              className={`
+                                group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200
+                                ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-900/40"
+                                    : "text-indigo-100/90 hover:bg-white/10 hover:text-white"
+                                }
+                              `}
+                            >
+                              <item.icon
+                                className={`h-5 w-5 transition-colors ${
+                                  isActive
+                                    ? "text-white"
+                                    : "text-indigo-200 group-hover:text-white"
+                                }`}
+                              />
+                              {item.name}
+                            </Link>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.title)}
+                        className="w-full px-4 py-2.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-100 hover:text-white transition bg-white/5 rounded-lg"
+                      >
+                        <span>{section.title}</span>
+                        <ChevronDownIcon
+                          className={`h-4 w-4 transition-transform ${
+                            isOpenSection ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {isOpenSection && (
+                        <div className="space-y-1 px-2.5 py-2">
+                          {section.items.map((item) => {
+                            const isActive =
+                              location.pathname === item.href ||
+                              matchesHref(
+                                location.pathname,
+                                location.search,
+                                item.href
+                              );
+                            return (
+                              <div key={item.name} className="space-y-2">
+                                <Link
+                                  to={item.href}
+                                  onClick={() => setIsOpen(false)}
+                                  className={`
+                                group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200
+                                ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-900/40"
+                                    : "text-indigo-100/90 hover:bg-white/10 hover:text-white"
+                                }
+                              `}
+                                >
+                                  <item.icon
+                                    className={`h-5 w-5 transition-colors ${
+                                      isActive
+                                        ? "text-white"
+                                        : "text-indigo-200 group-hover:text-white"
+                                    }`}
+                                  />
+                                  {item.name}
+                                </Link>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               );
             })}
           </nav>
 
-          <div className="relative p-4 border-t border-gray-200 bg-gray-50">
+          <div className="relative p-4 border-t border-white/10 bg-white/5 backdrop-blur-sm">
             <div className="w-full flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setShowAccountMenu((prev) => !prev)}
                 className="flex items-center flex-1"
               >
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-white text-sm font-bold">
+                <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-md shadow-indigo-900/40">
+                  <span className="text-white text-sm font-bold tracking-wide">
                     {(user?.username || "A").slice(0, 1).toUpperCase()}
                   </span>
                 </div>
                 <div className="ml-3 flex-1 text-left">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-semibold text-white truncate">
                     {user?.username || "Tài khoản"}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user?.role ? `Role: ${user.role}` : "Đã đăng nhập"}
+                  <p className="text-[11px] text-indigo-100/80 truncate">
+                    {user?.role ? `Role: ${user.role}` : "Chưa đăng nhập"}
                   </p>
                 </div>
               </button>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="ml-3 w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 transition"
-                title="Đăng xuất"
+                className="ml-3 w-9 h-9 flex items-center justify-center rounded-lg bg-red-500/10 text-red-200 hover:bg-red-500/20 border border-red-500/30 transition"
+                title="Đăng Xuất"
               >
                 <ArrowRightOnRectangleIcon className="h-5 w-5" />
               </button>
             </div>
             {showAccountMenu && (
-              <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-gray-200 bg-white shadow-lg z-10">
-                <ul className="py-2 text-sm text-gray-700 space-y-1">
-                  {["Thông tin", "Thêm Admin", "Thêm Quyền", "Đổi Mật Khẩu"].map(
-                    (label) => (
-                      <li key={label}>
-                        <button
-                          type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-indigo-500/10"
-                          onClick={() => setShowAccountMenu(false)}
-                        >
-                          {label}
-                        </button>
-                      </li>
-                    )
-                  )}
+              <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-white/15 bg-[#0f1432] shadow-2xl shadow-black/40 z-10">
+                <ul className="py-2 text-sm text-indigo-50 space-y-1">
+                  {[
+                    "Thông tin",
+                    "Thêm Admin",
+                    "Thêm Quyền",
+                    "Đổi Mật Khẩu",
+                  ].map((label) => (
+                    <li key={label}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-white/10"
+                        onClick={() => setShowAccountMenu(false)}
+                      >
+                        {label}
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}

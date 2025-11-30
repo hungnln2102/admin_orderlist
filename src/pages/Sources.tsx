@@ -17,7 +17,6 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import GlassPanel from "../components/GlassPanel";
 import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
 import GradientButton from "../components/GradientButton";
 import { SUPPLY_COLS, BANK_LIST_COLS } from "../lib/tableSql";
@@ -103,6 +102,23 @@ const normalizeStatusValue = (value?: string | null): "active" | "inactive" => {
 const resolveStatusBoolean = (value?: string | boolean | null): boolean => {
   if (typeof value === "boolean") return value;
   return normalizeStatusValue(value) !== "inactive";
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object";
+
+const getFieldValue = <T,>(
+  row: unknown,
+  keys: Array<string>,
+  fallback: T
+): T => {
+  if (!isRecord(row)) return fallback;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      return row[key] as T;
+    }
+  }
+  return fallback;
 };
 
 const DEFAULT_DELETE_ERROR =
@@ -318,6 +334,109 @@ const createInitialNewSupplierForm = (
   status: defaultStatus,
 });
 
+const normalizeSupplyFromRow = (
+  row: unknown
+): {
+  id: number;
+  sourceName: string;
+  numberBank: string | null;
+  binBank: string | null;
+  bankName: string | null;
+  rawStatus: string | null;
+  isActive: boolean;
+} => {
+  const sourceName = getFieldValue<string>(
+    row,
+    ["sourceName", SUPPLY_COLS.sourceName],
+    ""
+  );
+  const numberBank = getFieldValue<string | null>(
+    row,
+    ["numberBank", SUPPLY_COLS.numberBank],
+    null
+  );
+  const binBank = getFieldValue<string | null>(
+    row,
+    ["binBank", SUPPLY_COLS.binBank],
+    null
+  );
+  const bankName = getFieldValue<string | null>(
+    row,
+    ["bankName", BANK_LIST_COLS.bankName],
+    null
+  );
+  const rawStatus = getFieldValue<string | null>(
+    row,
+    ["rawStatus", "raw_status", "status"],
+    null
+  );
+  const activeFromRow = getFieldValue<boolean | null>(
+    row,
+    ["isActive", SUPPLY_COLS.activeSupply, "active_supply"],
+    null
+  );
+  const isActive =
+    typeof activeFromRow === "boolean"
+      ? activeFromRow
+      : normalizeStatusValue(rawStatus) !== "inactive";
+
+  return {
+    id: Number(getFieldValue(row, ["id", SUPPLY_COLS.id], 0)) || 0,
+    sourceName,
+    numberBank,
+    binBank,
+    bankName,
+    rawStatus,
+    isActive,
+  };
+};
+
+const normalizeSupplyOverviewResponse = (
+  payload: any
+): SupplyOverviewResponse => {
+  const recordPayload = isRecord(payload) ? payload : {};
+  const supplySection = isRecord(recordPayload.supply)
+    ? recordPayload.supply
+    : payload ?? {};
+  const supply = normalizeSupplyFromRow(supplySection);
+  const statsRow = isRecord(recordPayload.stats) ? recordPayload.stats : {};
+  const unpaidPaymentsRaw = Array.isArray(recordPayload.unpaidPayments)
+    ? recordPayload.unpaidPayments
+    : [];
+
+  return {
+    supply: {
+      ...supply,
+      status: supply.isActive ? "active" : "inactive",
+    },
+    stats: {
+      totalOrders:
+        Number(getFieldValue(statsRow, ["totalOrders", "total_orders"], 0)) ||
+        0,
+      canceledOrders:
+        Number(
+          getFieldValue(statsRow, ["canceledOrders", "canceled_orders"], 0)
+        ) || 0,
+      monthlyOrders:
+        Number(
+          getFieldValue(statsRow, ["monthlyOrders", "monthly_orders"], 0)
+        ) || 0,
+      totalPaidAmount:
+        Number(
+          getFieldValue(statsRow, ["totalPaidAmount", "total_paid_amount"], 0)
+        ) || 0,
+    },
+    unpaidPayments: unpaidPaymentsRaw.map((row) => ({
+      id: Number(getFieldValue(row, ["id"], 0)) || 0,
+      round: getFieldValue<string>(row, ["round"], ""),
+      totalImport:
+        Number(getFieldValue(row, ["totalImport", "import_value"], 0)) || 0,
+      paid: Number(getFieldValue(row, ["paid", "paid_value"], 0)) || 0,
+      status: getFieldValue<string>(row, ["status", "status_label"], ""),
+    })),
+  };
+};
+
 export default function Sources() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -366,6 +485,8 @@ export default function Sources() {
     paymentInfo: "",
     bankBin: "",
   });
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [statusLoadingMap, setStatusLoadingMap] = useState<
     Record<number, boolean>
   >({});
@@ -389,49 +510,79 @@ export default function Sources() {
         data.supplies
       )
         ? data.supplies.map((item) => {
-            const sourceName =
-              item.sourceName ?? item[SUPPLY_COLS.sourceName] ?? "";
-            const numberBank =
-              item.numberBank ?? item[SUPPLY_COLS.numberBank] ?? null;
-            const binBank = item.binBank ?? item[SUPPLY_COLS.binBank] ?? null;
-            const bankName =
-              item.bankName ?? item[BANK_LIST_COLS.bankName] ?? null;
-            const rawStatus = item.rawStatus ?? item.status ?? null;
-            const activeFlag =
-              typeof item.isActive === "boolean"
-                ? item.isActive
-                : normalizeStatusValue(rawStatus) !== "inactive";
+            const baseSupply = normalizeSupplyFromRow(item);
             return {
               ...item,
-              sourceName,
-              numberBank,
-              binBank,
-              bankName,
-              rawStatus,
-              isActive: activeFlag,
-              status: activeFlag ? "active" : "inactive",
+              ...baseSupply,
+              status: baseSupply.isActive ? "active" : "inactive",
               products: normalizeProducts(item.products),
               monthlyOrders:
-                Number(item.monthlyOrders ?? item.monthly_orders) || 0,
+                Number(
+                  getFieldValue(item, ["monthlyOrders", "monthly_orders"], 0)
+                ) || 0,
               monthlyImportValue:
-                Number(item.monthlyImportValue ?? item.monthly_import_value) ||
-                0,
-              totalOrders: Number(item.totalOrders ?? item.total_orders) || 0,
+                Number(
+                  getFieldValue(
+                    item,
+                    ["monthlyImportValue", "monthly_import_value"],
+                    0
+                  )
+                ) || 0,
+              totalOrders:
+                Number(
+                  getFieldValue(item, ["totalOrders", "total_orders"], 0)
+                ) || 0,
               totalPaidImport:
-                Number(item.totalPaidImport ?? item.total_paid_import) || 0,
+                Number(
+                  getFieldValue(
+                    item,
+                    ["totalPaidImport", "total_paid_import"],
+                    0
+                  )
+                ) || 0,
               totalUnpaidImport:
-                Number(item.totalUnpaidImport ?? item.total_unpaid_import) || 0,
+                Number(
+                  getFieldValue(
+                    item,
+                    ["totalUnpaidImport", "total_unpaid_import"],
+                    0
+                  )
+                ) || 0,
             } as SupplySummaryItem;
           })
         : [];
       setSupplies(normalizedSupplies);
+      const statsPayload = data.stats ?? {};
       setStats({
-        totalSuppliers: Number(data.stats?.totalSuppliers) || 0,
+        totalSuppliers:
+          Number(
+            getFieldValue(
+              statsPayload,
+              ["totalSuppliers", "total_suppliers"],
+              0
+            )
+          ) || 0,
         activeSuppliers:
-          Number(data.stats?.activeSuppliers) ||
+          Number(
+            getFieldValue(
+              statsPayload,
+              ["activeSuppliers", "active_suppliers"],
+              0
+            )
+          ) ||
           normalizedSupplies.filter((supply) => isSupplyActive(supply)).length,
-        monthlyOrders: Number(data.stats?.monthlyOrders) || 0,
-        totalImportValue: Number(data.stats?.totalImportValue) || 0,
+        monthlyOrders:
+          Number(
+            getFieldValue(statsPayload, ["monthlyOrders", "monthly_orders"], 0)
+          ) || 0,
+        totalImportValue:
+          Number(
+            getFieldValue(
+              statsPayload,
+              ["totalImportValue", "total_import_value"],
+              0
+            )
+          ) || 0,
       });
     } catch (err) {
       console.error(err);
@@ -841,7 +992,8 @@ export default function Sources() {
           errorText || "Không thể tải thông tin chi tiết nhà cung cấp"
         );
       }
-      const data: SupplyOverviewResponse = await response.json();
+      const raw = await response.json();
+      const data: SupplyOverviewResponse = normalizeSupplyOverviewResponse(raw);
       setViewModalState((prev) => ({
         ...prev,
         loading: false,
@@ -950,6 +1102,8 @@ export default function Sources() {
 
   const openEditForm = useCallback((supply: SupplySummaryItem) => {
     setEditingSupplyId(supply.id);
+    setEditFormError(null);
+    setIsSubmittingEdit(false);
     setEditFormValues({
       sourceName: supply.sourceName || "",
       paymentInfo: supply.numberBank || "",
@@ -958,8 +1112,10 @@ export default function Sources() {
   }, []);
 
   const closeEditForm = useCallback(() => {
+    if (isSubmittingEdit) return;
     setEditingSupplyId(null);
-  }, []);
+    setEditFormError(null);
+  }, [isSubmittingEdit]);
 
   const handleEditInputChange = useCallback(
     (field: keyof EditFormState, value: string) => {
@@ -967,6 +1123,7 @@ export default function Sources() {
         ...prev,
         [field]: value,
       }));
+      setEditFormError(null);
     },
     []
   );
@@ -982,32 +1139,104 @@ export default function Sources() {
   }, [bankOptions]);
 
   const handleEditSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+    async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (editingSupplyId === null) return;
+      if (editingSupplyId === null || isSubmittingEdit) return;
+
+      const currentSupply = supplies.find(
+        (supply) => supply.id === editingSupplyId
+      );
+      if (!currentSupply) {
+        setEditFormError("Không tìm thấy nhà cung cấp.");
+        return;
+      }
+
       const trimmedName = editFormValues.sourceName.trim();
+      if (!trimmedName) {
+        setEditFormError("Vui lòng nhập tên nguồn.");
+        return;
+      }
+
       const trimmedPayment = editFormValues.paymentInfo.trim();
       const trimmedBankBin = editFormValues.bankBin.trim();
-      setSupplies((prev) =>
-        prev.map((supply) =>
-          supply.id === editingSupplyId
-            ? {
-                ...supply,
-                sourceName: trimmedName || supply.sourceName,
-                numberBank: trimmedPayment || null,
-                binBank: trimmedBankBin || supply.binBank,
-                bankName: trimmedBankBin
-                  ? bankNameByBin.get(trimmedBankBin) ||
-                    supply.bankName ||
-                    `BIN ${trimmedBankBin}`
-                  : supply.bankName,
-              }
-            : supply
-        )
-      );
-      closeEditForm();
+      const resolvedBankBin = trimmedBankBin || currentSupply.binBank || "";
+
+      setIsSubmittingEdit(true);
+      setEditFormError(null);
+
+      try {
+        const payload = {
+          sourceName: trimmedName,
+          numberBank: trimmedPayment,
+          bankBin: resolvedBankBin,
+          bankName:
+            resolvedBankBin && bankNameByBin.has(resolvedBankBin)
+              ? bankNameByBin.get(resolvedBankBin)
+              : currentSupply.bankName,
+        };
+        const response = await apiFetch(`/api/supplies/${editingSupplyId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            errorText || "Không thể cập nhật thông tin nhà cung cấp."
+          );
+        }
+        const updatedRaw = await response.json().catch(() => ({}));
+        const updated =
+          updatedRaw && typeof updatedRaw === "object" ? updatedRaw : {};
+        setSupplies((prev) =>
+          prev.map((supply) =>
+            supply.id === editingSupplyId
+              ? {
+                  ...supply,
+                  sourceName: updated.sourceName ?? trimmedName,
+                  numberBank:
+                    "numberBank" in updated
+                      ? updated.numberBank
+                      : trimmedPayment || null,
+                  binBank:
+                    "binBank" in updated
+                      ? updated.binBank
+                      : resolvedBankBin || null,
+                  bankName:
+                    "bankName" in updated
+                      ? updated.bankName
+                      : resolvedBankBin
+                      ? bankNameByBin.get(resolvedBankBin) ||
+                        supply.bankName ||
+                        `BIN ${resolvedBankBin}`
+                      : supply.bankName ?? null,
+                }
+              : supply
+          )
+        );
+        closeEditForm();
+      } catch (error) {
+        console.error(error);
+        setEditFormError(
+          error instanceof Error
+            ? error.message
+            : "Không thể cập nhật nhà cung cấp."
+        );
+      } finally {
+        setIsSubmittingEdit(false);
+      }
     },
-    [bankNameByBin, closeEditForm, editFormValues, editingSupplyId, setSupplies]
+    [
+      bankNameByBin,
+      closeEditForm,
+      editFormValues.bankBin,
+      editFormValues.paymentInfo,
+      editFormValues.sourceName,
+      editingSupplyId,
+      isSubmittingEdit,
+      setSupplies,
+      supplies,
+    ]
   );
 
   const handleToggleSupplyStatus = useCallback(
@@ -1500,19 +1729,24 @@ export default function Sources() {
                 ))}
               </select>
             </div>
+            {editFormError && (
+              <p className="text-sm text-red-500">{editFormError}</p>
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 className="px-4 py-2 text-sm font-medium text-gray-600 rounded-lg border border-gray-200 hover:bg-indigo-500/10"
                 onClick={closeEditForm}
+                disabled={isSubmittingEdit}
               >
                 Hủy
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                disabled={isSubmittingEdit}
               >
-                Lưu Thông Tin
+                {isSubmittingEdit ? "Đang Lưu..." : "Lưu Thông Tin"}
               </button>
             </div>
           </form>
@@ -1643,7 +1877,7 @@ export default function Sources() {
         Icon: CalendarDaysIcon,
       },
       {
-        title: "Tổng tiền Thanh Toán",
+        title: "Tổng Tiền Thanh Toán",
         value: formatCurrencyVnd(stats?.totalPaidAmount ?? 0),
         accent: "emerald" as const,
         Icon: CurrencyDollarIcon,
@@ -1651,22 +1885,20 @@ export default function Sources() {
     ];
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-        <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl max-h-[95vh] flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+        <div className="w-full max-w-6xl bg-gradient-to-b from-[#0f132c] via-[#11183a] to-[#0b1025] border border-white/10 rounded-3xl shadow-2xl shadow-indigo-900/40 max-h-[95vh] flex flex-col overflow-hidden backdrop-blur-xl text-white">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur">
             <div>
-              <p className="text-lg font-semibold text-gray-900">
-                Thông tin NCC
-              </p>
+              <p className="text-lg font-semibold text-white">Thông tin NCC</p>
               {supply && (
-                <p className="text-xs text-white/80">
+                <p className="text-xs text-white/60">
                   ID: {supply.id} | {supply.sourceName}
                 </p>
               )}
             </div>
             <button
               type="button"
-              className="text-gray-400 hover:text-gray-600"
+              className="text-white/60 hover:text-white"
               onClick={closeViewModal}
             >
               <XMarkIcon className="h-6 w-6" />
@@ -1675,32 +1907,32 @@ export default function Sources() {
 
           <div className="px-6 py-5 overflow-y-auto space-y-6">
             {viewModalState.loading && (
-              <div className="text-center text-sm text-gray-500">
+              <div className="text-center text-sm text-white/70">
                 Đang tải thông tin...
               </div>
             )}
 
             {viewModalState.error && !viewModalState.loading && (
-              <div className="text-center text-sm text-red-500">
+              <div className="text-center text-sm text-rose-400">
                 {viewModalState.error}
               </div>
             )}
 
             {!viewModalState.loading && !viewModalState.error && supply && (
               <React.Fragment>
-                <section className="bg-white border border-gray-100 rounded-3xl p-6 shadow-lg">
+                <section className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur">
                   <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-                    <div className="flex-1 bg-white rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-2 border-gray-200 shadow-md">
+                    <div className="flex-1 bg-white/5 rounded-3xl p-5 text-sm grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border border-white/10 shadow-lg">
                       <div>
-                        <p className="text-gray-500">Tên NCC</p>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-white/60">Tên NCC</p>
+                        <p className="text-lg font-semibold text-white">
                           {supply.sourceName || "Chưa Đặt Tên"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Trạng Thái</p>
+                        <p className="text-white/60">Trạng Thái</p>
                         <span
-                          className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 ${getStatusClasses(
+                          className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-1 shadow ${getStatusClasses(
                             supply.isActive ?? supply.status
                           )}`}
                         >
@@ -1708,19 +1940,19 @@ export default function Sources() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-gray-500">Số Tài Khoản</p>
-                        <p className="text-base font-semibold text-gray-900">
+                        <p className="text-white/60">Số Tài Khoản</p>
+                        <p className="text-base font-semibold text-white">
                           {accountNumber || "Chưa Cung Cấp"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Ngân Hàng</p>
-                        <p className="text-base font-semibold text-gray-900">
+                        <p className="text-white/60">Ngân Hàng</p>
+                        <p className="text-base font-semibold text-white">
                           {bankLabel}
                         </p>
                       </div>
                     </div>
-                    <div className="flex-[1.4] bg-white rounded-3xl p-5 border-2 border-gray-200 shadow-md">
+                    <div className="flex-[1.4] rounded-3xl p-5 border border-white/10 shadow-lg bg-gradient-to-br from-white/5 via-white/0 to-white/5">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {statCards.map((card) => {
                           const IconComponent = card.Icon;
@@ -1730,11 +1962,8 @@ export default function Sources() {
                           return (
                             <div
                               key={card.title}
-                              className="relative isolate rounded-3xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_25px_65px_-40px_rgba(15,23,42,0.65)]"
+                              className="relative isolate rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-5 py-4 shadow-[0_25px_65px_-40px_rgba(15,23,42,0.65)]"
                             >
-                              <div
-                                className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br ${accent.glow} opacity-70 blur-2xl`}
-                              />
                               <div className="relative flex items-center gap-4">
                                 <div
                                   className={`rounded-2xl bg-gradient-to-br ${accent.iconBg} p-3 text-white shadow-inner shadow-black/10`}
@@ -1742,10 +1971,10 @@ export default function Sources() {
                                   <IconComponent className="h-5 w-5" />
                                 </div>
                                 <div className="text-right flex-1">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
                                     {card.title}
                                   </p>
-                                  <p className="text-xl font-extrabold text-slate-900">
+                                  <p className="text-xl font-extrabold text-white">
                                     {typeof card.value === "number"
                                       ? card.value.toLocaleString("vi-VN")
                                       : card.value}
@@ -1773,7 +2002,7 @@ export default function Sources() {
                   </div>
 
                   {unpaidPayments.length === 0 ? (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-white/70">
                       Không có chu kỳ chưa thanh toán.
                     </div>
                   ) : (
@@ -1782,10 +2011,10 @@ export default function Sources() {
                         {unpaidPayments.map((payment) => (
                           <button
                             key={payment.id}
-                            className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
+                            className={`w-full text-left rounded-2xl border px-4 py-3 transition backdrop-blur ${
                               payment.id === viewModalState.selectedPaymentId
-                                ? "border-blue-500 bg-blue-50"
-                                : "border-gray-200 hover:border-gray-300"
+                                ? "border-indigo-400 bg-indigo-500/20 shadow-lg shadow-indigo-900/30 text-white"
+                                : "border-white/10 bg-white/5 hover:border-white/30 text-white/80"
                             }`}
                             onClick={() => handleSelectPaymentCycle(payment.id)}
                           >
@@ -1802,12 +2031,12 @@ export default function Sources() {
 
                       <div className="lg:col-span-2">
                         {selectedPayment ? (
-                          <div className="border border-gray-200 rounded-2xl p-6 space-y-4 bg-white shadow-sm">
+                          <div className="border border-white/15 rounded-2xl p-6 space-y-4 bg-white/5 shadow-xl backdrop-blur">
                             <div>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-white/70">
                                 Thông tin chu kỳ
                               </p>
-                              <p className="text-lg font-semibold text-gray-900">
+                              <p className="text-lg font-semibold text-white">
                                 {selectedPayment.round || "Chu kỳ không tên"}
                               </p>
                             </div>
@@ -1816,58 +2045,57 @@ export default function Sources() {
                                 <img
                                   src={qrImageUrl}
                                   alt="Mã QR Thanh Toán"
-                                  className="w-60 h-auto"
+                                  className="w-60 h-auto rounded-lg shadow-lg shadow-black/30"
                                 />
                                 <p className="text-xs text-white/80">
                                   Quét mã QR để thanh toán
                                 </p>
                               </div>
                             ) : (
-                              <div className="text-sm text-gray-500 text-center">
-                                Không có dữ liệu tạo mã QR (Thiếu thông tin tài
-                                khoản hoặc ngân hàng).
+                              <div className="text-sm text-white/70 text-center">
+                                Chưa đủ thông tin để tạo mã QR (thiếu tài khoản
+                                hoặc ngân hàng).
                               </div>
                             )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-white">
                               <div>
-                                <p className="text-gray-500">Ngân Hàng</p>
-                                <p className="font-semibold text-gray-900">
+                                <p className="text-white/60">Ngân Hàng</p>
+                                <p className="font-semibold text-white">
                                   {bankLabel}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Số Tài Khoản</p>
-
-                                <p className="font-semibold text-gray-900">
+                                <p className="text-white/60">Số Tài Khoản</p>
+                                <p className="font-semibold text-white">
                                   {accountNumber || "Chưa Cung Cấp"}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">
+                                <p className="text-white/60">
                                   Chủ tài khoản / Nội dung
                                 </p>
-                                <p className="font-semibold text-gray-900">
+                                <p className="font-semibold text-white">
                                   {accountName}
                                 </p>
-                                <p className="text-xs text-white/80">
-                                  Nội Dung: {qrMessage}
+                                <p className="text-xs text-white/70">
+                                  Nội dung: {qrMessage}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-gray-500">Tổng Thanh Toán</p>
-                                <p className="font-semibold text-red-600">
+                                <p className="text-white/60">Tổng Thanh Toán</p>
+                                <p className="font-semibold text-rose-300">
                                   {formatCurrencyVnd(qrAmount)}
                                 </p>
                               </div>
                             </div>
                             {viewModalState.confirmError && (
-                              <div className="text-xs text-red-500">
+                              <div className="text-xs text-rose-400">
                                 {viewModalState.confirmError}
                               </div>
                             )}
                             <div className="flex justify-end">
                               <button
-                                className="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                                className="px-5 py-2 bg-gradient-to-r from-indigo-500 to-blue-500 text-white text-sm font-semibold rounded-lg hover:from-indigo-600 hover:to-blue-600 disabled:opacity-60 shadow-lg shadow-indigo-900/30"
                                 onClick={handleConfirmPayment}
                                 disabled={viewModalState.confirming}
                               >
@@ -1878,7 +2106,7 @@ export default function Sources() {
                             </div>
                           </div>
                         ) : (
-                          <div className="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-sm text-gray-500">
+                          <div className="border border-dashed border-white/20 rounded-2xl p-8 text-center text-sm text-white/70 bg-white/5">
                             Chọn một chu kỳ thanh toán để xem chi tiết.
                           </div>
                         )}
@@ -1893,7 +2121,6 @@ export default function Sources() {
       </div>
     );
   };
-
   const renderAddSupplierModal = () => {
     if (!addModalOpen) return null;
     return (
@@ -2036,8 +2263,12 @@ export default function Sources() {
         const data: BankOption[] = await response.json();
         const normalized = Array.isArray(data)
           ? data.map((row) => ({
-              bin: row.bin ?? (row as any)?.[BANK_LIST_COLS.bin] ?? "",
-              name: row.name ?? (row as any)?.[BANK_LIST_COLS.bankName] ?? "",
+              bin: getFieldValue<string>(row, ["bin", BANK_LIST_COLS.bin], ""),
+              name: getFieldValue<string>(
+                row,
+                ["name", BANK_LIST_COLS.bankName],
+                ""
+              ),
             }))
           : [];
         setBankOptions(normalized);
@@ -2156,41 +2387,44 @@ export default function Sources() {
           </div>
         </div>
 
-        <GlassPanel className="p-6 space-y-4" glow="neutral">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-white/5 via-white/0 to-white/5 p-5 shadow-[0_30px_80px_-45px_rgba(0,0,0,0.8)]">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-indigo-400/10 via-transparent to-blue-400/10 blur-3xl" />
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
               <input
                 type="text"
-                placeholder="Tìm Kiếm Nhà Cung Cấp..."
-                className={`${GLASS_FIELD_CLASS} pl-10`}
+                placeholder="Tìm kiếm nhà cung cấp..."
+                className="w-full rounded-full border border-white/15 bg-white/10 px-4 py-3 pl-10 text-sm text-white placeholder:text-white/50 shadow-inner shadow-black/20 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-300"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
 
             <select
-              className={GLASS_FIELD_CLASS}
+              className="w-full rounded-full border border-white/15 bg-white/10 px-4 py-3 text-sm text-white shadow-inner shadow-black/20 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:border-indigo-300"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
               <option value="all">Trạng Thái</option>
-
               <option value="active">Đang Hoạt Động</option>
-
               <option value="inactive">Tạm Dừng</option>
             </select>
 
-            <GradientButton className="w-full justify-center" type="button">
+            <GradientButton
+              className="w-full justify-center rounded-full shadow-lg shadow-indigo-900/30"
+              type="button"
+            >
               Xuất Danh Sách
             </GradientButton>
           </div>
 
-          {error && <div className="text-sm text-red-600">{error}</div>}
-        </GlassPanel>
+          {error && (
+            <div className="relative mt-2 text-sm text-rose-400">{error}</div>
+          )}
+        </div>
 
-        <div className="bg-white/10 border border-white/10 rounded-xl shadow-lg overflow-hidden max-w-6xl mx-auto backdrop-blur">
+        <div className="bg-white/10 border border-white/10 rounded-xl shadow-lg overflow-hidden w-full backdrop-blur">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-white/10 text-white">
               <thead className="bg-white/5">
@@ -2251,7 +2485,7 @@ export default function Sources() {
                         >
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-white">
-                              {supply.sourceName || "ChÆ°a Ä‘áº·t tÃªn"}
+                              {supply.sourceName || "Chưa Có Tên"}
                             </div>
 
                             <div className="text-xs text-white/70">
@@ -2261,7 +2495,7 @@ export default function Sources() {
 
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="text-sm text-white">
-                              {supply.numberBank || "ChÆ°a cÃ³ Tài Khoản"}
+                              {supply.numberBank || "Chưa Có Tài Khoản"}
                             </div>
 
                             <div className="text-xs text-white/70">
@@ -2269,7 +2503,7 @@ export default function Sources() {
                                 (supply.binBank
                                   ? bankNameByBin.get(supply.binBank.trim()) ||
                                     `BIN ${supply.binBank}`
-                                  : "ChÆ°a cÃ³ Ngân Hàng")}
+                                  : "Chưa Có Ngân Hàng")}
                             </div>
                           </td>
 
@@ -2333,7 +2567,7 @@ export default function Sources() {
 
                                   openViewModal(supply.id);
                                 }}
-                                aria-label="Xem chi tiáº¿t"
+                                aria-label="Xem chi tiết"
                               >
                                 <EyeIcon className="h-5 w-5" />
 

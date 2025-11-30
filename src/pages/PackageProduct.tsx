@@ -981,6 +981,20 @@ export default function PackageProduct() {
       statusFilter === slotState;
     return matchesSearch && matchesCategory && matchesStatus;
   });
+  const sortedRows = useMemo(
+    () =>
+      [...filteredRows].sort((a, b) => {
+        const rawA = Number(a.remainingSlots);
+        const rawB = Number(b.remainingSlots);
+        const slotsA = Number.isFinite(rawA) ? rawA : Number.POSITIVE_INFINITY;
+        const slotsB = Number.isFinite(rawB) ? rawB : Number.POSITIVE_INFINITY;
+        const normA = slotsA <= 0 ? Number.POSITIVE_INFINITY : slotsA;
+        const normB = slotsB <= 0 ? Number.POSITIVE_INFINITY : slotsB;
+        if (normA === normB) return 0;
+        return normA - normB; // ít còn trống trước, hết slot xuống cuối
+      }),
+    [filteredRows]
+  );
   const hasCapacityRows = filteredRows.some(
     (row) => row.hasCapacityField ?? false
   );
@@ -1705,7 +1719,7 @@ export default function PackageProduct() {
                       </td>
                     </tr>
                   ) : (
-                    filteredRows.map((item, idx) => {
+                    sortedRows.map((item, idx) => {
                       const totalSlots = item.slotLimit || DEFAULT_SLOT_LIMIT;
                       const slotUsed = item.slotUsed;
                       const remainingSlots = item.remainingSlots;

@@ -1,5 +1,11 @@
 // Backend shared helpers
 
+const ORDER_PREFIXES = {
+  ctv: "MAVC",
+  le: "MAVL",
+  thuong: "MAVT", // formerly MAVK
+};
+
 function monthsFromString(text) {
   if (!text || typeof text !== "string") return 0;
   const m = text.match(/--(\d+)m/i);
@@ -79,6 +85,7 @@ function calculatePeriods() {
 }
 
 module.exports = {
+  ORDER_PREFIXES,
   monthsFromString,
   daysFromMonths,
   roundGiaBanValue,

@@ -1,4 +1,7 @@
 // Centralized schema definitions for core tables
+const DEFAULT_NOTIFICATION_GROUP_ID = "-1002934465528";
+const DEFAULT_RENEWAL_TOPIC_ID = 2;
+
 const ORDER_COLS = {
   id: "id",
   idOrder: "id_order",
@@ -120,4 +123,6 @@ module.exports = {
   SUPPLY_COLS,
   SUPPLY_PRICE_COLS,
   USERS_COLS,
+  DEFAULT_NOTIFICATION_GROUP_ID,
+  DEFAULT_RENEWAL_TOPIC_ID,
 };

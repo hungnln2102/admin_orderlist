@@ -63,7 +63,13 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-const MIN_PROMO_RATIO = 0.01;
+const MIN_PROMO_RATIO = 0;
+
+const roundToNearestThousand = (value?: number | null): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const rounded = Math.round(Math.abs(value) / 1000) * 1000;
+  return value < 0 ? -rounded : rounded;
+};
 
 const cleanupLabel = (value: unknown): string => {
   if (value === undefined || value === null) return "";
@@ -155,7 +161,7 @@ const hasValidPromoRatio = (
   ) {
     return false;
   }
-  const maxAllowed = pctCtv - pctKhach;
+  const maxAllowed = pctKhach - 1;
   if (!Number.isFinite(maxAllowed) || maxAllowed < MIN_PROMO_RATIO) {
     return false;
   }
@@ -315,10 +321,11 @@ const formatRateDescription = ({
 };
 
 const formatCurrencyValue = (value?: number | null): string => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  const rounded = roundToNearestThousand(value);
+  if (rounded === null || rounded <= 0) {
     return "-";
   }
-  return currencyFormatter.format(value);
+  return currencyFormatter.format(rounded);
 };
 
 const formatPromoPercent = (value?: number | null): string | null => {
@@ -347,9 +354,9 @@ const normalizeProductKey = (value?: string | null): string =>
 
 const formatProfitValue = (value: number | null): string => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
-  if (value === 0) return currencyFormatter.format(0);
-  if (value > 0) return currencyFormatter.format(value);
-  return `-${currencyFormatter.format(Math.abs(value))}`;
+  const rounded = roundToNearestThousand(value) ?? 0;
+  if (rounded === 0) return currencyFormatter.format(0);
+  return currencyFormatter.format(rounded);
 };
 
 const formatProfitRange = (
@@ -1468,21 +1475,19 @@ function Pricing() {
     }
     if (nextPctPromo !== null) {
       if (nextPctPromo < MIN_PROMO_RATIO) {
+        setProductEditError("T? gi? khuy?n m?i kh?ng ???c ?m.");
+        return;
+      }
+      const promoHeadroom = Math.max(0, nextPctKhach - 1);
+      if (promoHeadroom === 0 && nextPctPromo > 0) {
         setProductEditError(
-          `Tỷ Giá Khuyến Mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
+          "T? gi? khuy?n m?i kh?ng ?p d?ng khi T? gi? Kh?ch ? 1."
         );
         return;
       }
-      const promoGap = nextPctCtv - nextPctKhach;
-      if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
+      if (nextPctPromo > promoHeadroom) {
         setProductEditError(
-          "Không thể thiết lập từ giá khuyến mãi vì chênh lệch từ giá quá nhỏ."
-        );
-        return;
-      }
-      if (nextPctPromo > promoGap) {
-        setProductEditError(
-          `Tỷ giá khuyến mãi không được vượt ${promoGap.toFixed(2)}`
+          `T? gi? khuy?n m?i kh?ng ???c v??t ${promoHeadroom.toFixed(2)}`
         );
         return;
       }
@@ -1572,47 +1577,23 @@ function Pricing() {
     }
     if (pctPromoValue !== null) {
       if (pctPromoValue < MIN_PROMO_RATIO) {
+        setCreateError("T? gi? khuy?n m?i kh?ng ???c ?m.");
+        return;
+      }
+      const promoHeadroom = Math.max(0, pctKhachValue - 1);
+      if (promoHeadroom === 0 && pctPromoValue > 0) {
         setCreateError(
-          `Tỷ giá khuyến mãi phải tối thiểu ${MIN_PROMO_RATIO.toFixed(2)}`
+          "T? gi? khuy?n m?i kh?ng ?p d?ng khi T? gi? Kh?ch ? 1."
         );
         return;
       }
-      const promoGap = (pctCtvValue ?? 0) - (pctKhachValue ?? 0);
-      if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
+      if (pctPromoValue > promoHeadroom) {
         setCreateError(
-          "Không thể thiết lập từ giá khuyến mãi vì chênh lệch từ giá quá nhỏ."
-        );
-        return;
-      }
-      if (pctPromoValue > promoGap) {
-        setCreateError(
-          `Tỷ giá khuyến mãi không được vượt ${promoGap.toFixed(2)}`
+          `T? gi? khuy?n m?i kh?ng ???c v??t ${promoHeadroom.toFixed(2)}`
         );
         return;
       }
     }
-    const normalizedSuppliers = createSuppliers.map((entry) => ({
-      sourceName: entry.sourceName.trim(),
-      numberBank: entry.numberBank.trim(),
-      bankBin: entry.bankBin,
-      price: Number(entry.price),
-    }));
-
-    for (const supplier of normalizedSuppliers) {
-      if (!supplier.sourceName) {
-        setCreateError("Mỗi NCC phải có tên hợp lệ.");
-        return;
-      }
-      if (!supplier.bankBin) {
-        setCreateError("Mỗi NCC phải chọn ngân hàng");
-        return;
-      }
-      if (!Number.isFinite(supplier.price) || supplier.price <= 0) {
-        setCreateError("Giá nhập của NCC phải lớn hơn 0");
-        return;
-      }
-    }
-
     setIsSubmittingCreate(true);
     setCreateError(null);
 
@@ -2176,7 +2157,7 @@ function Pricing() {
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-white shadow hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={handleCloseCreateModal}
                   disabled={isSubmittingCreate}
                 >
@@ -2715,12 +2696,12 @@ function Pricing() {
                                   </div>
                                 )}
                                 <div className="flex flex-wrap justify-end gap-3">
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center rounded-xl bg-gradient-to-r from-gray-200 to-gray-300 px-5 py-2 text-sm font-semibold text-white shadow hover:opacity-90 disabled:opacity-60"
-                                    onClick={handleCancelProductEdit}
-                                    disabled={isSavingProductEdit}
-                                  >
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                  onClick={handleCancelProductEdit}
+                                  disabled={isSavingProductEdit}
+                                >
                                     Hủy Bỏ
                                   </button>
                                   <button

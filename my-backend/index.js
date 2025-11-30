@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -8,6 +8,7 @@ const bcrypt = require("bcryptjs");
 
 const { updateDatabaseTask, getSchedulerStatus } = require("./scheduler");
 const Helpers = require("./helpers");
+const ORDER_PREFIXES = Helpers.ORDER_PREFIXES;
 const {
     ORDER_COLS,
     ACCOUNT_STORAGE_COLS,
@@ -91,7 +92,7 @@ const createNumericExtraction = (column) => `
 `;
 
 const VIETNAMESE_DIACRITICS_FROM =
-    "àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ";
+    "Ã Ã¡áº¡áº£Ã£Ã¢áº§áº¥áº­áº©áº«Äƒáº±áº¯áº·áº³áºµÃ¨Ã©áº¹áº»áº½Ãªá»áº¿á»‡á»ƒá»…Ã¬Ã­á»‹á»‰Ä©Ã²Ã³á»á»ÃµÃ´á»“á»‘á»™á»•á»—Æ¡á»á»›á»£á»Ÿá»¡Ã¹Ãºá»¥á»§Å©Æ°á»«á»©á»±á»­á»¯á»³Ã½á»µá»·á»¹Ä‘";
 const VIETNAMESE_DIACRITICS_TO =
     "a".repeat(17) +
     "e".repeat(11) +
@@ -229,7 +230,7 @@ const ensureSupplyRecord = async(client, sourceName) => {
         insertResult.rows[0].id :
         nextSupplyId;
     if (!newId) {
-        throw new Error("Không thể tạo nhà cung cấp mới.");
+        throw new Error("KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p má»›i.");
     }
     return newId;
 };
@@ -311,24 +312,24 @@ const hasAccountStoragePayload = (payload = {}) => {
 };
 
 const normalizeSupplyStatus = (value) => {
-    if (value === undefined || value === null) return "hoạt động";
+    if (value === undefined || value === null) return "hoáº¡t Ä‘á»™ng";
     const normalized = String(value)
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .trim()
         .toLowerCase();
-    if (!normalized) return "hoạt động";
+    if (!normalized) return "hoáº¡t Ä‘á»™ng";
     if (
         ["active", "dang hoat dong", "hoat dong", "running"].includes(normalized)
     ) {
-        return "hoạt động";
+        return "hoáº¡t Ä‘á»™ng";
     }
     if (
         ["inactive", "tam ngung", "tam dung", "pause", "paused"].includes(
             normalized
         )
     ) {
-        return "tạm dừng";
+        return "táº¡m dá»«ng";
     }
     return normalized;
 };
@@ -339,7 +340,7 @@ app.use(
             if (!origin || allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
-            return callback(new Error(`Yêu cầu bị chặn bởi CORS từ ${origin}`));
+            return callback(new Error(`YÃªu cáº§u bá»‹ cháº·n bá»Ÿi CORS tá»« ${origin}`));
         },
         credentials: true,
     })
@@ -384,7 +385,7 @@ app.post("/api/auth/login", async(req, res) => {
     if (!username || !password) {
         return res
             .status(400)
-            .json({ error: "Tên đăng nhập và Mật khẩu là bắt buộc" });
+            .json({ error: "TÃªn Ä‘Äƒng nháº­p vÃ  Máº­t kháº©u lÃ  báº¯t buá»™c" });
     }
     const normalizedUsername = String(username).trim().toLowerCase();
 
@@ -413,7 +414,7 @@ app.post("/api/auth/login", async(req, res) => {
       `, [normalizedUsername]
         );
         if (!result.rows.length) {
-            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
+            return res.status(401).json({ error: "Sai tÃ i khoáº£n hoáº·c máº­t kháº©u" });
         }
         const user = result.rows[0];
         const storedHash = user.passwordhash;
@@ -429,7 +430,7 @@ app.post("/api/auth/login", async(req, res) => {
             isMatch = password === hashString || password === hashString.trim();
         }
         if (!isMatch) {
-            return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
+            return res.status(401).json({ error: "Sai tÃ i khoáº£n hoáº·c máº­t kháº©u" });
         }
         req.session.user = {
             id: user.userid,
@@ -438,10 +439,10 @@ app.post("/api/auth/login", async(req, res) => {
         };
         res.json({ user: req.session.user });
     } catch (error) {
-        console.error("Đăng Nhập Thất Bại:", error);
+        console.error("ÄÄƒng Nháº­p Tháº¥t Báº¡i:", error);
         res
             .status(500)
-            .json({ error: "Không thể đăng nhập, vui lòng thử lại sau" });
+            .json({ error: "KhÃ´ng thá»ƒ Ä‘Äƒng nháº­p, vui lÃ²ng thá»­ láº¡i sau" });
     }
 });
 
@@ -458,7 +459,7 @@ app.post("/api/auth/logout", (req, res) => {
 
 app.get("/api/auth/me", (req, res) => {
     if (!req.session || !req.session.user) {
-        return res.status(401).json({ error: "Không có quyền truy cập" });
+        return res.status(401).json({ error: "KhÃ´ng cÃ³ quyá»n truy cáº­p" });
     }
     res.json({ user: req.session.user });
 });
@@ -472,7 +473,7 @@ app.use((req, res, next) => {
         return next();
     }
     if (!req.session || !req.session.user) {
-        return res.status(401).json({ error: "Không có quyền truy cập" });
+        return res.status(401).json({ error: "KhÃ´ng cÃ³ quyá»n truy cáº­p" });
     }
     return next();
 });
@@ -506,9 +507,9 @@ const ensureDefaultAdmin = async() => {
         await client.query(
             `INSERT INTO ${DB_SCHEMA}.users (${usernameCol}, ${passwordHashCol}, ${roleCol}) VALUES ($1, $2, $3)`, [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
         );
-        console.log(`[AUTH] Đã tạo người dùng quản trị '${usernameEnv}'`);
+        console.log(`[AUTH] ÄÃ£ táº¡o ngÆ°á»i dÃ¹ng quáº£n trá»‹ '${usernameEnv}'`);
     } catch (err) {
-        console.error("[AUTH] Lỗi khi tạo Admin:", err);
+        console.error("[AUTH] Lá»—i khi táº¡o Admin:", err);
     } finally {
         client.release();
     }
@@ -554,7 +555,7 @@ const resolveSupplyStatusColumn = async() => {
             null;
     } catch (error) {
         console.warn(
-            "Không tìm được cột trạng thái nhà cung cấp:",
+            "KhÃ´ng tÃ¬m Ä‘Æ°á»£c cá»™t tráº¡ng thÃ¡i nhÃ  cung cáº¥p:",
             error.message || error
         );
         supplyStatusColumnNameCache = null;
@@ -817,7 +818,7 @@ app.get("/api/dashboard/stats", async(_req, res) => {
     } catch (error) {
         console.error("Query failed (GET /api/dashboard/stats):", error);
         res.status(500).json({
-            error: "Không thể tải số liệu dashboard.",
+            error: "KhÃ´ng thá»ƒ táº£i sá»‘ liá»‡u dashboard.",
         });
     }
 });
@@ -849,7 +850,7 @@ app.get("/api/dashboard/years", async(_req, res) => {
     } catch (error) {
         console.error("Query failed (GET /api/dashboard/years):", error);
         res.status(500).json({
-            error: "Không thể tải danh sách các năm.",
+            error: "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch cÃ¡c nÄƒm.",
         });
     }
 });
@@ -939,7 +940,7 @@ app.get("/api/dashboard/charts", async(req, res) => {
     } catch (error) {
         console.error("Query failed (GET /api/dashboard/charts):", error);
         res.status(500).json({
-            error: "Không thể tải dữ liệu biểu đồ.",
+            error: "KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u biá»ƒu Ä‘á»“.",
         });
     }
 });
@@ -1028,7 +1029,7 @@ const roundToNearestThousand = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 0;
     if (numeric % 1000 === 0) {
-        // Nếu đã tròn nghìn thì giữ nguyên (tránh làm tròn lại)
+        // Náº¿u Ä‘Ã£ trÃ²n nghÃ¬n thÃ¬ giá»¯ nguyÃªn (trÃ¡nh lÃ m trÃ²n láº¡i)
         return Math.max(0, numeric);
     }
     return Math.max(0, Math.round(numeric / 1000) * 1000);
@@ -1121,11 +1122,11 @@ const mapPostgresErrorToMessage = (error) => {
     if (!error) return null;
     switch (error.code) {
         case "23505":
-            return "Mã Sản Phẩm Đã Tồn Tại, Vui Lòng Chọn Mã Sản Phẩm Khác";
+            return "MÃ£ Sáº£n Pháº©m ÄÃ£ Tá»“n Táº¡i, Vui LÃ²ng Chá»n MÃ£ Sáº£n Pháº©m KhÃ¡c";
         case "22P02":
-            return "Tỷ Lệ Giá Phải Là Số Hợp Lệ";
+            return "Tá»· Lá»‡ GiÃ¡ Pháº£i LÃ  Sá»‘ Há»£p Lá»‡";
         case "23503":
-            return "Không thể cập nhật sản phẩm do dữ liệu liên quan không hợp lệ.";
+            return "KhÃ´ng thá»ƒ cáº­p nháº­t sáº£n pháº©m do dá»¯ liá»‡u liÃªn quan khÃ´ng há»£p lá»‡.";
         default:
             return null;
     }
@@ -1185,19 +1186,24 @@ const parsePositiveNumber = (value) => {
 };
 
 const resolveOrderTypeLabel = (idOrder, customerType) => {
-    const normalizedType = String(customer_type || "")
+    const normalizedType = String(customerType || "")
         .trim()
         .toUpperCase();
-    if (normalizedType === "MAVK" || normalizedType === "MAVC" || normalizedType === "MAVL") {
+    const allPrefixes = new Set(
+        Object.values(ORDER_PREFIXES).map((p) => String(p || "").toUpperCase())
+    );
+    if (allPrefixes.has(normalizedType)) {
         return normalizedType;
     }
 
     const normalizedId = String(idOrder || "")
         .trim()
         .toUpperCase();
-    if (normalizedId.startsWith("MAVK")) return "MAVK";
-    if (normalizedId.startsWith("MAVL")) return "MAVL";
-    if (normalizedId.startsWith("MAVC")) return "MAVC";
+    for (const prefix of allPrefixes) {
+        if (normalizedId.startsWith(prefix)) {
+            return prefix;
+        }
+    }
     return null;
 };
 
@@ -1207,8 +1213,7 @@ const createHttpError = (status, message) => {
     return error;
 };
 
-const calculateOrderPriceFromRule = async(
-    { productName, supplyId, supplyName, idOrder, customerType },
+const calculateOrderPriceFromRule = async({ productName, supplyId, supplyName, idOrder, customerType },
     clientOverride = null
 ) => {
     const client = clientOverride || (await pool.connect());
@@ -1226,7 +1231,7 @@ const calculateOrderPriceFromRule = async(
         if (!orderType) {
             throw createHttpError(
                 400,
-                "Cannot determine order type (MAVC/MAVL/MAVK) from id_order or customer_type."
+                "Cannot determine order type (MAVC/MAVL/MAVT) from id_order or customer_type."
             );
         }
 
@@ -1390,22 +1395,22 @@ const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
         typeof row.status === "string" ?
         row.status.trim() :
         "";
-    let autoStatus = dbStatusRaw || "Chưa Thanh Toán";
+    let autoStatus = dbStatusRaw || "ChÆ°a Thanh ToÃ¡n";
     let autoCheckFlag = normalizeCheckFlagValue(row.check_flag);
 
-    if (autoStatus !== "Đã Thanh Toán") {
+    if (autoStatus !== "ÄÃ£ Thanh ToÃ¡n") {
         if (Number.isFinite(soNgayConLai)) {
             if (soNgayConLai <= 0) {
-                autoStatus = "Hết Hạn";
+                autoStatus = "Háº¿t Háº¡n";
                 autoCheckFlag = null;
             } else if (soNgayConLai > 0 && soNgayConLai <= 4) {
-                autoStatus = "Cần Gia Hạn";
+                autoStatus = "Cáº§n Gia Háº¡n";
                 autoCheckFlag = null;
             }
         }
     }
 
-    if (autoStatus === "Đã Thanh Toán" && autoCheckFlag === null) {
+    if (autoStatus === "ÄÃ£ Thanh ToÃ¡n" && autoCheckFlag === null) {
         autoCheckFlag = true;
     }
 
@@ -1639,7 +1644,7 @@ app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
         const result = await pool.query(
             `
         UPDATE mavryk.order_canceled
-        SET status = 'Đã Hoàn',
+        SET status = 'ÄÃ£ HoÃ n',
             check_flag = FALSE
         WHERE id = $1
         RETURNING id, id_order;
@@ -1654,7 +1659,7 @@ app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
             success: true,
             id: parsedId,
             id_order: result.rows[0].id_order,
-            status: "Đã Hoàn",
+            status: "ÄÃ£ HoÃ n",
             check_flag: false,
         });
     } catch (error) {
@@ -1666,30 +1671,30 @@ app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
 // New endpoint: Purchase Orders (table mavryk.purchase_order)
 
 app.get("/api/supply-insights", async(_req, res) => {
-    console.log("[GET] /api/supply-insights");
-    const { monthStart, nextMonthStart } = getCurrentMonthRange();
-    try {
-        const orderListCols = {
-            orderDateCol: ORDER_COLS.orderDate,
-            sourceCol: ORDER_COLS.supply,
-            costCol: ORDER_COLS.cost,
-        };
-        const orderExpiredCols = orderListCols;
-        const orderCanceledCols = orderListCols;
-        const statusColumnName = await resolveSupplyStatusColumn();
-        const paymentStatusKey = createVietnameseStatusKey("ps.status");
-        const statusSelect = statusColumnName ?
-            `s."${statusColumnName}"::text AS raw_status` :
-            "NULL AS raw_status";
+            console.log("[GET] /api/supply-insights");
+            const { monthStart, nextMonthStart } = getCurrentMonthRange();
+            try {
+                const orderListCols = {
+                    orderDateCol: ORDER_COLS.orderDate,
+                    sourceCol: ORDER_COLS.supply,
+                    costCol: ORDER_COLS.cost,
+                };
+                const orderExpiredCols = orderListCols;
+                const orderCanceledCols = orderListCols;
+                const statusColumnName = await resolveSupplyStatusColumn();
+                const paymentStatusKey = createVietnameseStatusKey("ps.status");
+                const statusSelect = statusColumnName ?
+                    `s."${statusColumnName}"::text AS raw_status` :
+                    "NULL AS raw_status";
 
-        const makeOrderSelect = (table, cols) => {
-            const orderDateExpr = createDateNormalization(
-                quoteIdent(cols.orderDateCol)
-            );
-            const sourceKeyExpr = createSourceKey(quoteIdent(cols.sourceCol));
-            const importExpr = createNumericExtraction(quoteIdent(cols.costCol));
-            const sourceIdent = quoteIdent(cols.sourceCol);
-            return `
+                const makeOrderSelect = (table, cols) => {
+                    const orderDateExpr = createDateNormalization(
+                        quoteIdent(cols.orderDateCol)
+                    );
+                    const sourceKeyExpr = createSourceKey(quoteIdent(cols.sourceCol));
+                    const importExpr = createNumericExtraction(quoteIdent(cols.costCol));
+                    const sourceIdent = quoteIdent(cols.sourceCol);
+                    return `
       SELECT
         ${orderDateExpr} AS order_date,
         COALESCE(${sourceKeyExpr}, '') AS source_key,
@@ -1698,9 +1703,9 @@ app.get("/api/supply-insights", async(_req, res) => {
       FROM ${DB_SCHEMA}.${table}
       WHERE TRIM(${sourceIdent}::text) <> ''
     `;
-        };
+                };
 
-        const ordersUnion = `
+                const ordersUnion = `
     WITH orders_union AS (
 ${makeOrderSelect("order_list", orderListCols)}
       UNION ALL
@@ -1948,13 +1953,13 @@ app.post("/api/supplies/:supplyId/payments", async(req, res) => {
     };
 
     const roundLabel =
-        (typeof req.body ?.round === "string" && req.body.round.trim()) ||
-        "Chu kỳ mới";
-    const totalImport = parseMoney(req.body ?.totalImport, 0);
-    const paid = parseMoney(req.body ?.paid, 0);
+        (typeof req.body?.round === "string" && req.body.round.trim()) ||
+        "Chu ká»³ má»›i";
+    const totalImport = parseMoney(req.body?.totalImport, 0);
+    const paid = parseMoney(req.body?.paid, 0);
     const statusLabel =
-        (typeof req.body ?.status === "string" && req.body.status.trim()) ||
-        "Chưa Thanh Toán";
+        (typeof req.body?.status === "string" && req.body.status.trim()) ||
+        "ChÆ°a Thanh ToÃ¡n";
 
     try {
         const insertQuery = `
@@ -2128,35 +2133,35 @@ app.post("/api/product-prices", async(req, res) => {
     const supplierEntries = Array.isArray(suppliers) ? suppliers : [];
 
     if (!normalizedSanPham) {
-        return res.status(400).json({ error: "Ma san pham khong duoc de trong." });
+        return res.status(400).json({ error: "MÃ£ sáº£n pháº©m khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng." });
     }
-    if (!pctCtvValue || pctCtvValue <= 0) {
-        return res.status(400).json({ error: "Ty gia CTV phai lon hon 0." });
+    if (pctCtvValue === null || pctCtvValue <= 0) {
+        return res.status(400).json({ error: "Tá»· giÃ¡ CTV pháº£i lá»›n hÆ¡n 0." });
     }
     if (!pctKhachValue || pctKhachValue <= 0) {
-        return res.status(400).json({ error: "Ty gia Khach phai lon hon 0." });
+        return res.status(400).json({ error: "Tá»· giÃ¡ KhÃ¡ch pháº£i lá»›n hÆ¡n 0." });
     }
     if (pctPromoValue !== null) {
         if (pctPromoValue < 0) {
             return res
                 .status(400)
-                .json({ error: "Ty gia khuyen mai phai lon hon hoac bang 0." });
+                .json({ error: "Tá»· giÃ¡ khuyáº¿n mÃ£i pháº£i lá»›n hÆ¡n hoáº·c báº±ng 0." });
         }
         if (pctPromoValue >= pctKhachValue) {
             return res.status(400).json({
-                error: "Ty gia khuyen mai phai nho hon ty gia khach.",
+                error: "Tá»· giÃ¡ khuyáº¿n mÃ£i pháº£i nhá» hÆ¡n tá»· giÃ¡ khÃ¡ch.",
             });
         }
         if (pctKhachValue - pctPromoValue > 1) {
             return res.status(400).json({
-                error: "Gia khuyen mai khong duoc vuot gia si.",
+                error: "GiÃ¡ khuyáº¿n mÃ£i khÃ´ng Ä‘Æ°á»£c vÆ°á»£t giÃ¡ sá»‰.",
             });
         }
     }
     if (supplierEntries.length === 0) {
-        return res.status(400).json({
-            error: "Can them it nhat mot nha cung cap.",
-        });
+        return res
+            .status(400)
+            .json({ error: "Cáº§n thÃªm Ã­t nháº¥t má»™t nhÃ  cung cáº¥p." });
     }
 
     const todayYmd = todayYMDInVietnam();
@@ -2182,34 +2187,34 @@ app.post("/api/product-prices", async(req, res) => {
                 todayYmd,
             ]
         );
-        const productId = productResult.rows ?.[0] ?.id ?? nextProductId;
+        const productId = productResult.rows?.[0]?.id ?? nextProductId;
         if (!productId) {
             await client.query("ROLLBACK");
-            return res.status(500).json({ error: "Khong the tao san pham moi." });
+            return res.status(500).json({ error: "KhÃ´ng thá»ƒ táº¡o sáº£n pháº©m má»›i." });
         }
 
         for (const supplier of supplierEntries) {
-            const sourceName = normalizeTextInput(supplier ?.sourceName);
-            const numberBank = normalizeTextInput(supplier ?.numberBank);
-            const bankBin = normalizeTextInput(supplier ?.bankBin);
-            const priceValue = toNullableNumber(supplier ?.price);
+            const sourceName = normalizeTextInput(supplier?.sourceName);
+            const numberBank = normalizeTextInput(supplier?.numberBank);
+            const bankBin = normalizeTextInput(supplier?.bankBin);
+            const priceValue = toNullableNumber(supplier?.price);
 
             if (!sourceName) {
                 await client.query("ROLLBACK");
                 return res
                     .status(400)
-                    .json({ error: "Ten nguon khong duoc bo trong." });
+                    .json({ error: "TÃªn nguá»“n khÃ´ng Ä‘Æ°á»£c bá» trá»‘ng." });
             }
             if (!bankBin) {
                 await client.query("ROLLBACK");
                 return res
                     .status(400)
-                    .json({ error: "Vui long chon ngan hang cho nguon." });
+                    .json({ error: "Vui lÃ²ng chá»n ngÃ¢n hÃ ng cho nguá»“n." });
             }
             if (!priceValue || priceValue <= 0) {
                 await client.query("ROLLBACK");
                 return res.status(400).json({
-                    error: `Gia nhap cho nguon ${sourceName} phai lon hon 0.`,
+                    error: `GiÃ¡ nháº­p cho nguá»“n ${sourceName} pháº£i lá»›n hÆ¡n 0.`,
                 });
             }
 
@@ -2237,14 +2242,14 @@ app.post("/api/product-prices", async(req, res) => {
         `,
                     values
                 );
-                supplyId = insertSupply.rows ?.[0] ?.id ?? nextSupplyId;
+                supplyId = insertSupply.rows?.[0]?.id ?? nextSupplyId;
             }
 
             if (!supplyId) {
                 await client.query("ROLLBACK");
                 return res
                     .status(500)
-                    .json({ error: "Khong the tao nha cung cap moi." });
+                    .json({ error: "KhÃ´ng thá»ƒ táº¡o nhÃ  cung cáº¥p má»›i." });
             }
 
             const nextSupplyPriceId = await getNextSupplyPriceId(client);
@@ -2267,7 +2272,7 @@ app.post("/api/product-prices", async(req, res) => {
         console.error("Mutation failed (POST /api/product-prices):", error);
         const friendlyMessage = mapPostgresErrorToMessage(error);
         res.status(friendlyMessage ? 400 : 500).json({
-            error: friendlyMessage || "Unable to create product pricing.",
+            error: friendlyMessage || "KhÃ´ng thá»ƒ táº¡o giÃ¡ sáº£n pháº©m.",
         });
     } finally {
         client.release();
@@ -2286,10 +2291,10 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
     const normalizedPrice = toNullableNumber(price);
 
     if (!normalizedSourceName) {
-        return res.status(400).json({ error: "Ten nguon khong duoc bo trong." });
+        return res.status(400).json({ error: "TÃªn nguá»“n khÃ´ng Ä‘Æ°á»£c bá» trá»‘ng." });
     }
     if (!normalizedPrice || normalizedPrice <= 0) {
-        return res.status(400).json({ error: "Gia nhap phai lon hon 0." });
+        return res.status(400).json({ error: "GiÃ¡ nháº­p pháº£i lá»›n hÆ¡n 0." });
     }
 
     const client = await pool.connect();
@@ -2315,7 +2320,7 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
         if (duplicateCheck.rows.length) {
             await client.query("ROLLBACK");
             return res.status(409).json({
-                error: "Nguon nay da ton tai cho san pham.",
+                error: "Nguá»“n nÃ y Ä‘Ã£ tá»“n táº¡i cho sáº£n pháº©m.",
             });
         }
 
@@ -2341,7 +2346,7 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
             error
         );
         res.status(500).json({
-            error: "Unable to add supplier price for this product.",
+            error: "KhÃ´ng thá»ƒ thÃªm giÃ¡ nhÃ  cung cáº¥p cho sáº£n pháº©m nÃ y.",
         });
     } finally {
         client.release();
@@ -2365,7 +2370,7 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
     if (!normalizedSanPham) {
         return res
             .status(400)
-            .json({ error: "Product code (san_pham) is required." });
+            .json({ error: "MÃ£ sáº£n pháº©m (san_pham) lÃ  báº¯t buá»™c." });
     }
 
     const pctCtvValue = toNullableNumber(pctCtv);
@@ -2373,31 +2378,29 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
     const pctPromoValue = toNullableNumber(pctPromo);
 
     if (!Number.isFinite(pctCtvValue) || pctCtvValue <= 0) {
-        return res
-            .status(400)
-            .json({ error: "pct_ctv must be a positive number." });
+        return res.status(400).json({ error: "pct_ctv pháº£i lÃ  má»™t sá»‘ dÆ°Æ¡ng." });
     }
     if (!Number.isFinite(pctKhachValue) || pctKhachValue <= 0) {
         return res
             .status(400)
-            .json({ error: "pct_khach must be a positive number." });
+            .json({ error: "pct_khach pháº£i lÃ  má»™t sá»‘ dÆ°Æ¡ng." });
     }
     if (pctPromoValue !== null) {
         const MIN_PROMO_RATIO = 0.01;
         const promoGap = pctCtvValue - pctKhachValue;
         if (!Number.isFinite(pctPromoValue) || pctPromoValue < MIN_PROMO_RATIO) {
             return res.status(400).json({
-                error: `pct_promo must be at least ${MIN_PROMO_RATIO}.`,
+                error: `pct_promo pháº£i Ã­t nháº¥t lÃ  ${MIN_PROMO_RATIO}.`,
             });
         }
         if (!Number.isFinite(promoGap) || promoGap < MIN_PROMO_RATIO) {
             return res.status(400).json({
-                error: "Cannot set promo ratio because pct_ctv - pct_khach is too small.",
+                error: "KhÃ´ng thá»ƒ Ä‘áº·t tá»· lá»‡ khuyáº¿n mÃ£i vÃ¬ pct_ctv - pct_khach quÃ¡ nhá».",
             });
         }
         if (pctPromoValue > promoGap) {
             return res.status(400).json({
-                error: "pct_promo cannot exceed (pct_ctv - pct_khach).",
+                error: "pct_promo khÃ´ng Ä‘Æ°á»£c vÆ°á»£t quÃ¡ (pct_ctv - pct_khach).",
             });
         }
     }
@@ -2605,7 +2608,7 @@ app.post("/api/supplies", async(req, res) => {
       RETURNING id;
     `;
         const insertResult = await pool.query(insertQuery, values);
-        const newId = insertResult.rows ?.[0] ?.id;
+        const newId = insertResult.rows?.[0]?.id;
         if (!newId) {
             return res
                 .status(500)
@@ -2629,11 +2632,11 @@ app.post("/api/supplies", async(req, res) => {
         const detailResult = await pool.query(detailQuery, [newId]);
         const row = detailResult.rows[0];
         res.status(201).json({
-            id: row ?.id || newId,
-            sourceName: row ?.source_name || trimmedName,
-            numberBank: row ?.number_bank || trimmedAccount || null,
-            binBank: row ?.bin_bank || trimmedBin || null,
-            bankName: row ?.bank_name || null,
+            id: row?.id || newId,
+            sourceName: row?.source_name || trimmedName,
+            numberBank: row?.number_bank || trimmedAccount || null,
+            binBank: row?.bin_bank || trimmedBin || null,
+            bankName: row?.bank_name || null,
             status: isActive ? "active" : "inactive",
             isActive,
         });
@@ -2641,6 +2644,141 @@ app.post("/api/supplies", async(req, res) => {
         console.error("Mutation failed (POST /api/supplies):", error);
         res.status(500).json({
             error: "Unable to create supplier.",
+        });
+    }
+});
+
+app.patch("/api/supplies/:supplyId", async(req, res) => {
+    console.log("[PATCH] /api/supplies/:supplyId", req.params, req.body);
+    const { supplyId } = req.params;
+    const parsedSupplyId = Number.parseInt(supplyId, 10);
+    if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
+        return res.status(400).json({ error: "Invalid supplier id." });
+    }
+
+    const { sourceName, numberBank, bankBin, bankName } = req.body || {};
+    const hasSourceName = typeof sourceName === "string";
+    const hasNumberBank = typeof numberBank === "string";
+    const hasBankInfo =
+        typeof bankBin === "string" || typeof bankName === "string";
+
+    if (!hasSourceName && !hasNumberBank && !hasBankInfo) {
+        return res.status(400).json({ error: "No update payload provided." });
+    }
+
+    const trimmedName =
+        hasSourceName && typeof sourceName === "string"
+            ? sourceName.trim()
+            : undefined;
+    if (hasSourceName && !trimmedName) {
+        return res
+            .status(400)
+            .json({ error: "Supplier name cannot be blank." });
+    }
+
+    const trimmedAccount =
+        hasNumberBank && typeof numberBank === "string"
+            ? numberBank.trim()
+            : undefined;
+
+    const trimmedBankBin =
+        typeof bankBin === "string" ? bankBin.trim() : undefined;
+    const trimmedBankName =
+        typeof bankName === "string" ? bankName.trim() : undefined;
+
+    let resolvedBankBin =
+        trimmedBankBin !== undefined ? trimmedBankBin : undefined;
+
+    if ((trimmedBankBin === undefined || trimmedBankBin === "") && trimmedBankName) {
+        try {
+            const bankLookup = await pool.query(
+                `
+      SELECT TRIM(${bankListCols.bin}::text) AS bin
+      FROM mavryk.bank_list
+      WHERE LOWER(TRIM(${bankListCols.bankName}::text)) = LOWER($1)
+      LIMIT 1;
+    `, [trimmedBankName]
+            );
+            resolvedBankBin = bankLookup.rows?.[0]?.bin || "";
+        } catch (error) {
+            console.error("Query failed while resolving bank bin:", error);
+            return res
+                .status(500)
+                .json({ error: "Unable to resolve bank selection." });
+        }
+    }
+
+    if (trimmedBankName && resolvedBankBin === "") {
+        return res
+            .status(400)
+            .json({ error: "Invalid bank name, unable to resolve BIN." });
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (hasSourceName) {
+        updates.push(`${supplyCols.sourceName} = $${params.length + 1}`);
+        params.push(trimmedName);
+    }
+
+    if (hasNumberBank) {
+        updates.push(`${supplyCols.numberBank} = $${params.length + 1}`);
+        params.push(trimmedAccount || null);
+    }
+
+    if (hasBankInfo) {
+        updates.push(`${supplyCols.binBank} = $${params.length + 1}`);
+        params.push(resolvedBankBin ? resolvedBankBin : null);
+    }
+
+    if (!updates.length) {
+        return res.status(400).json({ error: "No update fields provided." });
+    }
+
+    params.push(parsedSupplyId);
+
+    try {
+        const updateQuery = `
+      UPDATE mavryk.supply
+      SET ${updates.join(", ")}
+      WHERE ${supplyCols.id} = $${params.length}
+      RETURNING ${supplyCols.id} AS id;
+    `;
+        const updateResult = await pool.query(updateQuery, params);
+        if (!updateResult.rows.length) {
+            return res.status(404).json({ error: "Supplier not found." });
+        }
+
+        const detailQuery = `
+      SELECT
+        s.${supplyCols.id} AS id,
+        s.${supplyCols.sourceName} AS source_name,
+        s.${supplyCols.numberBank} AS number_bank,
+        s.${supplyCols.binBank} AS bin_bank,
+        COALESCE(bl.${bankListCols.bankName}, '') AS bank_name
+      FROM mavryk.supply s
+      LEFT JOIN mavryk.bank_list bl
+        ON TRIM(bl.${bankListCols.bin}::text) = TRIM(s.${supplyCols.binBank}::text)
+      WHERE s.${supplyCols.id} = $1
+      LIMIT 1;
+    `;
+        const detailResult = await pool.query(detailQuery, [parsedSupplyId]);
+        const row = detailResult.rows?.[0];
+        if (!row) {
+            return res.status(404).json({ error: "Supplier not found." });
+        }
+        res.json({
+            id: parsedSupplyId,
+            sourceName: row?.source_name || trimmedName || "",
+            numberBank: (row?.number_bank ?? trimmedAccount) || null,
+            binBank: (row?.bin_bank ?? resolvedBankBin) || null,
+            bankName: row?.bank_name || null,
+        });
+    } catch (error) {
+        console.error("Mutation failed (PATCH /api/supplies/:id):", error);
+        res.status(500).json({
+            error: "Unable to update supplier.",
         });
     }
 });
@@ -2659,7 +2797,7 @@ app.patch("/api/supplies/:supplyId/active", async(req, res) => {
 
     try {
         const statusColumn = await resolveSupplyStatusColumn();
-        const statusLabel = isActive ? "Đang Hoạt Động" : "Tạm Dừng";
+        const statusLabel = isActive ? "Äang Hoáº¡t Äá»™ng" : "Táº¡m Dá»«ng";
         const params = statusColumn ? [isActive, statusLabel, parsedSupplyId] : [isActive, parsedSupplyId];
         const updateQuery = statusColumn ?
             `
@@ -2873,7 +3011,7 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
           AND ${createSourceKey(quoteIdent(ORDER_COLS.supply))} = $1;
       `;
             const canceledResult = await client.query(canceledQuery, [supplyKey]);
-            canceledOrders = Number(canceledResult.rows ?.[0] ?.canceled_orders) || 0;
+            canceledOrders = Number(canceledResult.rows?.[0]?.canceled_orders) || 0;
         }
 
         const totalPaidQuery = `
@@ -2894,7 +3032,7 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
             parsedSupplyId,
         ]);
         const totalPaidAmount =
-            Number(totalPaidResult.rows ?.[0] ?.total_paid_amount) || 0;
+            Number(totalPaidResult.rows?.[0]?.total_paid_amount) || 0;
 
         const unpaidQuery = `
       SELECT
@@ -2958,7 +3096,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
         });
     }
 
-    const paidAmountRaw = req.body ?.paidAmount;
+    const paidAmountRaw = req.body?.paidAmount;
     const parsePaid = (value) => {
         if (value === null || value === undefined) return null;
         if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
@@ -2994,7 +3132,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             paidAmountNumber :
             Number(paymentRow.import) || 0;
 
-        // Lấy tên nguồn để map với order_list.nguon
+        // Láº¥y tÃªn nguá»“n Ä‘á»ƒ map vá»›i order_list.nguon
         const supplyResult = await pool.query(
             `SELECT ${supplyCols.sourceName} AS source_name FROM mavryk.supply WHERE ${supplyCols.id} = $1 LIMIT 1;`, [sourceId]
         );
@@ -3005,7 +3143,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             "";
         const trimmedSourceName = sourceName.trim();
 
-        // Đơn chưa thanh toán của nguồn này (lấy từ cũ đến mới)
+        // ÄÆ¡n chÆ°a thanh toÃ¡n cá»§a nguá»“n nÃ y (láº¥y tá»« cÅ© Ä‘áº¿n má»›i)
         const unpaidResult = await pool.query(
             `
         SELECT
@@ -3034,7 +3172,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             await pool.query(
                 `
           UPDATE ${DB_SCHEMA}.order_list
-          SET status = 'Đã Thanh Toán',
+          SET status = 'ÄÃ£ Thanh ToÃ¡n',
               check_flag = TRUE
           WHERE id = ANY($1::int[]);
         `, [orderIdsToMark]
@@ -3050,7 +3188,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             totalUnpaidImport - normalizedPaidAmount
         );
 
-        // Nếu còn dư thì tạo chu kỳ mới "Chưa Thanh Toán" với ghi chú ngày hiện tại
+        // Náº¿u cÃ²n dÆ° thÃ¬ táº¡o chu ká»³ má»›i "ChÆ°a Thanh ToÃ¡n" vá»›i ghi chÃº ngÃ y hiá»‡n táº¡i
         if (remainingImport > 0 && sourceId) {
             const now = new Date();
             const day = String(now.getUTCDate()).padStart(2, "0");
@@ -3061,14 +3199,14 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             await pool.query(
                 `
           INSERT INTO mavryk.payment_supply (${paymentSupplyCols.sourceId}, ${paymentSupplyCols.importValue}, ${paymentSupplyCols.paid}, ${paymentSupplyCols.round}, ${paymentSupplyCols.status})
-          VALUES ($1, $2, 0, $3, 'Chưa Thanh Toán');
+          VALUES ($1, $2, 0, $3, 'ChÆ°a Thanh ToÃ¡n');
         `, [sourceId, remainingImport, dmyNote]
             );
         }
 
         const updateQuery = `
       UPDATE mavryk.payment_supply
-      SET ${paymentSupplyCols.status} = 'Đã Thanh Toán',
+      SET ${paymentSupplyCols.status} = 'ÄÃ£ Thanh ToÃ¡n',
           ${paymentSupplyCols.paid} = $2
       WHERE ${paymentSupplyCols.id} = $1
       RETURNING ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.status} AS status, ${paymentSupplyCols.round} AS round;
@@ -3106,7 +3244,7 @@ app.post("/api/calculate-price", async(req, res) => {
     const productName =
         productNameRaw === undefined || productNameRaw === null ?
         "" :
-        String(productNameRaw).trim();
+        String(productNameRaw);
     const orderId =
         id_order === undefined || id_order === null ?
         "" :
@@ -3121,16 +3259,44 @@ app.post("/api/calculate-price", async(req, res) => {
     const parsedSupplyId = Number(supply_id);
 
     const orderLookupQuery = `
-    SELECT price AS gia_ban, cost AS gia_nhap
+    SELECT
+      id_product,
+      price AS gia_ban,
+      cost AS gia_nhap,
+      supply::text AS supply_name
     FROM mavryk.order_list
-    WHERE LOWER(TRIM(id_order)) = LOWER(TRIM($1))
+    WHERE id_order = $1
     LIMIT 1;
   `;
 
-    const productLookupQuery = `
-    SELECT id, pct_ctv, pct_khach, is_active
+    const productLookupExactQuery = `
+    SELECT
+      id,
+      pct_ctv,
+      pct_khach,
+      ${quoteIdent(PRODUCT_PRICE_COLS.pctPromo)} AS pct_promo,
+      is_active
     FROM mavryk.product_price
-    WHERE san_pham = $1
+    WHERE
+      LOWER(TRIM(san_pham::text)) = LOWER(TRIM($1))
+      OR LOWER(TRIM(package_product::text)) = LOWER(TRIM($1))
+      OR LOWER(TRIM(package::text)) = LOWER(TRIM($1))
+    LIMIT 1;
+  `;
+
+    const productLookupFuzzyQuery = `
+    SELECT
+      id,
+      pct_ctv,
+      pct_khach,
+      ${quoteIdent(PRODUCT_PRICE_COLS.pctPromo)} AS pct_promo,
+      is_active
+    FROM mavryk.product_price
+    WHERE
+      LOWER(TRIM($1)) LIKE '%' || LOWER(TRIM(san_pham::text)) || '%'
+      OR LOWER(TRIM($1)) LIKE '%' || LOWER(TRIM(package_product::text)) || '%'
+      OR LOWER(TRIM($1)) LIKE '%' || LOWER(TRIM(package::text)) || '%'
+      OR LOWER(TRIM(san_pham::text)) LIKE '%' || LOWER(TRIM($1)) || '%'
     LIMIT 1;
   `;
 
@@ -3142,10 +3308,78 @@ app.post("/api/calculate-price", async(req, res) => {
 
     try {
         const orderResult = await pool.query(orderLookupQuery, [orderId]);
-        const productResult = await pool.query(productLookupQuery, [productName]);
-
         const orderRow = orderResult.rows[0] || {};
-        const productPricing = productResult.rows[0];
+
+        const normalizeSupplyName = (value) => {
+            if (value === null || value === undefined) return "";
+            return String(value).trim();
+        };
+
+        const resolveSupplyId = async(nameRaw) => {
+            const raw = normalizeSupplyName(nameRaw);
+            if (!raw) return null;
+            const noAt = raw.replace(/^@/, "");
+            const lower = raw.toLowerCase();
+            const lowerNoAt = noAt.toLowerCase();
+
+            const sql = `
+              SELECT id FROM mavryk.supply
+              WHERE LOWER(TRIM(source_name::text)) = $1
+                 OR LOWER(TRIM(source_name::text)) = $2
+                 OR LOWER(TRIM(source_name::text)) LIKE $3
+              LIMIT 1;
+            `;
+            const result = await pool.query(sql, [
+                lower,
+                lowerNoAt,
+                `%${lowerNoAt}%`,
+            ]);
+            return result.rows?.[0]?.id ? Number(result.rows[0].id) : null;
+        };
+
+        const productLookupKey =
+            orderRow.id_product !== undefined && orderRow.id_product !== null ?
+            String(orderRow.id_product) :
+            productName;
+
+        let effectiveSupplyId = Number.isFinite(parsedSupplyId) ? parsedSupplyId : null;
+        let supplyFromOrderLookup = null;
+        let supplyFromCustomerTypeLookup = null;
+
+        if (effectiveSupplyId === null) {
+            supplyFromOrderLookup = await resolveSupplyId(orderRow.supply_name);
+            effectiveSupplyId = supplyFromOrderLookup;
+        }
+        if (effectiveSupplyId === null) {
+            supplyFromCustomerTypeLookup = await resolveSupplyId(customer_type);
+            effectiveSupplyId = supplyFromCustomerTypeLookup;
+        }
+
+        const buildNameCandidates = (raw) => {
+            const names = [];
+            const base = String(raw || "").trim();
+            if (base) names.push(base);
+            const singleDash = base.replace(/--+/g, "-").replace(/__+/g, "_");
+            if (singleDash && singleDash !== base) names.push(singleDash);
+            const noSpaces = base.replace(/\s+/g, "");
+            if (noSpaces && !names.includes(noSpaces)) names.push(noSpaces);
+            return names.filter(Boolean);
+        };
+
+        const tryFindProductPricing = async(nameList) => {
+            for (const name of nameList) {
+                const exact = await pool.query(productLookupExactQuery, [name]);
+                if (exact.rows?.[0]) return exact.rows[0];
+            }
+            for (const name of nameList) {
+                const fuzzy = await pool.query(productLookupFuzzyQuery, [name]);
+                if (fuzzy.rows?.[0]) return fuzzy.rows[0];
+            }
+            return null;
+        };
+
+        const nameCandidates = buildNameCandidates(productLookupKey);
+        const productPricing = await tryFindProductPricing(nameCandidates);
 
         const currentOrderPrice = Number(orderRow.gia_ban);
         const currentOrderImport = Number(orderRow.gia_nhap);
@@ -3156,29 +3390,29 @@ app.post("/api/calculate-price", async(req, res) => {
         const normalizedCustomerType = String(customer_type || "")
             .trim()
             .toUpperCase();
-        const typeFromPrefix = normalizedId.startsWith("MAVK") ?
-            "MAVK" :
-            normalizedId.startsWith("MAVL") ?
-            "MAVL" :
-            normalizedId.startsWith("MAVC") ?
-            "MAVC" :
-            "";
+        const prefixThuong = (ORDER_PREFIXES?.thuong || "").toUpperCase();
+        const prefixLe = (ORDER_PREFIXES?.le || "").toUpperCase();
+        const prefixCtv = (ORDER_PREFIXES?.ctv || "").toUpperCase();
+        const prefixList = [prefixThuong, prefixLe, prefixCtv].filter(Boolean);
 
-        const normalizedType =
-            normalizedCustomerType === "MAVK" ||
-            normalizedCustomerType === "MAVL" ||
-            normalizedCustomerType === "MAVC" ?
+        const typeFromPrefix =
+            prefixList.find((p) => normalizedId.startsWith(p)) || "";
+
+        const normalizedType = prefixList.includes(normalizedCustomerType) ?
             normalizedCustomerType :
             "";
 
         const customerLabel = normalizedType || typeFromPrefix;
 
-        const pctCtvRaw = Number(productPricing ?.pct_ctv);
-        const pctKhachRaw = Number(productPricing ?.pct_khach);
+        const pctCtvRaw = Number(productPricing?.pct_ctv);
+        const pctKhachRaw = Number(productPricing?.pct_khach);
         const pctCtv =
             Number.isFinite(pctCtvRaw) && pctCtvRaw > 0 ? pctCtvRaw : 1.0;
         const pctKhachValid = Number.isFinite(pctKhachRaw) && pctKhachRaw > 0;
         const pctKhach = pctKhachValid ? pctKhachRaw : 1.0;
+        const pctPromoRaw = Number(productPricing?.pct_promo);
+        const pctPromo =
+            Number.isFinite(pctPromoRaw) && pctPromoRaw >= 0 ? pctPromoRaw : 0;
 
         const supplyPriceRows = productPricing ?
             (await pool.query(productSupplyPricesQuery, [productPricing.id]))
@@ -3188,73 +3422,75 @@ app.post("/api/calculate-price", async(req, res) => {
             const price = Number(row.price);
             return Number.isFinite(price) && price > max ? price : max;
         }, 0);
+        const computedWholesale = 0;
+        const computedRetail = 0;
 
         let baseImport = null;
 
-        if (
-            Number.isFinite(parsedSupplyId) &&
-            parsedSupplyId > 0 &&
-            supplyPriceRows.length
-        ) {
-            const matched = supplyPriceRows.find(
-                (row) => Number(row.source_id) === parsedSupplyId
-            );
-            if (matched && Number.isFinite(Number(matched.price))) {
-                baseImport = Number(matched.price);
-            }
-        }
-
-        if (
-            baseImport === null &&
-            Number.isFinite(highestSupplyPrice) &&
-            highestSupplyPrice > 0
-        ) {
+        if (Number.isFinite(highestSupplyPrice) && highestSupplyPrice > 0) {
             baseImport = highestSupplyPrice;
         }
 
         if (
             baseImport === null &&
-            Number.isFinite(currentOrderImport) &&
-            currentOrderImport > 0
+            Number.isFinite(computedWholesale) &&
+            computedWholesale > 0
         ) {
-            baseImport = currentOrderImport;
+            baseImport = computedWholesale;
         }
 
         if (
             baseImport === null &&
-            Number.isFinite(currentOrderPrice) &&
-            currentOrderPrice > 0
+            customerLabel === prefixLe &&
+            Number.isFinite(computedRetail) &&
+            computedRetail > 0
         ) {
-            baseImport = currentOrderPrice;
+            baseImport = computedRetail;
         }
 
-        if (customerLabel === "MAVL" && !pctKhachValid) {
+        // Náº¿u khÃ´ng tÃ¬m tháº¥y giÃ¡ nguá»“n, tráº£ lá»—i thay vÃ¬ fallback vá» cost/price cá»§a Ä‘Æ¡n
+        if (baseImport === null) {
             return res.status(400).json({
-                error: "Sản phẩm chưa thiết lập pct_khach để tính giá MAVL.",
+                error: "KhÃ´ng tÃ¬m Ä‘Æ°á»£c giÃ¡ nguá»“n Ä‘á»ƒ tÃ­nh toÃ¡n.",
+            });
+        }
+
+        if (customerLabel === prefixLe && !pctKhachValid) {
+            return res.status(400).json({
+                error: "Sáº£n pháº©m chÆ°a thiáº¿t láº­p pct_khach Ä‘á»ƒ tÃ­nh giÃ¡ MAVL.",
             });
         }
 
         const computeByType = (baseValue) => {
             if (!Number.isFinite(baseValue) || baseValue <= 0) return null;
-            if (customerLabel === "MAVK") {
+            if (customerLabel === prefixThuong) {
                 return Helpers.roundGiaBanValue(baseValue);
             }
-            if (customerLabel === "MAVC" || !customerLabel) {
+            if (customerLabel === prefixCtv || !customerLabel) {
                 return Helpers.roundGiaBanValue(baseValue * pctCtv);
             }
-            if (customerLabel === "MAVL") {
+            if (customerLabel === prefixLe) {
                 return Helpers.roundGiaBanValue(baseValue * pctCtv * pctKhach);
             }
             return Helpers.roundGiaBanValue(baseValue * pctCtv);
         };
 
         const computedPrice = computeByType(baseImport);
+        const computedPromo =
+            customerLabel === prefixLe && baseImport !== null
+                ? computePromoPriceFromSupply(
+                    baseImport,
+                    pctCtv,
+                    pctKhach,
+                    pctPromo
+                  )
+                : null;
 
         let giaNhap = Number.isFinite(baseImport) ? baseImport : 0;
         let finalPrice =
             computedPrice !== null ?
             computedPrice :
-            Helpers.roundGiaBanValue(Math.max(0, Number(currentOrderPrice) || 0));
+            Helpers.roundGiaBanValue(Math.max(0, Number(baseImport) || 0));
 
         const months = Helpers.monthsFromString(productName);
         const days = Helpers.daysFromMonths(months) || 30;
@@ -3269,6 +3505,15 @@ app.post("/api/calculate-price", async(req, res) => {
         res.json({
             cost: Math.max(0, roundedGiaNhap),
             price: Math.max(0, roundedGiaBan),
+            promoPrice:
+                Number.isFinite(computedPromo) && computedPromo > 0
+                    ? Math.max(
+                        0,
+                        roundToNearestThousand(
+                            Helpers.roundGiaBanValue(computedPromo)
+                        )
+                      )
+                    : undefined,
             days: Number(days),
             order_expired: "",
         });
@@ -3287,7 +3532,7 @@ app.post("/api/orders", async(req, res) => {
 
     payload.order_date = normalizeDateInput(payload.order_date);
     payload.order_expired = normalizeDateInput(payload.order_expired);
-    payload.status = payload.status || "Chưa Thanh Toán";
+    payload.status = payload.status || "ChÆ°a Thanh ToÃ¡n";
     payload.check_flag = null;
     const normalizedSourceName = normalizeTextInput(payload.supply);
     if (normalizedSourceName) {
@@ -3367,11 +3612,11 @@ app.put("/api/orders/:id", async(req, res) => {
     });
     const values = fields.map((column) => payload[column]);
 
-    // Nếu trạng thái set về "Đã Thanh Toán" thì tự động bật check_flag = TRUE
+    // Náº¿u tráº¡ng thÃ¡i set vá» "ÄÃ£ Thanh ToÃ¡n" thÃ¬ tá»± Ä‘á»™ng báº­t check_flag = TRUE
     if (
         payload.status &&
         typeof payload.status === "string" &&
-        payload.status.trim() === "Đã Thanh Toán" &&
+        payload.status.trim() === "ÄÃ£ Thanh ToÃ¡n" &&
         !fields.includes("check_flag")
     ) {
         setClauses.push(`"check_flag" = $${values.length + 1}`);
@@ -3455,7 +3700,7 @@ const cancellationRefundRaw =
             columns: ARCHIVE_COLUMNS_CANCELED,
             overrides: {
                 refund: cancellationRefund,
-                status: "Chưa Hoàn",
+                status: "ChÆ°a HoÃ n",
                 check_flag: false,
             },
         };
@@ -3559,7 +3804,7 @@ app.patch(
                 .json({ error: "Invalid supplier id for supply price update." });
         }
 
-        const normalizedPrice = toNullableNumber(req.body ?.price);
+        const normalizedPrice = toNullableNumber(req.body?.price);
         if (normalizedPrice === null || normalizedPrice < 0) {
             return res
                 .status(400)
@@ -3627,7 +3872,7 @@ app.delete("/api/products/:productId/suppliers/:sourceId", async(req, res) => {
             await client.query("ROLLBACK");
             return res
                 .status(404)
-                .json({ error: "Nguồn này không tồn tại sản phẩm." });
+                .json({ error: "Nguá»“n nÃ y khÃ´ng tá»“n táº¡i cho sáº£n pháº©m." });
         }
         await client.query("COMMIT");
         res.json({
@@ -4020,3 +4265,4 @@ const handleBulkDeletePackages = async(req, res) => {
 };
 app.delete("/api/package-products/bulk-delete", handleBulkDeletePackages);
 app.post("/api/package-products/bulk-delete", handleBulkDeletePackages);
+
