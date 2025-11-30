@@ -456,10 +456,20 @@ const ensureSupplyAndPriceFromOrder = async(orderCode) => {
             if (priceRes.rows.length) {
                 supplyPriceValue = normalizeMoney(priceRes.rows[0].price);
             } else {
-                await client.query(
-                    `INSERT INTO ${SUPPLY_PRICE_TABLE} (${SUPPLY_PRICE_COLS.productId}, ${SUPPLY_PRICE_COLS.sourceId}, ${SUPPLY_PRICE_COLS.price})
-           VALUES ($1, $2, $3)`, [productId, sourceId, costValue]
-                );
+                try {
+                    await client.query(
+                        `INSERT INTO ${SUPPLY_PRICE_TABLE} (${SUPPLY_PRICE_COLS.productId}, ${SUPPLY_PRICE_COLS.sourceId}, ${SUPPLY_PRICE_COLS.price})
+             VALUES ($1, $2, $3)
+             ON CONFLICT ON CONSTRAINT supply_price_pkey DO NOTHING`, [productId, sourceId, costValue]
+                    );
+                } catch (insertErr) {
+                    console.error(
+                        "Insert supply_price failed, productId=%s, sourceId=%s:",
+                        productId,
+                        sourceId,
+                        insertErr
+                    );
+                }
                 supplyPriceValue = costValue;
             }
         }
