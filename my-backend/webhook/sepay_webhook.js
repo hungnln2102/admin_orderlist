@@ -80,6 +80,23 @@ const safeStringify = (data) => {
   }
 };
 
+const extractOrderCodeFromText = (...fields) => {
+  for (const field of fields) {
+    if (!field) continue;
+    const match = String(field).match(/MAV\w+/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return "";
+};
+
+const extractSenderFromContent = (text) => {
+  if (!text) return "";
+  const str = String(text);
+  const match = str.match(/NHAN\s+TU\s+([A-Za-z0-9]+)/i);
+  if (match && match[1]) return match[1].trim();
+  return "";
+};
+
 const normalizeTransactionPayload = (payload) => {
   if (!payload) return null;
   // If nested transaction object exists, use it directly
@@ -114,6 +131,9 @@ const normalizeTransactionPayload = (payload) => {
     amount_in,
     note: payload.note || payload.description || payload.content || "",
     description: payload.description || "",
+    account_number: payload.accountNumber || payload.account_number || "",
+    transfer_amount: payload.transferAmount || payload.amount || payload.amount_in,
+    transaction_date_raw: payload.transactionDate || payload.transaction_date || payload.transferTime || payload.time,
   };
 };
 
@@ -157,10 +177,14 @@ const isValidApiKey = (req) => {
   if (!SEPAY_API_KEY) return false;
   const incoming = extractApiKey(req);
   if (!incoming) return false;
+  const incomingTrimmed = String(incoming).trim();
+  const expectedTrimmed = String(SEPAY_API_KEY).trim();
+  if (incomingTrimmed === expectedTrimmed) return true;
+  // Fallback to constant-time compare to avoid accidental mismatch due to timing
   try {
     return crypto.timingSafeEqual(
-      Buffer.from(incoming),
-      Buffer.from(SEPAY_API_KEY)
+      Buffer.from(incomingTrimmed),
+      Buffer.from(expectedTrimmed)
     );
   } catch {
     return false;
@@ -193,16 +217,24 @@ const normalizeAmount = (value) => {
 };
 
 const insertPaymentReceipt = async(transaction) => {
-    const [orderCode, sender] = splitTransactionContent(
-        transaction.transaction_content
+    const orderCode = extractOrderCodeFromText(
+        transaction.transaction_content,
+        transaction.description
     );
-    const paidDate = parsePaidDate(transaction.transaction_date);
-    const amount = normalizeAmount(transaction.amount_in);
+    const senderParsed = extractSenderFromContent(
+        transaction.transaction_content || transaction.description
+    );
+    const receiverAccount = transaction.account_number || transaction.accountNumber || "";
+    const paidDate = parsePaidDate(transaction.transaction_date || transaction.transaction_date_raw);
+    const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
+    const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
+    const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
     const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
       ${PAYMENT_RECEIPT_COLS.orderCode},
       ${PAYMENT_RECEIPT_COLS.paidDate},
       ${PAYMENT_RECEIPT_COLS.amount},
+      ${PAYMENT_RECEIPT_COLS.receiver},
       ${PAYMENT_RECEIPT_COLS.sender},
       ${PAYMENT_RECEIPT_COLS.note}
     ) VALUES ($1, $2, $3, $4, $5)
@@ -211,8 +243,9 @@ const insertPaymentReceipt = async(transaction) => {
         orderCode,
         paidDate,
         amount,
-        sender,
-        transaction.transaction_content || "",
+        receiverAccount,
+        senderParsed || "",
+        noteValue,
     ]);
 };
 
@@ -850,6 +883,11 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
   const hasValidSignature = verifySepaySignature(req.rawBody, signature);
   const hasValidApiKey = isValidApiKey(req);
   if (!(hasValidSignature || hasValidApiKey)) {
+    console.error("Webhook auth failed", {
+      hasValidSignature,
+      hasValidApiKey,
+      receivedAuth: req.get("Authorization"),
+    });
     return res.status(403).json({ message: "Invalid Signature" });
   }
 

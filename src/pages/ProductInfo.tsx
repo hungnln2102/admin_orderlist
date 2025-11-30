@@ -1,9 +1,10 @@
-import React, { useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import Pagination from "../components/Pagination";
 
 type ProductRow = {
   id: string;
@@ -80,6 +81,22 @@ const mockProducts: ProductRow[] = [
 export default function ProductInfo() {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalItems = mockProducts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const pagedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return mockProducts.slice(start, end);
+  }, [currentPage]);
 
   const handleChooseFile = () => {
     fileInputRef.current?.click();
@@ -134,7 +151,7 @@ export default function ProductInfo() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {mockProducts.map((item) => {
+              {pagedProducts.map((item) => {
                 const initials = item.name.slice(0, 2).toUpperCase();
                 const isExpanded = expandedId === item.id;
                 return (
@@ -231,15 +248,13 @@ export default function ProductInfo() {
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-white/10 text-white/70 text-sm">
-          <div className="space-x-2">
-            <button className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">{"<<"}</button>
-            <button className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">{"<"}</button>
-            <button className="px-3 py-1 rounded bg-blue-600 text-white font-semibold">1</button>
-            <button className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">{">"}</button>
-            <button className="px-2 py-1 rounded bg-white/5 hover:bg-white/10">{">>"}</button>
-          </div>
-          <span>1-7 trong 7</span>
+        <div className="border-t border-white/10 px-4 py-3">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
         </div>
       </div>
     </div>

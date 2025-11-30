@@ -56,7 +56,8 @@ const PAYMENT_RECEIPT_COLS = {
   orderCode: "ma_don_hang",
   paidDate: "ngay_thanh_toan",
   amount: "so_tien",
-  sender: "nguoi_gui",
+  receiver: "nguoi_gui", // số tài khoản/ người nhận tiền
+  sender: "sender", // người gửi thực tế
   note: "noi_dung_ck",
 };
 

@@ -24,6 +24,7 @@ interface PaymentReceipt {
   paidAt: string;
   amount: number;
   sender: string;
+  receiver: string;
   note: string;
 }
 
@@ -254,6 +255,8 @@ export default function Invoices() {
           amount:
             Number(row?.amount ?? row?.[PAYMENT_RECEIPT_COLS.amount]) || 0,
           sender: row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender] ?? "",
+          receiver:
+            row?.receiver ?? row?.[PAYMENT_RECEIPT_COLS.receiver] ?? "",
           note: row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note] ?? "",
         });
         const rawList = Array.isArray(data?.receipts)
@@ -298,6 +301,7 @@ export default function Invoices() {
       "#",
       "Mã đơn",
       "Người gửi",
+      "Người nhận",
       "Số tiền gốc",
       "Số tiền định dạng",
       "Nội dung chuyển khoản",
@@ -309,6 +313,7 @@ export default function Invoices() {
       index + 1,
       receipt.orderCode || "",
       resolveSender(receipt),
+      receipt.receiver || "",
       receipt.amount,
       formatCurrencyVnd(receipt.amount),
       receipt.note || "",
@@ -809,7 +814,7 @@ export default function Invoices() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-white">
-                            {QR_BANK_INFO.accountNumber}
+                            {receipt.receiver || QR_BANK_INFO.accountNumber}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-white">
@@ -937,6 +942,12 @@ export default function Invoices() {
                     <p className="text-gray-500 mb-1">Người Gửi</p>
                     <p className="font-semibold text-gray-900">
                       {resolveSender(selectedReceipt) || "--"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Người Nhận</p>
+                    <p className="font-semibold text-gray-900">
+                      {selectedReceipt.receiver || "--"}
                     </p>
                   </div>
                   <div>

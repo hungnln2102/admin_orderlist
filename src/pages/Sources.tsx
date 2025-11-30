@@ -1404,7 +1404,7 @@ export default function Sources() {
       return null;
     }
 
-    return rows.map((row) => (
+    const renderedRows = rows.map((row) => (
       <tr key={row.id} className="border-t border-white/10 text-sm text-white">
         <td className="px-4 py-4 font-medium text-white text-left sm:text-center">
           {row.round || "--"}
@@ -1418,6 +1418,28 @@ export default function Sources() {
         </td>
       </tr>
     ));
+
+    if (!hasDraftRow && supplyId !== undefined) {
+      renderedRows.push(
+        <tr key="add-payment-row" className="border-t border-white/10 text-sm text-white">
+          <td className="px-4 py-4 text-left sm:text-center" colSpan={3}>
+            <span className="text-white/70">Thêm chu kỳ thanh toán mới</span>
+          </td>
+          <td className="px-4 py-4 text-center">
+            <button
+              type="button"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-white/40 text-white/80 hover:border-blue-400 hover:text-blue-200 transition"
+              title="Thêm chu kỳ thanh toán"
+              onClick={() => startAddPaymentCycle(supplyId)}
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+          </td>
+        </tr>
+      );
+    }
+
+    return renderedRows;
   };
 
   const renderAddPaymentRow = (supplyId: number, draft?: PaymentDraftState) => {
@@ -1493,7 +1515,7 @@ export default function Sources() {
               </button>
               <button
                 type="button"
-                className="h-9 w-9 rounded-full bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition"
+                className="h-9 w-9 rounded-full bg-rose-500 text-white shadow hover:bg-rose-600 transition"
                 title="Hủy"
                 disabled={isSubmitting}
                 onClick={() => cancelAddPaymentCycle(supplyId)}
@@ -1772,10 +1794,10 @@ export default function Sources() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-lg font-semibold text-rose-500">
                 Xác Nhận Xóa
               </p>
-              <p className="text-xs text-white/80">
+              <p className="text-xs text-slate-200">
                 Hành động này sẽ xóa nguồn khỏi dữ liệu.
               </p>
             </div>
@@ -1790,10 +1812,10 @@ export default function Sources() {
           </div>
           <div className="space-y-3 text-sm text-gray-600">
             <div>
-              <p className="font-semibold text-gray-900">
+              <p className="font-semibold text-white">
                 {supply.sourceName || "Nguồn Không Tên"}
               </p>
-              <p className="text-xs text-white/80">
+              <p className="text-xs text-slate-200">
                 {supply.numberBank
                   ? `Số Tài Khoản: ${supply.numberBank}`
                   : "Chưa Có Thông Tin Thanh Toán"}

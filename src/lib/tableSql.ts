@@ -57,7 +57,8 @@ export const PAYMENT_RECEIPT_COLS: ColumnDict = {
   orderCode: "ma_don_hang",
   paidDate: "ngay_thanh_toan",
   amount: "so_tien",
-  sender: "nguoi_gui",
+  receiver: "nguoi_gui",
+  sender: "sender",
   note: "noi_dung_ck",
 };
 
