@@ -51,7 +51,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_BASE_URL: https://api.mavrykpremium.store
+        VITE_API_BASE_URL: https://admin.mavrykpremium.store
     ports:
       - "80:80"
     depends_on:
