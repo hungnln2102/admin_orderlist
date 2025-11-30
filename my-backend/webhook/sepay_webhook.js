@@ -72,6 +72,43 @@ const SUPPLY_TABLE = `${DB_SCHEMA}.supply`;
 const SUPPLY_PRICE_TABLE = `${DB_SCHEMA}.supply_price`;
 const PAYMENT_SUPPLY_TABLE = `${DB_SCHEMA}.payment_supply`;
 
+const normalizeTransactionPayload = (payload) => {
+  if (!payload) return null;
+  // If nested transaction object exists, use it directly
+  if (payload.transaction && typeof payload.transaction === "object") {
+    return payload.transaction;
+  }
+
+  // Sepay may post flat fields; map them into expected keys
+  const transaction_content =
+    payload.content ||
+    payload.description ||
+    payload.note ||
+    payload.transaction_content ||
+    "";
+  const transaction_date =
+    payload.transactionDate ||
+    payload.transaction_date ||
+    payload.transferTime ||
+    payload.time;
+  const amount_in =
+    payload.amount_in ||
+    payload.transferAmount ||
+    payload.amountIn ||
+    payload.amount ||
+    0;
+
+  if (!transaction_content && !transaction_date && !amount_in) return null;
+
+  return {
+    transaction_content,
+    transaction_date,
+    amount_in,
+    note: payload.note || payload.description || payload.content || "",
+    description: payload.description || "",
+  };
+};
+
 const resolveSepaySignature = (req) => {
   return (
     req.get("X-SEPAY-SIGNATURE") ||
@@ -797,7 +834,7 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
     return res.status(403).json({ message: "Invalid Signature" });
   }
 
-  const transaction = req.body?.transaction;
+  const transaction = normalizeTransactionPayload(req.body);
   if (!transaction) {
     return res.status(400).json({ message: "Missing transaction" });
   }
