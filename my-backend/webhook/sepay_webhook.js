@@ -102,7 +102,7 @@ const verifySepaySignature = (rawBody, signature) => {
 const extractApiKey = (req) => {
   const auth = req.get("Authorization") || req.get("X-API-KEY") || "";
   const trimmed = String(auth || "").trim();
-  const match = trimmed.match(/^Apikey\\s+(.+)$/i);
+  const match = trimmed.match(/^Apikey\s+(.+)$/i);
   if (match && match[1]) return match[1].trim();
   if (trimmed && !trimmed.toLowerCase().startsWith("apikey")) return trimmed;
   return "";
