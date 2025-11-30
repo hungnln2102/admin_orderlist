@@ -72,6 +72,14 @@ const SUPPLY_TABLE = `${DB_SCHEMA}.supply`;
 const SUPPLY_PRICE_TABLE = `${DB_SCHEMA}.supply_price`;
 const PAYMENT_SUPPLY_TABLE = `${DB_SCHEMA}.payment_supply`;
 
+const safeStringify = (data) => {
+  try {
+    return JSON.stringify(data);
+  } catch (err) {
+    return "[unserializable payload]";
+  }
+};
+
 const normalizeTransactionPayload = (payload) => {
   if (!payload) return null;
   // If nested transaction object exists, use it directly
@@ -826,6 +834,7 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
     signature: req.get("Signature"),
     querySignature: req.query?.signature,
   });
+  console.log("Incoming Sepay webhook raw body:", safeStringify(req.body));
 
   const signature = resolveSepaySignature(req);
   const hasValidSignature = verifySepaySignature(req.rawBody, signature);
@@ -835,15 +844,18 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
   }
 
   const transaction = normalizeTransactionPayload(req.body);
+  console.log("Parsed transaction object:", safeStringify(transaction));
   if (!transaction) {
     return res.status(400).json({ message: "Missing transaction" });
   }
 
   const orderCode = deriveOrderCode(transaction);
+  console.log("Derived order code:", orderCode);
 
   try {
     await insertPaymentReceipt(transaction);
     const ensured = await ensureSupplyAndPriceFromOrder(orderCode);
+    console.log("Ensure supply/price result:", safeStringify(ensured));
     if (ensured?.sourceId && Number.isFinite(ensured.price)) {
       await updatePaymentSupplyBalance(ensured.sourceId, ensured.price, new Date());
     }
@@ -891,6 +903,7 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
     return res.json({ message: "OK", renewal: renewalResult });
   } catch (err) {
     console.error("Error saving payment:", err);
+    if (err?.stack) console.error(err.stack);
     return res.status(500).json({ message: "Internal Error" });
   }
 });
