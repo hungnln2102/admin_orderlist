@@ -5,6 +5,7 @@ const express = require("express");
 const crypto = require("crypto");
 const https = require("https");
 const { Pool } = require("pg");
+const cron = require("node-cron");
 const {
     ORDER_COLS,
     PAYMENT_RECEIPT_COLS,
@@ -43,6 +44,17 @@ const TELEGRAM_TOPIC_ID = Number.parseInt(
 const SEND_RENEWAL_TO_TOPIC =
     String(process.env.SEND_RENEWAL_TO_TOPIC || "true").toLowerCase() !==
     "false";
+const APP_TIMEZONE =
+    typeof process.env.APP_TIMEZONE === "string" &&
+    /^[A-Za-z0-9_\/+\-]+$/.test(process.env.APP_TIMEZONE) ?
+    process.env.APP_TIMEZONE :
+    "Asia/Ho_Chi_Minh";
+const RENEWAL_CRON_SCHEDULE =
+    process.env.RENEWAL_CRON_SCHEDULE && process.env.RENEWAL_CRON_SCHEDULE.trim() ?
+    process.env.RENEWAL_CRON_SCHEDULE.trim() :
+    "0 23 * * *"; // 23:00 Asia/Ho_Chi_Minh
+const RENEWAL_CRON_ENABLED =
+    String(process.env.ENABLE_RENEWAL_CRON || "true").toLowerCase() !== "false";
 
 const stripAccents = (value) =>
     String(value || "")
@@ -653,20 +665,21 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
         );
         const sourceId = await findSupplyId(client, nguon);
         const giaNhapSource = await fetchSupplyPrice(client, productId, sourceId);
-
-        const finalGiaNhapRaw =
+        // Always take the latest supply_price for this source+product; no extra rounding
+        const latestGiaNhap =
             giaNhapSource !== null && giaNhapSource !== undefined ?
             normalizeMoney(giaNhapSource) :
             giaNhapCu;
+
         const finalGiaBanRaw = calcGiaBan(
             orderCode,
-            giaNhapSource ?? finalGiaNhapRaw,
+            latestGiaNhap,
             pctCtv,
             pctKhach,
-            finalGiaNhapRaw
+            latestGiaNhap
         );
 
-        const finalGiaNhap = roundToThousands(finalGiaNhapRaw);
+        const finalGiaNhap = latestGiaNhap;
         const finalGiaBan = roundToThousands(finalGiaBanRaw);
 
         const ngayBatDauMoi = new Date(hetHan.getTime() + 86_400_000);
@@ -809,6 +822,144 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   }
 };
 
+const buildPaymentMessage = (orderCode, transaction) => {
+  if (!transaction) return "";
+  const amount = normalizeAmount(
+    transaction.transfer_amount || transaction.amount_in
+  );
+  const paidDate = parsePaidDate(
+    transaction.transaction_date || transaction.transaction_date_raw
+  );
+  const receiverAccount =
+    transaction.account_number || transaction.accountNumber || "";
+  const content =
+    transaction.description ||
+    transaction.transaction_content ||
+    transaction.note ||
+    "";
+  const senderParsed = extractSenderFromContent(
+    transaction.transaction_content || transaction.description
+  );
+
+  const parts = [
+    `[THU TIEN] ${orderCode || "Khong ro don"}`,
+    `- So tien: ${formatCurrency(amount)}`,
+    `- Ngay: ${paidDate}`,
+    senderParsed ? `- Nguoi gui: ${senderParsed}` : null,
+    receiverAccount ? `- Tai khoan nhan: ${receiverAccount}` : null,
+    content ? `- Noi dung: ${content}` : null,
+  ].filter(Boolean);
+
+  return parts.join("\n");
+};
+
+const sendPaymentNotification = async (orderCode, transaction) => {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  const text = buildPaymentMessage(orderCode, transaction);
+  if (!text) return;
+
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text,
+  };
+  if (Number.isFinite(TELEGRAM_TOPIC_ID)) {
+    payload.message_thread_id = TELEGRAM_TOPIC_ID;
+  }
+
+  try {
+    await postJson(url, payload);
+  } catch (err) {
+    console.error("Failed to send Telegram payment notification:", err);
+  }
+};
+
+// Find orders that need renewal based on status/checkFlag/expiry window
+const fetchRenewalCandidates = async () => {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `SELECT
+        ${ORDER_COLS.idOrder} AS order_code,
+        ${ORDER_COLS.status} AS status_value,
+        ${ORDER_COLS.checkFlag} AS check_flag_value,
+        ${ORDER_COLS.orderExpired} AS order_expired_value
+      FROM ${ORDER_TABLE}
+      WHERE TRIM(${ORDER_COLS.idOrder}::text) <> ''`
+    );
+
+    const candidates = [];
+    for (const row of res.rows) {
+      const orderCode = (row.order_code || "").trim();
+      if (!orderCode) continue;
+      const statusNorm = stripAccents(row.status_value || "").toLowerCase().trim();
+      const checkFlag = row.check_flag_value;
+      const daysLeft = daysUntil(row.order_expired_value);
+
+      const readyForRenew =
+        (statusNorm === "can gia han" || statusNorm === "het han") &&
+        isNullishFlag(checkFlag) &&
+        daysLeft <= 4;
+
+      const paidNeedsForce =
+        statusNorm === "da thanh toan" && isTrueFlag(checkFlag);
+
+      if (readyForRenew || paidNeedsForce) {
+        candidates.push({
+          orderCode,
+          forceRenewal: paidNeedsForce,
+          daysLeft,
+          status: statusNorm,
+        });
+      }
+    }
+    return candidates;
+  } finally {
+    client.release();
+  }
+};
+
+const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
+  const targets =
+    Array.isArray(orderCodes) && orderCodes.length
+      ? orderCodes.map((code) => ({
+          orderCode: String(code || "").trim(),
+          forceRenewal,
+        })).filter((c) => c.orderCode)
+      : await fetchRenewalCandidates();
+
+  const results = [];
+  for (const target of targets) {
+    const code = target.orderCode;
+    if (!code) continue;
+    try {
+      const renewalResult = await runRenewal(code, {
+        forceRenewal: forceRenewal || target.forceRenewal,
+      });
+      await sendRenewalNotification(code, renewalResult);
+      results.push({
+        orderCode: code,
+        success: !!renewalResult?.success,
+        processType: renewalResult?.processType || null,
+        details: renewalResult?.details || null,
+      });
+    } catch (err) {
+      results.push({
+        orderCode: code,
+        success: false,
+        error: err?.message || String(err),
+      });
+    }
+  }
+
+  return {
+    total: targets.length,
+    succeeded: results.filter((r) => r.success).length,
+    failed: results.filter((r) => !r.success).length,
+    results,
+  };
+};
+
 const fetchOrderState = async (orderCode) => {
   const client = await pool.connect();
   try {
@@ -869,6 +1020,25 @@ app.get(SEPAY_WEBHOOK_PATH, (_req, res) => {
   res.json({ message: "Sepay webhook endpoint. Use POST with signature." });
 });
 
+// Manual retry renewals (requires Sepay API key header)
+app.post("/api/renewals/retry", async (req, res) => {
+  if (!isValidApiKey(req)) {
+    return res.status(403).json({ message: "Invalid API key" });
+  }
+
+  try {
+    const { orders, force } = req.body || {};
+    const summary = await runRenewalBatch({
+      orderCodes: Array.isArray(orders) ? orders : undefined,
+      forceRenewal: Boolean(force),
+    });
+    res.json({ message: "OK", ...summary });
+  } catch (err) {
+    console.error("Renewal retry failed:", err);
+    res.status(500).json({ message: "Internal Error" });
+  }
+});
+
 app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
   console.log("Incoming Sepay webhook headers:", {
     authorization: req.get("Authorization"),
@@ -902,6 +1072,11 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
 
   try {
     await insertPaymentReceipt(transaction);
+    try {
+      await sendPaymentNotification(orderCode, transaction);
+    } catch (notifyErr) {
+      console.error("Payment notification failed:", notifyErr);
+    }
     const ensured = await ensureSupplyAndPriceFromOrder(orderCode);
     console.log("Ensure supply/price result:", safeStringify(ensured));
     if (ensured?.sourceId && Number.isFinite(ensured.price)) {
@@ -960,6 +1135,28 @@ if (require.main === module) {
   app.listen(PORT, HOST, () => {
     console.log(`Listening on http://${HOST}:${PORT}${SEPAY_WEBHOOK_PATH}`);
   });
+}
+
+if (RENEWAL_CRON_ENABLED) {
+  cron.schedule(
+    RENEWAL_CRON_SCHEDULE,
+    () => {
+      console.log("[Cron] Running scheduled renewal retry job...");
+      runRenewalBatch()
+        .then((summary) =>
+          console.log(
+            `[Cron] Renewal retry done. Success: ${summary.succeeded}/${summary.total}`
+          )
+        )
+        .catch((err) => console.error("[Cron] Renewal retry failed:", err));
+    }, {
+      scheduled: true,
+      timezone: APP_TIMEZONE,
+    }
+  );
+  console.log(
+    `[Cron] Renewal retry scheduled: '${RENEWAL_CRON_SCHEDULE}' (${APP_TIMEZONE})`
+  );
 }
 
 module.exports = app;
