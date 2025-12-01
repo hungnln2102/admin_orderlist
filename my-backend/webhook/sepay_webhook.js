@@ -874,6 +874,160 @@ const sendPaymentNotification = async (orderCode, transaction) => {
   }
 };
 
+// ------------------------------
+// Renewal retry state (in-memory)
+// ------------------------------
+const pendingRenewalTasks = new Map(); // orderCode -> task state
+
+const isTelegramEnabled = () =>
+  Boolean(
+    TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID && SEND_RENEWAL_TO_TOPIC !== false
+  );
+
+const isEligibleForRenewal = (statusValue, checkFlag, orderExpired) => {
+  const statusNorm = stripAccents(statusValue || "").toLowerCase().trim();
+  const daysLeft = daysUntil(orderExpired);
+
+  const readyForRenew =
+    (statusNorm === "can gia han" || statusNorm === "het han") &&
+    isNullishFlag(checkFlag) &&
+    daysLeft <= 4;
+
+  const paidNeedsForce = statusNorm === "da thanh toan" && isTrueFlag(checkFlag);
+
+  return {
+    eligible: readyForRenew || paidNeedsForce,
+    forceRenewal: paidNeedsForce,
+    needsStatusReset: paidNeedsForce,
+    daysLeft,
+    statusNorm,
+  };
+};
+
+const queueRenewalTask = (orderCode, options = {}) => {
+  if (!orderCode) return null;
+  const key = orderCode.trim();
+  if (!key) return null;
+  const existing = pendingRenewalTasks.get(key) || {};
+  const task = {
+    orderCode: key,
+    renewalDone: existing.renewalDone || false,
+    telegramDone: existing.telegramDone || false,
+    statusResetDone: existing.statusResetDone || false,
+    lastRenewalResult: existing.lastRenewalResult || null,
+    renewalAttempts: existing.renewalAttempts || 0,
+    telegramAttempts: existing.telegramAttempts || 0,
+    lastError: existing.lastError || null,
+    forceRenewal: existing.forceRenewal || options.forceRenewal || false,
+    needsStatusReset: existing.needsStatusReset || options.needsStatusReset || false,
+  };
+  pendingRenewalTasks.set(key, task);
+  return task;
+};
+
+const processRenewalTask = async (orderCode) => {
+  const task = pendingRenewalTasks.get(orderCode);
+  if (!task) return null;
+
+  const state = await fetchOrderState(orderCode);
+  if (!state) {
+    pendingRenewalTasks.delete(orderCode);
+    return { orderCode, skipped: true, reason: "not found" };
+  }
+
+  const { eligible, forceRenewal, needsStatusReset } = isEligibleForRenewal(
+    state[ORDER_COLS.status],
+    state[ORDER_COLS.checkFlag],
+    state[ORDER_COLS.orderExpired]
+  );
+
+  if (!eligible) {
+    pendingRenewalTasks.delete(orderCode);
+    return { orderCode, skipped: true, reason: "not eligible" };
+  }
+
+  // Run renewal only if not already successful
+  if (!task.renewalDone) {
+    try {
+      const renewalResult = await runRenewal(orderCode, {
+        forceRenewal: task.forceRenewal || forceRenewal,
+      });
+      task.renewalAttempts += 1;
+      task.lastRenewalResult = renewalResult;
+      task.renewalDone = !!renewalResult?.success;
+      task.lastError = task.renewalDone
+        ? null
+        : renewalResult?.details || "Renewal failed";
+    } catch (err) {
+      task.renewalAttempts += 1;
+      task.lastError = err?.message || String(err);
+      return {
+        orderCode,
+        success: false,
+        error: task.lastError,
+        renewalDone: false,
+        telegramDone: task.telegramDone,
+      };
+    }
+  }
+
+  // Optional status reset after forced renewal
+  if (task.renewalDone && needsStatusReset && !task.statusResetDone) {
+    try {
+      await setStatusUnpaid(orderCode);
+      task.statusResetDone = true;
+    } catch (err) {
+      task.lastError = err?.message || String(err);
+      return {
+        orderCode,
+        success: false,
+        error: task.lastError,
+        renewalDone: true,
+        telegramDone: task.telegramDone,
+      };
+    }
+  }
+
+  // Telegram notification only if renewal succeeded and not yet sent
+  if (task.renewalDone && !task.telegramDone) {
+    if (!isTelegramEnabled()) {
+      task.telegramDone = true; // Nothing to send; consider done
+    } else {
+      try {
+        await sendRenewalNotification(orderCode, task.lastRenewalResult);
+        task.telegramAttempts += 1;
+        task.telegramDone = true;
+        task.lastError = null;
+      } catch (err) {
+        task.telegramAttempts += 1;
+        task.lastError = err?.message || String(err);
+        return {
+          orderCode,
+          success: false,
+          error: task.lastError,
+          renewalDone: true,
+          telegramDone: false,
+        };
+      }
+    }
+  }
+
+  const success = task.renewalDone && task.telegramDone;
+  if (success) {
+    pendingRenewalTasks.delete(orderCode);
+  } else {
+    pendingRenewalTasks.set(orderCode, task);
+  }
+
+  return {
+    orderCode,
+    success,
+    renewalDone: task.renewalDone,
+    telegramDone: task.telegramDone,
+    lastError: task.lastError,
+  };
+};
+
 // Find orders that need renewal based on status/checkFlag/expiry window
 const fetchRenewalCandidates = async () => {
   const client = await pool.connect();
@@ -892,24 +1046,19 @@ const fetchRenewalCandidates = async () => {
     for (const row of res.rows) {
       const orderCode = (row.order_code || "").trim();
       if (!orderCode) continue;
-      const statusNorm = stripAccents(row.status_value || "").toLowerCase().trim();
-      const checkFlag = row.check_flag_value;
-      const daysLeft = daysUntil(row.order_expired_value);
+      const eligibility = isEligibleForRenewal(
+        row.status_value,
+        row.check_flag_value,
+        row.order_expired_value
+      );
 
-      const readyForRenew =
-        (statusNorm === "can gia han" || statusNorm === "het han") &&
-        isNullishFlag(checkFlag) &&
-        daysLeft <= 4;
-
-      const paidNeedsForce =
-        statusNorm === "da thanh toan" && isTrueFlag(checkFlag);
-
-      if (readyForRenew || paidNeedsForce) {
+      if (eligibility.eligible) {
         candidates.push({
           orderCode,
-          forceRenewal: paidNeedsForce,
-          daysLeft,
-          status: statusNorm,
+          forceRenewal: eligibility.forceRenewal,
+          daysLeft: eligibility.daysLeft,
+          status: eligibility.statusNorm,
+          needsStatusReset: eligibility.needsStatusReset,
         });
       }
     }
@@ -922,40 +1071,38 @@ const fetchRenewalCandidates = async () => {
 const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
   const targets =
     Array.isArray(orderCodes) && orderCodes.length
-      ? orderCodes.map((code) => ({
-          orderCode: String(code || "").trim(),
-          forceRenewal,
-        })).filter((c) => c.orderCode)
+      ? orderCodes
+          .map((code) => ({
+            orderCode: String(code || "").trim(),
+            forceRenewal,
+          }))
+          .filter((c) => c.orderCode)
       : await fetchRenewalCandidates();
 
+  // Queue tasks
+  for (const target of targets) {
+    queueRenewalTask(target.orderCode, {
+      forceRenewal: target.forceRenewal,
+      needsStatusReset: target.needsStatusReset,
+    });
+  }
+
+  // Process tasks
   const results = [];
   for (const target of targets) {
     const code = target.orderCode;
     if (!code) continue;
-    try {
-      const renewalResult = await runRenewal(code, {
-        forceRenewal: forceRenewal || target.forceRenewal,
-      });
-      await sendRenewalNotification(code, renewalResult);
-      results.push({
-        orderCode: code,
-        success: !!renewalResult?.success,
-        processType: renewalResult?.processType || null,
-        details: renewalResult?.details || null,
-      });
-    } catch (err) {
-      results.push({
-        orderCode: code,
-        success: false,
-        error: err?.message || String(err),
-      });
+    const outcome = await processRenewalTask(code);
+    if (outcome) {
+      results.push(outcome);
     }
   }
 
+  const succeeded = results.filter((r) => r?.success).length;
   return {
     total: targets.length,
-    succeeded: results.filter((r) => r.success).length,
-    failed: results.filter((r) => !r.success).length,
+    succeeded,
+    failed: results.length - succeeded,
     results,
   };
 };
@@ -1083,39 +1230,27 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
       await updatePaymentSupplyBalance(ensured.sourceId, ensured.price, new Date());
     }
 
-    // Try renewal/payment flag flow + Telegram notification (non-blocking for webhook)
-    let renewalResult = null;
+    // Renewal retry flow: only queue and retry needed actions
     try {
       if (orderCode) {
         const state = await fetchOrderState(orderCode);
         if (state) {
-          const statusNorm = stripAccents(state[ORDER_COLS.status])
-            .toLowerCase()
-            .trim();
-          const checkFlag = state[ORDER_COLS.checkFlag];
-          const daysLeft = daysUntil(state[ORDER_COLS.orderExpired]);
-
-          if (
-            (statusNorm === "can gia han" || statusNorm === "het han") &&
-            isNullishFlag(checkFlag) &&
-            daysLeft <= 4
-          ) {
-            renewalResult = await runRenewal(orderCode);
-            await sendRenewalNotification(orderCode, renewalResult);
+          const eligibility = isEligibleForRenewal(
+            state[ORDER_COLS.status],
+            state[ORDER_COLS.checkFlag],
+            state[ORDER_COLS.orderExpired]
+          );
+          if (eligibility.eligible) {
+            queueRenewalTask(orderCode, {
+              forceRenewal: eligibility.forceRenewal,
+              needsStatusReset: eligibility.needsStatusReset,
+            });
+            await processRenewalTask(orderCode);
           } else if (
-            statusNorm === "chua thanh toan" &&
-            isNullishFlag(checkFlag)
+            eligibility.statusNorm === "chua thanh toan" &&
+            isNullishFlag(state[ORDER_COLS.checkFlag])
           ) {
             await markCheckFlagFalse(orderCode);
-          } else if (
-            statusNorm === "da thanh toan" &&
-            isTrueFlag(checkFlag)
-          ) {
-            renewalResult = await runRenewal(orderCode, { forceRenewal: true });
-            await sendRenewalNotification(orderCode, renewalResult);
-            if (renewalResult?.success) {
-              await setStatusUnpaid(orderCode);
-            }
           }
         }
       }
@@ -1123,7 +1258,7 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
       console.error("Renewal flow failed:", renewErr);
     }
 
-    return res.json({ message: "OK", renewal: renewalResult });
+    return res.json({ message: "OK" });
   } catch (err) {
     console.error("Error saving payment:", err);
     if (err?.stack) console.error(err.stack);
