@@ -16,6 +16,7 @@ import Invoices from "./pages/Invoices";
 import RetroLogin from "./pages/RetroLogin";
 import ProductInfo from "./pages/ProductInfo";
 import Stats from "./pages/Stats";
+import HoaDon from "./pages/HoaDon";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,9 +46,9 @@ function App() {
               <ProtectedRoute>
                 <div className="min-h-screen app-aurora">
                   <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-                  <div className="transition-all duration-300 ease-in-out lg:ml-64">
+                  <div className="transition-all duration-300 ease-in-out lg:ml-64 print-shell">
                     <div className="h-16 lg:hidden"></div>
-                    <main className="p-0 max-w-none">
+                    <main className="p-0 pt-[10px] pl-[10px] max-w-none">
                       <Routes>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
@@ -57,6 +58,7 @@ function App() {
                         <Route path="/stats" element={<Stats />} />
                         <Route path="/sources" element={<Sources />} />
                         <Route path="/pricing" element={<Pricing />} />
+                        <Route path="/hoa-don" element={<HoaDon />} />
                         <Route path="/invoices" element={<Invoices />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                       </Routes>

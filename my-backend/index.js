@@ -834,7 +834,9 @@ app.get("/api/dashboard/years", async(_req, res) => {
       UNION ALL
       SELECT order_date::text AS raw_date FROM ${DB_SCHEMA}.order_expired
       UNION ALL
-      SELECT order_date::text AS raw_date FROM ${DB_SCHEMA}.order_canceled
+      SELECT createdate::text AS raw_date FROM ${DB_SCHEMA}.order_canceled
+      UNION ALL
+      SELECT ${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text AS raw_date FROM ${DB_SCHEMA}.payment_receipt
     ),
     normalized AS (
       SELECT DISTINCT ${normalizedYearCase} AS year_value
@@ -865,13 +867,21 @@ app.get("/api/dashboard/charts", async(req, res) => {
 
     const orderDateCase = createDateNormalization("order_date");
     const orderYearCase = createYearExtraction("order_date");
+    const receiptDateCase = createDateNormalization(
+        quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)
+    );
+    const receiptYearCase = createYearExtraction(
+        quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)
+    );
+    const refundDateCase = createDateNormalization("createdate");
+    const refundYearCase = createYearExtraction("createdate");
 
     const q = `
     WITH all_orders AS (
       SELECT
         ${orderDateCase} AS order_date,
         ${orderYearCase} AS order_year,
-        COALESCE(price, 0) AS gia_ban,
+        0 AS revenue_value,
         FALSE AS is_canceled
       FROM mavryk.order_list
       WHERE TRIM(order_date::text) <> ''
@@ -879,18 +889,18 @@ app.get("/api/dashboard/charts", async(req, res) => {
       SELECT
         ${orderDateCase} AS order_date,
         ${orderYearCase} AS order_year,
-        COALESCE(price, 0) AS gia_ban,
+        0 AS revenue_value,
         FALSE AS is_canceled
       FROM mavryk.order_expired
       WHERE TRIM(order_date::text) <> ''
       UNION ALL
       SELECT
-        ${createDateNormalization("order_date")} AS order_date,
-        ${createYearExtraction("order_date")} AS order_year,
-        COALESCE(price, 0) AS gia_ban,
+        ${createDateNormalization("createdate")} AS order_date,
+        ${createYearExtraction("createdate")} AS order_year,
+        0 AS revenue_value,
         TRUE AS is_canceled
       FROM mavryk.order_canceled
-      WHERE TRIM(order_date::text) <> ''
+      WHERE TRIM(createdate::text) <> ''
     ),
     filtered_orders AS (
       SELECT *
@@ -898,16 +908,63 @@ app.get("/api/dashboard/charts", async(req, res) => {
       WHERE order_date IS NOT NULL
         AND order_year = $1
     ),
-    monthly_stats AS (
+    order_counts AS (
       SELECT
         EXTRACT(MONTH FROM order_date) AS month_num,
         TO_CHAR(order_date, '"T"FM9') AS month_label,
-        COALESCE(SUM(gia_ban), 0) AS total_sales,
         COUNT(*) AS total_orders,
         COALESCE(SUM(CASE WHEN is_canceled THEN 1 ELSE 0 END), 0) AS total_canceled
       FROM filtered_orders
       GROUP BY 1, 2
       ORDER BY 1
+    ),
+    receipts AS (
+      SELECT
+        ${receiptDateCase} AS receipt_date,
+        ${receiptYearCase} AS receipt_year,
+        COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.amount)}, 0) AS amount_value
+      FROM ${DB_SCHEMA}.payment_receipt
+      WHERE TRIM(${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text) <> ''
+    ),
+    refunds AS (
+      SELECT
+        ${refundDateCase} AS refund_date,
+        ${refundYearCase} AS refund_year,
+        COALESCE(refund, 0) AS refund_value
+      FROM ${DB_SCHEMA}.order_canceled
+      WHERE TRIM(createdate::text) <> ''
+    ),
+    revenue_events AS (
+      SELECT receipt_date AS event_date, receipt_year AS event_year, amount_value AS value
+      FROM receipts
+      UNION ALL
+      SELECT refund_date, refund_year, -1 * refund_value AS value
+      FROM refunds
+    ),
+    filtered_revenue AS (
+      SELECT *
+      FROM revenue_events
+      WHERE event_date IS NOT NULL AND event_year = $1
+    ),
+    monthly_revenue AS (
+      SELECT
+        EXTRACT(MONTH FROM event_date) AS month_num,
+        TO_CHAR(event_date, '"T"FM9') AS month_label,
+        COALESCE(SUM(value), 0) AS total_sales
+      FROM filtered_revenue
+      GROUP BY 1, 2
+      ORDER BY 1
+    ),
+    monthly_stats AS (
+      SELECT
+        COALESCE(oc.month_num, mr.month_num) AS month_num,
+        COALESCE(oc.month_label, mr.month_label) AS month_label,
+        COALESCE(mr.total_sales, 0) AS total_sales,
+        COALESCE(oc.total_orders, 0) AS total_orders,
+        COALESCE(oc.total_canceled, 0) AS total_canceled
+      FROM order_counts oc
+      FULL OUTER JOIN monthly_revenue mr
+        ON oc.month_num = mr.month_num
     )
     SELECT
       months.month_label,
@@ -1530,6 +1587,7 @@ const ARCHIVE_COLUMNS_CANCELED = [
     ORDER_COLS.refund,
     ORDER_COLS.status,
     ORDER_COLS.checkFlag,
+    "createdate",
 ];
 
 const buildArchiveInsert = (tableName, columns, row, overrides = {}) => {
@@ -1683,7 +1741,11 @@ app.get("/api/supply-insights", async(_req, res) => {
                     costCol: ORDER_COLS.cost,
                 };
                 const orderExpiredCols = orderListCols;
-                const orderCanceledCols = orderListCols;
+                const orderCanceledCols = {
+                    orderDateCol: "createdate",
+                    sourceCol: ORDER_COLS.supply,
+                    costCol: ORDER_COLS.cost,
+                };
                 const statusColumnName = await resolveSupplyStatusColumn();
                 const paymentStatusKey = createVietnameseStatusKey("ps.status");
                 const statusSelect = statusColumnName ?
@@ -3724,9 +3786,7 @@ app.delete("/api/orders/:id", async(req, res) => {
         }
 
         const todayYmd = todayYMDInVietnam();
-const cancellationRefundRaw =
-            req.body?.refund ??
-            null;
+        const cancellationRefundRaw = req.body?.refund ?? null;
         const cancellationRefund = toNullableNumber(cancellationRefundRaw);
         const normalizedRow = normalizeOrderRow(existingResult.rows[0], todayYmd);
         const remainingDays =
@@ -3747,9 +3807,14 @@ const cancellationRefundRaw =
             table: "mavryk.order_canceled",
             columns: ARCHIVE_COLUMNS_CANCELED,
             overrides: {
-                refund: cancellationRefund,
+                refund: cancellationRefund !== null ?
+                    cancellationRefund :
+                    toNullableNumber(
+                        normalizedRow?.gia_tri_con_lai ?? normalizedRow?.price ?? 0
+                    ),
                 status: "Chưa Hoàn",
                 check_flag: false,
+                createdate: new Date(),
             },
         };
 

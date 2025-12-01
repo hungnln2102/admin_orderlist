@@ -237,7 +237,7 @@ const insertPaymentReceipt = async(transaction) => {
       ${PAYMENT_RECEIPT_COLS.receiver},
       ${PAYMENT_RECEIPT_COLS.sender},
       ${PAYMENT_RECEIPT_COLS.note}
-    ) VALUES ($1, $2, $3, $4, $5)
+    ) VALUES ($1, $2, $3, $4, $5, $6)
   `;
     await pool.query(sql, [
         orderCode,

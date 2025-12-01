@@ -55,6 +55,7 @@ const menuSections: MenuSection[] = [
     items: [
       { name: "Thống Kê", href: "/stats", icon: ChartPieIcon },
       { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
+      { name: "Hóa Đơn", href: "/hoa-don", icon: DocumentIcon },
       { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
     ],
   },

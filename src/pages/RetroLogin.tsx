@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../AuthContext";
 
@@ -18,8 +18,6 @@ export default function RetroLogin() {
   );
   const { setUser } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as any)?.from || "/dashboard";
 
   return (
     <div className="retro-login">
@@ -68,7 +66,7 @@ export default function RetroLogin() {
                   }
                   const data = await response.json();
                   setUser(data.user || null);
-                  navigate(from, { replace: true });
+                  navigate("/dashboard", { replace: true });
                 })
                 .catch((err) => {
                   setError(err instanceof Error ? err.message : "Login failed");

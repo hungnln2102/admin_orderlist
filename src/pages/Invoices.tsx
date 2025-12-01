@@ -2,11 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
-  EyeIcon,
-  PrinterIcon,
-  ArrowDownTrayIcon,
   CheckCircleIcon,
-  ClockIcon,
   XCircleIcon,
   CalendarDaysIcon,
   XMarkIcon,
@@ -246,18 +242,29 @@ export default function Invoices() {
           throw new Error("Không thể tải biên nhận.");
         }
         const data = await response.json();
-        const normalizeReceiptRow = (row: any): PaymentReceipt => ({
+        const toSafeString = (value: unknown) =>
+          typeof value === "string" ? value : "";
+        const normalizeReceiptRow = (
+          row: Partial<PaymentReceipt> & Record<string, unknown>
+        ): PaymentReceipt => ({
           id: Number(row?.id) || 0,
-          orderCode:
-            row?.orderCode ?? row?.[PAYMENT_RECEIPT_COLS.orderCode] ?? "",
-          paidAt:
-            row?.paidAt ?? row?.[PAYMENT_RECEIPT_COLS.paidDate] ?? "",
+          orderCode: toSafeString(
+            row?.orderCode ?? row?.[PAYMENT_RECEIPT_COLS.orderCode]
+          ),
+          paidAt: toSafeString(
+            row?.paidAt ?? row?.[PAYMENT_RECEIPT_COLS.paidDate]
+          ),
           amount:
             Number(row?.amount ?? row?.[PAYMENT_RECEIPT_COLS.amount]) || 0,
-          sender: row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender] ?? "",
-          receiver:
-            row?.receiver ?? row?.[PAYMENT_RECEIPT_COLS.receiver] ?? "",
-          note: row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note] ?? "",
+          sender: toSafeString(
+            row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender]
+          ),
+          receiver: toSafeString(
+            row?.receiver ?? row?.[PAYMENT_RECEIPT_COLS.receiver]
+          ),
+          note: toSafeString(
+            row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note]
+          ),
         });
         const rawList = Array.isArray(data?.receipts)
           ? data.receipts
@@ -277,11 +284,6 @@ export default function Invoices() {
 
     fetchReceipts();
   }, []);
-
-  const handleViewReceipt = (receipt: PaymentReceipt) => {
-    setSelectedReceipt(receipt);
-    setViewModalOpen(true);
-  };
 
   const toggleRowDetails = (receiptId: number) => {
     setExpandedReceiptId((current) =>
