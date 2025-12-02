@@ -1692,6 +1692,14 @@ app.post("/api/orders/:orderCode/renew", async(req, res) => {
             details: result?.details,
         });
         if (result?.success) {
+            try {
+                if (typeof sepayWebhookApp.sendRenewalNotification === "function") {
+                    await sepayWebhookApp.sendRenewalNotification(orderCode, result);
+                    console.log("[Renewal] Telegram notification sent", { orderCode });
+                }
+            } catch (notifyErr) {
+                console.error("[Renewal] Telegram notification failed:", notifyErr);
+            }
             return res.json(result);
         }
         const statusCode = result?.processType === "skipped" ? 409 : 400;
