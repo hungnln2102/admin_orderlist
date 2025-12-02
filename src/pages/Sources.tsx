@@ -558,11 +558,8 @@ export default function Sources() {
                 0
               )
             );
-            const totalUnpaidImport = maybeScaleCurrency(
-              rawUnpaidImport,
-              monthlyImportValue,
-              totalPaidImport
-            );
+            // Display exactly the DB import value (no scaling).
+            const totalUnpaidImport = rawUnpaidImport;
             return {
               ...item,
               ...baseSupply,

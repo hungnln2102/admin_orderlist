@@ -13,6 +13,8 @@ import {
 export const API_ENDPOINTS = {
   ORDERS: "/api/orders",
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
+  ORDER_RENEW: (orderCode: string) =>
+    `/api/orders/${encodeURIComponent(orderCode)}/renew`,
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",

@@ -168,6 +168,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<EditableOrder | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [renewingOrderCode, setRenewingOrderCode] = useState<string | null>(null);
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
   const fetchOrders = useCallback(async () => {
@@ -578,6 +579,61 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     }
   };
 
+  const handleRenewOrder = async (order: Order) => {
+    if (!order) return;
+    const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+    if (!orderCode) {
+      alert("Không tìm thấy mã đơn để gia hạn.");
+      return;
+    }
+
+    console.log("[Renew] start", { orderCode, orderId: order.id });
+    setRenewingOrderCode(orderCode);
+    try {
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ forceRenewal: true }),
+        }
+      );
+
+      let responseBody: string | null = null;
+      try {
+        responseBody = await response.clone().text();
+      } catch {
+        responseBody = null;
+      }
+      console.log("[Renew] response", {
+        orderCode,
+        status: response.status,
+        body: responseBody,
+      });
+
+      if (!response.ok) {
+        const errorMessage = await parseErrorResponse(response);
+        throw new Error(
+          errorMessage ||
+            `Gia hạn thất bại (mã: ${response.status || "unknown"})`
+        );
+      }
+
+      await fetchOrders();
+      alert("Gia hạn thành công.");
+    } catch (error) {
+      console.error("L��-i khi gia hA�n �`��n:", error);
+      alert(
+        `Gia hạn thất bại: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setRenewingOrderCode(null);
+    }
+  };
+
   const handleConfirmRefund = async (order: Order) => {
     if (!order || !order.id) return;
     try {
@@ -727,9 +783,11 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     handleSaveEdit,
     handleConfirmRefund,
     handleMarkPaid,
+    handleRenewOrder,
     confirmDelete,
     fetchError,
     reloadOrders: fetchOrders,
+    renewingOrderCode,
   };
 };
 
@@ -779,11 +837,13 @@ export default function Orders() {
     handleSaveEdit,
     handleConfirmRefund,
     handleMarkPaid,
+    handleRenewOrder,
     confirmDelete,
     fetchError,
     reloadOrders,
     filteredOrders, // Dùng để hiển thị tổng số dòng
     totalRecords,
+    renewingOrderCode,
   } = useOrdersData(datasetKey);
 
   useEffect(() => {
@@ -1027,6 +1087,8 @@ export default function Orders() {
                   const expiryDateDisplay =
                     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
                   const isExpanded = expandedOrderId === order.id;
+                  const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+                  const isRenewing = renewingOrderCode === orderCodeText;
 
                   return (
                     <React.Fragment key={order.id}>
@@ -1200,10 +1262,16 @@ export default function Orders() {
                                     </button>
                                   )}
                                   <button
-                                    className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40"
-                                    onClick={(e) => e.stopPropagation()}
+                                    className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    disabled={isRenewing}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isRenewing) {
+                                        handleRenewOrder(order);
+                                      }
+                                    }}
                                   >
-                                    Gia Hạn
+                                    {isRenewing ? "\u0110ang Gia H\u1ea1n..." : "Gia H\u1ea1n"}
                                   </button>
                                 </div>
                               </div>

@@ -14,7 +14,7 @@ const {
     SUPPLY_COLS,
     SUPPLY_PRICE_COLS,
 } = require("../schema/tables");
-const { monthsFromString, daysFromMonths, ORDER_PREFIXES } = require("../helpers");
+const { monthsFromString, ORDER_PREFIXES } = require("../helpers");
 
 const app = express();
 
@@ -300,6 +300,29 @@ const formatDateDB = (date) => {
     return `${year}/${month}/${day}`;
 };
 
+const addDays = (date, days) => {
+    const base = date instanceof Date ? new Date(date.getTime()) : new Date();
+    base.setHours(0, 0, 0, 0);
+    base.setDate(base.getDate() + days);
+    return base;
+};
+
+const addMonthsClamped = (date, months) => {
+    const base = date instanceof Date ? new Date(date.getTime()) : new Date();
+    base.setHours(0, 0, 0, 0);
+    const originalDay = base.getDate();
+    const target = new Date(base.getTime());
+    target.setDate(1);
+    target.setMonth(target.getMonth() + months);
+    const daysInTargetMonth = new Date(
+        target.getFullYear(),
+        target.getMonth() + 1,
+        0
+    ).getDate();
+    target.setDate(Math.min(originalDay, daysInTargetMonth));
+    return target;
+};
+
 const daysUntil = (value) => {
     const dt = parseFlexibleDate(value);
     if (!dt) return Number.POSITIVE_INFINITY;
@@ -357,25 +380,47 @@ const formatCurrency = (value) => {
     }
 };
 
-const calcGiaBan = (orderId, basePrice, pctCtv, pctKhach, giaNhapFallback) => {
-    const priceValue = Number.isFinite(Number(basePrice)) ?
-        Number(basePrice) :
-        Number(giaNhapFallback) || 0;
+const calcGiaBan = ({
+    orderId,
+    giaNhap,
+    priceMax,
+    pctCtv,
+    pctKhach,
+    giaBanFallback,
+}) => {
+    const code = String(orderId || "").toUpperCase();
     const pctC = Number.isFinite(Number(pctCtv)) ? Number(pctCtv) : 1;
     const pctK = Number.isFinite(Number(pctKhach)) ? Number(pctKhach) : 1;
-    const code = String(orderId || "").toUpperCase();
-    const prefixCtv = ORDER_PREFIXES.ctv;
-    const prefixLe = ORDER_PREFIXES.le;
-    const prefixThuong = ORDER_PREFIXES.thuong;
+    const basePrice =
+        Number.isFinite(Number(priceMax)) && Number(priceMax) > 0 ?
+        Number(priceMax) :
+        Number.isFinite(Number(giaNhap)) ?
+        Number(giaNhap) :
+        0;
+    const fallback =
+        Number.isFinite(Number(giaBanFallback)) && Number(giaBanFallback) > 0 ?
+        Number(giaBanFallback) :
+        Number.isFinite(Number(giaNhap)) ?
+        Number(giaNhap) :
+        basePrice;
 
     try {
-        if (code.startsWith(prefixCtv)) return priceValue * pctC;
-        if (code.startsWith(prefixLe)) return priceValue * pctC * pctK;
-        if (code.startsWith(prefixThuong)) return priceValue;
-        return priceValue;
+        if (ORDER_PREFIXES?.ctv && code.startsWith(ORDER_PREFIXES.ctv)) {
+            return basePrice * pctC;
+        }
+        if (ORDER_PREFIXES?.le && code.startsWith(ORDER_PREFIXES.le)) {
+            return basePrice * pctC * pctK;
+        }
+        if (code.startsWith("MAVK")) {
+            return Number.isFinite(Number(giaNhap)) ? Number(giaNhap) : fallback;
+        }
+        if (ORDER_PREFIXES?.thuong && code.startsWith(ORDER_PREFIXES.thuong)) {
+            return basePrice || fallback;
+        }
+        return basePrice || fallback;
     } catch (err) {
         console.error("Error calculating gia_ban for %s: %s", orderId, err);
-        return priceValue;
+        return basePrice || fallback;
     }
 };
 
@@ -442,6 +487,16 @@ const fetchSupplyPrice = async(client, productId, sourceId) => {
   `;
     const res = await client.query(sql, [productId, sourceId]);
     return res.rows.length ? res.rows[0][SUPPLY_PRICE_COLS.price] : null;
+};
+
+const fetchMaxSupplyPrice = async(client, productId) => {
+    if (!productId) return null;
+    const res = await client.query(
+        `SELECT MAX(${SUPPLY_PRICE_COLS.price}) AS price
+       FROM ${SUPPLY_PRICE_TABLE}
+       WHERE ${SUPPLY_PRICE_COLS.productId} = $1`, [productId]
+    );
+    return res.rows.length ? res.rows[0].price : null;
 };
 
 const ensureSupplyAndPriceFromOrder = async(orderCode, options = {}) => {
@@ -684,6 +739,7 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
         const hetHan = parseFlexibleDate(order[ORDER_COLS.orderExpired]);
         const nguon = order[ORDER_COLS.supply];
         const giaNhapCu = normalizeMoney(order[ORDER_COLS.cost]);
+        const giaBanCu = normalizeMoney(order[ORDER_COLS.price]);
         const thongTin = order[ORDER_COLS.informationOrder];
         const slot = order[ORDER_COLS.slot];
 
@@ -714,7 +770,7 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
             };
         }
 
-        const soNgayGiaHan = daysFromMonths(months) || months * 30;
+        const fallbackSoNgay = months * 30;
 
         const { productId, pctCtv, pctKhach } = await fetchProductPricing(
             client,
@@ -722,27 +778,50 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
         );
         const sourceId = await findSupplyId(client, nguon);
         const giaNhapSource = await fetchSupplyPrice(client, productId, sourceId);
+        const maxPriceRow = await fetchMaxSupplyPrice(client, productId);
+        const priceMax = normalizeMoney(maxPriceRow);
         // Always take the latest supply_price for this source+product; no extra rounding
         const latestGiaNhap =
             giaNhapSource !== null && giaNhapSource !== undefined ?
             normalizeMoney(giaNhapSource) :
             giaNhapCu;
 
-        const finalGiaBanRaw = calcGiaBan(
-            orderCode,
-            latestGiaNhap,
+        const effectivePriceMax =
+            priceMax > 0 ? priceMax : giaBanCu || latestGiaNhap;
+
+        const finalGiaBanRaw = calcGiaBan({
+            orderId: orderCode,
+            giaNhap: latestGiaNhap,
+            priceMax: effectivePriceMax,
             pctCtv,
             pctKhach,
-            latestGiaNhap
-        );
+            giaBanFallback: giaBanCu,
+        });
 
         const finalGiaNhap = latestGiaNhap;
-        const finalGiaBan = roundToThousands(finalGiaBanRaw);
+        const finalGiaBan = roundToThousands(finalGiaBanRaw || effectivePriceMax);
 
-        const ngayBatDauMoi = new Date(hetHan.getTime() + 86_400_000);
-        const ngayHetHanMoi = new Date(
-            ngayBatDauMoi.getTime() + soNgayGiaHan * 86_400_000
+        const ngayHetHanCu = new Date(hetHan.getTime());
+        ngayHetHanCu.setHours(0, 0, 0, 0);
+        const ngayBatDauMoi = addDays(ngayHetHanCu, 1);
+        const ngayHetHanTheoThang = addMonthsClamped(ngayBatDauMoi, months);
+        const ngayHetHanMoi = addDays(ngayHetHanTheoThang, -1);
+        const soNgayGiaHan = Math.max(
+            1,
+            Math.round((ngayHetHanMoi.getTime() - ngayBatDauMoi.getTime()) / 86_400_000) + 1
         );
+
+        console.log("[Renewal] Calculated span", {
+            orderCode,
+            months,
+            fallbackSoNgay,
+            soNgayGiaHan,
+            start: formatDateDMY(ngayBatDauMoi),
+            expired: formatDateDMY(ngayHetHanMoi),
+            giaNhap: finalGiaNhap,
+            giaBan: finalGiaBan,
+            priceMax: effectivePriceMax,
+        });
 
         const updateSql = `
       UPDATE ${ORDER_TABLE}
@@ -767,6 +846,14 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
             false,
             orderCode,
         ]);
+
+        if (sourceId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0) {
+            try {
+                await updatePaymentSupplyBalance(sourceId, finalGiaNhap, ngayBatDauMoi);
+            } catch (balanceErr) {
+                console.error("Failed to update payment_supply for %s:", orderCode, balanceErr);
+            }
+        }
 
         const details = {
             ID_DON_HANG: orderCode,
@@ -1357,3 +1444,7 @@ if (RENEWAL_CRON_ENABLED) {
 }
 
 module.exports = app;
+module.exports.runRenewal = runRenewal;
+module.exports.queueRenewalTask = queueRenewalTask;
+module.exports.processRenewalTask = processRenewalTask;
+module.exports.fetchOrderState = fetchOrderState;

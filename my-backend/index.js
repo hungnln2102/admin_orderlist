@@ -1666,6 +1666,48 @@ app.get("/api/orders", async(req, res) => {
     }
 });
 
+app.post("/api/orders/:orderCode/renew", async(req, res) => {
+    const orderCode = String(req.params.orderCode || "").trim();
+    const forceRenewal = req.body?.forceRenewal ?? req.body?.force ?? true;
+    console.log(`[POST] /api/orders/${orderCode}/renew`, {
+        forceRenewal,
+        body: req.body,
+    });
+
+    if (!orderCode) {
+        return res.status(400).json({ error: "Missing order code." });
+    }
+    if (typeof sepayWebhookApp.runRenewal !== "function") {
+        return res.status(500).json({ error: "Renewal service unavailable." });
+    }
+
+    try {
+        const result = await sepayWebhookApp.runRenewal(orderCode, {
+            forceRenewal: forceRenewal !== false,
+        });
+        console.log("[Renewal] result", {
+            orderCode,
+            success: result?.success,
+            processType: result?.processType,
+            details: result?.details,
+        });
+        if (result?.success) {
+            return res.json(result);
+        }
+        const statusCode = result?.processType === "skipped" ? 409 : 400;
+        return res.status(statusCode).json({
+            error: result?.details || "Renewal failed",
+            result,
+        });
+    } catch (error) {
+        console.error(
+            `[POST] /api/orders/${orderCode}/renew failed:`,
+            error
+        );
+        return res.status(500).json({ error: "Unable to renew order." });
+    }
+});
+
 app.get("/api/orders/expired", async(_req, res) => {
     console.log("[GET] /api/orders/expired");
     try {
