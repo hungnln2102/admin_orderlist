@@ -389,8 +389,15 @@ const calcGiaBan = ({
     giaBanFallback,
 }) => {
     const code = String(orderId || "").toUpperCase();
-    const pctC = Number.isFinite(Number(pctCtv)) ? Number(pctCtv) : 1;
-    const pctK = Number.isFinite(Number(pctKhach)) ? Number(pctKhach) : 1;
+    const normalizePct = (val) => {
+        const num = Number(val);
+        if (!Number.isFinite(num) || num <= 0) return 1;
+        // Nếu nhập 125 nghĩa là 125% -> 1.25
+        if (num > 10) return num / 100;
+        return num;
+    };
+    const pctC = normalizePct(pctCtv);
+    const pctK = normalizePct(pctKhach);
     const basePrice =
         Number.isFinite(Number(priceMax)) && Number(priceMax) > 0 ?
         Number(priceMax) :
@@ -779,12 +786,26 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
         const sourceId = await findSupplyId(client, nguon);
         const giaNhapSource = await fetchSupplyPrice(client, productId, sourceId);
         const maxPriceRow = await fetchMaxSupplyPrice(client, productId);
-        const priceMax = normalizeMoney(maxPriceRow);
-        // Always take the latest supply_price for this source+product; no extra rounding
+
+        // Chống x100: scale dựa trên giá cũ nếu có
+        const normalizedNhap = normalizeImportValue(
+            giaNhapSource,
+            giaNhapCu || undefined
+        );
         const latestGiaNhap =
-            giaNhapSource !== null && giaNhapSource !== undefined ?
-            normalizeMoney(giaNhapSource) :
-            giaNhapCu;
+            normalizedNhap && Number.isFinite(normalizedNhap.value) ?
+            normalizedNhap.value :
+            (giaNhapSource !== null && giaNhapSource !== undefined ? normalizeMoney(giaNhapSource) : giaNhapCu);
+
+        // Chống x100 cho priceMax: so với giá nhập đã normalize / giá cũ
+        const normalizedPriceMax = normalizeImportValue(
+            maxPriceRow,
+            latestGiaNhap || giaNhapCu || undefined
+        );
+        const priceMax =
+            normalizedPriceMax && Number.isFinite(normalizedPriceMax.value) ?
+            normalizedPriceMax.value :
+            normalizeMoney(maxPriceRow);
 
         const effectivePriceMax =
             priceMax > 0 ? priceMax : giaBanCu || latestGiaNhap;
@@ -821,6 +842,18 @@ const runRenewal = async(orderCode, { forceRenewal = false } = {}) => {
             giaNhap: finalGiaNhap,
             giaBan: finalGiaBan,
             priceMax: effectivePriceMax,
+            rawGiaNhap: giaNhapSource,
+            rawPriceMax: maxPriceRow,
+            normalizedGiaNhap: normalizedNhap,
+            normalizedPriceMax,
+            pctCtv,
+            pctKhach,
+            pctCtvNormalized: Number.isFinite(Number(pctCtv)) && Number(pctCtv) > 10 ? Number(pctCtv) / 100 : Number(pctCtv) || 1,
+            pctKhachNormalized: Number.isFinite(Number(pctKhach)) && Number(pctKhach) > 10 ? Number(pctKhach) / 100 : Number(pctKhach) || 1,
+            sourceId,
+            productId,
+            status: order[ORDER_COLS.status],
+            checkFlag: order[ORDER_COLS.checkFlag],
         });
 
         const updateSql = `

@@ -587,18 +587,21 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       return;
     }
 
-    console.log("[Renew] start", { orderCode, orderId: order.id });
+    const renewUrl = `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`;
+    console.log("[Renew] start", {
+      orderCode,
+      orderId: order.id,
+      apiBase: API_BASE,
+      renewUrl,
+    });
     setRenewingOrderCode(orderCode);
     try {
-      const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ forceRenewal: true }),
-        }
-      );
+      const response = await fetch(renewUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ forceRenewal: true }),
+      });
 
       let responseBody: string | null = null;
       try {
