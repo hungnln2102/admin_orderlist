@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { XMarkIcon, PlusCircleIcon, MinusCircleIcon } from "@heroicons/react/24/outline";
-import { ORDER_FIELDS, API_ENDPOINTS } from "../constants";
+import { ORDER_FIELDS, API_ENDPOINTS, Order as ApiOrder } from "../constants";
 import * as Helpers from "../lib/helpers";
 
 const API_BASE =
@@ -15,28 +15,10 @@ const API_BASE =
   (process.env.VITE_API_BASE_URL as string) ||
   "http://localhost:3001";
 
-interface Order {
-  id: number;
-  id_order: string;
-  id_product: string;
-  information_order: string;
-  customer: string;
-  contact: string;
-  slot: string;
-  order_date: string;
-  days: string;
-  order_expired: string;
-  registration_date?: string;
-  expiry_date?: string;
-  registration_date_display?: string;
-  expiry_date_display?: string;
-  supply: string;
-  cost: number;
-  price: number;
-  note: string;
-  status: string;
-  check_flag: boolean | null;
-}
+type Order = Omit<ApiOrder, "cost" | "price"> & {
+  cost: number | string;
+  price: number | string;
+};
 
 interface Supply {
   id: number;

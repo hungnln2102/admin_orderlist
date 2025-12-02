@@ -7,10 +7,15 @@ export const convertDMYToYMD = (dmyString: string): string => {
 };
 
 export const getTodayDMY = (): string => {
-  const date = new Date();
-  return `${String(date.getDate()).padStart(2, "0")}/${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}/${date.getFullYear()}`;
+  // Always compute "today" in Vietnam time (UTC+7) to avoid off-by-one errors
+  // for users whose device timezone is behind Vietnam.
+  const now = Date.now();
+  const vnMs = now + 7 * 60 * 60 * 1000;
+  const date = new Date(vnMs);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 export const calculateExpirationDate = (

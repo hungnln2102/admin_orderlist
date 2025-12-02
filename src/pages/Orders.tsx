@@ -15,8 +15,21 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
+import {
+  API_ENDPOINTS,
+  ORDER_FIELDS,
+  VIRTUAL_FIELDS,
+  ORDER_STATUSES,
+  ORDER_DATASET_CONFIG,
+  ORDER_DATASET_SEQUENCE,
+  OrderDatasetKey,
+  Order,
+} from "../constants";
 import GradientButton from "../components/GradientButton";
-import StatCard from "../components/StatCard";
+import StatCard, {
+  STAT_CARD_ACCENTS as CARD_ACCENTS,
+  StatAccent,
+} from "../components/StatCard";
 
 // Import Modal tùy chỉnh
 import ConfirmModal from "../components/ConfirmModal";
@@ -25,67 +38,106 @@ import EditOrderModal from "../components/EditOrderModal";
 import CreateOrderModal from "../components/CreateOrderModal";
 import * as Helpers from "../lib/helpers";
 
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.VITE_API_BASE_URL) ||
-  (process.env.VITE_API_BASE_URL as string) ||
-  "http://localhost:3001";
-
-const STATUS_DISPLAY_LABELS: Record<string, string> = {
-  "h?t h?n": ORDER_STATUSES.ORDER_EXPIRED,
-  "c?n gia h?n": ORDER_STATUSES.CAN_GIA_HAN,
-  "chua thanh toan": ORDER_STATUSES.CHUA_THANH_TOAN,
-  "da thanh toan": ORDER_STATUSES.DA_THANH_TOAN,
-  "chua hoan": "Chưa Hoàn",
-  "da hoan": "Đã Hoàn",
+type ViteEnv = { VITE_API_BASE_URL?: string };
+type LooseProcessEnv = { env?: Record<string, string | undefined> };
+type EditableOrder = Omit<Order, "cost" | "price"> & {
+  cost: number | string;
+  price: number | string;
 };
 
-const BASE_STOCK_STATS = [
+const resolveApiBase = (): string => {
+  // Try Vite env (import.meta) safely via globalThis to avoid TS index issues.
+  try {
+    const viteEnv =
+      (globalThis as unknown as { import?: { meta?: { env?: ViteEnv } } }).import
+        ?.meta?.env;
+    if (viteEnv?.VITE_API_BASE_URL) {
+      return viteEnv.VITE_API_BASE_URL;
+    }
+  } catch {
+    // ignore
+  }
+
+  // Fallback: process.env if available (SSR/Node)
+  const nodeProcess =
+    typeof globalThis !== "undefined" && "process" in globalThis
+      ? (globalThis as unknown as { process?: LooseProcessEnv }).process
+      : undefined;
+  if (nodeProcess) {
+    const fromProcess = (nodeProcess as LooseProcessEnv).env?.VITE_API_BASE_URL;
+    if (fromProcess) return fromProcess;
+  }
+
+  return "http://localhost:3001";
+};
+
+const API_BASE = resolveApiBase();
+
+const STATUS_DISPLAY_LABELS: Record<string, string> = {
+  "hết hạn": ORDER_STATUSES.ORDER_EXPIRED,
+  "cần gia hạn": ORDER_STATUSES.CAN_GIA_HAN,
+  "chưa thanh toán": ORDER_STATUSES.CHUA_THANH_TOAN,
+  "đã thanh toán": ORDER_STATUSES.DA_THANH_TOAN,
+  "chưa hoàn": "Chưa Hoàn",
+  "đã hoàn": "Đã Hoàn",
+};
+
+type BaseStat = {
+  name: string;
+  value: string;
+  icon: React.ElementType;
+  accent: StatAccent;
+};
+
+const BASE_STOCK_STATS: BaseStat[] = [
   {
     name: "Tổng Đơn Hàng",
     value: "0",
     icon: CheckCircleIcon,
-    accent: STAT_CARD_ACCENTS.sky,
+    accent: CARD_ACCENTS.sky,
   },
   {
     name: "Cần Gia Hạn",
     value: "0",
     icon: ExclamationTriangleIcon,
-    accent: STAT_CARD_ACCENTS.amber,
+    accent: CARD_ACCENTS.amber,
   },
   {
     name: "Hết Hạn",
     value: "0",
     icon: ArrowDownIcon,
-    accent: STAT_CARD_ACCENTS.rose,
+    accent: CARD_ACCENTS.rose,
   },
   {
     name: "Đăng Ký Hôm Nay",
     value: "0",
     icon: ArrowUpIcon,
-    accent: STAT_CARD_ACCENTS.emerald,
+    accent: CARD_ACCENTS.emerald,
   },
 ] as const;
-
-// =======================================================
-// 1. INTERFACES VÀ CONSTANTS
-// =======================================================
-
-import {
-  API_ENDPOINTS,
-  ORDER_FIELDS,
-  VIRTUAL_FIELDS,
-  ORDER_STATUSES,
-  STAT_CARD_ACCENTS,
-  ORDER_DATASET_CONFIG,
-  ORDER_DATASET_SEQUENCE,
-  OrderDatasetKey,
-  Order,
-} from "../constants";
 
 const formatCurrency = (value: number | string) => {
   const roundedNum = Helpers.roundGiaBanValue(value);
   return roundedNum.toLocaleString("vi-VN") + " VND";
+};
+
+const parseErrorResponse = async (response: Response): Promise<string | null> => {
+  try {
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      const data = JSON.parse(text);
+      if (data && typeof data === "object" && "error" in data) {
+        return (data as { error?: string }).error || null;
+      }
+      if (typeof data === "string") return data;
+    } catch {
+      // ignore JSON parse error; fall back to raw text
+    }
+    return text;
+  } catch {
+    return null;
+  }
 };
 
 const SEARCH_FIELD_OPTIONS = [
@@ -103,7 +155,6 @@ const SEARCH_FIELD_OPTIONS = [
 
 const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchField, setSearchField] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -115,13 +166,12 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [orderToView, setOrderToView] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
-  const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
+  const [orderToEdit, setOrderToEdit] = useState<EditableOrder | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
   const fetchOrders = useCallback(async () => {
     try {
-      setLoading(true);
       setFetchError(null);
       const endpoint = ORDER_DATASET_CONFIG[dataset].endpoint;
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -150,7 +200,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
           : "Có lỗi không xác định khi tải đơn hàng.";
       setFetchError(friendlyMessage);
     } finally {
-      setLoading(false);
+      // no-op
     }
   }, [dataset]);
 
@@ -173,15 +223,35 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   }, [dataset]);
   const calculatedData = useMemo(() => {
     const resolveDateDisplay = (
-      displayValue: unknown,
-      fallbackValue: unknown
+      displayValue: string | number | Date | null | undefined,
+      fallbackValue: string | number | Date | null | undefined
     ): string => {
       const value =
         displayValue !== undefined && displayValue !== null
           ? displayValue
           : fallbackValue;
       if (value === null || value === undefined) return "";
-      return Helpers.formatDateToDMY(value as any) || String(value);
+      return Helpers.formatDateToDMY(value) || String(value);
+    };
+
+    const sanitizeDateLike = (
+      value: unknown
+    ): string | number | Date | null | undefined => {
+      if (value === null || value === undefined) return value;
+      if (typeof value === "boolean") return undefined;
+      if (typeof value === "string" || typeof value === "number" || value instanceof Date) {
+        return value as string | number | Date;
+      }
+      return undefined;
+    };
+
+    const sanitizeNumberLike = (
+      value: unknown
+    ): number | string | null | undefined => {
+      if (value === null || value === undefined) return value;
+      if (typeof value === "boolean") return null;
+      if (typeof value === "number" || typeof value === "string") return value;
+      return null;
     };
 
     const parseNumeric = (value: unknown): number | null => {
@@ -230,22 +300,24 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     };
 
     const ordersWithVirtualFields: Order[] = orders.map((order) => {
-      const registrationSource =
-        order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE];
-      const expirySource =
-        order.expiry_date ?? order[ORDER_FIELDS.ORDER_EXPIRED];
+      const registrationSource = sanitizeDateLike(
+        order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE]
+      );
+      const expirySource = sanitizeDateLike(
+        order.expiry_date ?? order[ORDER_FIELDS.ORDER_EXPIRED]
+      );
 
       const formattedOrderDate = resolveDateDisplay(
-        order.registration_date_display,
+        sanitizeDateLike(order.registration_date_display),
         registrationSource
       );
       const formattedExpiryDate = resolveDateDisplay(
-        order.expiry_date_display,
+        sanitizeDateLike(order.expiry_date_display),
         expirySource
       );
 
       const backendRemaining = parseNumeric(
-        (order as any).so_ngay_con_lai ?? order.so_ngay_con_lai
+        sanitizeNumberLike(order.so_ngay_con_lai)
       );
       const fallbackRemaining = Helpers.daysUntilDate(
         expirySource || formattedExpiryDate
@@ -262,12 +334,14 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         order[ORDER_FIELDS.CHECK_FLAG]
       );
 
-      const giaBan = Helpers.roundGiaBanValue(order[ORDER_FIELDS.PRICE]);
+      const giaBan = Helpers.roundGiaBanValue(
+        Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
+      );
       const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
       const daysForValue = Math.max(0, effectiveRemaining);
       const giaTriConLai =
         soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
-      const canHoanValue = parseNumeric((order as any).can_hoan);
+      const canHoanValue = parseNumeric(order.can_hoan);
 
       return {
         ...order,
@@ -312,8 +386,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
 
     // --- LOGIC SẮP XẾP ---
     filteredOrders.sort((a, b) => {
-      const statusA = a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
-      const statusB = b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
+      const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
+      const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
       const priorityA = Helpers.getStatusPriority(statusA);
       const priorityB = Helpers.getStatusPriority(statusB);
 
@@ -321,8 +395,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         return priorityA - priorityB;
       }
 
-      const remainingA = a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
-      const remainingB = b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI];
+      const remainingA = Number(a[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
+      const remainingB = Number(b[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
 
       if (remainingA !== remainingB) {
         return remainingA - remainingB;
@@ -338,21 +412,22 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
 
     // Tính toán Stats
     const totalOrders = ordersWithVirtualFields.length;
-    const needsRenewal = ordersWithVirtualFields.filter(
-      (order) =>
-        order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] > 0 &&
-        order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 4
-    ).length;
-    const expiredOrders = ordersWithVirtualFields.filter(
-      (order) => order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] <= 0
-    ).length;
+    const needsRenewal = ordersWithVirtualFields.filter((order) => {
+      const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
+      return Number.isFinite(remaining) && remaining > 0 && remaining <= 4;
+    }).length;
+    const expiredOrders = ordersWithVirtualFields.filter((order) => {
+      const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
+      return Number.isFinite(remaining) && remaining <= 0;
+    }).length;
 
     const registeredTodayCount = ordersWithVirtualFields.filter((order) => {
-      const registrationSource =
+      const registrationSource = sanitizeDateLike(
         order.registration_date ||
-        (order as any).registration_date_display ||
-        order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
-        order[ORDER_FIELDS.ORDER_DATE];
+          order.registration_date_display ||
+          order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+          order[ORDER_FIELDS.ORDER_DATE]
+      );
       return Helpers.isRegisteredToday(registrationSource);
     }).length;
 
@@ -404,14 +479,21 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     setIsViewModalOpen(true);
   };
   const handleEditOrder = (order: Order) => {
-    setOrderToEdit(order);
+    const converted: EditableOrder = {
+      ...order,
+      cost: Number(order[ORDER_FIELDS.COST] ?? 0) || 0,
+      price: Number(order[ORDER_FIELDS.PRICE] ?? 0) || 0,
+    };
+    setOrderToEdit(converted);
     setIsEditModalOpen(true);
   };
   const handleDeleteOrder = (order: Order) => {
     setOrderToDelete(order);
     setIsModalOpen(true);
   };
-  const handleSaveNewOrder = async (newOrderData: Partial<Order>) => {
+  type CreateOrderPayload = Partial<EditableOrder> | EditableOrder;
+
+  const handleSaveNewOrder = async (newOrderData: CreateOrderPayload) => {
     closeCreateModal();
 
     try {
@@ -435,6 +517,61 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       console.error("Lỗi khi tạo đơn hàng:", error);
       alert(
         `Lỗi khi tạo đơn hàng: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  };
+
+  const handleMarkPaid = async (order: Order) => {
+    if (!order || !order.id) return;
+    const statusRaw = String(order[ORDER_FIELDS.STATUS] || "");
+    const statusNorm = statusRaw
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    const checkFlag = order[ORDER_FIELDS.CHECK_FLAG];
+
+    let payload: Partial<Order> | null = null;
+    if (statusNorm === "chua thanh toan" && (checkFlag === null || checkFlag === undefined)) {
+      payload = {
+        [ORDER_FIELDS.CHECK_FLAG]: false,
+      };
+    } else if (statusNorm === "chua thanh toan" && checkFlag === false) {
+      payload = {
+        [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
+        [ORDER_FIELDS.CHECK_FLAG]: true,
+      };
+    } else {
+      payload = {
+        [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
+        [ORDER_FIELDS.CHECK_FLAG]: true,
+      };
+    }
+
+    if (!payload) return;
+    try {
+      const response = await fetch(
+        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(order.id)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!response.ok) {
+        const errorMessage = await parseErrorResponse(response);
+        throw new Error(
+          errorMessage || "Lỗi khi cập nhật trạng thái từ máy chủ"
+        );
+      }
+      await fetchOrders();
+    } catch (error) {
+      console.error("Lỗi khi đánh dấu đã thanh toán:", error);
+      alert(
+        `Không thể đánh dấu đã thanh toán: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
@@ -469,7 +606,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     }
   };
 
-  const handleSaveEdit = async (updatedOrder: Order) => {
+  const handleSaveEdit = async (updatedOrder: EditableOrder) => {
     closeEditModal();
 
     // Ngày đăng ký / hết hạn là trường khóa, không gửi lên để giữ nguyên giá trị
@@ -481,8 +618,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       [ORDER_FIELDS.CONTACT]: updatedOrder.contact,
       [ORDER_FIELDS.SLOT]: updatedOrder.slot,
       [ORDER_FIELDS.SUPPLY]: updatedOrder.supply,
-      [ORDER_FIELDS.COST]: updatedOrder.cost,
-      [ORDER_FIELDS.PRICE]: updatedOrder.price,
+      [ORDER_FIELDS.COST]: Number(updatedOrder.cost ?? 0) || 0,
+      [ORDER_FIELDS.PRICE]: Number(updatedOrder.price ?? 0) || 0,
       [ORDER_FIELDS.NOTE]: updatedOrder.note,
       [ORDER_FIELDS.STATUS]: updatedOrder.status,
       [ORDER_FIELDS.CHECK_FLAG]: updatedOrder.check_flag,
@@ -490,7 +627,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
 
     try {
       const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(updatedOrder.id)}`,
+        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(Number(updatedOrder.id))}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -589,6 +726,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     handleSaveNewOrder,
     handleSaveEdit,
     handleConfirmRefund,
+    handleMarkPaid,
     confirmDelete,
     fetchError,
     reloadOrders: fetchOrders,
@@ -640,6 +778,7 @@ export default function Orders() {
     handleSaveNewOrder,
     handleSaveEdit,
     handleConfirmRefund,
+    handleMarkPaid,
     confirmDelete,
     fetchError,
     reloadOrders,
@@ -707,17 +846,18 @@ export default function Orders() {
       <div className="rounded-[28px] bg-gradient-to-r from-indigo-200/60 via-indigo-300/55 to-slate-200/45 p-4 shadow-[0_20px_50px_-28px_rgba(0,0,0,0.5),0_14px_32px_-24px_rgba(255,255,255,0.25)] border border-white/20">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {ORDER_DATASET_SEQUENCE.map((key) => {
-            const config = ORDER_DATASET_CONFIG[key];
+            const datasetKeyValue = key as OrderDatasetKey;
+            const config = ORDER_DATASET_CONFIG[datasetKeyValue];
 
-            const isActive = datasetKey === key;
+            const isActive = datasetKey === datasetKeyValue;
 
-            const count = datasetCounts[key] ?? 0;
+            const count = datasetCounts[datasetKeyValue] ?? 0;
 
             return (
               <button
                 key={key}
                 type="button"
-                onClick={() => setDatasetKey(key)}
+                onClick={() => setDatasetKey(datasetKeyValue)}
                 className={`flex items-center justify-between rounded-2xl px-5 py-4 text-left transition shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65),0_8px_22px_-18px_rgba(255,255,255,0.12)] ${
                   isActive
                     ? "bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500 text-white ring-1 ring-white/25"
@@ -747,15 +887,15 @@ export default function Orders() {
 
       <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {updatedStats.map((stat) => (
-            <StatCard
-              key={stat.name}
-              title={stat.name}
-              value={stat.value}
-              icon={stat.icon}
-              accent={stat.accent}
-            />
-          ))}
+      {updatedStats.map((stat) => (
+        <StatCard
+          key={stat.name}
+          title={stat.name}
+          value={stat.value}
+          icon={stat.icon}
+          accent={stat.accent}
+        />
+      ))}
         </div>
       </div>
 
@@ -864,7 +1004,16 @@ export default function Orders() {
                     [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
                     [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
                   } = order;
-                  const normalizedStatus = (trangThaiText || "")
+                  const costValue = Number.isFinite(Number(order[ORDER_FIELDS.COST]))
+                    ? Number(order[ORDER_FIELDS.COST])
+                    : 0;
+                  const priceValue = Number.isFinite(Number(order[ORDER_FIELDS.PRICE]))
+                    ? Number(order[ORDER_FIELDS.PRICE])
+                    : 0;
+                  const giaTriConLaiSafe = Number.isFinite(Number(giaTriConLai))
+                    ? Number(giaTriConLai)
+                    : 0;
+                  const normalizedStatus = String(trangThaiText || "")
                     .normalize("NFD")
                     .replace(/[\u0300-\u036f]/g, "")
                     .toLowerCase()
@@ -925,7 +1074,7 @@ export default function Orders() {
                             </span>
                             <span
                               className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
-                              title={order[ORDER_FIELDS.CONTACT] || ""}
+                              title={String(order[ORDER_FIELDS.CONTACT] || "")}
                             >
                               {order[ORDER_FIELDS.CONTACT] || ""}
                             </span>
@@ -938,37 +1087,42 @@ export default function Orders() {
                             ? `${orderDateDisplay} - ${expiryDateDisplay}`
                             : orderDateDisplay || expiryDateDisplay || ""}
                         </td>
-                        {showRemainingColumn && (
-                          <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
-                            <span
-                              className={
-                                isCanceled
-                                  ? "text-indigo-600"
-                                  : soNgayConLai <= 0
-                                  ? "text-red-600"
-                                  : soNgayConLai <= 4
-                                  ? "text-orange-500"
-                                  : "text-green-500"
-                              }
-                            >
-                              {isCanceled
-                                ? Helpers.formatCurrency(
-                                    order.can_hoan ?? 0,
-                                    false
-                                  )
-                                : soNgayConLai}
-                            </span>
-                          </td>
-                        )}
+                {showRemainingColumn && (
+                  <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
+                    {/* Coerce soNgayConLai to a finite number before comparing/formatting. */}
+                    {(() => {
+                      const remaining = Number.isFinite(Number(soNgayConLai))
+                        ? Number(soNgayConLai)
+                        : 0;
+                      return (
+                        <span
+                          className={
+                            isCanceled
+                              ? "text-indigo-600"
+                              : remaining <= 0
+                              ? "text-red-600"
+                          : remaining <= 4
+                          ? "text-orange-500"
+                          : "text-green-500"
+                        }
+                      >
+                        {isCanceled
+                            ? Helpers.formatCurrency(order.can_hoan ?? 0)
+                            : remaining}
+                      </span>
+                    );
+                  })()}
+                  </td>
+                )}
 
                         {/* STATUS (text-center) */}
                         <td className="px-4 py-4 whitespace-nowrap truncate w-[90px] text-center">
                           <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
-                              trangThaiText
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
+                              String(trangThaiText || "")
                             )}`}
                           >
-                            {trangThaiText}
+                            {String(trangThaiText || "")}
                           </span>
                         </td>
                         {/* ACTION (text-right) */}
@@ -1033,12 +1187,25 @@ export default function Orders() {
                                     #{order[ORDER_FIELDS.ID_ORDER] || ""}
                                   </p>
                                 </div>
-                                <button
-                                  className="ml-4 rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Gia hạn
-                                </button>
+                                <div className="ml-4 flex items-center gap-2">
+                                  {!(order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN && order[ORDER_FIELDS.CHECK_FLAG] === true) && (
+                                    <button
+                                      className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMarkPaid(order);
+                                      }}
+                                    >
+                                      Đã Thanh Toán
+                                    </button>
+                                  )}
+                                  <button
+                                    className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Gia Hạn
+                                  </button>
+                                </div>
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
@@ -1054,9 +1221,7 @@ export default function Orders() {
                                     Giá nhập
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
-                                    {Helpers.formatCurrency(
-                                      order[ORDER_FIELDS.COST]
-                                    )}
+                                    {Helpers.formatCurrency(costValue)}
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
@@ -1064,9 +1229,7 @@ export default function Orders() {
                                     Giá bán
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
-                                    {Helpers.formatCurrency(
-                                      order[ORDER_FIELDS.PRICE]
-                                    )}
+                                    {Helpers.formatCurrency(priceValue)}
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
@@ -1074,7 +1237,7 @@ export default function Orders() {
                                     Giá trị còn lại
                                   </p>
                                   <p className="mt-1 text-sm font-semibold text-white">
-                                    {Helpers.formatCurrency(giaTriConLai)}
+                                    {Helpers.formatCurrency(giaTriConLaiSafe)}
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
@@ -1105,7 +1268,7 @@ export default function Orders() {
                                       <input
                                         type="checkbox"
                                         className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                        checked={check_flag_status}
+                                        checked={Boolean(check_flag_status)}
                                         readOnly
                                         onClick={(e) => e.stopPropagation()}
                                       />
@@ -1188,12 +1351,14 @@ export default function Orders() {
         isOpen={isEditModalOpen}
         onClose={closeEditModal}
         order={orderToEdit}
-        onSave={handleSaveEdit}
+        onSave={(data) => handleSaveEdit(data as EditableOrder)}
       />
       <CreateOrderModal
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
-        onSave={handleSaveNewOrder}
+        onSave={(data) => {
+          void handleSaveNewOrder(data);
+        }}
       />
     </div>
   );

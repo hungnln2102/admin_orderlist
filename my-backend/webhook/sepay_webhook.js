@@ -315,6 +315,30 @@ const normalizeMoney = (value) => {
     return Number.isFinite(numeric) ? numeric : 0;
 };
 
+// Normalize import values that are likely inflated (e.g., accidentally x100).
+// Accepts multiple reference values and scales down when ratio is abnormally large.
+const normalizeImportValue = (value, ...referenceValues) => {
+    const numeric = normalizeMoney(value);
+    const references = referenceValues
+        .map((ref) => normalizeMoney(ref))
+        .filter((ref) => Number.isFinite(ref) && ref > 0);
+
+    for (const reference of references) {
+        const ratio = numeric / reference;
+        const shouldScaleDown =
+            ratio >= 40 && ratio <= 150 && numeric % 100 === 0;
+        if (shouldScaleDown) {
+            return {
+                value: Math.round(numeric / 100),
+                scaled: true,
+                reference,
+            };
+        }
+    }
+
+    return { value: numeric, scaled: false, reference: null };
+};
+
 const roundToThousands = (value) => {
     const numeric = Number.parseInt(value, 10);
     if (!Number.isFinite(numeric) || numeric === 0) return 0;
@@ -420,8 +444,9 @@ const fetchSupplyPrice = async(client, productId, sourceId) => {
     return res.rows.length ? res.rows[0][SUPPLY_PRICE_COLS.price] : null;
 };
 
-const ensureSupplyAndPriceFromOrder = async(orderCode) => {
+const ensureSupplyAndPriceFromOrder = async(orderCode, options = {}) => {
     if (!orderCode) return null;
+    const referenceImport = normalizeMoney(options.referenceImport);
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -487,7 +512,9 @@ const ensureSupplyAndPriceFromOrder = async(orderCode) => {
             }
         }
 
-        let supplyPriceValue = costValue;
+        let supplyPriceValue = costValue || referenceImport || 0;
+        let supplyPriceScaled = false;
+        let rawSupplyPrice = null;
         if (productId && sourceId) {
             const priceRes = await client.query(
                 `SELECT ${SUPPLY_PRICE_COLS.price} AS price
@@ -499,13 +526,38 @@ const ensureSupplyAndPriceFromOrder = async(orderCode) => {
             );
 
             if (priceRes.rows.length) {
-                supplyPriceValue = normalizeMoney(priceRes.rows[0].price);
+                rawSupplyPrice = normalizeMoney(priceRes.rows[0].price);
+                const normalized = normalizeImportValue(
+                    rawSupplyPrice,
+                    costValue,
+                    referenceImport
+                );
+                supplyPriceValue = normalized.value;
+                supplyPriceScaled = normalized.scaled;
+                if (supplyPriceScaled && rawSupplyPrice !== supplyPriceValue) {
+                    try {
+                        await client.query(
+                            `UPDATE ${SUPPLY_PRICE_TABLE}
+               SET ${SUPPLY_PRICE_COLS.price} = $1
+             WHERE ${SUPPLY_PRICE_COLS.productId} = $2
+               AND ${SUPPLY_PRICE_COLS.sourceId} = $3`, [supplyPriceValue, productId, sourceId]
+                        );
+                    } catch (adjustErr) {
+                        console.error(
+                            "Failed to normalize supply_price for productId=%s, sourceId=%s:",
+                            productId,
+                            sourceId,
+                            adjustErr
+                        );
+                    }
+                }
             } else {
                 try {
+                    const insertPrice = supplyPriceValue || referenceImport || costValue;
                     await client.query(
                         `INSERT INTO ${SUPPLY_PRICE_TABLE} (${SUPPLY_PRICE_COLS.productId}, ${SUPPLY_PRICE_COLS.sourceId}, ${SUPPLY_PRICE_COLS.price})
              VALUES ($1, $2, $3)
-             ON CONFLICT ON CONSTRAINT supply_price_pkey DO NOTHING`, [productId, sourceId, costValue]
+             ON CONFLICT ON CONSTRAINT supply_price_pkey DO NOTHING`, [productId, sourceId, insertPrice]
                     );
                 } catch (insertErr) {
                     console.error(
@@ -515,12 +567,17 @@ const ensureSupplyAndPriceFromOrder = async(orderCode) => {
                         insertErr
                     );
                 }
-                supplyPriceValue = costValue;
+                supplyPriceValue = supplyPriceValue || referenceImport || costValue;
             }
         }
 
         await client.query("COMMIT");
-        return { productId, sourceId, price: supplyPriceValue };
+        return {
+            productId,
+            sourceId,
+            price: supplyPriceValue,
+            priceScaled: supplyPriceScaled,
+        };
     } catch (err) {
         await client.query("ROLLBACK");
         throw err;
@@ -1216,6 +1273,9 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
 
   const orderCode = deriveOrderCode(transaction);
   console.log("Derived order code:", orderCode);
+  const transferAmountNormalized = normalizeAmount(
+    transaction.transfer_amount || transaction.amount_in
+  );
 
   try {
     await insertPaymentReceipt(transaction);
@@ -1224,7 +1284,9 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
     } catch (notifyErr) {
       console.error("Payment notification failed:", notifyErr);
     }
-    const ensured = await ensureSupplyAndPriceFromOrder(orderCode);
+    const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
+      referenceImport: transferAmountNormalized,
+    });
     console.log("Ensure supply/price result:", safeStringify(ensured));
     if (ensured?.sourceId && Number.isFinite(ensured.price)) {
       await updatePaymentSupplyBalance(ensured.sourceId, ensured.price, new Date());

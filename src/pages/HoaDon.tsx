@@ -56,6 +56,9 @@ const DEFAULT_ITEMS: InvoiceItem[] = [
   { name: "Office 365 Bản Quyền - 12 tháng", unitPrice: 0, quantity: 1 },
 ];
 
+const INVOICE_FONT_STACK =
+  "'Myriad Pro','Myriad','Segoe UI','Helvetica Neue',Arial,sans-serif";
+
 const formatCurrency = (value: number): string =>
   `${value.toLocaleString("vi-VN")} đ`;
 
@@ -67,6 +70,10 @@ export default function HoaDon() {
   const chipInputClass =
     "w-full rounded-lg border border-white/20 bg-white/5 text-white px-2 py-1.5 text-sm focus-within:ring-2 focus-within:ring-blue-400/60 focus-within:border-blue-400/60 flex items-center gap-2 flex-wrap relative overflow-x-auto";
   const printStyles = `
+    #invoice-preview,
+    #invoice-preview * {
+      font-family: ${INVOICE_FONT_STACK};
+    }
     @media print {
       @page { size: A4; margin: 0; }
       html, body { margin: 0; padding: 0; background: white !important; }
@@ -119,6 +126,10 @@ export default function HoaDon() {
       #invoice-preview table th,
       #invoice-preview table td {
         color: #111 !important;
+      }
+      #invoice-preview,
+      #invoice-preview * {
+        font-family: ${INVOICE_FONT_STACK} !important;
       }
     }
   `;
@@ -309,7 +320,8 @@ export default function HoaDon() {
           <div id="invoice-print-area">
             <div
               id="invoice-preview"
-              className="mx-auto max-w-5xl border border-slate-300 bg-white shadow-sm px-10 py-10 font-serif text-white"
+              className="mx-auto max-w-5xl border border-slate-300 bg-white shadow-sm px-10 py-10 text-white"
+              style={{ fontFamily: INVOICE_FONT_STACK }}
             >
               <div className="text-center leading-7">
                 <h1 className="text-2xl font-bold uppercase tracking-wide">
@@ -356,7 +368,7 @@ export default function HoaDon() {
 
               <div className="mt-8 px-2">
                 <div className="overflow-hidden border border-slate-700 rounded-sm">
-                  <table className="w-full border-collapse text-sm text-white font-serif leading-6">
+                  <table className="w-full border-collapse text-sm text-white leading-6">
                     <thead>
                       <tr className="bg-transparent text-white font-semibold">
                         <th className="border border-slate-700 px-3 py-2 text-left text-white">

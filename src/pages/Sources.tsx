@@ -73,8 +73,8 @@ const DEFAULT_STATS: SupplyStats = {
   totalImportValue: 0,
 };
 
-const GLASS_FIELD_CLASS =
-  "w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 placeholder:text-gray-400";
+// const GLASS_FIELD_CLASS =
+//   "w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-2 text-sm text-gray-700 shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 placeholder:text-gray-400";
 const formatCurrencyShort = Helpers.formatCurrencyShort;
 const formatCurrencyVnd = Helpers.formatCurrency;
 
@@ -119,6 +119,32 @@ const getFieldValue = <T,>(
     }
   }
   return fallback;
+};
+
+const parseMoneyValue = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value !== "string") return 0;
+  const cleaned = value.replace(/[^\d-]/g, "");
+  if (!cleaned) return 0;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const maybeScaleCurrency = (
+  value: number,
+  referenceA: number,
+  referenceB: number
+): number => {
+  const reference = Math.max(referenceA, referenceB, 0);
+  if (reference <= 0) return value;
+  const ratio = value / reference;
+  if (value > reference && ratio >= 40 && ratio <= 150 && value % 100 === 0) {
+    const scaled = Math.round(value / 100);
+    if (scaled > 0 && scaled < value) return scaled;
+  }
+  return value;
 };
 
 const DEFAULT_DELETE_ERROR =
@@ -392,7 +418,7 @@ const normalizeSupplyFromRow = (
 };
 
 const normalizeSupplyOverviewResponse = (
-  payload: any
+  payload: unknown
 ): SupplyOverviewResponse => {
   const recordPayload = isRecord(payload) ? payload : {};
   const supplySection = isRecord(recordPayload.supply)
@@ -511,6 +537,32 @@ export default function Sources() {
       )
         ? data.supplies.map((item) => {
             const baseSupply = normalizeSupplyFromRow(item);
+            const monthlyImportValue = parseMoneyValue(
+              getFieldValue(
+                item,
+                ["monthlyImportValue", "monthly_import_value"],
+                0
+              )
+            );
+            const totalPaidImport = parseMoneyValue(
+              getFieldValue(
+                item,
+                ["totalPaidImport", "total_paid_import"],
+                0
+              )
+            );
+            const rawUnpaidImport = parseMoneyValue(
+              getFieldValue(
+                item,
+                ["totalUnpaidImport", "total_unpaid_import"],
+                0
+              )
+            );
+            const totalUnpaidImport = maybeScaleCurrency(
+              rawUnpaidImport,
+              monthlyImportValue,
+              totalPaidImport
+            );
             return {
               ...item,
               ...baseSupply,
@@ -520,34 +572,13 @@ export default function Sources() {
                 Number(
                   getFieldValue(item, ["monthlyOrders", "monthly_orders"], 0)
                 ) || 0,
-              monthlyImportValue:
-                Number(
-                  getFieldValue(
-                    item,
-                    ["monthlyImportValue", "monthly_import_value"],
-                    0
-                  )
-                ) || 0,
+              monthlyImportValue,
               totalOrders:
                 Number(
                   getFieldValue(item, ["totalOrders", "total_orders"], 0)
                 ) || 0,
-              totalPaidImport:
-                Number(
-                  getFieldValue(
-                    item,
-                    ["totalPaidImport", "total_paid_import"],
-                    0
-                  )
-                ) || 0,
-              totalUnpaidImport:
-                Number(
-                  getFieldValue(
-                    item,
-                    ["totalUnpaidImport", "total_unpaid_import"],
-                    0
-                  )
-                ) || 0,
+              totalPaidImport,
+              totalUnpaidImport,
             } as SupplySummaryItem;
           })
         : [];
@@ -632,12 +663,13 @@ export default function Sources() {
         `/api/supplies/${supplyId}/payments?${params.toString()}`
       );
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
+        const errorData = (await response.json().catch(() => null)) as { error?: string } | null;
         const message =
-          (errorData as any)?.error || "Không thể tải lịch sử thanh toán.";
+          errorData?.error || "Khong the tai lich su thanh toan.";
         throw new Error(message);
       }
-      return response.json();
+      const data = (await response.json()) as PaymentHistoryResponse;
+      return data;
     },
     []
   );
