@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import { ArrowDownTrayIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { API_ENDPOINTS } from "../constants";
+import { ORDER_COLS, PRODUCT_PRICE_COLS } from "../lib/tableSql";
 
 type InvoiceForm = {
   invoiceCode: string;
@@ -11,23 +13,74 @@ type InvoiceForm = {
   taxCode: string;
 };
 
-type InvoiceItem = {
-  name: string;
-  unitPrice: number;
-  quantity: number;
-};
-
 type InvoiceEntry = {
   id: string;
   code: string;
 };
 
+type OrderRow = Record<string, any>;
+type ProductPriceRow = Record<string, any>;
+
+type InvoiceLine = {
+  id: string;
+  code: string;
+  description: string;
+  unitPrice: number;
+  quantity: number;
+  discountPct: number;
+  total: number;
+};
+
+let invoiceEntrySeq = 0;
 const buildInvoiceEntry = (code: string): InvoiceEntry => {
-  const makeId =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? () => crypto.randomUUID()
-      : () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return { id: makeId(), code };
+  invoiceEntrySeq += 1;
+  const uniqueId = `inv-${Date.now().toString(36)}-${invoiceEntrySeq.toString(
+    36
+  )}`;
+  return { id: uniqueId, code };
+};
+
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (process.env.VITE_API_BASE_URL as string) ||
+  "http://localhost:3001";
+
+const normalizeKey = (value?: string | null) =>
+  (value || "").trim().toLowerCase();
+
+const extractMonths = (value?: string | null): number | null => {
+  if (!value) return null;
+  const match = value.match(/--\s*(\d+)\s*m/i);
+  if (match && match[1]) {
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const resolveOrderType = (
+  orderCode?: string | null
+): "MAVC" | "MAVL" | "MAVK" | "MAVT" | null => {
+  const upper = (orderCode || "").trim().toUpperCase();
+  if (upper.startsWith("MAVC")) return "MAVC";
+  if (upper.startsWith("MAVL")) return "MAVL";
+  if (upper.startsWith("MAVK")) return "MAVK";
+  if (upper.startsWith("MAVT")) return "MAVT";
+  return null;
+};
+
+const toPositiveNumber = (value: unknown): number => {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+};
+
+const normalizeDiscountRatio = (value: unknown): number => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+  // Accept both ratio (0-1) and percent (e.g., 20 => 20%)
+  const ratio = num > 1 ? num / 100 : num;
+  return Math.min(Math.max(ratio, 0), 1);
 };
 
 const COMPANY_INFO = {
@@ -42,19 +95,12 @@ const COMPANY_INFO = {
 const DEFAULT_FORM: InvoiceForm = {
   invoiceCode: "",
   invoiceDate: new Date().toISOString().slice(0, 10),
-  customerName: "CÔNG TY TNHH TMDV THANH SƠN HÓA NÔNG",
-  address:
-    "829 Trần Xuân Soạn, Phường Tân Hưng, Thành Phố Hồ Chí Minh, Việt Nam",
-  phone: "028 3771 9999",
-  fax: "028 3775 3266",
-  taxCode: "0301760011",
+  customerName: "",
+  address: "",
+  phone: "",
+  fax: "",
+  taxCode: "",
 };
-
-const DEFAULT_ITEMS: InvoiceItem[] = [
-  { name: "Adobe Bản Quyền 1PC - 12 tháng", unitPrice: 4_860_000, quantity: 1 },
-  { name: "Canva Pro - 12 tháng", unitPrice: 0, quantity: 1 },
-  { name: "Office 365 Bản Quyền - 12 tháng", unitPrice: 0, quantity: 1 },
-];
 
 const INVOICE_FONT_STACK =
   "'Myriad Pro','Myriad','Segoe UI','Helvetica Neue',Arial,sans-serif";
@@ -62,13 +108,19 @@ const INVOICE_FONT_STACK =
 const formatCurrency = (value: number): string =>
   `${value.toLocaleString("vi-VN")} đ`;
 
-export default function HoaDon() {
+export default function BillOrder() {
   const [form, setForm] = useState<InvoiceForm>(DEFAULT_FORM);
   const [invoiceCodes, setInvoiceCodes] = useState<InvoiceEntry[]>([]);
+  const [hoveredInvoiceId, setHoveredInvoiceId] = useState<string | null>(null);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [productPrices, setProductPrices] = useState<ProductPriceRow[]>([]);
+  const invoiceInputId = useId();
   const inputClass =
     "w-full rounded-lg border border-white/20 bg-white/5 text-white placeholder:text-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60";
-  const chipInputClass =
-    "w-full rounded-lg border border-white/20 bg-white/5 text-white px-2 py-1.5 text-sm focus-within:ring-2 focus-within:ring-blue-400/60 focus-within:border-blue-400/60 flex items-center gap-2 flex-wrap relative overflow-x-auto";
+  const chipListBoxClass =
+    "w-full rounded-lg border border-white/20 bg-white/5 text-white px-3 py-2 text-sm shadow-sm shadow-indigo-900/40 flex flex-wrap items-center gap-2 min-h-[48px]";
+  const chipInputBoxClass =
+    "w-full rounded-lg border border-white/20 bg-white/5 text-white px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-blue-400/60 focus-within:border-blue-400/60 flex items-center relative overflow-hidden";
   const printStyles = `
     #invoice-preview,
     #invoice-preview * {
@@ -134,13 +186,131 @@ export default function HoaDon() {
     }
   `;
 
-  const totals = useMemo(() => {
-    const subtotal = DEFAULT_ITEMS.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    );
-    return { subtotal };
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`, {
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("Failed to load orders");
+        const data = await response.json();
+        if (isMounted && Array.isArray(data)) {
+          setOrders(data);
+        }
+      } catch (err) {
+        console.error("Không thể tải dữ liệu order_list:", err);
+      }
+    };
+
+    const fetchProductPrices = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`,
+          { credentials: "include" }
+        );
+        if (!response.ok) throw new Error("Failed to load product_price");
+        const data = await response.json();
+        if (isMounted && data?.items && Array.isArray(data.items)) {
+          setProductPrices(data.items);
+        }
+      } catch (err) {
+        console.error("Không thể tải dữ liệu product_price:", err);
+      }
+    };
+
+    fetchOrders();
+    fetchProductPrices();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const orderMap = useMemo(() => {
+    const map = new Map<string, OrderRow>();
+    orders.forEach((row) => {
+      const key = normalizeKey(row?.[ORDER_COLS.idOrder]);
+      if (key) {
+        map.set(key, row);
+      }
+    });
+    return map;
+  }, [orders]);
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, ProductPriceRow>();
+    productPrices.forEach((row) => {
+      const key = normalizeKey(row?.[PRODUCT_PRICE_COLS.product]);
+      if (key) {
+        map.set(key, row);
+      }
+    });
+    return map;
+  }, [productPrices]);
+
+  const invoiceLines: InvoiceLine[] = useMemo(() => {
+    return invoiceCodes.map((entry) => {
+      const order = orderMap.get(normalizeKey(entry.code));
+      const productKey = normalizeKey(order?.[ORDER_COLS.idProduct]);
+      const product = productMap.get(productKey);
+
+      const orderType = resolveOrderType(order?.[ORDER_COLS.idOrder] || entry.code);
+      const months =
+        extractMonths(order?.[ORDER_COLS.idProduct]) ||
+        extractMonths(product?.[PRODUCT_PRICE_COLS.product]);
+      const monthsLabel = months ? `${months} tháng` : "";
+      const baseName =
+        (product?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
+        (product?.[PRODUCT_PRICE_COLS.package] as string) ||
+        order?.[ORDER_COLS.idProduct] ||
+        entry.code;
+      const description = monthsLabel
+        ? `${baseName} ${monthsLabel}`
+        : baseName;
+
+      const wholesalePrice =
+        toPositiveNumber(product?.computed_wholesale_price) ||
+        toPositiveNumber(order?.[ORDER_COLS.price]);
+      const retailPrice =
+        toPositiveNumber(product?.computed_retail_price) || wholesalePrice;
+
+      let unitPrice = retailPrice;
+      if (orderType === "MAVC") {
+        unitPrice = wholesalePrice;
+      } else if (orderType === "MAVT") {
+        unitPrice = 0;
+      } else if (orderType === "MAVL" || orderType === "MAVK") {
+        unitPrice = retailPrice;
+      } else {
+        unitPrice = retailPrice || wholesalePrice;
+      }
+
+      const discountRatio =
+        orderType === "MAVK"
+          ? normalizeDiscountRatio(product?.[PRODUCT_PRICE_COLS.pctPromo])
+          : 0;
+      const discountPct = Number((discountRatio * 100).toFixed(2));
+      const quantity = 1;
+      const total = Math.max(0, unitPrice * quantity * (1 - discountRatio));
+
+      return {
+        id: entry.id,
+        code: entry.code,
+        description,
+        unitPrice,
+        quantity,
+        discountPct,
+        total,
+      };
+    });
+  }, [invoiceCodes, orderMap, productMap]);
+
+  const totals = useMemo(() => {
+    const subtotal = invoiceLines.reduce((sum, item) => sum + item.total, 0);
+    return { subtotal };
+  }, [invoiceLines]);
 
   const dateDisplay = useMemo(() => {
     if (!form.invoiceDate) return "..... tháng ..... năm 20..";
@@ -164,13 +334,7 @@ export default function HoaDon() {
   };
 
   const removeInvoiceCode = (id: string) => {
-    setInvoiceCodes((prev) => {
-      const idx = prev.findIndex((item) => item.id === id);
-      if (idx === -1) return prev;
-      const next = [...prev];
-      next.splice(idx, 1);
-      return next;
-    });
+    setInvoiceCodes((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,42 +357,66 @@ export default function HoaDon() {
 
         <form className="px-6 py-5 space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <label className="space-y-1">
-              <span className="text-sm font-medium text-slate-100">
+            <div className="space-y-1">
+              <label
+                htmlFor={invoiceInputId}
+                className="text-sm font-medium text-slate-100"
+              >
                 Hóa Đơn
-              </span>
-              <div className={`${chipInputClass} flex flex-wrap items-center gap-2`}>
-                {invoiceCodes.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="relative z-10 flex shrink-0 items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1.5 text-white shadow-sm shadow-indigo-900/40"
-                  >
-                    <span className="font-semibold text-sm">{entry.code}</span>
+              </label>
+              <div className="space-y-2">
+                <div
+                  className={chipListBoxClass}
+                  onMouseLeave={() => setHoveredInvoiceId(null)}
+                >
+                  {invoiceCodes.map((entry) => (
                     <button
+                      key={entry.id}
                       type="button"
                       onClick={() => removeInvoiceCode(entry.id)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+                      onMouseEnter={() => setHoveredInvoiceId(entry.id)}
+                      onMouseLeave={() => setHoveredInvoiceId(null)}
+                      className="relative inline-flex shrink-0 items-center gap-2 rounded-full bg-slate-900/70 px-3 py-1.5 text-white shadow-sm shadow-indigo-900/40 hover:bg-slate-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                       aria-label={`Xóa hóa đơn ${entry.code}`}
                     >
-                      <XMarkIcon className="h-4 w-4" />
+                      <span className="pointer-events-none font-semibold text-sm">
+                        {entry.code}
+                      </span>
+                      <span
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors ${
+                          hoveredInvoiceId === entry.id
+                            ? "bg-white/20 text-red-500"
+                            : ""
+                        }`}
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </span>
                     </button>
-                  </div>
-                ))}
-                <input
-                  type="text"
-                value={form.invoiceCode}
-                onChange={(e) => handleChange("invoiceCode", e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleInvoiceCodeBlur();
-                  }
-                  }}
-                  className="min-w-[120px] flex-1 bg-transparent text-white placeholder:text-slate-300 focus:outline-none h-8 relative z-0"
-                  placeholder="Nhập mã hóa đơn và nhấn Enter"
-                />
+                  ))}
+                </div>
+                <div className={chipInputBoxClass}>
+                  <input
+                    id={invoiceInputId}
+                    type="text"
+                    onMouseEnter={() => setHoveredInvoiceId(null)}
+                    onFocus={() => setHoveredInvoiceId(null)}
+                    onBlur={() => setHoveredInvoiceId(null)}
+                    value={form.invoiceCode}
+                    onChange={(e) =>
+                      handleChange("invoiceCode", e.target.value)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleInvoiceCodeBlur();
+                      }
+                    }}
+                    className="w-full bg-transparent text-white placeholder:text-slate-300 focus:outline-none h-8 relative z-0"
+                    placeholder="Nhập mã hóa đơn và nhấn Enter"
+                  />
+                </div>
               </div>
-            </label>
+            </div>
             <label className="space-y-1">
               <span className="text-sm font-medium text-slate-100">Ngày</span>
               <input
@@ -381,17 +569,28 @@ export default function HoaDon() {
                           SL
                         </th>
                         <th className="border border-slate-700 px-3 py-2 text-center text-white font-semibold">
+                          Chiết khấu
+                        </th>
+                        <th className="border border-slate-700 px-3 py-2 text-center text-white font-semibold">
                           Thành tiền
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {DEFAULT_ITEMS.map((item) => {
-                        const lineTotal = item.unitPrice * item.quantity;
-                        return (
-                          <tr key={item.name}>
+                      {invoiceLines.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="border border-slate-700 px-3 py-3 text-center text-white/80"
+                          >
+                            Chưa có mã hóa đơn nào được chọn.
+                          </td>
+                        </tr>
+                      ) : (
+                        invoiceLines.map((item) => (
+                          <tr key={item.id}>
                             <td className="border border-slate-700 px-3 py-2 text-white">
-                              {item.name}
+                              <div className="font-semibold">{item.description}</div>
                             </td>
                             <td className="border border-slate-700 px-3 py-2 text-center text-white font-semibold">
                               {formatCurrency(item.unitPrice)}
@@ -400,11 +599,16 @@ export default function HoaDon() {
                               {item.quantity}
                             </td>
                             <td className="border border-slate-700 px-3 py-2 text-center text-white font-semibold">
-                              {formatCurrency(lineTotal)}
+                              {`${item.discountPct.toLocaleString("vi-VN", {
+                                maximumFractionDigits: 2,
+                              })} %`}
+                            </td>
+                            <td className="border border-slate-700 px-3 py-2 text-center text-white font-semibold">
+                              {formatCurrency(item.total)}
                             </td>
                           </tr>
-                        );
-                      })}
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

@@ -5,7 +5,6 @@ const express = require("express");
 const crypto = require("crypto");
 const https = require("https");
 const { Pool } = require("pg");
-const cron = require("node-cron");
 const {
     ORDER_COLS,
     PAYMENT_RECEIPT_COLS,
@@ -44,18 +43,6 @@ const TELEGRAM_TOPIC_ID = Number.parseInt(
 const SEND_RENEWAL_TO_TOPIC =
     String(process.env.SEND_RENEWAL_TO_TOPIC || "true").toLowerCase() !==
     "false";
-const APP_TIMEZONE =
-    typeof process.env.APP_TIMEZONE === "string" &&
-    /^[A-Za-z0-9_\/+\-]+$/.test(process.env.APP_TIMEZONE) ?
-    process.env.APP_TIMEZONE :
-    "Asia/Ho_Chi_Minh";
-const RENEWAL_CRON_SCHEDULE =
-    process.env.RENEWAL_CRON_SCHEDULE && process.env.RENEWAL_CRON_SCHEDULE.trim() ?
-    process.env.RENEWAL_CRON_SCHEDULE.trim() :
-    "0 23 * * *"; // 23:00 Asia/Ho_Chi_Minh
-const RENEWAL_CRON_ENABLED =
-    String(process.env.ENABLE_RENEWAL_CRON || "true").toLowerCase() !== "false";
-
 const stripAccents = (value) =>
     String(value || "")
     .normalize("NFD")
@@ -1452,28 +1439,6 @@ if (require.main === module) {
   app.listen(PORT, HOST, () => {
     console.log(`Listening on http://${HOST}:${PORT}${SEPAY_WEBHOOK_PATH}`);
   });
-}
-
-if (RENEWAL_CRON_ENABLED) {
-  cron.schedule(
-    RENEWAL_CRON_SCHEDULE,
-    () => {
-      console.log("[Cron] Running scheduled renewal retry job...");
-      runRenewalBatch()
-        .then((summary) =>
-          console.log(
-            `[Cron] Renewal retry done. Success: ${summary.succeeded}/${summary.total}`
-          )
-        )
-        .catch((err) => console.error("[Cron] Renewal retry failed:", err));
-    }, {
-      scheduled: true,
-      timezone: APP_TIMEZONE,
-    }
-  );
-  console.log(
-    `[Cron] Renewal retry scheduled: '${RENEWAL_CRON_SCHEDULE}' (${APP_TIMEZONE})`
-  );
 }
 
 module.exports = app;
