@@ -3388,7 +3388,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
       UPDATE mavryk.payment_supply
       SET ${paymentSupplyCols.status} = 'Đã Thanh Toán',
           ${paymentSupplyCols.paid} = $2,
-          ${paymentSupplyCols.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${paymentSupplyCols.round}::text, ''), ' - ', $3))
+          ${paymentSupplyCols.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${paymentSupplyCols.round}::text, ''), ' - ', $3::text))
       WHERE ${paymentSupplyCols.id} = $1
       RETURNING ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.status} AS status, ${paymentSupplyCols.round} AS round;
     `;
