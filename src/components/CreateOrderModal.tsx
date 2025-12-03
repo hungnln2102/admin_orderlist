@@ -14,31 +14,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS, Order as ApiOrder } from "../constants";
 import * as Helpers from "../lib/helpers";
+import { API_BASE_URL } from "../lib/api";
 
-type ViteEnv = { VITE_API_BASE_URL?: string };
-type LooseProcessEnv = { env?: Record<string, string | undefined> };
-
-const resolveApiBase = (): string => {
-  try {
-    const viteEnv =
-      (globalThis as unknown as { import?: { meta?: { env?: ViteEnv } } }).import
-        ?.meta?.env;
-    if (viteEnv?.VITE_API_BASE_URL) return viteEnv.VITE_API_BASE_URL;
-  } catch {
-    // ignore
-  }
-
-  const nodeProcess =
-    typeof globalThis !== "undefined" && "process" in globalThis
-      ? (globalThis as unknown as { process?: LooseProcessEnv }).process
-      : undefined;
-  const fromProcess = nodeProcess?.env?.VITE_API_BASE_URL;
-  if (fromProcess) return fromProcess;
-
-  return "http://localhost:3001";
-};
-
-const API_BASE = resolveApiBase();
+const API_BASE = API_BASE_URL;
 
 // =======================================================
 // 1. INTERFACES (Cấu trúc dữ liệu)

@@ -30,6 +30,7 @@ import StatCard, {
   STAT_CARD_ACCENTS as CARD_ACCENTS,
   StatAccent,
 } from "../components/StatCard";
+import { API_BASE_URL } from "../lib/api";
 
 // Import Modal tùy chỉnh
 import ConfirmModal from "../components/ConfirmModal";
@@ -38,40 +39,12 @@ import EditOrderModal from "../components/EditOrderModal";
 import CreateOrderModal from "../components/CreateOrderModal";
 import * as Helpers from "../lib/helpers";
 
-type ViteEnv = { VITE_API_BASE_URL?: string };
-type LooseProcessEnv = { env?: Record<string, string | undefined> };
 type EditableOrder = Omit<Order, "cost" | "price"> & {
   cost: number | string;
   price: number | string;
 };
 
-const resolveApiBase = (): string => {
-  // Try Vite env (import.meta) safely via globalThis to avoid TS index issues.
-  try {
-    const viteEnv =
-      (globalThis as unknown as { import?: { meta?: { env?: ViteEnv } } }).import
-        ?.meta?.env;
-    if (viteEnv?.VITE_API_BASE_URL) {
-      return viteEnv.VITE_API_BASE_URL;
-    }
-  } catch {
-    // ignore
-  }
-
-  // Fallback: process.env if available (SSR/Node)
-  const nodeProcess =
-    typeof globalThis !== "undefined" && "process" in globalThis
-      ? (globalThis as unknown as { process?: LooseProcessEnv }).process
-      : undefined;
-  if (nodeProcess) {
-    const fromProcess = (nodeProcess as LooseProcessEnv).env?.VITE_API_BASE_URL;
-    if (fromProcess) return fromProcess;
-  }
-
-  return "http://localhost:3001";
-};
-
-const API_BASE = resolveApiBase();
+const API_BASE = API_BASE_URL;
 
 const STATUS_DISPLAY_LABELS: Record<string, string> = {
   "hết hạn": ORDER_STATUSES.ORDER_EXPIRED,
