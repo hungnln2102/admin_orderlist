@@ -3292,6 +3292,17 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             paidAmountNumber :
             Number(paymentRow.import) || 0;
 
+        const todayDMY =
+            typeof Helpers.getTodayDMY === "function"
+                ? Helpers.getTodayDMY()
+                : (() => {
+                      const now = new Date();
+                      const day = String(now.getUTCDate()).padStart(2, "0");
+                      const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+                      const year = now.getUTCFullYear();
+                      return `${day}/${month}/${year}`;
+                  })();
+
         // Láº¥y tÃªn nguá»“n Ä‘á»ƒ map vá»›i order_list.nguon
         const supplyResult = await pool.query(
             `SELECT ${supplyCols.sourceName} AS source_name FROM mavryk.supply WHERE ${supplyCols.id} = $1 LIMIT 1;`, [sourceId]
@@ -3348,32 +3359,43 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             totalUnpaidImport - normalizedPaidAmount
         );
 
-        // Náº¿u cÃ²n dÆ° thÃ¬ táº¡o chu ká»³ má»›i "Chưa Thanh Toán" vá»›i ghi chÃº ngÃ y hiá»‡n táº¡i
-        if (remainingImport > 0 && sourceId) {
-            const now = new Date();
-            const day = String(now.getUTCDate()).padStart(2, "0");
-            const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-            const year = now.getUTCFullYear();
-            const dmyNote = `${day}/${month}/${year}`;
+        // Only consider creating a new payment cycle when there are no other unpaid cycles
+        let hasUnpaidCycle = false;
+        if (sourceId) {
+            const unpaidCycleResult = await pool.query(
+                `
+          SELECT 1
+          FROM ${DB_SCHEMA}.payment_supply ps
+          WHERE ps.${paymentSupplyCols.sourceId} = $1
+            AND ${createVietnameseStatusKey(`ps.${paymentSupplyCols.status}`)} = 'chua thanh toan'
+          LIMIT 1;
+        `, [sourceId]
+            );
+            hasUnpaidCycle = unpaidCycleResult.rows.length > 0;
+        }
 
+        // Náº¿u cÃ²n dÆ° thÃ¬ táº¡o chu ká»³ má»›i "Chưa Thanh Toán" vá»›i ghi chÃº ngÃ y hiá»‡n táº¡i
+        if (remainingImport > 0 && sourceId && !hasUnpaidCycle) {
             await pool.query(
                 `
           INSERT INTO mavryk.payment_supply (${paymentSupplyCols.sourceId}, ${paymentSupplyCols.importValue}, ${paymentSupplyCols.paid}, ${paymentSupplyCols.round}, ${paymentSupplyCols.status})
           VALUES ($1, $2, 0, $3, 'Chưa Thanh Toán');
-        `, [sourceId, remainingImport, dmyNote]
+        `, [sourceId, remainingImport, todayDMY]
             );
         }
 
         const updateQuery = `
       UPDATE mavryk.payment_supply
       SET ${paymentSupplyCols.status} = 'Đã Thanh Toán',
-          ${paymentSupplyCols.paid} = $2
+          ${paymentSupplyCols.paid} = $2,
+          ${paymentSupplyCols.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${paymentSupplyCols.round}::text, ''), ' - ', $3))
       WHERE ${paymentSupplyCols.id} = $1
       RETURNING ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.status} AS status, ${paymentSupplyCols.round} AS round;
     `;
         const result = await pool.query(updateQuery, [
             parsedPaymentId,
             normalizedPaidAmount,
+            todayDMY,
         ]);
 
         await pool.query("COMMIT");
