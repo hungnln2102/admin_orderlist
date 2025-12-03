@@ -872,6 +872,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const infoBValue = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
   const registerDateValue =
     (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+  const costValue = formData[ORDER_FIELDS.COST] as string | number | undefined;
+  const priceValue = formData[ORDER_FIELDS.PRICE] as string | number | undefined;
 
   const handlePriceInput = useCallback(
     (
@@ -1142,7 +1144,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <input
                     type="text"
                     name={ORDER_FIELDS.INFORMATION_ORDER}
-                    value={formData[ORDER_FIELDS.INFORMATION_ORDER] || ""}
+                    value={
+                      (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || ""
+                    }
                     onChange={handleChange}
                     className={inputClass}
                     required
@@ -1203,54 +1207,52 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <div>
                     <label className={labelClass}>Giá Nhập</label>
                     {customMode ? (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        name={ORDER_FIELDS.COST}
-                        value={Helpers.formatCurrencyPlain(
-                          Number(formData[ORDER_FIELDS.COST] || 0)
-                        )}
-                        onChange={handlePriceInput(ORDER_FIELDS.COST)}
-                        className={`${inputClass} font-semibold`}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        name={ORDER_FIELDS.COST}
-                        value={Helpers.formatCurrency(
-                          formData[ORDER_FIELDS.COST] || 0
-                        )}
-                        readOnly
-                        className={`${inputClass} font-semibold ${readOnlyClass}`}
-                      />
-                    )}
-                  </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name={ORDER_FIELDS.COST}
+                      value={Helpers.formatCurrencyPlain(
+                        Number(costValue ?? 0)
+                      )}
+                      onChange={handlePriceInput(ORDER_FIELDS.COST)}
+                      className={`${inputClass} font-semibold`}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      name={ORDER_FIELDS.COST}
+                      value={Helpers.formatCurrency(costValue ?? 0)}
+                      readOnly
+                      className={`${inputClass} font-semibold ${readOnlyClass}`}
+                    />
+                  )}
+                </div>
                   {/* Giá Bán (Sẽ hiển thị giá tính toán từ giá nhập cao nhất) */}
                   <div>
                     <label className={labelClass}>Giá Bán</label>
                     {customMode ? (
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name={ORDER_FIELDS.PRICE}
+                      value={Helpers.formatCurrencyPlain(
+                        Number(priceValue ?? 0)
+                      )}
+                      onChange={handlePriceInput(ORDER_FIELDS.PRICE)}
+                      className={`${inputClass} font-semibold text-green-700`}
+                    />
+                  ) : (
                       <input
                         type="text"
-                        inputMode="numeric"
                         name={ORDER_FIELDS.PRICE}
-                        value={Helpers.formatCurrencyPlain(
-                          Number(formData[ORDER_FIELDS.PRICE] || 0)
-                        )}
-                        onChange={handlePriceInput(ORDER_FIELDS.PRICE)}
-                        className={`${inputClass} font-semibold text-green-700`}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        name={ORDER_FIELDS.PRICE}
-                        value={
-                          customerType === "MAVK" && !selectedSupplyId
-                            ? ""
-                            : Helpers.formatCurrency(
-                                formData[ORDER_FIELDS.PRICE] || 0
-                              )
-                        }
-                        readOnly
+                      value={
+                        customerType === "MAVK" && !selectedSupplyId
+                          ? ""
+                          : Helpers.formatCurrency(
+                              priceValue ?? 0
+                            )
+                      }
+                      readOnly
                         className={`${inputClass} font-semibold text-green-700 ${readOnlyClass}`}
                       />
                     )}
@@ -1261,7 +1263,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Ghi Chú</label>
                     <textarea
                       name={ORDER_FIELDS.NOTE}
-                      value={formData[ORDER_FIELDS.NOTE] || ""}
+                      value={(formData[ORDER_FIELDS.NOTE] as string) || ""}
                       onChange={handleChange}
                       rows={8}
                       className={inputClass}

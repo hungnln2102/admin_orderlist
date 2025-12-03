@@ -5,29 +5,33 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { XMarkIcon, PlusCircleIcon, MinusCircleIcon } from "@heroicons/react/24/outline";
+import {
+  XMarkIcon,
+  PlusCircleIcon,
+  MinusCircleIcon,
+} from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, API_ENDPOINTS, Order as ApiOrder } from "../constants";
 import * as Helpers from "../lib/helpers";
+import { API_BASE_URL } from "../lib/api";
 
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.VITE_API_BASE_URL) ||
-  (process.env.VITE_API_BASE_URL as string) ||
-  "http://localhost:3001";
+const API_BASE = API_BASE_URL;
 
 type Order = Omit<ApiOrder, "cost" | "price"> & {
   cost: number | string;
   price: number | string;
 };
 
-interface Supply {
-  id: number;
-  source_name: string;
+interface Supply extends Helpers.SupplyLike {
+  id?: number;
+  source_name?: string;
+  name?: string;
 }
 
-interface SupplyPrice {
-  source_id: number;
-  price: number;
+interface SupplyPrice extends Helpers.SupplyPriceLike {
+  id?: number;
+  source_id?: number;
+  price?: number;
+  source_name?: string;
 }
 
 interface EditOrderModalProps {
@@ -45,6 +49,19 @@ const readOnlyClass = "bg-gray-100 cursor-not-allowed text-gray-500";
 const formatCurrency = (value: number | string) => {
   const num = Number(value) || 0;
   return num.toLocaleString("vi-VN") + " d";
+};
+
+const normalizeDateLike = (
+  value: unknown
+): string | number | Date | null => {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    value instanceof Date
+  ) {
+    return value;
+  }
+  return null;
 };
 
 const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
@@ -138,9 +155,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       setFormData(normalized);
       baseOrderRef.current = normalized;
       setSupplies((prev) => mergeCurrentSupply(prev));
-      if (order.id_product) {
-        fetchSuppliesForProduct(order.id_product);
-        fetchSupplyPricesForProduct(order.id_product);
+      const productName = order.id_product as string;
+      if (productName) {
+        fetchSuppliesForProduct(productName);
+        fetchSupplyPricesForProduct(productName);
       }
       setIsCustomSupply(false);
     } else if (!isOpen) {
@@ -159,8 +177,9 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
 
   useEffect(() => {
     if (!isOpen || !formData?.id_product) return;
-    fetchSuppliesForProduct(formData.id_product);
-    fetchSupplyPricesForProduct(formData.id_product);
+    const productName = formData.id_product as string;
+    fetchSuppliesForProduct(productName);
+    fetchSupplyPricesForProduct(productName);
   }, [
     isOpen,
     formData?.id_product,
@@ -199,7 +218,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       if (Number.isFinite(normalizedPrice)) {
         setFieldValue(
           ORDER_FIELDS.COST as keyof Order,
-          normalizedPrice as any
+          normalizedPrice as Order[typeof ORDER_FIELDS.COST]
         );
       } else if (baseOrderRef.current) {
         const fallbackCost = Number(
@@ -207,7 +226,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         );
         setFieldValue(
           ORDER_FIELDS.COST as keyof Order,
-          fallbackCost as any
+          fallbackCost as Order[typeof ORDER_FIELDS.COST]
         );
       }
     },
@@ -229,7 +248,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
     setIsCustomSupply((prev) => {
       const next = !prev;
       if (!next) {
-        setFieldValue(ORDER_FIELDS.SUPPLY as keyof Order, "" as any);
+        setFieldValue(
+          ORDER_FIELDS.SUPPLY as keyof Order,
+          "" as Order[typeof ORDER_FIELDS.SUPPLY]
+        );
       }
       return next;
     });
@@ -237,9 +259,10 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
 
   const resetForm = useCallback(() => {
     setFormData(baseOrderRef.current);
-    if (baseOrderRef.current?.id_product) {
-      fetchSuppliesForProduct(baseOrderRef.current.id_product);
-      fetchSupplyPricesForProduct(baseOrderRef.current.id_product);
+    const productName = baseOrderRef.current?.id_product as string | undefined;
+    if (productName) {
+      fetchSuppliesForProduct(productName);
+      fetchSupplyPricesForProduct(productName);
     }
   }, [fetchSuppliesForProduct, fetchSupplyPricesForProduct]);
 
@@ -274,15 +297,23 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   } = useEditOrderLogic(order, isOpen);
   const [isSaving, setIsSaving] = useState(false);
 
+  const stringField = (key: keyof Order): string =>
+    formData ? String(formData[key] ?? "") : "";
+  const numericField = (key: keyof Order): number =>
+    formData ? Number(formData[key] ?? 0) || 0 : 0;
+
   const handleInputChange = useCallback(
     (
       e: React.ChangeEvent<
         HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
       >
     ) => {
-      const { name, value, type, checked } = e.target;
+      const target = e.target;
+      const { name, value } = target;
       const nextValue =
-        type === "checkbox" ? (checked as unknown as Order[keyof Order]) : (value as unknown as Order[keyof Order]);
+        target instanceof HTMLInputElement && target.type === "checkbox"
+          ? (target.checked as unknown as Order[keyof Order])
+          : (value as unknown as Order[keyof Order]);
       setFieldValue(name as keyof Order, nextValue);
     },
     [setFieldValue]
@@ -298,19 +329,21 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
   const orderDateDisplay = useMemo(() => {
     if (!formData) return "";
-    const raw =
+    const raw = normalizeDateLike(
       formData.registration_date_display ||
-      formData.registration_date ||
-      formData[ORDER_FIELDS.ORDER_DATE];
+        formData.registration_date ||
+        formData[ORDER_FIELDS.ORDER_DATE]
+    );
     return Helpers.formatDateToDMY(raw) || String(raw || "");
   }, [formData]);
 
   const orderExpiredDisplay = useMemo(() => {
     if (!formData) return "";
-    const raw =
+    const raw = normalizeDateLike(
       formData.expiry_date_display ||
-      formData.expiry_date ||
-      formData[ORDER_FIELDS.ORDER_EXPIRED];
+        formData.expiry_date ||
+        formData[ORDER_FIELDS.ORDER_EXPIRED]
+    );
     return Helpers.formatDateToDMY(raw) || String(raw || "");
   }, [formData]);
 
@@ -351,7 +384,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.ID_ORDER}
-                value={formData[ORDER_FIELDS.ID_ORDER] || ""}
+                value={stringField(ORDER_FIELDS.ID_ORDER as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -362,7 +395,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.CUSTOMER}
-                value={formData[ORDER_FIELDS.CUSTOMER] || ""}
+                value={stringField(ORDER_FIELDS.CUSTOMER as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -373,7 +406,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.CONTACT}
-                value={formData[ORDER_FIELDS.CONTACT] || ""}
+                value={stringField(ORDER_FIELDS.CONTACT as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -383,10 +416,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <label className={labelClass}>Slot</label>
               <input
                 type="text"
-              name={ORDER_FIELDS.SLOT}
-              value={formData[ORDER_FIELDS.SLOT] || ""}
-              onChange={handleInputChange}
-              className={inputClass}
+                name={ORDER_FIELDS.SLOT}
+                value={stringField(ORDER_FIELDS.SLOT as keyof Order)}
+                onChange={handleInputChange}
+                className={inputClass}
               />
             </div>
           </div>
@@ -397,7 +430,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.ID_PRODUCT}
-                value={formData[ORDER_FIELDS.ID_PRODUCT] || ""}
+                value={stringField(ORDER_FIELDS.ID_PRODUCT as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -410,7 +443,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                   <input
                     type="text"
                     name={ORDER_FIELDS.SUPPLY}
-                    value={formData[ORDER_FIELDS.SUPPLY] || ""}
+                    value={stringField(ORDER_FIELDS.SUPPLY as keyof Order)}
                     onChange={(e) => handleCustomSupplyChange(e.target.value)}
                     className={inputClass}
                     placeholder="Nhập nguồn mới"
@@ -460,7 +493,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
             <input
               type="text"
               name={ORDER_FIELDS.INFORMATION_ORDER}
-              value={formData[ORDER_FIELDS.INFORMATION_ORDER] || ""}
+              value={stringField(ORDER_FIELDS.INFORMATION_ORDER as keyof Order)}
               onChange={handleInputChange}
               className={inputClass}
             />
@@ -483,7 +516,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.DAYS}
-                value={formData[ORDER_FIELDS.DAYS] || ""}
+                value={stringField(ORDER_FIELDS.DAYS as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -508,7 +541,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.COST}
-                value={formatCurrency(formData[ORDER_FIELDS.COST] || 0)}
+                value={formatCurrency(
+                  numericField(ORDER_FIELDS.COST as keyof Order)
+                )}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass} font-semibold`}
@@ -519,7 +554,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.PRICE}
-                value={formatCurrency(formData[ORDER_FIELDS.PRICE] || 0)}
+                value={formatCurrency(
+                  numericField(ORDER_FIELDS.PRICE as keyof Order)
+                )}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass} font-semibold text-green-700`}
@@ -533,7 +570,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <input
                 type="text"
                 name={ORDER_FIELDS.STATUS}
-                value={formData[ORDER_FIELDS.STATUS] || ""}
+                value={stringField(ORDER_FIELDS.STATUS as keyof Order)}
                 readOnly
                 disabled
                 className={`${inputClass} ${readOnlyClass}`}
@@ -557,7 +594,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
             <label className={labelClass}>Ghi chú</label>
             <textarea
               name={ORDER_FIELDS.NOTE}
-              value={formData[ORDER_FIELDS.NOTE] || ""}
+              value={stringField(ORDER_FIELDS.NOTE as keyof Order)}
               rows={4}
               onChange={handleInputChange}
               className={inputClass}

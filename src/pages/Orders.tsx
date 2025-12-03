@@ -315,7 +315,13 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       const daysForValue = Math.max(0, effectiveRemaining);
       const giaTriConLai =
         soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
-      const canHoanValue = parseNumeric(order.can_hoan);
+
+      const rawRefund =
+        order.can_hoan ??
+        (order as Record<string, unknown>)[ORDER_FIELDS.REFUND] ??
+        (order as Record<string, unknown>)["refund"];
+      const canHoanValue =
+        parseNumeric(rawRefund) ?? (Number.isFinite(giaTriConLai) ? giaTriConLai : null);
 
       return {
         ...order,
@@ -840,6 +846,7 @@ export default function Orders() {
   };
 
   const showRemainingColumn = datasetKey !== "expired";
+  const showActionButtons = datasetKey !== "expired";
   const isCanceled = datasetKey === "canceled";
   const remainingLabel = isCanceled ? "Giá Trị Còn Lại" : "Còn Lại";
   const totalColumns = showRemainingColumn ? 7 : 6;
@@ -1049,6 +1056,9 @@ export default function Orders() {
                   const giaTriConLaiSafe = Number.isFinite(Number(giaTriConLai))
                     ? Number(giaTriConLai)
                     : 0;
+                  const refundSafe = Number.isFinite(Number(order.can_hoan))
+                    ? Number(order.can_hoan)
+                    : giaTriConLaiSafe;
                   const normalizedStatus = String(trangThaiText || "")
                     .normalize("NFD")
                     .replace(/[\u0300-\u036f]/g, "")
@@ -1145,7 +1155,7 @@ export default function Orders() {
                         }
                       >
                         {isCanceled
-                            ? Helpers.formatCurrency(order.can_hoan ?? 0)
+                            ? Helpers.formatCurrency(refundSafe)
                             : remaining}
                       </span>
                     );
@@ -1225,6 +1235,7 @@ export default function Orders() {
                                     #{order[ORDER_FIELDS.ID_ORDER] || ""}
                                   </p>
                                 </div>
+                                {showActionButtons && (
                                 <div className="ml-4 flex items-center gap-2">
                                   {!(order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN && order[ORDER_FIELDS.CHECK_FLAG] === true) && (
                                     <button
@@ -1250,6 +1261,7 @@ export default function Orders() {
                                     {isRenewing ? "\u0110ang Gia H\u1ea1n..." : "Gia H\u1ea1n"}
                                   </button>
                                 </div>
+                                )}
                               </div>
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">

@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as Helpers from "../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { API_ENDPOINTS, ORDER_FIELDS, VIRTUAL_FIELDS, Order } from "../constants";
+import {
+  API_ENDPOINTS,
+  ORDER_FIELDS,
+  VIRTUAL_FIELDS,
+  Order,
+} from "../constants";
+import { API_BASE_URL } from "../lib/api";
 
 type OrderView = Order & {
   customer_type?: string | null;
@@ -16,15 +22,17 @@ interface ViewOrderModalProps {
   formatCurrency: (value: number | string) => string;
 }
 
+type CalculatePriceResponse = {
+  gia_ban?: number;
+  price?: number;
+  error?: string;
+};
+
 const BANK_SHORT_CODE = "VPB";
 const ACCOUNT_NO = "9183400998";
 const ACCOUNT_NAME = "NGO LE NGOC HUNG";
 
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.VITE_API_BASE_URL) ||
-  (process.env.VITE_API_BASE_URL as string) ||
-  "http://localhost:3001";
+const API_BASE = API_BASE_URL;
 
 const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
@@ -36,8 +44,35 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceError, setPriceError] = useState<string | null>(null);
 
+  const normalizeDateLike = (
+    value: unknown
+  ): string | number | Date | null => {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      value instanceof Date
+    ) {
+      return value;
+    }
+    return null;
+  };
+
+  const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
+  const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
+  const basePrice = Number(order?.[ORDER_FIELDS.PRICE]) || 0;
+  const supplyName = (order?.[ORDER_FIELDS.SUPPLY] as string) || "";
+  const customerType = order?.customer_type || supplyName || "";
+  const orderDateRaw =
+    order?.registration_date ||
+    (order?.[ORDER_FIELDS.ORDER_DATE] as string) ||
+    "";
+  const normalizedOrderDate =
+    Helpers.convertDMYToYMD(
+      Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
+    ) || null;
+
   useEffect(() => {
-    if (!isOpen || !order) {
+    if (!isOpen || !orderId || !productName) {
       setCalculatedPrice(null);
       setPriceLoading(false);
       setPriceError(null);
@@ -45,25 +80,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     }
 
     let ignore = false;
-    const basePrice = Number(order[ORDER_FIELDS.PRICE]) || 0;
     setCalculatedPrice(basePrice);
-
-    const productName = order[ORDER_FIELDS.ID_PRODUCT];
-    const orderId = order[ORDER_FIELDS.ID_ORDER];
-
-    if (!productName || !orderId) {
-      setPriceLoading(false);
-      return;
-    }
-
-    const orderDateRaw =
-      order.registration_date ||
-      (order[ORDER_FIELDS.ORDER_DATE] as string) ||
-      "";
-    const normalizedOrderDate =
-      Helpers.convertDMYToYMD(
-        Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
-      ) || null;
 
     const payload: Record<string, unknown> = {
       san_pham_name: productName,
@@ -75,8 +92,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       payload.order_date = normalizedOrderDate;
     }
 
-    const customerType =
-      order.customer_type || (order[ORDER_FIELDS.SUPPLY] as string);
     if (customerType) {
       payload.customer_type = customerType;
     }
@@ -97,11 +112,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         );
 
         const { data, rawText } =
-          await Helpers.readJsonOrText<{
-            gia_ban?: number;
-            price?: number;
-            error?: string;
-          }>(response);
+          await Helpers.readJsonOrText<CalculatePriceResponse>(response);
 
         if (!response.ok) {
           const message =
@@ -111,12 +122,10 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           throw new Error(message);
         }
 
-        const result = data || {};
+        const result: CalculatePriceResponse = data ?? {};
 
         if (!ignore) {
-          const backendPrice = Number(
-            (result as any)?.price ?? result?.gia_ban
-          );
+          const backendPrice = Number(result.price ?? result.gia_ban);
           setCalculatedPrice(
             Number.isFinite(backendPrice) && backendPrice >= 0
               ? backendPrice
@@ -145,11 +154,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     };
   }, [
     isOpen,
-    order?.[ORDER_FIELDS.ID_ORDER],
-    order?.[ORDER_FIELDS.ID_PRODUCT],
-    order?.[ORDER_FIELDS.SUPPLY],
-    order?.customer_type,
-    order?.[ORDER_FIELDS.PRICE],
+    orderId,
+    productName,
+    customerType,
+    basePrice,
+    normalizedOrderDate,
   ]);
 
   const effectiveAmount = useMemo(() => {
@@ -161,46 +170,53 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   if (!isOpen || !order) return null;
 
   const displayStatus =
-    (order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] ||
-      order.trangThaiText ||
-      order[ORDER_FIELDS.STATUS] ||
-      "").trim() || "Chua Thanh Toan";
+    String(
+      order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] ||
+        order.trangThaiText ||
+        order[ORDER_FIELDS.STATUS] ||
+        ""
+    ).trim() || "Chua Thanh Toan";
 
   const remainingFromBackend =
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== undefined &&
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== null
       ? Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI])
       : null;
-  const fallbackRemaining = Helpers.daysUntilDate(
+  const expirySource = normalizeDateLike(
     order.expiry_date ||
       order.expiry_date_display ||
       order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
-      (order[ORDER_FIELDS.ORDER_EXPIRED] as string) ||
-      null
+      (order[ORDER_FIELDS.ORDER_EXPIRED] as string | null)
   );
+
+  const fallbackRemaining = Helpers.daysUntilDate(expirySource);
   const displayRemainingDays =
     remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
       ? remainingFromBackend
       : fallbackRemaining ?? 0;
 
-  const registrationDisplay =
+  const registrationSource = normalizeDateLike(
     order.registration_date_display ||
-    order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
-    Helpers.formatDateToDMY(
-      order.registration_date || (order[ORDER_FIELDS.ORDER_DATE] as string)
-    ) ||
-    String((order[ORDER_FIELDS.ORDER_DATE] as string) || "");
+      order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+      order.registration_date ||
+      (order[ORDER_FIELDS.ORDER_DATE] as string | null)
+  );
+
+  const registrationDisplay =
+    (order.registration_date_display ||
+      order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+      Helpers.formatDateToDMY(registrationSource) ||
+      String((order[ORDER_FIELDS.ORDER_DATE] as string) || "")) ??
+    "";
   const expiryDisplay =
     order.expiry_date_display ||
     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
-    Helpers.formatDateToDMY(
-      order.expiry_date || (order[ORDER_FIELDS.ORDER_EXPIRED] as string)
-    ) ||
+    Helpers.formatDateToDMY(expirySource) ||
     String((order[ORDER_FIELDS.ORDER_EXPIRED] as string) || "");
 
   // VietQR
   const qrAmount = effectiveAmount;
-  const qrMessage = order[ORDER_FIELDS.ID_ORDER];
+  const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
   const normalizedAmount = Math.max(0, Number(qrAmount) || 0);
   const safeQrAmount = Helpers.roundGiaBanValue(normalizedAmount);
   const qrCodeImageUrl = Helpers.buildSepayQrUrl({

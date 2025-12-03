@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../AuthContext";
@@ -106,8 +106,8 @@ export default function RetroLogin() {
               </button>
             </div>
 
-            <button type="submit" className="cta">
-              Đăng nhập
+            <button type="submit" className="cta" disabled={loading}>
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
             {error && <p className="error-msg">{error}</p>}
           </form>

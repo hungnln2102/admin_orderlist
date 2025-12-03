@@ -1,5 +1,3 @@
-import React from "react";
-
 const statGroups = [
   {
     title: "Hiệu suất chung",

@@ -22,6 +22,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import {
   fetchChartData,
   fetchAvailableYears,
@@ -57,24 +58,33 @@ const toChangeLabel = (diff: number) => {
   return `${prefix}${Math.abs(diff).toFixed(1)}%`;
 };
 
+const percentChange = (current: number, previous: number): number => {
+  if (previous !== 0) {
+    return ((current - previous) / previous) * 100;
+  }
+  return current > 0 ? 100 : 0;
+};
+
 const calculateStat = (
   name: string,
-  current: number,
-  previous: number,
+  current: number | string,
+  previous: number | string,
   isCurrency: boolean
 ): Omit<ProcessedStat, "icon" | "accent" | "changeType"> & {
   changeType: "increase" | "decrease";
 } => {
-  const displayValue = isCurrency
-    ? formatCurrency(current)
-    : current.toLocaleString("vi-VN");
+  const currentValue = Number.isFinite(Number(current))
+    ? Number(current)
+    : 0;
+  const previousValue = Number.isFinite(Number(previous))
+    ? Number(previous)
+    : 0;
 
-  let diff = 0;
-  if (previous !== 0) {
-    diff = ((current - previous) / previous) * 100;
-  } else if (current > 0) {
-    diff = 100;
-  }
+  const displayValue = isCurrency
+    ? formatCurrency(currentValue)
+    : currentValue.toLocaleString("vi-VN");
+
+  const diff = percentChange(currentValue, previousValue);
 
   return {
     name,
@@ -158,6 +168,31 @@ const Dashboard: React.FC = () => {
       const charts: ChartsApiResponse = await fetchChartData(year);
       setRevenueChartData(charts.revenueData);
       setOrderChartData(charts.orderStatusData);
+
+      // Fallback: derive change for total orders from the last two months of chart data.
+      const orderPoints = charts.orderStatusData.filter((p) =>
+        Number.isFinite(Number(p.total_orders))
+      );
+      if (orderPoints.length >= 2) {
+        const currentOrders =
+          Number(orderPoints[orderPoints.length - 1].total_orders) || 0;
+        const previousOrders =
+          Number(orderPoints[orderPoints.length - 2].total_orders) || 0;
+        const fallbackDiff = percentChange(currentOrders, previousOrders);
+
+        setStatsData((prev) =>
+          prev.map((item, idx) =>
+            idx === 0
+              ? {
+                  ...item,
+                  change: toChangeLabel(fallbackDiff),
+                  changeType:
+                    fallbackDiff >= 0 ? "increase" : ("decrease" as const),
+                }
+              : item
+          )
+        );
+      }
     } catch (err) {
       console.error("Lỗi khi lấy dữ liệu dashboard:", err);
       setErrorMessage(
@@ -339,7 +374,7 @@ const Dashboard: React.FC = () => {
                   tick={{ fill: "#e5e7eb", fontSize: 12 }}
                 />
                 <Tooltip
-                  formatter={(value: number, _name: string, props: any) => [
+                  formatter={(value: number, _name: string, props?: Payload<number, string>) => [
                     value,
                     props?.dataKey === "total_orders"
                       ? "Tổng đơn"

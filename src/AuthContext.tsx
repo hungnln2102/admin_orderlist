@@ -17,13 +17,15 @@ const AuthContext = createContext<AuthContextType>({
   refresh: async () => {},
 });
 
+export const useAuth = (): AuthContextType => useContext(AuthContext);
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = async() => {
+  const refresh = async () => {
     try {
       const res = await apiFetch("/api/auth/me");
       if (!res.ok) {
@@ -49,5 +51,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);
