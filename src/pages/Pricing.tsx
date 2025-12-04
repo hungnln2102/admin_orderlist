@@ -213,6 +213,43 @@ const sortSupplyItems = (items: SupplyPriceItem[]): SupplyPriceItem[] => {
   });
 };
 
+const normalizeSupplyName = (value: string | null | undefined): string => {
+  if (!value) return "";
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+};
+
+const dedupeSupplyItems = (items: SupplyPriceItem[]): SupplyPriceItem[] => {
+  const map = new Map<string, SupplyPriceItem>();
+  for (const item of items) {
+    const key =
+      Number.isFinite(item.sourceId) && item.sourceId > 0
+        ? `id:${item.sourceId}`
+        : `name:${normalizeSupplyName(item.sourceName)}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, item);
+      continue;
+    }
+
+    const existingPrice = existing.price ?? Number.POSITIVE_INFINITY;
+    const candidatePrice = item.price ?? Number.POSITIVE_INFINITY;
+    const existingDate = Date.parse(existing.lastOrderDate ?? "") || 0;
+    const candidateDate = Date.parse(item.lastOrderDate ?? "") || 0;
+
+    if (
+      candidatePrice < existingPrice ||
+      (candidatePrice === existingPrice && candidateDate > existingDate)
+    ) {
+      map.set(key, item);
+    }
+  }
+  return Array.from(map.values());
+};
+
 const buildSupplyRowKey = (productId: number, sourceId: number): string =>
   `${productId}-${sourceId}`;
 
@@ -697,27 +734,26 @@ function Pricing() {
           throw new Error("Không thể tải giá nhập");
         }
         const payload = await response.json();
-        const items: SupplyPriceItem[] = Array.isArray(payload)
-          ? sortSupplyItems(
-              payload.map((entry: any, index: number) => ({
-                sourceId: Number.isFinite(
-                  Number(entry?.[SUPPLY_PRICE_COLS.sourceId])
-                )
-                  ? Number(entry[SUPPLY_PRICE_COLS.sourceId])
-                  : index,
-                sourceName:
-                  cleanupLabel(entry?.[SUPPLY_COLS.sourceName]) ||
-                  `Nhà Cung Cấp #${
-                    Number(entry?.[SUPPLY_PRICE_COLS.sourceId]) || index + 1
-                  }`,
-                price: toNumberOrNull(entry?.[SUPPLY_PRICE_COLS.price]),
-                lastOrderDate:
-                  typeof entry?.last_order_date === "string"
-                    ? entry.last_order_date
-                    : null,
-              }))
-            )
+        const mappedItems: SupplyPriceItem[] = Array.isArray(payload)
+          ? payload.map((entry: any, index: number) => ({
+              sourceId: Number.isFinite(
+                Number(entry?.[SUPPLY_PRICE_COLS.sourceId])
+              )
+                ? Number(entry[SUPPLY_PRICE_COLS.sourceId])
+                : index,
+              sourceName:
+                cleanupLabel(entry?.[SUPPLY_COLS.sourceName]) ||
+                `Nh? Cung C?p #${
+                  Number(entry?.[SUPPLY_PRICE_COLS.sourceId]) || index + 1
+                }`,
+              price: toNumberOrNull(entry?.[SUPPLY_PRICE_COLS.price]),
+              lastOrderDate:
+                typeof entry?.last_order_date === "string"
+                  ? entry.last_order_date
+                  : null,
+            }))
           : [];
+        const items = sortSupplyItems(dedupeSupplyItems(mappedItems));
 
         setSupplyPriceMap((prev) => ({
           ...prev,

@@ -126,6 +126,18 @@ const SEARCH_FIELD_OPTIONS = [
 // 2. CUSTOM HOOK: useOrdersData
 // =======================================================
 
+const normalizeSearchText = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+};
+
+const normalizeOrderCode = (value: unknown): string =>
+  normalizeSearchText(value).replace(/[^a-z0-9]/g, "");
+
 const useOrdersData = (dataset: OrderDatasetKey) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -335,7 +347,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       } as Order;
     });
 
-    const lowerSearchTerm = searchTerm.toLowerCase();
+    const normalizedSearchTerm = normalizeSearchText(searchTerm);
+    const normalizedOrderSearchTerm = normalizeOrderCode(searchTerm);
     const searchableFields =
       searchField === "all"
         ? [
@@ -350,10 +363,23 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       statusFilter === "all" ? "" : normalizeStatusValue(statusFilter);
     const filteredOrders = ordersWithVirtualFields.filter((order) => {
       const matchesSearch =
-        !lowerSearchTerm ||
-        searchableFields.some((field) =>
-          String(order[field] || "").toLowerCase().includes(lowerSearchTerm)
-        );
+        !normalizedSearchTerm ||
+        searchableFields.some((field) => {
+          const rawValue = (order as Record<string, unknown>)[field];
+          const normalizedFieldValue = normalizeSearchText(rawValue);
+          if (!normalizedFieldValue) return false;
+
+          if (field === ORDER_FIELDS.ID_ORDER) {
+            const normalizedOrderValue = normalizeOrderCode(rawValue);
+            return (
+              (!!normalizedOrderSearchTerm &&
+                normalizedOrderValue.includes(normalizedOrderSearchTerm)) ||
+              normalizedFieldValue.includes(normalizedSearchTerm)
+            );
+          }
+
+          return normalizedFieldValue.includes(normalizedSearchTerm);
+        });
 
       const matchesStatus =
         statusFilter === "all" ||
