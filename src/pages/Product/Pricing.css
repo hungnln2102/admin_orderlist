@@ -1,0 +1,29 @@
+.supplier-select {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #0f172a;
+}
+
+.supplier-select option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.supplier-select option:hover,
+.supplier-select option:checked {
+  background: #1e293b;
+}
+
+.supplier-select::-webkit-scrollbar {
+  width: 8px;
+  background: #0f172a;
+}
+
+.supplier-select::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #38bdf8, #6366f1);
+  border-radius: 8px;
+}
+
+.supplier-select::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22d3ee, #4f46e5);
+}

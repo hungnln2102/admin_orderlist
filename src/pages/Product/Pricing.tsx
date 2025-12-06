@@ -13,16 +13,18 @@ import {
   ChevronDownIcon,
   PowerIcon,
   TrashIcon,
+  MinusIcon,
 } from "@heroicons/react/24/outline";
-import { deleteProductPrice } from "../lib/productPricesApi";
-import { API_ENDPOINTS } from "../constants";
-import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
-import GradientButton from "../components/GradientButton";
+import { deleteProductPrice } from "../../lib/productPricesApi";
+import { API_ENDPOINTS } from "../../constants";
+import StatCard, { STAT_CARD_ACCENTS } from "../../components/StatCard";
+import GradientButton from "../../components/GradientButton";
 import {
   PRODUCT_PRICE_COLS,
   SUPPLY_PRICE_COLS,
   SUPPLY_COLS,
-} from "../lib/tableSql";
+} from "../../lib/tableSql";
+import "./Pricing.css";
 
 const API_BASE =
   (typeof import.meta !== "undefined" &&
@@ -315,6 +317,13 @@ interface BankOption {
   name: string;
 }
 
+interface SupplierOption {
+  id: number | null;
+  name: string;
+  numberBank?: string;
+  binBank?: string;
+}
+
 interface CreateProductFormState {
   packageName: string;
   packageProduct: string;
@@ -326,10 +335,12 @@ interface CreateProductFormState {
 
 interface CreateSupplierEntry {
   id: string;
+  sourceId: number | null;
   sourceName: string;
   price: string;
   numberBank: string;
   bankBin: string;
+  useCustomName: boolean;
 }
 
 const createSupplierEntry = (): CreateSupplierEntry => {
@@ -341,11 +352,30 @@ const createSupplierEntry = (): CreateSupplierEntry => {
       : Math.random().toString(36).slice(2);
   return {
     id,
+    sourceId: null,
     sourceName: "",
     price: "",
     numberBank: "",
     bankBin: "",
+    useCustomName: false,
   };
+};
+
+const formatVndInput = (raw: string): string => {
+  const digits = (raw || "").replace(/\D+/g, "");
+  if (!digits) return "";
+  const num = Number(digits);
+  if (!Number.isFinite(num)) return "";
+  return num.toLocaleString("vi-VN");
+};
+
+const formatVndDisplay = (value: string | number): string => {
+  if (value === null || value === undefined) return "";
+  const digits = String(value).replace(/\D+/g, "");
+  if (!digits) return "";
+  const num = Number(digits);
+  if (!Number.isFinite(num)) return "";
+  return new Intl.NumberFormat("vi-VN").format(num);
 };
 
 const formatRateDescription = ({
@@ -414,7 +444,7 @@ const formatProfitRange = (
       : null;
 
   const wholesaleText = formatProfitValue(wholesaleDiff);
-  const retailText = formatProfitValue(retailDiff);
+const retailText = formatProfitValue(retailDiff);
 
   return `${wholesaleText} - ${retailText}`;
 };
@@ -641,6 +671,8 @@ function Pricing() {
   );
   const [createError, setCreateError] = useState<string | null>(null);
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+  const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
   const [bankOptions, setBankOptions] = useState<BankOption[]>([]);
   const [isLoadingBanks, setIsLoadingBanks] = useState(false);
   const [statusOverrides, setStatusOverrides] = useState<
@@ -743,7 +775,7 @@ function Pricing() {
                 : index,
               sourceName:
                 cleanupLabel(entry?.[SUPPLY_COLS.sourceName]) ||
-                `Nh? Cung C?p #${
+                `Nhà Cung Cấp #${
                   Number(entry?.[SUPPLY_PRICE_COLS.sourceId]) || index + 1
                 }`,
               price: toNumberOrNull(entry?.[SUPPLY_PRICE_COLS.price]),
@@ -809,6 +841,71 @@ function Pricing() {
     }
   }, [bankOptions.length, isLoadingBanks]);
 
+  const loadSupplierOptions = useCallback(async () => {
+    if (isLoadingSuppliers || supplierOptions.length > 0) return;
+    setIsLoadingSuppliers(true);
+    try {
+      const response = await fetch(`${API_BASE}${API_ENDPOINTS.SUPPLIES}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Không thể tải danh sách NCC.");
+      }
+      const payload = await response.json().catch(() => null);
+      const items = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+        ? payload
+        : [];
+      const normalized = items
+        .map((item) => {
+          const idRaw = item?.[SUPPLY_COLS.id] ?? item?.id;
+          const idValue =
+            typeof idRaw === "number" && Number.isFinite(idRaw)
+              ? idRaw
+              : Number.isFinite(Number(idRaw))
+              ? Number(idRaw)
+              : null;
+          const name =
+            item?.[SUPPLY_COLS.sourceName] ??
+            item?.source_name ??
+            item?.name ??
+            "";
+          return {
+            id: idValue ?? null,
+            name: (name || "").trim(),
+            numberBank:
+              item?.[SUPPLY_COLS.numberBank] ??
+              item?.number_bank ??
+              item?.numberBank ??
+              "",
+            binBank:
+              item?.[SUPPLY_COLS.binBank] ??
+              item?.bin_bank ??
+              item?.binBank ??
+              "",
+          } as SupplierOption;
+        })
+        .filter((opt) => opt.name.length > 0);
+      const deduped: SupplierOption[] = [];
+      const seen = new Set<string>();
+      for (const opt of normalized) {
+        const key =
+          opt.id !== null
+            ? `id:${opt.id}`
+            : `name:${opt.name.toLowerCase().trim()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(opt);
+      }
+      setSupplierOptions(deduped);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách NCC:", err);
+    } finally {
+      setIsLoadingSuppliers(false);
+    }
+  }, [isLoadingSuppliers, supplierOptions.length]);
+
   useEffect(() => {
     fetchProductPrices();
   }, [fetchProductPrices]);
@@ -817,7 +914,22 @@ function Pricing() {
     if (isCreateModalOpen && bankOptions.length === 0 && !isLoadingBanks) {
       loadBankOptions();
     }
-  }, [isCreateModalOpen, bankOptions.length, isLoadingBanks, loadBankOptions]);
+    if (
+      isCreateModalOpen &&
+      supplierOptions.length === 0 &&
+      !isLoadingSuppliers
+    ) {
+      loadSupplierOptions();
+    }
+  }, [
+    isCreateModalOpen,
+    bankOptions.length,
+    isLoadingBanks,
+    loadBankOptions,
+    supplierOptions.length,
+    isLoadingSuppliers,
+    loadSupplierOptions,
+  ]);
 
   const handleRefreshAll = useCallback(async () => {
     if (isRefreshing) return;
@@ -989,7 +1101,7 @@ function Pricing() {
       [rowKey]:
         currentPrice === null || currentPrice === undefined
           ? ""
-          : String(currentPrice),
+          : formatVndDisplay(currentPrice),
     }));
     setSupplyRowErrors((prev) => ({ ...prev, [rowKey]: null }));
   };
@@ -1000,7 +1112,8 @@ function Pricing() {
     nextValue: string
   ) => {
     const rowKey = buildSupplyRowKey(productId, sourceId);
-    setSupplyPriceDrafts((prev) => ({ ...prev, [rowKey]: nextValue }));
+    const formatted = formatVndInput(nextValue);
+    setSupplyPriceDrafts((prev) => ({ ...prev, [rowKey]: formatted }));
     setSupplyRowErrors((prev) => ({ ...prev, [rowKey]: null }));
   };
 
@@ -1030,7 +1143,7 @@ function Pricing() {
       }));
       return;
     }
-    const parsedValue = Number(trimmedValue);
+    const parsedValue = Number(trimmedValue.replace(/\D+/g, ""));
     if (!Number.isFinite(parsedValue) || parsedValue < 0) {
       setSupplyRowErrors((prev) => ({
         ...prev,
@@ -1164,12 +1277,14 @@ function Pricing() {
     field: "sourceName" | "price",
     value: string
   ) => {
+    const next =
+      field === "price" ? formatVndInput(value) : value;
     setNewSupplyRows((prev) => {
       const current = prev[productId];
       if (!current) return prev;
       return {
         ...prev,
-        [productId]: { ...current, [field]: value, error: null },
+        [productId]: { ...current, [field]: next, error: null },
       };
     });
   };
@@ -1186,7 +1301,7 @@ function Pricing() {
     const current = newSupplyRows[product.id];
     if (!current) return;
     const trimmedName = current.sourceName.trim();
-    const parsedPrice = Number(current.price);
+    const parsedPrice = Number((current.price || "").replace(/\D+/g, ""));
     if (!trimmedName) {
       setNewSupplyRows((prev) => ({
         ...prev,
@@ -1449,6 +1564,9 @@ function Pricing() {
     if (bankOptions.length === 0 && !isLoadingBanks) {
       loadBankOptions();
     }
+    if (supplierOptions.length === 0 && !isLoadingSuppliers) {
+      loadSupplierOptions();
+    }
   };
 
   const handleCloseCreateModal = () => {
@@ -1470,7 +1588,69 @@ function Pricing() {
   ) => {
     setCreateSuppliers((prev) =>
       prev.map((entry) =>
-        entry.id === supplierId ? { ...entry, [field]: value } : entry
+        entry.id === supplierId
+          ? {
+              ...entry,
+              [field]:
+                field === "sourceId"
+                  ? value
+                    ? Number(value) || null
+                    : null
+                  : field === "useCustomName"
+                  ? value === "true"
+                  : value,
+            }
+          : entry
+      )
+    );
+  };
+
+  const handleSupplierSelectChange = (supplierId: string, optionValue: string) => {
+    const selected =
+      supplierOptions.find(
+        (opt) =>
+          (opt.id !== null && optionValue === String(opt.id)) ||
+          (opt.id === null && optionValue === opt.name)
+      ) || null;
+
+    setCreateSuppliers((prev) =>
+      prev.map((entry) =>
+        entry.id === supplierId
+          ? {
+              ...entry,
+              sourceId: selected?.id ?? null,
+              sourceName: selected?.name ?? "",
+              numberBank: selected?.numberBank ?? "",
+              bankBin: selected?.binBank ?? "",
+              useCustomName: false,
+            }
+          : entry
+      )
+    );
+  };
+
+  const handleSupplierPriceInput = (supplierId: string, rawValue: string) => {
+    const formatted = formatVndInput(rawValue);
+    setCreateSuppliers((prev) =>
+      prev.map((entry) =>
+        entry.id === supplierId ? { ...entry, price: formatted } : entry
+      )
+    );
+  };
+
+  const handleEnableCustomSupplier = (supplierId: string) => {
+    setCreateSuppliers((prev) =>
+      prev.map((entry) =>
+        entry.id === supplierId
+          ? {
+              ...entry,
+              sourceId: null,
+              sourceName: "",
+              numberBank: "",
+              bankBin: "",
+              useCustomName: true,
+            }
+          : entry
       )
     );
   };
@@ -1511,19 +1691,19 @@ function Pricing() {
     }
     if (nextPctPromo !== null) {
       if (nextPctPromo < MIN_PROMO_RATIO) {
-        setProductEditError("T? gi? khuy?n m?i kh?ng ???c ?m.");
+        setProductEditError("Tỷ giá khuyến mãi không được âm.");
         return;
       }
       const promoHeadroom = Math.max(0, nextPctKhach - 1);
       if (promoHeadroom === 0 && nextPctPromo > 0) {
         setProductEditError(
-          "T? gi? khuy?n m?i kh?ng ?p d?ng khi T? gi? Kh?ch ? 1."
+          "Tỷ giá khuyến mãi không áp dụng khi Tỷ giá Khách ở mức 1."
         );
         return;
       }
       if (nextPctPromo > promoHeadroom) {
         setProductEditError(
-          `T? gi? khuy?n m?i kh?ng ???c v??t ${promoHeadroom.toFixed(2)}`
+          `Tỷ giá khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
         );
         return;
       }
@@ -1603,33 +1783,62 @@ function Pricing() {
       setCreateError("Vui lòng nhập mã sản phẩm");
       return;
     }
-    if (!pctCtvValue || pctCtvValue <= 0) {
+    if (pctCtvValue !== null && pctCtvValue <= 0) {
       setCreateError("Tỷ giá CTV phải lớn hơn 0.");
       return;
     }
-    if (!pctKhachValue || pctKhachValue <= 0) {
+    if (pctKhachValue !== null && pctKhachValue <= 0) {
       setCreateError("Tỷ giá khách phải lớn hơn 0.");
       return;
     }
     if (pctPromoValue !== null) {
       if (pctPromoValue < MIN_PROMO_RATIO) {
-        setCreateError("T? gi? khuy?n m?i kh?ng ???c ?m.");
+        setCreateError("Tỷ giá khuyến mãi không được âm.");
         return;
       }
-      const promoHeadroom = Math.max(0, pctKhachValue - 1);
-      if (promoHeadroom === 0 && pctPromoValue > 0) {
-        setCreateError(
-          "T? gi? khuy?n m?i kh?ng ?p d?ng khi T? gi? Kh?ch ? 1."
-        );
-        return;
-      }
-      if (pctPromoValue > promoHeadroom) {
-        setCreateError(
-          `T? gi? khuy?n m?i kh?ng ???c v??t ${promoHeadroom.toFixed(2)}`
-        );
-        return;
+      if (pctKhachValue !== null && pctKhachValue > 0) {
+        const promoHeadroom = Math.max(0, pctKhachValue - 1);
+        if (promoHeadroom === 0 && pctPromoValue > 0) {
+          setCreateError(
+            "Tỷ giá khuyến mãi không áp dụng khi Tỷ giá Khách ở mức 1."
+          );
+          return;
+        }
+        if (pctPromoValue > promoHeadroom) {
+          setCreateError(
+            `Tỷ giá khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
+          );
+          return;
+        }
       }
     }
+    const normalizedSuppliers = createSuppliers
+      .map((entry) => {
+        const name = entry.sourceName.trim();
+        const numericPrice = Number((entry.price || "").replace(/\D+/g, ""));
+        const price =
+          Number.isFinite(numericPrice) && numericPrice > 0 ? numericPrice : null;
+        if (!name && price === null) return null;
+        return {
+          sourceId:
+            entry.sourceId !== null && Number.isFinite(entry.sourceId)
+              ? entry.sourceId
+              : undefined,
+          sourceName: name || undefined,
+          price,
+          numberBank: entry.numberBank.trim() || undefined,
+          binBank: entry.bankBin.trim() || undefined,
+        };
+      })
+      .filter(
+        (entry): entry is {
+          sourceId?: number;
+          sourceName?: string;
+          price: number | null;
+          numberBank?: string;
+          binBank?: string;
+        } => Boolean(entry && (entry.sourceId || entry.sourceName))
+      );
     setIsSubmittingCreate(true);
     setCreateError(null);
 
@@ -1876,8 +2085,8 @@ function Pricing() {
           >
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-lg font-semibold text-white">xác định Xóa</p>
-                <p className="text-xs text-white/70">
+                <p className="text-lg font-bold text-sky-100">Xác Định Xóa</p>
+                <p className="text-sm text-sky-200/90">
                   Hành động này sẽ Xóa Sản Phẩm khỏi bảng Giá.
                 </p>
               </div>
@@ -1892,13 +2101,13 @@ function Pricing() {
             </div>
             <div className="space-y-3 text-sm text-white/70">
               <div>
-                <p className="font-semibold text-white">
+                <p className="font-bold text-sky-100">
                   {deleteProductState.product.packageName ||
                     deleteProductState.product.packageProduct ||
                     deleteProductState.product.sanPhamRaw ||
                     `Sản Phẩm #${deleteProductState.product.id}`}
                 </p>
-                <p className="text-xs text-white/70">
+                <p className="text-sm text-sky-200/90">
                   Mã:{" "}
                   {deleteProductState.product.sanPhamRaw || "Không xác định"}
                 </p>
@@ -1945,10 +2154,10 @@ function Pricing() {
             </button>
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 sm:px-6 sm:py-8">
               <div>
-                <h2 className="text-xl font-semibold text-white">
+                <h2 className="text-xl font-bold text-sky-100">
                   Thêm Sản Phẩm mới
                 </h2>
-                <p className="text-sm text-white/70">
+                <p className="text-base text-sky-200/90">
                   Nhập Thông tin Sản Phẩm, Nhà Cung Cấp, Tỷ Giá
                 </p>
               </div>
@@ -2091,82 +2300,221 @@ function Pricing() {
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Tên NCC
                             </label>
-                            <input
-                              type="text"
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
-                              value={supplier.sourceName}
-                              onChange={(event) =>
-                                handleSupplierChange(
-                                  supplier.id,
-                                  "sourceName",
-                                  event.target.value
-                                )
-                              }
-                            />
+                            <div className="mt-1 flex items-stretch gap-2">
+                              <div className="flex-1">
+                                {supplier.useCustomName ? (
+                                  <input
+                                    type="text"
+                                    className="w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Nhập tên NCC"
+                                    value={supplier.sourceName}
+                                    onChange={(event) =>
+                                      handleSupplierChange(
+                                        supplier.id,
+                                        "sourceName",
+                                        event.target.value
+                                      )
+                                    }
+                                  />
+                                ) : (
+                                  <select
+                                    className="supplier-select w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                    value={
+                                      supplier.sourceId !== null
+                                        ? String(supplier.sourceId)
+                                        : supplier.sourceName
+                                    }
+                                    onChange={(event) =>
+                                      handleSupplierSelectChange(
+                                        supplier.id,
+                                        event.target.value
+                                      )
+                                    }
+                                  >
+                                    <option value="">
+                                      {isLoadingSuppliers
+                                        ? "Đang tải NCC..."
+                                        : "Chọn NCC"}
+                                    </option>
+                                    {supplierOptions.map((option) => {
+                                      const optionValue =
+                                        option.id !== null
+                                          ? String(option.id)
+                                          : option.name;
+                                      return (
+                                        <option key={optionValue} value={optionValue}>
+                                          {option.name}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-300/70 bg-white/90 text-blue-600 hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-60"
+                                onClick={() =>
+                                  supplier.useCustomName
+                                    ? handleSupplierSelectChange(supplier.id, "")
+                                    : handleEnableCustomSupplier(supplier.id)
+                                }
+                                title={
+                                  supplier.useCustomName
+                                    ? "Quay lại chọn NCC có sẵn"
+                                    : "Thêm NCC mới (điền tên thủ công)"
+                                }
+                              >
+                                {supplier.useCustomName ? (
+                                  <MinusIcon className="h-5 w-5" />
+                                ) : (
+                                  <PlusIcon className="h-5 w-5" />
+                                )}
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Giá Nhập
                             </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1000"
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
-                              value={supplier.price}
-                              onChange={(event) =>
-                                handleSupplierChange(
-                                  supplier.id,
-                                  "price",
-                                  event.target.value
-                                )
-                              }
-                            />
+                            {(() => {
+                              const displayPrice = formatVndDisplay(supplier.price);
+                              return (
+                                <input
+                                  type="text"
+                                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                  value={displayPrice}
+                                  onChange={(event) =>
+                                    handleSupplierPriceInput(
+                                      supplier.id,
+                                      event.target.value
+                                    )
+                                  }
+                                  placeholder="0"
+                                />
+                              );
+                            })()}
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Số Tài Khoản
                             </label>
-                            <input
-                              type="text"
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
-                              value={supplier.numberBank}
-                              onChange={(event) =>
-                                handleSupplierChange(
-                                  supplier.id,
-                                  "numberBank",
-                                  event.target.value
-                                )
-                              }
-                            />
+                            {(() => {
+                              const isLocked =
+                                !supplier.useCustomName &&
+                                Boolean(supplier.sourceId) &&
+                                Boolean(supplier.bankBin || supplier.numberBank);
+                              return (
+                                <input
+                                  type="text"
+                                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                  value={supplier.numberBank}
+                                  onChange={(event) =>
+                                    handleSupplierChange(
+                                      supplier.id,
+                                      "numberBank",
+                                      event.target.value
+                                    )
+                                  }
+                                  disabled={isLocked}
+                                  style={
+                                    isLocked
+                                      ? { opacity: 0.7, cursor: "not-allowed" }
+                                      : undefined
+                                  }
+                                />
+                              );
+                            })()}
                           </div>
                           <div>
                             <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
                               Ngân Hàng
                             </label>
-                            <select
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
-                              value={supplier.bankBin}
-                              onChange={(event) =>
-                                handleSupplierChange(
-                                  supplier.id,
-                                  "bankBin",
-                                  event.target.value
-                                )
-                              }
-                            >
-                              <option value="">Chọn Ngân Hàng</option>
-                              {bankOptions.map((bank) => (
-                                <option key={bank.bin} value={bank.bin}>
-                                  {bank.name}
-                                </option>
-                              ))}
-                            </select>
+                            {(() => {
+                              const isLocked =
+                                !supplier.useCustomName &&
+                                Boolean(supplier.sourceId) &&
+                                Boolean(supplier.bankBin || supplier.numberBank);
+                              return (
+                                <select
+                                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                  value={supplier.bankBin}
+                                  onChange={(event) =>
+                                    handleSupplierChange(
+                                      supplier.id,
+                                      "bankBin",
+                                      event.target.value
+                                    )
+                                  }
+                                  disabled={isLocked}
+                                  style={
+                                    isLocked
+                                      ? { opacity: 0.7, cursor: "not-allowed" }
+                                      : undefined
+                                  }
+                                >
+                                  <option value="">Chọn Ngân Hàng</option>
+                                  {bankOptions.map((bank) => (
+                                    <option key={bank.bin} value={bank.bin}>
+                                      {bank.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })()}
                             {isLoadingBanks && (
                               <p className="mt-1 text-[11px] text-white/60">
                                 Đang Tải Danh Sách Ngân Hàng...
                               </p>
                             )}
+                          </div>
+                          <div className="md:col-span-2">
+                            {(() => {
+                              const basePrice = Number(
+                                (supplier.price || "").replace(/\D+/g, "")
+                              );
+                              const pctCtvValue = parseRatioInput(createForm.pctCtv);
+                              const pctKhachValue = parseRatioInput(createForm.pctKhach);
+                              const wholesalePreview =
+                                basePrice && pctCtvValue
+                                  ? multiplyValue(basePrice, pctCtvValue)
+                                  : null;
+                              const retailPreview =
+                                pctKhachValue && (wholesalePreview || basePrice)
+                                  ? multiplyValue(
+                                      wholesalePreview || basePrice,
+                                      pctKhachValue
+                                    )
+                                  : null;
+                              return (
+                                <div className="mt-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 shadow-inner">
+                                  <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">
+                                    Xem trước giá
+                                  </p>
+                                  <div className="mt-2 grid gap-3 md:grid-cols-2">
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[11px] uppercase text-white/60">
+                                        Giá sỉ (theo Tỷ giá CTV)
+                                      </span>
+                                      <span className="text-sm font-semibold text-white">
+                                        {wholesalePreview
+                                          ? formatCurrencyValue(wholesalePreview)
+                                          : "-"}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[11px] uppercase text-white/60">
+                                        Giá lẻ (theo Tỷ giá Khách)
+                                      </span>
+                                      <span className="text-sm font-semibold text-white">
+                                        {retailPreview
+                                          ? formatCurrencyValue(retailPreview)
+                                          : "-"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -2205,7 +2553,7 @@ function Pricing() {
                   onClick={handleSubmitCreateProduct}
                   disabled={isSubmittingCreate}
                 >
-                  {isSubmittingCreate ? "Đang Lưu..." : "Luu Sản Phẩm"}
+                  {isSubmittingCreate ? "Đang Lưu..." : "Lưu Sản Phẩm"}
                 </button>
               </div>
             </div>
@@ -2268,7 +2616,7 @@ function Pricing() {
               onClick={handleRefreshAll}
               disabled={isLoading || isRefreshing}
             >
-              {isLoading || isRefreshing ? "Đang Đồng Bộ..." : "Đồng Bộ Lỗi"}
+              {isLoading || isRefreshing ? "Đang Đồng Bộ..." : "Đồng Bộ Lại"}
             </GradientButton>
           </div>
           {error && (
@@ -2927,9 +3275,7 @@ function Pricing() {
                                                       <div className="flex flex-col items-center">
                                                         <div className="flex items-center gap-1">
                                                           <input
-                                                            type="number"
-                                                            min={0}
-                                                            step="1000"
+                                                            type="text"
                                                             value={inputValue}
                                                             disabled={
                                                               inputDisabled
@@ -2953,7 +3299,7 @@ function Pricing() {
                                                             }`}
                                                           />
                                                           <span className="text-xs text-white/70">
-                                                            ?
+                                                            đ
                                                           </span>
                                                         </div>
                                                         {inputError && (
@@ -3076,16 +3422,14 @@ function Pricing() {
                                                       />
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                      <div className="flex items-center justify-center gap-1">
-                                                        <input
-                                                          type="number"
-                                                          min={0}
-                                                          step="1000"
-                                                          className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                                          placeholder="Giá Nhập"
-                                                          value={draft.price}
-                                                          onChange={(event) =>
-                                                            handleNewSupplierInputChange(
+                                                        <div className="flex items-center justify-center gap-1">
+                                                          <input
+                                                            type="text"
+                                                            className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                            placeholder="Giá Nhập"
+                                                            value={draft.price}
+                                                            onChange={(event) =>
+                                                              handleNewSupplierInputChange(
                                                               item.id,
                                                               "price",
                                                               event.target.value
@@ -3096,7 +3440,7 @@ function Pricing() {
                                                           }
                                                         />
                                                         <span className="text-xs text-white/70">
-                                                          ?
+                                                          đ
                                                         </span>
                                                       </div>
                                                     </td>

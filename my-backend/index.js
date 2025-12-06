@@ -17,6 +17,7 @@ const {
     PAYMENT_RECEIPT_COLS,
     PAYMENT_SUPPLY_COLS,
     PRODUCT_PRICE_COLS,
+    PRODUCT_DESC_COLS,
     SUPPLY_COLS,
     SUPPLY_PRICE_COLS,
     USERS_COLS,
@@ -195,6 +196,18 @@ const getNextSupplyPriceId = async(client) => {
     await client.query("LOCK TABLE mavryk.supply_price IN EXCLUSIVE MODE;");
     const result = await client.query(
         `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.supply_price;`
+    );
+    const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
+    const nextId = Number(
+        nextRow && nextRow.next_id !== undefined ? nextRow.next_id : 1
+    );
+    return Number.isFinite(nextId) ? nextId : 1;
+};
+
+const getNextProductDescId = async(client) => {
+    await client.query("LOCK TABLE mavryk.product_desc IN EXCLUSIVE MODE;");
+    const result = await client.query(
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.product_desc;`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -615,6 +628,13 @@ const supplyPriceCols = {
     productId: quoteIdent(SUPPLY_PRICE_COLS.productId),
     sourceId: quoteIdent(SUPPLY_PRICE_COLS.sourceId),
     price: quoteIdent(SUPPLY_PRICE_COLS.price),
+};
+const productDescCols = {
+    id: quoteIdent(PRODUCT_DESC_COLS.id),
+    productId: quoteIdent(PRODUCT_DESC_COLS.productId),
+    rules: quoteIdent(PRODUCT_DESC_COLS.rules),
+    description: quoteIdent(PRODUCT_DESC_COLS.description),
+    imageUrl: quoteIdent(PRODUCT_DESC_COLS.imageUrl),
 };
 
 const PACKAGE_PRODUCTS_SELECT = `
@@ -1100,6 +1120,14 @@ const normalizeTextInput = (value) => {
     return String(value).trim();
 };
 
+const trimToLength = (value, maxLength = 255) => {
+    if (value === undefined || value === null) return null;
+    const str = String(value).trim();
+    if (!str) return null;
+    if (str.length <= maxLength) return str;
+    return str.slice(0, maxLength);
+};
+
 const normalizeMultiplier = (value) => {
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? numeric : 1.0;
@@ -1175,6 +1203,23 @@ const mapDbProductPriceRow = (row) => {
         computed_promo_price: computedPromoPrice,
         promo_price: computedPromoPrice,
         max_supply_price: baseSupplyPrice,
+    };
+};
+
+const mapProductDescRow = (row) => {
+    if (!row) return null;
+    const productId = (row.product_id || "").trim();
+    const imageUrl =
+        typeof row.image_url === "string" && row.image_url.trim()
+            ? row.image_url.trim()
+            : null;
+    return {
+        id: Number(row.id) || 0,
+        productId,
+        productName: (row.product_name || "").trim() || null,
+        rules: (row.rules || "").trim(),
+        description: (row.description || "").trim(),
+        imageUrl,
     };
 };
 
@@ -1426,6 +1471,15 @@ const normalizeCheckFlagValue = (value) => {
         }
     }
     return null;
+};
+
+const normalizeStatusKey = (value) => {
+    if (value === undefined || value === null) return "";
+    return String(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/gi, "")
+        .toLowerCase();
 };
 
 const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
@@ -1964,6 +2018,26 @@ ${makeOrderSelect("order_canceled", orderCanceledCols)}
     }
 });
 
+app.get("/api/supplies", async(req, res) => {
+    try {
+        const result = await pool.query(
+            `
+      SELECT
+        ${supplyCols.id} AS id,
+        ${supplyCols.sourceName} AS source_name,
+        ${supplyCols.numberBank} AS number_bank,
+        ${supplyCols.binBank} AS bin_bank
+      FROM ${DB_SCHEMA}.supply
+      ORDER BY ${supplyCols.sourceName};
+      `
+        );
+        res.json(result.rows || []);
+    } catch (error) {
+        console.error("Query failed (GET /api/supplies):", error);
+        res.status(500).json({ error: "Unable to load suppliers." });
+    }
+});
+
 app.get("/api/supplies/:supplyId/products", async(req, res) => {
     const { supplyId } = req.params;
     console.log(`[GET] /api/supplies/${supplyId}/products`);
@@ -2168,7 +2242,7 @@ app.get("/api/payment-receipts", async(req, res) => {
 app.get("/api/products", async(_req, res) => {
     console.log("[GET] /api/products");
     const q = `
-    SELECT id, san_pham
+    SELECT id, san_pham, package_product, package
     FROM mavryk.product_price
     ORDER BY san_pham;
   `;
@@ -2181,6 +2255,173 @@ app.get("/api/products", async(_req, res) => {
         res.status(500).json({
             error: "Unable to load products.",
         });
+    }
+});
+
+app.get("/api/product-descriptions", async(req, res) => {
+    console.log("[GET] /api/product-descriptions", req.query);
+    const limitParam = Number.parseInt(req.query.limit, 10);
+    const offsetParam = Number.parseInt(req.query.offset, 10);
+    const search =
+        typeof req.query.search === "string" ? req.query.search.trim() : "";
+
+    const limit = Number.isFinite(limitParam) ?
+        Math.min(Math.max(limitParam, 1), 200) :
+        50;
+    const offset =
+        Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
+
+    const params = [];
+    let whereClause = "";
+    if (search) {
+        params.push(`%${search.toLowerCase()}%`);
+        const searchIdx = params.length;
+        whereClause = `
+      WHERE (
+        LOWER(COALESCE(pd.${productDescCols.productId}::text, '')) LIKE $${searchIdx}
+        OR LOWER(COALESCE(pd.${productDescCols.rules}::text, '')) LIKE $${searchIdx}
+        OR LOWER(COALESCE(pd.${productDescCols.description}::text, '')) LIKE $${searchIdx}
+      )
+    `;
+    }
+
+    params.push(offset);
+    const offsetIdx = params.length;
+    params.push(limit);
+    const limitIdx = params.length;
+
+    const query = `
+    WITH raw AS (
+      SELECT
+        pd.${productDescCols.id} AS id,
+        COALESCE(TRIM(pd.${productDescCols.productId}::text), '') AS product_id,
+        COALESCE(TRIM(pd.${productDescCols.rules}::text), '') AS rules,
+        COALESCE(TRIM(pd.${productDescCols.description}::text), '') AS description,
+        COALESCE(NULLIF(TRIM(pd.${productDescCols.imageUrl}::text), ''), NULL) AS image_url,
+        COALESCE(pp.san_pham::text, '') AS product_name
+      FROM ${DB_SCHEMA}.product_desc pd
+      LEFT JOIN ${DB_SCHEMA}.product_price pp
+        ON (
+          CASE
+            WHEN TRIM(pd.${productDescCols.productId}::text) ~ '^\\d+$'
+              THEN TRIM(pd.${productDescCols.productId}::text)::int
+            ELSE NULL
+          END
+        ) = pp.id
+        OR LOWER(TRIM(pd.${productDescCols.productId}::text)) = LOWER(TRIM(pp.san_pham::text))
+      ${whereClause}
+    )
+    SELECT *, COUNT(*) OVER() AS total_count
+    FROM raw
+    ORDER BY id DESC
+    OFFSET $${offsetIdx}
+    LIMIT $${limitIdx};
+  `;
+
+    try {
+        const result = await pool.query(query, params);
+        const rows = result.rows || [];
+        const items = rows.map(mapProductDescRow).filter((row) => row !== null);
+        const totalCount =
+            rows.length > 0 && Number.isFinite(Number(rows[0].total_count)) ?
+            Number(rows[0].total_count) :
+            items.length;
+        res.json({
+            items,
+            count: items.length,
+            total: totalCount,
+            offset,
+            limit,
+        });
+    } catch (error) {
+        console.error("Query failed (GET /api/product-descriptions):", error);
+        res.status(500).json({
+            error: "Unable to load product descriptions.",
+        });
+    }
+});
+
+app.post("/api/product-descriptions", async(req, res) => {
+    console.log("[POST] /api/product-descriptions");
+    const { productId, rules, description, imageUrl } = req.body || {};
+
+    const normalizedProductId = trimToLength(normalizeTextInput(productId), 255);
+    const normalizedRules = trimToLength(rules, 255);
+    const normalizedDescription = trimToLength(description, 255);
+    const normalizedImageUrl = trimToLength(imageUrl, 255);
+
+    if (!normalizedProductId) {
+        return res.status(400).json({ error: "product_id is required." });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const existing = await client.query(
+            `
+        SELECT ${productDescCols.id} AS id
+        FROM ${DB_SCHEMA}.product_desc
+        WHERE LOWER(TRIM(${productDescCols.productId}::text)) = LOWER(TRIM($1::text))
+        LIMIT 1;
+      `, [normalizedProductId]
+        );
+
+        if (existing.rows.length) {
+            const currentId = existing.rows[0].id;
+            const updateResult = await client.query(
+                `
+          UPDATE ${DB_SCHEMA}.product_desc
+          SET ${productDescCols.productId} = $1,
+              ${productDescCols.rules} = $2,
+              ${productDescCols.description} = $3,
+              ${productDescCols.imageUrl} = $4
+          WHERE ${productDescCols.id} = $5
+          RETURNING ${productDescCols.id} AS id,
+                    ${productDescCols.productId} AS product_id,
+                    ${productDescCols.rules} AS rules,
+                    ${productDescCols.description} AS description,
+                    ${productDescCols.imageUrl} AS image_url;
+        `, [
+                    normalizedProductId,
+                    normalizedRules,
+                    normalizedDescription,
+                    normalizedImageUrl,
+                    currentId,
+                ]
+            );
+            await client.query("COMMIT");
+            return res.json(mapProductDescRow(updateResult.rows[0]));
+        }
+
+        const nextId = await getNextProductDescId(client);
+        const insertResult = await client.query(
+            `
+        INSERT INTO ${DB_SCHEMA}.product_desc
+          (${productDescCols.id}, ${productDescCols.productId}, ${productDescCols.rules}, ${productDescCols.description}, ${productDescCols.imageUrl})
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING ${productDescCols.id} AS id,
+                  ${productDescCols.productId} AS product_id,
+                  ${productDescCols.rules} AS rules,
+                  ${productDescCols.description} AS description,
+                  ${productDescCols.imageUrl} AS image_url;
+      `, [
+                nextId,
+                normalizedProductId,
+                normalizedRules,
+                normalizedDescription,
+                normalizedImageUrl,
+            ]
+        );
+        await client.query("COMMIT");
+        return res.status(201).json(mapProductDescRow(insertResult.rows[0]));
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Mutation failed (POST /api/product-descriptions):", error);
+        res.status(500).json({
+            error: "Unable to save product description.",
+        });
+    } finally {
+        client.release();
     }
 });
 
@@ -2318,28 +2559,35 @@ app.post("/api/product-prices", async(req, res) => {
             const numberBank = normalizeTextInput(supplier?.numberBank);
             const bankBin = normalizeTextInput(supplier?.bankBin);
             const priceValue = toNullableNumber(supplier?.price);
+            const sourceIdFromPayload = toNullableNumber(supplier?.sourceId);
 
-            if (!sourceName) {
+            if (!sourceName && !sourceIdFromPayload) {
                 await client.query("ROLLBACK");
                 return res
                     .status(400)
-                    .json({ error: "TÃªn nguá»“n khÃ´ng Ä‘Æ°á»£c bá» trá»‘ng." });
-            }
-            if (!bankBin) {
-                await client.query("ROLLBACK");
-                return res
-                    .status(400)
-                    .json({ error: "Vui lÃ²ng chá»n ngÃ¢n hÃ ng cho nguá»“n." });
+                    .json({ error: "Tên nguồn không được bỏ trống." });
             }
             if (!priceValue || priceValue <= 0) {
                 await client.query("ROLLBACK");
                 return res.status(400).json({
-                    error: `GiÃ¡ nháº­p cho nguá»“n ${sourceName} pháº£i lá»›n hÆ¡n 0.`,
+                    error: `Giá nhập cho nguồn ${sourceName || sourceIdFromPayload || ""} phải lớn hơn 0.`,
                 });
             }
 
-            let supplyId = await findSupplyIdByName(client, sourceName);
+            // Nếu đã có sourceId, không yêu cầu ngân hàng/STK và không tạo supply mới.
+            let supplyId = sourceIdFromPayload || null;
+            if (!supplyId && sourceName) {
+                supplyId = await findSupplyIdByName(client, sourceName);
+            }
+
+            // Chỉ tạo supply mới nếu chưa có; khi tạo mới mới yêu cầu bankBin.
             if (!supplyId) {
+                if (!bankBin) {
+                    await client.query("ROLLBACK");
+                    return res
+                        .status(400)
+                        .json({ error: "Vui lòng chọn ngân hàng cho nguồn." });
+                }
                 const nextSupplyId = await getNextSupplyId(client);
                 const statusColumn = await resolveSupplyStatusColumn();
                 const fields = [
@@ -3861,6 +4109,32 @@ app.delete("/api/orders/:id", async(req, res) => {
         const cancellationRefundRaw = req.body?.refund ?? null;
         const cancellationRefund = toNullableNumber(cancellationRefundRaw);
         const normalizedRow = normalizeOrderRow(existingResult.rows[0], todayYmd);
+        const normalizedStatusKey = normalizeStatusKey(normalizedRow?.status);
+        const normalizedCheckFlag = normalizeCheckFlagValue(
+            normalizedRow?.check_flag
+        );
+        const shouldHardDelete =
+            normalizedStatusKey.startsWith("chuathanhto") &&
+            normalizedCheckFlag === null;
+
+        // Newly created, unpaid orders (status "Chua Thanh Toan" & check_flag is null)
+        // should be removed outright without archiving to refund/expired tables.
+        if (shouldHardDelete) {
+            await client.query(
+                `
+      DELETE FROM mavryk.order_list
+      WHERE id = $1
+    `, [parsedId]
+            );
+            await client.query("COMMIT");
+            return res.json({
+                success: true,
+                deletedId: parsedId,
+                movedTo: "deleted",
+                deletedOrder: normalizedRow,
+            });
+        }
+
         const remainingDays =
             typeof normalizedRow.so_ngay_con_lai === "number" ?
             normalizedRow.so_ngay_con_lai :

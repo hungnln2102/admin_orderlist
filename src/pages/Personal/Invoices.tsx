@@ -7,11 +7,11 @@ import {
   CalendarDaysIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
-import GradientButton from "../components/GradientButton";
-import * as Helpers from "../lib/helpers";
-import { apiFetch } from "../lib/api";
-import { PAYMENT_RECEIPT_COLS } from "../lib/tableSql";
+import StatCard, { STAT_CARD_ACCENTS } from "../../components/StatCard";
+import GradientButton from "../../components/GradientButton";
+import * as Helpers from "../../lib/helpers";
+import { apiFetch } from "../../lib/api";
+import { PAYMENT_RECEIPT_COLS } from "../../lib/tableSql";
 import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
 
 interface PaymentReceipt {

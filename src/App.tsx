@@ -8,16 +8,16 @@ import {
 } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
-import Orders from "./pages/Orders";
-import PackageProduct from "./pages/PackageProduct";
-import Sources from "./pages/Sources";
-import Pricing from "./pages/Pricing";
-import Invoices from "./pages/Invoices";
+import Orders from "./pages/Product/Orders";
+import PackageProduct from "./pages/Product/PackageProduct";
+import ProductInfo from "./pages/Product/ProductInfo";
+import Pricing from "./pages/Product/Pricing";
 import RetroLogin from "./pages/RetroLogin";
-import ProductInfo from "./pages/ProductInfo";
-import Stats from "./pages/Stats";
-import BillOrder from "./pages/bill-order";
-import ShowPrice from "./pages/ShowPrice";
+import Stats from "./pages/Personal/Stats";
+import Sources from "./pages/Personal/Sources";
+import ShowPrice from "./pages/Personal/ShowPrice";
+import BillOrder from "./pages/Personal/bill-order";
+import Invoices from "./pages/Personal/Invoices";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

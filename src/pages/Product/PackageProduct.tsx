@@ -6,8 +6,8 @@ import React, {
   useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { apiFetch } from "../lib/api";
-import GradientButton from "../components/GradientButton";
+import { apiFetch } from "../../lib/api";
+import GradientButton from "../../components/GradientButton";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -23,8 +23,8 @@ import {
   TrashIcon,
   CheckIcon,
 } from "@heroicons/react/24/outline";
-import StatCard, { STAT_CARD_ACCENTS } from "../components/StatCard";
-import { ORDER_COLS } from "../lib/tableSql";
+import StatCard, { STAT_CARD_ACCENTS } from "../../components/StatCard";
+import { ORDER_COLS } from "../../lib/tableSql";
 
 const SUMMARY_CARD_ACCENTS = [
   {

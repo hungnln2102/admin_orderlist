@@ -83,6 +83,14 @@ export const PRODUCT_PRICE_COLS: ColumnDict = {
   pctPromo: "pct_promo",
 };
 
+export const PRODUCT_DESC_COLS: ColumnDict = {
+  id: "id",
+  productId: "product_id",
+  rules: "rules",
+  description: "description",
+  imageUrl: "image_url",
+};
+
 export const REFUND_COLS: ColumnDict = {
   id: "id",
   orderCode: "ma_don_hang",
@@ -121,6 +129,7 @@ export const SCHEMA_TABLES = {
   PAYMENT_RECEIPT_COLS,
   PAYMENT_SUPPLY_COLS,
   PRODUCT_PRICE_COLS,
+  PRODUCT_DESC_COLS,
   REFUND_COLS,
   SUPPLY_COLS,
   SUPPLY_PRICE_COLS,

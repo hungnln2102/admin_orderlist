@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useMemo, useState } from "react";
 import { ArrowDownTrayIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { API_ENDPOINTS } from "../constants";
-import { ORDER_COLS, PRODUCT_PRICE_COLS } from "../lib/tableSql";
+import { API_ENDPOINTS } from "../../constants";
+import { ORDER_COLS, PRODUCT_PRICE_COLS } from "../../lib/tableSql";
 
 type InvoiceForm = {
   invoiceCode: string;
@@ -109,6 +109,14 @@ const formatCurrency = (value: number): string =>
   `${value.toLocaleString("vi-VN")} đ`;
 
 export default function BillOrder() {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "Mavryk Premium Store";
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
   const [form, setForm] = useState<InvoiceForm>(DEFAULT_FORM);
   const [invoiceCodes, setInvoiceCodes] = useState<InvoiceEntry[]>([]);
   const [hoveredInvoiceId, setHoveredInvoiceId] = useState<string | null>(null);

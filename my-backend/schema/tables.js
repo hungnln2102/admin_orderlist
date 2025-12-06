@@ -81,6 +81,14 @@ const PRODUCT_PRICE_COLS = {
     pctPromo: "pct_promo",
 };
 
+const PRODUCT_DESC_COLS = {
+    id: "id",
+    productId: "product_id",
+    rules: "rules",
+    description: "description",
+    imageUrl: "image_url",
+};
+
 const REFUND_COLS = {
     id: "id",
     orderCode: "ma_don_hang",
@@ -119,6 +127,7 @@ module.exports = {
     PAYMENT_RECEIPT_COLS,
     PAYMENT_SUPPLY_COLS,
     PRODUCT_PRICE_COLS,
+    PRODUCT_DESC_COLS,
     REFUND_COLS,
     SUPPLY_COLS,
     SUPPLY_PRICE_COLS,

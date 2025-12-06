@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type QuoteLine = {
   id: string;
@@ -30,6 +30,14 @@ const inputClass =
   "w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-slate-300 focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60";
 
 export default function ShowPrice() {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "Mavryk Premium Store";
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
   const [quoteDate, setQuoteDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
@@ -37,10 +45,38 @@ export default function ShowPrice() {
   const [contact, setContact] = useState("");
   const [productCode, setProductCode] = useState("");
   const [lines, setLines] = useState<QuoteLine[]>([
-    { id: "1", product: "Zoom Pro - 100 user", packageName: "1 nam", term: "", unitPrice: 1_950_000, quantity: 1 },
-    { id: "2", product: "Zoom Pro - 300 user", packageName: "1 nam", term: "", unitPrice: 3_134_000, quantity: 1 },
-    { id: "3", product: "Zoom Pro - 500 user", packageName: "1 nam", term: "", unitPrice: 12_025_000, quantity: 1 },
-    { id: "4", product: "Zoom Pro - 1000 user", packageName: "1 nam", term: "", unitPrice: 19_805_000, quantity: 1 },
+    {
+      id: "1",
+      product: "Zoom Pro - 100 user",
+      packageName: "1 nam",
+      term: "",
+      unitPrice: 1_950_000,
+      quantity: 1,
+    },
+    {
+      id: "2",
+      product: "Zoom Pro - 300 user",
+      packageName: "1 nam",
+      term: "",
+      unitPrice: 3_134_000,
+      quantity: 1,
+    },
+    {
+      id: "3",
+      product: "Zoom Pro - 500 user",
+      packageName: "1 nam",
+      term: "",
+      unitPrice: 12_025_000,
+      quantity: 1,
+    },
+    {
+      id: "4",
+      product: "Zoom Pro - 1000 user",
+      packageName: "1 nam",
+      term: "",
+      unitPrice: 19_805_000,
+      quantity: 1,
+    },
   ]);
 
   const totals = useMemo(() => {
@@ -102,7 +138,9 @@ export default function ShowPrice() {
       {/* Control panel - only for editing, not printed */}
       <div className="no-print rounded-2xl bg-white/5 border border-white/10 shadow-lg shadow-indigo-900/30">
         <div className="border-b border-white/10 px-6 py-4">
-          <h2 className="text-lg font-semibold text-white">Thong tin bao gia</h2>
+          <h2 className="text-lg font-semibold text-white">
+            Thong tin bao gia
+          </h2>
         </div>
 
         <div className="px-6 py-5 space-y-4">
@@ -127,7 +165,11 @@ export default function ShowPrice() {
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium text-white">Ma bao gia</span>
-              <input value={quoteCode} readOnly className={`${inputClass} opacity-80`} />
+              <input
+                value={quoteCode}
+                readOnly
+                className={`${inputClass} opacity-80`}
+              />
             </label>
           </div>
 
@@ -143,7 +185,9 @@ export default function ShowPrice() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-white">Ghi chu (tuy chon)</span>
+              <span className="text-sm font-medium text-white">
+                Ghi chu (tuy chon)
+              </span>
               <input
                 type="text"
                 className={inputClass}
@@ -206,10 +250,10 @@ export default function ShowPrice() {
       <div className="print-wrapper flex justify-center">
         <div
           id="quote-print-area"
-          className="bg-white text-slate-900 shadow-lg border border-slate-600 print-target"
+          className="bg-white text-slate-900 print-target"
           style={{ width: "210mm", minHeight: "297mm", padding: "12mm 10mm" }}
         >
-          <div className="border border-slate-600">
+          <div>
             {/* Header */}
             <div className="grid grid-cols-[1.1fr_1fr] items-start px-6 pt-5 pb-3">
               <div className="flex items-center gap-4">
@@ -220,7 +264,8 @@ export default function ShowPrice() {
                     className="max-w-full max-h-full"
                     style={{ objectFit: "contain", mixBlendMode: "screen" }}
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                      (e.currentTarget as HTMLImageElement).style.display =
+                        "none";
                     }}
                   />
                 </div>
@@ -233,38 +278,58 @@ export default function ShowPrice() {
             </div>
 
             {/* Title */}
-            <div className="text-center text-[15px] font-semibold border-y border-slate-600 bg-slate-100 py-2">
-              BANG BAO GIA PHAN MEM ZOOM PRO BAN QUYEN
+            <div className="text-center text-[15px] font-semibold bg-indigo-100 text-indigo-900 py-2">
+              BẢNG BÁO GIÁ
             </div>
 
             {/* Intro */}
             <div className="px-6 py-4 text-sm leading-6">
-              <p>Ngay: <strong>{displayDate(quoteDate) || "..."}</strong></p>
-              <p>Kinh gui: <strong>{recipient}</strong></p>
-              {contact ? <p>Thong tin lien he: <strong>{contact}</strong></p> : null}
+              <p>
+                Ngay: <strong>{displayDate(quoteDate) || "..."}</strong>
+              </p>
+              <p>
+                Kinh gui: <strong>{recipient}</strong>
+              </p>
+              {contact ? (
+                <p>
+                  Thong tin lien he: <strong>{contact}</strong>
+                </p>
+              ) : null}
               <p className="mt-3 italic">
-                Loi dau tien, xin tran trong cam on quy khach hang da quan tam den san pham cua chung toi.
-                Chung toi xin gui den quy khach hang bang bao gia chi tiet nhu sau:
+                Loi dau tien, xin tran trong cam on quy khach hang da quan tam
+                den san pham cua chung toi. Chung toi xin gui den quy khach hang
+                bang bao gia chi tiet nhu sau:
               </p>
             </div>
 
             {/* Table */}
             <table className="w-full text-sm border-t border-b border-slate-600">
               <thead>
-                <tr className="text-center bg-slate-200 font-semibold">
+                <tr className="text-center bg-indigo-100 text-slate-900 font-semibold">
                   <th className="border border-slate-600 py-2 w-12">STT</th>
-                  <th className="border border-slate-600 py-2">TEN SAN PHAM</th>
+                  <th className="border border-slate-600 py-2 px-2 whitespace-nowrap">
+                    TEN SAN PHAM
+                  </th>
                   <th className="border border-slate-600 py-2 w-32">GOI</th>
                   <th className="border border-slate-600 py-2 w-32">DON GIA</th>
-                  <th className="border border-slate-600 py-2 w-32">THANH TIEN</th>
+                  <th className="border border-slate-600 py-2 w-32">
+                    THANH TIEN
+                  </th>
                   <th className="border border-slate-600 py-2 w-36">GHI CHU</th>
                 </tr>
               </thead>
               <tbody>
                 {totals.rows.map((row, idx) => (
                   <tr key={row.id} className="align-top">
-                    <td className="border border-slate-600 text-center py-2">{idx + 1}</td>
-                    <td className="border border-slate-600 px-2 py-2">{row.product}</td>
+                    <td className="border border-slate-600 text-center py-2">
+                      {idx + 1}
+                    </td>
+                    <td
+                      className="border border-slate-600 px-2 py-2 whitespace-nowrap"
+                      title={row.product}
+                    >
+                      {row.product}
+                    </td>
                     <td className="border border-slate-600 text-center px-2 py-2">
                       {row.packageName || row.term}
                     </td>
@@ -291,7 +356,8 @@ export default function ShowPrice() {
               <p>So luong nguoi tham gia: 100, 300, 500 den 1000 nguoi</p>
               <p>1GB write lai cuoc hop tren dam may</p>
               <p className="mt-2">
-                Moi van de thac mac ve bao gia xin vui long lien he: 0378.304.963
+                Moi van de thac mac ve bao gia xin vui long lien he:
+                0378.304.963
               </p>
               <p className="italic text-[13px]">Xin chan thanh cam on!</p>
             </div>
@@ -302,7 +368,9 @@ export default function ShowPrice() {
                 <p className="font-semibold underline underline-offset-2">
                   Mavryk Premium Store
                 </p>
-                <p className="text-[12px] italic text-white/80">(Ky, ghi ro ho ten)</p>
+                <p className="text-[12px] italic text-white/80">
+                  (Ky, ghi ro ho ten)
+                </p>
                 <div className="min-h-[90px] flex items-center justify-center">
                   <img
                     src="/signature.png"
@@ -310,7 +378,8 @@ export default function ShowPrice() {
                     className="max-h-[90px] max-w-[220px]"
                     style={{ objectFit: "contain" }}
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                      (e.currentTarget as HTMLImageElement).style.display =
+                        "none";
                     }}
                   />
                 </div>
@@ -325,10 +394,29 @@ export default function ShowPrice() {
 }
 
 const printStyles = `
+  /* Hide scrollbars while keeping scroll functionality */
+  body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
   @media print {
-    body { background: white !important; }
+    /* Hide everything except the printable quote */
+    body { background: white !important; margin: 0 !important; padding: 0 !important; }
+    body * { visibility: hidden !important; }
+    #quote-print-area,
+    #quote-print-area * { visibility: visible !important; }
+    #quote-print-area {
+      position: absolute;
+      left: 0;
+      top: 0;
+      box-shadow: none !important;
+      border: none !important;
+    }
     .no-print { display: none !important; }
     .print-wrapper { margin: 0 !important; padding: 0 !important; }
-    #quote-print-area { box-shadow: none !important; border: 1px solid #475569 !important; }
   }
 `;

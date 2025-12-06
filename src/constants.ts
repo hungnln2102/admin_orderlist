@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
   CALCULATE_PRICE: "/api/calculate-price",
 
   PRODUCTS_ALL: "/api/products",
+  PRODUCT_DESCRIPTIONS: "/api/product-descriptions",
   PRODUCT_PRICES: "/api/product-prices",
   PRODUCT_PRICE_DETAIL: (productId: number) =>
     `/api/product-prices/${productId}`,

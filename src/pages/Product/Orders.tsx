@@ -24,20 +24,20 @@ import {
   ORDER_DATASET_SEQUENCE,
   OrderDatasetKey,
   Order,
-} from "../constants";
-import GradientButton from "../components/GradientButton";
+} from "../../constants";
+import GradientButton from "../../components/GradientButton";
 import StatCard, {
   STAT_CARD_ACCENTS as CARD_ACCENTS,
   StatAccent,
-} from "../components/StatCard";
-import { API_BASE_URL } from "../lib/api";
+} from "../../components/StatCard";
+import { API_BASE_URL } from "../../lib/api";
 
 // Import Modal tùy chỉnh
-import ConfirmModal from "../components/ConfirmModal";
-import ViewOrderModal from "../components/ViewOrderModal";
-import EditOrderModal from "../components/EditOrderModal";
-import CreateOrderModal from "../components/CreateOrderModal";
-import * as Helpers from "../lib/helpers";
+import ConfirmModal from "../../components/ConfirmModal";
+import ViewOrderModal from "../../components/ViewOrderModal";
+import EditOrderModal from "../../components/EditOrderModal";
+import CreateOrderModal from "../../components/CreateOrderModal";
+import * as Helpers from "../../lib/helpers";
 
 type EditableOrder = Omit<Order, "cost" | "price"> & {
   cost: number | string;
@@ -392,6 +392,33 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
 
     // --- LOGIC SẮP XẾP ---
     filteredOrders.sort((a, b) => {
+      // Với danh sách hết hạn: ưu tiên ngày hết hạn mới nhất (gần hiện tại nhất) trước
+      if (dataset === "expired") {
+        const parseExpiryTime = (order: Order): number => {
+          const raw =
+            sanitizeDateLike(order.expiry_date) ??
+            sanitizeDateLike(order[ORDER_FIELDS.ORDER_EXPIRED]) ??
+            sanitizeDateLike(order.expiry_date_display) ??
+            sanitizeDateLike(order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]);
+          const formatted = Helpers.formatDateToDMY(raw) || String(raw || "");
+          const parts = formatted.split("/");
+          if (parts.length === 3) {
+            const [d, m, y] = parts.map(Number);
+            if (Number.isFinite(d) && Number.isFinite(m) && Number.isFinite(y)) {
+              return new Date(y, m - 1, d).getTime();
+            }
+          }
+          const fallback = new Date(String(raw || ""));
+          return Number.isFinite(fallback.getTime()) ? fallback.getTime() : 0;
+        };
+
+        const timeA = parseExpiryTime(a);
+        const timeB = parseExpiryTime(b);
+        if (timeA !== timeB) {
+          return timeB - timeA; // mới nhất trước
+        }
+      }
+
       const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
       const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
       const priorityA = Helpers.getStatusPriority(statusA);
