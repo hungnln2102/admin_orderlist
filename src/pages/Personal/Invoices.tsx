@@ -38,7 +38,7 @@ const formatCurrencyVndFull = (value: number): string => {
 
 const extractSenderFromNote = (note?: string | null): string | null => {
   if (!note) return null;
-  const match = note.match(/nhan tu\s+(.+?)\s+trace/i);
+  const match = note.match(/nhận từ\s+(.+?)\s+trace/i);
   if (!match) return null;
   const sender = match[1].trim();
   return sender || null;
@@ -391,7 +391,7 @@ export default function Invoices() {
             <div className="px-6 py-10 space-y-6">
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-semibold">
-                  Tạo Thông Tin Thanh Toán Qua QR Code
+                  Tạo thông tin thanh toán qua QR Code
                 </h2>
                 <p className="text-sm text-slate-300">
                   Quét mã QR để chuyển khoản nhanh chóng. Điền số tiền và nội
@@ -401,7 +401,7 @@ export default function Invoices() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-6 flex flex-col items-center text-center space-y-4">
                   <p className="text-lg font-semibold text-sky-200">
-                    Quét Mã QR Để Thanh Toán
+                    Quét mã QR để thanh toán
                   </p>
                   <div className="rounded-2xl bg-white p-4">
                     <img
@@ -468,7 +468,7 @@ export default function Invoices() {
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm text-slate-300">
-                      <span>Thụ Hưởng</span>
+                      <span>Thụ hưởng</span>
                       <span className="font-semibold text-white">
                         {QR_BANK_INFO.accountHolder}
                       </span>
@@ -577,7 +577,7 @@ export default function Invoices() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white drop-shadow-sm">
-              Biên Nhận Thanh Toán
+              Biên nhận thanh toán
             </h1>
             <p className="mt-1 text-sm text-white/80">
               Theo dõi giao dịch chuyển đến được lưu trong hệ thống

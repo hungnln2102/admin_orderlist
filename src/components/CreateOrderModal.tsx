@@ -1,4 +1,4 @@
-﻿// CreateOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
+// CreateOrderModal.tsx - Mã đã được làm sạch và đồng bộ với DB DATE/YMD
 
 import React, {
   useState,
@@ -579,10 +579,7 @@ const useCreateOrderLogic = (
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    updateForm({ [name]: value });
   };
 
   const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -684,7 +681,7 @@ const useCreateOrderLogic = (
         ? Helpers.convertDMYToYMD(expiryDMY)
         : normalizedRegister;
 
-      const dataToSave = {
+      const dataToSave: Partial<Order> = {
         ...formData,
         [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
         [ORDER_FIELDS.PRICE]: Number(formData[ORDER_FIELDS.PRICE]),
@@ -874,6 +871,18 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
   const costValue = formData[ORDER_FIELDS.COST] as string | number | undefined;
   const priceValue = formData[ORDER_FIELDS.PRICE] as string | number | undefined;
+  const rawExpiryValue = useMemo(
+    () => (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || "",
+    [formData]
+  );
+  const registerDateDMY = useMemo(
+    () => (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY(),
+    [formData]
+  );
+  const totalDays = useMemo(
+    () => Number(formData[ORDER_FIELDS.DAYS] || 0) || 0,
+    [formData]
+  );
 
   const handlePriceInput = useCallback(
     (
@@ -915,27 +924,24 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     updateForm,
   ]);
 
-  const rawExpiryValue = (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || "";
-  const registerDateDMY =
-    (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
-  const totalDays = Number(formData[ORDER_FIELDS.DAYS] || 0) || 0;
-
-  // Ensure expiry date is populated and formatted.
-  // If backend doesn't return it, compute from register date + days.
   useEffect(() => {
-    const normalized = Helpers.formatDateToDMY(rawExpiryValue);
+    // Ensure expiry date is populated and formatted.
+    // If backend doesn't return it, compute from register date + days.
+    if (rawExpiryValue) {
+      const normalized = Helpers.formatDateToDMY(rawExpiryValue);
 
-    if (!normalized && registerDateDMY && totalDays > 0) {
-      const computed = calculateExpirationDate(registerDateDMY, totalDays);
-      if (computed && computed !== "N/A") {
+      if (!normalized && registerDateDMY && totalDays > 0) {
+        const computed = calculateExpirationDate(registerDateDMY, totalDays);
+        if (computed && computed !== "N/A") {
+          updateForm({
+            [ORDER_FIELDS.ORDER_EXPIRED]: computed,
+          } as Partial<Order>);
+        }
+      } else if (normalized && normalized !== rawExpiryValue) {
         updateForm({
-          [ORDER_FIELDS.ORDER_EXPIRED]: computed,
+          [ORDER_FIELDS.ORDER_EXPIRED]: normalized,
         } as Partial<Order>);
       }
-    } else if (normalized && normalized !== rawExpiryValue) {
-      updateForm({
-        [ORDER_FIELDS.ORDER_EXPIRED]: normalized,
-      } as Partial<Order>);
     }
   }, [
     rawExpiryValue,
@@ -944,13 +950,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     updateForm,
   ]);
 
-  const readyToLoad = (() => {
+  const readyToLoad = useMemo(() => {
     const prod = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
     const src = (formData[ORDER_FIELDS.SUPPLY] as string) || "";
     const info = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
     const customer = (formData[ORDER_FIELDS.CUSTOMER] as string) || "";
     return !!prod && !!src && !!info && !!customer;
-  })();
+  }, [formData]);
 
   // Mark data as ready when 4 required fields are filled
   useEffect(() => {

@@ -277,6 +277,14 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         .toLowerCase()
         .trim();
     };
+    const isUnpaidNormalizedStatus = (normalizedStatus: string): boolean => {
+      return (
+        normalizedStatus === "chua thanh toan" ||
+        normalizedStatus === "chua hoan" ||
+        normalizedStatus.includes("chua thanh toan") ||
+        normalizedStatus.includes("chua hoan")
+      );
+    };
     const formatStatusDisplay = (value: string): string => {
       const normalized = normalizeStatusValue(value);
       if (normalized && STATUS_DISPLAY_LABELS[normalized]) {
@@ -392,6 +400,18 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
 
     // --- LOGIC SẮP XẾP ---
     filteredOrders.sort((a, b) => {
+      const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
+      const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
+      const normalizedStatusA = normalizeStatusValue(statusA);
+      const normalizedStatusB = normalizeStatusValue(statusB);
+      const unpaidA = isUnpaidNormalizedStatus(normalizedStatusA);
+      const unpaidB = isUnpaidNormalizedStatus(normalizedStatusB);
+
+      // Always bubble unpaid/unrefunded orders to the top for quick visibility.
+      if (unpaidA !== unpaidB) {
+        return unpaidA ? -1 : 1;
+      }
+
       // Với danh sách hết hạn: ưu tiên ngày hết hạn mới nhất (gần hiện tại nhất) trước
       if (dataset === "expired") {
         const parseExpiryTime = (order: Order): number => {
@@ -419,8 +439,6 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
         }
       }
 
-      const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
-      const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
       const priorityA = Helpers.getStatusPriority(statusA);
       const priorityB = Helpers.getStatusPriority(statusB);
 
@@ -487,9 +505,35 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
     };
   }, [orders, searchTerm, searchField, statusFilter, rowsPerPage, currentPage]);
 
+  const {
+    filteredOrders,
+    currentOrders,
+    totalPages,
+    updatedStats,
+    totalRecords,
+  } = calculatedData;
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, searchField, statusFilter, rowsPerPage]);
+
+  const paginationPages = useMemo(() => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+      return pages;
+    }
+    const clamp = (v: number, min: number, max: number) =>
+      Math.min(Math.max(v, min), max);
+    const start = clamp(currentPage - 1, 2, totalPages - 3);
+    const end = clamp(currentPage + 1, 4, totalPages - 1);
+    pages.push(1);
+    if (start > 2) pages.push("...");
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages - 1) pages.push("...");
+    pages.push(totalPages);
+    return pages;
+  }, [currentPage, totalPages]);
 
   // --- HÀM XỬ LÝ MODAL VÀ CRUD (giữ nguyên) ---
 
@@ -658,7 +702,7 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
       await fetchOrders();
       alert("Gia hạn thành công.");
     } catch (error) {
-      console.error("L��-i khi gia hA�n �`��n:", error);
+      console.error("Lỗi khi gia hạn đơn:", error);
       alert(
         `Gia hạn thất bại: ${
           error instanceof Error ? error.message : String(error)
@@ -785,6 +829,8 @@ const useOrdersData = (dataset: OrderDatasetKey) => {
   return {
     // Data & Logic
     ...calculatedData,
+    filteredOrders,
+    paginationPages,
     searchTerm,
     setSearchTerm,
     searchField,
@@ -843,6 +889,8 @@ export default function Orders() {
     currentOrders,
     totalPages,
     updatedStats,
+    filteredOrders,
+    paginationPages,
     searchTerm,
     setSearchTerm,
     searchField,
@@ -876,7 +924,6 @@ export default function Orders() {
     confirmDelete,
     fetchError,
     reloadOrders,
-    filteredOrders, // Dùng để hiển thị tổng số dòng
     totalRecords,
     renewingOrderCode,
   } = useOrdersData(datasetKey);
@@ -1311,7 +1358,7 @@ export default function Orders() {
                                       }
                                     }}
                                   >
-                                    {isRenewing ? "\u0110ang Gia H\u1ea1n..." : "Gia H\u1ea1n"}
+                                    {isRenewing ? "Đang Gia Hạn..." : "Gia Hạn"}
                                   </button>
                                 </div>
                                 )}
@@ -1399,7 +1446,7 @@ export default function Orders() {
 
         {/* Thanh phân trang */}
         {filteredOrders.length > 0 && (
-          <div className="flex items-center justify-between border-t border-white/10 bg-slate-900/85 text-white px-4 py-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 bg-slate-900/85 text-white px-4 py-3 sm:px-6">
             {/* Bộ chọn số dòng / trang */}
             <div className="flex items-center space-x-2 text-sm text-white/80">
               <span>Hiển thị</span>
@@ -1415,27 +1462,66 @@ export default function Orders() {
               </select>
               <span>dòng</span>
             </div>
-            {/* Nút bấm chuyển trang */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-white/80">
-                Trang {currentPage} của {totalPages} (Tổng:{" "}
-                {filteredOrders.length} kết quả)
-              </span>
+            {/* Nút bấm chuyển trang dạng pill */}
+            <div className="flex items-center gap-2 sm:justify-end">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Trang đầu"
+              >
+                {"<<"}
+              </button>
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="rounded p-1 text-white/70 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Trang trước"
               >
-                <ChevronLeftIcon className="h-5 w-5" />
+                {"<"}
               </button>
+              <div className="flex items-center gap-1">
+                {paginationPages.map((p, idx) =>
+                  p === "..." ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-3 py-1 text-white/50"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p)}
+                      disabled={p === currentPage}
+                      className={`h-9 min-w-[36px] rounded-lg px-3 text-sm font-semibold transition border ${
+                        p === currentPage
+                          ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-900/40"
+                          : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              </div>
               <button
                 onClick={() =>
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="rounded p-1 text-white/70 hover:bg-indigo-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Trang sau"
               >
-                <ChevronRightIcon className="h-5 w-5" />
+                {">"}
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Trang cuối"
+              >
+                {">>"}
               </button>
             </div>
           </div>

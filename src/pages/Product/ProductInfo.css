@@ -30,6 +30,67 @@
   border-color: rgba(59, 130, 246, 0.4);
 }
 
+.rich-toolbar-select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rich-toolbar-select option {
+  color: #0b1220;
+}
+
+.rich-toolbar-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rich-color-native {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.rich-color-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e5e7eb;
+  font-size: 13px;
+}
+
+.rich-color-apply {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #f8fafc;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.rich-color-apply:hover {
+  background: #1d4ed8;
+}
+
+.rich-color-error {
+  margin-top: 8px;
+  color: #fca5a5;
+  font-size: 12px;
+}
+
 .rich-editor {
   min-height: 120px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -45,4 +106,17 @@
 .rich-editor:focus {
   outline: 2px solid rgba(59, 130, 246, 0.5);
   outline-offset: 2px;
+}
+
+.rich-editor a,
+.rich-editor a:visited,
+.rich-display a,
+.rich-display a:visited {
+  color: #38bdf8;
+  text-decoration: underline;
+}
+
+.rich-editor a:hover,
+.rich-display a:hover {
+  text-decoration: underline;
 }

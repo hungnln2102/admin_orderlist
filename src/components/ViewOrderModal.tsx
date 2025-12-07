@@ -175,7 +175,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         order.trangThaiText ||
         order[ORDER_FIELDS.STATUS] ||
         ""
-    ).trim() || "Chua Thanh Toan";
+    ).trim() || "Chưa Thanh Toán";
 
   const remainingFromBackend =
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== undefined &&
@@ -239,7 +239,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         {/* Header */}
         <div className="flex justify-center items-center p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
           <h3 className="text-xl font-semibold text-white">
-            Chi Tiết Đơn Hàng:{" "}
+            Chi tiết đơn hàng:{" "}
             <span className="text-blue-600">{order[ORDER_FIELDS.ID_ORDER]}</span>
           </h3>
           <button
@@ -363,13 +363,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           {/* QR Code */}
           <div className="text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
             <h4 className="text-lg font-semibold text-indigo-100 mb-3">
-              Quét Mã QR Để Thanh Toán (VietQR)
+              Quét mã QR để thanh toán (VietQR)
             </h4>
             {qrCodeImageUrl ? (
               <div className="flex justify-center mb-3">
                 <img
                   src={qrCodeImageUrl}
-                  alt={`QR Code thanh toan ${order[ORDER_FIELDS.ID_ORDER]}`}
+                  alt={`QR Code thanh toán ${order[ORDER_FIELDS.ID_ORDER]}`}
                   className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40"
                   width={280}
                   height={280}
@@ -377,21 +377,21 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               </div>
             ) : (
               <p className="text-red-600 font-medium">
-                Không Thể Tạo Mã QR. Vui Lòng Kiểm Tra Lại Cấu Hình
+                Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình
               </p>
             )}
             <div className="text-sm text-slate-100 space-y-1">
               <p>
-                Ngân Hàng: <strong className="text-indigo-100">VP Bank</strong>
+                Ngân hàng: <strong className="text-indigo-100">VP Bank</strong>
               </p>
               <p>
-                Số Tài Khoản: <strong className="text-indigo-100">{ACCOUNT_NO}</strong>
+                Số tài khoản: <strong className="text-indigo-100">{ACCOUNT_NO}</strong>
               </p>
               <p>
-                Chủ Tài Khoản: <strong className="text-indigo-100">{ACCOUNT_NAME}</strong>
+                Chủ tài khoản: <strong className="text-indigo-100">{ACCOUNT_NAME}</strong>
               </p>
               <p>
-                Số Tiền:{" "}
+                Số tiền:{" "}
                 <strong className="text-xl text-red-600">
                   {priceLoading
                     ? "Đang tính..."
@@ -402,13 +402,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <p className="text-xs text-red-500">{priceError}</p>
               )}
               <p>
-                Nội Dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
-                (Vui Lòng Điền Đúng)
+                Nội dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
+                (Vui lòng điền đúng)
               </p>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

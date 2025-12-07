@@ -1,13 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { API_ENDPOINTS } from "../../constants";
+import { PRODUCT_PRICE_COLS } from "../../lib/tableSql";
+import SIGN_IMG from "../../../sign.png";
 
 type QuoteLine = {
   id: string;
+  productCode?: string;
   product: string;
   packageName: string;
   term: string;
+  durationMonths?: number | null;
   unitPrice: number;
   quantity: number;
+  discount?: number;
   note?: string;
+};
+
+type ProductDesc = {
+  productId: string;
+  rules?: string | null;
+  description?: string | null;
 };
 
 const LOGO_SRC = "/mavryk-logo.png"; // Place transparent logo at public/mavryk-logo.png
@@ -18,6 +30,70 @@ const toNumber = (value: unknown): number => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
+
+const extractMonthsFromSku = (value: string): number | null => {
+  if (!value) return null;
+  const match = value.match(/--\s*(\d+)\s*m/i) || value.match(/(\d+)\s*m\b/i);
+  if (match && match[1]) {
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const normalizeKey = (value?: string | null) => (value || "").trim().toLowerCase();
+const stripDurationSuffix = (value?: string | null) => {
+  const raw = (value || "").trim();
+  if (!raw) return "";
+  return raw.replace(/--\s*\d+\s*m\s*$/i, "").trim();
+};
+const htmlToPlainText = (value?: string | null): string => {
+  if (!value) return "";
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(value, "text/html");
+    const blockTags = new Set(["DIV", "P", "BR", "LI", "UL", "OL", "SECTION"]);
+    const lines: string[] = [];
+
+    const walk = (node: ChildNode, buffer: string[]) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        buffer.push((node.textContent || "").replace(/\u00a0/g, " "));
+        return;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (el.tagName === "BR") {
+          buffer.push("\n");
+          return;
+        }
+        const childBuffer: string[] = [];
+        el.childNodes.forEach((child) => walk(child, childBuffer));
+        const joined = childBuffer.join("");
+        buffer.push(joined);
+        if (blockTags.has(el.tagName)) {
+          buffer.push("\n");
+        }
+      }
+    };
+
+    const rootBuffer: string[] = [];
+    doc.body.childNodes.forEach((child) => walk(child, rootBuffer));
+    return rootBuffer
+      .join("")
+      .replace(/\u00a0/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .trim();
+  } catch {
+    return value;
+  }
+};
+
+const API_BASE =
+  (typeof import.meta !== "undefined" &&
+    (import.meta as any).env?.VITE_API_BASE_URL) ||
+  (process.env.VITE_API_BASE_URL as string) ||
+  "http://localhost:3001";
 
 const displayDate = (iso: string): string => {
   if (!iso) return "";
@@ -43,50 +119,211 @@ export default function ShowPrice() {
   );
   const [recipient, setRecipient] = useState("Ms. Diu Nguyen");
   const [contact, setContact] = useState("");
-  const [productCode, setProductCode] = useState("");
-  const [lines, setLines] = useState<QuoteLine[]>([
-    {
-      id: "1",
-      product: "Zoom Pro - 100 user",
-      packageName: "1 nam",
-      term: "",
-      unitPrice: 1_950_000,
-      quantity: 1,
-    },
-    {
-      id: "2",
-      product: "Zoom Pro - 300 user",
-      packageName: "1 nam",
-      term: "",
-      unitPrice: 3_134_000,
-      quantity: 1,
-    },
-    {
-      id: "3",
-      product: "Zoom Pro - 500 user",
-      packageName: "1 nam",
-      term: "",
-      unitPrice: 12_025_000,
-      quantity: 1,
-    },
-    {
-      id: "4",
-      product: "Zoom Pro - 1000 user",
-      packageName: "1 nam",
-      term: "",
-      unitPrice: 19_805_000,
-      quantity: 1,
-    },
-  ]);
+  const [productPrices, setProductPrices] = useState<Record<string, any>[]>([]);
+  const [productDescs, setProductDescs] = useState<ProductDesc[]>([]);
+  const [selectedProductKeys, setSelectedProductKeys] = useState<string[]>([]);
+  const [lines, setLines] = useState<QuoteLine[]>([]);
 
   const totals = useMemo(() => {
     const rows = lines.map((line) => ({
       ...line,
-      total: line.unitPrice * line.quantity,
+      total: (line.unitPrice - (line.discount || 0)) * line.quantity,
     }));
     const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
     return { rows, grandTotal };
   }, [lines]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchProductPrices = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`,
+          {
+            credentials: "include",
+          }
+        );
+        if (!response.ok) throw new Error("Failed to load product_price");
+        const data = await response.json();
+        if (isMounted && data?.items && Array.isArray(data.items)) {
+          setProductPrices(data.items);
+        }
+      } catch (err) {
+        console.error("Không thể tải product_price:", err);
+      }
+    };
+    fetchProductPrices();
+    const fetchProductDescs = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.PRODUCT_DESCRIPTIONS}`,
+          { credentials: "include" }
+        );
+        if (!response.ok) throw new Error("Failed to load product_desc");
+        const data = await response.json();
+        if (isMounted && data?.items && Array.isArray(data.items)) {
+          setProductDescs(
+            data.items.map((item: any) => ({
+              productId: item.productId || item.product_id || "",
+              rules: item.rules ?? "",
+              description: item.description ?? "",
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Không thể tải product_desc:", err);
+      }
+    };
+    fetchProductDescs();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const productOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const options: Array<{
+      value: string;
+      productDisplay: string;
+      packageDisplay: string;
+      label: string;
+      durationMonths: number | null;
+      unitPrice: number;
+      productId: string;
+    }> = [];
+
+    productPrices.forEach((row) => {
+      const sanPham =
+        (row?.[PRODUCT_PRICE_COLS.product] as string) ||
+        (row?.san_pham as string) ||
+        "";
+      const value = sanPham.trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      const productName =
+        (row?.[PRODUCT_PRICE_COLS.package] as string) ||
+        (row?.package as string) ||
+        "";
+      const packageName =
+        (row?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
+        (row?.package_product as string) ||
+        "";
+
+      const unitPrice =
+        toNumber(
+          row?.computed_retail_price ??
+            row?.retail_price ??
+            row?.gia_le ??
+            row?.gia_ban
+        ) || 0;
+
+      const label = productName
+        ? `${productName} (${value})`
+        : packageName
+        ? `${packageName} (${value})`
+        : value;
+
+      options.push({
+        productId: value,
+        value,
+        productDisplay: productName || value,
+        packageDisplay: packageName || productName || value,
+        label,
+        durationMonths: extractMonthsFromSku(value),
+        unitPrice,
+      });
+    });
+
+    return options.sort((a, b) => a.label.localeCompare(b.label, "vi"));
+  }, [productPrices]);
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, (typeof productOptions)[number]>();
+    productOptions.forEach((opt) => {
+      map.set(opt.value.toLowerCase(), opt);
+    });
+    return map;
+  }, [productOptions]);
+
+  const productDescMap = useMemo(() => {
+    const map = new Map<string, ProductDesc>();
+    productDescs.forEach((item) => {
+      const key = normalizeKey(stripDurationSuffix(item.productId));
+      if (key) map.set(key, item);
+    });
+    return map;
+  }, [productDescs]);
+
+  const activeProductDesc = useMemo(() => {
+    const code = lines[0]?.productCode || lines[0]?.product || "";
+    const key = normalizeKey(stripDurationSuffix(code));
+    return key ? productDescMap.get(key) || null : null;
+  }, [lines, productDescMap]);
+
+  const productDescSections = useMemo(() => {
+    const seen = new Set<string>();
+    const sections: Array<{
+      name: string;
+      rules: string;
+      description: string;
+    }> = [];
+    lines.forEach((line) => {
+      const rawCode = line.productCode || line.product || "";
+      const key = normalizeKey(stripDurationSuffix(rawCode));
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      const desc = productDescMap.get(key);
+      sections.push({
+        name: line.product || rawCode || "Sản phẩm",
+        rules: htmlToPlainText(desc?.rules),
+        description: htmlToPlainText(desc?.description),
+      });
+    });
+    return sections;
+  }, [lines, productDescMap]);
+
+  const handleAddSelectedProduct = () => {
+    if (!selectedProductKeys.length) return;
+
+    const selections = selectedProductKeys
+      .map((raw) => raw.trim())
+      .filter(Boolean);
+
+    if (!selections.length) return;
+
+    setLines((prev) => {
+      const nextLines = [...prev];
+      selections.forEach((rawKey) => {
+        const selected =
+          productMap.get(rawKey.toLowerCase()) ??
+          productMap.get(
+            rawKey
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase()
+          );
+
+        const nextId = (nextLines.length + 1).toString();
+        nextLines.push({
+          id: nextId,
+          productCode: rawKey,
+          product: selected?.productDisplay || rawKey,
+          packageName: selected?.packageDisplay || "",
+          term: "",
+          durationMonths: selected?.durationMonths ?? null,
+          unitPrice: selected?.unitPrice ?? 0,
+          quantity: 1,
+          discount: 0,
+        });
+      });
+      return nextLines;
+    });
+
+    setSelectedProductKeys([]);
+  };
 
   const handleLineChange = (
     id: string,
@@ -113,24 +350,6 @@ export default function ShowPrice() {
 
   const quoteCode = `BG-${(quoteDate || "").replaceAll("-", "") || "----"}`;
 
-  const handleAddProductCode = () => {
-    const code = productCode.trim();
-    if (!code) return;
-    const nextId = (lines.length + 1).toString();
-    setLines((prev) => [
-      ...prev,
-      {
-        id: nextId,
-        product: code,
-        packageName: "1 nam",
-        term: "",
-        unitPrice: 0,
-        quantity: 1,
-      },
-    ]);
-    setProductCode("");
-  };
-
   return (
     <div className="p-4 lg:p-6 space-y-4">
       <style>{printStyles}</style>
@@ -139,14 +358,14 @@ export default function ShowPrice() {
       <div className="no-print rounded-2xl bg-white/5 border border-white/10 shadow-lg shadow-indigo-900/30">
         <div className="border-b border-white/10 px-6 py-4">
           <h2 className="text-lg font-semibold text-white">
-            Thong tin bao gia
+            Thông tin báo giá
           </h2>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="space-y-1">
-              <span className="text-sm font-medium text-white">Kinh gui</span>
+              <span className="text-sm font-medium text-white">Kính gửi</span>
               <input
                 type="text"
                 value={recipient}
@@ -155,7 +374,7 @@ export default function ShowPrice() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-white">Ngay</span>
+              <span className="text-sm font-medium text-white">Ngày</span>
               <input
                 type="date"
                 value={quoteDate}
@@ -164,7 +383,7 @@ export default function ShowPrice() {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-sm font-medium text-white">Ma bao gia</span>
+              <span className="text-sm font-medium text-white">Mã báo giá</span>
               <input
                 value={quoteCode}
                 readOnly
@@ -175,7 +394,7 @@ export default function ShowPrice() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1">
-              <span className="text-sm font-medium text-white">Lien he</span>
+              <span className="text-sm font-medium text-white">Liên hệ</span>
               <input
                 type="text"
                 value={contact}
@@ -186,34 +405,50 @@ export default function ShowPrice() {
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium text-white">
-                Ghi chu (tuy chon)
+                Ghi chú (tùy chọn)
               </span>
               <input
                 type="text"
                 className={inputClass}
-                placeholder="Thong tin them cho bao gia"
+                placeholder="Thông tin thêm cho báo giá"
               />
             </label>
           </div>
 
           <div className="border border-white/15 rounded-lg p-3 space-y-2">
             <label className="text-sm font-semibold text-white block">
-              Ma san pham
+              Mã sản phẩm
             </label>
             <div className="flex flex-wrap gap-2 items-center">
-              <input
-                type="text"
-                value={productCode}
-                onChange={(e) => setProductCode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddProductCode();
-                  }
+              <select
+                multiple
+                value={selectedProductKeys}
+                onChange={(e) => {
+                  const values = Array.from(
+                    e.target.selectedOptions,
+                    (opt) => opt.value
+                  );
+                  setSelectedProductKeys(values);
                 }}
-                className="flex-1 min-w-[260px] rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60"
-                placeholder="Nhap ma san pham va nhan Enter"
-              />
+                className="flex-1 min-w-[260px] rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60 h-32"
+              >
+                <option value="" disabled>
+                  Giữ Ctrl / Cmd để chọn nhiều sản phẩm
+                </option>
+                {productOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAddSelectedProduct}
+                className="rounded bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-2 text-sm"
+                disabled={!selectedProductKeys.length}
+              >
+                Thêm
+              </button>
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -234,7 +469,7 @@ export default function ShowPrice() {
                       type="button"
                       onClick={() => removeLine(line.id)}
                       className="text-red-300 hover:text-red-200 font-semibold"
-                      title="Xoa"
+                      title="Xóa"
                     >
                       ×
                     </button>
@@ -255,67 +490,76 @@ export default function ShowPrice() {
         >
           <div>
             {/* Header */}
-            <div className="grid grid-cols-[1.1fr_1fr] items-start px-6 pt-5 pb-3">
-              <div className="flex items-center gap-4">
-                <div className="w-36 h-24 relative flex items-center justify-center">
-                  <img
-                    src={LOGO_SRC}
-                    alt="Mavryk Logo"
-                    className="max-w-full max-h-full"
-                    style={{ objectFit: "contain", mixBlendMode: "screen" }}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display =
-                        "none";
-                    }}
-                  />
-                </div>
+            <div className="flex flex-col items-center gap-2 px-6 pt-2 pb-2">
+              <div
+                className="relative flex items-center justify-center"
+                style={{ maxWidth: "140px", maxHeight: "90px" }}
+              >
+                <img
+                  src={LOGO_SRC}
+                  alt="Mavryk Logo"
+                  className="max-w-full max-h-full"
+                  style={{ objectFit: "contain", mixBlendMode: "screen" }}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display =
+                      "none";
+                  }}
+                />
               </div>
-              <div className="text-right text-sm leading-6 pr-1">
-                <p className="font-semibold">Mavryk Premium Store</p>
-                <p>SDT: 0378.304.963</p>
-                <p>Web: mavrykpremium.store</p>
+              <div className="text-sm leading-6 text-white print:text-black flex items-center justify-center text-center">
+                <div>
+                  <p className="font-semibold">Mavryk Premium Store</p>
+                  <p>SDT: 0378.304.963</p>
+                  <p>Web: mavrykpremium.store</p>
+                </div>
               </div>
             </div>
 
             {/* Title */}
-            <div className="text-center text-[15px] font-semibold bg-indigo-100 text-indigo-900 py-2">
+            <div className="text-center text-[20px] font-bold bg-indigo-100 text-indigo-900 py-3 tracking-wide uppercase">
               BẢNG BÁO GIÁ
             </div>
 
             {/* Intro */}
-            <div className="px-6 py-4 text-sm leading-6">
+            <div className="px-6 py-4 text-sm leading-6 text-white/90 print:text-slate-800">
               <p>
-                Ngay: <strong>{displayDate(quoteDate) || "..."}</strong>
+                Ngày: <strong>{displayDate(quoteDate) || "..."}</strong>
               </p>
               <p>
-                Kinh gui: <strong>{recipient}</strong>
+                Kính gửi: <strong>{recipient}</strong>
               </p>
               {contact ? (
                 <p>
-                  Thong tin lien he: <strong>{contact}</strong>
+                  Thông tin liên hệ: <strong>{contact}</strong>
                 </p>
               ) : null}
               <p className="mt-3 italic">
-                Loi dau tien, xin tran trong cam on quy khach hang da quan tam
-                den san pham cua chung toi. Chung toi xin gui den quy khach hang
-                bang bao gia chi tiet nhu sau:
+                Lời đầu tiên, xin trân trọng cảm ơn quý khách hàng đã quan tâm
+                đến sản phẩm của chúng tôi. Chúng tôi xin gửi đến quý khách hàng
+                bảng báo giá chi tiết như sau:
               </p>
             </div>
 
             {/* Table */}
-            <table className="w-full text-sm border-t border-b border-slate-600">
+            <table className="w-full text-sm border-t border-b border-slate-600 text-white print:text-black">
               <thead>
                 <tr className="text-center bg-indigo-100 text-slate-900 font-semibold">
                   <th className="border border-slate-600 py-2 w-12">STT</th>
                   <th className="border border-slate-600 py-2 px-2 whitespace-nowrap">
-                    TEN SAN PHAM
+                    TÊN SẢN PHẨM
                   </th>
-                  <th className="border border-slate-600 py-2 w-32">GOI</th>
-                  <th className="border border-slate-600 py-2 w-32">DON GIA</th>
+                  <th className="border border-slate-600 py-2 w-32">GÓI</th>
+                  <th className="border border-slate-600 py-2 w-28">
+                    THỜI GIAN
+                  </th>
+                  <th className="border border-slate-600 py-2 w-32">ĐƠN GIÁ</th>
+                  <th className="border border-slate-600 py-2 w-28">
+                    GIẢM GIÁ
+                  </th>
                   <th className="border border-slate-600 py-2 w-32">
-                    THANH TIEN
+                    THÀNH TIỀN
                   </th>
-                  <th className="border border-slate-600 py-2 w-36">GHI CHU</th>
+                  <th className="border border-slate-600 py-2 w-36">GHI CHÚ</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,21 +569,29 @@ export default function ShowPrice() {
                       {idx + 1}
                     </td>
                     <td
-                      className="border border-slate-600 px-2 py-2 whitespace-nowrap"
+                      className="border border-slate-600 px-2 py-2 text-center text-white print:text-black"
                       title={row.product}
                     >
                       {row.product}
                     </td>
-                    <td className="border border-slate-600 text-center px-2 py-2">
+                    <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
                       {row.packageName || row.term}
                     </td>
-                    <td className="border border-slate-600 text-right px-2 py-2">
+                    <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
+                      {row.durationMonths
+                        ? `${row.durationMonths} tháng`
+                        : row.term || "--"}
+                    </td>
+                    <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
                       {formatCurrency(row.unitPrice)}
                     </td>
-                    <td className="border border-slate-600 text-right px-2 py-2">
+                    <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
+                      {formatCurrency(row.discount || 0)}
+                    </td>
+                    <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
                       {formatCurrency(row.total)}
                     </td>
-                    <td className="border border-slate-600 px-2 py-2 text-sm text-slate-700">
+                    <td className="border border-slate-600 px-2 py-2 text-sm text-white print:text-black">
                       {row.note || ""}
                     </td>
                   </tr>
@@ -348,34 +600,61 @@ export default function ShowPrice() {
             </table>
 
             {/* Product info */}
-            <div className="px-6 py-4 text-sm leading-6 border-b border-slate-600 space-y-1">
-              <p className="font-semibold">Thong Tin San Pham</p>
-              <p>Cong dung: Goi 1 nam</p>
-              <p>Bao hanh toan thoi gian</p>
-              <p>Thoi gian goi: 30h</p>
-              <p>So luong nguoi tham gia: 100, 300, 500 den 1000 nguoi</p>
-              <p>1GB write lai cuoc hop tren dam may</p>
-              <p className="mt-2">
-                Moi van de thac mac ve bao gia xin vui long lien he:
-                0378.304.963
-              </p>
-              <p className="italic text-[13px]">Xin chan thanh cam on!</p>
+            <div className="px-6 py-4 text-sm leading-6 border-b border-slate-600 space-y-4 text-white/90 print:text-black">
+              {productDescSections.length === 0 ? (
+                <div>
+                  <p className="font-semibold">Quy Tắc</p>
+                  <div className="mt-1 whitespace-pre-wrap break-words">
+                    Chưa cập nhật.
+                  </div>
+                  <p className="font-semibold mt-3">Thông tin sản phẩm</p>
+                  <div className="mt-1 whitespace-pre-wrap break-words">
+                    Chưa cập nhật.
+                  </div>
+                </div>
+              ) : (
+                productDescSections.map((section) => (
+                  <div key={section.name} className="space-y-2">
+                    <p className="font-semibold">{section.name}</p>
+                    <div>
+                      <p className="font-semibold">Quy Tắc</p>
+                      <div className="mt-1 whitespace-pre-wrap break-words">
+                        {section.rules || "Chưa cập nhật."}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-semibold">Thông tin sản phẩm</p>
+                      <div className="mt-1 whitespace-pre-wrap break-words">
+                        {section.description || "Chưa cập nhật."}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div className="pt-2 text-sm">
+                <p className="font-semibold">Mọi thông tin chi tiết có thể liên hệ:</p>
+                <div className="mt-1 whitespace-pre-wrap">
+                  - Fanpage: Mavryk - Tài Khoản Premium
+                  {"\n"}- Zalo: 0378.304.963
+                  {"\n"}- Telegram: @hung_culi
+                </div>
+              </div>
             </div>
 
             {/* Signatures */}
-            <div className="flex justify-center px-6 py-8 text-sm text-white">
-              <div className="px-6 py-4 space-y-2 min-w-[280px] max-w-md text-center">
-                <p className="font-semibold underline underline-offset-2">
-                  Mavryk Premium Store
-                </p>
-                <p className="text-[12px] italic text-white/80">
-                  (Ky, ghi ro ho ten)
-                </p>
-                <div className="min-h-[90px] flex items-center justify-center">
+              <div className="flex justify-center px-6 py-8 text-sm text-white print:text-black">
+                <div className="px-6 py-4 space-y-2 min-w-[280px] max-w-md text-center">
+                  <p className="font-semibold underline underline-offset-2">
+                    Mavryk Premium Store
+                  </p>
+                  <p className="text-[12px] italic text-white/80 print:text-black">
+                    (Ký, ghi rõ họ tên)
+                  </p>
+                <div className="min-h-[110px] flex items-center justify-center">
                   <img
-                    src="/signature.png"
-                    alt="Chu ky"
-                    className="max-h-[90px] max-w-[220px]"
+                    src={SIGN_IMG}
+                    alt="Chữ ký"
+                    className="max-h-[110px] max-w-[260px]"
                     style={{ objectFit: "contain" }}
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.display =
@@ -383,7 +662,6 @@ export default function ShowPrice() {
                     }}
                   />
                 </div>
-                <p className="font-semibold">Ngo Le Ngoc Hung</p>
               </div>
             </div>
           </div>

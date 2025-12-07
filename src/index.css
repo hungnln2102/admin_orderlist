@@ -70,3 +70,24 @@
 .to-green-50 {
   --tw-gradient-to: #7e67d98c var(--tw-gradient-to-position);
 }
+
+/* Scrollbar styling for modals/long forms */
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #6b74ff #0f1324;
+}
+.custom-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: #0f1324;
+  border-radius: 999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6b74ff, #8f5fff);
+  border-radius: 999px;
+  border: 1px solid #0f1324;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7f89ff, #a56dff);
+}

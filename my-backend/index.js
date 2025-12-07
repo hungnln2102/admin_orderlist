@@ -2265,9 +2265,8 @@ app.get("/api/product-descriptions", async(req, res) => {
     const search =
         typeof req.query.search === "string" ? req.query.search.trim() : "";
 
-    const limit = Number.isFinite(limitParam) ?
-        Math.min(Math.max(limitParam, 1), 200) :
-        50;
+    const limit =
+        Number.isFinite(limitParam) && limitParam > 0 ? limitParam : null;
     const offset =
         Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
 
@@ -2285,10 +2284,17 @@ app.get("/api/product-descriptions", async(req, res) => {
     `;
     }
 
-    params.push(offset);
-    const offsetIdx = params.length;
-    params.push(limit);
-    const limitIdx = params.length;
+    let paginationClause = "";
+    if (limit !== null) {
+        params.push(offset);
+        const offsetIdx = params.length;
+        params.push(limit);
+        const limitIdx = params.length;
+        paginationClause = `
+    OFFSET $${offsetIdx}
+    LIMIT $${limitIdx}
+  `;
+    }
 
     const query = `
     WITH raw AS (
@@ -2314,8 +2320,7 @@ app.get("/api/product-descriptions", async(req, res) => {
     SELECT *, COUNT(*) OVER() AS total_count
     FROM raw
     ORDER BY id DESC
-    OFFSET $${offsetIdx}
-    LIMIT $${limitIdx};
+    ${paginationClause};
   `;
 
     try {
@@ -2342,13 +2347,17 @@ app.get("/api/product-descriptions", async(req, res) => {
 });
 
 app.post("/api/product-descriptions", async(req, res) => {
-    console.log("[POST] /api/product-descriptions");
-    const { productId, rules, description, imageUrl } = req.body || {};
+  console.log("[POST] /api/product-descriptions");
+  const { productId, rules, description, imageUrl } = req.body || {};
 
-    const normalizedProductId = trimToLength(normalizeTextInput(productId), 255);
-    const normalizedRules = trimToLength(rules, 255);
-    const normalizedDescription = trimToLength(description, 255);
-    const normalizedImageUrl = trimToLength(imageUrl, 255);
+  const normalizedProductId = trimToLength(normalizeTextInput(productId), 255);
+  const normalizedRules =
+    rules === undefined || rules === null ? "" : String(rules);
+  const normalizedDescription =
+    description === undefined || description === null
+      ? ""
+      : String(description);
+  const normalizedImageUrl = trimToLength(imageUrl, 255);
 
     if (!normalizedProductId) {
         return res.status(400).json({ error: "product_id is required." });
