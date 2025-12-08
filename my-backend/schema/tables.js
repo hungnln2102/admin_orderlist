@@ -119,6 +119,18 @@ const USERS_COLS = {
     createdAt: "createdat",
 };
 
+const WAREHOUSE_COLS = {
+    id: "id",
+    category: "category",
+    account: "account",
+    password: "password",
+    backupEmail: "backup_email",
+    twoFa: "two_fa",
+    note: "note",
+    status: "status",
+    createdAt: "created_at",
+};
+
 module.exports = {
     ORDER_COLS,
     ACCOUNT_STORAGE_COLS,
@@ -132,6 +144,7 @@ module.exports = {
     SUPPLY_COLS,
     SUPPLY_PRICE_COLS,
     USERS_COLS,
+    WAREHOUSE_COLS,
     DEFAULT_NOTIFICATION_GROUP_ID,
     DEFAULT_RENEWAL_TOPIC_ID,
 };

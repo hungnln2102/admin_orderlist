@@ -18,6 +18,7 @@ import Sources from "./pages/Personal/Sources";
 import ShowPrice from "./pages/Personal/ShowPrice";
 import BillOrder from "./pages/Personal/bill-order";
 import Invoices from "./pages/Personal/Invoices";
+import Warehouse from "./pages/Personal/Warehouse";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,6 +63,7 @@ function App() {
                         <Route path="/bill-order" element={<BillOrder />} />
                         <Route path="/show-price" element={<ShowPrice />} />
                         <Route path="/invoices" element={<Invoices />} />
+                        <Route path="/warehouse" element={<Warehouse />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                       </Routes>
                     </main>

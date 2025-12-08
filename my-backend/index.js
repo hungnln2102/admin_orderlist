@@ -21,6 +21,7 @@ const {
     SUPPLY_COLS,
     SUPPLY_PRICE_COLS,
     USERS_COLS,
+    WAREHOUSE_COLS,
 } = require("./schema/tables");
 const sepayWebhookApp = require("./webhook/sepay_webhook");
 
@@ -4402,6 +4403,169 @@ app.get("/api/package-products", async(_req, res) => {
     } catch (error) {
         console.error("Query failed (GET /api/package-products):", error);
         res.status(500).json({ error: "Unable to load package products." });
+    }
+});
+
+// Warehouse: simple inventory listing
+const handleGetWarehouse = async(_req, res) => {
+    console.log("[GET] /api/warehouse");
+    try {
+        const result = await pool.query(
+            `SELECT
+                ${WAREHOUSE_COLS.id} AS id,
+                ${WAREHOUSE_COLS.category} AS category,
+                ${WAREHOUSE_COLS.account} AS account,
+                ${WAREHOUSE_COLS.password} AS password,
+                ${WAREHOUSE_COLS.backupEmail} AS backup_email,
+                ${WAREHOUSE_COLS.twoFa} AS two_fa,
+                ${WAREHOUSE_COLS.note} AS note,
+                ${WAREHOUSE_COLS.status} AS status,
+                ${WAREHOUSE_COLS.createdAt} AS created_at
+             FROM ${DB_SCHEMA}.warehouse
+             ORDER BY ${WAREHOUSE_COLS.id} ASC`
+        );
+        res.json(result.rows || []);
+    } catch (error) {
+        console.error("Query failed (GET /api/warehouse):", error);
+        res.status(500).json({ error: "Unable to load warehouse." });
+    }
+};
+app.get("/api/warehouse", handleGetWarehouse);
+app.get("/api/warehouses", handleGetWarehouse);
+
+app.post("/api/warehouse", async(req, res) => {
+    console.log("[POST] /api/warehouse");
+    const {
+        category,
+        account,
+        password,
+        backup_email,
+        two_fa,
+        note,
+        status,
+        created_at,
+    } = req.body || {};
+
+    try {
+        const result = await pool.query(
+            `
+            INSERT INTO ${DB_SCHEMA}.warehouse (
+              ${WAREHOUSE_COLS.category},
+              ${WAREHOUSE_COLS.account},
+              ${WAREHOUSE_COLS.password},
+              ${WAREHOUSE_COLS.backupEmail},
+              ${WAREHOUSE_COLS.twoFa},
+              ${WAREHOUSE_COLS.note},
+              ${WAREHOUSE_COLS.status},
+              ${WAREHOUSE_COLS.createdAt}
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            RETURNING
+              ${WAREHOUSE_COLS.id} AS id,
+              ${WAREHOUSE_COLS.category} AS category,
+              ${WAREHOUSE_COLS.account} AS account,
+              ${WAREHOUSE_COLS.password} AS password,
+              ${WAREHOUSE_COLS.backupEmail} AS backup_email,
+              ${WAREHOUSE_COLS.twoFa} AS two_fa,
+              ${WAREHOUSE_COLS.note} AS note,
+              ${WAREHOUSE_COLS.status} AS status,
+              ${WAREHOUSE_COLS.createdAt} AS created_at
+          `,
+            [
+                category ?? null,
+                account ?? null,
+                password ?? null,
+                backup_email ?? null,
+                two_fa ?? null,
+                note ?? null,
+                status ?? null,
+                created_at ?? new Date().toISOString(),
+            ]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error("Insert failed (POST /api/warehouse):", error);
+        res.status(500).json({ error: "Unable to create warehouse item." });
+    }
+});
+
+app.put("/api/warehouse/:id", async(req, res) => {
+    const { id } = req.params;
+    console.log(`[PUT] /api/warehouse/${id}`);
+    const {
+        category,
+        account,
+        password,
+        backup_email,
+        two_fa,
+        note,
+        status,
+        created_at,
+    } = req.body || {};
+    if (!id) return res.status(400).json({ error: "Missing id" });
+
+    try {
+        const result = await pool.query(
+            `
+            UPDATE ${DB_SCHEMA}.warehouse
+            SET
+              ${WAREHOUSE_COLS.category} = $1,
+              ${WAREHOUSE_COLS.account} = $2,
+              ${WAREHOUSE_COLS.password} = $3,
+              ${WAREHOUSE_COLS.backupEmail} = $4,
+              ${WAREHOUSE_COLS.twoFa} = $5,
+              ${WAREHOUSE_COLS.note} = $6,
+              ${WAREHOUSE_COLS.status} = $7,
+              ${WAREHOUSE_COLS.createdAt} = $8
+            WHERE ${WAREHOUSE_COLS.id} = $9
+            RETURNING
+              ${WAREHOUSE_COLS.id} AS id,
+              ${WAREHOUSE_COLS.category} AS category,
+              ${WAREHOUSE_COLS.account} AS account,
+              ${WAREHOUSE_COLS.password} AS password,
+              ${WAREHOUSE_COLS.backupEmail} AS backup_email,
+              ${WAREHOUSE_COLS.twoFa} AS two_fa,
+              ${WAREHOUSE_COLS.note} AS note,
+              ${WAREHOUSE_COLS.status} AS status,
+              ${WAREHOUSE_COLS.createdAt} AS created_at
+          `,
+            [
+                category ?? null,
+                account ?? null,
+                password ?? null,
+                backup_email ?? null,
+                two_fa ?? null,
+                note ?? null,
+                status ?? null,
+                created_at ?? null,
+                id,
+            ]
+        );
+        if (!result.rows.length) {
+            return res.status(404).json({ error: "Not found" });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error(`Update failed (PUT /api/warehouse/${id}):`, error);
+        res.status(500).json({ error: "Unable to update warehouse item." });
+    }
+});
+
+app.delete("/api/warehouse/:id", async(req, res) => {
+    const { id } = req.params;
+    console.log(`[DELETE] /api/warehouse/${id}`);
+    if (!id) return res.status(400).json({ error: "Missing id" });
+    try {
+        const result = await pool.query(
+            `DELETE FROM ${DB_SCHEMA}.warehouse WHERE ${WAREHOUSE_COLS.id} = $1`,
+            [id]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Not found" });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`Delete failed (DELETE /api/warehouse/${id}):`, error);
+        res.status(500).json({ error: "Unable to delete warehouse item." });
     }
 });
 app.post("/api/package-products", async(req, res) => {

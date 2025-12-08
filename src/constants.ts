@@ -8,6 +8,7 @@ import {
   PURCHASE_ORDER_FIELD_MAP,
   REFUND_FIELD_MAP,
   BANK_LIST_FIELD_MAP,
+  WAREHOUSE_FIELD_MAP,
 } from "./lib/fieldMapper";
 
 export const API_ENDPOINTS = {
@@ -48,6 +49,7 @@ export const API_ENDPOINTS = {
   PURCHASE_ORDERS: "/api/purchase-orders",
   REFUNDS: "/api/refunds",
   BANK_LIST: "/api/banks",
+  WAREHOUSE: "/api/warehouse",
 };
 
 // Keep UI aliases stable; values now sourced from tableSql via fieldMapper.
@@ -61,6 +63,7 @@ export const PAYMENT_RECEIPT_FIELDS = PAYMENT_RECEIPT_FIELD_MAP;
 export const PURCHASE_ORDER_FIELDS = PURCHASE_ORDER_FIELD_MAP;
 export const REFUND_FIELDS = REFUND_FIELD_MAP;
 export const BANK_LIST_FIELDS = BANK_LIST_FIELD_MAP;
+export const WAREHOUSE_FIELDS = WAREHOUSE_FIELD_MAP;
 
 export const VIRTUAL_FIELDS = {
   SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",

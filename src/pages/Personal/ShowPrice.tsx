@@ -10,6 +10,7 @@ type QuoteLine = {
   packageName: string;
   term: string;
   durationMonths?: number | null;
+  durationDays?: number | null;
   unitPrice: number;
   quantity: number;
   discount?: number;
@@ -31,21 +32,27 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const extractMonthsFromSku = (value: string): number | null => {
-  if (!value) return null;
-  const match = value.match(/--\s*(\d+)\s*m/i) || value.match(/(\d+)\s*m\b/i);
-  if (match && match[1]) {
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+const parseDurationFromSku = (
+  value: string
+): { months: number | null; days: number | null } => {
+  if (!value) return { months: null, days: null };
+  const match =
+    value.match(/--\s*(\d+)\s*([md])\b/i) ||
+    value.match(/(\d+)\s*([md])\b/i);
+  if (!match || !match[1]) return { months: null, days: null };
+  const num = Number(match[1]);
+  if (!Number.isFinite(num)) return { months: null, days: null };
+  const unit = (match[2] || "").toLowerCase();
+  if (unit === "d") return { months: null, days: num };
+  if (unit === "m") return { months: num, days: null };
+  return { months: null, days: null };
 };
 
 const normalizeKey = (value?: string | null) => (value || "").trim().toLowerCase();
 const stripDurationSuffix = (value?: string | null) => {
   const raw = (value || "").trim();
   if (!raw) return "";
-  return raw.replace(/--\s*\d+\s*m\s*$/i, "").trim();
+  return raw.replace(/--\s*\d+\s*[md]\s*$/i, "").trim();
 };
 const htmlToPlainText = (value?: string | null): string => {
   if (!value) return "";
@@ -125,12 +132,12 @@ export default function ShowPrice() {
   const [lines, setLines] = useState<QuoteLine[]>([]);
 
   const totals = useMemo(() => {
-    const rows = lines.map((line) => ({
+    const lineItems = lines.map((line) => ({
       ...line,
       total: (line.unitPrice - (line.discount || 0)) * line.quantity,
     }));
-    const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
-    return { rows, grandTotal };
+    const grandTotal = lineItems.reduce((sum, row) => sum + row.total, 0);
+    return { rows: lineItems, grandTotal };
   }, [lines]);
 
   useEffect(() => {
@@ -188,6 +195,8 @@ export default function ShowPrice() {
       packageDisplay: string;
       label: string;
       durationMonths: number | null;
+      durationDays: number | null;
+      term: string;
       unitPrice: number;
       productId: string;
     }> = [];
@@ -203,14 +212,7 @@ export default function ShowPrice() {
       if (seen.has(key)) return;
       seen.add(key);
 
-      const productName =
-        (row?.[PRODUCT_PRICE_COLS.package] as string) ||
-        (row?.package as string) ||
-        "";
-      const packageName =
-        (row?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
-        (row?.package_product as string) ||
-        "";
+      const durationInfo = parseDurationFromSku(value);
 
       const unitPrice =
         toNumber(
@@ -220,19 +222,27 @@ export default function ShowPrice() {
             row?.gia_ban
         ) || 0;
 
-      const label = productName
-        ? `${productName} (${value})`
-        : packageName
-        ? `${packageName} (${value})`
+      const packageProduct =
+        (row?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
+        (row?.package_product as string) ||
+        (row?.package_product_label as string) ||
+        "";
+
+      const label = packageProduct
+        ? `${packageProduct} (${value})`
+        : row?.package
+        ? `${row?.package} (${value})`
         : value;
 
       options.push({
         productId: value,
         value,
-        productDisplay: productName || value,
-        packageDisplay: packageName || productName || value,
+        productDisplay: row?.package || value,
+        packageDisplay: packageProduct || row?.package || value,
         label,
-        durationMonths: extractMonthsFromSku(value),
+        durationMonths: durationInfo.months,
+        durationDays: durationInfo.days,
+        term: durationInfo.days ? `${durationInfo.days} ngày` : "",
         unitPrice,
       });
     });
@@ -248,6 +258,26 @@ export default function ShowPrice() {
     return map;
   }, [productOptions]);
 
+  const packageProductMap = useMemo(() => {
+    const map = new Map<string, string>();
+    productPrices.forEach((row) => {
+      const productCode =
+        (row?.[PRODUCT_PRICE_COLS.product] as string) ||
+        (row?.san_pham as string) ||
+        "";
+      const packageProduct =
+        (row?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
+        (row?.package_product as string) ||
+        (row?.package_product_label as string) ||
+        "";
+      const key = normalizeKey(stripDurationSuffix(productCode));
+      if (key && packageProduct) {
+        map.set(key, packageProduct);
+      }
+    });
+    return map;
+  }, [productPrices]);
+
   const productDescMap = useMemo(() => {
     const map = new Map<string, ProductDesc>();
     productDescs.forEach((item) => {
@@ -256,12 +286,6 @@ export default function ShowPrice() {
     });
     return map;
   }, [productDescs]);
-
-  const activeProductDesc = useMemo(() => {
-    const code = lines[0]?.productCode || lines[0]?.product || "";
-    const key = normalizeKey(stripDurationSuffix(code));
-    return key ? productDescMap.get(key) || null : null;
-  }, [lines, productDescMap]);
 
   const productDescSections = useMemo(() => {
     const seen = new Set<string>();
@@ -276,14 +300,18 @@ export default function ShowPrice() {
       if (!key || seen.has(key)) return;
       seen.add(key);
       const desc = productDescMap.get(key);
+      const packageProductName =
+        packageProductMap.get(key) ||
+        line.packageName ||
+        line.product;
       sections.push({
-        name: line.product || rawCode || "Sản phẩm",
+        name: line.product,
         rules: htmlToPlainText(desc?.rules),
         description: htmlToPlainText(desc?.description),
       });
     });
     return sections;
-  }, [lines, productDescMap]);
+  }, [lines, productDescMap, packageProductMap]);
 
   const handleAddSelectedProduct = () => {
     if (!selectedProductKeys.length) return;
@@ -307,13 +335,22 @@ export default function ShowPrice() {
           );
 
         const nextId = (nextLines.length + 1).toString();
+        const durationTerm = selected?.durationDays
+          ? `${selected.durationDays} ngày`
+          : selected?.term || "";
         nextLines.push({
           id: nextId,
           productCode: rawKey,
           product: selected?.productDisplay || rawKey,
-          packageName: selected?.packageDisplay || "",
-          term: "",
+          packageName:
+            selected?.packageDisplay ||
+            packageProductMap.get(
+              normalizeKey(stripDurationSuffix(rawKey))
+            ) ||
+            "",
+          term: durationTerm,
           durationMonths: selected?.durationMonths ?? null,
+          durationDays: selected?.durationDays ?? null,
           unitPrice: selected?.unitPrice ?? 0,
           quantity: 1,
           discount: 0,
@@ -419,32 +456,40 @@ export default function ShowPrice() {
             <label className="text-sm font-semibold text-white block">
               Mã sản phẩm
             </label>
-            <div className="flex flex-wrap gap-2 items-center">
-              <select
-                multiple
-                value={selectedProductKeys}
-                onChange={(e) => {
-                  const values = Array.from(
-                    e.target.selectedOptions,
-                    (opt) => opt.value
-                  );
-                  setSelectedProductKeys(values);
-                }}
-                className="flex-1 min-w-[260px] rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400/60 h-32"
-              >
-                <option value="" disabled>
-                  Giữ Ctrl / Cmd để chọn nhiều sản phẩm
-                </option>
-                {productOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+            <p className="text-xs text-white/70">
+              Click để chọn / bỏ chọn, không cần giữ Ctrl / Cmd.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-52 overflow-y-auto rounded-lg border border-white/20 bg-white/5 p-2">
+              {productOptions.map((opt) => {
+                const isActive = selectedProductKeys.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() =>
+                      setSelectedProductKeys((prev) =>
+                        prev.includes(opt.value)
+                          ? prev.filter((v) => v !== opt.value)
+                          : [...prev, opt.value]
+                      )
+                    }
+                    className={`text-left rounded-md border px-3 py-2 text-sm transition-colors ${
+                      isActive
+                        ? "border-blue-400/80 bg-blue-500/20 text-white"
+                        : "border-white/10 bg-white/5 hover:border-white/30 text-white/90"
+                    }`}
+                    title={opt.label}
+                  >
                     {opt.label}
-                  </option>
-                ))}
-              </select>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
               <button
                 type="button"
                 onClick={handleAddSelectedProduct}
-                className="rounded bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-2 text-sm"
+                className="rounded bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-60"
                 disabled={!selectedProductKeys.length}
               >
                 Thêm
@@ -486,7 +531,12 @@ export default function ShowPrice() {
         <div
           id="quote-print-area"
           className="bg-white text-slate-900 print-target"
-          style={{ width: "210mm", minHeight: "297mm", padding: "12mm 10mm" }}
+          style={{
+            width: "210mm",
+            minHeight: "297mm",
+            padding: "12mm 10mm",
+            fontSize: "18px",
+          }}
         >
           <div>
             {/* Header */}
@@ -580,6 +630,8 @@ export default function ShowPrice() {
                     <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
                       {row.durationMonths
                         ? `${row.durationMonths} tháng`
+                        : row.durationDays
+                        ? `${row.durationDays} ngày`
                         : row.term || "--"}
                     </td>
                     <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">

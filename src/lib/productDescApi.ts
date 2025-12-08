@@ -6,7 +6,9 @@ export interface ProductDescription {
   productId: string;
   productName?: string | null;
   rules: string;
+  rulesHtml?: string | null;
   description: string;
+  descriptionHtml?: string | null;
   imageUrl?: string | null;
 }
 
@@ -58,7 +60,10 @@ export const saveProductDescription = async (
     productId: (data as any).productId || "",
     productName: (data as any).productName ?? null,
     rules: (data as any).rules || "",
+    rulesHtml: (data as any).rulesHtml || (data as any).rules || "",
     description: (data as any).description || "",
+    descriptionHtml:
+      (data as any).descriptionHtml || (data as any).description || "",
     imageUrl: (data as any).imageUrl ?? null,
   };
 };

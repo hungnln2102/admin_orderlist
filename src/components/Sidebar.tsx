@@ -12,6 +12,7 @@ import {
   InformationCircleIcon,
   ChartPieIcon,
   ChevronDownIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../AuthContext";
 import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
@@ -58,6 +59,7 @@ const menuSections: MenuSection[] = [
       { name: "Báo Giá", href: "/show-price", icon: DocumentIcon },
       { name: "Hóa Đơn", href: "/bill-order", icon: DocumentIcon },
       { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
+      { name: "Lưu trữ", href: "/warehouse", icon: ArchiveBoxIcon },
     ],
   },
 ];

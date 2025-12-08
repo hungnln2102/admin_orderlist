@@ -121,6 +121,18 @@ export const USERS_COLS: ColumnDict = {
   createdAt: "createdat",
 };
 
+export const WAREHOUSE_COLS: ColumnDict = {
+  id: "id",
+  category: "category",
+  account: "account",
+  password: "password",
+  backupEmail: "backup_email",
+  twoFa: "two_fa",
+  note: "note",
+  status: "status",
+  createdAt: "created_at",
+};
+
 export const SCHEMA_TABLES = {
   ORDER_COLS,
   ACCOUNT_STORAGE_COLS,
@@ -134,6 +146,7 @@ export const SCHEMA_TABLES = {
   SUPPLY_COLS,
   SUPPLY_PRICE_COLS,
   USERS_COLS,
+  WAREHOUSE_COLS,
 };
 
 export type SchemaTables = typeof SCHEMA_TABLES;

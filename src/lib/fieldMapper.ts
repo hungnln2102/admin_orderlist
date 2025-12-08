@@ -10,6 +10,7 @@ import {
   PAYMENT_RECEIPT_COLS,
   REFUND_COLS,
   BANK_LIST_COLS,
+  WAREHOUSE_COLS,
 } from "./tableSql";
 
 // ORDER_FIELDS mapping (constants.ts -> tableSql.ts)
@@ -99,6 +100,18 @@ export const BANK_LIST_FIELD_MAP = {
   BANK_NAME: BANK_LIST_COLS.bankName,
 } as const;
 
+export const WAREHOUSE_FIELD_MAP = {
+  ID: WAREHOUSE_COLS.id,
+  CATEGORY: WAREHOUSE_COLS.category,
+  ACCOUNT: WAREHOUSE_COLS.account,
+  PASSWORD: WAREHOUSE_COLS.password,
+  BACKUP_EMAIL: WAREHOUSE_COLS.backupEmail,
+  TWO_FA: WAREHOUSE_COLS.twoFa,
+  NOTE: WAREHOUSE_COLS.note,
+  STATUS: WAREHOUSE_COLS.status,
+  CREATED_AT: WAREHOUSE_COLS.createdAt,
+} as const;
+
 export type OrderFieldKey = keyof typeof ORDER_FIELD_MAP;
 export type OrderExpiredFieldKey = keyof typeof ORDER_EXPIRED_FIELD_MAP;
 export type PurchaseOrderFieldKey = keyof typeof PURCHASE_ORDER_FIELD_MAP;
@@ -108,3 +121,4 @@ export type SupplyPriceFieldKey = keyof typeof SUPPLY_PRICE_FIELD_MAP;
 export type PaymentReceiptFieldKey = keyof typeof PAYMENT_RECEIPT_FIELD_MAP;
 export type RefundFieldKey = keyof typeof REFUND_FIELD_MAP;
 export type BankListFieldKey = keyof typeof BANK_LIST_FIELD_MAP;
+export type WarehouseFieldKey = keyof typeof WAREHOUSE_FIELD_MAP;

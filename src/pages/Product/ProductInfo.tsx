@@ -201,8 +201,9 @@ function mergeProducts(
       packageName: priceRow
         ? stripDurationSuffix(priceRow.package || priceRow.san_pham || "")
         : null,
-      rulesHtml: toHtmlFromPlain(item.rules || ""),
-      descriptionHtml: toHtmlFromPlain(item.description || ""),
+      rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
+      descriptionHtml:
+        item.descriptionHtml || toHtmlFromPlain(item.description || ""),
     };
     const key = normalizedId || normalizeProductKey(merged.productName || "");
     if (!key) continue;
@@ -413,15 +414,28 @@ export default function ProductInfo() {
         id: saved.id || editingProduct.id,
         productId: saved.productId,
         rules: saved.rules || "",
-        rulesHtml: saved.rules || "",
+        rulesHtml:
+          saved.rulesHtml ||
+          saved.rules ||
+          editForm.rulesHtml ||
+          editForm.rules ||
+          "",
         description: saved.description || "",
-        descriptionHtml: saved.description || "",
+        descriptionHtml:
+          saved.descriptionHtml ||
+          saved.description ||
+          editForm.descriptionHtml ||
+          editForm.description ||
+          "",
         imageUrl: saved.imageUrl || null,
       };
 
       setProductDescs((prev) => {
+        const targetKey = normalizeProductKey(
+          saved.productId || editingProduct.productId || ""
+        );
         const idx = prev.findIndex(
-          (p) => p.id === saved.id || p.productId === saved.productId
+          (p) => normalizeProductKey(p.productId || "") === targetKey
         );
         if (idx === -1) {
           return [
@@ -431,9 +445,19 @@ export default function ProductInfo() {
               productId: saved.productId,
               productName: editingProduct.productName || null,
               rules: saved.rules || "",
-              rulesHtml: saved.rules || "",
+              rulesHtml:
+                saved.rulesHtml ||
+                saved.rules ||
+                editForm.rulesHtml ||
+                editForm.rules ||
+                "",
               description: saved.description || "",
-              descriptionHtml: saved.description || "",
+              descriptionHtml:
+                saved.descriptionHtml ||
+                saved.description ||
+                editForm.descriptionHtml ||
+                editForm.description ||
+                "",
               imageUrl: saved.imageUrl || null,
             },
           ];
@@ -444,9 +468,19 @@ export default function ProductInfo() {
           id: saved.id || next[idx].id,
           productId: saved.productId,
           rules: saved.rules || "",
-          rulesHtml: saved.rules || "",
+          rulesHtml:
+            saved.rulesHtml ||
+            saved.rules ||
+            editForm.rulesHtml ||
+            editForm.rules ||
+            "",
           description: saved.description || "",
-          descriptionHtml: saved.description || "",
+          descriptionHtml:
+            saved.descriptionHtml ||
+            saved.description ||
+            editForm.descriptionHtml ||
+            editForm.description ||
+            "",
           imageUrl: saved.imageUrl || null,
         };
         return next;
@@ -473,6 +507,12 @@ export default function ProductInfo() {
     element: HTMLDivElement | null
   ) => {
     if (!element) return;
+    const selection = document.getSelection();
+    const range =
+      selection && selection.rangeCount > 0
+        ? selection.getRangeAt(0).cloneRange()
+        : null;
+
     const html = normalizeRichHtmlForSave(element.innerHTML);
     const text = element.innerText;
     typingFromEditorRef.current = true;
@@ -481,6 +521,13 @@ export default function ProductInfo() {
       [field]: text,
       [`${field}Html`]: html,
     }));
+
+    // Restore caret after state update to avoid jumping to start
+    const shouldRestore = document.activeElement === element;
+    if (range && shouldRestore) {
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
   };
 
   const getActiveEditorEl = (): HTMLDivElement | null => {
@@ -495,6 +542,7 @@ export default function ProductInfo() {
     // Always reset when editingProduct changes to ensure content appears.
     if (typingFromEditorRef.current) {
       typingFromEditorRef.current = false;
+      return;
     }
     target.innerHTML = editForm.rulesHtml || toHtmlFromPlain(editForm.rules);
   }, [editForm.rules, editForm.rulesHtml, editingProduct]);
