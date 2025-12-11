@@ -42,9 +42,10 @@ interface EditOrderModalProps {
 }
 
 const inputClass =
-  "w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all";
-const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-const readOnlyClass = "bg-gray-100 cursor-not-allowed text-gray-500";
+  "w-full p-2 rounded-lg border border-white/25 bg-white/10 text-slate-100 placeholder-white/70 focus:ring-indigo-300/70 focus:border-indigo-300/70 transition-all";
+const labelClass = "block text-sm font-medium text-slate-100 mb-1";
+const readOnlyClass =
+  "bg-white/10 border-white/20 text-slate-300 cursor-not-allowed";
 
 const formatCurrency = (value: number | string) => {
   const num = Number(value) || 0;
@@ -361,16 +362,16 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   if (!isOpen || !formData) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-slate-900/90 border border-white/10 text-slate-100 w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4 sticky top-0 bg-slate-800/80 z-10">
-          <h3 className="text-lg font-semibold text-white">
+    <div className="edit-order-shell fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-lg px-4 py-6">
+      <div className="edit-order-panel custom-scroll w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-800/85 via-slate-800/80 to-indigo-900/85 text-slate-100 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8),0_16px_40px_-26px_rgba(99,102,241,0.35)] backdrop-blur-xl">
+        <div className="edit-order-header flex items-center justify-between border-b border-white/15 px-6 py-4 sticky top-0 bg-white/10 backdrop-blur-md z-10 rounded-t-2xl">
+          <h3 className="text-lg font-semibold text-slate-100">
             Chỉnh sửa đơn hàng
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-300 hover:text-white"
+            className="text-slate-300 hover:text-white transition-colors"
             aria-label="Đóng"
           >
             <XMarkIcon className="h-6 w-6" />
@@ -481,7 +482,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 </button>
               </div>
               {!supplies.length && !isCustomSupply && (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-slate-300">
                   Không có danh sách nguồn cho sản phẩm hiện tại.
                 </p>
               )}
@@ -559,7 +560,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 )}
                 readOnly
                 disabled
-                className={`${inputClass} ${readOnlyClass} font-semibold text-green-700`}
+                className={`${inputClass} ${readOnlyClass} font-semibold text-emerald-300`}
               />
             </div>
           </div>
@@ -577,12 +578,12 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               />
             </div>
             <div className="flex items-center gap-3 mt-6 md:mt-8">
-              <label className="text-sm font-medium text-gray-700 mb-0">
+              <label className="text-sm font-medium text-slate-100 mb-0">
                 Kiểm tra
               </label>
               <input
                 type="checkbox"
-                className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-5 w-5 rounded border-white/30 text-indigo-300 focus:ring-indigo-400"
                 checked={Boolean(formData[ORDER_FIELDS.CHECK_FLAG])}
                 disabled
                 readOnly
@@ -601,18 +602,18 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+          <div className="flex justify-end gap-3 border-t border-white/10 pt-4">
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+              className="px-4 py-2 rounded-lg border border-white/15 text-slate-100 hover:bg-white/10"
             >
               Hoàn tác
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+              className="px-4 py-2 rounded-lg border border-white/15 text-slate-100 hover:bg-white/10"
             >
               Đóng
             </button>
@@ -621,8 +622,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               disabled={isSaving}
               className={`px-5 py-2 rounded-lg text-white font-medium transition-colors ${
                 isSaving
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-600 hover:bg-green-700"
+                  ? "bg-white/20 cursor-not-allowed"
+                  : "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
               }`}
             >
               {isSaving ? "Đang lưu..." : "Lưu thay đổi"}

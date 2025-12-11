@@ -320,7 +320,21 @@ const daysUntil = (value) => {
 };
 
 const normalizeMoney = (value) => {
-    const digits = String(value ?? "").replace(/[^\d-]/g, "");
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return Math.round(value);
+    }
+    const text = String(value ?? "").trim();
+    if (!text) return 0;
+
+    // Handle decimals safely (e.g., "70000.00" -> 70000, not 7000000)
+    const normalized = text.replace(/,/g, "").replace(/\s+/g, "");
+    const asNumber = Number.parseFloat(normalized);
+    if (Number.isFinite(asNumber)) {
+        return Math.round(asNumber);
+    }
+
+    // Fallback: strip non-digits
+    const digits = normalized.replace(/[^\d-]/g, "");
     const numeric = Number.parseInt(digits || "0", 10);
     return Number.isFinite(numeric) ? numeric : 0;
 };
@@ -903,9 +917,21 @@ const postJson = (url, data) =>
 
         if (typeof fetch === "function") {
             fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: payload,
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: payload,
+            })
+                .then(async (res) => {
+                    const bodyText = await res.text().catch(() => "");
+                    if (!res.ok) {
+                        const err = new Error(
+                            `Request failed with status ${res.status}`
+                        );
+                        err.status = res.status;
+                        err.body = bodyText;
+                        throw err;
+                    }
+                    return bodyText;
                 })
                 .then(resolve)
                 .catch(reject);
@@ -925,8 +951,23 @@ const postJson = (url, data) =>
         };
 
         const req = https.request(options, (res) => {
-            res.on("data", () => {});
-            res.on("end", resolve);
+            let responseBody = "";
+            res.on("data", (chunk) => {
+                responseBody += chunk;
+            });
+            res.on("end", () => {
+                const status = res.statusCode || 0;
+                if (status >= 400) {
+                    const err = new Error(
+                        `Request failed with status ${status}`
+                    );
+                    err.status = status;
+                    err.body = responseBody;
+                    reject(err);
+                    return;
+                }
+                resolve(responseBody);
+            });
         });
         req.on("error", reject);
         req.write(payload);
@@ -971,17 +1012,45 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
 
   const text = buildRenewalMessage(orderCode, renewalResult);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const payload = {
-    chat_id: TELEGRAM_CHAT_ID,
-    text,
+  const buildPayload = (includeTopic = true) => {
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+    };
+    if (
+      includeTopic &&
+      SEND_RENEWAL_TO_TOPIC !== false &&
+      Number.isFinite(TELEGRAM_TOPIC_ID)
+    ) {
+      payload.message_thread_id = TELEGRAM_TOPIC_ID;
+    }
+    return payload;
   };
-  if (Number.isFinite(TELEGRAM_TOPIC_ID)) {
-    payload.message_thread_id = TELEGRAM_TOPIC_ID;
-  }
 
   try {
-    await postJson(url, payload);
+    await postJson(url, buildPayload(true));
   } catch (err) {
+    const bodyText = String(err?.body || err?.message || "");
+    const isThreadError =
+      err?.status === 400 &&
+      bodyText.toLowerCase().includes("message_thread_id");
+
+    if (isThreadError) {
+      try {
+        await postJson(url, buildPayload(false));
+        console.warn(
+          "Telegram renewal notification resent without topic_id after thread error"
+        );
+        return;
+      } catch (retryErr) {
+        console.error(
+          "Failed to send Telegram renewal notification after retry:",
+          retryErr
+        );
+        return;
+      }
+    }
+
     console.error("Failed to send Telegram renewal notification:", err);
   }
 };
@@ -1322,6 +1391,11 @@ const isTrueFlag = (value) => {
   return false;
 };
 
+const shouldResetStatusToUnpaid = (statusValue) => {
+  const norm = stripAccents(statusValue || "").toLowerCase().trim();
+  return norm === "can gia han" || norm === "het han";
+};
+
 app.get("/", (_req, res) => {
   res.json({ status: "ok" });
 });
@@ -1404,6 +1478,9 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
       if (orderCode) {
         const state = await fetchOrderState(orderCode);
         if (state) {
+          const resetToUnpaid = shouldResetStatusToUnpaid(
+            state[ORDER_COLS.status]
+          );
           const eligibility = isEligibleForRenewal(
             state[ORDER_COLS.status],
             state[ORDER_COLS.checkFlag],
@@ -1420,6 +1497,10 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
             isNullishFlag(state[ORDER_COLS.checkFlag])
           ) {
             await markCheckFlagFalse(orderCode);
+          }
+
+          if (resetToUnpaid) {
+            await setStatusUnpaid(orderCode);
           }
         }
       }
