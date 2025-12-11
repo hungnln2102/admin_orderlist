@@ -7,7 +7,7 @@ const envPath = path.join(__dirname, ".env");
 require("dotenv").config({ path: envPath });
 const { Pool } = require("pg");
 const cron = require("node-cron");
-const { ORDER_COLS } = require("./schema/tables");
+const { DB_DEFINITIONS, TABLES, SCHEMA } = require("./schema/tables");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
@@ -29,21 +29,21 @@ const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
 
 // Centralized column names (aligned with schema/tables.js)
 const COL = {
-  idOrder: quoteIdent(ORDER_COLS.idOrder),
-  idProduct: quoteIdent(ORDER_COLS.idProduct),
-  informationOrder: quoteIdent(ORDER_COLS.informationOrder),
-  customer: quoteIdent(ORDER_COLS.customer),
-  contact: quoteIdent(ORDER_COLS.contact),
-  slot: quoteIdent(ORDER_COLS.slot),
-  orderDate: quoteIdent(ORDER_COLS.orderDate),
-  days: quoteIdent(ORDER_COLS.days),
-  orderExpired: quoteIdent(ORDER_COLS.orderExpired),
-  supply: quoteIdent(ORDER_COLS.supply),
-  cost: quoteIdent(ORDER_COLS.cost),
-  price: quoteIdent(ORDER_COLS.price),
-  note: quoteIdent(ORDER_COLS.note),
-  status: quoteIdent(ORDER_COLS.status),
-  checkFlag: quoteIdent(ORDER_COLS.checkFlag),
+  idOrder: quoteIdent(DB_DEFINITIONS.orderList.columns.idOrder),
+  idProduct: quoteIdent(DB_DEFINITIONS.orderList.columns.idProduct),
+  informationOrder: quoteIdent(DB_DEFINITIONS.orderList.columns.informationOrder),
+  customer: quoteIdent(DB_DEFINITIONS.orderList.columns.customer),
+  contact: quoteIdent(DB_DEFINITIONS.orderList.columns.contact),
+  slot: quoteIdent(DB_DEFINITIONS.orderList.columns.slot),
+  orderDate: quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate),
+  days: quoteIdent(DB_DEFINITIONS.orderList.columns.days),
+  orderExpired: quoteIdent(DB_DEFINITIONS.orderList.columns.orderExpired),
+  supply: quoteIdent(DB_DEFINITIONS.orderList.columns.supply),
+  cost: quoteIdent(DB_DEFINITIONS.orderList.columns.cost),
+  price: quoteIdent(DB_DEFINITIONS.orderList.columns.price),
+  note: quoteIdent(DB_DEFINITIONS.orderList.columns.note),
+  status: quoteIdent(DB_DEFINITIONS.orderList.columns.status),
+  checkFlag: quoteIdent(DB_DEFINITIONS.orderList.columns.checkFlag),
 };
 
 // Normalize mixed-format date columns to a proper DATE in SQL
@@ -111,7 +111,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
   try {
     await client.query("BEGIN");
 
-    // 1) Move expired orders (< 0 days) to mavryk.order_expired
+    // 1) Move expired orders (< 0 days) to expired table
     const transfer = await client.query(`
       WITH expired AS (
         SELECT
@@ -132,10 +132,10 @@ const updateDatabaseTask = async (trigger = "cron") => {
           ${COL.note},
           ${COL.status},
           ${COL.checkFlag}
-        FROM mavryk.order_list
+        FROM ${TABLES.orderList}
         WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       )
-      INSERT INTO mavryk.order_expired (
+      INSERT INTO ${TABLES.orderExpired} (
         ${[
           COL.idOrder,
           COL.idProduct,
@@ -187,7 +187,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
 
     // 2a) Update 0 ngay con lai -> 'Hết Hạn'
     const dueToday = await client.query(`
-      UPDATE mavryk.order_list
+      UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS_EXPIRED}',
           ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
@@ -200,7 +200,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
 
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
     const del = await client.query(`
-      DELETE FROM mavryk.order_list
+      DELETE FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       RETURNING ${COL.idOrder};
     `);
@@ -218,7 +218,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
     // 2) Update "Cần Gia Hạn" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
     // 2b) Update 1..4 ngay -> 'Cần Gia Hạn'
     const soon = await client.query(`
-      UPDATE mavryk.order_list
+      UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS_RENEW}',
           ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4

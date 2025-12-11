@@ -10,24 +10,14 @@ const { updateDatabaseTask, getSchedulerStatus } = require("./scheduler");
 const Helpers = require("./helpers");
 const ORDER_PREFIXES = Helpers.ORDER_PREFIXES;
 const {
-    ORDER_COLS,
-    ACCOUNT_STORAGE_COLS,
-    BANK_LIST_COLS,
-    PACKAGE_PRODUCT_COLS,
-    PAYMENT_RECEIPT_COLS,
-    PAYMENT_SUPPLY_COLS,
-    PRODUCT_PRICE_COLS,
-    PRODUCT_DESC_COLS,
-    SUPPLY_COLS,
-    SUPPLY_PRICE_COLS,
-    USERS_COLS,
-    WAREHOUSE_COLS,
+    DB_DEFINITIONS,
+    TABLES,
+    SCHEMA,
 } = require("./schema/tables");
 const sepayWebhookApp = require("./webhook/sepay_webhook");
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
-const DB_SCHEMA = process.env.DB_SCHEMA || "mavryk";
 const SEPAY_PORT = Number(process.env.SEPAY_PORT) || 5000;
 const SEPAY_HOST = process.env.SEPAY_HOST || "0.0.0.0";
 
@@ -132,6 +122,18 @@ const quoteIdent = (value) => {
     return `"${sanitized}"`;
 };
 
+// Quoted column maps generated from DB_DEFINITIONS
+const quoteColumns = (cols = {}) =>
+    Object.fromEntries(
+        Object.entries(cols).map(([key, value]) => [key, quoteIdent(value)])
+    );
+const QUOTED_COLS = Object.fromEntries(
+    Object.entries(DB_DEFINITIONS).map(([key, def]) => [
+        key,
+        quoteColumns(def.columns),
+    ])
+);
+
 const normalizeDateInput = (value) => {
     if (value === undefined || value === null) return null;
     const trimmed = String(value).trim();
@@ -160,7 +162,7 @@ const toNullableNumber = (value) => {
 };
 const getNextAccountStorageId = async(client) => {
     const result = await client.query(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.account_storage`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ${TABLES.accountStorage}`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -170,9 +172,9 @@ const getNextAccountStorageId = async(client) => {
 };
 
 const getNextProductPriceId = async(client) => {
-    await client.query("LOCK TABLE mavryk.product_price IN EXCLUSIVE MODE;");
+    await client.query(`LOCK TABLE ${TABLES.productPrice} IN EXCLUSIVE MODE;`);
     const result = await client.query(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.product_price;`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ${TABLES.productPrice};`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -182,9 +184,9 @@ const getNextProductPriceId = async(client) => {
 };
 
 const getNextSupplyId = async(client) => {
-    await client.query("LOCK TABLE mavryk.supply IN EXCLUSIVE MODE;");
+    await client.query(`LOCK TABLE ${TABLES.supply} IN EXCLUSIVE MODE;`);
     const result = await client.query(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.supply;`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ${TABLES.supply};`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -194,9 +196,9 @@ const getNextSupplyId = async(client) => {
 };
 
 const getNextSupplyPriceId = async(client) => {
-    await client.query("LOCK TABLE mavryk.supply_price IN EXCLUSIVE MODE;");
+    await client.query(`LOCK TABLE ${TABLES.supplyPrice} IN EXCLUSIVE MODE;`);
     const result = await client.query(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.supply_price;`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ${TABLES.supplyPrice};`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -206,9 +208,9 @@ const getNextSupplyPriceId = async(client) => {
 };
 
 const getNextProductDescId = async(client) => {
-    await client.query("LOCK TABLE mavryk.product_desc IN EXCLUSIVE MODE;");
+    await client.query(`LOCK TABLE ${TABLES.productDesc} IN EXCLUSIVE MODE;`);
     const result = await client.query(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM mavryk.product_desc;`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ${TABLES.productDesc};`
     );
     const nextRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     const nextId = Number(
@@ -224,7 +226,7 @@ const ensureSupplyRecord = async(client, sourceName) => {
     }
     const nextSupplyId = await getNextSupplyId(client);
     const statusColumn = await resolveSupplyStatusColumn();
-    const fields = [supplyCols.id, supplyCols.sourceName];
+    const fields = [QUOTED_COLS.supply.id, QUOTED_COLS.supply.sourceName];
     const values = [nextSupplyId, sourceName];
     if (statusColumn) {
         fields.push(`"${statusColumn}"`);
@@ -233,7 +235,7 @@ const ensureSupplyRecord = async(client, sourceName) => {
     const placeholders = values.map((_, idx) => `$${idx + 1}`);
     const insertResult = await client.query(
         `
-    INSERT INTO mavryk.supply (${fields.join(", ")})
+    INSERT INTO ${TABLES.supply} (${fields.join(", ")})
     VALUES (${placeholders.join(", ")})
     RETURNING id;
   `,
@@ -424,9 +426,9 @@ app.post("/api/auth/login", async(req, res) => {
     try {
         const result = await pool.query(
             `
-        SELECT ${quoteIdent(USERS_COLS.userId)} AS userid, ${quoteIdent(USERS_COLS.username)} AS username, ${quoteIdent(USERS_COLS.passwordHash)} AS passwordhash, ${quoteIdent(USERS_COLS.role)} AS role
-        FROM ${DB_SCHEMA}.users
-        WHERE LOWER(${quoteIdent(USERS_COLS.username)}) = $1
+        SELECT ${quoteIdent(DB_DEFINITIONS.users.columns.userId)} AS userid, ${quoteIdent(DB_DEFINITIONS.users.columns.username)} AS username, ${quoteIdent(DB_DEFINITIONS.users.columns.passwordHash)} AS passwordhash, ${quoteIdent(DB_DEFINITIONS.users.columns.role)} AS role
+        FROM ${TABLES.users}
+        WHERE LOWER(${quoteIdent(DB_DEFINITIONS.users.columns.username)}) = $1
         LIMIT 1;
       `, [normalizedUsername]
         );
@@ -511,18 +513,18 @@ const ensureDefaultAdmin = async() => {
     const client = await pool.connect();
     try {
         const normalizedUsername = usernameEnv.toLowerCase();
-        const userIdCol = quoteIdent(USERS_COLS.userId);
-        const usernameCol = quoteIdent(USERS_COLS.username);
-        const passwordHashCol = quoteIdent(USERS_COLS.passwordHash);
-        const roleCol = quoteIdent(USERS_COLS.role);
+        const userIdCol = quoteIdent(DB_DEFINITIONS.users.columns.userId);
+        const usernameCol = quoteIdent(DB_DEFINITIONS.users.columns.username);
+        const passwordHashCol = quoteIdent(DB_DEFINITIONS.users.columns.passwordHash);
+        const roleCol = quoteIdent(DB_DEFINITIONS.users.columns.role);
         const existing = await client.query(
-            `SELECT ${userIdCol} FROM ${DB_SCHEMA}.users WHERE LOWER(${usernameCol}) = $1 LIMIT 1`, [normalizedUsername]
+            `SELECT ${userIdCol} FROM ${TABLES.users} WHERE LOWER(${usernameCol}) = $1 LIMIT 1`, [normalizedUsername]
         );
         if (existing.rows.length) {
             return;
         }
         await client.query(
-            `INSERT INTO ${DB_SCHEMA}.users (${usernameCol}, ${passwordHashCol}, ${roleCol}) VALUES ($1, $2, $3)`, [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
+            `INSERT INTO ${TABLES.users} (${usernameCol}, ${passwordHashCol}, ${roleCol}) VALUES ($1, $2, $3)`, [usernameEnv, await bcrypt.hash(passwordEnv, 10), "admin"]
         );
         console.log(`[AUTH] Đã tạo người dùng quản trị '${usernameEnv}'`);
     } catch (err) {
@@ -553,9 +555,9 @@ const resolveSupplyStatusColumn = async() => {
         const detectionQuery = `
       SELECT column_name
       FROM information_schema.columns
-      WHERE table_schema = 'mavryk'
+      WHERE table_schema = $1
         AND table_name = 'supply'
-        AND column_name = ANY($1::text[])
+        AND column_name = ANY($2::text[])
       ORDER BY CASE column_name
         WHEN 'status' THEN 1
         WHEN 'trang_thai' THEN 2
@@ -564,6 +566,7 @@ const resolveSupplyStatusColumn = async() => {
       LIMIT 1;
     `;
         const result = await client.query(detectionQuery, [
+            SCHEMA,
             SUPPLY_STATUS_CANDIDATES,
         ]);
         supplyStatusColumnNameCache =
@@ -583,93 +586,38 @@ const resolveSupplyStatusColumn = async() => {
     return supplyStatusColumnNameCache;
 };
 
-const packageProductCols = {
-    id: quoteIdent(PACKAGE_PRODUCT_COLS.id),
-    package: quoteIdent(PACKAGE_PRODUCT_COLS.package),
-    username: quoteIdent(PACKAGE_PRODUCT_COLS.username),
-    password: quoteIdent(PACKAGE_PRODUCT_COLS.password),
-    mail2nd: quoteIdent(PACKAGE_PRODUCT_COLS.mail2nd),
-    note: quoteIdent(PACKAGE_PRODUCT_COLS.note),
-    supplier: quoteIdent(PACKAGE_PRODUCT_COLS.supplier),
-    importPrice: quoteIdent(PACKAGE_PRODUCT_COLS.importPrice),
-    slot: quoteIdent(PACKAGE_PRODUCT_COLS.slot),
-    expired: quoteIdent(PACKAGE_PRODUCT_COLS.expired),
-    match: quoteIdent(PACKAGE_PRODUCT_COLS.match),
-};
-const accountStorageCols = {
-    id: quoteIdent(ACCOUNT_STORAGE_COLS.id),
-    username: quoteIdent(ACCOUNT_STORAGE_COLS.username),
-    password: quoteIdent(ACCOUNT_STORAGE_COLS.password),
-    mail2nd: quoteIdent(ACCOUNT_STORAGE_COLS.mail2nd),
-    note: quoteIdent(ACCOUNT_STORAGE_COLS.note),
-    storage: quoteIdent(ACCOUNT_STORAGE_COLS.storage),
-    mailFamily: quoteIdent(ACCOUNT_STORAGE_COLS.mailFamily),
-};
-const paymentSupplyCols = {
-    id: quoteIdent(PAYMENT_SUPPLY_COLS.id),
-    sourceId: quoteIdent(PAYMENT_SUPPLY_COLS.sourceId),
-    importValue: quoteIdent(PAYMENT_SUPPLY_COLS.importValue),
-    round: quoteIdent(PAYMENT_SUPPLY_COLS.round),
-    status: quoteIdent(PAYMENT_SUPPLY_COLS.status),
-    paid: quoteIdent(PAYMENT_SUPPLY_COLS.paid),
-};
-const supplyCols = {
-    id: quoteIdent(SUPPLY_COLS.id),
-    sourceName: quoteIdent(SUPPLY_COLS.sourceName),
-    numberBank: quoteIdent(SUPPLY_COLS.numberBank),
-    binBank: quoteIdent(SUPPLY_COLS.binBank),
-    activeSupply: quoteIdent(SUPPLY_COLS.activeSupply),
-};
-const bankListCols = {
-    bin: quoteIdent(BANK_LIST_COLS.bin),
-    bankName: quoteIdent(BANK_LIST_COLS.bankName),
-};
-const supplyPriceCols = {
-    id: quoteIdent(SUPPLY_PRICE_COLS.id),
-    productId: quoteIdent(SUPPLY_PRICE_COLS.productId),
-    sourceId: quoteIdent(SUPPLY_PRICE_COLS.sourceId),
-    price: quoteIdent(SUPPLY_PRICE_COLS.price),
-};
-const productDescCols = {
-    id: quoteIdent(PRODUCT_DESC_COLS.id),
-    productId: quoteIdent(PRODUCT_DESC_COLS.productId),
-    rules: quoteIdent(PRODUCT_DESC_COLS.rules),
-    description: quoteIdent(PRODUCT_DESC_COLS.description),
-    imageUrl: quoteIdent(PRODUCT_DESC_COLS.imageUrl),
-};
-
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
-    pp.${packageProductCols.id} AS package_id,
-    pp.${packageProductCols.package} AS package_name,
-    pp.${packageProductCols.username} AS package_username,
-    pp.${packageProductCols.password} AS package_password,
-    pp.${packageProductCols.mail2nd} AS package_mail_2nd,
-    pp.${packageProductCols.note} AS package_note,
-    pp.${packageProductCols.supplier} AS package_supplier,
-    pp.${packageProductCols.importPrice} AS package_import,
-    pp.${packageProductCols.slot} AS package_slot,
-    pp.${packageProductCols.expired} AS package_expired,
-    pp.${packageProductCols.expired}::text AS package_expired_raw,
-    pp.${packageProductCols.match} AS package_match,
-    acc.${accountStorageCols.id} AS account_id,
-    acc.${accountStorageCols.username} AS account_username,
-    acc.${accountStorageCols.password} AS account_password,
-    acc.${accountStorageCols.mail2nd} AS account_mail_2nd,
-    acc.${accountStorageCols.note} AS account_note,
-    acc.${accountStorageCols.storage} AS account_storage,
-    acc.${accountStorageCols.mailFamily} AS account_mail_family,
+    pp.${QUOTED_COLS.packageProduct.id} AS package_id,
+    pp.${QUOTED_COLS.packageProduct.package} AS package_name,
+    pp.${QUOTED_COLS.packageProduct.username} AS package_username,
+    pp.${QUOTED_COLS.packageProduct.password} AS package_password,
+    pp.${QUOTED_COLS.packageProduct.mail2nd} AS package_mail_2nd,
+    pp.${QUOTED_COLS.packageProduct.note} AS package_note,
+    pp.${QUOTED_COLS.packageProduct.supplier} AS package_supplier,
+    pp.${QUOTED_COLS.packageProduct.importPrice} AS package_import,
+    pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
+    pp.${QUOTED_COLS.packageProduct.expired} AS package_expired,
+    pp.${QUOTED_COLS.packageProduct.expired}::text AS package_expired_raw,
+    pp.${QUOTED_COLS.packageProduct.match} AS package_match,
+    acc.${QUOTED_COLS.accountStorage.id} AS account_id,
+    acc.${QUOTED_COLS.accountStorage.username} AS account_username,
+    acc.${QUOTED_COLS.accountStorage.password} AS account_password,
+    acc.${QUOTED_COLS.accountStorage.mail2nd} AS account_mail_2nd,
+    acc.${QUOTED_COLS.accountStorage.note} AS account_note,
+    acc.${QUOTED_COLS.accountStorage.storage} AS account_storage,
+    acc.${QUOTED_COLS.accountStorage.mailFamily} AS account_mail_family,
     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
-  FROM mavryk.package_product pp
-  LEFT JOIN mavryk.account_storage acc
-    ON acc.${accountStorageCols.mailFamily} = pp.${packageProductCols.username}
+  FROM ${TABLES.packageProduct} pp
+  LEFT JOIN ${TABLES.accountStorage} acc
+    ON acc.${QUOTED_COLS.accountStorage.mailFamily} = pp.${QUOTED_COLS.packageProduct.username}
   LEFT JOIN (
     SELECT
-      LOWER(TRIM(${quoteIdent(PRODUCT_PRICE_COLS.package)}::text)) AS package_key,
-      ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(${quoteIdent(PRODUCT_PRICE_COLS.product)}::text), '')), NULL) AS product_codes
-    FROM mavryk.product_price
-    GROUP BY LOWER(TRIM(${quoteIdent(PRODUCT_PRICE_COLS.package)}::text))
-  ) product_codes ON product_codes.package_key = LOWER(TRIM(pp.${packageProductCols.package}::text))
+      LOWER(TRIM(${quoteIdent(DB_DEFINITIONS.productPrice.columns.package)}::text)) AS package_key,
+      ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(${quoteIdent(DB_DEFINITIONS.productPrice.columns.product)}::text), '')), NULL) AS product_codes
+    FROM ${TABLES.productPrice}
+    GROUP BY LOWER(TRIM(${quoteIdent(DB_DEFINITIONS.productPrice.columns.package)}::text))
+  ) product_codes ON product_codes.package_key = LOWER(TRIM(pp.${QUOTED_COLS.packageProduct.package}::text))
 `;
 const mapPackageProductRow = (row) => {
     const packageId = getRowId(row, "package_id", "id", "ID");
@@ -728,11 +676,11 @@ const timezoneCandidate =
     process.env.APP_TIMEZONE :
     DEFAULT_TIMEZONE;
 const CURRENT_DATE_SQL = `(CURRENT_TIMESTAMP AT TIME ZONE '${timezoneCandidate}')::date`;
-const ORDER_ID_COL = quoteIdent(ORDER_COLS.id);
-const ORDER_DATE_COL = quoteIdent(ORDER_COLS.orderDate);
-const ORDER_EXPIRED_COL = quoteIdent(ORDER_COLS.orderExpired);
-const ORDER_COST_COL = quoteIdent(ORDER_COLS.cost);
-const ORDER_PRICE_COL = quoteIdent(ORDER_COLS.price);
+const ORDER_ID_COL = quoteIdent(DB_DEFINITIONS.orderList.columns.id);
+const ORDER_DATE_COL = quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate);
+const ORDER_EXPIRED_COL = quoteIdent(DB_DEFINITIONS.orderList.columns.orderExpired);
+const ORDER_COST_COL = quoteIdent(DB_DEFINITIONS.orderList.columns.cost);
+const ORDER_PRICE_COL = quoteIdent(DB_DEFINITIONS.orderList.columns.price);
 
 const dashStatsQuery = `
   WITH period_data AS (
@@ -754,7 +702,7 @@ const dashStatsQuery = `
       END AS expiry_date,
       COALESCE(${ORDER_COST_COL}, 0) AS cost_value,
       COALESCE(${ORDER_PRICE_COL}, 0) AS price_value
-    FROM ${DB_SCHEMA}.order_list
+    FROM ${TABLES.orderList}
   )
   SELECT
     COALESCE(SUM(CASE
@@ -851,13 +799,13 @@ app.get("/api/dashboard/years", async(_req, res) => {
     console.log("[GET] /api/dashboard/years");
     const q = `
     WITH all_dates AS (
-      SELECT order_date::text AS raw_date FROM ${DB_SCHEMA}.order_list
+      SELECT order_date::text AS raw_date FROM ${TABLES.orderList}
       UNION ALL
-      SELECT order_date::text AS raw_date FROM ${DB_SCHEMA}.order_expired
+      SELECT order_date::text AS raw_date FROM ${TABLES.orderExpired}
       UNION ALL
-      SELECT createdate::text AS raw_date FROM ${DB_SCHEMA}.order_canceled
+      SELECT createdate::text AS raw_date FROM ${TABLES.orderCanceled}
       UNION ALL
-      SELECT ${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text AS raw_date FROM ${DB_SCHEMA}.payment_receipt
+      SELECT ${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)}::text AS raw_date FROM ${TABLES.paymentReceipt}
     ),
     normalized AS (
       SELECT DISTINCT ${normalizedYearCase} AS year_value
@@ -889,10 +837,10 @@ app.get("/api/dashboard/charts", async(req, res) => {
     const orderDateCase = createDateNormalization("order_date");
     const orderYearCase = createYearExtraction("order_date");
     const receiptDateCase = createDateNormalization(
-        quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)
+        quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)
     );
     const receiptYearCase = createYearExtraction(
-        quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)
+        quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)
     );
     const refundDateCase = createDateNormalization("createdate");
     const refundYearCase = createYearExtraction("createdate");
@@ -904,7 +852,7 @@ app.get("/api/dashboard/charts", async(req, res) => {
         ${orderYearCase} AS order_year,
         0 AS revenue_value,
         FALSE AS is_canceled
-      FROM mavryk.order_list
+      FROM ${TABLES.orderList}
       WHERE TRIM(order_date::text) <> ''
       UNION ALL
       SELECT
@@ -912,7 +860,7 @@ app.get("/api/dashboard/charts", async(req, res) => {
         ${orderYearCase} AS order_year,
         0 AS revenue_value,
         FALSE AS is_canceled
-      FROM mavryk.order_expired
+      FROM ${TABLES.orderExpired}
       WHERE TRIM(order_date::text) <> ''
       UNION ALL
       SELECT
@@ -920,7 +868,7 @@ app.get("/api/dashboard/charts", async(req, res) => {
         ${createYearExtraction("createdate")} AS order_year,
         0 AS revenue_value,
         TRUE AS is_canceled
-      FROM mavryk.order_canceled
+      FROM ${TABLES.orderCanceled}
       WHERE TRIM(createdate::text) <> ''
     ),
     filtered_orders AS (
@@ -943,16 +891,16 @@ app.get("/api/dashboard/charts", async(req, res) => {
       SELECT
         ${receiptDateCase} AS receipt_date,
         ${receiptYearCase} AS receipt_year,
-        COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.amount)}, 0) AS amount_value
-      FROM ${DB_SCHEMA}.payment_receipt
-      WHERE TRIM(${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text) <> ''
+        COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.amount)}, 0) AS amount_value
+      FROM ${TABLES.paymentReceipt}
+      WHERE TRIM(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)}::text) <> ''
     ),
     refunds AS (
       SELECT
         ${refundDateCase} AS refund_date,
         ${refundYearCase} AS refund_year,
         COALESCE(refund, 0) AS refund_value
-      FROM ${DB_SCHEMA}.order_canceled
+      FROM ${TABLES.orderCanceled}
       WHERE TRIM(createdate::text) <> ''
     ),
     revenue_events AS (
@@ -1242,7 +1190,7 @@ const fetchProductPriceRowById = async(client, productId) => {
     const reloadQuery = `
     WITH supply AS (
       SELECT product_id, MAX(price) AS max_supply_price
-      FROM mavryk.supply_price
+      FROM ${TABLES.supplyPrice}
       GROUP BY product_id
     )
     SELECT
@@ -1256,7 +1204,7 @@ const fetchProductPriceRowById = async(client, productId) => {
       pp.is_active,
       pp.update,
       COALESCE(supply.max_supply_price, 0) AS max_supply_price
-    FROM mavryk.product_price pp
+    FROM ${TABLES.productPrice} pp
     LEFT JOIN supply ON supply.product_id = pp.id
     WHERE pp.id = $1
     LIMIT 1;
@@ -1274,10 +1222,10 @@ const findSupplyIdByName = async(client, sourceName) => {
     if (!normalized) return null;
     const result = await client.query(
         `
-    SELECT ${supplyCols.id} AS id
-    FROM mavryk.supply
-    WHERE LOWER(TRIM(${supplyCols.sourceName}::text)) = $1
-    ORDER BY ${supplyCols.id} ASC
+    SELECT ${QUOTED_COLS.supply.id} AS id
+    FROM ${TABLES.supply}
+    WHERE LOWER(TRIM(${QUOTED_COLS.supply.sourceName}::text)) = $1
+    ORDER BY ${QUOTED_COLS.supply.id} ASC
     LIMIT 1;
   `, [normalized]
     );
@@ -1343,11 +1291,11 @@ const calculateOrderPriceFromRule = async({ productName, supplyId, supplyName, i
 
         const productResult = await client.query(
             `
-      SELECT ${quoteIdent(PRODUCT_PRICE_COLS.id)} AS id,
-             ${quoteIdent(PRODUCT_PRICE_COLS.pctCtv)} AS pct_ctv,
-             ${quoteIdent(PRODUCT_PRICE_COLS.pctKhach)} AS pct_khach
-      FROM ${DB_SCHEMA}.product_price
-      WHERE ${quoteIdent(PRODUCT_PRICE_COLS.product)} = $1
+      SELECT ${quoteIdent(DB_DEFINITIONS.productPrice.columns.id)} AS id,
+             ${quoteIdent(DB_DEFINITIONS.productPrice.columns.pctCtv)} AS pct_ctv,
+             ${quoteIdent(DB_DEFINITIONS.productPrice.columns.pctKhach)} AS pct_khach
+      FROM ${TABLES.productPrice}
+      WHERE ${quoteIdent(DB_DEFINITIONS.productPrice.columns.product)} = $1
       LIMIT 1;
     `, [normalizedProduct]
         );
@@ -1386,10 +1334,10 @@ const calculateOrderPriceFromRule = async({ productName, supplyId, supplyName, i
 
         const supplyPriceResult = await client.query(
             `
-      SELECT ${quoteIdent(SUPPLY_PRICE_COLS.price)} AS price
-      FROM ${DB_SCHEMA}.supply_price
-      WHERE ${quoteIdent(SUPPLY_PRICE_COLS.productId)} = $1
-        AND ${quoteIdent(SUPPLY_PRICE_COLS.sourceId)} = $2
+      SELECT ${quoteIdent(DB_DEFINITIONS.supplyPrice.columns.price)} AS price
+      FROM ${TABLES.supplyPrice}
+      WHERE ${quoteIdent(DB_DEFINITIONS.supplyPrice.columns.productId)} = $1
+        AND ${quoteIdent(DB_DEFINITIONS.supplyPrice.columns.sourceId)} = $2
       LIMIT 1;
     `, [productId, resolvedSupplyId]
         );
@@ -1554,21 +1502,21 @@ const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
 };
 
 const ORDER_WRITABLE_COLUMNS = new Set([
-    ORDER_COLS.idOrder,
-    ORDER_COLS.idProduct,
-    ORDER_COLS.informationOrder,
-    ORDER_COLS.customer,
-    ORDER_COLS.contact,
-    ORDER_COLS.slot,
-    ORDER_COLS.orderDate,
-    ORDER_COLS.days,
-    ORDER_COLS.orderExpired,
-    ORDER_COLS.supply,
-    ORDER_COLS.cost,
-    ORDER_COLS.price,
-    ORDER_COLS.note,
-    ORDER_COLS.status,
-    ORDER_COLS.checkFlag,
+    DB_DEFINITIONS.orderList.columns.idOrder,
+    DB_DEFINITIONS.orderList.columns.idProduct,
+    DB_DEFINITIONS.orderList.columns.informationOrder,
+    DB_DEFINITIONS.orderList.columns.customer,
+    DB_DEFINITIONS.orderList.columns.contact,
+    DB_DEFINITIONS.orderList.columns.slot,
+    DB_DEFINITIONS.orderList.columns.orderDate,
+    DB_DEFINITIONS.orderList.columns.days,
+    DB_DEFINITIONS.orderList.columns.orderExpired,
+    DB_DEFINITIONS.orderList.columns.supply,
+    DB_DEFINITIONS.orderList.columns.cost,
+    DB_DEFINITIONS.orderList.columns.price,
+    DB_DEFINITIONS.orderList.columns.note,
+    DB_DEFINITIONS.orderList.columns.status,
+    DB_DEFINITIONS.orderList.columns.checkFlag,
 ]);
 
 const sanitizeOrderWritePayload = (raw = {}) => {
@@ -1581,19 +1529,19 @@ const sanitizeOrderWritePayload = (raw = {}) => {
 
         let normalizedValue = value;
         if (
-            mappedKey === ORDER_COLS.orderDate ||
-            mappedKey === ORDER_COLS.orderExpired
+            mappedKey === DB_DEFINITIONS.orderList.columns.orderDate ||
+            mappedKey === DB_DEFINITIONS.orderList.columns.orderExpired
         ) {
             normalizedValue = normalizeDateInput(value);
         } else if (
-            mappedKey === ORDER_COLS.cost ||
-            mappedKey === ORDER_COLS.price
+            mappedKey === DB_DEFINITIONS.orderList.columns.cost ||
+            mappedKey === DB_DEFINITIONS.orderList.columns.price
         ) {
             normalizedValue =
                 value === undefined || value === null || value === "" ?
                 null :
                 toNullableNumber(value);
-        } else if (mappedKey === ORDER_COLS.days) {
+        } else if (mappedKey === DB_DEFINITIONS.orderList.columns.days) {
             if (
                 value === undefined ||
                 value === null ||
@@ -1604,7 +1552,7 @@ const sanitizeOrderWritePayload = (raw = {}) => {
                 const parsedDays = Number(value);
                 normalizedValue = Number.isFinite(parsedDays) ? parsedDays : value;
             }
-        } else if (mappedKey === ORDER_COLS.checkFlag) {
+        } else if (mappedKey === DB_DEFINITIONS.orderList.columns.checkFlag) {
             normalizedValue = normalizeCheckFlagValue(value);
         } else if (typeof value === "string") {
             normalizedValue = value.trim();
@@ -1616,32 +1564,32 @@ const sanitizeOrderWritePayload = (raw = {}) => {
     return sanitized;
 };
 const ARCHIVE_COLUMNS_COMMON = [
-    ORDER_COLS.id,
-    ORDER_COLS.idOrder,
-    ORDER_COLS.idProduct,
-    ORDER_COLS.informationOrder,
-    ORDER_COLS.customer,
-    ORDER_COLS.contact,
-    ORDER_COLS.slot,
-    ORDER_COLS.orderDate,
-    ORDER_COLS.days,
-    ORDER_COLS.orderExpired,
-    ORDER_COLS.supply,
-    ORDER_COLS.cost,
-    ORDER_COLS.price,
+    DB_DEFINITIONS.orderList.columns.id,
+    DB_DEFINITIONS.orderList.columns.idOrder,
+    DB_DEFINITIONS.orderList.columns.idProduct,
+    DB_DEFINITIONS.orderList.columns.informationOrder,
+    DB_DEFINITIONS.orderList.columns.customer,
+    DB_DEFINITIONS.orderList.columns.contact,
+    DB_DEFINITIONS.orderList.columns.slot,
+    DB_DEFINITIONS.orderList.columns.orderDate,
+    DB_DEFINITIONS.orderList.columns.days,
+    DB_DEFINITIONS.orderList.columns.orderExpired,
+    DB_DEFINITIONS.orderList.columns.supply,
+    DB_DEFINITIONS.orderList.columns.cost,
+    DB_DEFINITIONS.orderList.columns.price,
 ];
 const ARCHIVE_COLUMNS_EXPIRED = [
     ...ARCHIVE_COLUMNS_COMMON,
-    ORDER_COLS.note,
-    ORDER_COLS.status,
-    ORDER_COLS.checkFlag,
+    DB_DEFINITIONS.orderList.columns.note,
+    DB_DEFINITIONS.orderList.columns.status,
+    DB_DEFINITIONS.orderList.columns.checkFlag,
     "archived_at",
 ];
 const ARCHIVE_COLUMNS_CANCELED = [
     ...ARCHIVE_COLUMNS_COMMON,
-    ORDER_COLS.refund,
-    ORDER_COLS.status,
-    ORDER_COLS.checkFlag,
+    DB_DEFINITIONS.orderList.columns.refund,
+    DB_DEFINITIONS.orderList.columns.status,
+    DB_DEFINITIONS.orderList.columns.checkFlag,
     "createdate",
 ];
 
@@ -1660,34 +1608,34 @@ const buildArchiveInsert = (tableName, columns, row, overrides = {}) => {
 
 const fetchOrdersFromTable = async(tableName) => {
     const isCanceled = tableName.includes("order_canceled");
-    const orderDateCol = quoteIdent(ORDER_COLS.orderDate);
-    const orderExpiredCol = quoteIdent(ORDER_COLS.orderExpired);
+    const orderDateCol = quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate);
+    const orderExpiredCol = quoteIdent(DB_DEFINITIONS.orderList.columns.orderExpired);
     const baseSelect = `
-    ${quoteIdent(ORDER_COLS.id)},
-    ${quoteIdent(ORDER_COLS.idOrder)},
-    ${quoteIdent(ORDER_COLS.idProduct)},
-    ${quoteIdent(ORDER_COLS.informationOrder)},
-    ${quoteIdent(ORDER_COLS.customer)},
-    ${quoteIdent(ORDER_COLS.contact)},
-    ${quoteIdent(ORDER_COLS.slot)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.id)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.idOrder)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.idProduct)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.informationOrder)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.customer)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.contact)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.slot)},
     ${orderDateCol},
     ${orderDateCol}::text AS order_date_raw,
-    ${quoteIdent(ORDER_COLS.days)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.days)},
     ${orderExpiredCol},
     ${orderExpiredCol}::text AS order_expired_raw,
-    ${quoteIdent(ORDER_COLS.supply)},
-    ${quoteIdent(ORDER_COLS.cost)},
-    ${quoteIdent(ORDER_COLS.price)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.cost)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.price)},
   `;
     const selectColumns = isCanceled ?
         `${baseSelect}
-    ${quoteIdent(ORDER_COLS.refund)},
-    ${quoteIdent(ORDER_COLS.status)},
-    ${quoteIdent(ORDER_COLS.checkFlag)}` :
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.refund)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.status)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.checkFlag)}` :
         `${baseSelect}
-    ${quoteIdent(ORDER_COLS.note)},
-    ${quoteIdent(ORDER_COLS.status)},
-    ${quoteIdent(ORDER_COLS.checkFlag)}`;
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.note)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.status)},
+    ${quoteIdent(DB_DEFINITIONS.orderList.columns.checkFlag)}`;
     const query = `
     SELECT
 ${selectColumns}
@@ -1705,10 +1653,10 @@ app.get("/api/orders", async(req, res) => {
 
     const table =
         scope === "expired" ?
-        "mavryk.order_expired" :
+        TABLES.orderExpired :
         scope === "canceled" || scope === "cancelled" ?
-        "mavryk.order_canceled" :
-        "mavryk.order_list";
+        TABLES.orderCanceled :
+        TABLES.orderList;
 
     try {
         const rows = await fetchOrdersFromTable(table);
@@ -1774,7 +1722,7 @@ app.post("/api/orders/:orderCode/renew", async(req, res) => {
 app.get("/api/orders/expired", async(_req, res) => {
     console.log("[GET] /api/orders/expired");
     try {
-        const rows = await fetchOrdersFromTable("mavryk.order_expired");
+        const rows = await fetchOrdersFromTable(TABLES.orderExpired);
         res.json(rows);
     } catch (error) {
         console.error("Query failed (GET /api/orders/expired):", error);
@@ -1787,7 +1735,7 @@ app.get("/api/orders/expired", async(_req, res) => {
 app.get("/api/orders/canceled", async(_req, res) => {
     console.log("[GET] /api/orders/canceled");
     try {
-        const rows = await fetchOrdersFromTable("mavryk.order_canceled");
+        const rows = await fetchOrdersFromTable(TABLES.orderCanceled);
         res.json(rows);
     } catch (error) {
         console.error("Query failed (GET /api/orders/canceled):", error);
@@ -1809,7 +1757,7 @@ app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
     try {
         const result = await pool.query(
             `
-        UPDATE mavryk.order_canceled
+        UPDATE ${TABLES.orderCanceled}
         SET status = 'Đã Hoàn',
             check_flag = FALSE
         WHERE id = $1
@@ -1834,22 +1782,22 @@ app.patch("/api/orders/canceled/:id/refund", async(req, res) => {
     }
 });
 
-// New endpoint: Purchase Orders (table mavryk.purchase_order)
+// New endpoint: Purchase Orders (table ${TABLES.purchaseOrder})
 
 app.get("/api/supply-insights", async(_req, res) => {
             console.log("[GET] /api/supply-insights");
             const { monthStart, nextMonthStart } = getCurrentMonthRange();
             try {
                 const orderListCols = {
-                    orderDateCol: ORDER_COLS.orderDate,
-                    sourceCol: ORDER_COLS.supply,
-                    costCol: ORDER_COLS.cost,
+                    orderDateCol: DB_DEFINITIONS.orderList.columns.orderDate,
+                    sourceCol: DB_DEFINITIONS.orderList.columns.supply,
+                    costCol: DB_DEFINITIONS.orderList.columns.cost,
                 };
                 const orderExpiredCols = orderListCols;
                 const orderCanceledCols = {
                     orderDateCol: "createdate",
-                    sourceCol: ORDER_COLS.supply,
-                    costCol: ORDER_COLS.cost,
+                    sourceCol: DB_DEFINITIONS.orderList.columns.supply,
+                    costCol: DB_DEFINITIONS.orderList.columns.cost,
                 };
                 const statusColumnName = await resolveSupplyStatusColumn();
                 const paymentStatusKey = createVietnameseStatusKey("ps.status");
@@ -1861,27 +1809,27 @@ app.get("/api/supply-insights", async(_req, res) => {
                     const orderDateExpr = createDateNormalization(
                         quoteIdent(cols.orderDateCol)
                     );
-                    const sourceKeyExpr = createSourceKey(quoteIdent(cols.sourceCol));
-                    const importExpr = createNumericExtraction(quoteIdent(cols.costCol));
-                    const sourceIdent = quoteIdent(cols.sourceCol);
-                    return `
+                const sourceKeyExpr = createSourceKey(quoteIdent(cols.sourceCol));
+                const importExpr = createNumericExtraction(quoteIdent(cols.costCol));
+                const sourceIdent = quoteIdent(cols.sourceCol);
+                return `
       SELECT
         ${orderDateExpr} AS order_date,
         COALESCE(${sourceKeyExpr}, '') AS source_key,
         TRIM(${sourceIdent}::text) AS source_name,
         ${importExpr} AS import_value
-      FROM ${DB_SCHEMA}.${table}
+      FROM ${table}
       WHERE TRIM(${sourceIdent}::text) <> ''
     `;
-                };
+            };
 
-                const ordersUnion = `
+            const ordersUnion = `
     WITH orders_union AS (
-${makeOrderSelect("order_list", orderListCols)}
+${makeOrderSelect(TABLES.orderList, orderListCols)}
       UNION ALL
-${makeOrderSelect("order_expired", orderExpiredCols)}
+${makeOrderSelect(TABLES.orderExpired, orderExpiredCols)}
       UNION ALL
-${makeOrderSelect("order_canceled", orderCanceledCols)}
+${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
     ),
     orders_filtered AS (
       SELECT *
@@ -1917,36 +1865,36 @@ ${makeOrderSelect("order_canceled", orderCanceledCols)}
       SELECT
         sp.source_id,
         ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(pp.san_pham::text), '')), NULL) AS product_list
-      FROM ${DB_SCHEMA}.supply_price sp
-      JOIN ${DB_SCHEMA}.product_price pp ON sp.product_id = pp.id
+      FROM ${TABLES.supplyPrice} sp
+      JOIN ${TABLES.productPrice} pp ON sp.product_id = pp.id
       GROUP BY sp.source_id
     ),
     payment_summary AS (
       SELECT
-        ps.${paymentSupplyCols.sourceId},
-        SUM(COALESCE(ps.${paymentSupplyCols.paid}, 0)) AS total_paid_import,
+        ps.${QUOTED_COLS.paymentSupply.sourceId},
+        SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_paid_import,
         SUM(
           CASE
             WHEN ${createVietnameseStatusKey(
-                `ps.${paymentSupplyCols.status}`
+                `ps.${QUOTED_COLS.paymentSupply.status}`
             )} = 'chua thanh toan'
               THEN GREATEST(
-                COALESCE(ps.${paymentSupplyCols.importValue}, 0) - COALESCE(ps.${paymentSupplyCols.paid}, 0),
+                COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0),
                 0
               )
             ELSE 0
           END
         ) AS total_unpaid_import
-      FROM ${DB_SCHEMA}.payment_supply ps
-      GROUP BY ps.${paymentSupplyCols.sourceId}
+      FROM ${TABLES.paymentSupply} ps
+      GROUP BY ps.${QUOTED_COLS.paymentSupply.sourceId}
     )
     SELECT
-      s.${supplyCols.id} AS id,
-      s.${supplyCols.sourceName} AS source_name,
-      s.${supplyCols.numberBank} AS number_bank,
-      s.${supplyCols.binBank} AS bin_bank,
+      s.${QUOTED_COLS.supply.id} AS id,
+      s.${QUOTED_COLS.supply.sourceName} AS source_name,
+      s.${QUOTED_COLS.supply.numberBank} AS number_bank,
+      s.${QUOTED_COLS.supply.binBank} AS bin_bank,
       ${statusSelect},
-      COALESCE(bl.${bankListCols.bankName}, '') AS bank_name,
+      COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name,
       COALESCE(product_data.product_list, ARRAY[]::text[]) AS product_names,
       COALESCE(month_data.monthly_orders, 0) AS monthly_orders,
       COALESCE(month_data.monthly_import_value, 0) AS monthly_import_value,
@@ -1954,19 +1902,19 @@ ${makeOrderSelect("order_canceled", orderCanceledCols)}
       COALESCE(total_data.total_orders, 0) AS total_orders,
       COALESCE(payment_summary.total_paid_import, 0) AS total_paid_import,
       COALESCE(payment_summary.total_unpaid_import, 0) AS total_unpaid_import
-    FROM ${DB_SCHEMA}.supply s
-    LEFT JOIN product_data ON product_data.source_id = s.${supplyCols.id}
+    FROM ${TABLES.supply} s
+    LEFT JOIN product_data ON product_data.source_id = s.${QUOTED_COLS.supply.id}
     LEFT JOIN month_data
-      ON month_data.source_key = ${createSourceKey(`s.${supplyCols.sourceName}`)}
+      ON month_data.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
     LEFT JOIN last_order
-      ON last_order.source_key = ${createSourceKey(`s.${supplyCols.sourceName}`)}
+      ON last_order.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
     LEFT JOIN total_data
-      ON total_data.source_key = ${createSourceKey(`s.${supplyCols.sourceName}`)}
+      ON total_data.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
     LEFT JOIN payment_summary
-      ON payment_summary.source_id = s.${supplyCols.id}
-    LEFT JOIN ${DB_SCHEMA}.bank_list bl
-      ON TRIM(bl.${bankListCols.bin}::text) = TRIM(s.${supplyCols.binBank}::text)
-    ORDER BY s.${supplyCols.sourceName};
+      ON payment_summary.source_id = s.${QUOTED_COLS.supply.id}
+    LEFT JOIN ${TABLES.bankList} bl
+      ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
+    ORDER BY s.${QUOTED_COLS.supply.sourceName};
   `;
 
         const result = await pool.query(ordersUnion, [monthStart, nextMonthStart]);
@@ -2024,12 +1972,12 @@ app.get("/api/supplies", async(req, res) => {
         const result = await pool.query(
             `
       SELECT
-        ${supplyCols.id} AS id,
-        ${supplyCols.sourceName} AS source_name,
-        ${supplyCols.numberBank} AS number_bank,
-        ${supplyCols.binBank} AS bin_bank
-      FROM ${DB_SCHEMA}.supply
-      ORDER BY ${supplyCols.sourceName};
+        ${QUOTED_COLS.supply.id} AS id,
+        ${QUOTED_COLS.supply.sourceName} AS source_name,
+        ${QUOTED_COLS.supply.numberBank} AS number_bank,
+        ${QUOTED_COLS.supply.binBank} AS bin_bank
+      FROM ${TABLES.supply}
+      ORDER BY ${QUOTED_COLS.supply.sourceName};
       `
         );
         res.json(result.rows || []);
@@ -2045,8 +1993,8 @@ app.get("/api/supplies/:supplyId/products", async(req, res) => {
 
     const q = `
     SELECT DISTINCT pp.id, pp.san_pham
-    FROM mavryk.supply_price sp
-    JOIN mavryk.product_price pp ON sp.product_id = pp.id
+    FROM ${TABLES.supplyPrice} sp
+    JOIN ${TABLES.productPrice} pp ON sp.product_id = pp.id
     WHERE sp.source_id = $1
     ORDER BY pp.san_pham;
   `;
@@ -2083,17 +2031,17 @@ app.get("/api/supplies/:supplyId/payments", async(req, res) => {
     const limitPlusOne = limit + 1;
     const q = `
     SELECT
-      ps.${paymentSupplyCols.id} AS id,
-      ps.${paymentSupplyCols.sourceId} AS source_id,
-      COALESCE(s.${supplyCols.sourceName}, '') AS source_name,
-      COALESCE(ps.${paymentSupplyCols.importValue}, 0) AS import_value,
-      COALESCE(ps.${paymentSupplyCols.paid}, 0) AS paid_value,
-      COALESCE(ps.${paymentSupplyCols.round}, '') AS round_label,
-      COALESCE(ps.${paymentSupplyCols.status}, '') AS status_label
-    FROM mavryk.payment_supply ps
-    LEFT JOIN mavryk.supply s ON s.${supplyCols.id} = ps.${paymentSupplyCols.sourceId}
-    WHERE ps.${paymentSupplyCols.sourceId} = $1
-    ORDER BY ps.${paymentSupplyCols.id} DESC
+      ps.${QUOTED_COLS.paymentSupply.id} AS id,
+      ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
+      COALESCE(s.${QUOTED_COLS.supply.sourceName}, '') AS source_name,
+      COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) AS import_value,
+      COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0) AS paid_value,
+      COALESCE(ps.${QUOTED_COLS.paymentSupply.round}, '') AS round_label,
+      COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
+    FROM ${TABLES.paymentSupply} ps
+    LEFT JOIN ${TABLES.supply} s ON s.${QUOTED_COLS.supply.id} = ps.${QUOTED_COLS.paymentSupply.sourceId}
+    WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1
+    ORDER BY ps.${QUOTED_COLS.paymentSupply.id} DESC
     OFFSET $2
     LIMIT $3;
   `;
@@ -2158,9 +2106,9 @@ app.post("/api/supplies/:supplyId/payments", async(req, res) => {
 
     try {
         const insertQuery = `
-      INSERT INTO mavryk.payment_supply (${paymentSupplyCols.sourceId}, ${paymentSupplyCols.importValue}, ${paymentSupplyCols.paid}, ${paymentSupplyCols.round}, ${paymentSupplyCols.status})
+      INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.round} AS round, ${paymentSupplyCols.status} AS status;
+      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.round} AS round, ${QUOTED_COLS.paymentSupply.status} AS status;
     `;
         const result = await pool.query(insertQuery, [
             parsedSupplyId,
@@ -2206,16 +2154,16 @@ app.get("/api/payment-receipts", async(req, res) => {
 
     const query = `
     SELECT
-      ${quoteIdent(PAYMENT_RECEIPT_COLS.id)} AS id,
-      COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.orderCode)}::text, '') AS ma_don_hang,
-      COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text, '') AS ngay_thanh_toan,
-      COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.amount)}, 0) AS so_tien,
-      COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.sender)}::text, '') AS nguoi_gui,
-      COALESCE(${quoteIdent(PAYMENT_RECEIPT_COLS.note)}::text, '') AS noi_dung_ck
-    FROM mavryk.payment_receipt
+      ${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.id)} AS id,
+      COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.orderCode)}::text, '') AS ma_don_hang,
+      COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)}::text, '') AS ngay_thanh_toan,
+      COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.amount)}, 0) AS so_tien,
+      COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.sender)}::text, '') AS nguoi_gui,
+      COALESCE(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.note)}::text, '') AS noi_dung_ck
+    FROM ${TABLES.paymentReceipt}
     ORDER BY
-      NULLIF(${quoteIdent(PAYMENT_RECEIPT_COLS.paidDate)}::text, '') DESC NULLS LAST,
-      ${quoteIdent(PAYMENT_RECEIPT_COLS.id)} DESC
+      NULLIF(${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.paidDate)}::text, '') DESC NULLS LAST,
+      ${quoteIdent(DB_DEFINITIONS.paymentReceipt.columns.id)} DESC
     OFFSET $1
     LIMIT $2;
   `;
@@ -2244,7 +2192,7 @@ app.get("/api/products", async(_req, res) => {
     console.log("[GET] /api/products");
     const q = `
     SELECT id, san_pham, package_product, package
-    FROM mavryk.product_price
+    FROM ${TABLES.productPrice}
     ORDER BY san_pham;
   `;
 
@@ -2278,9 +2226,9 @@ app.get("/api/product-descriptions", async(req, res) => {
         const searchIdx = params.length;
         whereClause = `
       WHERE (
-        LOWER(COALESCE(pd.${productDescCols.productId}::text, '')) LIKE $${searchIdx}
-        OR LOWER(COALESCE(pd.${productDescCols.rules}::text, '')) LIKE $${searchIdx}
-        OR LOWER(COALESCE(pd.${productDescCols.description}::text, '')) LIKE $${searchIdx}
+        LOWER(COALESCE(pd.${QUOTED_COLS.productDesc.productId}::text, '')) LIKE $${searchIdx}
+        OR LOWER(COALESCE(pd.${QUOTED_COLS.productDesc.rules}::text, '')) LIKE $${searchIdx}
+        OR LOWER(COALESCE(pd.${QUOTED_COLS.productDesc.description}::text, '')) LIKE $${searchIdx}
       )
     `;
     }
@@ -2300,22 +2248,22 @@ app.get("/api/product-descriptions", async(req, res) => {
     const query = `
     WITH raw AS (
       SELECT
-        pd.${productDescCols.id} AS id,
-        COALESCE(TRIM(pd.${productDescCols.productId}::text), '') AS product_id,
-        COALESCE(TRIM(pd.${productDescCols.rules}::text), '') AS rules,
-        COALESCE(TRIM(pd.${productDescCols.description}::text), '') AS description,
-        COALESCE(NULLIF(TRIM(pd.${productDescCols.imageUrl}::text), ''), NULL) AS image_url,
+        pd.${QUOTED_COLS.productDesc.id} AS id,
+        COALESCE(TRIM(pd.${QUOTED_COLS.productDesc.productId}::text), '') AS product_id,
+        COALESCE(TRIM(pd.${QUOTED_COLS.productDesc.rules}::text), '') AS rules,
+        COALESCE(TRIM(pd.${QUOTED_COLS.productDesc.description}::text), '') AS description,
+        COALESCE(NULLIF(TRIM(pd.${QUOTED_COLS.productDesc.imageUrl}::text), ''), NULL) AS image_url,
         COALESCE(pp.san_pham::text, '') AS product_name
-      FROM ${DB_SCHEMA}.product_desc pd
-      LEFT JOIN ${DB_SCHEMA}.product_price pp
+      FROM ${TABLES.productDesc} pd
+      LEFT JOIN ${TABLES.productPrice} pp
         ON (
           CASE
-            WHEN TRIM(pd.${productDescCols.productId}::text) ~ '^\\d+$'
-              THEN TRIM(pd.${productDescCols.productId}::text)::int
+            WHEN TRIM(pd.${QUOTED_COLS.productDesc.productId}::text) ~ '^\\d+$'
+              THEN TRIM(pd.${QUOTED_COLS.productDesc.productId}::text)::int
             ELSE NULL
           END
         ) = pp.id
-        OR LOWER(TRIM(pd.${productDescCols.productId}::text)) = LOWER(TRIM(pp.san_pham::text))
+        OR LOWER(TRIM(pd.${QUOTED_COLS.productDesc.productId}::text)) = LOWER(TRIM(pp.san_pham::text))
       ${whereClause}
     )
     SELECT *, COUNT(*) OVER() AS total_count
@@ -2369,9 +2317,9 @@ app.post("/api/product-descriptions", async(req, res) => {
         await client.query("BEGIN");
         const existing = await client.query(
             `
-        SELECT ${productDescCols.id} AS id
-        FROM ${DB_SCHEMA}.product_desc
-        WHERE LOWER(TRIM(${productDescCols.productId}::text)) = LOWER(TRIM($1::text))
+        SELECT ${QUOTED_COLS.productDesc.id} AS id
+        FROM ${TABLES.productDesc}
+        WHERE LOWER(TRIM(${QUOTED_COLS.productDesc.productId}::text)) = LOWER(TRIM($1::text))
         LIMIT 1;
       `, [normalizedProductId]
         );
@@ -2380,17 +2328,17 @@ app.post("/api/product-descriptions", async(req, res) => {
             const currentId = existing.rows[0].id;
             const updateResult = await client.query(
                 `
-          UPDATE ${DB_SCHEMA}.product_desc
-          SET ${productDescCols.productId} = $1,
-              ${productDescCols.rules} = $2,
-              ${productDescCols.description} = $3,
-              ${productDescCols.imageUrl} = $4
-          WHERE ${productDescCols.id} = $5
-          RETURNING ${productDescCols.id} AS id,
-                    ${productDescCols.productId} AS product_id,
-                    ${productDescCols.rules} AS rules,
-                    ${productDescCols.description} AS description,
-                    ${productDescCols.imageUrl} AS image_url;
+          UPDATE ${TABLES.productDesc}
+          SET ${QUOTED_COLS.productDesc.productId} = $1,
+              ${QUOTED_COLS.productDesc.rules} = $2,
+              ${QUOTED_COLS.productDesc.description} = $3,
+              ${QUOTED_COLS.productDesc.imageUrl} = $4
+          WHERE ${QUOTED_COLS.productDesc.id} = $5
+          RETURNING ${QUOTED_COLS.productDesc.id} AS id,
+                    ${QUOTED_COLS.productDesc.productId} AS product_id,
+                    ${QUOTED_COLS.productDesc.rules} AS rules,
+                    ${QUOTED_COLS.productDesc.description} AS description,
+                    ${QUOTED_COLS.productDesc.imageUrl} AS image_url;
         `, [
                     normalizedProductId,
                     normalizedRules,
@@ -2406,14 +2354,14 @@ app.post("/api/product-descriptions", async(req, res) => {
         const nextId = await getNextProductDescId(client);
         const insertResult = await client.query(
             `
-        INSERT INTO ${DB_SCHEMA}.product_desc
-          (${productDescCols.id}, ${productDescCols.productId}, ${productDescCols.rules}, ${productDescCols.description}, ${productDescCols.imageUrl})
+        INSERT INTO ${TABLES.productDesc}
+          (${QUOTED_COLS.productDesc.id}, ${QUOTED_COLS.productDesc.productId}, ${QUOTED_COLS.productDesc.rules}, ${QUOTED_COLS.productDesc.description}, ${QUOTED_COLS.productDesc.imageUrl})
         VALUES ($1, $2, $3, $4, $5)
-        RETURNING ${productDescCols.id} AS id,
-                  ${productDescCols.productId} AS product_id,
-                  ${productDescCols.rules} AS rules,
-                  ${productDescCols.description} AS description,
-                  ${productDescCols.imageUrl} AS image_url;
+        RETURNING ${QUOTED_COLS.productDesc.id} AS id,
+                  ${QUOTED_COLS.productDesc.productId} AS product_id,
+                  ${QUOTED_COLS.productDesc.rules} AS rules,
+                  ${QUOTED_COLS.productDesc.description} AS description,
+                  ${QUOTED_COLS.productDesc.imageUrl} AS image_url;
       `, [
                 nextId,
                 normalizedProductId,
@@ -2449,11 +2397,11 @@ app.get("/api/product-prices", async(_req, res) => {
         pp.pct_promo,
         pp.is_active,
         pp.update
-      FROM mavryk.product_price pp
+      FROM ${TABLES.productPrice} pp
     ),
     supply AS (
       SELECT product_id, MAX(price) AS max_supply_price
-      FROM mavryk.supply_price
+      FROM ${TABLES.supplyPrice}
       GROUP BY product_id
     )
     SELECT
@@ -2543,7 +2491,7 @@ app.post("/api/product-prices", async(req, res) => {
         const nextProductId = await getNextProductPriceId(client);
         const productResult = await client.query(
             `
-      INSERT INTO mavryk.product_price
+      INSERT INTO ${TABLES.productPrice}
         (id, package, package_product, san_pham, pct_ctv, pct_khach, pct_promo, is_active, "update")
       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
       RETURNING id;
@@ -2601,10 +2549,10 @@ app.post("/api/product-prices", async(req, res) => {
                 const nextSupplyId = await getNextSupplyId(client);
                 const statusColumn = await resolveSupplyStatusColumn();
                 const fields = [
-                    supplyCols.id,
-                    supplyCols.sourceName,
-                    supplyCols.numberBank,
-                    supplyCols.binBank,
+                    QUOTED_COLS.supply.id,
+                    QUOTED_COLS.supply.sourceName,
+                    QUOTED_COLS.supply.numberBank,
+                    QUOTED_COLS.supply.binBank,
                 ];
                 const values = [nextSupplyId, sourceName, numberBank || null, bankBin];
                 if (statusColumn) {
@@ -2614,7 +2562,7 @@ app.post("/api/product-prices", async(req, res) => {
                 const placeholders = values.map((_, index) => `$${index + 1}`);
                 const insertSupply = await client.query(
                     `
-          INSERT INTO mavryk.supply (${fields.join(", ")})
+          INSERT INTO ${TABLES.supply} (${fields.join(", ")})
           VALUES (${placeholders.join(", ")})
           RETURNING id;
         `,
@@ -2633,7 +2581,7 @@ app.post("/api/product-prices", async(req, res) => {
             const nextSupplyPriceId = await getNextSupplyPriceId(client);
             await client.query(
                 `
-        INSERT INTO mavryk.supply_price (id, product_id, source_id, price)
+        INSERT INTO ${TABLES.supplyPrice} (id, product_id, source_id, price)
         VALUES ($1, $2, $3, $4);
       `, [nextSupplyPriceId, productId, supplyId, priceValue]
             );
@@ -2679,7 +2627,7 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
     try {
         await client.query("BEGIN");
         const productExists = await client.query(
-            `SELECT id FROM mavryk.product_price WHERE id = $1 LIMIT 1;`, [parsedProductId]
+            `SELECT id FROM ${TABLES.productPrice} WHERE id = $1 LIMIT 1;`, [parsedProductId]
         );
         if (!productExists.rows.length) {
             await client.query("ROLLBACK");
@@ -2690,7 +2638,7 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
 
         const duplicateCheck = await client.query(
             `
-      SELECT id FROM mavryk.supply_price
+      SELECT id FROM ${TABLES.supplyPrice}
       WHERE product_id = $1 AND source_id = $2
       LIMIT 1;
     `, [parsedProductId, supplyId]
@@ -2705,7 +2653,7 @@ app.post("/api/product-prices/:productId/suppliers", async(req, res) => {
         const nextSupplyPriceId = await getNextSupplyPriceId(client);
         await client.query(
             `
-      INSERT INTO mavryk.supply_price (id, product_id, source_id, price)
+      INSERT INTO ${TABLES.supplyPrice} (id, product_id, source_id, price)
       VALUES ($1, $2, $3, $4);
     `, [nextSupplyPriceId, parsedProductId, supplyId, normalizedPrice]
         );
@@ -2790,7 +2738,7 @@ app.patch("/api/product-prices/:productId", async(req, res) => {
         await client.query("BEGIN");
         const updateResult = await client.query(
             `
-      UPDATE mavryk.product_price
+      UPDATE ${TABLES.productPrice}
       SET package = $1,
           package_product = $2,
           san_pham = $3,
@@ -2862,7 +2810,7 @@ app.patch("/api/product-prices/:productId/status", async(req, res) => {
         const updatedAtDateOnly = updatedAtIso.slice(0, 10);
         const result = await pool.query(
             `
-      UPDATE mavryk.product_price
+      UPDATE ${TABLES.productPrice}
       SET is_active = $1,
           update = $2
       WHERE id = $3
@@ -2899,12 +2847,12 @@ app.get("/api/products/supplies-by-name/:productName", async(req, res) => {
 
     const q = `
     SELECT DISTINCT
-      s.${supplyCols.id} AS id,
-      COALESCE(NULLIF(TRIM(s.${supplyCols.sourceName}::text), ''), CONCAT('Nguon #', s.${supplyCols.id}::text)) AS source_name
-    FROM mavryk.supply s
-    JOIN mavryk.supply_price sp ON s.${supplyCols.id} = sp.source_id
-    JOIN mavryk.product_price pp ON sp.product_id = pp.id
-    WHERE TRIM(pp.${quoteIdent(PRODUCT_PRICE_COLS.product)}::text) = TRIM($1::text)
+      s.${QUOTED_COLS.supply.id} AS id,
+      COALESCE(NULLIF(TRIM(s.${QUOTED_COLS.supply.sourceName}::text), ''), CONCAT('Nguon #', s.${QUOTED_COLS.supply.id}::text)) AS source_name
+    FROM ${TABLES.supply} s
+    JOIN ${TABLES.supplyPrice} sp ON s.${QUOTED_COLS.supply.id} = sp.source_id
+    JOIN ${TABLES.productPrice} pp ON sp.product_id = pp.id
+    WHERE TRIM(pp.${quoteIdent(DB_DEFINITIONS.productPrice.columns.product)}::text) = TRIM($1::text)
     ORDER BY source_name;
   `;
 
@@ -2923,10 +2871,10 @@ app.get("/api/banks", async(_req, res) => {
     console.log("[GET] /api/banks");
     const q = `
     SELECT
-      TRIM(${bankListCols.bin}::text) AS bin,
-      TRIM(${bankListCols.bankName}::text) AS bank_name
-    FROM mavryk.bank_list
-    WHERE TRIM(${bankListCols.bin}::text) <> ''
+      TRIM(${QUOTED_COLS.bankList.bin}::text) AS bin,
+      TRIM(${QUOTED_COLS.bankList.bankName}::text) AS bank_name
+    FROM ${TABLES.bankList}
+    WHERE TRIM(${QUOTED_COLS.bankList.bin}::text) <> ''
     ORDER BY bank_name;
   `;
     try {
@@ -2969,10 +2917,10 @@ app.post("/api/supplies", async(req, res) => {
     try {
         const statusColumn = await resolveSupplyStatusColumn();
         const fields = [
-            supplyCols.sourceName,
-            supplyCols.numberBank,
-            supplyCols.binBank,
-            supplyCols.activeSupply,
+            QUOTED_COLS.supply.sourceName,
+            QUOTED_COLS.supply.numberBank,
+            QUOTED_COLS.supply.binBank,
+            QUOTED_COLS.supply.activeSupply,
         ];
         const values = [trimmedName, trimmedAccount || null, trimmedBin, isActive];
         if (statusColumn && trimmedStatus) {
@@ -2981,7 +2929,7 @@ app.post("/api/supplies", async(req, res) => {
         }
         const placeholders = values.map((_, index) => `$${index + 1}`);
         const insertQuery = `
-      INSERT INTO mavryk.supply (${fields.join(", ")})
+      INSERT INTO ${TABLES.supply} (${fields.join(", ")})
       VALUES (${placeholders.join(", ")})
       RETURNING id;
     `;
@@ -2995,16 +2943,16 @@ app.post("/api/supplies", async(req, res) => {
 
         const detailQuery = `
       SELECT
-        s.${supplyCols.id} AS id,
-        s.${supplyCols.sourceName} AS source_name,
-        s.${supplyCols.numberBank} AS number_bank,
-        s.${supplyCols.binBank} AS bin_bank,
-        COALESCE(s.${supplyCols.activeSupply}, TRUE) AS active_supply,
-        COALESCE(bl.${bankListCols.bankName}, '') AS bank_name
-      FROM mavryk.supply s
-      LEFT JOIN mavryk.bank_list bl
-        ON TRIM(bl.${bankListCols.bin}::text) = TRIM(s.${supplyCols.binBank}::text)
-      WHERE s.${supplyCols.id} = $1
+        s.${QUOTED_COLS.supply.id} AS id,
+        s.${QUOTED_COLS.supply.sourceName} AS source_name,
+        s.${QUOTED_COLS.supply.numberBank} AS number_bank,
+        s.${QUOTED_COLS.supply.binBank} AS bin_bank,
+        COALESCE(s.${QUOTED_COLS.supply.activeSupply}, TRUE) AS active_supply,
+        COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name
+      FROM ${TABLES.supply} s
+      LEFT JOIN ${TABLES.bankList} bl
+        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
+      WHERE s.${QUOTED_COLS.supply.id} = $1
       LIMIT 1;
     `;
         const detailResult = await pool.query(detailQuery, [newId]);
@@ -3071,9 +3019,9 @@ app.patch("/api/supplies/:supplyId", async(req, res) => {
         try {
             const bankLookup = await pool.query(
                 `
-      SELECT TRIM(${bankListCols.bin}::text) AS bin
-      FROM mavryk.bank_list
-      WHERE LOWER(TRIM(${bankListCols.bankName}::text)) = LOWER($1)
+      SELECT TRIM(${QUOTED_COLS.bankList.bin}::text) AS bin
+      FROM ${TABLES.bankList}
+      WHERE LOWER(TRIM(${QUOTED_COLS.bankList.bankName}::text)) = LOWER($1)
       LIMIT 1;
     `, [trimmedBankName]
             );
@@ -3096,17 +3044,17 @@ app.patch("/api/supplies/:supplyId", async(req, res) => {
     const params = [];
 
     if (hasSourceName) {
-        updates.push(`${supplyCols.sourceName} = $${params.length + 1}`);
+        updates.push(`${QUOTED_COLS.supply.sourceName} = $${params.length + 1}`);
         params.push(trimmedName);
     }
 
     if (hasNumberBank) {
-        updates.push(`${supplyCols.numberBank} = $${params.length + 1}`);
+        updates.push(`${QUOTED_COLS.supply.numberBank} = $${params.length + 1}`);
         params.push(trimmedAccount || null);
     }
 
     if (hasBankInfo) {
-        updates.push(`${supplyCols.binBank} = $${params.length + 1}`);
+        updates.push(`${QUOTED_COLS.supply.binBank} = $${params.length + 1}`);
         params.push(resolvedBankBin ? resolvedBankBin : null);
     }
 
@@ -3118,10 +3066,10 @@ app.patch("/api/supplies/:supplyId", async(req, res) => {
 
     try {
         const updateQuery = `
-      UPDATE mavryk.supply
+      UPDATE ${TABLES.supply}
       SET ${updates.join(", ")}
-      WHERE ${supplyCols.id} = $${params.length}
-      RETURNING ${supplyCols.id} AS id;
+      WHERE ${QUOTED_COLS.supply.id} = $${params.length}
+      RETURNING ${QUOTED_COLS.supply.id} AS id;
     `;
         const updateResult = await pool.query(updateQuery, params);
         if (!updateResult.rows.length) {
@@ -3130,15 +3078,15 @@ app.patch("/api/supplies/:supplyId", async(req, res) => {
 
         const detailQuery = `
       SELECT
-        s.${supplyCols.id} AS id,
-        s.${supplyCols.sourceName} AS source_name,
-        s.${supplyCols.numberBank} AS number_bank,
-        s.${supplyCols.binBank} AS bin_bank,
-        COALESCE(bl.${bankListCols.bankName}, '') AS bank_name
-      FROM mavryk.supply s
-      LEFT JOIN mavryk.bank_list bl
-        ON TRIM(bl.${bankListCols.bin}::text) = TRIM(s.${supplyCols.binBank}::text)
-      WHERE s.${supplyCols.id} = $1
+        s.${QUOTED_COLS.supply.id} AS id,
+        s.${QUOTED_COLS.supply.sourceName} AS source_name,
+        s.${QUOTED_COLS.supply.numberBank} AS number_bank,
+        s.${QUOTED_COLS.supply.binBank} AS bin_bank,
+        COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name
+      FROM ${TABLES.supply} s
+      LEFT JOIN ${TABLES.bankList} bl
+        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
+      WHERE s.${QUOTED_COLS.supply.id} = $1
       LIMIT 1;
     `;
         const detailResult = await pool.query(detailQuery, [parsedSupplyId]);
@@ -3179,17 +3127,17 @@ app.patch("/api/supplies/:supplyId/active", async(req, res) => {
         const params = statusColumn ? [isActive, statusLabel, parsedSupplyId] : [isActive, parsedSupplyId];
         const updateQuery = statusColumn ?
             `
-      UPDATE mavryk.supply
-      SET ${supplyCols.activeSupply} = $1,
+      UPDATE ${TABLES.supply}
+      SET ${QUOTED_COLS.supply.activeSupply} = $1,
           "${statusColumn}" = $2
-      WHERE ${supplyCols.id} = $3
-      RETURNING ${supplyCols.activeSupply} AS active_supply, "${statusColumn}" AS raw_status;
+      WHERE ${QUOTED_COLS.supply.id} = $3
+      RETURNING ${QUOTED_COLS.supply.activeSupply} AS active_supply, "${statusColumn}" AS raw_status;
     ` :
             `
-      UPDATE mavryk.supply
-      SET ${supplyCols.activeSupply} = $1
-      WHERE ${supplyCols.id} = $2
-      RETURNING ${supplyCols.activeSupply} AS active_supply;
+      UPDATE ${TABLES.supply}
+      SET ${QUOTED_COLS.supply.activeSupply} = $1
+      WHERE ${QUOTED_COLS.supply.id} = $2
+      RETURNING ${QUOTED_COLS.supply.activeSupply} AS active_supply;
     `;
         const updateResult = await pool.query(updateQuery, params);
         if (!updateResult.rows.length) {
@@ -3220,13 +3168,13 @@ app.delete("/api/supplies/:supplyId", async(req, res) => {
         await client.query("BEGIN");
         await client.query(
             `
-      DELETE FROM mavryk.supply_price
+      DELETE FROM ${TABLES.supplyPrice}
       WHERE source_id = $1;
     `, [parsedSupplyId]
         );
         const deleteResult = await client.query(
             `
-      DELETE FROM mavryk.supply
+      DELETE FROM ${TABLES.supply}
       WHERE id = $1
       RETURNING id;
     `, [parsedSupplyId]
@@ -3261,13 +3209,13 @@ app.delete("/api/product-prices/:productId", async(req, res) => {
         await client.query("BEGIN");
         await client.query(
             `
-      DELETE FROM mavryk.supply_price
+      DELETE FROM ${TABLES.supplyPrice}
       WHERE product_id = $1;
     `, [parsedProductId]
         );
         const deleteResult = await client.query(
             `
-      DELETE FROM mavryk.product_price
+      DELETE FROM ${TABLES.productPrice}
       WHERE id = $1
       RETURNING id;
     `, [parsedProductId]
@@ -3309,26 +3257,26 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
         const statusSelect = statusColumnName ?
             `s."${statusColumnName}"::text AS raw_status` :
             "NULL AS raw_status";
-        const supplySourceKey = createSourceKey(`s.${supplyCols.sourceName}`);
+        const supplySourceKey = createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`);
         const { monthStart, nextMonthStart } = getCurrentMonthRange();
         const paymentStatusKey = createVietnameseStatusKey(
-            `ps.${paymentSupplyCols.status}`
+            `ps.${QUOTED_COLS.paymentSupply.status}`
         );
 
         const supplyQuery = `
       SELECT
-        s.${supplyCols.id} AS id,
-        s.${supplyCols.sourceName} AS source_name,
-        s.${supplyCols.numberBank} AS number_bank,
-        s.${supplyCols.binBank} AS bin_bank,
+        s.${QUOTED_COLS.supply.id} AS id,
+        s.${QUOTED_COLS.supply.sourceName} AS source_name,
+        s.${QUOTED_COLS.supply.numberBank} AS number_bank,
+        s.${QUOTED_COLS.supply.binBank} AS bin_bank,
         ${statusSelect},
-        COALESCE(s.${supplyCols.activeSupply}, TRUE) AS active_supply,
-        COALESCE(bl.${bankListCols.bankName}, '') AS bank_name,
+        COALESCE(s.${QUOTED_COLS.supply.activeSupply}, TRUE) AS active_supply,
+        COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name,
         ${supplySourceKey} AS supply_key
-      FROM mavryk.supply s
-      LEFT JOIN mavryk.bank_list bl
-        ON TRIM(bl.${bankListCols.bin}::text) = TRIM(s.${supplyCols.binBank}::text)
-      WHERE s.${supplyCols.id} = $1
+      FROM ${TABLES.supply} s
+      LEFT JOIN ${TABLES.bankList} bl
+        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
+      WHERE s.${QUOTED_COLS.supply.id} = $1
       LIMIT 1;
     `;
         const supplyResult = await client.query(supplyQuery, [parsedSupplyId]);
@@ -3344,22 +3292,22 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
             const statsQuery = `
         WITH orders_union AS (
           SELECT
-            ${createDateNormalization(quoteIdent(ORDER_COLS.orderDate))} AS order_date,
-            COALESCE(${createSourceKey(quoteIdent(ORDER_COLS.supply))}, '') AS source_key
-          FROM mavryk.order_list
-          WHERE TRIM(${quoteIdent(ORDER_COLS.supply)}::text) <> ''
+            ${createDateNormalization(quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate))} AS order_date,
+            COALESCE(${createSourceKey(quoteIdent(DB_DEFINITIONS.orderList.columns.supply))}, '') AS source_key
+          FROM ${TABLES.orderList}
+          WHERE TRIM(${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)}::text) <> ''
           UNION ALL
           SELECT
-            ${createDateNormalization(quoteIdent(ORDER_COLS.orderDate))} AS order_date,
-            COALESCE(${createSourceKey(quoteIdent(ORDER_COLS.supply))}, '') AS source_key
-          FROM mavryk.order_expired
-          WHERE TRIM(${quoteIdent(ORDER_COLS.supply)}::text) <> ''
+            ${createDateNormalization(quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate))} AS order_date,
+            COALESCE(${createSourceKey(quoteIdent(DB_DEFINITIONS.orderList.columns.supply))}, '') AS source_key
+          FROM ${TABLES.orderExpired}
+          WHERE TRIM(${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)}::text) <> ''
           UNION ALL
           SELECT
-            ${createDateNormalization(quoteIdent(ORDER_COLS.orderDate))} AS order_date,
-            COALESCE(${createSourceKey(quoteIdent(ORDER_COLS.supply))}, '') AS source_key
-          FROM mavryk.order_canceled
-          WHERE TRIM(${quoteIdent(ORDER_COLS.supply)}::text) <> ''
+            ${createDateNormalization(quoteIdent(DB_DEFINITIONS.orderList.columns.orderDate))} AS order_date,
+            COALESCE(${createSourceKey(quoteIdent(DB_DEFINITIONS.orderList.columns.supply))}, '') AS source_key
+          FROM ${TABLES.orderCanceled}
+          WHERE TRIM(${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)}::text) <> ''
         )
         SELECT
           COUNT(*) AS total_orders,
@@ -3384,9 +3332,9 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
         if (supplyKey) {
             const canceledQuery = `
         SELECT COUNT(*) AS canceled_orders
-        FROM mavryk.order_canceled
-        WHERE TRIM(${quoteIdent(ORDER_COLS.supply)}::text) <> ''
-          AND ${createSourceKey(quoteIdent(ORDER_COLS.supply))} = $1;
+        FROM ${TABLES.orderCanceled}
+        WHERE TRIM(${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)}::text) <> ''
+          AND ${createSourceKey(quoteIdent(DB_DEFINITIONS.orderList.columns.supply))} = $1;
       `;
             const canceledResult = await client.query(canceledQuery, [supplyKey]);
             canceledOrders = Number(canceledResult.rows?.[0]?.canceled_orders) || 0;
@@ -3397,14 +3345,14 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
         COALESCE(
           SUM(
             CASE WHEN ${paymentStatusKey} = 'da thanh toan'
-              THEN COALESCE(ps.${paymentSupplyCols.paid}, 0)
+              THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)
             ELSE 0
             END
           ),
           0
         ) AS total_paid_amount
-      FROM mavryk.payment_supply ps
-      WHERE ps.${paymentSupplyCols.sourceId} = $1;
+      FROM ${TABLES.paymentSupply} ps
+      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1;
     `;
         const totalPaidResult = await client.query(totalPaidQuery, [
             parsedSupplyId,
@@ -3420,7 +3368,7 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
           CASE
             WHEN ${paymentStatusKey} = 'chua thanh toan'
               THEN GREATEST(
-                COALESCE(ps.${paymentSupplyCols.importValue}, 0) - COALESCE(ps.${paymentSupplyCols.paid}, 0),
+                COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0),
                 0
               )
             ELSE 0
@@ -3428,8 +3376,8 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
         ),
         0
       ) AS total_unpaid_amount
-      FROM mavryk.payment_supply ps
-      WHERE ps.${paymentSupplyCols.sourceId} = $1;
+      FROM ${TABLES.paymentSupply} ps
+      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1;
     `;
             const totalUnpaidAmountResult = await client.query(
                 totalUnpaidAmountQuery, [parsedSupplyId]
@@ -3443,15 +3391,15 @@ app.get("/api/supplies/:supplyId/overview", async(req, res) => {
 
         const unpaidQuery = `
       SELECT
-        ps.${paymentSupplyCols.id} AS id,
-        ps.${paymentSupplyCols.round} AS round,
-        COALESCE(ps.${paymentSupplyCols.importValue}, 0) AS import_value,
-        COALESCE(ps.${paymentSupplyCols.paid}, 0) AS paid_value,
-        COALESCE(ps.${paymentSupplyCols.status}, '') AS status_label
-      FROM mavryk.payment_supply ps
-      WHERE ps.${paymentSupplyCols.sourceId} = $1
+        ps.${QUOTED_COLS.paymentSupply.id} AS id,
+        ps.${QUOTED_COLS.paymentSupply.round} AS round,
+        COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) AS import_value,
+        COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0) AS paid_value,
+        COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
+      FROM ${TABLES.paymentSupply} ps
+      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1
         AND ${paymentStatusKey} = 'chua thanh toan'
-      ORDER BY ps.${paymentSupplyCols.id} DESC;
+      ORDER BY ps.${QUOTED_COLS.paymentSupply.id} DESC;
     `;
         const unpaidResult = await client.query(unpaidQuery, [parsedSupplyId]);
         const unpaidPayments = (unpaidResult.rows || []).map((row) => ({
@@ -3533,9 +3481,9 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
 
         const paymentResult = await pool.query(
             `
-        SELECT ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.round} AS round, ${paymentSupplyCols.status} AS status
-        FROM mavryk.payment_supply
-        WHERE ${paymentSupplyCols.id} = $1
+        SELECT ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.round} AS round, ${QUOTED_COLS.paymentSupply.status} AS status
+        FROM ${TABLES.paymentSupply}
+        WHERE ${QUOTED_COLS.paymentSupply.id} = $1
         LIMIT 1;
       `, [parsedPaymentId]
         );
@@ -3563,7 +3511,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
 
         // Láº¥y tÃªn nguá»“n Ä‘á»ƒ map vá»›i order_list.nguon
         const supplyResult = await pool.query(
-            `SELECT ${supplyCols.sourceName} AS source_name FROM mavryk.supply WHERE ${supplyCols.id} = $1 LIMIT 1;`, [sourceId]
+            `SELECT ${QUOTED_COLS.supply.sourceName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supply.id} = $1 LIMIT 1;`, [sourceId]
         );
         const sourceName =
             (supplyResult.rows &&
@@ -3579,7 +3527,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
           id,
           COALESCE(cost, 0) AS cost,
           ${createDateNormalization("order_date")} AS order_date
-        FROM ${DB_SCHEMA}.order_list
+        FROM ${TABLES.orderList}
         WHERE ${createVietnameseStatusKey("status")} = 'chua thanh toan'
           AND COALESCE(check_flag, FALSE) = FALSE
           AND TRIM(supply::text) = TRIM($1)
@@ -3600,7 +3548,7 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
         if (orderIdsToMark.length) {
             await pool.query(
                 `
-          UPDATE ${DB_SCHEMA}.order_list
+          UPDATE ${TABLES.orderList}
           SET status = 'Đã Thanh Toán',
               check_flag = TRUE
           WHERE id = ANY($1::int[]);
@@ -3623,9 +3571,9 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
             const unpaidCycleResult = await pool.query(
                 `
           SELECT 1
-          FROM ${DB_SCHEMA}.payment_supply ps
-          WHERE ps.${paymentSupplyCols.sourceId} = $1
-            AND ${createVietnameseStatusKey(`ps.${paymentSupplyCols.status}`)} = 'chua thanh toan'
+          FROM ${TABLES.paymentSupply} ps
+          WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1
+            AND ${createVietnameseStatusKey(`ps.${QUOTED_COLS.paymentSupply.status}`)} = 'chua thanh toan'
           LIMIT 1;
         `, [sourceId]
             );
@@ -3636,19 +3584,19 @@ app.post("/api/payment-supply/:paymentId/confirm", async(req, res) => {
         if (remainingImport > 0 && sourceId && !hasUnpaidCycle) {
             await pool.query(
                 `
-          INSERT INTO mavryk.payment_supply (${paymentSupplyCols.sourceId}, ${paymentSupplyCols.importValue}, ${paymentSupplyCols.paid}, ${paymentSupplyCols.round}, ${paymentSupplyCols.status})
+          INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
           VALUES ($1, $2, 0, $3, 'Chưa Thanh Toán');
         `, [sourceId, remainingImport, todayDMY]
             );
         }
 
         const updateQuery = `
-      UPDATE mavryk.payment_supply
-      SET ${paymentSupplyCols.status} = 'Đã Thanh Toán',
-          ${paymentSupplyCols.paid} = $2,
-          ${paymentSupplyCols.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${paymentSupplyCols.round}::text, ''), ' - ', $3::text))
-      WHERE ${paymentSupplyCols.id} = $1
-      RETURNING ${paymentSupplyCols.id} AS id, ${paymentSupplyCols.sourceId} AS source_id, ${paymentSupplyCols.importValue} AS import, ${paymentSupplyCols.paid} AS paid, ${paymentSupplyCols.status} AS status, ${paymentSupplyCols.round} AS round;
+      UPDATE ${TABLES.paymentSupply}
+      SET ${QUOTED_COLS.paymentSupply.status} = 'Đã Thanh Toán',
+          ${QUOTED_COLS.paymentSupply.paid} = $2,
+          ${QUOTED_COLS.paymentSupply.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${QUOTED_COLS.paymentSupply.round}::text, ''), ' - ', $3::text))
+      WHERE ${QUOTED_COLS.paymentSupply.id} = $1
+      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.status} AS status, ${QUOTED_COLS.paymentSupply.round} AS round;
     `;
         const result = await pool.query(updateQuery, [
             parsedPaymentId,
@@ -3704,7 +3652,7 @@ app.post("/api/calculate-price", async(req, res) => {
       price AS gia_ban,
       cost AS gia_nhap,
       supply::text AS supply_name
-    FROM mavryk.order_list
+    FROM ${TABLES.orderList}
     WHERE id_order = $1
     LIMIT 1;
   `;
@@ -3714,9 +3662,9 @@ app.post("/api/calculate-price", async(req, res) => {
       id,
       pct_ctv,
       pct_khach,
-      ${quoteIdent(PRODUCT_PRICE_COLS.pctPromo)} AS pct_promo,
+      ${quoteIdent(DB_DEFINITIONS.productPrice.columns.pctPromo)} AS pct_promo,
       is_active
-    FROM mavryk.product_price
+    FROM ${TABLES.productPrice}
     WHERE
       LOWER(TRIM(san_pham::text)) = LOWER(TRIM($1))
       OR LOWER(TRIM(package_product::text)) = LOWER(TRIM($1))
@@ -3729,9 +3677,9 @@ app.post("/api/calculate-price", async(req, res) => {
       id,
       pct_ctv,
       pct_khach,
-      ${quoteIdent(PRODUCT_PRICE_COLS.pctPromo)} AS pct_promo,
+      ${quoteIdent(DB_DEFINITIONS.productPrice.columns.pctPromo)} AS pct_promo,
       is_active
-    FROM mavryk.product_price
+    FROM ${TABLES.productPrice}
     WHERE
       LOWER(TRIM($1)) LIKE '%' || LOWER(TRIM(san_pham::text)) || '%'
       OR LOWER(TRIM($1)) LIKE '%' || LOWER(TRIM(package_product::text)) || '%'
@@ -3742,7 +3690,7 @@ app.post("/api/calculate-price", async(req, res) => {
 
     const productSupplyPricesQuery = `
     SELECT source_id, price
-    FROM mavryk.supply_price
+    FROM ${TABLES.supplyPrice}
     WHERE product_id = $1
   `;
 
@@ -3763,7 +3711,7 @@ app.post("/api/calculate-price", async(req, res) => {
             const lowerNoAt = noAt.toLowerCase();
 
             const sql = `
-              SELECT id FROM mavryk.supply
+              SELECT id FROM ${TABLES.supply}
               WHERE LOWER(TRIM(source_name::text)) = $1
                  OR LOWER(TRIM(source_name::text)) = $2
                  OR LOWER(TRIM(source_name::text)) LIKE $3
@@ -3989,7 +3937,7 @@ app.post("/api/orders", async(req, res) => {
     const values = Object.values(payload);
 
     const q = `
-    INSERT INTO mavryk.order_list (${colList})
+    INSERT INTO ${TABLES.orderList} (${colList})
     VALUES (${placeholders})
     RETURNING *;
   `;
@@ -4045,7 +3993,7 @@ app.put("/api/orders/:id", async(req, res) => {
 
     const setClauses = fields.map((column, index) => {
         const cast =
-            column === ORDER_COLS.orderDate || column === ORDER_COLS.orderExpired ?
+            column === DB_DEFINITIONS.orderList.columns.orderDate || column === DB_DEFINITIONS.orderList.columns.orderExpired ?
             "::date" :
             "";
         return `"${column}" = $${index + 1}${cast}`;
@@ -4064,7 +4012,7 @@ app.put("/api/orders/:id", async(req, res) => {
     }
 
     const q = `
-    UPDATE mavryk.order_list
+    UPDATE ${TABLES.orderList}
     SET ${setClauses.join(", ")}
     WHERE id = $${fields.length + 1}
     RETURNING *,
@@ -4105,7 +4053,7 @@ app.delete("/api/orders/:id", async(req, res) => {
       SELECT *,
              order_date::text AS order_date_raw,
              order_expired::text      AS order_expired_raw
-      FROM mavryk.order_list
+      FROM ${TABLES.orderList}
       WHERE id = $1
     `, [parsedId]
         );
@@ -4132,7 +4080,7 @@ app.delete("/api/orders/:id", async(req, res) => {
         if (shouldHardDelete) {
             await client.query(
                 `
-      DELETE FROM mavryk.order_list
+      DELETE FROM ${TABLES.orderList}
       WHERE id = $1
     `, [parsedId]
             );
@@ -4154,13 +4102,13 @@ app.delete("/api/orders/:id", async(req, res) => {
             remainingDays < 4 :
             false;
         const archiveConfig = moveToExpired ? {
-            table: "mavryk.order_expired",
+            table: TABLES.orderExpired,
             columns: ARCHIVE_COLUMNS_EXPIRED,
             overrides: {
                 archived_at: new Date(),
             },
         } : {
-            table: "mavryk.order_canceled",
+            table: TABLES.orderCanceled,
             columns: ARCHIVE_COLUMNS_CANCELED,
             overrides: {
                 refund: cancellationRefund !== null ?
@@ -4185,7 +4133,7 @@ app.delete("/api/orders/:id", async(req, res) => {
 
         await client.query(
             `
-      DELETE FROM mavryk.order_list
+      DELETE FROM ${TABLES.orderList}
       WHERE id = $1
     `, [parsedId]
         );
@@ -4212,26 +4160,26 @@ app.get("/api/products/all-prices-by-name/:productName", async(req, res) => {
 
     const q = `
     SELECT
-      sp.${supplyPriceCols.sourceId} AS source_id,
+      sp.${QUOTED_COLS.supplyPrice.sourceId} AS source_id,
       COALESCE(
-        NULLIF(TRIM(s.${supplyCols.sourceName}::text), ''),
-        CONCAT('Nguon #', sp.${supplyPriceCols.sourceId}::text)
+        NULLIF(TRIM(s.${QUOTED_COLS.supply.sourceName}::text), ''),
+        CONCAT('Nguon #', sp.${QUOTED_COLS.supplyPrice.sourceId}::text)
       ) AS source_name,
-      sp.${supplyPriceCols.price} AS price,
+      sp.${QUOTED_COLS.supplyPrice.price} AS price,
       recent.last_order_date
-    FROM mavryk.supply_price sp
-    JOIN mavryk.product_price pp ON sp.${supplyPriceCols.productId} = pp.id
-    LEFT JOIN mavryk.supply s ON sp.${supplyPriceCols.sourceId} = s.${supplyCols.id}
+    FROM ${TABLES.supplyPrice} sp
+    JOIN ${TABLES.productPrice} pp ON sp.${QUOTED_COLS.supplyPrice.productId} = pp.id
+    LEFT JOIN ${TABLES.supply} s ON sp.${QUOTED_COLS.supplyPrice.sourceId} = s.${QUOTED_COLS.supply.id}
   LEFT JOIN LATERAL (
       SELECT MAX(ol.order_date) AS last_order_date
-      FROM mavryk.order_list ol
+      FROM ${TABLES.orderList} ol
       WHERE
-        s.${supplyCols.sourceName} IS NOT NULL
-        AND LOWER(TRIM(ol.${quoteIdent(ORDER_COLS.supply)}::text)) = LOWER(TRIM(s.${supplyCols.sourceName}::text))
+        s.${QUOTED_COLS.supply.sourceName} IS NOT NULL
+        AND LOWER(TRIM(ol.${quoteIdent(DB_DEFINITIONS.orderList.columns.supply)}::text)) = LOWER(TRIM(s.${QUOTED_COLS.supply.sourceName}::text))
     ) AS recent ON TRUE
-    WHERE pp.${quoteIdent(PRODUCT_PRICE_COLS.product)} = $1
+    WHERE pp.${quoteIdent(DB_DEFINITIONS.productPrice.columns.product)} = $1
     ORDER BY
-      sp.${supplyPriceCols.price} ASC NULLS LAST,
+      sp.${QUOTED_COLS.supplyPrice.price} ASC NULLS LAST,
       COALESCE(recent.last_order_date, '1900-01-01'::date) DESC,
       source_name ASC;
   `;
@@ -4283,7 +4231,7 @@ app.patch(
         try {
             const result = await pool.query(
                 `
-        UPDATE mavryk.supply_price
+        UPDATE ${TABLES.supplyPrice}
         SET price = $1
         WHERE product_id = $2 AND source_id = $3
         RETURNING product_id, source_id, price;
@@ -4332,7 +4280,7 @@ app.delete("/api/products/:productId/suppliers/:sourceId", async(req, res) => {
         await client.query("BEGIN");
         const deleteResult = await client.query(
             `
-        DELETE FROM mavryk.supply_price
+        DELETE FROM ${TABLES.supplyPrice}
         WHERE product_id = $1 AND source_id = $2
         RETURNING id;
       `, [parsedProductId, parsedSourceId]
@@ -4412,17 +4360,17 @@ const handleGetWarehouse = async(_req, res) => {
     try {
         const result = await pool.query(
             `SELECT
-                ${WAREHOUSE_COLS.id} AS id,
-                ${WAREHOUSE_COLS.category} AS category,
-                ${WAREHOUSE_COLS.account} AS account,
-                ${WAREHOUSE_COLS.password} AS password,
-                ${WAREHOUSE_COLS.backupEmail} AS backup_email,
-                ${WAREHOUSE_COLS.twoFa} AS two_fa,
-                ${WAREHOUSE_COLS.note} AS note,
-                ${WAREHOUSE_COLS.status} AS status,
-                ${WAREHOUSE_COLS.createdAt} AS created_at
-             FROM ${DB_SCHEMA}.warehouse
-             ORDER BY ${WAREHOUSE_COLS.id} ASC`
+                ${DB_DEFINITIONS.warehouse.columns.id} AS id,
+                ${DB_DEFINITIONS.warehouse.columns.category} AS category,
+                ${DB_DEFINITIONS.warehouse.columns.account} AS account,
+                ${DB_DEFINITIONS.warehouse.columns.password} AS password,
+                ${DB_DEFINITIONS.warehouse.columns.backupEmail} AS backup_email,
+                ${DB_DEFINITIONS.warehouse.columns.twoFa} AS two_fa,
+                ${DB_DEFINITIONS.warehouse.columns.note} AS note,
+                ${DB_DEFINITIONS.warehouse.columns.status} AS status,
+                ${DB_DEFINITIONS.warehouse.columns.createdAt} AS created_at
+             FROM ${TABLES.warehouse}
+             ORDER BY ${DB_DEFINITIONS.warehouse.columns.id} ASC`
         );
         res.json(result.rows || []);
     } catch (error) {
@@ -4449,26 +4397,26 @@ app.post("/api/warehouse", async(req, res) => {
     try {
         const result = await pool.query(
             `
-            INSERT INTO ${DB_SCHEMA}.warehouse (
-              ${WAREHOUSE_COLS.category},
-              ${WAREHOUSE_COLS.account},
-              ${WAREHOUSE_COLS.password},
-              ${WAREHOUSE_COLS.backupEmail},
-              ${WAREHOUSE_COLS.twoFa},
-              ${WAREHOUSE_COLS.note},
-              ${WAREHOUSE_COLS.status},
-              ${WAREHOUSE_COLS.createdAt}
+            INSERT INTO ${TABLES.warehouse} (
+              ${DB_DEFINITIONS.warehouse.columns.category},
+              ${DB_DEFINITIONS.warehouse.columns.account},
+              ${DB_DEFINITIONS.warehouse.columns.password},
+              ${DB_DEFINITIONS.warehouse.columns.backupEmail},
+              ${DB_DEFINITIONS.warehouse.columns.twoFa},
+              ${DB_DEFINITIONS.warehouse.columns.note},
+              ${DB_DEFINITIONS.warehouse.columns.status},
+              ${DB_DEFINITIONS.warehouse.columns.createdAt}
             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
             RETURNING
-              ${WAREHOUSE_COLS.id} AS id,
-              ${WAREHOUSE_COLS.category} AS category,
-              ${WAREHOUSE_COLS.account} AS account,
-              ${WAREHOUSE_COLS.password} AS password,
-              ${WAREHOUSE_COLS.backupEmail} AS backup_email,
-              ${WAREHOUSE_COLS.twoFa} AS two_fa,
-              ${WAREHOUSE_COLS.note} AS note,
-              ${WAREHOUSE_COLS.status} AS status,
-              ${WAREHOUSE_COLS.createdAt} AS created_at
+              ${DB_DEFINITIONS.warehouse.columns.id} AS id,
+              ${DB_DEFINITIONS.warehouse.columns.category} AS category,
+              ${DB_DEFINITIONS.warehouse.columns.account} AS account,
+              ${DB_DEFINITIONS.warehouse.columns.password} AS password,
+              ${DB_DEFINITIONS.warehouse.columns.backupEmail} AS backup_email,
+              ${DB_DEFINITIONS.warehouse.columns.twoFa} AS two_fa,
+              ${DB_DEFINITIONS.warehouse.columns.note} AS note,
+              ${DB_DEFINITIONS.warehouse.columns.status} AS status,
+              ${DB_DEFINITIONS.warehouse.columns.createdAt} AS created_at
           `,
             [
                 category ?? null,
@@ -4506,27 +4454,27 @@ app.put("/api/warehouse/:id", async(req, res) => {
     try {
         const result = await pool.query(
             `
-            UPDATE ${DB_SCHEMA}.warehouse
+            UPDATE ${TABLES.warehouse}
             SET
-              ${WAREHOUSE_COLS.category} = $1,
-              ${WAREHOUSE_COLS.account} = $2,
-              ${WAREHOUSE_COLS.password} = $3,
-              ${WAREHOUSE_COLS.backupEmail} = $4,
-              ${WAREHOUSE_COLS.twoFa} = $5,
-              ${WAREHOUSE_COLS.note} = $6,
-              ${WAREHOUSE_COLS.status} = $7,
-              ${WAREHOUSE_COLS.createdAt} = $8
-            WHERE ${WAREHOUSE_COLS.id} = $9
+              ${DB_DEFINITIONS.warehouse.columns.category} = $1,
+              ${DB_DEFINITIONS.warehouse.columns.account} = $2,
+              ${DB_DEFINITIONS.warehouse.columns.password} = $3,
+              ${DB_DEFINITIONS.warehouse.columns.backupEmail} = $4,
+              ${DB_DEFINITIONS.warehouse.columns.twoFa} = $5,
+              ${DB_DEFINITIONS.warehouse.columns.note} = $6,
+              ${DB_DEFINITIONS.warehouse.columns.status} = $7,
+              ${DB_DEFINITIONS.warehouse.columns.createdAt} = $8
+            WHERE ${DB_DEFINITIONS.warehouse.columns.id} = $9
             RETURNING
-              ${WAREHOUSE_COLS.id} AS id,
-              ${WAREHOUSE_COLS.category} AS category,
-              ${WAREHOUSE_COLS.account} AS account,
-              ${WAREHOUSE_COLS.password} AS password,
-              ${WAREHOUSE_COLS.backupEmail} AS backup_email,
-              ${WAREHOUSE_COLS.twoFa} AS two_fa,
-              ${WAREHOUSE_COLS.note} AS note,
-              ${WAREHOUSE_COLS.status} AS status,
-              ${WAREHOUSE_COLS.createdAt} AS created_at
+              ${DB_DEFINITIONS.warehouse.columns.id} AS id,
+              ${DB_DEFINITIONS.warehouse.columns.category} AS category,
+              ${DB_DEFINITIONS.warehouse.columns.account} AS account,
+              ${DB_DEFINITIONS.warehouse.columns.password} AS password,
+              ${DB_DEFINITIONS.warehouse.columns.backupEmail} AS backup_email,
+              ${DB_DEFINITIONS.warehouse.columns.twoFa} AS two_fa,
+              ${DB_DEFINITIONS.warehouse.columns.note} AS note,
+              ${DB_DEFINITIONS.warehouse.columns.status} AS status,
+              ${DB_DEFINITIONS.warehouse.columns.createdAt} AS created_at
           `,
             [
                 category ?? null,
@@ -4556,7 +4504,7 @@ app.delete("/api/warehouse/:id", async(req, res) => {
     if (!id) return res.status(400).json({ error: "Missing id" });
     try {
         const result = await pool.query(
-            `DELETE FROM ${DB_SCHEMA}.warehouse WHERE ${WAREHOUSE_COLS.id} = $1`,
+            `DELETE FROM ${TABLES.warehouse} WHERE ${DB_DEFINITIONS.warehouse.columns.id} = $1`,
             [id]
         );
         if (result.rowCount === 0) {
@@ -4604,8 +4552,8 @@ app.post("/api/package-products", async(req, res) => {
         await client.query("BEGIN");
         const pkgResult = await client.query(
             `
-        INSERT INTO mavryk.package_product
-          (${packageProductCols.package}, ${packageProductCols.username}, ${packageProductCols.password}, ${packageProductCols.mail2nd}, ${packageProductCols.note}, ${packageProductCols.supplier}, ${packageProductCols.importPrice}, ${packageProductCols.expired}, ${packageProductCols.slot}, ${packageProductCols.match})
+        INSERT INTO ${TABLES.packageProduct}
+          (${QUOTED_COLS.packageProduct.package}, ${QUOTED_COLS.packageProduct.username}, ${QUOTED_COLS.packageProduct.password}, ${QUOTED_COLS.packageProduct.mail2nd}, ${QUOTED_COLS.packageProduct.note}, ${QUOTED_COLS.packageProduct.supplier}, ${QUOTED_COLS.packageProduct.importPrice}, ${QUOTED_COLS.packageProduct.expired}, ${QUOTED_COLS.packageProduct.slot}, ${QUOTED_COLS.packageProduct.match})
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id;
       `, [
@@ -4642,8 +4590,8 @@ app.post("/api/package-products", async(req, res) => {
             const nextStorageId = await getNextAccountStorageId(client);
             await client.query(
                 `
-          INSERT INTO mavryk.account_storage
-            (${accountStorageCols.id}, ${accountStorageCols.username}, ${accountStorageCols.password}, ${accountStorageCols.mail2nd}, ${accountStorageCols.note}, ${accountStorageCols.storage}, ${accountStorageCols.mailFamily})
+          INSERT INTO ${TABLES.accountStorage}
+            (${QUOTED_COLS.accountStorage.id}, ${QUOTED_COLS.accountStorage.username}, ${QUOTED_COLS.accountStorage.password}, ${QUOTED_COLS.accountStorage.mail2nd}, ${QUOTED_COLS.accountStorage.note}, ${QUOTED_COLS.accountStorage.storage}, ${QUOTED_COLS.accountStorage.mailFamily})
           VALUES ($1, $2, $3, $4, $5, $6, $7);
         `, [
                     nextStorageId,
@@ -4746,18 +4694,18 @@ app.put("/api/package-products/:id", async(req, res) => {
         await client.query("BEGIN");
         const pkgResult = await client.query(
             `
-        UPDATE mavryk.package_product
-        SET ${packageProductCols.package} = $1,
-            ${packageProductCols.username} = $2,
-            ${packageProductCols.password} = $3,
-            ${packageProductCols.mail2nd} = $4,
-            ${packageProductCols.note} = $5,
-            ${packageProductCols.supplier} = $6,
-            ${packageProductCols.importPrice} = $7,
-            ${packageProductCols.expired} = $8,
-            ${packageProductCols.slot} = $9,
-            ${packageProductCols.match} = $10
-        WHERE ${packageProductCols.id} = $11
+        UPDATE ${TABLES.packageProduct}
+        SET ${QUOTED_COLS.packageProduct.package} = $1,
+            ${QUOTED_COLS.packageProduct.username} = $2,
+            ${QUOTED_COLS.packageProduct.password} = $3,
+            ${QUOTED_COLS.packageProduct.mail2nd} = $4,
+            ${QUOTED_COLS.packageProduct.note} = $5,
+            ${QUOTED_COLS.packageProduct.supplier} = $6,
+            ${QUOTED_COLS.packageProduct.importPrice} = $7,
+            ${QUOTED_COLS.packageProduct.expired} = $8,
+            ${QUOTED_COLS.packageProduct.slot} = $9,
+            ${QUOTED_COLS.packageProduct.match} = $10
+        WHERE ${QUOTED_COLS.packageProduct.id} = $11
         RETURNING id;
       `, [
                 trimmedPackageName,
@@ -4789,14 +4737,14 @@ app.put("/api/package-products/:id", async(req, res) => {
         if (storageIdNumber && shouldUpsertAccountStorage) {
             await client.query(
                 `
-          UPDATE mavryk.account_storage
-          SET ${accountStorageCols.username} = $1,
-              ${accountStorageCols.password} = $2,
-              ${accountStorageCols.mail2nd} = $3,
-              ${accountStorageCols.note} = $4,
-              ${accountStorageCols.storage} = $5,
-              ${accountStorageCols.mailFamily} = $6
-          WHERE ${accountStorageCols.id} = $7;
+          UPDATE ${TABLES.accountStorage}
+          SET ${QUOTED_COLS.accountStorage.username} = $1,
+              ${QUOTED_COLS.accountStorage.password} = $2,
+              ${QUOTED_COLS.accountStorage.mail2nd} = $3,
+              ${QUOTED_COLS.accountStorage.note} = $4,
+              ${QUOTED_COLS.accountStorage.storage} = $5,
+              ${QUOTED_COLS.accountStorage.mailFamily} = $6
+          WHERE ${QUOTED_COLS.accountStorage.id} = $7;
         `, [
                     accountUser || null,
                     accountPass || null,
@@ -4812,8 +4760,8 @@ app.put("/api/package-products/:id", async(req, res) => {
             storageIdNumber = nextStorageId;
             await client.query(
                 `
-          INSERT INTO mavryk.account_storage
-            (${accountStorageCols.id}, ${accountStorageCols.username}, ${accountStorageCols.password}, ${accountStorageCols.mail2nd}, ${accountStorageCols.note}, ${accountStorageCols.storage}, ${accountStorageCols.mailFamily})
+          INSERT INTO ${TABLES.accountStorage}
+            (${QUOTED_COLS.accountStorage.id}, ${QUOTED_COLS.accountStorage.username}, ${QUOTED_COLS.accountStorage.password}, ${QUOTED_COLS.accountStorage.mail2nd}, ${QUOTED_COLS.accountStorage.note}, ${QUOTED_COLS.accountStorage.storage}, ${QUOTED_COLS.accountStorage.mailFamily})
           VALUES ($1, $2, $3, $4, $5, $6, $7);
         `, [
                     nextStorageId,
@@ -4883,7 +4831,7 @@ const handleBulkDeletePackages = async(req, res) => {
     const client = await pool.connect();
     try {
         const deleteResult = await client.query(
-            `DELETE FROM mavryk.package_product WHERE package = ANY($1::text[]) RETURNING package;`, [names]
+            `DELETE FROM ${TABLES.packageProduct} WHERE package = ANY($1::text[]) RETURNING package;`, [names]
         );
         const deletedNames = deleteResult.rows
             .map((row) => row.package)
@@ -4904,4 +4852,3 @@ const handleBulkDeletePackages = async(req, res) => {
 };
 app.delete("/api/package-products/bulk-delete", handleBulkDeletePackages);
 app.post("/api/package-products/bulk-delete", handleBulkDeletePackages);
-

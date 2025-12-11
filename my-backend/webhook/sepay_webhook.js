@@ -1001,12 +1001,15 @@ const buildRenewalMessage = (orderCode, result) => {
 };
 
 const sendRenewalNotification = async (orderCode, renewalResult) => {
-  if (
-    !renewalResult ||
-    !TELEGRAM_BOT_TOKEN ||
-    !TELEGRAM_CHAT_ID ||
-    !SEND_RENEWAL_TO_TOPIC
-  ) {
+  const sendEnabled =
+    SEND_RENEWAL_TO_TOPIC !== false && String(SEND_RENEWAL_TO_TOPIC) !== "false";
+  if (!renewalResult || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn("[Renewal][Telegram] Skip send: missing data/config", {
+      hasResult: Boolean(renewalResult),
+      hasToken: Boolean(TELEGRAM_BOT_TOKEN),
+      hasChat: Boolean(TELEGRAM_CHAT_ID),
+      sendEnabled,
+    });
     return;
   }
 
@@ -1017,17 +1020,18 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
       chat_id: TELEGRAM_CHAT_ID,
       text,
     };
-    if (
-      includeTopic &&
-      SEND_RENEWAL_TO_TOPIC !== false &&
-      Number.isFinite(TELEGRAM_TOPIC_ID)
-    ) {
+    if (includeTopic && sendEnabled && Number.isFinite(TELEGRAM_TOPIC_ID)) {
       payload.message_thread_id = TELEGRAM_TOPIC_ID;
     }
     return payload;
   };
 
   try {
+    console.log("[Renewal][Telegram] Sending notification", {
+      orderCode,
+      chat: TELEGRAM_CHAT_ID,
+      topic: TELEGRAM_TOPIC_ID,
+    });
     await postJson(url, buildPayload(true));
   } catch (err) {
     const bodyText = String(err?.body || err?.message || "");
@@ -1041,6 +1045,10 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
         console.warn(
           "Telegram renewal notification resent without topic_id after thread error"
         );
+        console.log("[Renewal][Telegram] Sent without topic", {
+          orderCode,
+          chat: TELEGRAM_CHAT_ID,
+        });
         return;
       } catch (retryErr) {
         console.error(
