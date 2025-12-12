@@ -200,9 +200,23 @@ const TABLES = Object.fromEntries(
   ])
 );
 
+// Convenience column maps (unquoted) for consumers
+const ORDER_COLS = DB_DEFINITIONS.orderList.columns;
+const PAYMENT_RECEIPT_COLS = DB_DEFINITIONS.paymentReceipt.columns;
+const PAYMENT_SUPPLY_COLS = DB_DEFINITIONS.paymentSupply.columns;
+const PRODUCT_PRICE_COLS = DB_DEFINITIONS.productPrice.columns;
+const SUPPLY_COLS = DB_DEFINITIONS.supply.columns;
+const SUPPLY_PRICE_COLS = DB_DEFINITIONS.supplyPrice.columns;
+
 module.exports = {
   ...CONFIG,
   DB_DEFINITIONS, // Cấu trúc dữ liệu chính
   TABLES, // Helper để lấy nhanh tên bảng kèm schema
   tableName: tableNameWithSchema,
+  ORDER_COLS,
+  PAYMENT_RECEIPT_COLS,
+  PAYMENT_SUPPLY_COLS,
+  PRODUCT_PRICE_COLS,
+  SUPPLY_COLS,
+  SUPPLY_PRICE_COLS,
 };
