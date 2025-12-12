@@ -8,6 +8,8 @@ require("dotenv").config({ path: envPath });
 const { Pool } = require("pg");
 const cron = require("node-cron");
 const { DB_DEFINITIONS, TABLES, SCHEMA } = require("./schema/tables");
+// Raw column names (unquoted) for reading rows returned by pg
+const ORDER_COLS = DB_DEFINITIONS.orderList.columns;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
