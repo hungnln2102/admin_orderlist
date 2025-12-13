@@ -213,40 +213,73 @@ const parsePaidDate = (value) => {
 };
 
 const normalizeAmount = (value) => {
-    const text = String(value || "0").split(".")[0];
-    const digits = text.replace(/[^\d-]/g, "");
-    const parsed = Number.parseInt(digits, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+  const text = String(value || "0").split(".")[0];
+  const digits = text.replace(/[^\d-]/g, "");
+  const parsed = Number.parseInt(digits, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const safeIdent = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
+
+let paymentReceiptOrderColCache = null;
+const resolvePaymentReceiptOrderColumn = async () => {
+  if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
+  const candidates = [
+    PAYMENT_RECEIPT_COLS.orderCode,
+    "id_order",
+    "ma_don_hang",
+    "order_code",
+  ]
+    .filter(Boolean)
+    .map((c) => String(c).toLowerCase());
+  try {
+    const res = await pool.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2
+      `,
+      [DB_SCHEMA, "payment_receipt"]
+    );
+    const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
+    const found = candidates.find((c) => names.includes(c));
+    paymentReceiptOrderColCache = found || PAYMENT_RECEIPT_COLS.orderCode;
+  } catch (err) {
+    console.error("Failed to resolve payment_receipt order column:", err);
+    paymentReceiptOrderColCache = PAYMENT_RECEIPT_COLS.orderCode;
+  }
+  return paymentReceiptOrderColCache;
 };
 
 const insertPaymentReceipt = async(transaction) => {
-    const orderCode = extractOrderCodeFromText(
-        transaction.transaction_content,
-        transaction.description
-    );
+  const orderCode = extractOrderCodeFromText(
+    transaction.transaction_content,
+    transaction.description
+  );
     const senderParsed = extractSenderFromContent(
         transaction.transaction_content || transaction.description
     );
     const receiverAccount = transaction.account_number || transaction.accountNumber || "";
     const paidDate = parsePaidDate(transaction.transaction_date || transaction.transaction_date_raw);
-    const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
-    const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
-    const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
-    const sql = `
+  const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
+  const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
+  const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
+  const orderCodeColumn = await resolvePaymentReceiptOrderColumn();
+  const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
-      ${PAYMENT_RECEIPT_COLS.orderCode},
-      ${PAYMENT_RECEIPT_COLS.paidDate},
-      ${PAYMENT_RECEIPT_COLS.amount},
-      ${PAYMENT_RECEIPT_COLS.receiver},
-      ${PAYMENT_RECEIPT_COLS.sender},
-      ${PAYMENT_RECEIPT_COLS.note}
+      ${safeIdent(orderCodeColumn)},
+      ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)},
+      ${safeIdent(PAYMENT_RECEIPT_COLS.amount)},
+      ${safeIdent(PAYMENT_RECEIPT_COLS.receiver)},
+      ${safeIdent(PAYMENT_RECEIPT_COLS.sender)},
+      ${safeIdent(PAYMENT_RECEIPT_COLS.note)}
     ) VALUES ($1, $2, $3, $4, $5, $6)
   `;
-    await pool.query(sql, [
-        orderCode,
-        paidDate,
-        amount,
-        receiverAccount,
+  await pool.query(sql, [
+    orderCode,
+    paidDate,
+    amount,
+    receiverAccount,
         senderParsed || "",
         noteValue,
     ]);
