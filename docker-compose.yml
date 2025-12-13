@@ -32,18 +32,18 @@ services:
   backend:
     container_name: admin_orderlist-backend
     build:
-      context: ./my-backend # Trỏ vào thư mục code backend
+      context: ./backend # Trỏ vào thư mục code backend
     restart: always
     depends_on:
       postgres:
         condition: service_healthy # Chỉ chạy khi Database đã khởi động xong
     env_file:
-      - ./my-backend/.env.docker # Load file cấu hình riêng cho môi trường Docker
+      - ./backend/.env.docker # Load file cấu hình riêng cho môi trường Docker
     ports:
       - "3001:3001"
     volumes:
       # Mount code để sửa code xong server tự reload (Hot Reload)
-      - ./my-backend:/app
+      - ./backend:/app
       - /app/node_modules
     networks:
       - app-network
