@@ -221,6 +221,31 @@ const normalizeAmount = (value) => {
 
 const safeIdent = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
 
+let paymentReceiptOrderColCache = null;
+const getPaymentReceiptOrderColumn = async () => {
+  if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
+  const preferred = ["id_order", "order_code", PAYMENT_RECEIPT_COLS.orderCode]
+    .filter(Boolean)
+    .map((c) => String(c).toLowerCase());
+  try {
+    const res = await pool.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2
+      `,
+      [DB_SCHEMA, "payment_receipt"]
+    );
+    const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
+    const found = preferred.find((c) => names.includes(c));
+    paymentReceiptOrderColCache = found || names[0] || "id_order";
+  } catch (err) {
+    console.error("Failed to resolve payment_receipt column list:", err);
+    paymentReceiptOrderColCache = "id_order";
+  }
+  return paymentReceiptOrderColCache;
+};
+
 const insertPaymentReceipt = async (transaction) => {
   const orderCode = extractOrderCodeFromText(
     transaction.transaction_content,
@@ -237,8 +262,7 @@ const insertPaymentReceipt = async (transaction) => {
   const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
   const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
   const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
-  // payment_receipt uses id_order in our schema; force this column to avoid cache/mismatch issues.
-  const orderCodeColumn = "id_order";
+  const orderCodeColumn = await getPaymentReceiptOrderColumn();
   const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
       ${safeIdent(orderCodeColumn)},
