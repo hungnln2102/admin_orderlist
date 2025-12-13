@@ -221,36 +221,6 @@ const normalizeAmount = (value) => {
 
 const safeIdent = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
 
-let paymentReceiptOrderColCache = null;
-const resolvePaymentReceiptOrderColumn = async () => {
-  if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
-  const candidates = [
-    PAYMENT_RECEIPT_COLS.orderCode,
-    "id_order",
-    "ma_don_hang",
-    "order_code",
-  ]
-    .filter(Boolean)
-    .map((c) => String(c).toLowerCase());
-  try {
-    const res = await pool.query(
-      `
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = $1 AND table_name = $2
-      `,
-      [DB_SCHEMA, "payment_receipt"]
-    );
-    const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
-    const found = candidates.find((c) => names.includes(c));
-    paymentReceiptOrderColCache = found || PAYMENT_RECEIPT_COLS.orderCode;
-  } catch (err) {
-    console.error("Failed to resolve payment_receipt order column:", err);
-    paymentReceiptOrderColCache = PAYMENT_RECEIPT_COLS.orderCode;
-  }
-  return paymentReceiptOrderColCache;
-};
-
 const insertPaymentReceipt = async (transaction) => {
   const orderCode = extractOrderCodeFromText(
     transaction.transaction_content,
@@ -267,8 +237,8 @@ const insertPaymentReceipt = async (transaction) => {
   const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
   const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
   const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
-  // payment_receipt uses id_order in our schema; stick to it to avoid missing-column errors.
-  const orderCodeColumn = PAYMENT_RECEIPT_COLS.orderCode || "id_order";
+  // payment_receipt uses id_order in our schema; force this column to avoid cache/mismatch issues.
+  const orderCodeColumn = "id_order";
   const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
       ${safeIdent(orderCodeColumn)},
