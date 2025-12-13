@@ -11,8 +11,8 @@ Prereqs
 - (Optional) remove existing build artifacts: `rm -rf dist`
 
 2) Configure backend env
-- `cp my-backend/.env.example my-backend/.env`
-- Edit `my-backend/.env`:
+- `cp backend/.env.example backend/.env`
+- Edit `backend/.env`:
   - `DATABASE_URL=postgresql://USER:PASSWORD@host.docker.internal:5432/DB_NAME` (if Postgres runs on the host). Replace host with your private IP if Docker cannot reach it.
   - `FRONTEND_ORIGINS=http://admin.mavrykpremium.store,https://admin.mavrykpremium.store`
   - Adjust `CRON_SCHEDULE`, `RUN_CRON_ON_START`, `APP_TIMEZONE` if needed.

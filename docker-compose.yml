@@ -1,62 +1,76 @@
-version: "3.9"
+version: "3.8"
 
 services:
+  # ==========================================
+  # 1. DATABASE SERVICE (PostgreSQL)
+  # ==========================================
   postgres:
-    image: postgres:16-alpine
+    container_name: admin_orderlist-postgres
+    build:
+      context: ./database
+    restart: always
     environment:
-      POSTGRES_DB: mydtbmav
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: ZAQ!xsw21122
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Mount thư mục dữ liệu để không bị mất khi restart container
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  backend-api:
+  # ==========================================
+  # 2. BACKEND SERVICE (Node.js)
+  # ==========================================
+  backend:
+    container_name: admin_orderlist-backend
     build:
-      context: ./my-backend
-    env_file:
-      - my-backend/.env.docker
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      SEPAY_PORT: 5000
-      SEPAY_HOST: 0.0.0.0
+      context: ./my-backend # Trỏ vào thư mục code backend
+    restart: always
     depends_on:
-      - postgres
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      postgres:
+        condition: service_healthy # Chỉ chạy khi Database đã khởi động xong
+    env_file:
+      - ./my-backend/.env.docker # Load file cấu hình riêng cho môi trường Docker
     ports:
       - "3001:3001"
-      - "5000:5000"
-    restart: unless-stopped
+    volumes:
+      # Mount code để sửa code xong server tự reload (Hot Reload)
+      - ./my-backend:/app
+      - /app/node_modules
+    networks:
+      - app-network
 
-  backend-scheduler:
-    build:
-      context: ./my-backend
-    env_file:
-      - my-backend/.env
-    environment:
-      NODE_ENV: production
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: ["node", "scheduler.js"]
-    depends_on:
-      - backend-api
-    restart: unless-stopped
-
+  # ==========================================
+  # 3. FRONTEND SERVICE (React + Vite)
+  # ==========================================
   frontend:
+    container_name: admin_orderlist-frontend
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: https://admin.mavrykpremium.store
+      context: ./frontend # Trỏ vào thư mục code frontend
+    restart: always
     ports:
-      - "80:80"
-    depends_on:
-      - backend-api
-    restart: unless-stopped
+      - "5173:5173"
+    volumes:
+      # Mount code để sửa giao diện xong web tự cập nhật
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
-  postgres-data:
+  postgres_data:

@@ -1,6 +1,6 @@
 # Step 1 - Install deps from package.json only
 FROM node:20-alpine AS deps
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Tối ưu npm để build nhanh hơn
 ENV npm_config_fund=false \
@@ -8,14 +8,14 @@ ENV npm_config_fund=false \
     npm_config_progress=false
 
 # Copy package files
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 # Cài deps với cache tối đa
 RUN npm ci --prefer-offline --no-audit --no-fund
 
 # Step 2 - Build app
 FROM node:20-alpine AS build
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Tối ưu npm + tránh out-of-memory
 ENV npm_config_fund=false \
@@ -24,10 +24,12 @@ ENV npm_config_fund=false \
     NODE_OPTIONS="--max_old_space_size=1024"
 
 # Copy node_modules từ stage deps
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/frontend/node_modules ./node_modules
 
 # Copy source code
-COPY . .
+COPY frontend/. .
+# Shared schema consumed by frontend
+COPY shared /app/shared
 
 # Build-time API URL
 ARG VITE_API_BASE_URL
@@ -39,9 +41,8 @@ RUN npm run build
 # Step 3 - Serve with Nginx
 FROM nginx:1.27-alpine AS runtime
 
-COPY docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY frontend/docker/frontend-nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-

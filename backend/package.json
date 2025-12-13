@@ -1,0 +1,33 @@
+{
+    "name": "backend",
+    "version": "1.0.0",
+    "description": "",
+    "main": "server.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node index.js",
+        "start:api": "node index.js",
+        "start:scheduler": "node scheduler.js",
+        "dev": "npm run start:api",
+        "start:new": "node src/server.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "express-session": "^1.18.2",
+        "helmet": "^8.1.0",
+        "knex": "^3.1.0",
+        "morgan": "^1.10.1",
+        "node-cron": "^4.2.1",
+        "pg": "^8.16.3"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}

@@ -1,0 +1,3 @@
+-- init.sql
+-- Place base schema or bootstrap SQL here.
+-- Example: \i /docker-entrypoint-initdb.d/migrations/001_normalize_types.sql
