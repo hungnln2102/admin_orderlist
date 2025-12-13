@@ -21,8 +21,8 @@ const SUPPLY_PRICE_COLS = getDefinition("SUPPLY_PRICE").columns;
 
 const app = express();
 
-// DB schema name (string). Fallback to exported SCHEMA ('mavryk') or 'public'.
-const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA || "public";
+// DB schema name (string). Fallback to exported SCHEMA ('mavryk') or 'mavryk'.
+const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA || "mavryk";
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
     process.env.SEPAY_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || "";

@@ -56,7 +56,7 @@ const resolveSupplyStatusColumn = async () => {
     return supplyStatusColumnNameCache;
   }
   try {
-    const schemaName = process.env.DB_SCHEMA || SCHEMA || "public";
+    const schemaName = process.env.DB_SCHEMA || SCHEMA || "mavryk";
     const result = await db("information_schema.columns")
       .select("column_name")
       .where({
