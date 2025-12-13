@@ -6,9 +6,9 @@ const crypto = require("crypto");
 const https = require("https");
 const { Pool } = require("pg");
 const {
-    tableName,
-    getDefinition,
-    DB_SCHEMA: DEFAULT_SCHEMA,
+  tableName,
+  getDefinition,
+  SCHEMA: DEFAULT_SCHEMA,
 } = require("../src/config/dbSchema");
 const { monthsFromString, ORDER_PREFIXES } = require("../helpers");
 
@@ -21,6 +21,7 @@ const SUPPLY_PRICE_COLS = getDefinition("SUPPLY_PRICE").columns;
 
 const app = express();
 
+// DB schema name (string). Fallback to exported SCHEMA ('mavryk') or 'public'.
 const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA || "public";
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
