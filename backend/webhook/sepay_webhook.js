@@ -251,20 +251,24 @@ const resolvePaymentReceiptOrderColumn = async () => {
   return paymentReceiptOrderColCache;
 };
 
-const insertPaymentReceipt = async(transaction) => {
+const insertPaymentReceipt = async (transaction) => {
   const orderCode = extractOrderCodeFromText(
     transaction.transaction_content,
     transaction.description
   );
-    const senderParsed = extractSenderFromContent(
-        transaction.transaction_content || transaction.description
-    );
-    const receiverAccount = transaction.account_number || transaction.accountNumber || "";
-    const paidDate = parsePaidDate(transaction.transaction_date || transaction.transaction_date_raw);
+  const senderParsed = extractSenderFromContent(
+    transaction.transaction_content || transaction.description
+  );
+  const receiverAccount =
+    transaction.account_number || transaction.accountNumber || "";
+  const paidDate = parsePaidDate(
+    transaction.transaction_date || transaction.transaction_date_raw
+  );
   const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
   const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
   const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
-  const orderCodeColumn = await resolvePaymentReceiptOrderColumn();
+  // payment_receipt uses id_order in our schema; stick to it to avoid missing-column errors.
+  const orderCodeColumn = PAYMENT_RECEIPT_COLS.orderCode || "id_order";
   const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
       ${safeIdent(orderCodeColumn)},
