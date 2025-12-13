@@ -224,9 +224,16 @@ const safeIdent = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
 let paymentReceiptOrderColCache = null;
 const getPaymentReceiptOrderColumn = async () => {
   if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
-  const preferred = ["id_order", "order_code", PAYMENT_RECEIPT_COLS.orderCode]
+
+  const preferred = [
+    process.env.PAYMENT_RECEIPT_ORDER_COLUMN,
+    "id_order",
+    "order_code",
+    PAYMENT_RECEIPT_COLS.orderCode,
+  ]
     .filter(Boolean)
     .map((c) => String(c).toLowerCase());
+
   try {
     const res = await pool.query(
       `
@@ -236,9 +243,16 @@ const getPaymentReceiptOrderColumn = async () => {
       `,
       [DB_SCHEMA, "payment_receipt"]
     );
-    const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
+    const names = res.rows.map((r) =>
+      String(r.column_name || "").toLowerCase()
+    );
     const found = preferred.find((c) => names.includes(c));
     paymentReceiptOrderColCache = found || names[0] || "id_order";
+    console.log(
+      `[Webhook] payment_receipt order column resolved to '${paymentReceiptOrderColCache}' (candidates: ${preferred.join(
+        ", "
+      )})`
+    );
   } catch (err) {
     console.error("Failed to resolve payment_receipt column list:", err);
     paymentReceiptOrderColCache = "id_order";
@@ -263,6 +277,17 @@ const insertPaymentReceipt = async (transaction) => {
   const baseNote = transaction.description || transaction.transaction_content || transaction.note || "";
   const noteValue = senderParsed ? `[Sender:${senderParsed}] ${baseNote}` : baseNote;
   const orderCodeColumn = await getPaymentReceiptOrderColumn();
+  console.log("[Webhook] Insert payment_receipt", {
+    orderCode,
+    orderCodeColumn,
+    paidDate,
+    amount,
+    receiverAccount,
+    senderParsed,
+    noteValue,
+    rawContent: transaction.transaction_content,
+    rawDescription: transaction.description,
+  });
   const sql = `
     INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
       ${safeIdent(orderCodeColumn)},
