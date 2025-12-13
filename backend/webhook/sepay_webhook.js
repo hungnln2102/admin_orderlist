@@ -747,10 +747,8 @@ const updatePaymentSupplyBalance = async(sourceId, priceValue, noteDate) => {
         };
 
         const latest = latestRes.rows[0];
-        const statusNorm = stripAccents(latest?.status_label || "")
-            .toLowerCase()
-            .trim();
-        if (latest && statusNorm === "chua thanh toan") {
+        const statusLabel = String(latest?.status_label || "");
+        if (latest && statusLabel === "Chưa Thanh Toán") {
             await client.query(
                 `UPDATE ${PAYMENT_SUPPLY_TABLE}
          SET ${PAYMENT_SUPPLY_COLS.importValue} = COALESCE(${PAYMENT_SUPPLY_COLS.importValue}, 0) + $2
@@ -765,7 +763,7 @@ const updatePaymentSupplyBalance = async(sourceId, priceValue, noteDate) => {
             ${PAYMENT_SUPPLY_COLS.status},
             ${PAYMENT_SUPPLY_COLS.paid}
           )
-          VALUES ($1, $2, $3, 'Chua Thanh Toan', NULL)`, [sourceId, priceValue, formatNote()]
+          VALUES ($1, $2, $3, 'Chưa Thanh Toán', NULL)`, [sourceId, priceValue, formatNote()]
             );
         }
 
@@ -1043,15 +1041,37 @@ const postJson = (url, data) =>
     });
 
 const buildRenewalMessage = (orderCode, result) => {
-        if (!result) return `Don ${orderCode}: Khong co ket qua gia han`;
-        const status = result.success ?
-            "Gia Hạn Thành Công" :
-            result.processType === "skipped" ?
-            "Bỏ Qua" :
-            "Lỗi Gia Hạn";
+  if (!result) return `Don ${orderCode}: Khong co ket qua gia han`;
 
-        if (!result.details || typeof result.details !== "object") {
-            return `Đơn ${orderCode}: ${status}${result.details ? ` - ${result.details}` : ""}`;
+  const status = result.success
+    ? "Gia Hạn Thành Công"
+    : result.processType === "skipped"
+    ? "Bỏ Qua"
+    : "Lỗi Gia Hạn";
+
+  // New rich notification for successful renewals
+  if (result.success && result.details && typeof result.details === "object") {
+    const d = result.details;
+    const lines = [
+      "✅ GIA HẠN TỰ ĐỘNG THÀNH CÔNG",
+      "──── Thông Tin Đơn Hàng ────",
+      `🪪 Mã Đơn: ${orderCode}`,
+      `📦 Sản Phẩm: ${d.SAN_PHAM || ""}`,
+      `ℹ️ Thông tin: ${d.THONG_TIN_DON || ""}`,
+      d.SLOT ? `🎯 Slot: ${d.SLOT}` : null,
+      `📅 Ngày Đăng Ký: ${d.NGAY_DANG_KY || ""}`,
+      `📆 Hết Hạn: ${d.HET_HAN || ""}`,
+      `💵 Giá Bán: ${formatCurrency(d.GIA_BAN)}`,
+      "──── Thông Tin Nhà Cung Cấp ────",
+      d.NGUON ? `🏷 Nhà Cung Cấp: ${d.NGUON}` : null,
+      `💰 Giá Nhập: ${formatCurrency(d.GIA_NHAP)}`,
+    ].filter(Boolean);
+    return lines.join("\n");
+  }
+
+  // Fallback for skipped / failed renewals
+  if (!result.details || typeof result.details !== "object") {
+    return `Đơn ${orderCode}: ${status}${result.details ? ` - ${result.details}` : ""}`;
   }
 
   const d = result.details;
@@ -1163,6 +1183,8 @@ const buildPaymentMessage = (orderCode, transaction) => {
 };
 
 const sendPaymentNotification = async (orderCode, transaction) => {
+  // Payment notifications to Telegram are currently disabled.
+  return;
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
   const text = buildPaymentMessage(orderCode, transaction);
   if (!text) return;
@@ -1194,15 +1216,15 @@ const isTelegramEnabled = () =>
   );
 
 const isEligibleForRenewal = (statusValue, checkFlag, orderExpired) => {
-  const statusNorm = stripAccents(statusValue || "").toLowerCase().trim();
+  const statusNorm = String(statusValue || "");
   const daysLeft = daysUntil(orderExpired);
 
   const readyForRenew =
-    (statusNorm === "can gia han" || statusNorm === "het han") &&
+    (statusNorm === "Cần Gia Hạn" || statusNorm === "Hết Hạn") &&
     isNullishFlag(checkFlag) &&
     daysLeft <= 4;
 
-  const paidNeedsForce = statusNorm === "da thanh toan" && isTrueFlag(checkFlag);
+  const paidNeedsForce = statusNorm === "Đã Thanh Toán" && isTrueFlag(checkFlag);
 
   return {
     eligible: readyForRenew || paidNeedsForce,
@@ -1448,7 +1470,7 @@ const markCheckFlagFalse = async (orderCode) => {
 const setStatusUnpaid = async (orderCode) => {
   const sql = `
     UPDATE ${ORDER_TABLE}
-    SET ${ORDER_COLS.status} = 'Chua Thanh Toan',
+    SET ${ORDER_COLS.status} = 'Chưa Thanh Toán',
         ${ORDER_COLS.checkFlag} = FALSE
     WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
   `;
@@ -1467,10 +1489,8 @@ const isTrueFlag = (value) => {
   return false;
 };
 
-const shouldResetStatusToUnpaid = (statusValue) => {
-  const norm = stripAccents(statusValue || "").toLowerCase().trim();
-  return norm === "can gia han" || norm === "het han";
-};
+const shouldResetStatusToUnpaid = (statusValue) =>
+  statusValue === "Cần Gia Hạn" || statusValue === "Hết Hạn";
 
 app.get("/", (_req, res) => {
   res.json({ status: "ok" });
@@ -1569,7 +1589,7 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
             });
             await processRenewalTask(orderCode);
           } else if (
-            eligibility.statusNorm === "chua thanh toan" &&
+            eligibility.statusNorm === "Chưa Thanh Toán" &&
             isNullishFlag(state[ORDER_COLS.checkFlag])
           ) {
             await markCheckFlagFalse(orderCode);

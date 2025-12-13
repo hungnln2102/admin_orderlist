@@ -12,7 +12,7 @@ export const ORDER_COLS = {
   slot: "slot",
   orderDate: "order_date",
   days: "days",
-  orderExpired: "order_expired", // Khớp với EXPIRED_DATE trong dbSchema
+  orderExpired: "order_expired", // Khớp với ORDER_EXPIRED trong dbSchema
   supply: "supply",
   cost: "cost",
   price: "price",
