@@ -53,7 +53,7 @@ const dashboardStats = async(_req, res) => {
           ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
           'active' as status, -- Đánh dấu nguồn dữ liệu
           ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS registration_date,
-          ${createDateNormalization(quoteIdent(ORDER_DEF.columns.expiredDate))} AS expiry_date,
+          ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderExpired))} AS expiry_date,
           ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
           ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.price))} AS price_value
         FROM ${TABLES.orderList}
@@ -65,7 +65,7 @@ const dashboardStats = async(_req, res) => {
           ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
           'expired' as status,
           ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS registration_date,
-          ${createDateNormalization(quoteIdent(ORDER_DEF.columns.expiredDate))} AS expiry_date,
+          ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderExpired))} AS expiry_date,
           ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
           ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.price))} AS price_value
         FROM ${TABLES.orderExpired}
