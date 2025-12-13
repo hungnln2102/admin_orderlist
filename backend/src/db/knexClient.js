@@ -22,8 +22,8 @@ if (!DATABASE_URL) {
 }
 
 const searchPath = [
-  process.env.DB_SCHEMA || SCHEMA || "public",
-  "public",
+  process.env.DB_SCHEMA || SCHEMA || "mavryk",
+  "mavryk",
 ].filter(Boolean);
 
 const db = knex({
