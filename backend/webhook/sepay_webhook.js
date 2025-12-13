@@ -298,6 +298,16 @@ const insertPaymentReceipt = async (transaction) => {
       ${safeIdent(PAYMENT_RECEIPT_COLS.note)}
     ) VALUES ($1, $2, $3, $4, $5, $6)
   `;
+  console.log("[Webhook] payment_receipt SQL:", sql.trim(), {
+    params: [
+      orderCode,
+      paidDate,
+      amount,
+      receiverAccount,
+      senderParsed || "",
+      noteValue,
+    ],
+  });
   await pool.query(sql, [
     orderCode,
     paidDate,
