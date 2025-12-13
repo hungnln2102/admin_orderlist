@@ -683,10 +683,7 @@ const updatePaymentSupplyBalance = async(sourceId, priceValue, noteDate) => {
         const statusNorm = stripAccents(latest?.status_label || "")
             .toLowerCase()
             .trim();
-        const paidIsNull =
-            latest && (latest.paid_value === null || latest.paid_value === undefined);
-
-        if (latest && statusNorm === "chua thanh toan" && paidIsNull) {
+        if (latest && statusNorm === "chua thanh toan") {
             await client.query(
                 `UPDATE ${PAYMENT_SUPPLY_TABLE}
          SET ${PAYMENT_SUPPLY_COLS.importValue} = COALESCE(${PAYMENT_SUPPLY_COLS.importValue}, 0) + $2
@@ -701,7 +698,7 @@ const updatePaymentSupplyBalance = async(sourceId, priceValue, noteDate) => {
             ${PAYMENT_SUPPLY_COLS.status},
             ${PAYMENT_SUPPLY_COLS.paid}
           )
-          VALUES ($1, $2, $3, 'Chưa Thanh Toán', NULL)`, [sourceId, priceValue, formatNote()]
+          VALUES ($1, $2, $3, 'Chua Thanh Toan', NULL)`, [sourceId, priceValue, formatNote()]
             );
         }
 

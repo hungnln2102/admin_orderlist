@@ -22,12 +22,16 @@ const ORDER_CANCELED_DEF = getDefinition("ORDER_CANCELED");
 const SUPPLY_DEF = getDefinition("SUPPLY");
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
 const BANK_LIST_DEF = getDefinition("BANK_LIST");
+const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
+const SUPPLY_PRICE_DEF = getDefinition("SUPPLY_PRICE");
 const orderCols = ORDER_DEF.columns;
 const orderExpiredCols = ORDER_EXPIRED_DEF.columns;
 const orderCanceledCols = ORDER_CANCELED_DEF.columns;
 const supplyCols = SUPPLY_DEF.columns;
 const paymentSupplyCols = PAYMENT_SUPPLY_DEF.columns;
 const bankListCols = BANK_LIST_DEF.columns;
+const productPriceCols = PRODUCT_PRICE_DEF.columns;
+const supplyPriceCols = SUPPLY_PRICE_DEF.columns;
 
 const TABLES = {
   orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
@@ -163,11 +167,20 @@ ${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
     ),
     product_data AS (
       SELECT
-        sp.source_id,
-        ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(pp.san_pham::text), '')), NULL) AS product_list
+        sp.${quoteIdent(supplyPriceCols.sourceId)} AS source_id,
+        ARRAY_REMOVE(
+          ARRAY_AGG(
+            DISTINCT NULLIF(
+              TRIM(pp.${quoteIdent(productPriceCols.product)}::text),
+              ''
+            )
+          ),
+          NULL
+        ) AS product_list
       FROM ${TABLES.supplyPrice} sp
-      JOIN ${TABLES.productPrice} pp ON sp.product_id = pp.id
-      GROUP BY sp.source_id
+      JOIN ${TABLES.productPrice} pp
+        ON sp.${quoteIdent(supplyPriceCols.productId)} = pp.${quoteIdent(productPriceCols.id)}
+      GROUP BY sp.${quoteIdent(supplyPriceCols.sourceId)}
     ),
     payment_summary AS (
       SELECT
@@ -295,11 +308,14 @@ router.get("/:supplyId/products", async (req, res) => {
   console.log(`[GET] /api/supplies/${supplyId}/products`);
 
   const q = `
-    SELECT DISTINCT pp.id, pp.san_pham
+    SELECT DISTINCT
+      pp.${quoteIdent(productPriceCols.id)} AS id,
+      pp.${quoteIdent(productPriceCols.product)} AS san_pham
     FROM ${TABLES.supplyPrice} sp
-    JOIN ${TABLES.productPrice} pp ON sp.product_id = pp.id
-    WHERE sp.source_id = ?
-    ORDER BY pp.san_pham;
+    JOIN ${TABLES.productPrice} pp
+      ON sp.${quoteIdent(supplyPriceCols.productId)} = pp.${quoteIdent(productPriceCols.id)}
+    WHERE sp.${quoteIdent(supplyPriceCols.sourceId)} = ?
+    ORDER BY pp.${quoteIdent(productPriceCols.product)};
   `;
 
   try {

@@ -275,6 +275,13 @@ const SupplyRow = ({ supply, isExpanded, onToggle, onEdit, onDelete, onView, onT
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  const normalizeStatus = (status: string) =>
+    (status || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
   useEffect(() => {
     if (isExpanded && payments.length === 0) {
       loadPayments();
@@ -399,10 +406,12 @@ const SupplyRow = ({ supply, isExpanded, onToggle, onEdit, onDelete, onView, onT
                          )}
                          {loadingPay ? (
                             <tr><td colSpan={5} className="text-center py-4">Đang tải...</td></tr>
-                         ) : payments.length === 0 ? (
+                          ) : payments.length === 0 ? (
                             <tr><td colSpan={5} className="text-center py-4 opacity-50">Chưa có dữ liệu thanh toán</td></tr>
                          ) : (
-                            payments.map(p => (
+                            payments.map(p => {
+                               const canEdit = normalizeStatus(p.status) === "chua thanh toan";
+                               return (
                                <tr key={p.id} className="hover:bg-white/5">
                                   <td className="px-4 py-2">{p.round}</td>
                                   <td className="px-4 py-2">
@@ -421,12 +430,13 @@ const SupplyRow = ({ supply, isExpanded, onToggle, onEdit, onDelete, onView, onT
                                            <button onClick={() => handleEditPayment(p.id)} className="text-emerald-400 mr-2"><CheckIcon className="h-4 w-4 inline"/></button>
                                            <button onClick={() => setEditingId(null)} className="text-rose-400"><XMarkIcon className="h-4 w-4 inline"/></button>
                                         </>
-                                     ) : (
+                                     ) : canEdit ? (
                                         <button onClick={() => { setEditingId(p.id); setEditValue(p.totalImport.toLocaleString('vi-VN')); }} className="text-white/40 hover:text-blue-300"><PencilSquareIcon className="h-4 w-4 inline"/></button>
-                                     )}
+                                     ) : null}
                                   </td>
                                </tr>
-                            ))
+                               );
+                            })
                          )}
                       </tbody>
                    </table>
@@ -501,10 +511,38 @@ export default function Sources() {
   // Filter Logic
   const filteredSupplies = useMemo(() => {
     const term = normalizeText(searchTerm);
-    return supplies.filter(s => {
-       const matchSearch = !term || normalizeText(s.sourceName).includes(term);
-       const matchStatus = statusFilter === "all" || (statusFilter === "active" ? s.isActive : !s.isActive);
-       return matchSearch && matchStatus;
+    const parsed = supplies.filter((s) => {
+      const matchSearch = !term || normalizeText(s.sourceName).includes(term);
+      const matchStatus =
+        statusFilter === "all" || (statusFilter === "active" ? s.isActive : !s.isActive);
+      return matchSearch && matchStatus;
+    });
+
+    const getDateValue = (value: string | null) => {
+      if (!value) return 0;
+      const ts = new Date(value).getTime();
+      return Number.isFinite(ts) ? ts : 0;
+    };
+
+    return parsed.sort((a, b) => {
+      const debtA = Number(a.totalUnpaidImport) || 0;
+      const debtB = Number(b.totalUnpaidImport) || 0;
+      const hasDebtA = debtA > 0;
+      const hasDebtB = debtB > 0;
+      if (hasDebtA !== hasDebtB) return hasDebtA ? -1 : 1; // Debt first
+      if (hasDebtA && hasDebtB && debtA !== debtB) return debtB - debtA; // Higher debt first
+
+      const lastA = getDateValue(a.lastOrderDate);
+      const lastB = getDateValue(b.lastOrderDate);
+      const hasDateA = lastA > 0;
+      const hasDateB = lastB > 0;
+      if (hasDateA !== hasDateB) return hasDateA ? -1 : 1; // Recent orders next
+      if (lastA !== lastB) return lastB - lastA; // Newer first
+
+      const ordersDiff = (b.totalOrders || 0) - (a.totalOrders || 0);
+      if (ordersDiff !== 0) return ordersDiff;
+
+      return a.sourceName.localeCompare(b.sourceName);
     });
   }, [supplies, searchTerm, statusFilter]);
 
