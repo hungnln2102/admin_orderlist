@@ -7,8 +7,8 @@ import {
   CalendarDaysIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import StatCard, { STAT_CARD_ACCENTS } from "../../components/StatCard";
-import GradientButton from "../../components/GradientButton";
+import StatCard, { STAT_CARD_ACCENTS } from "../../components/ui/StatCard";
+import GradientButton from "../../components/ui/GradientButton";
 import * as Helpers from "../../lib/helpers";
 import { apiFetch } from "../../lib/api";
 import { PAYMENT_RECEIPT_COLS } from "../../lib/tableSql";

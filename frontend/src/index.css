@@ -199,20 +199,77 @@
 /* Scrollbar styling for modals/long forms */
 .custom-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #6b74ff #0f1324;
+  scrollbar-color: #6b74ff transparent; /* overlay feel */
 }
 .custom-scroll::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 .custom-scroll::-webkit-scrollbar-track {
-  background: #0f1324;
-  border-radius: 999px;
+  background: transparent;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #6b74ff, #8f5fff);
   border-radius: 999px;
-  border: 1px solid #0f1324;
+  border: 1px solid transparent;
+  box-shadow: inset 0 0 0 6px transparent; /* keep overlay look */
 }
 .custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7f89ff, #a56dff);
+}
+
+/* Global scrollbar style (applies to all scrollable areas) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #6b74ff transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6b74ff, #8f5fff);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7f89ff, #a56dff);
+}
+
+/* Overlay scrollbar so it doesn't reserve gutter space */
+.scroll-overlay {
+  padding-right: 6px;
+  margin-right: -6px;
+}
+
+/* Make page-level scrollbar overlay + styled */
+html,
+body {
+  overflow-y: overlay;
+  scrollbar-width: thin;
+  scrollbar-color: #6b74ff transparent;
+  padding-right: 6px; /* reclaim scrollbar gutter */
+  margin-right: -6px;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 6px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6b74ff, #8f5fff);
+  border-radius: 999px;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #7f89ff, #a56dff);
 }

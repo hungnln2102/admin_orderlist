@@ -3,33 +3,20 @@ const { DB_SCHEMA, getDefinition, tableName, SCHEMA } = require("../config/dbSch
 const { QUOTED_COLS } = require("../utils/columns");
 const {
   normalizeSupplyStatus,
-  normalizeTextInput,
-  toNullableNumber,
   formatDateOutput,
 } = require("../utils/normalizers");
 const {
   createDateNormalization,
   createSourceKey,
   createNumericExtraction,
-  createVietnameseStatusKey,
   quoteIdent,
 } = require("../utils/sql");
 const { db } = require("../db");
 
 const ORDER_DEF = getDefinition("ORDER_LIST");
-const ORDER_EXPIRED_DEF = getDefinition("ORDER_EXPIRED");
-const ORDER_CANCELED_DEF = getDefinition("ORDER_CANCELED");
-const SUPPLY_DEF = getDefinition("SUPPLY");
-const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
-const BANK_LIST_DEF = getDefinition("BANK_LIST");
 const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
 const SUPPLY_PRICE_DEF = getDefinition("SUPPLY_PRICE");
 const orderCols = ORDER_DEF.columns;
-const orderExpiredCols = ORDER_EXPIRED_DEF.columns;
-const orderCanceledCols = ORDER_CANCELED_DEF.columns;
-const supplyCols = SUPPLY_DEF.columns;
-const paymentSupplyCols = PAYMENT_SUPPLY_DEF.columns;
-const bankListCols = BANK_LIST_DEF.columns;
 const productPriceCols = PRODUCT_PRICE_DEF.columns;
 const supplyPriceCols = SUPPLY_PRICE_DEF.columns;
 
@@ -45,6 +32,32 @@ const TABLES = {
 };
 
 const router = express.Router();
+
+const STATUS = {
+  UNPAID: "Chưa Thanh Toán",
+  PAID: "Đã Thanh Toán",
+  COLLECTED: "Đã Thu",
+  PAID_ALT: "Thanh Toán",
+  CANCELED: "Hủy",
+  REFUNDED: "Đã Hoàn",
+  PENDING_REFUND: "Chưa Hoàn",
+};
+
+const parseMoney = (value, fallback = 0) => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+  const cleaned = String(value).replace(/[^0-9]/g, "");
+  if (!cleaned) return fallback;
+  const num = Number(cleaned);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+};
+
+const parseSupplyId = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
 
 // ---------- Helpers ----------
 let supplyStatusColumnNameCache = null;
@@ -94,78 +107,87 @@ const getSupplyInsights = async (_req, res) => {
     .slice(0, 10);
 
   try {
-    const orderListCols = {
-      orderDateCol: orderCols.orderDate,
-      sourceCol: orderCols.supply,
-      costCol: orderCols.cost,
-    };
-    const orderExpiredCols = orderListCols;
-    const orderCanceledCols = {
-      orderDateCol: "createdate",
-      sourceCol: orderCols.supply,
-      costCol: orderCols.cost,
-    };
     const statusColumnName = await resolveSupplyStatusColumn();
-    const paymentStatusKey = createVietnameseStatusKey("ps.status");
-    const statusSelect = statusColumnName
-      ? `s."${statusColumnName}"::text AS raw_status`
+    const statusColumnIdent = statusColumnName ? quoteIdent(statusColumnName) : null;
+    const statusSelect = statusColumnIdent
+      ? `${statusColumnIdent}::text AS raw_status`
       : "NULL AS raw_status";
 
-    const makeOrderSelect = (table, cols) => {
-      const orderDateExpr = createDateNormalization(quoteIdent(cols.orderDateCol));
-      const sourceKeyExpr = createSourceKey(quoteIdent(cols.sourceCol));
-      const importExpr = createNumericExtraction(quoteIdent(cols.costCol));
-      const sourceIdent = quoteIdent(cols.sourceCol);
-      return `
-      SELECT
-        ${orderDateExpr} AS order_date,
-        COALESCE(${sourceKeyExpr}, '') AS source_key,
-        TRIM(${sourceIdent}::text) AS source_name,
-        ${importExpr} AS import_value
-      FROM ${table}
-      WHERE TRIM(${sourceIdent}::text) <> ''
-    `;
-    };
-
-    const ordersUnion = `
-    WITH orders_union AS (
-${makeOrderSelect(TABLES.orderList, orderListCols)}
-      UNION ALL
-${makeOrderSelect(TABLES.orderExpired, orderExpiredCols)}
-      UNION ALL
-${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
-    ),
-    orders_filtered AS (
-      SELECT *
-      FROM orders_union
-      WHERE order_date IS NOT NULL
-        AND source_key <> ''
-    ),
-    month_data AS (
+    const monthlySql = `
+      WITH params AS (
+        SELECT ?::date AS curr_start, ?::date AS curr_end
+      )
       SELECT
         source_key,
         COUNT(*) AS monthly_orders,
         COALESCE(SUM(import_value), 0) AS monthly_import_value
-      FROM orders_filtered
-      WHERE order_date >= ?::date
-        AND order_date < ?::date
+      FROM (
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
+          ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
+        FROM ${TABLES.orderList}, params
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
+          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
+        UNION ALL
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
+          ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
+        FROM ${TABLES.orderExpired}, params
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
+          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
+        UNION ALL
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
+          ${createDateNormalization("createdate")} AS order_date
+        FROM ${TABLES.orderCanceled}, params
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+          AND ${createDateNormalization("createdate")} >= params.curr_start
+          AND ${createDateNormalization("createdate")} < params.curr_end
+      ) m
+      WHERE order_date IS NOT NULL
       GROUP BY source_key
-    ),
-    last_order AS (
+    `;
+
+    const summarySql = `
       SELECT
         source_key,
-        MAX(order_date) AS last_order_date
-      FROM orders_filtered
+        SUM(total_orders) AS total_orders,
+        MAX(last_order_date) AS last_order_date
+      FROM (
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          COUNT(*) AS total_orders,
+          MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
+        FROM ${TABLES.orderList}
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        GROUP BY source_key
+        UNION ALL
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          COUNT(*) AS total_orders,
+          MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
+        FROM ${TABLES.orderExpired}
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        GROUP BY source_key
+        UNION ALL
+        SELECT
+          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          COUNT(*) AS total_orders,
+          MAX(${createDateNormalization("createdate")}) AS last_order_date
+        FROM ${TABLES.orderCanceled}
+        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        GROUP BY source_key
+      ) agg
+      WHERE source_key <> ''
       GROUP BY source_key
-    ),
-    total_data AS (
-      SELECT
-        source_key,
-        COUNT(*) AS total_orders
-      FROM orders_filtered
-      GROUP BY source_key
-    ),
-    product_data AS (
+    `;
+
+    const productsSql = `
       SELECT
         sp.${quoteIdent(supplyPriceCols.sourceId)} AS source_id,
         ARRAY_REMOVE(
@@ -181,14 +203,15 @@ ${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
       JOIN ${TABLES.productPrice} pp
         ON sp.${quoteIdent(supplyPriceCols.productId)} = pp.${quoteIdent(productPriceCols.id)}
       GROUP BY sp.${quoteIdent(supplyPriceCols.sourceId)}
-    ),
-    payment_summary AS (
+    `;
+
+    const paymentSummarySql = `
       SELECT
-        ps.${QUOTED_COLS.paymentSupply.sourceId},
+        ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
         SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_paid_import,
         SUM(
           CASE
-            WHEN ${paymentStatusKey} = 'chua thanh toan'
+            WHEN ps.${QUOTED_COLS.paymentSupply.status} = ?
               THEN GREATEST(
                 COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0),
                 0
@@ -198,43 +221,80 @@ ${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
         ) AS total_unpaid_import
       FROM ${TABLES.paymentSupply} ps
       GROUP BY ps.${QUOTED_COLS.paymentSupply.sourceId}
-    )
-    SELECT
-      s.${QUOTED_COLS.supply.id} AS id,
-      s.${QUOTED_COLS.supply.sourceName} AS source_name,
-      s.${QUOTED_COLS.supply.numberBank} AS number_bank,
-      s.${QUOTED_COLS.supply.binBank} AS bin_bank,
-      ${statusSelect},
-      COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name,
-      COALESCE(product_data.product_list, ARRAY[]::text[]) AS product_names,
-      COALESCE(month_data.monthly_orders, 0) AS monthly_orders,
-      COALESCE(month_data.monthly_import_value, 0) AS monthly_import_value,
-      COALESCE(last_order.last_order_date, NULL) AS last_order_date,
-      COALESCE(total_data.total_orders, 0) AS total_orders,
-      COALESCE(payment_summary.total_paid_import, 0) AS total_paid_import,
-      COALESCE(payment_summary.total_unpaid_import, 0) AS total_unpaid_import
-    FROM ${TABLES.supply} s
-    LEFT JOIN product_data ON product_data.source_id = s.${QUOTED_COLS.supply.id}
-    LEFT JOIN month_data
-      ON month_data.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
-    LEFT JOIN last_order
-      ON last_order.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
-    LEFT JOIN total_data
-      ON total_data.source_key = ${createSourceKey(`s.${QUOTED_COLS.supply.sourceName}`)}
-    LEFT JOIN payment_summary
-      ON payment_summary.source_id = s.${QUOTED_COLS.supply.id}
-    LEFT JOIN ${TABLES.bankList} bl
-      ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
-    ORDER BY s.${QUOTED_COLS.supply.sourceName};
-  `;
+    `;
 
-    const result = await db.raw(ordersUnion, [monthStart, nextMonthStart]);
-    const rows = result.rows || [];
-    const supplies = rows.map((row) => {
+    const supplySql = `
+      SELECT
+        s.${QUOTED_COLS.supply.id} AS id,
+        s.${QUOTED_COLS.supply.sourceName} AS source_name,
+        s.${QUOTED_COLS.supply.numberBank} AS number_bank,
+        s.${QUOTED_COLS.supply.binBank} AS bin_bank,
+        ${statusSelect},
+        COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name
+      FROM ${TABLES.supply} s
+      LEFT JOIN ${TABLES.bankList} bl
+        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
+      ORDER BY s.${QUOTED_COLS.supply.sourceName};
+    `;
+
+    const [monthlyRes, summaryRes, productsRes, paymentsRes, supplyRes] = await Promise.all([
+      db.raw(monthlySql, [monthStart, nextMonthStart]),
+      db.raw(summarySql),
+      db.raw(productsSql),
+      db.raw(paymentSummarySql, [STATUS.UNPAID]),
+      db.raw(supplySql),
+    ]);
+
+    const makeSourceKey = (value) =>
+      String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+
+    const monthlyMap = new Map();
+    (monthlyRes.rows || []).forEach((row) => {
+      monthlyMap.set(row.source_key, {
+        monthly_orders: Number(row.monthly_orders) || 0,
+        monthly_import_value: Number(row.monthly_import_value) || 0,
+      });
+    });
+
+    const summaryMap = new Map();
+    (summaryRes.rows || []).forEach((row) => {
+      summaryMap.set(row.source_key, {
+        total_orders: Number(row.total_orders) || 0,
+        last_order_date: row.last_order_date || null,
+      });
+    });
+
+    const productsMap = new Map();
+    (productsRes.rows || []).forEach((row) => {
+      productsMap.set(row.source_id, row.product_list || []);
+    });
+
+    const paymentsMap = new Map();
+    (paymentsRes.rows || []).forEach((row) => {
+      paymentsMap.set(row.source_id, {
+        total_paid_import: Number(row.total_paid_import) || 0,
+        total_unpaid_import: Number(row.total_unpaid_import) || 0,
+      });
+    });
+
+    const supplies = (supplyRes.rows || []).map((row) => {
+      const sourceKey = makeSourceKey(row.source_name);
+      const monthly = monthlyMap.get(sourceKey) || {
+        monthly_orders: 0,
+        monthly_import_value: 0,
+      };
+      const summary = summaryMap.get(sourceKey) || {
+        total_orders: 0,
+        last_order_date: null,
+      };
+      const payments = paymentsMap.get(row.id) || {
+        total_paid_import: 0,
+        total_unpaid_import: 0,
+      };
       const normalizedStatus = normalizeSupplyStatus(row.raw_status);
-      const isActive = normalizedStatus !== "inactive";
-      const totalUnpaidRaw = Number(row.total_unpaid_import) || 0;
-      const totalUnpaidImport = totalUnpaidRaw < 0 ? 0 : totalUnpaidRaw;
+      const totalUnpaidImport =
+        payments.total_unpaid_import < 0 ? 0 : payments.total_unpaid_import;
+
       return {
         id: row.id,
         sourceName: row.source_name || "",
@@ -243,13 +303,13 @@ ${makeOrderSelect(TABLES.orderCanceled, orderCanceledCols)}
         bankName: row.bank_name || null,
         status: normalizedStatus || "inactive",
         rawStatus: row.raw_status || null,
-        isActive,
-        products: Array.isArray(row.product_names) ? row.product_names : [],
-        monthlyOrders: Number(row.monthly_orders) || 0,
-        monthlyImportValue: Number(row.monthly_import_value) || 0,
-        lastOrderDate: formatDateOutput(row.last_order_date),
-        totalOrders: Number(row.total_orders) || 0,
-        totalPaidImport: Number(row.total_paid_import) || 0,
+        isActive: normalizedStatus !== "inactive",
+        products: productsMap.get(row.id) || [],
+        monthlyOrders: monthly.monthly_orders,
+        monthlyImportValue: monthly.monthly_import_value,
+        lastOrderDate: formatDateOutput(summary.last_order_date),
+        totalOrders: summary.total_orders,
+        totalPaidImport: payments.total_paid_import,
         totalUnpaidImport,
       };
     });
@@ -333,11 +393,9 @@ router.get("/:supplyId/payments", async (req, res) => {
   const { supplyId } = req.params;
   console.log(`[GET] /api/supplies/${supplyId}/payments`, req.query);
 
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({
-      error: "Invalid supply id.",
-    });
+  const parsedSupplyId = parseSupplyId(supplyId);
+  if (!parsedSupplyId) {
+    return res.status(400).json({ error: "Invalid supply id." });
   }
 
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -395,23 +453,10 @@ router.post("/:supplyId/payments", async (req, res) => {
   const { supplyId } = req.params;
   console.log(`[POST] /api/supplies/${supplyId}/payments`, req.body);
 
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({
-      error: "Invalid supply id.",
-    });
+  const parsedSupplyId = parseSupplyId(supplyId);
+  if (!parsedSupplyId) {
+    return res.status(400).json({ error: "Invalid supply id." });
   }
-
-  const parseMoney = (value, fallback = 0) => {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      return value;
-    }
-    const cleaned = String(value).replace(/[^0-9]/g, "");
-    if (!cleaned) return fallback;
-    const num = Number(cleaned);
-    return Number.isFinite(num) && num >= 0 ? num : fallback;
-  };
 
   const roundLabel =
     (typeof req.body?.round === "string" && req.body.round.trim()) || "Chu ky moi";
@@ -419,34 +464,38 @@ router.post("/:supplyId/payments", async (req, res) => {
   const paid = parseMoney(req.body?.paid, 0);
   const statusLabel =
     (typeof req.body?.status === "string" && req.body.status.trim()) ||
-    "Chua Thanh Toan";
+    "Chưa Thanh Toán";
 
   try {
-    const insertQuery = `
-      INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
-      VALUES (?, ?, ?, ?, ?)
-      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.round} AS round, ${QUOTED_COLS.paymentSupply.status} AS status;
-    `;
-    const result = await db.raw(insertQuery, [
-      parsedSupplyId,
-      totalImport,
-      paid,
-      roundLabel,
-      statusLabel,
-    ]);
-    if (!result.rows?.length) {
+    const result = await db(TABLES.paymentSupply)
+      .insert({
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID]: parsedSupplyId,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]: totalImport,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]: paid,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND]: roundLabel,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS]: statusLabel,
+      })
+      .returning([
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID,
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID,
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE,
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID,
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND,
+        DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS,
+      ]);
+    if (!result?.length) {
       return res.status(500).json({
         error: "Failed to insert payment cycle.",
       });
     }
-    const row = result.rows[0];
+    const row = result[0];
     res.status(201).json({
-      id: row.id,
-      sourceId: row.source_id,
-      totalImport: Number(row.import) || 0,
-      paid: Number(row.paid) || 0,
-      round: row.round || "",
-      status: row.status || "",
+      id: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID],
+      sourceId: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID],
+      totalImport: Number(row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]) || 0,
+      paid: Number(row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]) || 0,
+      round: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND] || "",
+      status: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS] || "",
     });
   } catch (error) {
     console.error(
@@ -466,29 +515,13 @@ router.patch("/:supplyId/payments/:paymentId", async (req, res) => {
     req.body
   );
 
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  const parsedPaymentId = Number.parseInt(paymentId, 10);
-  if (
-    !Number.isInteger(parsedSupplyId) ||
-    parsedSupplyId <= 0 ||
-    !Number.isInteger(parsedPaymentId) ||
-    parsedPaymentId <= 0
-  ) {
+  const parsedSupplyId = parseSupplyId(supplyId);
+  const parsedPaymentId = parseSupplyId(paymentId);
+  if (!parsedSupplyId || !parsedPaymentId) {
     return res.status(400).json({
       error: "Invalid supply or payment id.",
     });
   }
-
-  const parseMoney = (value, fallback = null) => {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      return value;
-    }
-    const cleaned = String(value).replace(/[^0-9]/g, "");
-    if (!cleaned) return fallback;
-    const num = Number(cleaned);
-    return Number.isFinite(num) && num >= 0 ? num : fallback;
-  };
 
   const nextTotalImport = parseMoney(req.body?.totalImport, null);
   if (nextTotalImport === null) {
@@ -691,11 +724,9 @@ router.patch("/:supplyId/active", async (req, res) => {
   const { supplyId } = req.params;
   console.log("[PATCH] /api/supplies/:supplyId/active", req.body);
 
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({
-      error: "Invalid supply id.",
-    });
+  const parsedSupplyId = parseSupplyId(supplyId);
+  if (!parsedSupplyId) {
+    return res.status(400).json({ error: "Invalid supply id." });
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
@@ -737,11 +768,9 @@ router.patch("/:supplyId/active", async (req, res) => {
 
 router.delete("/:supplyId", async (req, res) => {
   const { supplyId } = req.params;
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({
-      error: "Invalid supply id.",
-    });
+  const parsedSupplyId = parseSupplyId(supplyId);
+  if (!parsedSupplyId) {
+    return res.status(400).json({ error: "Invalid supply id." });
   }
   try {
     const result = await db.raw(
@@ -767,18 +796,16 @@ router.get("/:supplyId/overview", async (req, res) => {
   const { supplyId } = req.params;
   console.log(`[GET] /api/supplies/${supplyId}/overview`);
 
-  const parsedSupplyId = Number.parseInt(supplyId, 10);
-  if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({
-      error: "Invalid supply id.",
-    });
+  const parsedSupplyId = parseSupplyId(supplyId);
+  if (!parsedSupplyId) {
+    return res.status(400).json({ error: "Invalid supply id." });
   }
 
   try {
     const client = db;
     const statusColumnName = await resolveSupplyStatusColumn();
-    const statusColumn = statusColumnName || "status";
-    const paymentStatusKey = createVietnameseStatusKey("ps.status");
+    // Chỉ dùng cột trạng thái nếu tồn tại, không mặc định "status" khi schema không có
+    const supplyStatusColumn = statusColumnName || null;
 
     const supplyRowResult = await client.raw(
       `
@@ -787,7 +814,7 @@ router.get("/:supplyId/overview", async (req, res) => {
           s.${QUOTED_COLS.supply.sourceName} AS source_name,
           s.${QUOTED_COLS.supply.numberBank} AS number_bank,
           s.${QUOTED_COLS.supply.binBank} AS bin_bank,
-          ${statusColumn ? `s."${statusColumn}"` : QUOTED_COLS.supply.activeSupply} AS raw_status,
+          ${supplyStatusColumn ? `s."${supplyStatusColumn}"` : QUOTED_COLS.supply.activeSupply} AS raw_status,
           bl.${QUOTED_COLS.bankList.bankName} AS bank_name,
           COALESCE(s.${QUOTED_COLS.supply.activeSupply}, TRUE) AS active_supply
         FROM ${TABLES.supply} s
@@ -805,24 +832,16 @@ router.get("/:supplyId/overview", async (req, res) => {
     const supplyRow = supplyRowResult.rows[0];
     const normalizedStatus = normalizeSupplyStatus(supplyRow.raw_status);
 
+    const statusColumn = quoteIdent(orderCols.status);
     const statsQuery = `
       SELECT
-        COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'Da Hoan' AND status IS DISTINCT FROM 'Hoan' AND status IS DISTINCT FROM 'Da Hoàn' AND status IS DISTINCT FROM 'Hoàn') AS total_orders,
-        COUNT(*) FILTER (WHERE ${createVietnameseStatusKey("status")} = 'huy') AS canceled_orders,
-        COUNT(*) FILTER (WHERE ${createVietnameseStatusKey("status")} = 'chua thanh toan') AS unpaid_orders,
-        COUNT(*) FILTER (WHERE ${createVietnameseStatusKey("status")} IN ('da thanh toan', 'da thu', 'dathu', 'thanh toan')) AS paid_orders,
-        SUM(CASE WHEN ${createVietnameseStatusKey("status")} IN ('da thanh toan', 'da thu', 'dathu', 'thanh toan') THEN COALESCE(${QUOTED_COLS.orderList.price}, 0) ELSE 0 END) AS total_paid_amount
+        COUNT(*) FILTER (WHERE ${statusColumn} IS DISTINCT FROM '${STATUS.REFUNDED}' AND ${statusColumn} IS DISTINCT FROM '${STATUS.PENDING_REFUND}') AS total_orders,
+        COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.CANCELED}')) AS canceled_orders,
+        COUNT(*) FILTER (WHERE ${statusColumn} = ?) AS unpaid_orders,
+        COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.PAID}', '${STATUS.COLLECTED}', '${STATUS.PAID_ALT}')) AS paid_orders
       FROM ${TABLES.orderList}
-      WHERE TRIM(supply::text) = TRIM(?)
+      WHERE TRIM(${quoteIdent(orderCols.supply)}::text) = TRIM(?)
     `;
-    const statsResult = await client.raw(statsQuery, [supplyRow.source_name]);
-    const stats = statsResult.rows?.[0] || {};
-    const totalOrders = Number(stats.total_orders) || 0;
-    const canceledOrders = Number(stats.canceled_orders) || 0;
-    const unpaidOrders = Number(stats.unpaid_orders) || 0;
-    const paidOrders = Number(stats.paid_orders) || 0;
-    const totalPaidAmount = Number(stats.total_paid_amount) || 0;
-
     const monthlyQuery = `
       SELECT
         EXTRACT(MONTH FROM ${createDateNormalization("order_date")}) AS month_num,
@@ -832,29 +851,25 @@ router.get("/:supplyId/overview", async (req, res) => {
       GROUP BY month_num
       ORDER BY month_num;
     `;
-    const monthlyResult = await client.raw(monthlyQuery, [supplyRow.source_name]);
-    const monthlyOrders =
-      monthlyResult.rows?.map((row) => ({
-        month: Number(row.month_num),
-        orders: Number(row.monthly_orders) || 0,
-      })) || [];
 
-    let totalUnpaidAmount = 0;
-    try {
-      const unpaidSummary = await client.raw(
-        `
-        SELECT SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_unpaid
-        FROM ${TABLES.paymentSupply} ps
-        WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
-          AND ${paymentStatusKey} = 'chua thanh toan';
-      `,
-        [parsedSupplyId]
-      );
-      totalUnpaidAmount = Number(unpaidSummary.rows?.[0]?.total_unpaid) || 0;
-    } catch (err) {
-      console.error("Failed to compute total unpaid amount:", err);
-      totalUnpaidAmount = 0;
-    }
+    const unpaidSummarySql = `
+      SELECT SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_unpaid
+      FROM ${TABLES.paymentSupply} ps
+      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
+        AND ps.${QUOTED_COLS.paymentSupply.status} = ?
+    `;
+
+    const paidSummarySql = `
+      SELECT SUM(
+        CASE
+          WHEN ps.${QUOTED_COLS.paymentSupply.status} <> ?
+            THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, ps.${QUOTED_COLS.paymentSupply.importValue}, 0)
+          ELSE 0
+        END
+      ) AS total_paid_cycles
+      FROM ${TABLES.paymentSupply} ps
+      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
+    `;
 
     const unpaidQuery = `
       SELECT
@@ -865,10 +880,33 @@ router.get("/:supplyId/overview", async (req, res) => {
         COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
       FROM ${TABLES.paymentSupply} ps
       WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
-        AND ${paymentStatusKey} = 'chua thanh toan'
+        AND ps.${QUOTED_COLS.paymentSupply.status} = ?
       ORDER BY ps.${QUOTED_COLS.paymentSupply.id} DESC;
     `;
-    const unpaidResult = await client.raw(unpaidQuery, [parsedSupplyId]);
+
+    const [statsResult, monthlyResult, unpaidSummary, paidSummary, unpaidResult] = await Promise.all([
+      client.raw(statsQuery, [STATUS.UNPAID, supplyRow.source_name]),
+      client.raw(monthlyQuery, [supplyRow.source_name]),
+      client.raw(unpaidSummarySql, [parsedSupplyId, STATUS.UNPAID]),
+      client.raw(paidSummarySql, [STATUS.UNPAID, parsedSupplyId]),
+      client.raw(unpaidQuery, [parsedSupplyId, STATUS.UNPAID]),
+    ]);
+
+    const stats = statsResult.rows?.[0] || {};
+    const totalOrders = Number(stats.total_orders) || 0;
+    const canceledOrders = Number(stats.canceled_orders) || 0;
+    const unpaidOrders = Number(stats.unpaid_orders) || 0;
+    const paidOrders = Number(stats.paid_orders) || 0;
+    const totalPaidAmount = Number(paidSummary.rows?.[0]?.total_paid_cycles) || 0;
+
+    const monthlyOrders =
+      monthlyResult.rows?.map((row) => ({
+        month: Number(row.month_num),
+        orders: Number(row.monthly_orders) || 0,
+      })) || [];
+
+    const totalUnpaidAmount = Number(unpaidSummary.rows?.[0]?.total_unpaid) || 0;
+
     const unpaidPayments = (unpaidResult.rows || []).map((row) => ({
       id: row.id,
       round: row.round || "",
@@ -883,7 +921,7 @@ router.get("/:supplyId/overview", async (req, res) => {
         round: "Tien no",
         totalImport: totalUnpaidAmount,
         paid: 0,
-        status: "Chua Thanh Toan",
+        status: STATUS.UNPAID,
       });
     }
 

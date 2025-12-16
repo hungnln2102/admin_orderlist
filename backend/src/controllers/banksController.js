@@ -12,7 +12,7 @@ const listBanks = async (_req, res) => {
     res.json(rows || []);
   } catch (error) {
     console.error("[banks] Query failed:", error);
-    res.status(500).json({ error: "Unable to load banks" });
+    res.status(500).json({ error: "Không tải được danh sách ngân hàng" });
   }
 };
 
