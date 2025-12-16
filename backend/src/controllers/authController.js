@@ -9,7 +9,7 @@ const login = async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({
-      error: "Ten dang nhap va mat khau la bat buoc",
+      error: "Tên đăng nhập và mật khẩu là bắt buộc",
     });
   }
   const normalizedUsername = String(username).trim().toLowerCase();

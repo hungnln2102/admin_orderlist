@@ -48,10 +48,9 @@ const dashboardStats = async(_req, res) => {
           :currEnd::date AS curr_end
       ),
       valid_orders AS (
-        -- Dùng UNION ALL để giữ lại cả các đơn có ID trùng nhau giữa 2 bảng
         SELECT
           ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
-          'active' as status, -- Đánh dấu nguồn dữ liệu
+          'active' as status,
           ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS registration_date,
           ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderExpired))} AS expiry_date,
           ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
@@ -59,7 +58,7 @@ const dashboardStats = async(_req, res) => {
         FROM ${TABLES.orderList}
         WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
         
-        UNION ALL -- QUAN TRỌNG: Sửa thành UNION ALL
+        UNION ALL
         
         SELECT
           ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
@@ -88,7 +87,6 @@ const dashboardStats = async(_req, res) => {
           SELECT *, TRUE as is_canceled FROM canceled_data
       )
       SELECT
-        -- Tổng đơn hàng: Đếm tất cả dòng không hủy
         COALESCE(SUM(CASE
           WHEN is_canceled IS FALSE AND registration_date BETWEEN params.curr_start AND params.curr_end THEN 1
           ELSE 0
@@ -151,7 +149,7 @@ const dashboardStats = async(_req, res) => {
     } catch (error) {
         console.error("[dashboard] Query failed (stats):", error);
         res.status(500).json({
-            error: "Khong the tai so lieu dashboard.",
+            error: "Không thể tải dữ liệu.",
         });
     }
 };
@@ -185,7 +183,7 @@ const dashboardYears = async(_req, res) => {
     } catch (error) {
         console.error("[dashboard] Query failed (years):", error);
         res.status(500).json({
-            error: "Khong the tai danh sach nam.",
+            error: "Không thể tải danh sách năm.",
         });
     }
 };
@@ -211,9 +209,7 @@ const dashboardCharts = async(req, res) => {
       SELECT gs AS month_num, TO_CHAR(gs, '"T"FM99') AS month_label
       FROM generate_series(1, 12) AS gs
     ),
-    -- 1. NGUỒN THU (+): Lấy đơn hàng từ Order List và Expired
     income_stream AS (
-      -- SELECT thêm cột id_order để UNION phân biệt được các đơn trùng ngày/giá
       SELECT
         ${orderIdStringColumn}, 
         ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS event_date,
@@ -222,7 +218,7 @@ const dashboardCharts = async(req, res) => {
       FROM ${TABLES.orderList}
       WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
       
-      UNION -- Quay lại dùng UNION (DISTINCT) để loại bỏ nếu đơn đó nằm ở cả 2 bảng
+      UNION
       
       SELECT
         ${orderIdStringColumn},
@@ -232,7 +228,6 @@ const dashboardCharts = async(req, res) => {
       FROM ${TABLES.orderExpired}
       WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
     ),
-    -- 2. NGUỒN CHI (-): Lấy đơn hoàn tiền
     refund_stream AS (
       SELECT
         NULL AS id_order, -- Đơn hoàn không cần check trùng ID với đơn bán
@@ -243,13 +238,11 @@ const dashboardCharts = async(req, res) => {
       WHERE TRIM(createdate::text) <> ''
         AND status = 'Đã Hoàn'
     ),
-    -- 3. TỔNG HỢP GIAO DỊCH
     all_transactions AS (
         SELECT id_order, event_date, amount, order_count FROM income_stream
         UNION ALL
         SELECT id_order, event_date, amount, order_count FROM refund_stream
     ),
-    -- 4. LỌC THEO NĂM
     filtered_trans AS (
       SELECT *
       FROM all_transactions, params
@@ -257,7 +250,6 @@ const dashboardCharts = async(req, res) => {
         AND event_date >= params.year_start
         AND event_date < params.next_year_start
     ),
-    -- 5. TÍNH TOÁN THEO THÁNG
     monthly_stats AS (
       SELECT
         EXTRACT(MONTH FROM event_date) AS month_num,
@@ -289,7 +281,7 @@ const dashboardCharts = async(req, res) => {
     } catch (error) {
         console.error("[dashboard] Query failed (charts):", error);
         res.status(500).json({
-            error: "Khong the tai bieu do dashboard.",
+            error: "Không thể tải biểu đồ.",
         });
     }
 };

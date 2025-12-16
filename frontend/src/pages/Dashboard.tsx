@@ -10,7 +10,7 @@ import {
 import StatCard, {
   STAT_CARD_ACCENTS,
   type StatAccent,
-} from "../components/StatCard";
+} from "../components/ui/StatCard";
 import {
   LineChart,
   Line,

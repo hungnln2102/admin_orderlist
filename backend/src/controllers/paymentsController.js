@@ -1,21 +1,17 @@
-const { db, withTransaction } = require("../db");
+﻿const { db, withTransaction } = require("../db");
 const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
 const { QUOTED_COLS } = require("../utils/columns");
 const {
   createDateNormalization,
-  createVietnameseStatusKey,
 } = require("../utils/sql");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
-const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
-const SUPPLY_DEF = getDefinition("SUPPLY");
-const BANK_LIST_DEF = getDefinition("BANK_LIST");
-
 const TABLES = {
   paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
   paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
   supply: tableName(DB_SCHEMA.SUPPLY.TABLE),
   bankList: tableName(DB_SCHEMA.BANK_LIST.TABLE),
+  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
 };
 
 const listPaymentReceipts = async (req, res) => {
@@ -95,7 +91,7 @@ const confirmPaymentSupply = async (req, res) => {
                ${QUOTED_COLS.paymentSupply.round} AS round,
                ${QUOTED_COLS.paymentSupply.status} AS status
         FROM ${TABLES.paymentSupply}
-        WHERE ${QUOTED_COLS.paymentSupply.id} = $1
+        WHERE ${QUOTED_COLS.paymentSupply.id} = ?
         LIMIT 1;
       `,
         [parsedPaymentId]
@@ -119,7 +115,7 @@ const confirmPaymentSupply = async (req, res) => {
       })();
 
       const supplyResult = await trx.raw(
-        `SELECT ${QUOTED_COLS.supply.sourceName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supply.id} = $1 LIMIT 1;`,
+        `SELECT ${QUOTED_COLS.supply.sourceName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supply.id} = ? LIMIT 1;`,
         [sourceId]
       );
       const sourceName =
@@ -128,48 +124,60 @@ const confirmPaymentSupply = async (req, res) => {
           : "";
       const trimmedSourceName = sourceName.trim();
 
-      const unpaidResult = await trx.raw(
-        `
-        SELECT
-          id,
-          COALESCE(cost, 0) AS cost,
-          ${createDateNormalization("order_date")} AS order_date
-        FROM ${TABLES.orderList}
-        WHERE ${createVietnameseStatusKey("status")} = 'chua thanh toan'
-          AND COALESCE(check_flag, FALSE) = FALSE
-          AND TRIM(supply::text) = TRIM($1)
-        ORDER BY order_date ASC NULLS FIRST, id ASC;
-      `,
-        [trimmedSourceName]
-      );
+      const UNPAID_STATUS = "Chưa Thanh Toán";
+      const PAID_STATUS = "Đã Thanh Toán";
 
-      const unpaidRows = unpaidResult.rows || [];
-      let runningSum = 0;
-      const orderIdsToMark = [];
-      for (const row of unpaidRows) {
-        if (runningSum >= normalizedPaidAmount) break;
-        const costValue = Number(row.cost) || 0;
-        runningSum += costValue;
-        orderIdsToMark.push(row.id);
-      }
-
-      if (orderIdsToMark.length) {
-        await trx.raw(
+      let remainingImport = null;
+      try {
+        const unpaidResult = await trx.raw(
           `
-          UPDATE ${TABLES.orderList}
-          SET status = 'Da Thanh Toan',
-              check_flag = TRUE
-          WHERE id = ANY($1::int[]);
+          SELECT
+            ${QUOTED_COLS.orderList.id} AS id,
+            COALESCE(${QUOTED_COLS.orderList.cost}, 0) AS cost,
+            ${createDateNormalization(QUOTED_COLS.orderList.orderDate)} AS order_date
+          FROM ${TABLES.orderList}
+          WHERE ${QUOTED_COLS.orderList.status} = ?
+            AND COALESCE(${QUOTED_COLS.orderList.checkFlag}, FALSE) = FALSE
+            AND TRIM(${QUOTED_COLS.orderList.supply}::text) = TRIM(?)
+          ORDER BY order_date ASC NULLS FIRST, ${QUOTED_COLS.orderList.id} ASC;
         `,
-          [orderIdsToMark]
+        [UNPAID_STATUS, trimmedSourceName]
+        );
+
+        const unpaidRows = unpaidResult.rows || [];
+        let runningSum = 0;
+        const orderIdsToMark = [];
+        for (const row of unpaidRows) {
+          if (runningSum >= normalizedPaidAmount) break;
+          const costValue = Number(row.cost) || 0;
+          runningSum += costValue;
+          orderIdsToMark.push(row.id);
+        }
+
+        if (orderIdsToMark.length) {
+          await trx.raw(
+            `
+            UPDATE ${TABLES.orderList}
+            SET ${QUOTED_COLS.orderList.status} = ?,
+                ${QUOTED_COLS.orderList.checkFlag} = TRUE
+            WHERE ${QUOTED_COLS.orderList.id} = ANY(?::int[]);
+          `,
+            [PAID_STATUS, orderIdsToMark]
+          );
+        }
+
+        const totalUnpaidImport = unpaidRows.reduce(
+          (acc, row) => acc + (Number(row.cost) || 0),
+          0
+        );
+        remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
+      } catch (orderErr) {
+        console.error(
+          "[payments] Failed to reconcile unpaid orders for supply",
+          sourceId,
+          orderErr
         );
       }
-
-      const totalUnpaidImport = unpaidRows.reduce(
-        (acc, row) => acc + (Number(row.cost) || 0),
-        0
-      );
-      const remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
 
       let hasUnpaidCycle = false;
       if (sourceId) {
@@ -177,35 +185,35 @@ const confirmPaymentSupply = async (req, res) => {
           `
           SELECT 1
           FROM ${TABLES.paymentSupply} ps
-          WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = $1
-            AND ${createVietnameseStatusKey(`ps.${QUOTED_COLS.paymentSupply.status}`)} = 'chua thanh toan'
+          WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
+            AND ps.${QUOTED_COLS.paymentSupply.status} = ?
           LIMIT 1;
         `,
-          [sourceId]
+          [sourceId, UNPAID_STATUS]
         );
         hasUnpaidCycle = unpaidCycleResult.rows?.length > 0;
       }
 
-      if (remainingImport > 0 && sourceId && !hasUnpaidCycle) {
+      if (remainingImport !== null && remainingImport > 0 && sourceId && !hasUnpaidCycle) {
         await trx.raw(
           `
           INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
-          VALUES ($1, $2, 0, $3, 'Chua Thanh Toan');
+          VALUES (?, ?, 0, ?, ?);
         `,
-          [sourceId, remainingImport, todayDMY]
+          [sourceId, remainingImport, todayDMY, UNPAID_STATUS]
         );
       }
 
       const updateResult = await trx.raw(
         `
       UPDATE ${TABLES.paymentSupply}
-      SET ${QUOTED_COLS.paymentSupply.status} = 'Da Thanh Toan',
-          ${QUOTED_COLS.paymentSupply.paid} = $2,
-          ${QUOTED_COLS.paymentSupply.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${QUOTED_COLS.paymentSupply.round}::text, ''), ' - ', $3::text))
-      WHERE ${QUOTED_COLS.paymentSupply.id} = $1
+      SET ${QUOTED_COLS.paymentSupply.status} = ?,
+          ${QUOTED_COLS.paymentSupply.paid} = ?,
+          ${QUOTED_COLS.paymentSupply.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${QUOTED_COLS.paymentSupply.round}::text, ''), ' - ', ?::text))
+      WHERE ${QUOTED_COLS.paymentSupply.id} = ?
       RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.status} AS status, ${QUOTED_COLS.paymentSupply.round} AS round;
     `,
-        [parsedPaymentId, normalizedPaidAmount, todayDMY]
+        [PAID_STATUS, normalizedPaidAmount, todayDMY, parsedPaymentId]
       );
 
       return updateResult.rows?.[0] || null;
@@ -230,3 +238,11 @@ module.exports = {
   listPaymentReceipts,
   confirmPaymentSupply,
 };
+
+
+
+
+
+
+
+

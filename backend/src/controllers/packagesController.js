@@ -64,8 +64,8 @@ const createPackageProduct = async (req, res) => {
 
   const normalizedExpired = normalizeDateInput(expired);
   const normalizedSlotLimit = toNullableNumber(slotLimit);
-  const normalizedMatchMode =
-    matchMode === "slot" ? "slot" : "thong_tin_don_hang";
+const normalizedMatchMode =
+    matchMode === "slot" ? "slot" : pkgCols.informationOrder || "information_order";
 
   try {
     const newRow = await withTransaction(async (trx) => {
@@ -186,8 +186,8 @@ const updatePackageProduct = async (req, res) => {
 
   const normalizedExpired = normalizeDateInput(expired);
   const normalizedSlotLimit = toNullableNumber(slotLimit);
-  const normalizedMatchMode =
-    matchMode === "slot" ? "slot" : "thong_tin_don_hang";
+const normalizedMatchMode =
+    matchMode === "slot" ? "slot" : pkgCols.informationOrder || "information_order";
 
   try {
     const updated = await withTransaction(async (trx) => {

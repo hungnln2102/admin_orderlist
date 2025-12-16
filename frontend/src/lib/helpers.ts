@@ -162,10 +162,9 @@ const toFiniteNumber = (value: number | string): number => {
 
 export const roundGiaBanValue = (value: number | string): number => {
   const numeric = toFiniteNumber(value);
-  if (numeric >= 0) {
-    return Math.floor(numeric + 0.5);
-  }
-  return -Math.floor(Math.abs(numeric) + 0.5);
+  const divisor = 1000;
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.round(numeric / divisor) * divisor;
 };
 
 // Currency helpers
@@ -214,15 +213,13 @@ export const getImportPriceBySupplyName = (
   supplyPrices: SupplyPriceLike[],
   supplies: SupplyLike[] = []
 ): number | undefined => {
-  const normalizedName = (supplyName || "").trim().toLowerCase();
-  if (!normalizedName) return undefined;
+  const targetName = supplyName || "";
+  if (!targetName) return undefined;
 
   const supplyId =
     supplies.find(
       (s) =>
-        (s[SUPPLY_COLS.sourceName] || s.name || "")
-          .trim()
-          .toLowerCase() === normalizedName
+        (s[SUPPLY_COLS.sourceName] || s.name || "") === targetName
     )?.[SUPPLY_COLS.id] ?? null;
 
   if (supplyId !== null) {
@@ -237,7 +234,7 @@ export const getImportPriceBySupplyName = (
 
   const priceByName = supplyPrices.find(
     (p) =>
-      (p[SUPPLY_COLS.sourceName] || "").trim().toLowerCase() === normalizedName
+      (p[SUPPLY_COLS.sourceName] || "") === targetName
   );
   const priceValue = priceByName?.[SUPPLY_PRICE_COLS.price];
   return Number.isFinite(priceValue) ? Number(priceValue) : undefined;
@@ -248,39 +245,35 @@ export const generateRandomId = (length: number): string => {
   return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
 };
 
-const normalizeStatus = (status: string): string => {
-  if (!status) return "";
-  return status
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-};
-
 export const getStatusColor = (status: string): string => {
-  const normalized = normalizeStatus(status);
-  switch (normalized) {
-    case "da thanh toan":
-      return "bg-green-600 text-white";
-    case "chua thanh toan":
-      return "bg-yellow-500 text-slate-900";
-    case "can gia han":
-      return "bg-orange-500 text-white";
-    case "het han":
-      return "bg-red-600 text-white";
-    default:
-      return "bg-slate-600 text-white";
-  }
+  return getStatusMeta(status).color;
 };
 
 export const getStatusPriority = (status: string): number => {
-  const normalized = normalizeStatus(status);
-  if (normalized === "het han") return 1;
-  if (normalized === "can gia han") return 2;
-  if (normalized === "chua thanh toan") return 3;
-  if (normalized === "da thanh toan") return 4;
-  return 5;
+  return getStatusMeta(status).priority;
 };
+
+export const ORDER_STATUS = {
+  PAID: "Đã Thanh Toán",
+  UNPAID: "Chưa Thanh Toán",
+  EXPIRED: "Hết Hạn",
+  RENEWAL: "Cần Gia Hạn",
+  REFUNDED: "Đã Hoàn",
+  PENDING_REFUND: "Chưa Hoàn",
+} as const;
+
+const ORDER_STATUS_META: Record<
+  string,
+  { color: string; priority: number }
+> = {
+  [ORDER_STATUS.EXPIRED]: { color: "bg-red-600 text-white", priority: 1 },
+  [ORDER_STATUS.RENEWAL]: { color: "bg-orange-500 text-white", priority: 2 },
+  [ORDER_STATUS.UNPAID]: { color: "bg-yellow-500 text-slate-900", priority: 3 },
+  [ORDER_STATUS.PAID]: { color: "bg-green-600 text-white", priority: 4 },
+};
+
+const getStatusMeta = (status: string) =>
+  ORDER_STATUS_META[status?.trim()] || { color: "bg-slate-600 text-white", priority: 5 };
 
 export interface SepayQrOptions {
   accountNumber: string;

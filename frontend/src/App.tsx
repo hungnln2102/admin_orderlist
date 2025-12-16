@@ -6,15 +6,15 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./components/layout/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Product/Orders";
 import PackageProduct from "./pages/Product/PackageProduct";
 import ProductInfo from "./pages/Product/ProductInfo";
-import Pricing from "./pages/Product/Pricing";
+import Pricing from "./pages/Product/priceList";
 import RetroLogin from "./pages/RetroLogin";
 import Stats from "./pages/Personal/Stats";
-import Sources from "./pages/Personal/Sources";
+import Sources from "./pages/Personal/Supply";
 import ShowPrice from "./pages/Personal/ShowPrice";
 import BillOrder from "./pages/Personal/bill-order";
 import Invoices from "./pages/Personal/Invoices";

@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_ENDPOINTS } from "../../constants";
+import { apiFetch } from "../../lib/api";
 import { PRODUCT_PRICE_COLS } from "../../lib/tableSql";
+import { roundGiaBanValue } from "../../lib/helpers";
 import SIGN_IMG from "../../assets/sign.png";
 
 type QuoteLine = {
@@ -53,6 +55,64 @@ const stripDurationSuffix = (value?: string | null) => {
   const raw = (value || "").trim();
   if (!raw) return "";
   return raw.replace(/--\s*\d+\s*[md]\s*$/i, "").trim();
+};
+const normalizeProductKey = (value?: string | null) => (value || "").trim().toLowerCase();
+const safeNumber = (value: unknown) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+const parseApiPriceEntry = (data: any) => {
+  const customerPrice = safeNumber(data?.price);
+  const resellPrice = safeNumber(data?.resellPrice);
+  const promoPrice = safeNumber(data?.promoPrice);
+  return {
+    price: customerPrice || resellPrice || promoPrice || 0,
+    promoPrice: promoPrice || 0,
+    resellPrice: resellPrice || undefined,
+  };
+};
+
+const computeLinePricing = (
+  apiPricing: ApiPriceEntry | undefined,
+  selected: {
+    basePrice?: number;
+    unitPrice?: number;
+    pctPromo?: number;
+    pctKhach?: number;
+    pctCtv?: number;
+  }
+) => {
+  if (apiPricing) {
+    const unitPrice = roundGiaBanValue(apiPricing.price || 0);
+    const discount =
+      apiPricing.promoPrice > 0
+        ? roundGiaBanValue(apiPricing.promoPrice)
+        : 0;
+    return { unitPrice, discount };
+  }
+
+  const basePrice = selected?.basePrice ?? selected?.unitPrice ?? 0;
+  const pctPromo =
+    selected?.pctPromo !== undefined
+      ? toNumber(selected.pctPromo)
+      : 0;
+  const pctPromoDecimal =
+    pctPromo > 1 ? pctPromo / 100 : Math.max(0, pctPromo);
+  const pctKhach =
+    selected?.pctKhach !== undefined && selected?.pctKhach > 0
+      ? selected.pctKhach
+      : 1;
+  const pctCtv =
+    selected?.pctCtv !== undefined && selected?.pctCtv > 0
+      ? selected.pctCtv
+      : 1;
+
+  const retailPrice = roundGiaBanValue(basePrice * pctKhach * pctCtv);
+  const discount =
+    pctPromoDecimal > 0
+      ? roundGiaBanValue(retailPrice * pctPromoDecimal)
+      : 0;
+  return { unitPrice: retailPrice, discount };
 };
 const htmlToPlainText = (value?: string | null): string => {
   if (!value) return "";
@@ -128,6 +188,10 @@ export default function ShowPrice() {
   const [contact, setContact] = useState("");
   const [productPrices, setProductPrices] = useState<Record<string, any>[]>([]);
   const [productDescs, setProductDescs] = useState<ProductDesc[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  type ApiPriceEntry = { price: number; promoPrice: number; resellPrice?: number };
+  const [priceMap, setPriceMap] = useState<Record<string, ApiPriceEntry>>({});
+  const pendingPriceRequests = useRef<Record<string, Promise<ApiPriceEntry | null>>>({});
   const [selectedProductKeys, setSelectedProductKeys] = useState<string[]>([]);
   const [lines, setLines] = useState<QuoteLine[]>([]);
 
@@ -152,8 +216,13 @@ export default function ShowPrice() {
         );
         if (!response.ok) throw new Error("Failed to load product_price");
         const data = await response.json();
-        if (isMounted && data?.items && Array.isArray(data.items)) {
+        if (!isMounted) return;
+        if (Array.isArray(data)) {
+          setProductPrices(data);
+        } else if (data?.items && Array.isArray(data.items)) {
           setProductPrices(data.items);
+        } else {
+          setProductPrices([]);
         }
       } catch (err) {
         console.error("Không thể tải product_price:", err);
@@ -187,6 +256,74 @@ export default function ShowPrice() {
     };
   }, []);
 
+  const ensurePriceForCodes = useCallback(
+    async (codes: string[]) => {
+      const pairs = codes
+        .map((c) => ({ original: c, key: normalizeProductKey(c) }))
+        .filter((p) => p.key);
+      if (!pairs.length) return priceMap;
+
+      const missing = pairs.filter((p) => !priceMap[p.key]);
+      if (!missing.length) return priceMap;
+
+      const updates: Record<string, ApiPriceEntry> = {};
+      const started: Array<Promise<void>> = [];
+
+      missing.forEach(({ original, key }) => {
+        if (pendingPriceRequests.current[key]) {
+          // Already in flight; we'll wait below
+          started.push(
+            pendingPriceRequests.current[key].then((entry) => {
+              if (entry) updates[key] = entry;
+            })
+          );
+          return;
+        }
+
+        const request = (async (): Promise<ApiPriceEntry | null> => {
+          try {
+            const response = await apiFetch(API_ENDPOINTS.CALCULATE_PRICE, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                san_pham_name: original,
+                id_product: original,
+                customer_type: "LE",
+                for_quote: true,
+              }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || "Fail calculate-price");
+            return parseApiPriceEntry(data);
+          } catch (err) {
+            console.error("calculate-price failed", original, err);
+            return null;
+          }
+        })();
+
+        pendingPriceRequests.current[key] = request;
+        started.push(
+          request.then((entry) => {
+            if (entry) updates[key] = entry;
+          }).finally(() => {
+            delete pendingPriceRequests.current[key];
+          })
+        );
+      });
+
+      if (started.length) {
+        await Promise.all(started);
+      }
+
+      if (Object.keys(updates).length) {
+        setPriceMap((prev) => ({ ...prev, ...updates }));
+        return { ...priceMap, ...updates };
+      }
+      return priceMap;
+    },
+    [priceMap]
+  );
+
   const productOptions = useMemo(() => {
     const seen = new Set<string>();
     const options: Array<{
@@ -198,6 +335,11 @@ export default function ShowPrice() {
       durationDays: number | null;
       term: string;
       unitPrice: number;
+      discountValue: number;
+      pctPromo: number;
+      pctKhach: number;
+      pctCtv: number;
+      wholesalePrice: number;
       productId: string;
     }> = [];
 
@@ -214,13 +356,58 @@ export default function ShowPrice() {
 
       const durationInfo = parseDurationFromSku(value);
 
-      const unitPrice =
+      const pctKhachRaw = toNumber(
+        row?.pct_khach ?? row?.[PRODUCT_PRICE_COLS.pctKhach]
+      );
+      const pctCtvRaw = toNumber(
+        row?.pct_ctv ?? row?.[PRODUCT_PRICE_COLS.pctCtv]
+      );
+      const pctKhach =
+        pctKhachRaw > 10 ? pctKhachRaw / 100 : pctKhachRaw > 0 ? pctKhachRaw : 1;
+      const pctCtv =
+        pctCtvRaw > 10 ? pctCtvRaw / 100 : pctCtvRaw > 0 ? pctCtvRaw : 1;
+      const pctPromoRaw = toNumber(
+        row?.pct_promo ?? row?.[PRODUCT_PRICE_COLS.pctPromo]
+      );
+      const pctPromo =
+        pctPromoRaw > 1 ? pctPromoRaw / 100 : Math.max(0, pctPromoRaw);
+      const baseSupply = toNumber(row?.max_supply_price);
+
+      const retailBase =
         toNumber(
           row?.computed_retail_price ??
             row?.retail_price ??
             row?.gia_le ??
             row?.gia_ban
         ) || 0;
+      const promoBase =
+        toNumber(
+          row?.computed_promo_price ??
+            row?.promo_price ??
+            row?.gia_khuyen_mai ??
+            row?.gia_km
+        ) || 0;
+
+      // retail displayed: ưu tiên giá lẻ từ bảng giá, nếu có thì nhân pct_khach và pct_ctv khi backend lưu dạng hệ số
+      const wholesaleRounded = baseSupply > 0 ? roundGiaBanValue(baseSupply) : 0;
+      const fallbackRetail =
+        retailBase ||
+        promoBase ||
+        wholesaleRounded;
+      const retailPriceRaw =
+        fallbackRetail *
+        (pctCtv > 0 ? pctCtv : 1) *
+        (pctKhach > 0 ? pctKhach : 1);
+      const retailPrice = roundGiaBanValue(retailPriceRaw);
+      const promoPriceRaw = retailPrice * (1 - pctPromo);
+      const promoRounded = roundGiaBanValue(promoPriceRaw);
+      const promoClamped = Math.min(
+        retailPrice,
+        wholesaleRounded > 0 ? Math.max(wholesaleRounded, promoRounded) : promoRounded
+      );
+      const discountValue =
+        promoClamped > 0 ? retailPrice - promoClamped : 0;
+      const unitPrice = retailPrice;
 
       const packageProduct =
         (row?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
@@ -234,6 +421,9 @@ export default function ShowPrice() {
         ? `${row?.package} (${value})`
         : value;
 
+      const priceKey = normalizeProductKey(value);
+      const apiPrice = priceMap[priceKey];
+
       options.push({
         productId: value,
         value,
@@ -243,17 +433,24 @@ export default function ShowPrice() {
         durationMonths: durationInfo.months,
         durationDays: durationInfo.days,
         term: durationInfo.days ? `${durationInfo.days} ngày` : "",
-        unitPrice,
+        unitPrice: retailPrice,
+        discountValue,
+        basePrice: apiPrice?.price ?? apiPrice?.resellPrice ?? retailBase ?? retailPrice,
+        promoPrice: apiPrice?.promoPrice ?? 0,
+        pctPromo,
+        pctKhach,
+        pctCtv,
+        wholesalePrice: wholesaleRounded,
       });
     });
 
     return options.sort((a, b) => a.label.localeCompare(b.label, "vi"));
-  }, [productPrices]);
+  }, [productPrices, priceMap]);
 
   const productMap = useMemo(() => {
     const map = new Map<string, (typeof productOptions)[number]>();
     productOptions.forEach((opt) => {
-      map.set(opt.value.toLowerCase(), opt);
+      map.set(normalizeProductKey(opt.value), opt);
     });
     return map;
   }, [productOptions]);
@@ -287,6 +484,21 @@ export default function ShowPrice() {
     return map;
   }, [productDescs]);
 
+  const filteredProductOptions = useMemo(() => {
+    const term = productSearch.trim().toLowerCase();
+    if (!term) return productOptions;
+    return productOptions.filter((opt) => {
+      const label = opt.label.toLowerCase();
+      const value = opt.value.toLowerCase();
+      const display = opt.productDisplay.toLowerCase();
+      return (
+        label.includes(term) ||
+        value.includes(term) ||
+        display.includes(term)
+      );
+    });
+  }, [productOptions, productSearch]);
+
   const productDescSections = useMemo(() => {
     const seen = new Set<string>();
     const sections: Array<{
@@ -305,7 +517,7 @@ export default function ShowPrice() {
         line.packageName ||
         line.product;
       sections.push({
-        name: line.product,
+        name: packageProductName,
         rules: htmlToPlainText(desc?.rules),
         description: htmlToPlainText(desc?.description),
       });
@@ -313,7 +525,7 @@ export default function ShowPrice() {
     return sections;
   }, [lines, productDescMap, packageProductMap]);
 
-  const handleAddSelectedProduct = () => {
+  const handleAddSelectedProduct = async () => {
     if (!selectedProductKeys.length) return;
 
     const selections = selectedProductKeys
@@ -322,22 +534,27 @@ export default function ShowPrice() {
 
     if (!selections.length) return;
 
+    const priceData = await ensurePriceForCodes(selections);
+
     setLines((prev) => {
       const nextLines = [...prev];
       selections.forEach((rawKey) => {
         const selected =
-          productMap.get(rawKey.toLowerCase()) ??
+          productMap.get(normalizeProductKey(rawKey)) ??
           productMap.get(
-            rawKey
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase()
+            normalizeProductKey(
+              rawKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            )
           );
 
         const nextId = (nextLines.length + 1).toString();
         const durationTerm = selected?.durationDays
           ? `${selected.durationDays} ngày`
           : selected?.term || "";
+        const key = normalizeProductKey(rawKey);
+        const apiPricing = priceData[key];
+
+        const { unitPrice, discount } = computeLinePricing(apiPricing, selected || {});
         nextLines.push({
           id: nextId,
           productCode: rawKey,
@@ -351,9 +568,9 @@ export default function ShowPrice() {
           term: durationTerm,
           durationMonths: selected?.durationMonths ?? null,
           durationDays: selected?.durationDays ?? null,
-          unitPrice: selected?.unitPrice ?? 0,
+          unitPrice,
           quantity: 1,
-          discount: 0,
+          discount,
         });
       });
       return nextLines;
@@ -454,13 +671,26 @@ export default function ShowPrice() {
 
           <div className="border border-white/15 rounded-lg p-3 space-y-2">
             <label className="text-sm font-semibold text-white block">
-              Mã sản phẩm
+              Mã Sản Phẩm
             </label>
-            <p className="text-xs text-white/70">
-              Click để chọn / bỏ chọn, không cần giữ Ctrl / Cmd.
-            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className={`${inputClass} text-sm`}
+                placeholder="Tìm sản phẩm..."
+              />
+              <button
+                type="button"
+                onClick={() => setProductSearch("")}
+                className="px-3 py-2 text-sm rounded-lg border border-white/20 bg-white/5 text-white hover:border-white/40 transition-colors"
+              >
+                Xóa Tìm Kiếm
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-52 overflow-y-auto rounded-lg border border-white/20 bg-white/5 p-2">
-              {productOptions.map((opt) => {
+              {filteredProductOptions.map((opt) => {
                 const isActive = selectedProductKeys.includes(opt.value);
                 return (
                   <button
