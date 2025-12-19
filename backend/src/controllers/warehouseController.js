@@ -87,7 +87,7 @@ const updateWarehouse = async (req, res) => {
   if (!id) return res.status(400).json({ error: "Missing id" });
 
   try {
-    const row = await db(warehouseTable)
+    const [row] = await db(warehouseTable)
       .where(cols.id, id)
       .update({
         [cols.category]: category ?? null,
@@ -109,8 +109,7 @@ const updateWarehouse = async (req, res) => {
         note: cols.note,
         status: cols.status,
         created_at: cols.createdAt,
-      })
-      .first();
+      });
 
     if (!row) {
       return res.status(404).json({ error: "Not found" });

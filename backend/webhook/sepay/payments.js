@@ -63,15 +63,40 @@ const getPaymentReceiptOrderColumn = async () => {
   return paymentReceiptOrderColCache;
 };
 
-const insertPaymentReceipt = async (transaction) => {
-  if (!transaction) return;
+const normalizeKeyText = (value) =>
+  String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+const buildReceiptIdempotencyKey = ({
+  orderCode,
+  paidDate,
+  amount,
+  receiverAccount,
+  senderParsed,
+  noteValue,
+}) =>
+  [
+    normalizeKeyText(orderCode),
+    normalizeKeyText(paidDate),
+    String(Number(amount) || 0),
+    normalizeKeyText(receiverAccount),
+    normalizeKeyText(senderParsed),
+    normalizeKeyText(noteValue),
+  ].join("|");
+
+const insertPaymentReceipt = async (transaction, options = {}) => {
+  if (!transaction) return { inserted: false, skipped: true, reason: "missing_transaction" };
 
   const orderCode =
+    (options.orderCode !== undefined ? String(options.orderCode || "") : "") ||
     extractOrderCodeFromText(
       transaction.transaction_content,
       transaction.note,
       transaction.description
-    ) || "";
+    ) ||
+    "";
   const paidDate = parsePaidDate(
     transaction.transaction_date || transaction.transaction_date_raw
   );
@@ -85,44 +110,136 @@ const insertPaymentReceipt = async (transaction) => {
   const noteValue = transaction.note || transaction.description || "";
 
   const orderCodeColumn =
-    (await getPaymentReceiptOrderColumn()) || PAYMENT_RECEIPT_COLS.orderCode || "id_order";
-  const sql = `
-    INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
-      ${safeIdent(orderCodeColumn)},
-      ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)},
-      ${safeIdent(PAYMENT_RECEIPT_COLS.amount)},
-      ${safeIdent(PAYMENT_RECEIPT_COLS.receiver)},
-      ${safeIdent(PAYMENT_RECEIPT_COLS.sender)},
-      ${safeIdent(PAYMENT_RECEIPT_COLS.note)}
-    )
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `;
-  console.log("[Webhook] payment_receipt SQL:", sql.trim(), {
-    params: [
+    (await getPaymentReceiptOrderColumn()) ||
+    PAYMENT_RECEIPT_COLS.orderCode ||
+    "id_order";
+
+  const externalClient = options.client || null;
+  const client = externalClient || (await pool.connect());
+  const manageTransaction = !externalClient;
+
+  const receiptKey = buildReceiptIdempotencyKey({
+    orderCode,
+    paidDate,
+    amount,
+    receiverAccount,
+    senderParsed,
+    noteValue,
+  });
+
+  try {
+    if (manageTransaction) {
+      await client.query("BEGIN");
+    }
+
+    // Ensure concurrent identical webhooks cannot double-insert / double-update.
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2));",
+      ["sepay_payment_receipt", receiptKey]
+    );
+
+    const existsSql = `
+      SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
+      FROM ${PAYMENT_RECEIPT_TABLE}
+      WHERE LOWER(${safeIdent(orderCodeColumn)}) = LOWER($1)
+        AND ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)} = $2
+        AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $3
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.receiver)}::text, '') = $4
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.sender)}::text, '') = $5
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.note)}::text, '') = $6
+      LIMIT 1
+    `;
+
+    const existsRes = await client.query(existsSql, [
       orderCode,
       paidDate,
       amount,
       receiverAccount,
       senderParsed || "",
       noteValue,
-    ],
-  });
-  await pool.query(sql, [
-    orderCode,
-    paidDate,
-    amount,
-    receiverAccount,
-    senderParsed || "",
-    noteValue,
-  ]);
+    ]);
+
+    if (existsRes.rows.length) {
+      if (manageTransaction) {
+        await client.query("COMMIT");
+      }
+      return {
+        inserted: false,
+        duplicate: true,
+        existingId: existsRes.rows[0]?.id ?? null,
+        receiptKey,
+        orderCode,
+        paidDate,
+        amount,
+      };
+    }
+
+    const sql = `
+      INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
+        ${safeIdent(orderCodeColumn)},
+        ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)},
+        ${safeIdent(PAYMENT_RECEIPT_COLS.amount)},
+        ${safeIdent(PAYMENT_RECEIPT_COLS.receiver)},
+        ${safeIdent(PAYMENT_RECEIPT_COLS.sender)},
+        ${safeIdent(PAYMENT_RECEIPT_COLS.note)}
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
+    `;
+    console.log("[Webhook] payment_receipt SQL:", sql.trim(), {
+      params: [
+        orderCode,
+        paidDate,
+        amount,
+        receiverAccount,
+        senderParsed || "",
+        noteValue,
+      ],
+    });
+
+    const insertRes = await client.query(sql, [
+      orderCode,
+      paidDate,
+      amount,
+      receiverAccount,
+      senderParsed || "",
+      noteValue,
+    ]);
+
+    if (manageTransaction) {
+      await client.query("COMMIT");
+    }
+
+    return {
+      inserted: true,
+      id: insertRes.rows[0]?.id ?? null,
+      receiptKey,
+      orderCode,
+      paidDate,
+      amount,
+    };
+  } catch (err) {
+    if (manageTransaction) {
+      await client.query("ROLLBACK");
+    }
+    throw err;
+  } finally {
+    if (manageTransaction) {
+      client.release();
+    }
+  }
 };
 
 const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
   if (!orderCode) return null;
   const referenceImport = normalizeMoney(options.referenceImport);
-  const client = await pool.connect();
+  const externalClient = options.client || null;
+  const client = externalClient || (await pool.connect());
+  const manageTransaction = !externalClient;
   try {
-    await client.query("BEGIN");
+    if (manageTransaction) {
+      await client.query("BEGIN");
+    }
 
     const orderRes = await client.query(
       `SELECT
@@ -136,7 +253,9 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
     );
 
     if (!orderRes.rows.length) {
-      await client.query("ROLLBACK");
+      if (manageTransaction) {
+        await client.query("ROLLBACK");
+      }
       return null;
     }
 
@@ -248,7 +367,9 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
       }
     }
 
-    await client.query("COMMIT");
+    if (manageTransaction) {
+      await client.query("COMMIT");
+    }
     return {
       productId,
       sourceId,
@@ -256,18 +377,26 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
       priceScaled: supplyPriceScaled,
     };
   } catch (err) {
-    await client.query("ROLLBACK");
+    if (manageTransaction) {
+      await client.query("ROLLBACK");
+    }
     throw err;
   } finally {
-    client.release();
+    if (manageTransaction) {
+      client.release();
+    }
   }
 };
 
-const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate) => {
+const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, options = {}) => {
   if (!(sourceId && Number.isFinite(priceValue) && priceValue > 0)) return;
-  const client = await pool.connect();
+  const externalClient = options.client || null;
+  const client = externalClient || (await pool.connect());
+  const manageTransaction = !externalClient;
   try {
-    await client.query("BEGIN");
+    if (manageTransaction) {
+      await client.query("BEGIN");
+    }
 
     const latestRes = await client.query(
       `SELECT
@@ -313,12 +442,18 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate) => {
       );
     }
 
-    await client.query("COMMIT");
+    if (manageTransaction) {
+      await client.query("COMMIT");
+    }
   } catch (err) {
-    await client.query("ROLLBACK");
+    if (manageTransaction) {
+      await client.query("ROLLBACK");
+    }
     throw err;
   } finally {
-    client.release();
+    if (manageTransaction) {
+      client.release();
+    }
   }
 };
 

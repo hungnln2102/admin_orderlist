@@ -321,13 +321,15 @@ export const usePackageData = (): UsePackageDataResult => {
           orderMatchers.length > 0 &&
           (productCodeSet?.size || packageCode.length > 0);
 
-        const matchesProductRecord = (record: NormalizedOrderRecord) => {
-          if (productCodeSet && productCodeSet.size > 0) {
-            return (
-              !!record.productCodeNormalized &&
-              productCodeSet.has(record.productCodeNormalized)
-            );
-          }
+        const matchesByProductCodes = (record: NormalizedOrderRecord) => {
+          if (!productCodeSet || productCodeSet.size === 0) return false;
+          return (
+            !!record.productCodeNormalized &&
+            productCodeSet.has(record.productCodeNormalized)
+          );
+        };
+
+        const matchesByPackageName = (record: NormalizedOrderRecord) => {
           if (!packageCode) return false;
           const productMatch =
             (!!record.productKey &&
@@ -346,6 +348,10 @@ export const usePackageData = (): UsePackageDataResult => {
               (record.infoLettersKey.startsWith(packageLettersCode) ||
                 record.infoLettersKey.includes(packageLettersCode)));
           return productMatch || infoMatch;
+        };
+
+        const matchesProductRecord = (record: NormalizedOrderRecord) => {
+          return matchesByProductCodes(record) || matchesByPackageName(record);
         };
 
         const matchesLinkRecord = (record: NormalizedOrderRecord) => {
@@ -369,12 +375,30 @@ export const usePackageData = (): UsePackageDataResult => {
             : null;
 
         const relevantOrders = shouldMatchOrders
-          ? candidateOrders
-            ? candidateOrders.filter((record) => matchesLinkRecord(record))
-            : orderMatchers.filter(
-                (record) =>
-                  matchesProductRecord(record) && matchesLinkRecord(record)
-              )
+          ? (() => {
+              const combined = new Map<string, NormalizedOrderRecord>();
+
+              const addOrder = (record: NormalizedOrderRecord) => {
+                const key = buildOrderLookupKey(record, combined.size);
+                if (!combined.has(key)) {
+                  combined.set(key, record);
+                }
+              };
+
+              candidateOrders?.forEach(addOrder);
+
+              // If price-list product codes don't match order product codes,
+              // fall back to matching by package name so seats aren't missed.
+              orderMatchers.forEach((record) => {
+                if (matchesProductRecord(record)) {
+                  addOrder(record);
+                }
+              });
+
+              return Array.from(combined.values()).filter((record) =>
+                matchesLinkRecord(record)
+              );
+            })()
           : [];
 
         const seenOrderIds = new Set<string>();

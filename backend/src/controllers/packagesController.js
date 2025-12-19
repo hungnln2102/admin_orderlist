@@ -191,7 +191,7 @@ const normalizedMatchMode =
 
   try {
     const updated = await withTransaction(async (trx) => {
-      const updatedPkg = await trx(TABLES.packageProduct)
+      const [updatedPkg] = await trx(TABLES.packageProduct)
         .where(pkgCols.id, id)
         .update({
           [pkgCols.package]: packageName.trim(),
@@ -205,8 +205,7 @@ const normalizedMatchMode =
           [pkgCols.slot]: normalizedSlotLimit,
           [pkgCols.match]: normalizedMatchMode,
         })
-        .returning("id")
-        .first();
+        .returning("id");
 
       if (!updatedPkg) {
         return null;

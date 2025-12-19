@@ -8,10 +8,13 @@ const {
   HOST,
   PORT,
   ORDER_COLS,
+  ORDER_TABLE,
+  pool,
 } = require("./sepay/config");
 const {
   safeStringify,
   normalizeAmount,
+  extractOrderCodes,
 } = require("./sepay/utils");
 const {
   normalizeTransactionPayload,
@@ -112,29 +115,112 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
 
   const orderCode = deriveOrderCode(transaction);
   console.log("Derived order code:", orderCode);
+  const extractedOrderCodes = extractOrderCodes(transaction);
+  const orderCodes = Array.from(
+    new Set(
+      (
+        extractedOrderCodes.length
+          ? extractedOrderCodes
+          : orderCode
+          ? [orderCode]
+          : []
+      )
+        .map((code) => String(code || "").trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+  if (orderCodes.length > 1) {
+    console.log("Extracted order codes:", safeStringify(orderCodes));
+  }
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
   );
 
   try {
-    await insertPaymentReceipt(transaction);
+    let receiptResult = null;
+    const eligibilityByOrderCode = new Map();
+
+    const client = await pool.connect();
     try {
-      await sendPaymentNotification(orderCode, transaction);
+      await client.query("BEGIN");
+
+      for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        const stateRes = await client.query(
+          `SELECT
+            ${ORDER_COLS.status},
+            ${ORDER_COLS.checkFlag},
+            ${ORDER_COLS.orderExpired}
+          FROM ${ORDER_TABLE}
+          WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
+          LIMIT 1`,
+          [code]
+        );
+        const state = stateRes.rows[0] || null;
+        eligibilityByOrderCode.set(
+          code,
+          state
+            ? isEligibleForRenewal(
+                state[ORDER_COLS.status],
+                state[ORDER_COLS.checkFlag],
+                state[ORDER_COLS.orderExpired]
+              )
+            : null
+        );
+      }
+
+      receiptResult = await insertPaymentReceipt(transaction, { client, orderCode });
+
+      if (receiptResult?.inserted) {
+        const referenceImport =
+          orderCodes.length > 1 ? null : transferAmountNormalized;
+
+        for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+          const eligibility = eligibilityByOrderCode.get(code);
+
+          // Avoid double supplier import updates for renewal flows:
+          // - Renewal path already calls updatePaymentSupplyBalance() inside runRenewal().
+          // - Non-renewal path should add import once per unique receipt.
+          if (eligibility?.eligible) continue;
+
+          const ensured = await ensureSupplyAndPriceFromOrder(code, {
+            referenceImport,
+            client,
+          });
+          console.log(
+            "Ensure supply/price result:",
+            safeStringify({ orderCode: code, ensured })
+          );
+          if (ensured?.sourceId && Number.isFinite(ensured.price)) {
+            await updatePaymentSupplyBalance(
+              ensured.sourceId,
+              ensured.price,
+              new Date(),
+              { client }
+            );
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+    } catch (dbErr) {
+      await client.query("ROLLBACK");
+      throw dbErr;
+    } finally {
+      client.release();
+    }
+
+    try {
+      if (receiptResult?.inserted) {
+        await sendPaymentNotification(orderCode, transaction);
+      }
     } catch (notifyErr) {
       console.error("Payment notification failed:", notifyErr);
-    }
-    const ensured = await ensureSupplyAndPriceFromOrder(orderCode, {
-      referenceImport: transferAmountNormalized,
-    });
-    console.log("Ensure supply/price result:", safeStringify(ensured));
-    if (ensured?.sourceId && Number.isFinite(ensured.price)) {
-      await updatePaymentSupplyBalance(ensured.sourceId, ensured.price, new Date());
     }
 
     // Renewal retry flow: only queue and retry needed actions
     try {
-      if (orderCode) {
-        const state = await fetchOrderState(orderCode);
+      for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        const state = await fetchOrderState(code);
         if (state) {
           const resetToUnpaid = shouldResetStatusToUnpaid(
             state[ORDER_COLS.status]
@@ -145,20 +231,20 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
             state[ORDER_COLS.orderExpired]
           );
           if (eligibility.eligible) {
-            queueRenewalTask(orderCode, {
+            queueRenewalTask(code, {
               forceRenewal: eligibility.forceRenewal,
               needsStatusReset: eligibility.needsStatusReset,
             });
-            await processRenewalTask(orderCode);
+            await processRenewalTask(code);
           } else if (
             eligibility.statusNorm === "Chưa Thanh Toán" &&
             isNullishFlag(state[ORDER_COLS.checkFlag])
           ) {
-            await markCheckFlagFalse(orderCode);
+            await markCheckFlagFalse(code);
           }
 
           if (resetToUnpaid) {
-            await setStatusUnpaid(orderCode);
+            await setStatusUnpaid(code);
           }
         }
       }

@@ -337,8 +337,7 @@ export const toMatchColumnValue = (mode: SlotLinkMode): string =>
   mode === "slot" ? MATCH_COLUMN_SLOT : MATCH_COLUMN_INFORMATION;
 
 export const normalizeProductCodeValue = (value?: string | null): string => {
-  const trimmed = (value || "").trim().toLowerCase();
-  return trimmed;
+  return normalizeIdentifier(value);
 };
 
 export const parseNumericValue = (input: unknown): number | null => {
