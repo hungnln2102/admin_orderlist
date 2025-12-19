@@ -57,6 +57,20 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     return null;
   };
 
+  const parseNumberLike = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
   const basePrice = Number(order?.[ORDER_FIELDS.PRICE]) || 0;
@@ -178,6 +192,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== null
       ? Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI])
       : null;
+  const remainingFromRaw = parseNumberLike(
+    (order as Record<string, unknown>).so_ngay_con_lai
+  );
   const expirySource = normalizeDateLike(
     order.expiry_date ||
       order.expiry_date_display ||
@@ -185,11 +202,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       (order[ORDER_FIELDS.ORDER_EXPIRED] as string | null)
   );
 
-  const fallbackRemaining = Helpers.daysUntilDate(expirySource);
+  const fallbackRemaining =
+    Helpers.daysUntilDate(expirySource) ??
+    parseNumberLike(order[ORDER_FIELDS.DAYS]);
   const displayRemainingDays =
     remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
       ? remainingFromBackend
-      : fallbackRemaining ?? 0;
+      : remainingFromRaw ?? fallbackRemaining ?? 0;
 
   const registrationSource = normalizeDateLike(
     order.registration_date_display ||
