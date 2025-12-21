@@ -6,7 +6,7 @@ const scheduler = require("../scheduler"); // eslint-disable-line no-unused-vars
 const sepayWebhookApp = require("../webhook/sepay_webhook");
 
 ensureDefaultAdmin().catch((err) =>
-  console.error("[AUTH] ensureDefaultAdmin failed:", err)
+  console.error("[AUTH] ensureDefaultAdmin thất bại:", err)
 );
 
 app.listen(port, () => {

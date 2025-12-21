@@ -31,9 +31,6 @@ const {
   updatePaymentSupplyBalance,
 } = require("./sepay/payments");
 const {
-  sendPaymentNotification,
-} = require("./sepay/notifications");
-const {
   queueRenewalTask,
   processRenewalTask,
   fetchOrderState,
@@ -207,14 +204,6 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
       throw dbErr;
     } finally {
       client.release();
-    }
-
-    try {
-      if (receiptResult?.inserted) {
-        await sendPaymentNotification(orderCode, transaction);
-      }
-    } catch (notifyErr) {
-      console.error("Payment notification failed:", notifyErr);
     }
 
     // Renewal retry flow: only queue and retry needed actions

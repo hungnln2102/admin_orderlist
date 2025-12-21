@@ -24,7 +24,7 @@ const listWarehouse = async (_req, res) => {
     res.json(rows || []);
   } catch (error) {
     console.error("[warehouse] Query failed:", error);
-    res.status(500).json({ error: "Unable to load warehouse." });
+    res.status(500).json({ error: "Không thể tải kho hàng." });
   }
 };
 
@@ -67,7 +67,7 @@ const createWarehouse = async (req, res) => {
     res.status(201).json(row);
   } catch (error) {
     console.error("[warehouse] Insert failed:", error);
-    res.status(500).json({ error: "Unable to create warehouse item." });
+    res.status(500).json({ error: "Không thể tạo kho hàng." });
   }
 };
 
@@ -112,12 +112,12 @@ const updateWarehouse = async (req, res) => {
       });
 
     if (!row) {
-      return res.status(404).json({ error: "Not found" });
+      return res.status(404).json({ error: "Không tìm thấy" });
     }
     res.json(row);
   } catch (error) {
     console.error(`[warehouse] Update failed for id=${id}:`, error);
-    res.status(500).json({ error: "Unable to update warehouse item." });
+    res.status(500).json({ error: "Không thể cập nhật kho hàng." });
   }
 };
 
@@ -128,12 +128,12 @@ const deleteWarehouse = async (req, res) => {
   try {
     const deleted = await db(warehouseTable).where(cols.id, id).del();
     if (!deleted) {
-      return res.status(404).json({ error: "Not found" });
+      return res.status(404).json({ error: "Không tìm thấy" });
     }
     res.json({ success: true });
   } catch (error) {
     console.error(`[warehouse] Delete failed for id=${id}:`, error);
-    res.status(500).json({ error: "Unable to delete warehouse item." });
+    res.status(500).json({ error: "Không thể xóa kho hàng." });
   }
 };
 

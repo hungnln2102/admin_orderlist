@@ -18,6 +18,17 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  const formatMoneyInput = (raw: string) => {
+    const cleaned = String(raw || "").replace(/[^\d-]/g, "");
+    const normalized = cleaned.startsWith("-")
+      ? "-" + cleaned.slice(1).replace(/-/g, "")
+      : cleaned.replace(/-/g, "");
+    if (normalized === "-") return "-";
+    const num = Number(normalized);
+    if (!Number.isFinite(num)) return "";
+    return num.toLocaleString("vi-VN");
+  };
+
   const loadPayments = useCallback(async () => {
     setLoading(true);
     try {
@@ -42,7 +53,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
         round: draft.round,
         totalImport: parseMoney(draft.import),
         paid: parseMoney(draft.paid),
-        status: "Chua Thanh Toan",
+        status: "Chưa Thanh Toán",
       };
       const res = await apiFetch(`/api/supplies/${supplyId}/payments`, {
         method: "POST",
@@ -117,9 +128,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
                   className="bg-transparent border-b border-white/30 w-full focus:outline-none text-white"
                   placeholder="0"
                   value={draft.import}
-                  onChange={(e) =>
-                    setDraft({ ...draft, import: Number(e.target.value.replace(/\D/g, "")).toLocaleString("vi-VN") })
-                  }
+                  onChange={(e) => setDraft({ ...draft, import: formatMoneyInput(e.target.value) })}
                 />
               </td>
               <td className="px-4 py-2">
@@ -127,9 +136,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
                   className="bg-transparent border-b border-white/30 w-full focus:outline-none text-white"
                   placeholder="0"
                   value={draft.paid}
-                  onChange={(e) =>
-                    setDraft({ ...draft, paid: Number(e.target.value.replace(/\D/g, "")).toLocaleString("vi-VN") })
-                  }
+                  onChange={(e) => setDraft({ ...draft, paid: formatMoneyInput(e.target.value) })}
                 />
               </td>
               <td className="px-4 py-2 text-xs italic opacity-70">Mới</td>
@@ -167,7 +174,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
                       <input
                         className="bg-black/20 border border-white/20 rounded px-1 w-24 text-right"
                         value={editValue}
-                        onChange={(e) => setEditValue(Number(e.target.value.replace(/\D/g, "")).toLocaleString("vi-VN"))}
+                        onChange={(e) => setEditValue(formatMoneyInput(e.target.value))}
                       />
                     ) : (
                       formatCurrency(p.totalImport)

@@ -17,7 +17,7 @@ const DATABASE_URL =
 if (!DATABASE_URL) {
   // eslint-disable-next-line no-console
   console.warn(
-    "[db] DATABASE_URL is missing. Knex will be initialised without a connection string."
+    "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
   );
 }
 

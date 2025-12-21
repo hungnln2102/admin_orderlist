@@ -5,7 +5,7 @@ const authGuard = (req, res, next) => {
     return next();
   }
   if (!req.session || !req.session.user) {
-    return res.status(401).json({ error: "Khong co quyen truy cap" });
+    return res.status(401).json({ error: "Không có quyền truy cập" });
   }
   return next();
 };

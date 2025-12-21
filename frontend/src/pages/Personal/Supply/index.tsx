@@ -41,7 +41,12 @@ const AddSupplierModal = ({
       const res = await apiFetch("/api/supplies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          source_name: form.sourceName,
+          number_bank: form.numberBank,
+          bin_bank: form.bankBin,
+          status: form.status,
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Lỗi khi tạo");
       onSuccess();
@@ -83,7 +88,7 @@ const AddSupplierModal = ({
             <select className="w-full border rounded-lg p-2 mt-1" value={form.bankBin} onChange={(e) => setForm({ ...form, bankBin: e.target.value })}>
               {banks.map((b) => (
                 <option key={b.bin} value={b.bin}>
-                  {b.name || `BIN ${b.bin}`}
+                  {b.name || b.bin}
                 </option>
               ))}
             </select>
@@ -138,7 +143,11 @@ const EditSupplierModal = ({
       const res = await apiFetch(`/api/supplies/${supply.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          source_name: form.sourceName,
+          number_bank: form.numberBank,
+          bin_bank: form.bankBin,
+        }),
       });
       if (!res.ok) throw new Error("Lỗi cập nhật");
       onSuccess();
@@ -168,7 +177,7 @@ const EditSupplierModal = ({
             <select className="w-full border rounded-lg p-2 mt-1" value={form.bankBin} onChange={(e) => setForm({ ...form, bankBin: e.target.value })}>
               {banks.map((b) => (
                 <option key={b.bin} value={b.bin}>
-                  {b.name || `BIN ${b.bin}`}
+                  {b.name || b.bin}
                 </option>
               ))}
             </select>
@@ -226,7 +235,13 @@ export default function Sources() {
     apiFetch("/api/banks")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) setBanks(data.map((b: any) => ({ bin: b.bin, name: b.name })));
+        if (Array.isArray(data))
+          setBanks(
+            data.map((b: any) => ({
+              bin: b.bin,
+              name: b.bank_name || b.bankName || b.name || b.bank || b.bin,
+            }))
+          );
       })
       .catch(console.error);
   }, [fetchSupplies]);
@@ -248,10 +263,15 @@ export default function Sources() {
     return parsed.sort((a, b) => {
       const debtA = Number(a.totalUnpaidImport) || 0;
       const debtB = Number(b.totalUnpaidImport) || 0;
-      const hasDebtA = debtA > 0;
-      const hasDebtB = debtB > 0;
-      if (hasDebtA !== hasDebtB) return hasDebtA ? -1 : 1;
-      if (hasDebtA && hasDebtB && debtA !== debtB) return debtB - debtA;
+      const posA = debtA > 0;
+      const posB = debtB > 0;
+      if (posA !== posB) return posA ? -1 : 1; // ưu tiên dương
+
+      const negA = debtA < 0;
+      const negB = debtB < 0;
+      if (negA !== negB) return negA ? -1 : 1; // sau dương, ưu tiên âm trước zero
+
+      if ((posA || negA) && debtA !== debtB) return debtB - debtA;
 
       const lastA = getDateValue(a.lastOrderDate);
       const lastB = getDateValue(b.lastOrderDate);

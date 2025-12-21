@@ -193,7 +193,7 @@ const formatCurrency = (value) => {
   }
 };
 
-const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallback }) => {
+const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallback, pctPromo }) => {
   const code = String(orderId || "").toUpperCase();
   const normalizePct = (val) => {
     const num = Number(val);
@@ -203,6 +203,13 @@ const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallba
   };
   const pctC = normalizePct(pctCtv);
   const pctK = normalizePct(pctKhach);
+  const promoNormRaw = Number(pctPromo);
+  const promoNorm =
+    Number.isFinite(promoNormRaw) && promoNormRaw > 0
+      ? promoNormRaw > 1
+        ? promoNormRaw / 100
+        : promoNormRaw
+      : 0;
   const basePrice =
     Number.isFinite(Number(priceMax)) && Number(priceMax) > 0
       ? Number(priceMax)
@@ -223,11 +230,19 @@ const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallba
     if (ORDER_PREFIXES?.le && code.startsWith(ORDER_PREFIXES.le)) {
       return basePrice * pctC * pctK;
     }
-    if (code.startsWith("MAVK")) {
-      return Number.isFinite(Number(giaNhap)) ? Number(giaNhap) : fallback;
+    if (ORDER_PREFIXES?.khuyen && code.startsWith(ORDER_PREFIXES.khuyen)) {
+      if (promoNorm > 0) {
+        const factor = Math.max(0, 1 - promoNorm);
+        return basePrice * pctC * pctK * factor;
+      }
+      // No promo -> behave like MAVL (customer price)
+      return basePrice * pctC * pctK;
     }
-    if (ORDER_PREFIXES?.thuong && code.startsWith(ORDER_PREFIXES.thuong)) {
-      return basePrice || fallback;
+    if (ORDER_PREFIXES?.tang && code.startsWith(ORDER_PREFIXES.tang)) {
+      return 0;
+    }
+    if (ORDER_PREFIXES?.nhap && code.startsWith(ORDER_PREFIXES.nhap)) {
+      return Number.isFinite(Number(giaNhap)) ? Number(giaNhap) : basePrice || fallback;
     }
     return basePrice || fallback;
   } catch (err) {

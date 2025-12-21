@@ -11,7 +11,7 @@ const attachCalculatePriceRoute = (router) => {
         const orderId = String(id_order || "").trim();
 
         if (!productName) {
-            return res.status(400).json({ error: "Missing productName" });
+            return res.status(400).json({ error: "Tên sản phẩm bị thiếu." });
         }
 
         try {
@@ -63,12 +63,16 @@ const attachCalculatePriceRoute = (router) => {
             const pctPromo = Number(productPricing.pct_promo) || 0;
             const prefixCtv = (Helpers.ORDER_PREFIXES?.ctv || "MAVC").toUpperCase();
             const prefixLe = (Helpers.ORDER_PREFIXES?.le || "MAVL").toUpperCase();
-            const prefixThuong = (Helpers.ORDER_PREFIXES?.thuong || "MAVK").toUpperCase();
+            const prefixKhuyen = (Helpers.ORDER_PREFIXES?.khuyen || "MAVK").toUpperCase();
+            const prefixTang = (Helpers.ORDER_PREFIXES?.tang || "MAVT").toUpperCase();
+            const prefixNhap = (Helpers.ORDER_PREFIXES?.nhap || "MAVN").toUpperCase();
             const orderPrefix = orderId.toUpperCase();
             const customerTypePrefix = String(customer_type || "").toUpperCase();
             const isCtv = orderPrefix.startsWith(prefixCtv) || customerTypePrefix === prefixCtv;
             const isLe = orderPrefix.startsWith(prefixLe) || customerTypePrefix === prefixLe;
-            const isThuong = orderPrefix.startsWith(prefixThuong) || customerTypePrefix === prefixThuong;
+            const isKhuyen = orderPrefix.startsWith(prefixKhuyen) || customerTypePrefix === prefixKhuyen;
+            const isTang = orderPrefix.startsWith(prefixTang) || customerTypePrefix === prefixTang;
+            const isNhap = orderPrefix.startsWith(prefixNhap) || customerTypePrefix === prefixNhap;
 
             // Tính 3 biến: Resell, Customer
             const resellRaw = baseImport * pctCtv;
@@ -78,24 +82,30 @@ const attachCalculatePriceRoute = (router) => {
             const round = (v) => Math.max(0, Math.round(v / 1000) * 1000);
             const resellPrice = round(Helpers.roundGiaBanValue(resellRaw));
             const customerPrice = round(Helpers.roundGiaBanValue(customerRaw));
+            const baseCost = round(baseImport);
 
             const promoFactor = pctPromo > 1 ? pctPromo / 100 : pctPromo;
+            const promoAmount = round(Helpers.roundGiaBanValue(customerPrice * promoFactor));
+            const pricePromo = Math.max(0, customerPrice - promoAmount);
+            const promoPrice = promoAmount;
 
             let price = customerPrice;
             if (isCtv) {
                 price = resellPrice;
-            } else if (isLe || isThuong) {
+            } else if (isLe) {
                 price = customerPrice;
+            } else if (isKhuyen) {
+                const factor = Math.max(0, 1 - promoFactor);
+                price = round(Helpers.roundGiaBanValue(customerRaw * factor));
+            } else if (isTang) {
+                price = 0;
+            } else if (isNhap) {
+                price = baseCost;
             }
-            // B1: tính phần khuyến mãi dựa trên customerPrice, làm tròn
-            const promoAmount = round(Helpers.roundGiaBanValue(customerPrice * promoFactor));
-            // B2: giá khuyến mãi = customerPrice - promoAmount (không cần làm tròn thêm)
-            const pricePromo = Math.max(0, customerPrice - promoAmount);
-            const promoPrice = promoAmount;
-            const totalPrice = pricePromo;
+            const totalPrice = price;
 
             res.json({
-                cost: round(baseImport),
+                cost: baseCost,
                 price,
                 promoPrice,
                 pricePromo,
@@ -115,3 +125,5 @@ const attachCalculatePriceRoute = (router) => {
 };
 
 module.exports = { attachCalculatePriceRoute };
+
+
