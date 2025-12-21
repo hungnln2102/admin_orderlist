@@ -11,7 +11,7 @@ const listBanks = async (_req, res) => {
       .orderBy(bankName, "asc");
     res.json(rows || []);
   } catch (error) {
-    console.error("[banks] Query failed:", error);
+    console.error("[banks] Truy vấn thất bại:", error);
     res.status(500).json({ error: "Không tải được danh sách ngân hàng" });
   }
 };

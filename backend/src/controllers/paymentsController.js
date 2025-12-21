@@ -53,7 +53,7 @@ const listPaymentReceipts = async (req, res) => {
     res.json({ receipts, count: receipts.length, offset, limit });
   } catch (error) {
     console.error("[payments] Query failed (payment-receipts):", error);
-    res.status(500).json({ error: "Unable to load payment receipts." });
+    res.status(500).json({ error: "Không thể tải biên lai thanh toán." });
   }
 };
 
@@ -62,7 +62,7 @@ const confirmPaymentSupply = async (req, res) => {
   const parsedPaymentId = Number.parseInt(paymentId, 10);
   if (!Number.isInteger(parsedPaymentId) || parsedPaymentId <= 0) {
     return res.status(400).json({
-      error: "Invalid payment id.",
+      error: "ID thanh toán không hợp lệ.",
     });
   }
 
@@ -173,7 +173,7 @@ const confirmPaymentSupply = async (req, res) => {
         remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
       } catch (orderErr) {
         console.error(
-          "[payments] Failed to reconcile unpaid orders for supply",
+          "[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa",
           sourceId,
           orderErr
         );
@@ -220,7 +220,7 @@ const confirmPaymentSupply = async (req, res) => {
     });
 
     if (!updatedRow) {
-      return res.status(404).json({ error: "Payment record not found." });
+      return res.status(404).json({ error: "Không tìm thấy hồ sơ thanh toán." });
     }
     res.json(updatedRow);
   } catch (error) {
@@ -229,7 +229,7 @@ const confirmPaymentSupply = async (req, res) => {
       error
     );
     res.status(500).json({
-      error: "Unable to confirm payment.",
+      error: "Không thể xác nhận thanh toán.",
     });
   }
 };

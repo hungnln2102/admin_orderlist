@@ -3,7 +3,11 @@
 const ORDER_PREFIXES = {
   ctv: "MAVC",
   le: "MAVL",
-  thuong: "MAVT", // formerly MAVK
+  khuyen: "MAVK", // khuyến mãi
+  tang: "MAVT", // tặng
+  nhap: "MAVN", // nhập
+  // Back-compat alias
+  thuong: "MAVT",
 };
 
 function monthsFromString(text) {
@@ -49,6 +53,42 @@ function convertDMYToYMD(dmyString) {
 }
 
 function calculatePeriods() {
+  const resolveTimezone = () => {
+    const candidate = process.env.APP_TIMEZONE;
+    if (
+      typeof candidate === "string" &&
+      candidate &&
+      /^[A-Za-z0-9_\/+-]+$/.test(candidate)
+    ) {
+      return candidate;
+    }
+    return "Asia/Ho_Chi_Minh";
+  };
+
+  const getDatePartsInTimezone = (date, timeZone) => {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(date);
+      const year = Number(parts.find((p) => p.type === "year")?.value);
+      const month = Number(parts.find((p) => p.type === "month")?.value);
+      const day = Number(parts.find((p) => p.type === "day")?.value);
+      if (
+        !Number.isFinite(year) ||
+        !Number.isFinite(month) ||
+        !Number.isFinite(day)
+      ) {
+        return null;
+      }
+      return { year, month, day };
+    } catch {
+      return null;
+    }
+  };
+
   const now = new Date();
   if (process.env.MOCK_DATE) {
     const mockDate = new Date(process.env.MOCK_DATE);
@@ -57,30 +97,28 @@ function calculatePeriods() {
     }
   }
 
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const currentDay = now.getDate();
+  const tz = resolveTimezone();
+  const tzParts = getDatePartsInTimezone(now, tz);
+  const currentYear = tzParts?.year ?? now.getFullYear();
+  const currentMonth = tzParts?.month ?? now.getMonth() + 1; // 1-based
+  const currentDay = tzParts?.day ?? now.getDate();
 
-  const currentStart = new Date(currentYear, currentMonth, 1);
-  const currentEnd = new Date(currentYear, currentMonth, currentDay);
-
-  const previousStart = new Date(currentYear, currentMonth - 1, 1);
-  const previousMonthLastDay = new Date(currentYear, currentMonth, 0).getDate();
-  const previousEndDay = Math.min(currentDay, previousMonthLastDay);
-  const previousEnd = new Date(currentYear, currentMonth - 1, previousEndDay);
-
-  const formatDate = (d) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  const formatDate = (year, month, day) => {
+    const m = String(month).padStart(2, "0");
+    const d = String(day).padStart(2, "0");
+    return `${year}-${m}-${d}`;
   };
 
+  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  const prevMonthLastDay = new Date(Date.UTC(prevYear, prevMonth, 0)).getUTCDate();
+  const prevEndDay = Math.min(currentDay, prevMonthLastDay);
+
   return {
-    currentStart: formatDate(currentStart),
-    currentEnd: formatDate(currentEnd),
-    previousStart: formatDate(previousStart),
-    previousEnd: formatDate(previousEnd),
+    currentStart: formatDate(currentYear, currentMonth, 1),
+    currentEnd: formatDate(currentYear, currentMonth, currentDay),
+    previousStart: formatDate(prevYear, prevMonth, 1),
+    previousEnd: formatDate(prevYear, prevMonth, prevEndDay),
   };
 }
 

@@ -19,11 +19,17 @@ const attachListRoutes = (router) => {
                 db.raw("order_expired::text as order_expired_raw")
             );
             const today = todayYMDInVietnam();
-            const normalized = rows.map(r => normalizeOrderRow(r, today));
+            const normalized = rows.map((row) =>
+                normalizeOrderRow(row, today, {
+                    // Refund/canceled table should display the stored status from DB (e.g. Chưa Hoàn/Đã Hoàn)
+                    // and must not be auto-overridden to Hết Hạn/Còn Gia Hạn based on expiry.
+                    enableAutoStatus: !(scope === "canceled" || scope === "cancelled"),
+                })
+            );
             res.json(normalized);
         } catch (error) {
-            console.error("Query failed:", error);
-            res.status(500).json({ error: "Unable to load order list." });
+            console.error("Truy vấn thất bại:", error);
+            res.status(500).json({ error: "Không thể tải danh sách đơn hàng." });
         }
     });
 

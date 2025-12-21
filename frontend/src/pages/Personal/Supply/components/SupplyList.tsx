@@ -40,6 +40,7 @@ const SupplyList: React.FC<Props> = ({
               <th className="px-4 py-3">Lần cuối</th>
               <th className="px-4 py-3">Đã trả</th>
               <th className="px-4 py-3">Cần nợ</th>
+              <th className="px-4 py-3">Thanh toán</th>
               <th className="px-4 py-3 text-center">TT</th>
               <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
@@ -109,7 +110,12 @@ const SupplyRow = ({
         </td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatDate(supply.lastOrderDate)}</td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatCurrency(supply.totalPaidImport)}</td>
-        <td className="px-4 py-4 font-bold text-orange-400 text-sm">{formatCurrency(supply.totalUnpaidImport)}</td>
+        <td className="px-4 py-4 font-bold text-orange-400 text-sm">
+          {formatCurrency(Math.min(0, supply.totalUnpaidImport || 0))}
+        </td>
+        <td className="px-4 py-4 text-white/80 text-sm">
+          {formatCurrency(Math.max(0, supply.totalUnpaidImport || 0))}
+        </td>
         <td className="px-4 py-4 text-center">
           <button
             onClick={(e) => {

@@ -25,7 +25,11 @@ const normalizeRawToYMD = (value) => {
     return `${match[1]}-${match[2]}-${match[3]}`;
 };
 
-const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
+const normalizeOrderRow = (
+    row,
+    todayYmd = todayYMDInVietnam(),
+    options = {}
+) => {
     const registrationRaw = row.order_date_raw || row.order_date;
     const expiryRaw = row.order_expired_raw || row.order_expired;
 
@@ -46,7 +50,9 @@ const normalizeOrderRow = (row, todayYmd = todayYMDInVietnam()) => {
     let autoStatus = dbStatusRaw;
     let autoCheckFlag = normalizeCheckFlagValue(row.check_flag);
 
-    if (autoStatus !== STATUS.PAID && Number.isFinite(soNgayConLai)) {
+    const enableAutoStatus = options.enableAutoStatus !== false;
+
+    if (enableAutoStatus && autoStatus !== STATUS.PAID && Number.isFinite(soNgayConLai)) {
         if (soNgayConLai <= 0) {
             autoStatus = STATUS.EXPIRED;
             autoCheckFlag = null;

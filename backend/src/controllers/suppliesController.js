@@ -45,13 +45,16 @@ const STATUS = {
 
 const parseMoney = (value, fallback = 0) => {
   if (value === null || value === undefined) return fallback;
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
-  const cleaned = String(value).replace(/[^0-9]/g, "");
-  if (!cleaned) return fallback;
-  const num = Number(cleaned);
-  return Number.isFinite(num) && num >= 0 ? num : fallback;
+  const cleaned = String(value).replace(/[^\d-]/g, "");
+  const normalized = cleaned.startsWith("-")
+    ? "-" + cleaned.slice(1).replace(/-/g, "")
+    : cleaned.replace(/-/g, "");
+  if (!normalized || normalized === "-") return fallback;
+  const num = Number(normalized);
+  return Number.isFinite(num) ? num : fallback;
 };
 
 const parseSupplyId = (value) => {
@@ -88,7 +91,7 @@ const resolveSupplyStatusColumn = async () => {
     supplyStatusColumnNameCache =
       result?.[0]?.column_name ? result[0].column_name : null;
   } catch (error) {
-    console.warn("Khong tim duoc cot trang thai nha cung cap:", error.message || error);
+    console.warn("Không tìm thấy trạng thái nhà cung cấp:", error.message || error);
     supplyStatusColumnNameCache = null;
   } finally {
     supplyStatusColumnResolved = true;
@@ -212,10 +215,7 @@ const getSupplyInsights = async (_req, res) => {
         SUM(
           CASE
             WHEN ps.${QUOTED_COLS.paymentSupply.status} = ?
-              THEN GREATEST(
-                COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0),
-                0
-              )
+              THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)
             ELSE 0
           END
         ) AS total_unpaid_import
@@ -292,8 +292,7 @@ const getSupplyInsights = async (_req, res) => {
         total_unpaid_import: 0,
       };
       const normalizedStatus = normalizeSupplyStatus(row.raw_status);
-      const totalUnpaidImport =
-        payments.total_unpaid_import < 0 ? 0 : payments.total_unpaid_import;
+      const totalUnpaidImport = payments.total_unpaid_import;
 
       return {
         id: row.id,
@@ -334,7 +333,7 @@ const getSupplyInsights = async (_req, res) => {
   } catch (error) {
     console.error("Query failed (GET /api/supply-insights):", error);
     res.status(500).json({
-      error: "Unable to load supply insights.",
+      error: "Không thể tải thông tin chi tiết về nguồn cung.",
     });
   }
 };
@@ -359,7 +358,7 @@ router.get("/", async (_req, res) => {
     res.json(result.rows || []);
   } catch (error) {
     console.error("Query failed (GET /api/supplies):", error);
-    res.status(500).json({ error: "Unable to load suppliers." });
+    res.status(500).json({ error: "Không thể tải danh sách nhà cung cấp." });
   }
 });
 
@@ -384,7 +383,7 @@ router.get("/:supplyId/products", async (req, res) => {
   } catch (error) {
     console.error("Query failed (GET /api/supplies/:id/products):", error);
     res.status(500).json({
-      error: "Unable to load products for this supplier.",
+      error: "Không thể tải sản phẩm cho nhà cung cấp này.",
     });
   }
 });
@@ -395,7 +394,7 @@ router.get("/:supplyId/payments", async (req, res) => {
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
-    return res.status(400).json({ error: "Invalid supply id." });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -444,7 +443,7 @@ router.get("/:supplyId/payments", async (req, res) => {
   } catch (error) {
     console.error("Query failed (GET /api/supplies/:id/payments):", error);
     res.status(500).json({
-      error: "Unable to load payment history for this supplier.",
+      error: "Không thể tải lịch sử thanh toán cho nhà cung cấp này.",
     });
   }
 });
@@ -455,23 +454,39 @@ router.post("/:supplyId/payments", async (req, res) => {
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
-    return res.status(400).json({ error: "Invalid supply id." });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
   const roundLabel =
-    (typeof req.body?.round === "string" && req.body.round.trim()) || "Chu ky moi";
-  const totalImport = parseMoney(req.body?.totalImport, 0);
-  const paid = parseMoney(req.body?.paid, 0);
+    typeof req.body?.round === "string" && req.body.round.trim()
+      ? req.body.round.trim()
+      : null;
   const statusLabel =
-    (typeof req.body?.status === "string" && req.body.status.trim()) ||
-    "Chưa Thanh Toán";
+    typeof req.body?.status === "string" && req.body.status.trim()
+      ? req.body.status.trim()
+      : null;
+  const totalImportRaw = Number(req.body?.totalImport);
+  const paidRaw = Number(req.body?.paid);
+
+  if (!roundLabel) {
+    return res.status(400).json({ error: "Chu kỳ không hợp lệ." });
+  }
+  if (!Number.isFinite(totalImportRaw)) {
+    return res.status(400).json({ error: "Tổng nhập không hợp lệ." });
+  }
+  if (!Number.isFinite(paidRaw)) {
+    return res.status(400).json({ error: "Giá trị đã thanh toán không hợp lệ." });
+  }
+  if (!statusLabel) {
+    return res.status(400).json({ error: "Trạng thái không hợp lệ." });
+  }
 
   try {
     const result = await db(TABLES.paymentSupply)
       .insert({
         [DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID]: parsedSupplyId,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]: totalImport,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]: paid,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]: totalImportRaw,
+        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]: paidRaw,
         [DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND]: roundLabel,
         [DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS]: statusLabel,
       })
@@ -485,7 +500,7 @@ router.post("/:supplyId/payments", async (req, res) => {
       ]);
     if (!result?.length) {
       return res.status(500).json({
-        error: "Failed to insert payment cycle.",
+        error: "Không thể thêm chu kỳ thanh toán.",
       });
     }
     const row = result[0];
@@ -503,7 +518,7 @@ router.post("/:supplyId/payments", async (req, res) => {
       error
     );
     res.status(500).json({
-      error: "Unable to create payment cycle.",
+      error: "Không thể thêm chu kỳ thanh toán.",
     });
   }
 });
@@ -519,14 +534,14 @@ router.patch("/:supplyId/payments/:paymentId", async (req, res) => {
   const parsedPaymentId = parseSupplyId(paymentId);
   if (!parsedSupplyId || !parsedPaymentId) {
     return res.status(400).json({
-      error: "Invalid supply or payment id.",
+      error: "Mã cung cấp hoặc mã thanh toán không hợp lệ.",
     });
   }
 
   const nextTotalImport = parseMoney(req.body?.totalImport, null);
   if (nextTotalImport === null) {
     return res.status(400).json({
-      error: "Invalid total import value.",
+      error: "Giá trị tổng nhập không hợp lệ.",
     });
   }
 
@@ -553,7 +568,7 @@ router.patch("/:supplyId/payments/:paymentId", async (req, res) => {
 
     if (!result.rows?.length) {
       return res.status(404).json({
-        error: "Payment cycle not found for this supplier.",
+        error: "Không tìm thấy chu kỳ thanh toán cho nhà cung cấp này.",
       });
     }
 
@@ -572,7 +587,7 @@ router.patch("/:supplyId/payments/:paymentId", async (req, res) => {
       error
     );
     res.status(500).json({
-      error: "Unable to update payment cycle.",
+      error: "Không thể cập nhật chu kỳ thanh toán.",
     });
   }
 });
@@ -582,7 +597,7 @@ router.post("/", async (req, res) => {
   const { source_name, number_bank, bin_bank, status, active_supply } =
     req.body || {};
   if (!source_name) {
-    return res.status(400).json({ error: "source_name is required" });
+    return res.status(400).json({ error: "Tên nhà cung cấp là bắt buộc." });
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
@@ -622,7 +637,7 @@ router.post("/", async (req, res) => {
     });
   } catch (error) {
     console.error("Mutation failed (POST /api/supplies):", error);
-    res.status(500).json({ error: "Unable to create supplier." });
+    res.status(500).json({ error: "Không thể tạo nhà cung cấp." });
   }
 });
 
@@ -631,7 +646,7 @@ router.patch("/:supplyId", async (req, res) => {
   const { supplyId } = req.params;
   const parsedSupplyId = Number.parseInt(supplyId, 10);
   if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
-    return res.status(400).json({ error: "Invalid supply id" });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
   const {
@@ -649,7 +664,7 @@ router.patch("/:supplyId", async (req, res) => {
     status === undefined &&
     active_supply === undefined
   ) {
-    return res.status(400).json({ error: "No fields to update" });
+    return res.status(400).json({ error: "Không có trường nào để cập nhật" });
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
@@ -682,7 +697,7 @@ router.patch("/:supplyId", async (req, res) => {
   }
 
   if (fields.length === 0) {
-    return res.status(400).json({ error: "No fields to update" });
+    return res.status(400).json({ error: "Không có trường nào để cập nhật" });
   }
 
   try {
@@ -702,7 +717,7 @@ router.patch("/:supplyId", async (req, res) => {
     );
 
     if (!result.rows?.length) {
-      return res.status(404).json({ error: "Supply not found" });
+      return res.status(404).json({ error: "Không tìm thấy nguồn cung cấp" });
     }
     const row = result.rows[0];
     const normalizedStatus = normalizeSupplyStatus(row.raw_status);
@@ -716,7 +731,7 @@ router.patch("/:supplyId", async (req, res) => {
     });
   } catch (error) {
     console.error("Mutation failed (PATCH /api/supplies/:id):", error);
-    res.status(500).json({ error: "Unable to update supplier." });
+    res.status(500).json({ error: "Không thể cập nhật nhà cung cấp." });
   }
 });
 
@@ -726,7 +741,7 @@ router.patch("/:supplyId/active", async (req, res) => {
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
-    return res.status(400).json({ error: "Invalid supply id." });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
@@ -747,7 +762,7 @@ router.patch("/:supplyId/active", async (req, res) => {
 
     if (!result.rows?.length) {
       return res.status(404).json({
-        error: "Supply not found.",
+        error: "Không tìm thấy nguồn cung cấp.",
       });
     }
 
@@ -761,7 +776,7 @@ router.patch("/:supplyId/active", async (req, res) => {
   } catch (error) {
     console.error("Mutation failed (PATCH /api/supplies/:id/active):", error);
     res.status(500).json({
-      error: "Unable to update supply status.",
+      error: "Không thể cập nhật trạng thái nhà cung cấp.",
     });
   }
 });
@@ -770,7 +785,7 @@ router.delete("/:supplyId", async (req, res) => {
   const { supplyId } = req.params;
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
-    return res.status(400).json({ error: "Invalid supply id." });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
   try {
     const result = await db.raw(
@@ -778,7 +793,7 @@ router.delete("/:supplyId", async (req, res) => {
       [parsedSupplyId]
     );
     if (!result.rowCount) {
-      return res.status(404).json({ error: "Supply not found." });
+      return res.status(404).json({ error: "Không tìm thấy nguồn cung cấp." });
     }
     res.json({ success: true });
   } catch (error) {
@@ -787,7 +802,7 @@ router.delete("/:supplyId", async (req, res) => {
       error
     );
     res.status(500).json({
-      error: "Unable to delete supply.",
+      error: "Không thể xóa nhà cung cấp.",
     });
   }
 });
@@ -798,7 +813,7 @@ router.get("/:supplyId/overview", async (req, res) => {
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
-    return res.status(400).json({ error: "Invalid supply id." });
+    return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
   try {
@@ -826,7 +841,7 @@ router.get("/:supplyId/overview", async (req, res) => {
     );
     if (!supplyRowResult.rows?.length) {
       return res.status(404).json({
-        error: "Supply not found.",
+        error: "Không tìm thấy nguồn cung cấp.",
       });
     }
     const supplyRow = supplyRowResult.rows[0];
@@ -918,7 +933,7 @@ router.get("/:supplyId/overview", async (req, res) => {
     if ((!unpaidPayments || unpaidPayments.length === 0) && totalUnpaidAmount > 0) {
       unpaidPayments.push({
         id: 0,
-        round: "Tien no",
+        round: "Tiền nợ",
         totalImport: totalUnpaidAmount,
         paid: 0,
         status: STATUS.UNPAID,
@@ -949,7 +964,7 @@ router.get("/:supplyId/overview", async (req, res) => {
   } catch (error) {
     console.error("Query failed (GET /api/supplies/:id/overview):", error);
     res.status(500).json({
-      error: "Unable to load supplier overview.",
+      error: "Không thể tải thông tin nhà cung cấp.",
     });
   }
 });

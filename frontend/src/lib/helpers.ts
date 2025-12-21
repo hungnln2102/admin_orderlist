@@ -152,7 +152,9 @@ export const parseMonthsFromInfo = (info?: string): number => {
 
 export const daysFromMonths = (months: number): number => {
   if (!Number.isFinite(months) || months <= 0) return 0;
-  return months === 12 ? 365 : months * 30;
+  const years = Math.floor(months / 12);
+  const remainder = months % 12;
+  return years * 365 + remainder * 30;
 };
 
 const toFiniteNumber = (value: number | string): number => {

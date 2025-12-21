@@ -8,7 +8,7 @@ const attachRenewRoutes = (router) => {
         const { orderCode } = req.params;
         const forceRenewal = req.body?.forceRenewal ?? req.body?.force ?? true;
 
-        if (!orderCode) return res.status(400).json({ error: "Missing order code." });
+        if (!orderCode) return res.status(400).json({ error: "Thiếu mã đơn hàng." });
 
         try {
             const result = await sepayWebhookApp.runRenewal(orderCode, { forceRenewal });
@@ -19,17 +19,17 @@ const attachRenewRoutes = (router) => {
                 return res.json(result);
             }
             const status = result?.processType === "skipped" ? 409 : 400;
-            return res.status(status).json({ error: result?.details || "Renewal failed", result });
+            return res.status(status).json({ error: result?.details || "Gia hạn thất bại", result });
         } catch (error) {
-            console.error(`Renewal error (${orderCode}):`, error);
-            return res.status(500).json({ error: "Unable to renew order." });
+            console.error(`Lỗi gia hạn đơn hàng(${orderCode}):`, error);
+            return res.status(500).json({ error: "Không thể gia hạn đơn hàng." });
         }
     });
 
     // PATCH /refund
     router.patch("/canceled/:id/refund", async(req, res) => {
         const id = Number(req.params.id);
-        if (!id) return res.status(400).json({ error: "Invalid ID" });
+        if (!id) return res.status(400).json({ error: "ID không hợp lệ" });
 
         try {
             const [updated] = await db(TABLES.orderCanceled)
@@ -37,11 +37,11 @@ const attachRenewRoutes = (router) => {
                 .update({ status: STATUS.REFUNDED, check_flag: false })
                 .returning(["id", "id_order", "status", "check_flag"]);
 
-            if (!updated) return res.status(404).json({ error: "Order not found" });
+            if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
             res.json({ success: true, ...updated });
         } catch (error) {
-            console.error("Refund error:", error);
-            res.status(500).json({ error: "Unable to mark refunded." });
+            console.error("Lỗi hoàn tiền:", error);
+            res.status(500).json({ error: "Không thể đánh dấu hoàn tiền." });
         }
     });
 };

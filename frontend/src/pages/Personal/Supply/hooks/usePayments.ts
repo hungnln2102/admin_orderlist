@@ -56,7 +56,9 @@ export const usePayments = ({
   };
 
   const showQrForPayment = (payment: PaymentInput) => {
-    const amount = Math.max(0, (payment.totalImport || 0) - (payment.paid || 0));
+    const diff = (payment.totalImport || 0) - (payment.paid || 0);
+    const amount = Math.abs(diff);
+    const isPositive = diff > 0;
     const today = (() => {
       const now = new Date();
       const day = String(now.getDate()).padStart(2, "0");
@@ -65,9 +67,12 @@ export const usePayments = ({
       return `${day}/${month}/${year}`;
     })();
 
+    const accountNumber = isPositive ? supply?.numberBank || "" : "MAVPRE";
+    const bankCode = isPositive ? supply?.binBank || "" : "970432"; // VPBank BIN
+
     const url = buildSepayQrUrl({
-      accountNumber: supply?.numberBank || "",
-      bankCode: supply?.binBank || "",
+      accountNumber,
+      bankCode,
       amount,
       description: payment.round || today,
     });

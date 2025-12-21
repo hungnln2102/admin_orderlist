@@ -6,7 +6,7 @@ const runSchedulerNow = async (_req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error("[scheduler] Cron job failed:", error);
-    res.status(500).json({ error: "Unable to run scheduled task." });
+    res.status(500).json({ error: "Không thể chạy tác vụ theo lịch trình." });
   }
 };
 

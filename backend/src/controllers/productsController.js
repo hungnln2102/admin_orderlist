@@ -265,7 +265,7 @@ const listProducts = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("Query failed (GET /api/products):", error);
-    res.status(500).json({ error: "Unable to load products." });
+    res.status(500).json({ error: "Không thể tải sản phẩm." });
   }
 };
 
@@ -306,7 +306,7 @@ const listProductPrices = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("Query failed (GET /api/product-prices):", error);
-    res.status(500).json({ error: "Unable to load product prices." });
+    res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };
 
@@ -314,7 +314,7 @@ const getProductPriceById = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "Invalid product id." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   try {
     const query = `
@@ -325,12 +325,12 @@ const getProductPriceById = async (req, res) => {
     `;
     const result = await db.raw(query, [parsedId]);
     if (!result.rows || !result.rows.length) {
-      return res.status(404).json({ error: "Product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json(mapProductPriceRow(result.rows[0]));
   } catch (error) {
     console.error(`Query failed (GET /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "Unable to load product price." });
+    res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };
 
@@ -348,7 +348,7 @@ const createProductPrice = async (req, res) => {
 
   const productCode = normalizeTextInput(sanPham);
   if (!productCode) {
-    return res.status(400).json({ error: "sanPham is required." });
+    return res.status(400).json({ error: "sanPham là bắt buộc." });
   }
 
   const pctCtvVal = toNullableNumber(pctCtv);
@@ -391,7 +391,7 @@ const createProductPrice = async (req, res) => {
     const insertedRow =
       result.rows && result.rows[0] ? mapProductPriceRow(result.rows[0]) : null;
     if (!insertedRow) {
-      return res.status(500).json({ error: "Product not created." });
+      return res.status(500).json({ error: "Không thể tạo sản phẩm." });
     }
 
     const productId = insertedRow.id;
@@ -419,7 +419,7 @@ const createProductPrice = async (req, res) => {
     res.status(201).json(insertedRow);
   } catch (error) {
     console.error("Insert failed (POST /api/product-prices):", error);
-    res.status(500).json({ error: "Unable to create product price." });
+    res.status(500).json({ error: "Không thể tạo giá sản phẩm." });
   }
 };
 
@@ -427,7 +427,7 @@ const updateProductPrice = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "Invalid product id." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
 
   const {
@@ -451,7 +451,7 @@ const updateProductPrice = async (req, res) => {
   if (sanPham !== undefined) {
     const normalized = normalizeTextInput(sanPham);
     if (!normalized) {
-      return res.status(400).json({ error: "sanPham cannot be empty." });
+      return res.status(400).json({ error: "sanPham không thể để trống." });
     }
     pushField(productCols.product, normalized);
   }
@@ -479,7 +479,7 @@ const updateProductPrice = async (req, res) => {
   }
 
   if (!fields.length) {
-    return res.status(400).json({ error: "No fields to update." });
+    return res.status(400).json({ error: "Không có trường nào để cập nhật." });
   }
 
   pushField(productCols.updateDate, new Date());
@@ -494,12 +494,12 @@ const updateProductPrice = async (req, res) => {
   try {
     const result = await db.raw(updateSql, [...values, parsedId]);
     if (!result.rows || !result.rows.length) {
-      return res.status(404).json({ error: "Product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json(mapProductPriceRow(result.rows[0]));
   } catch (error) {
     console.error(`Update failed (PATCH /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "Unable to update product price." });
+    res.status(500).json({ error: "Không thể cập nhật giá sản phẩm." });
   }
 };
 
@@ -507,7 +507,7 @@ const toggleProductPriceStatus = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "Invalid product id." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   const isActiveBody = req.body?.is_active;
   const isActive =
@@ -528,7 +528,7 @@ const toggleProductPriceStatus = async (req, res) => {
       [isActive, parsedId]
     );
     if (!result.rows || !result.rows.length) {
-      return res.status(404).json({ error: "Product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json({
       id: result.rows[0].id,
@@ -540,7 +540,7 @@ const toggleProductPriceStatus = async (req, res) => {
       `Update failed (PATCH /api/product-prices/${productId}/status):`,
       error
     );
-    res.status(500).json({ error: "Unable to update product status." });
+    res.status(500).json({ error: "Không thể cập nhật trạng thái sản phẩm." });
   }
 };
 
@@ -548,7 +548,7 @@ const deleteProductPrice = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "Invalid product id." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   try {
     await db.raw(
@@ -563,12 +563,12 @@ const deleteProductPrice = async (req, res) => {
       [parsedId]
     );
     if (!result.rowCount && (!result.rows || !result.rows.length)) {
-      return res.status(404).json({ error: "Product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json({ success: true, id: parsedId });
   } catch (error) {
     console.error(`Delete failed (DELETE /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "Unable to delete product price." });
+    res.status(500).json({ error: "Không thể xóa giá sản phẩm." });
   }
 };
 
@@ -603,7 +603,7 @@ const getSuppliesByProductName = async (req, res) => {
       `Query failed (GET /api/products/supplies-by-name/${productName}):`,
       error
     );
-    res.status(500).json({ error: "Unable to load supplies for product." });
+    res.status(500).json({ error: "Không thể tải nhà cung cấp cho sản phẩm." });
   }
 };
 
@@ -635,7 +635,7 @@ const getSupplyPricesByProductName = async (req, res) => {
       `Query failed (GET /api/products/all-prices-by-name/${productName}):`,
       error
     );
-    res.status(500).json({ error: "Unable to load supply prices for product." });
+    res.status(500).json({ error: "Không thể tải giá nhà cung cấp cho sản phẩm." });
   }
 };
 
@@ -654,7 +654,7 @@ const updateSupplyPriceForProduct = async (req, res) => {
       `Update failed (PATCH /api/products/${productId}/suppliers/${sourceId}/price):`,
       error
     );
-    res.status(500).json({ error: "Unable to update supply price." });
+    res.status(500).json({ error: "Không thể cập nhật giá nhà cung cấp." });
   }
 };
 
@@ -664,13 +664,13 @@ const createSupplyPriceForProduct = async (req, res) => {
   try {
     const parsedProductId = Number(productId);
     if (!Number.isFinite(parsedProductId) || parsedProductId <= 0) {
-      return res.status(400).json({ error: "Invalid product id." });
+      return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
     }
     const resolvedSourceId = Number.isFinite(Number(sourceId))
       ? Number(sourceId)
       : await ensureSupplyRecord(sourceName, numberBank, binBank);
     if (!resolvedSourceId) {
-      return res.status(400).json({ error: "Missing or invalid supplier." });
+      return res.status(400).json({ error: "Nhà cung cấp bị thiếu hoặc không hợp lệ." });
     }
     const result = await upsertSupplyPrice(parsedProductId, resolvedSourceId, price);
     res.status(201).json({
@@ -683,7 +683,7 @@ const createSupplyPriceForProduct = async (req, res) => {
       `Insert failed (POST /api/product-prices/${productId}/suppliers):`,
       error
     );
-    res.status(500).json({ error: "Unable to add supplier price." });
+    res.status(500).json({ error: "Không thể thêm giá nhà cung cấp." });
   }
 };
 
@@ -692,7 +692,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
   const parsedProductId = Number(productId);
   const parsedSourceId = Number(sourceId);
   if (!Number.isFinite(parsedProductId) || !Number.isFinite(parsedSourceId)) {
-    return res.status(400).json({ error: "Invalid product or source id." });
+    return res.status(400).json({ error: "ID sản phẩm hoặc ID nhà cung cấp không hợp lệ." });
   }
   try {
     await db.raw(
@@ -709,7 +709,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
       `Delete failed (DELETE /api/products/${productId}/suppliers/${sourceId}):`,
       error
     );
-    res.status(500).json({ error: "Unable to delete supplier price." });
+    res.status(500).json({ error: "Không thể xóa giá nhà cung cấp." });
   }
 };
 

@@ -190,8 +190,20 @@ const dashboardYears = async(_req, res) => {
 
 // --- 3. DASHBOARD CHARTS (Biểu đồ) ---
 const dashboardCharts = async(req, res) => {
-    const currentYear = new Date().getFullYear();
+    const currentYear = (() => {
+        try {
+            const formatted = new Intl.DateTimeFormat("en-CA", {
+                timeZone: timezoneCandidate,
+                year: "numeric",
+            }).format(new Date());
+            const parsed = Number(formatted);
+            return Number.isFinite(parsed) ? parsed : new Date().getFullYear();
+        } catch {
+            return new Date().getFullYear();
+        }
+    })();
     const filterYear = req.query.year ? Number(req.query.year) : currentYear;
+    const limitToToday = filterYear === currentYear;
 
     // Lấy tên cột giá
     const orderPriceColumn = quoteIdent(ORDER_DEF.columns.price);
@@ -249,6 +261,7 @@ const dashboardCharts = async(req, res) => {
       WHERE event_date IS NOT NULL
         AND event_date >= params.year_start
         AND event_date < params.next_year_start
+        AND (:limitToToday::boolean IS FALSE OR event_date <= ${CURRENT_DATE_SQL})
     ),
     monthly_stats AS (
       SELECT
@@ -272,7 +285,8 @@ const dashboardCharts = async(req, res) => {
 
     try {
         const result = await db.raw(q, {
-            year: filterYear
+            year: filterYear,
+            limitToToday,
         });
         res.json({
             year: filterYear,

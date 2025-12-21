@@ -80,7 +80,7 @@ const listProductDescriptions = async (req, res) => {
     });
   } catch (error) {
     console.error("Query failed (GET /api/product-descriptions):", error);
-    res.status(500).json({ error: "Unable to load product descriptions." });
+    res.status(500).json({ error: "Không thể tải mô tả sản phẩm." });
   }
 };
 
@@ -88,7 +88,7 @@ const saveProductDescription = async (req, res) => {
   const { productId, rules, description, imageUrl } = req.body || {};
   const normalizedProductId = normalizeTextInput(productId);
   if (!normalizedProductId) {
-    return res.status(400).json({ error: "productId is required." });
+    return res.status(400).json({ error: "productId là bắt buộc." });
   }
 
   const normalizedRules = trimToLength(rules ?? "", 8000) || "";
@@ -143,7 +143,7 @@ const saveProductDescription = async (req, res) => {
     res.status(201).json(mapProductDescRow(inserted.rows[0]));
   } catch (error) {
     console.error("Save failed (POST /api/product-descriptions):", error);
-    res.status(500).json({ error: "Unable to save product description." });
+    res.status(500).json({ error: "Không thể lưu mô tả sản phẩm." });
   }
 };
 

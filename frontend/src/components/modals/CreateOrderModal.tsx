@@ -53,7 +53,7 @@ type RawCalculatedPriceResult = Partial<{
   days: number;
   order_expired: string;
 }>;
-type CustomerType = "MAVC" | "MAVL" | "MAVK";
+type CustomerType = "MAVC" | "MAVL" | "MAVK" | "MAVT" | "MAVN";
 interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -179,9 +179,9 @@ const useCreateOrderLogic = (
   const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
   const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
 
-  const updateForm = (patch: Partial<Order>) => {
+  const updateForm = useCallback((patch: Partial<Order>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
-  };
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -333,7 +333,7 @@ const useCreateOrderLogic = (
       result: CalculatedPriceResult | undefined,
       registerDMY: string,
       fallbackImport?: number,
-      options?: { updateCost?: boolean }
+      options?: { updateCost?: boolean; productNameOverride?: string; infoOverride?: string }
     ) => {
       if (!result) return;
 
@@ -341,10 +341,34 @@ const useCreateOrderLogic = (
         Helpers.formatDateToDMY(registerDMY) ||
         registerDMY ||
         Helpers.getTodayDMY();
-      const days = Number(result.days || 0) || 0;
-      const expiry =
+      let days = Number(result.days || 0) || 0;
+      let expiry =
         result.order_expired ||
         (days > 0 ? calculateExpirationDate(safeRegister, days) : "");
+
+      // Fallback/override: derive duration from pattern --<xm> in info/product
+      const monthsFromInfo =
+        Helpers.parseMonthsFromInfo(
+          options?.infoOverride ||
+          (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) ||
+          ""
+        ) ||
+        Helpers.parseMonthsFromInfo(
+          (
+            options?.productNameOverride ||
+            (formData[ORDER_FIELDS.ID_PRODUCT] as string) ||
+            productName ||
+            ""
+          ).toString()
+        );
+      if (monthsFromInfo > 0) {
+        const derivedDays = Helpers.daysFromMonths(monthsFromInfo);
+        const end = Helpers.addMonthsMinusOneDay(safeRegister, monthsFromInfo);
+        if (derivedDays > 0) {
+          days = derivedDays;
+          expiry = end;
+        }
+      }
 
       setFormData((prev) => {
         const prevGiaNhap = Number(prev[ORDER_FIELDS.COST] || 0);
@@ -363,10 +387,10 @@ const useCreateOrderLogic = (
           Number.isFinite(result.price) && result.price > 0
             ? result.price
             : undefined;
-        const giaBan =
-          customerType === "MAVK"
-            ? giaNhap
-            : giaBanFromResult ?? prevGiaBan ?? 0;
+        let giaBan = giaBanFromResult ?? prevGiaBan ?? 0;
+        if (customerType === "MAVK") {
+          giaBan = giaBanFromResult ?? giaNhap ?? prevGiaBan ?? 0;
+        }
 
         return {
           ...prev,
@@ -398,10 +422,14 @@ const useCreateOrderLogic = (
       if (!productName || !orderId || !registerDate) return;
       calculatePrice(supplyId, productName, orderId, registerDate).then(
         (result) =>
-          applyCalculationResult(result, registerDate, fallbackImport, options)
-      );
+          applyCalculationResult(result, registerDate, fallbackImport, {
+            ...options,
+            productNameOverride: productName,
+            infoOverride: formData[ORDER_FIELDS.INFORMATION_ORDER] as string,
+          })
+        );
     },
-    [calculatePrice, applyCalculationResult]
+    [calculatePrice, applyCalculationResult, formData]
   );
 
   useEffect(() => {
@@ -439,14 +467,6 @@ const useCreateOrderLogic = (
     if (!productName || !orderId || !registerDate) return;
     if (customMode) return;
 
-    if (customerType === "MAVK") {
-      setFormData((prev) => ({
-        ...prev,
-        [ORDER_FIELDS.PRICE]: prev[ORDER_FIELDS.COST] || 0,
-      }));
-      return;
-    }
-
     // Trigger tinh gia lai khi loai khach hang thay doi
     const supplyId = selectedSupplyId ?? 0;
     recalcPrice(supplyId, productName, orderId, registerDate, undefined, {
@@ -462,14 +482,54 @@ const useCreateOrderLogic = (
     customMode,
   ]);
 
+  // When clearing product, also reset calculated fields to avoid stale values.
+  useEffect(() => {
+    if (productName) return;
+    setSelectedSupplyId(null);
+    setFormData((prev) => {
+      const alreadyCleared =
+        !prev[ORDER_FIELDS.ID_PRODUCT] &&
+        Number(prev[ORDER_FIELDS.PRICE] || 0) === 0 &&
+        String(prev[ORDER_FIELDS.DAYS] || "0") === "0";
+      if (alreadyCleared) return prev;
+      const resetExpiry =
+        (prev[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+      return {
+        ...prev,
+        [ORDER_FIELDS.ID_PRODUCT]: "",
+        [ORDER_FIELDS.SUPPLY]: "",
+        [ORDER_FIELDS.COST]: 0,
+        [ORDER_FIELDS.PRICE]: 0,
+        [ORDER_FIELDS.DAYS]: "0",
+        [ORDER_FIELDS.ORDER_EXPIRED]: resetExpiry,
+      };
+    });
+  }, [productName]);
+
   const handleProductSelect = (productName: string) => {
-    // ... (logic giữ nguyên)
+    const trimmed = (productName || "").trim();
     setSelectedSupplyId(null);
     setCustomProductTouched(false);
 
+    if (!trimmed) {
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.ID_PRODUCT]: "",
+        [ORDER_FIELDS.SUPPLY]: "",
+        [ORDER_FIELDS.COST]: 0,
+        [ORDER_FIELDS.PRICE]: 0,
+        [ORDER_FIELDS.DAYS]: "0",
+        [ORDER_FIELDS.ORDER_EXPIRED]: prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
+      }));
+      setSupplies(allSupplies);
+      setSupplyPrices([]);
+      setIsDataLoaded(false);
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.ID_PRODUCT]: productName,
+      [ORDER_FIELDS.ID_PRODUCT]: trimmed,
       [ORDER_FIELDS.SUPPLY]: "",
       [ORDER_FIELDS.COST]: 0,
       [ORDER_FIELDS.PRICE]: 0,
@@ -479,24 +539,17 @@ const useCreateOrderLogic = (
     setSupplies([]);
     setSupplyPrices([]);
 
-    if (productName) {
-      fetchSuppliesByProduct(productName);
-      fetchAllSupplyPrices(productName);
+    fetchSuppliesByProduct(trimmed);
+    fetchAllSupplyPrices(trimmed);
 
-      const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
-      const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
+    const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
+    const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
 
-      if (orderId && registerDate) {
-        if (!customMode) {
-          const supplyId = selectedSupplyId ?? 0;
-          recalcPrice(supplyId, productName, orderId, registerDate, undefined, {
-            updateCost: Boolean(supplyId),
-          });
-        }
-      }
-    } else {
-      setSupplies(allSupplies);
-      setIsDataLoaded(false);
+    if (orderId && registerDate && !customMode) {
+      const supplyId = selectedSupplyId ?? 0;
+      recalcPrice(supplyId, trimmed, orderId, registerDate, undefined, {
+        updateCost: Boolean(supplyId),
+      });
     }
   };
 
@@ -923,21 +976,25 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   useEffect(() => {
     // Ensure expiry date is populated and formatted.
     // If backend doesn't return it, compute from register date + days.
-    if (rawExpiryValue) {
-      const normalized = Helpers.formatDateToDMY(rawExpiryValue);
+    if (!rawExpiryValue) return;
 
-      if (!normalized && registerDateDMY && totalDays > 0) {
-        const computed = calculateExpirationDate(registerDateDMY, totalDays);
-        if (computed && computed !== "N/A") {
-          updateForm({
-            [ORDER_FIELDS.ORDER_EXPIRED]: computed,
-          } as Partial<Order>);
-        }
-      } else if (normalized && normalized !== rawExpiryValue) {
+    const normalized = Helpers.formatDateToDMY(rawExpiryValue);
+
+    if (!normalized && registerDateDMY && totalDays > 0) {
+      const computed = calculateExpirationDate(registerDateDMY, totalDays);
+      if (
+        computed &&
+        computed !== "N/A" &&
+        computed !== rawExpiryValue
+      ) {
         updateForm({
-          [ORDER_FIELDS.ORDER_EXPIRED]: normalized,
+          [ORDER_FIELDS.ORDER_EXPIRED]: computed,
         } as Partial<Order>);
       }
+    } else if (normalized && normalized !== rawExpiryValue) {
+      updateForm({
+        [ORDER_FIELDS.ORDER_EXPIRED]: normalized,
+      } as Partial<Order>);
     }
   }, [
     rawExpiryValue,
@@ -1003,6 +1060,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <option value="MAVC">Cộng Tác Viên</option>
                     <option value="MAVL">Khách Lẻ</option>
                     <option value="MAVK">Khuyến Mãi</option>
+                    <option value="MAVT">Quà Tặng</option>
+                    <option value="MAVN">Nhập Hàng</option>
                   </select>
                 </div>
                 {/* Mã Đơn Hàng */}
@@ -1247,14 +1306,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       <input
                         type="text"
                         name={ORDER_FIELDS.PRICE}
-                      value={
-                        customerType === "MAVK" && !selectedSupplyId
-                          ? ""
-                          : Helpers.formatCurrency(
-                              priceValue ?? 0
-                            )
-                      }
-                      readOnly
+                        value={Helpers.formatCurrency(priceValue ?? 0)}
+                        readOnly
                         className={`${inputClass} font-semibold text-green-700 ${readOnlyClass}`}
                       />
                     )}

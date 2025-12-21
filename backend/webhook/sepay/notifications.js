@@ -1,4 +1,5 @@
 const https = require("https");
+const dns = require("dns");
 const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
@@ -12,58 +13,101 @@ const {
   extractSenderFromContent,
 } = require("./utils");
 
-const postJson = (url, data) =>
-  new Promise((resolve, reject) => {
-    const payload = JSON.stringify(data);
+const HTTP_TIMEOUT_MS = 10_000;
 
-    if (typeof fetch === "function") {
-      fetch(url, {
+const preferIpv4Lookup = (hostname, options, cb) =>
+  dns.lookup(hostname, { ...options, family: 4, all: false }, cb);
+
+const sendWithHttps = (url, payload, headers = { "Content-Type": "application/json" }) =>
+  new Promise((resolve, reject) => {
+    const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+    const urlObj = new URL(url);
+
+    const req = https.request(
+      {
+        protocol: urlObj.protocol,
+        hostname: urlObj.hostname,
+        port: urlObj.port || 443,
+        path: `${urlObj.pathname}${urlObj.search}`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: payload,
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            const err = new Error(`Request failed with status ${res.status}`);
-            err.status = res.status;
-            err.body = await res.text().catch(() => "");
+        headers: {
+          ...headers,
+          "Content-Length": Buffer.byteLength(body),
+        },
+        agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
+      },
+      (res) => {
+        let responseBody = "";
+        res.on("data", (chunk) => {
+          responseBody += chunk;
+        });
+        res.on("end", () => {
+          const status = res.statusCode || 0;
+          if (status >= 400) {
+            const err = new Error(`Request failed with status ${status}`);
+            err.status = status;
+            err.body = responseBody;
             reject(err);
             return;
           }
-          resolve(await res.text());
-        })
-        .catch(reject);
-      return;
-    }
+          resolve(responseBody);
+        });
+      }
+    );
 
-    const options = new URL(url);
-    options.method = "POST";
-    options.headers = {
-      "Content-Type": "application/json",
-      "Content-Length": Buffer.byteLength(payload),
-    };
-
-    const req = https.request(options, (res) => {
-      let responseBody = "";
-      res.on("data", (chunk) => {
-        responseBody += chunk;
-      });
-      res.on("end", () => {
-        const status = res.statusCode || 0;
-        if (status >= 400) {
-          const err = new Error(`Request failed with status ${status}`);
-          err.status = status;
-          err.body = responseBody;
-          reject(err);
-          return;
-        }
-        resolve(responseBody);
-      });
+    req.setTimeout(HTTP_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timed out after ${HTTP_TIMEOUT_MS}ms`));
     });
     req.on("error", reject);
-    req.write(payload);
+    req.write(body);
     req.end();
   });
+
+const postJson = async (url, data) => {
+  const payload = JSON.stringify(data);
+  const headers = { "Content-Type": "application/json" };
+
+  const timeoutSignal =
+    typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+      ? AbortSignal.timeout(HTTP_TIMEOUT_MS)
+      : undefined;
+
+  if (typeof fetch === "function") {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: payload,
+        signal: timeoutSignal,
+      });
+      if (!res.ok) {
+        const err = new Error(`Request failed with status ${res.status}`);
+        err.status = res.status;
+        err.body = await res.text().catch(() => "");
+        throw err;
+      }
+      return await res.text();
+    } catch (err) {
+      const code = err?.code || err?.cause?.code;
+      const isTransient =
+        err?.name === "AbortError" ||
+        code === "ETIMEDOUT" ||
+        code === "EAI_AGAIN" ||
+        code === "ENOTFOUND" ||
+        code === "ECONNRESET" ||
+        /fetch failed/i.test(err?.message || "");
+      if (!isTransient) {
+        throw err;
+      }
+      console.warn("[Telegram] Fetch failed, retrying with https client", {
+        code,
+        status: err?.status,
+      });
+    }
+  }
+
+  return sendWithHttps(url, payload, headers);
+};
 
 const buildRenewalMessage = (orderCode, result) => {
   if (!result) return `Don ${orderCode}: Khong co ket qua gia han`;
@@ -171,48 +215,14 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   }
 };
 
-const buildPaymentMessage = (orderCode, transaction) => {
-  if (!transaction) return "";
-  const amount = normalizeAmount(transaction.transfer_amount || transaction.amount_in);
-  const paidDate = parsePaidDate(transaction.transaction_date || transaction.transaction_date_raw);
-  const receiverAccount = transaction.account_number || transaction.accountNumber || "";
-  const content =
-    transaction.description || transaction.transaction_content || transaction.note || "";
-  const senderParsed = extractSenderFromContent(
-    transaction.transaction_content || transaction.description
-  );
-
-  const parts = [
-    `[THU TIEN] ${orderCode || "Khong ro don"}`,
-    `- So tien: ${formatCurrency(amount)}`,
-    `- Ngay: ${paidDate}`,
-    senderParsed ? `- Nguoi gui: ${senderParsed}` : null,
-    receiverAccount ? `- Tai khoan nhan: ${receiverAccount}` : null,
-    content ? `- Noi dung: ${content}` : null,
-  ].filter(Boolean);
-
-  return parts.join("\n");
-};
-
-const sendPaymentNotification = async (orderCode, transaction) => {
-  // Payment notifications to Telegram are currently disabled.
+// Stubbed payment notification (disabled)
+const sendPaymentNotification = async () => {
   return;
-  // The code below is intentionally left for potential re-enable:
-  // if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-  // const text = buildPaymentMessage(orderCode, transaction);
-  // if (!text) return;
-  // const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  // const payload = { chat_id: TELEGRAM_CHAT_ID, text };
-  // if (Number.isFinite(TELEGRAM_TOPIC_ID)) {
-  //   payload.message_thread_id = TELEGRAM_TOPIC_ID;
-  // }
-  // await postJson(url, payload);
 };
 
 module.exports = {
   postJson,
   buildRenewalMessage,
   sendRenewalNotification,
-  buildPaymentMessage,
   sendPaymentNotification,
 };
