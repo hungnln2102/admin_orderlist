@@ -410,6 +410,11 @@ const useCreateOrderLogic = (
     [customerType]
   );
 
+  const infoRef = useRef<string>("");
+  useEffect(() => {
+    infoRef.current = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
+  }, [formData]);
+
   const recalcPrice = useCallback(
     (
       supplyId: number,
@@ -425,11 +430,11 @@ const useCreateOrderLogic = (
           applyCalculationResult(result, registerDate, fallbackImport, {
             ...options,
             productNameOverride: productName,
-            infoOverride: formData[ORDER_FIELDS.INFORMATION_ORDER] as string,
+            infoOverride: infoRef.current,
           })
         );
     },
-    [calculatePrice, applyCalculationResult, formData]
+    [calculatePrice, applyCalculationResult]
   );
 
   useEffect(() => {

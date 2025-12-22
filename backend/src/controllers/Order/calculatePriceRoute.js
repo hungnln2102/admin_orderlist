@@ -48,15 +48,38 @@ const attachCalculatePriceRoute = (router) => {
                 return res.status(400).json({ error: "Không tìm được bảng giá." });
             }
 
-            const supplyPriceRow = await db(TABLES.supplyPrice)
+            // Giá nhập (cost) ưu tiên theo nguồn đã chọn; Giá bán tính theo giá cao nhất.
+            let importBySource = 0;
+            if (effectiveSupplyId) {
+                const latestBySource = await db(TABLES.supplyPrice)
+                    .select(COLS.SUPPLY_PRICE.PRICE)
+                    .where(COLS.SUPPLY_PRICE.PRODUCT_ID, productPricing.id)
+                    .andWhere(COLS.SUPPLY_PRICE.SOURCE_ID, effectiveSupplyId)
+                    .orderBy(COLS.SUPPLY_PRICE.ID, "desc")
+                    .first();
+                if (latestBySource?.[COLS.SUPPLY_PRICE.PRICE] !== undefined) {
+                    importBySource = Number(latestBySource[COLS.SUPPLY_PRICE.PRICE]) || 0;
+                }
+            }
+
+            // Fallback cost: dùng cost của đơn nếu có (tránh trả 0).
+            if (importBySource <= 0 && orderRow?.cost) {
+                importBySource = Number(orderRow.cost) || 0;
+            }
+
+            const maxPriceRow = await db(TABLES.supplyPrice)
                 .max(`${COLS.SUPPLY_PRICE.PRICE} as maxPrice`)
                 .where(COLS.SUPPLY_PRICE.PRODUCT_ID, productPricing.id)
                 .first();
+            const baseForPricing = Number(maxPriceRow?.maxPrice || 0);
 
-            const baseImport = Number(supplyPriceRow?.maxPrice || 0);
-            if (baseImport <= 0) {
+            if (baseForPricing <= 0 && importBySource <= 0) {
                 return res.status(400).json({ error: "Không có giá NCC" });
             }
+
+            // Nếu vẫn chưa có cost theo nguồn, fallback sang giá cao nhất để có giá trị hiển thị.
+            const pricingBase = baseForPricing > 0 ? baseForPricing : importBySource;
+            const baseImport = importBySource > 0 ? importBySource : baseForPricing;
 
             const pctCtv = Number(productPricing.pct_ctv) || 1;
             const pctKhach = Number(productPricing.pct_khach) || 1;
@@ -75,7 +98,7 @@ const attachCalculatePriceRoute = (router) => {
             const isNhap = orderPrefix.startsWith(prefixNhap) || customerTypePrefix === prefixNhap;
 
             // Tính 3 biến: Resell, Customer
-            const resellRaw = baseImport * pctCtv;
+            const resellRaw = pricingBase * pctCtv;
             const customerRaw = resellRaw * pctKhach;
 
             // làm tròn về bậc nghìn: < 500 xuống, >= 500 lên (1,400 => 1,000; 1,500 => 2,000)

@@ -198,20 +198,20 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
 
     if (isThreadError) {
       console.warn(
-        "Telegram renewal notification failed with topic; retrying without topic_id",
+        "Thông báo gia hạn Telegram thất bại do thiếu chủ đề; đang thử lại mà không có topic_id",
         err
       );
       try {
         await postJson(url, buildPayload(false));
-        console.log("Telegram renewal notification resent without topic_id after thread error");
+        console.log("Thông báo gia hạn Telegram được gửi lại mà không có topic_id sau lỗi chủ đề");
         return;
       } catch (retryErr) {
-        console.error("Failed to send Telegram renewal notification after retry:", retryErr);
+        console.error("Gửi thông báo gia hạn Telegram thất bại sau khi thử lại:", retryErr);
         return;
       }
     }
 
-    console.error("Failed to send Telegram renewal notification:", err);
+    console.error("Không thể gửi thông báo gia hạn Telegram:", err);
   }
 };
 
