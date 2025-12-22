@@ -319,8 +319,13 @@ const Dashboard: React.FC = () => {
             </select>
           </div>
 
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-80 min-h-[320px]">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={320}
+              minHeight={240}
+            >
               <LineChart data={revenueChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e166" />
                 <XAxis
@@ -360,8 +365,13 @@ const Dashboard: React.FC = () => {
             Tổng đơn hàng và đơn hủy theo tháng
           </h3>
 
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-80 min-h-[320px]">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={320}
+              minHeight={240}
+            >
               <BarChart data={orderChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e166" />
                 <XAxis

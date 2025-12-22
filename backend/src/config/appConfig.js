@@ -14,15 +14,26 @@ const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
   .filter(Boolean);
 
 const isProd = process.env.NODE_ENV === "production";
-const cookieSecureEnv = (process.env.COOKIE_SECURE || "").toLowerCase();
+const cookieSecureEnv = (process.env.COOKIE_SECURE || "").trim().toLowerCase();
 const hasHttpOrigin = allowedOrigins.some((origin) =>
   origin.toLowerCase().startsWith("http://")
 );
-const cookieSecure =
-  cookieSecureEnv === "true" ||
-  cookieSecureEnv === "1" ||
-  (!cookieSecureEnv && isProd && !hasHttpOrigin);
-const cookieSameSite = cookieSecure ? "none" : "lax";
+
+// Allow "auto" to support both HTTP (local) and HTTPS (prod) without breaking sessions.
+// If a non-HTTPS origin is present, fall back to "auto" even when COOKIE_SECURE=true
+// so that dev environments still receive the session cookie.
+let cookieSecure =
+  cookieSecureEnv === "auto"
+    ? "auto"
+    : cookieSecureEnv === "true" ||
+      cookieSecureEnv === "1" ||
+      (!cookieSecureEnv && isProd && !hasHttpOrigin);
+
+if (cookieSecure === true && hasHttpOrigin) {
+  cookieSecure = "auto";
+}
+
+const cookieSameSite = cookieSecure === true ? "none" : "lax";
 
 module.exports = {
   port,
