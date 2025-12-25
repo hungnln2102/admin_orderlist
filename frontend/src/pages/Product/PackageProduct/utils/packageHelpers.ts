@@ -1,4 +1,5 @@
 import { ORDER_COLS } from "../../../../lib/tableSql";
+import * as Helpers from "../../../../lib/helpers";
 
 export type PackageField =
   | "information"
@@ -219,21 +220,19 @@ export const toCleanString = (value: unknown): string => {
 };
 
 export const formatDisplayDate = (value?: string | null): string => {
-  if (!value) return "";
-  const trimmed = value.trim();
+  const normalized = Helpers.formatDateToDMY(value ?? "");
+  if (normalized) return normalized;
+
+  const trimmed = (value || "").trim();
   if (!trimmed) return "";
-  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) {
-    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+
+  // Accept flexible D/M/YYYY (with or without leading zero) and normalize.
+  const looseMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (looseMatch) {
+    const [, d, m, y] = looseMatch;
+    return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
   }
-  const slashMatch = trimmed.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
-  if (slashMatch) {
-    return `${slashMatch[3]}/${slashMatch[2]}/${slashMatch[1]}`;
-  }
-  const dmyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (dmyMatch) {
-    return `${dmyMatch[1]}/${dmyMatch[2]}/${dmyMatch[3]}`;
-  }
+
   return trimmed;
 };
 

@@ -9,6 +9,7 @@ type PackageTableProps = {
   tableColumnCount: number;
   onEdit: (row: AugmentedRow) => void;
   onView: (row: AugmentedRow) => void;
+  onDelete: (row: AugmentedRow) => void;
 };
 
 export const PackageTable: React.FC<PackageTableProps> = ({
@@ -18,6 +19,7 @@ export const PackageTable: React.FC<PackageTableProps> = ({
   tableColumnCount,
   onEdit,
   onView,
+  onDelete,
 }) => {
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
   const handleRowToggle = (rowId: number) => {
@@ -25,7 +27,7 @@ export const PackageTable: React.FC<PackageTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden text-white">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -91,6 +93,7 @@ export const PackageTable: React.FC<PackageTableProps> = ({
                   onToggle={handleRowToggle}
                   onEdit={onEdit}
                   onView={onView}
+                  onDelete={onDelete}
                 />
               ))
             )}

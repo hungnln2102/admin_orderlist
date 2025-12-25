@@ -6,6 +6,10 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   title: string;
   message: string;
+  secondaryMessage?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  isSubmitting?: boolean;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -14,6 +18,10 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   title,
   message,
+  secondaryMessage,
+  confirmLabel = "OK",
+  cancelLabel = "Huy",
+  isSubmitting = false,
 }) => {
   // Nếu không mở thì không render gì cả
   if (!isOpen) return null;
@@ -30,22 +38,29 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         {/* Nội dung */}
         <div className="mb-4">
           <p className="text-sm text-white/90">{message}</p>
+          {secondaryMessage ? (
+            <p className="mt-2 text-sm font-semibold text-rose-300">
+              {secondaryMessage}
+            </p>
+          ) : null}
         </div>
         {/* Nút bấm */}
         <div className="flex justify-end space-x-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-white/20 bg-white/10 text-white hover:bg-white/15 transition-colors"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-md border border-white/20 bg-white/10 text-white hover:bg-white/15 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Hủy
+            {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700 transition-colors"
+            disabled={isSubmitting}
+            className="px-4 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            OK
+            {isSubmitting ? "Dang xu ly..." : confirmLabel}
           </button>
         </div>
       </div>

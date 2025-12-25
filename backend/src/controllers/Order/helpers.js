@@ -91,7 +91,7 @@ const normalizeOrderRow = (
 const ORDER_WRITABLE_COLUMNS = [
     COLS.ORDER.ID_ORDER, COLS.ORDER.ID_PRODUCT, COLS.ORDER.INFORMATION_ORDER,
     COLS.ORDER.CUSTOMER, COLS.ORDER.CONTACT, COLS.ORDER.SLOT,
-    COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.EXPIRED_DATE,
+    COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.ORDER_EXPIRED,
     COLS.ORDER.SUPPLY, COLS.ORDER.COST, COLS.ORDER.PRICE,
     COLS.ORDER.NOTE, COLS.ORDER.STATUS, COLS.ORDER.CHECK_FLAG
 ];
@@ -102,7 +102,7 @@ const sanitizeOrderWritePayload = (raw = {}) => {
         if (raw[col] === undefined) return;
 
         let val = raw[col];
-        if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.EXPIRED_DATE) {
+        if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.ORDER_EXPIRED) {
             val = normalizeDateInput(val);
         } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.DAYS) {
             val = toNullableNumber(val);
