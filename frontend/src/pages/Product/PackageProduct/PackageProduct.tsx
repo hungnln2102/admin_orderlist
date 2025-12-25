@@ -17,6 +17,7 @@ import GradientButton from "../../../components/ui/GradientButton";
 import StatCard, { STAT_CARD_ACCENTS } from "../../../components/ui/StatCard";
 import { apiFetch } from "../../../lib/api";
 import { PackageTable } from "./components/PackageTable";
+import ConfirmModal from "../../../components/modals/ConfirmModal";
 import { CreatePackageModal } from "./components/Modals/CreatePackageModal";
 import { PackageFormModal } from "./components/Modals/PackageFormModal";
 import { PackageViewModal } from "./components/Modals/PackageViewModal";
@@ -107,6 +108,11 @@ const PackageProduct: React.FC = () => {
   const [packagesMarkedForDeletion, setPackagesMarkedForDeletion] = useState<
     Set<string>
   >(new Set());
+  const [deleteRowTarget, setDeleteRowTarget] = useState<AugmentedRow | null>(
+    null
+  );
+  const [deleteRowProcessing, setDeleteRowProcessing] = useState(false);
+  const [deleteRowError, setDeleteRowError] = useState<string | null>(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -114,35 +120,46 @@ const PackageProduct: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const packageParam = params.get("package");
-    setCategoryFilter(packageParam || "all");
-  }, [location.search, setCategoryFilter]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (categoryFilter === "all") {
-      params.delete("package");
-    } else {
-      params.set("package", categoryFilter);
-    }
-    const search = params.toString();
-    const nextSearch = search ? `?${search}` : "";
-    if (nextSearch === location.search) return;
-    navigate(
-      {
-        pathname: location.pathname,
-        search: nextSearch,
-      },
-      { replace: true }
+    const normalizedCategory = packageParam || "all";
+    setCategoryFilter((prev) =>
+      prev === normalizedCategory ? prev : normalizedCategory
     );
-  }, [categoryFilter, location.pathname, location.search, navigate]);
+  }, [location.search, setCategoryFilter]);
 
   const handleCategorySelect = useCallback(
     (value: string) => {
-      setCategoryFilter((prev) =>
-        value === "all" ? "all" : prev === value ? "all" : value
-      );
+      const next =
+        value === "all" ? "all" : categoryFilter === value ? "all" : value;
+
+      if (next !== categoryFilter) {
+        setCategoryFilter(next);
+      }
+
+      const params = new URLSearchParams(location.search);
+      if (next === "all") {
+        params.delete("package");
+      } else {
+        params.set("package", next);
+      }
+      const search = params.toString();
+      const nextSearch = search ? `?${search}` : "";
+      if (nextSearch !== location.search) {
+        navigate(
+          {
+            pathname: location.pathname,
+            search: nextSearch,
+          },
+          { replace: true }
+        );
+      }
     },
-    [setCategoryFilter]
+    [
+      categoryFilter,
+      location.pathname,
+      location.search,
+      navigate,
+      setCategoryFilter,
+    ]
   );
 
   const handleCreateButtonClick = () => {
@@ -319,6 +336,87 @@ const PackageProduct: React.FC = () => {
     setViewModalOpen(false);
     setViewRow(null);
   }, []);
+
+  const handleDeleteRow = useCallback((row: AugmentedRow) => {
+    setDeleteRowError(null);
+    setDeleteRowTarget(row);
+  }, []);
+
+  const closeDeleteRowModal = useCallback(() => {
+    setDeleteRowProcessing(false);
+    setDeleteRowError(null);
+    setDeleteRowTarget(null);
+  }, []);
+
+  const confirmDeleteRow = useCallback(async () => {
+    if (!deleteRowTarget || deleteRowProcessing) return;
+    const targetId = deleteRowTarget.id;
+    const targetName = (deleteRowTarget.package || "").trim();
+
+    if (targetId === undefined || targetId === null) {
+      setDeleteRowError("Khong tim thay ID goi de xoa.");
+      return;
+    }
+
+    setDeleteRowProcessing(true);
+
+    const parseError = async (res: Response) => {
+      const rawText = await res.text().catch(() => "");
+      const cleanedMessage = rawText
+        ? rawText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+        : "";
+      const statusLabel = res.status ? ` (HTTP ${res.status})` : "";
+      const friendlyMessage =
+        cleanedMessage || res.statusText || "Khong the thuc hien xoa tren may chu";
+      throw new Error(`Khong the xoa goi${statusLabel}: ${friendlyMessage}`);
+    };
+
+    try {
+      const res = await apiFetch(`/api/package-products/${targetId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        await parseError(res);
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        deletedIds?: Array<number | string>;
+        deletedNames?: string[];
+      };
+      console.log("Delete package product response", {
+        targetId,
+        targetName,
+        data,
+      });
+      const deletedIds = new Set(
+        (data.deletedIds && data.deletedIds.length
+          ? data.deletedIds
+          : [targetId]
+        ).map((v) => String(v))
+      );
+
+      setRows((prev) =>
+        prev.filter((item) => {
+          const idStr =
+            item.id !== undefined && item.id !== null ? String(item.id) : "__";
+          return !deletedIds.has(idStr);
+        })
+      );
+      closeDeleteRowModal();
+    } catch (error) {
+      console.error("Xoa goi that bai:", error);
+      setDeleteRowError(error instanceof Error ? error.message : "Loi khong xac dinh");
+      setDeleteRowProcessing(false);
+    }
+  }, [
+    deleteRowProcessing,
+    deleteRowTarget,
+    setRows,
+    setTemplates,
+    selectedPackage,
+    handleCategorySelect,
+    closeDeleteRowModal,
+    setDeleteRowError,
+  ]);
 
   const handleAddSubmit = useCallback(
     async (values: PackageFormValues) => {
@@ -713,17 +811,17 @@ const PackageProduct: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
             <div className="grid grid-cols-3 gap-4 items-center">
               <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder={`Tìm kiếm trong các gói của ${selectedPackage}...`}
-                  className="w-full pl-10 pr-4 py-2 border border-white/40 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <select
-                className="w-full px-4 py-2 border border-white/40 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                   value={statusFilter}
                 onChange={(e) =>
                   setStatusFilter(e.target.value as StatusFilter)
@@ -738,8 +836,8 @@ const PackageProduct: React.FC = () => {
               <button
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   filteredRows.length
-                    ? "bg-gray-100 text-gray-700 hover:bg-indigo-500/20"
-                    : "bg-gray-100 text-white/70 cursor-not-allowed"
+                    ? "bg-gray-100 text-gray-800 hover:bg-indigo-50"
+                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}
                 disabled={!filteredRows.length}
               >
@@ -773,6 +871,7 @@ const PackageProduct: React.FC = () => {
             tableColumnCount={tableColumnCount}
             onEdit={openEditModal}
             onView={openViewModal}
+            onDelete={handleDeleteRow}
           />
         </>
       )}
@@ -808,6 +907,17 @@ const PackageProduct: React.FC = () => {
         open={viewModalOpen}
         row={viewRow}
         onClose={closeViewModal}
+      />
+      <ConfirmModal
+        isOpen={Boolean(deleteRowTarget)}
+        onClose={closeDeleteRowModal}
+        onConfirm={confirmDeleteRow}
+        title="Xac nhan xoa goi"
+        message={`Ban co chac muon xoa goi "${deleteRowTarget?.package}"?`}
+        secondaryMessage={deleteRowError || undefined}
+        confirmLabel="OK"
+        cancelLabel="Huy"
+        isSubmitting={deleteRowProcessing}
       />
     </div>
   );

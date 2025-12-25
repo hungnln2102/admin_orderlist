@@ -8,6 +8,7 @@ require("dotenv").config({ path: envPath });
 const { Pool } = require("pg");
 const cron = require("node-cron");
 const { DB_SCHEMA, getDefinition, tableName, SCHEMA } = require("./src/config/dbSchema");
+const { backupDatabaseToDrive } = require("./src/utils/backupService");
 // Raw column names (unquoted) for reading rows returned by pg
 const ORDER_DEF = getDefinition("ORDER_LIST");
 const ORDER_COLS = ORDER_DEF.columns;
@@ -26,6 +27,7 @@ const schedulerTimezone =
     : DEFAULT_TIMEZONE;
 const cronExpression = process.env.CRON_SCHEDULE || "1 0 * * *";
 const runOnStart = process.env.RUN_CRON_ON_START === "true";
+const enableDbBackup = process.env.ENABLE_DB_BACKUP !== "false";
 let lastRunAt = null;
 
 const STATUS_EXPIRED = "Hết Hạn";
@@ -240,6 +242,14 @@ const updateDatabaseTask = async (trigger = "cron") => {
     await client.query("COMMIT");
     console.log("[CRON] Hoan thanh cap nhat.");
     lastRunAt = new Date();
+
+    if (enableDbBackup) {
+      try {
+        await backupDatabaseToDrive();
+      } catch (backupErr) {
+        console.error("[CRON] Backup database failed:", backupErr);
+      }
+    }
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[CRON] Loi khi cap nhat:", err);

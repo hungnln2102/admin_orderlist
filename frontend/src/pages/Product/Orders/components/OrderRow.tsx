@@ -208,7 +208,8 @@ export const OrderRow = React.memo(function OrderRow({
                 </button>
                 <button
                   onClick={stopPropagation(onDelete)}
-                  className="text-red-600 hover:text-red-900 p-1 rounded"
+                  className="text-red-500 hover:text-red-700 p-1 rounded"
+                  title="Xoa don hang"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>

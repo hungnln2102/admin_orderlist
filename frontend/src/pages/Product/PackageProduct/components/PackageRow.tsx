@@ -1,5 +1,5 @@
 import React from "react";
-import { BoltIcon, EyeIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { BoltIcon, EyeIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import {
   AugmentedRow,
   DEFAULT_CAPACITY_LIMIT,
@@ -18,6 +18,7 @@ type PackageRowProps = {
   onToggle: (rowId: number) => void;
   onEdit: (row: AugmentedRow) => void;
   onView: (row: AugmentedRow) => void;
+  onDelete: (row: AugmentedRow) => void;
 };
 
 export const PackageRow: React.FC<PackageRowProps> = ({
@@ -28,6 +29,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
   onToggle,
   onEdit,
   onView,
+  onDelete,
 }) => {
   const totalSlots = row.slotLimit || DEFAULT_SLOT_LIMIT;
   const slotUsed = row.slotUsed;
@@ -156,6 +158,17 @@ export const PackageRow: React.FC<PackageRowProps> = ({
             }}
           >
             <EyeIcon className="h-4 w-4" />
+          </button>
+          <button
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition"
+            type="button"
+            aria-label="Xóa"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(row);
+            }}
+          >
+            <TrashIcon className="h-4 w-4" />
           </button>
         </td>
       </tr>

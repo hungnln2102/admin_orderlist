@@ -1,4 +1,10 @@
 FROM node:20-alpine AS base
+
+# --- THÊM DÒNG NÀY ---
+# Cài đặt postgresql-client để có lệnh pg_dump cho tính năng backup
+RUN apk add --no-cache postgresql-client
+# ---------------------
+
 WORKDIR /app
 
 # Install only the production dependencies

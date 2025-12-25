@@ -287,6 +287,36 @@ const normalizedMatchMode =
   }
 };
 
+const deletePackageProduct = async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: "ID sản phẩm đóng gói là bắt buộc." });
+  }
+
+  try {
+    console.log("[packages] deletePackageProduct called with id:", id);
+    const deletedRows = await db(TABLES.packageProduct)
+      .where(pkgCols.id, id)
+      .del()
+      .returning([pkgCols.id, pkgCols.package]);
+
+    console.log("[packages] deletePackageProduct result:", deletedRows);
+
+    if (!deletedRows || deletedRows.length === 0) {
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm đóng gói." });
+    }
+
+    res.json({
+      deleted: deletedRows.length,
+      deletedIds: deletedRows.map((row) => row[pkgCols.id]).filter(Boolean),
+      deletedNames: [],
+    });
+  } catch (error) {
+    console.error(`[packages] Delete failed for id=${id}:`, error);
+    res.status(500).json({ error: "Không thể xóa sản phẩm đóng gói." });
+  }
+};
+
 const bulkDeletePackages = async (req, res) => {
   const { packages } = req.body || {};
   if (!Array.isArray(packages)) {
@@ -324,5 +354,6 @@ module.exports = {
   listPackageProducts,
   createPackageProduct,
   updatePackageProduct,
+  deletePackageProduct,
   bulkDeletePackages,
 };
