@@ -1,5 +1,5 @@
-const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
+const { db } = require("../../db");
+const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
 
 const listBanks = async (_req, res) => {
   try {

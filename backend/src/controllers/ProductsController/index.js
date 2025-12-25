@@ -1,9 +1,9 @@
-const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
-const { QUOTED_COLS } = require("../utils/columns");
-const { quoteIdent } = require("../utils/sql");
-const { normalizeTextInput, toNullableNumber } = require("../utils/normalizers");
-const { getNextSupplyId } = require("../services/idService");
+const { db } = require("../../db");
+const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { QUOTED_COLS } = require("../../utils/columns");
+const { quoteIdent } = require("../../utils/sql");
+const { normalizeTextInput, toNullableNumber } = require("../../utils/normalizers");
+const { getNextSupplyId } = require("../../services/idService");
 
 const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
 const SUPPLY_PRICE_DEF = getDefinition("SUPPLY_PRICE");

@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
-const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
+const { db } = require("../../db");
+const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
 
 const USERS_DEF = getDefinition("USERS");
 const USERS_TABLE = tableName(DB_SCHEMA.USERS.TABLE);

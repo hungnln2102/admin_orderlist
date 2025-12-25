@@ -4,7 +4,7 @@ const {
   createWarehouse,
   updateWarehouse,
   deleteWarehouse,
-} = require("../controllers/warehouseController");
+} = require("../controllers/WarehouseController");
 
 const router = express.Router();
 

@@ -1,6 +1,6 @@
-const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
-const { normalizeDateInput } = require("../utils/normalizers");
+const { db } = require("../../db");
+const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { normalizeDateInput } = require("../../utils/normalizers");
 
 const warehouseDef = getDefinition("WAREHOUSE");
 const cols = warehouseDef.columns;

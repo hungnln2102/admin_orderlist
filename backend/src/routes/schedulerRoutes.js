@@ -2,7 +2,7 @@ const express = require("express");
 const {
   runSchedulerNow,
   schedulerStatus,
-} = require("../controllers/schedulerController");
+} = require("../controllers/SchedulerController");
 
 const router = express.Router();
 

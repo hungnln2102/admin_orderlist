@@ -1,6 +1,6 @@
 const app = require("./app");
 const { port, sepay } = require("./config/appConfig");
-const { ensureDefaultAdmin } = require("./controllers/authController");
+const { ensureDefaultAdmin } = require("./controllers/AuthController");
 // Ensure scheduler boots cron tasks
 const scheduler = require("../scheduler"); // eslint-disable-line no-unused-vars
 const sepayWebhookApp = require("../webhook/sepay_webhook");

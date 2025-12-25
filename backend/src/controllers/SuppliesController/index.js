@@ -1,17 +1,17 @@
 const express = require("express");
-const { DB_SCHEMA, getDefinition, tableName, SCHEMA } = require("../config/dbSchema");
-const { QUOTED_COLS } = require("../utils/columns");
+const { DB_SCHEMA, getDefinition, tableName, SCHEMA } = require("../../config/dbSchema");
+const { QUOTED_COLS } = require("../../utils/columns");
 const {
   normalizeSupplyStatus,
   formatDateOutput,
-} = require("../utils/normalizers");
+} = require("../../utils/normalizers");
 const {
   createDateNormalization,
   createSourceKey,
   createNumericExtraction,
   quoteIdent,
-} = require("../utils/sql");
-const { db } = require("../db");
+} = require("../../utils/sql");
+const { db } = require("../../db");
 
 const ORDER_DEF = getDefinition("ORDER_LIST");
 const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
