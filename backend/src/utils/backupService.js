@@ -82,6 +82,9 @@ const uploadToDrive = async (filePath, fileName) => {
     resource: metadata,
     media,
     fields: "id, name, createdTime",
+    // Needed for shared drives (no personal quota for service accounts)
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
   return data;
 };
@@ -96,6 +99,8 @@ const cleanupOldBackups = async () => {
     q,
     fields: "files(id, name, createdTime)",
     pageSize: 1000,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const oldFiles =
