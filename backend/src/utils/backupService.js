@@ -8,9 +8,38 @@ const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const databaseUrl = process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL;
 const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
 const retentionDays = Number.parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 7;
+const logFilePath =
+  process.env.BACKUP_LOG_FILE || path.join(__dirname, "../../logs/backup.log");
+
+const appendLog = (level, message) => {
+  const line = `[${new Date().toISOString()}] [${level}] ${message}\n`;
+  try {
+    const dir = path.dirname(logFilePath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(logFilePath, line, "utf8");
+  } catch (err) {
+    // Fallback to console if file logging fails
+    console.error("[Backup] Failed to write log file:", err.message);
+  }
+};
+
+const logInfo = (message) => {
+  console.log(`[Backup] ${message}`);
+  appendLog("INFO", message);
+};
+
+const logWarn = (message) => {
+  console.warn(`[Backup] ${message}`);
+  appendLog("WARN", message);
+};
+
+const logError = (message) => {
+  console.error(`[Backup] ${message}`);
+  appendLog("ERROR", message);
+};
 
 if (!databaseUrl) {
-  console.warn("[Backup] DATABASE_URL / BACKUP_DATABASE_URL not set. Backup will be skipped.");
+  logWarn("DATABASE_URL / BACKUP_DATABASE_URL not set. Backup will be skipped.");
 }
 
 const createDriveClient = () => {
@@ -81,33 +110,44 @@ const cleanupOldBackups = async () => {
     oldFiles.map((file) =>
       drive.files
         .delete({ fileId: file.id })
-        .catch((err) => console.warn(`[Backup] Failed to delete old backup ${file.id}:`, err.message))
+        .catch((err) => logWarn(`Failed to delete old backup ${file.id}: ${err.message}`))
     )
   );
-  console.log(`[Backup] Deleted ${oldFiles.length} old backup file(s) from Drive (retention ${retentionDays}d).`);
+  logInfo(`Deleted ${oldFiles.length} old backup file(s) from Drive (retention ${retentionDays}d).`);
 };
 
 const backupDatabaseToDrive = async () => {
-  if (!databaseUrl) return;
+  if (!databaseUrl) {
+    logWarn("Skipped backup: no DATABASE_URL / BACKUP_DATABASE_URL provided.");
+    return;
+  }
+
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const fileName = `db-backup-${timestamp}.dump`;
   const outPath = path.join(os.tmpdir(), fileName);
 
-  console.log("[Backup] Starting database backup...");
-  await execPgDump(outPath);
-  console.log(`[Backup] Dump created at ${outPath}`);
-
-  const uploaded = await uploadToDrive(outPath, fileName);
-  console.log(`[Backup] Uploaded to Google Drive: ${uploaded.id} (${uploaded.name})`);
-
   try {
-    fs.unlinkSync(outPath);
+    logInfo("Starting database backup...");
+    await execPgDump(outPath);
+    logInfo(`Dump created at ${outPath}`);
+
+    const uploaded = await uploadToDrive(outPath, fileName);
+    logInfo(`Uploaded to Google Drive: ${uploaded.id} (${uploaded.name})`);
   } catch (err) {
-    console.warn("[Backup] Failed to remove local dump:", err.message);
+    logError(`Backup failed: ${err.message}`);
+    throw err;
+  } finally {
+    try {
+      if (fs.existsSync(outPath)) {
+        fs.unlinkSync(outPath);
+      }
+    } catch (err) {
+      logWarn(`Failed to remove local dump: ${err.message}`);
+    }
   }
 
   await cleanupOldBackups();
-  console.log("[Backup] Backup finished.");
+  logInfo("Backup finished.");
 };
 
 module.exports = {
