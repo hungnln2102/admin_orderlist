@@ -5,7 +5,7 @@ const {
   getSupplyPricesByProductName,
   updateSupplyPriceForProduct,
   deleteSupplyPriceForProduct,
-} = require("../controllers/productsController");
+} = require("../controllers/ProductsController");
 
 const router = express.Router();
 

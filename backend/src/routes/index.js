@@ -3,7 +3,7 @@ const authRoutes = require("./authRoutes");
 const dashboardRoutes = require("./dashboardRoutes");
 const ordersRoutes = require("./ordersRoutes");
 const suppliesRoutes = require("./suppliesRoutes");
-const suppliesController = require("../controllers/suppliesController");
+const suppliesController = require("../controllers/SuppliesController");
 const paymentsRoutes = require("./paymentsRoutes");
 const productsRoutes = require("./productsRoutes");
 const productPricesRoutes = require("./productPricesRoutes");
@@ -12,7 +12,7 @@ const banksRoutes = require("./banksRoutes");
 const packagesRoutes = require("./packagesRoutes");
 const warehouseRoutes = require("./warehouseRoutes");
 const schedulerRoutes = require("./schedulerRoutes");
-const { runSchedulerNow } = require("../controllers/schedulerController");
+const { runSchedulerNow } = require("../controllers/SchedulerController");
 const { authGuard } = require("../middleware/authGuard");
 
 const router = express.Router();

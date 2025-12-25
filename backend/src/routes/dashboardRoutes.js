@@ -3,7 +3,7 @@ const {
   dashboardStats,
   dashboardYears,
   dashboardCharts,
-} = require("../controllers/dashboardController");
+} = require("../controllers/DashboardController");
 
 const router = express.Router();
 

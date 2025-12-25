@@ -1,4 +1,4 @@
-const { updateDatabaseTask, getSchedulerStatus } = require("../../scheduler");
+const { updateDatabaseTask, getSchedulerStatus } = require("../../../scheduler");
 
 const runSchedulerNow = async (_req, res) => {
   try {

@@ -1,3 +1,3 @@
-const router = require("../controllers/suppliesController");
+const router = require("../controllers/SuppliesController");
 
 module.exports = router;

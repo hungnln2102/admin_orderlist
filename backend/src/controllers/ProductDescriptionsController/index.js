@@ -1,7 +1,7 @@
-const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
-const { quoteIdent } = require("../utils/sql");
-const { normalizeTextInput, trimToLength } = require("../utils/normalizers");
+const { db } = require("../../db");
+const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { quoteIdent } = require("../../utils/sql");
+const { normalizeTextInput, trimToLength } = require("../../utils/normalizers");
 
 const PRODUCT_DESC_DEF = getDefinition("PRODUCT_DESC");
 const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");

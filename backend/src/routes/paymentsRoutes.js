@@ -2,7 +2,7 @@ const express = require("express");
 const {
   listPaymentReceipts,
   confirmPaymentSupply,
-} = require("../controllers/paymentsController");
+} = require("../controllers/PaymentsController");
 
 const router = express.Router();
 
