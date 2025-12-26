@@ -1,4 +1,13 @@
 node_modules/
 # dist/
 # build/
-# .env
+.env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+backend/creds/
+backend/creds/**
+backend/creds/*.json
+clean_repo/
+*.log
