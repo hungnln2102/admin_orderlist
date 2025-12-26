@@ -8,6 +8,9 @@ const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const databaseUrl = process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL;
 const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
 const retentionDays = Number.parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 7;
+const oauthClientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;
+const oauthClientSecret = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
+const oauthRefreshToken = process.env.GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN;
 const logFilePath =
   process.env.BACKUP_LOG_FILE || path.join(__dirname, "../../logs/backup.log");
 
@@ -45,7 +48,14 @@ if (!databaseUrl) {
 const createDriveClient = () => {
   const scopes = ["https://www.googleapis.com/auth/drive.file"];
 
-  // Prefer GOOGLE_APPLICATION_CREDENTIALS (JSON key file)
+  // 1) OAuth refresh token (personal Google Drive)
+  if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+    const oauth2 = new google.auth.OAuth2(oauthClientId, oauthClientSecret);
+    oauth2.setCredentials({ refresh_token: oauthRefreshToken });
+    return google.drive({ version: "v3", auth: oauth2 });
+  }
+
+  // 2) Service account via key file
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     const auth = new google.auth.GoogleAuth({
       keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -54,12 +64,14 @@ const createDriveClient = () => {
     return google.drive({ version: "v3", auth });
   }
 
-  // Fallback to env pair
+  // 3) Service account via env pair
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const privateKey = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 
   if (!clientEmail || !privateKey) {
-    throw new Error("Missing Google Drive service account credentials (email/private key).");
+    throw new Error(
+      "Missing Google Drive credentials. Provide OAuth (GOOGLE_DRIVE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN) or service account (GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_EMAIL/GOOGLE_PRIVATE_KEY)."
+    );
   }
 
   const auth = new google.auth.JWT(clientEmail, null, privateKey, scopes);
