@@ -43,6 +43,18 @@ if (!databaseUrl) {
 }
 
 const createDriveClient = () => {
+  const scopes = ["https://www.googleapis.com/auth/drive.file"];
+
+  // Prefer GOOGLE_APPLICATION_CREDENTIALS (JSON key file)
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes,
+    });
+    return google.drive({ version: "v3", auth });
+  }
+
+  // Fallback to env pair
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const privateKey = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 
@@ -50,7 +62,6 @@ const createDriveClient = () => {
     throw new Error("Missing Google Drive service account credentials (email/private key).");
   }
 
-  const scopes = ["https://www.googleapis.com/auth/drive.file"];
   const auth = new google.auth.JWT(clientEmail, null, privateKey, scopes);
   return google.drive({ version: "v3", auth });
 };
