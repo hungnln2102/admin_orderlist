@@ -21,7 +21,7 @@ const dashboardStats = async (_req, res) => {
   } catch (error) {
     console.error("[dashboard] Query failed (stats):", error);
     res.status(500).json({
-      error: "KhA'ng th ¯Ÿ t §œi d ¯_ li ¯Øu.",
+      error: "Không thể tải dữ liệu.",
     });
   }
 };
@@ -33,7 +33,7 @@ const dashboardYears = async (_req, res) => {
   } catch (error) {
     console.error("[dashboard] Query failed (years):", error);
     res.status(500).json({
-      error: "KhA'ng th ¯Ÿ t §œi danh sA­ch nŽŸm.",
+      error: "Không thể tải danh sách năm.",
     });
   }
 };
@@ -52,7 +52,7 @@ const dashboardCharts = async (req, res) => {
   } catch (error) {
     console.error("[dashboard] Query failed (charts):", error);
     res.status(500).json({
-      error: "KhA'ng th ¯Ÿ t §œi bi ¯Ÿu Ž` ¯\".",
+      error: "Không thể tải biểu đồ.",
     });
   }
 };

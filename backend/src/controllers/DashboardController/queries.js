@@ -128,8 +128,10 @@ const orderIdStringColumn = '"id_order"';
 const buildChartsQuery = () => `
   WITH params AS (
     SELECT
-      make_date(:year, 1, 1) AS year_start,
-      make_date(:year + 1, 1, 1) AS next_year_start
+      ?::int AS year_value,
+      make_date(?::int, 1, 1) AS year_start,
+      make_date((?::int) + 1, 1, 1) AS next_year_start,
+      ?::boolean AS limit_to_today
   ),
   months AS (
     SELECT gs AS month_num, TO_CHAR(gs, '"T"FM99') AS month_label
@@ -162,7 +164,7 @@ const buildChartsQuery = () => `
       0 AS order_count
     FROM ${TABLES.orderCanceled}
     WHERE TRIM(createdate::text) <> ''
-      AND status = 'Ž?Aœ HoAÿn'
+      AND status = 'Đã Hoàn'
   ),
   all_transactions AS (
       SELECT id_order, event_date, amount, order_count FROM income_stream
@@ -175,7 +177,7 @@ const buildChartsQuery = () => `
     WHERE event_date IS NOT NULL
       AND event_date >= params.year_start
       AND event_date < params.next_year_start
-      AND (:limitToToday::boolean IS FALSE OR event_date <= ${CURRENT_DATE_SQL})
+      AND (params.limit_to_today IS FALSE OR event_date <= ${CURRENT_DATE_SQL})
   ),
   monthly_stats AS (
     SELECT

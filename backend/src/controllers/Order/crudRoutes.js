@@ -6,6 +6,7 @@ const {
     ensureSupplyRecord,
     normalizeTextInput,
 } = require("./helpers");
+const { adjustSupplierDebtIfNeeded, calcRemainingRefund } = require("./orderFinanceHelpers");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { DB_SCHEMA } = require("../../config/dbSchema");
 const { nextId } = require("../../services/idService");

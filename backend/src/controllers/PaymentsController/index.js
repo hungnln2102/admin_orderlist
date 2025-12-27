@@ -53,7 +53,7 @@ const listPaymentReceipts = async (req, res) => {
     res.json({ receipts, count: receipts.length, offset, limit });
   } catch (error) {
     console.error("[payments] Query failed (payment-receipts):", error);
-    res.status(500).json({ error: "KhÙng th? t?i biÍn lai thanh to·n." });
+    res.status(500).json({ error: "Kh√¥ng th·ªÉ t·∫£i bi√™n lai thanh to√°n." });
   }
 };
 
@@ -62,7 +62,7 @@ const confirmPaymentSupply = async (req, res) => {
   const parsedPaymentId = Number.parseInt(paymentId, 10);
   if (!Number.isInteger(parsedPaymentId) || parsedPaymentId <= 0) {
     return res.status(400).json({
-      error: "ID thanh to·n khÙng h?p l?.",
+      error: "ID thanh to√°n kh√¥ng h·ª£p l·ªá.",
     });
   }
 
@@ -124,8 +124,8 @@ const confirmPaymentSupply = async (req, res) => {
           : "";
       const trimmedSourceName = sourceName.trim();
 
-      const UNPAID_STATUS = "Chua Thanh To·n";
-      const PAID_STATUS = "–„ Thanh To·n";
+      const UNPAID_STATUS = "Ch∆∞a Thanh To√°n";
+      const PAID_STATUS = "ƒê√£ Thanh To√°n";
 
       let remainingImport = null;
       try {
@@ -173,7 +173,7 @@ const confirmPaymentSupply = async (req, res) => {
         remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
       } catch (orderErr) {
         console.error(
-          "[payments] KhÙng th? d?i chi?u c·c don d?t h‡ng chua thanh to·n cho h‡ng hÛa",
+          "[payments] Kh√¥ng th·ªÉ ƒë·ªëi chi·∫øu c√°c ƒë∆°n ƒë·∫∑t h√†ng ch∆∞a thanh to√°n cho h√†ng h√≥a",
           sourceId,
           orderErr
         );
@@ -220,7 +220,7 @@ const confirmPaymentSupply = async (req, res) => {
     });
 
     if (!updatedRow) {
-      return res.status(404).json({ error: "KhÙng tÏm th?y h? so thanh to·n." });
+      return res.status(404).json({ error: "Kh√¥ng t√¨m th·∫•y h·ªì s∆° thanh to√°n." });
     }
     res.json(updatedRow);
   } catch (error) {
@@ -229,7 +229,7 @@ const confirmPaymentSupply = async (req, res) => {
       error
     );
     res.status(500).json({
-      error: "KhÙng th? x·c nh?n thanh to·n.",
+      error: "Kh√¥ng th·ªÉ x√°c nh·∫≠n thanh to√°n.",
     });
   }
 };

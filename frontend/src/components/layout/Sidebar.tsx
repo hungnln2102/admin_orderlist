@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ChartBarIcon,
@@ -10,7 +10,6 @@ import {
   XMarkIcon,
   Bars3Icon,
   InformationCircleIcon,
-  ChartPieIcon,
   ChevronDownIcon,
   ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
@@ -54,12 +53,11 @@ const menuSections: MenuSection[] = [
   {
     title: "Cá Nhân",
     items: [
-      { name: "Thống Kê", href: "/stats", icon: ChartPieIcon },
       { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
       { name: "Báo Giá", href: "/show-price", icon: DocumentIcon },
       { name: "Hóa Đơn", href: "/bill-order", icon: DocumentIcon },
       { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
-      { name: "Lưu trữ", href: "/warehouse", icon: ArchiveBoxIcon },
+      { name: "Lưu Trữ", href: "/warehouse", icon: ArchiveBoxIcon },
     ],
   },
 ];
@@ -280,10 +278,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 </div>
                 <div className="ml-3 flex-1 text-left">
                   <p className="text-sm font-semibold text-white truncate">
-                    {user?.username || "Tài khoản"}
+                    {user?.username || "T�i kho?n"}
                   </p>
                   <p className="text-[11px] text-indigo-100/80 truncate">
-                    {user?.role ? `Role: ${user.role}` : "Chưa đăng nhập"}
+                    {user?.role ? `Role: ${user.role}` : "Chua dang nh?p"}
                   </p>
                 </div>
               </button>
@@ -291,7 +289,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 type="button"
                 onClick={handleLogout}
                 className="ml-3 w-9 h-9 flex items-center justify-center rounded-lg bg-red-500/10 text-red-200 hover:bg-red-500/20 border border-red-500/30 transition"
-                title="Đăng Xuất"
+                title="�ang Xu?t"
               >
                 <ArrowRightOnRectangleIcon className="h-5 w-5" />
               </button>
@@ -300,10 +298,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-white/15 bg-[#0f1432] shadow-2xl shadow-black/40 z-10">
                 <ul className="py-2 text-sm text-indigo-50 space-y-1">
                   {[
-                    "Thông tin",
-                    "Thêm Admin",
-                    "Thêm Quyền",
-                    "Đổi Mật Khẩu",
+                    "Th�ng tin",
+                    "Th�m Admin",
+                    "Th�m Quy?n",
+                    "�?i M?t Kh?u",
                   ].map((label) => (
                     <li key={label}>
                       <button

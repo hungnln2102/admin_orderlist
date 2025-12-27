@@ -13,7 +13,6 @@ import PackageProduct from "./pages/Product/PackageProduct";
 import ProductInfo from "./pages/Product/ProductInfo";
 import Pricing from "./pages/Product/priceList";
 import RetroLogin from "./pages/RetroLogin";
-import Stats from "./pages/Personal/Stats";
 import Sources from "./pages/Personal/Supply";
 import ShowPrice from "./pages/Personal/ShowPrice";
 import BillOrder from "./pages/Personal/bill-order";
@@ -57,7 +56,6 @@ function App() {
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/package-products" element={<PackageProduct />} />
                         <Route path="/product-info" element={<ProductInfo />} />
-                        <Route path="/stats" element={<Stats />} />
                         <Route path="/sources" element={<Sources />} />
                         <Route path="/pricing" element={<Pricing />} />
                         <Route path="/bill-order" element={<BillOrder />} />
