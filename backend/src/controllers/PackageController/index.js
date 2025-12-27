@@ -13,14 +13,14 @@ const listHandler = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("[packages] Query failed:", error);
-    res.status(500).json({ error: "Unable to load package products." });
+    res.status(500).json({ error: "Không thể tải sản phẩm đóng gói." });
   }
 };
 
 const createHandler = async (req, res) => {
   const { packageName } = req.body || {};
   if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Package name is required." });
+    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
   }
 
   try {
@@ -28,7 +28,7 @@ const createHandler = async (req, res) => {
     res.status(201).json(newRow);
   } catch (error) {
     console.error("[packages] Insert failed:", error);
-    res.status(500).json({ error: "Unable to create package product." });
+    res.status(500).json({ error: "Không thể tạo sản phẩm đóng gói." });
   }
 };
 
@@ -37,34 +37,34 @@ const updateHandler = async (req, res) => {
   const { packageName } = req.body || {};
 
   if (!id) {
-    return res.status(400).json({ error: "Package product ID is required." });
+    return res.status(400).json({ error: "ID sản phẩm đóng gói là bắt buộc." });
   }
   if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Package name is required." });
+    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
   }
 
   try {
     const updated = await updatePackageProduct(id, req.body || {});
     if (!updated) {
-      return res.status(404).json({ error: "Package product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm đóng gói." });
     }
     res.json(updated);
   } catch (error) {
     console.error(`[packages] Update failed for id=${id}:`, error);
-    res.status(500).json({ error: "Unable to update package product." });
+    res.status(500).json({ error: "Không thể cập nhật sản phẩm đóng gói." });
   }
 };
 
 const deleteHandler = async (req, res) => {
   const { id } = req.params;
   if (!id) {
-    return res.status(400).json({ error: "Package product ID is required." });
+    return res.status(400).json({ error: "ID sản phẩm đóng gói là bắt buộc." });
   }
 
   try {
     const deletedRows = await deletePackageProduct(id);
     if (!deletedRows || deletedRows.length === 0) {
-      return res.status(404).json({ error: "Package product not found." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm đóng gói." });
     }
 
     res.json({
@@ -74,14 +74,14 @@ const deleteHandler = async (req, res) => {
     });
   } catch (error) {
     console.error(`[packages] Delete failed for id=${id}:`, error);
-    res.status(500).json({ error: "Unable to delete package product." });
+    res.status(500).json({ error: "Không thể xóa sản phẩm đóng gói." });
   }
 };
 
 const bulkDeleteHandler = async (req, res) => {
   const { packages } = req.body || {};
   if (!Array.isArray(packages)) {
-    return res.status(400).json({ error: "Packages must be an array." });
+    return res.status(400).json({ error: "Các gói phải là một mảng." });
   }
   const names = Array.from(
     new Set(
@@ -91,7 +91,7 @@ const bulkDeleteHandler = async (req, res) => {
     )
   );
   if (!names.length) {
-    return res.status(400).json({ error: "No package names provided." });
+    return res.status(400).json({ error: "Không có tên gói nào được cung cấp." });
   }
 
   try {
@@ -103,7 +103,7 @@ const bulkDeleteHandler = async (req, res) => {
     });
   } catch (error) {
     console.error("[packages] Delete failed:", error);
-    res.status(500).json({ error: "Unable to delete package products." });
+    res.status(500).json({ error: "Không thể xóa sản phẩm đóng gói." });
   }
 };
 

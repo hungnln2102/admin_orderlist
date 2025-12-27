@@ -39,10 +39,8 @@ const fetchDashboardYears = async () => {
 };
 
 const fetchDashboardCharts = async ({ year, limitToToday }) => {
-  const result = await db.raw(buildChartsQuery(), {
-    year,
-    limitToToday,
-  });
+  const bindings = [year, year, year, !!limitToToday];
+  const result = await db.raw(buildChartsQuery(), bindings);
 
   return {
     year,
