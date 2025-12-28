@@ -9,6 +9,11 @@ import {
 } from "../utils";
 
 interface UseProductDataResult {
+  currentPage: number;
+  setCurrentPage: (value: number) => void;
+  rowsPerPage: number;
+  setRowsPerPage: (value: number) => void;
+  totalRows: number;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   statusFilter: StatusFilter;
@@ -34,6 +39,8 @@ interface UseProductDataResult {
 export const useProductData = (apiBase: string): UseProductDataResult => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [productPrices, setProductPrices] = useState<ProductPricingRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +151,20 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     updatedTimestampMap,
   ]);
 
+  const pagedPricing = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+    return filteredPricing.slice(start, end);
+  }, [filteredPricing, currentPage, rowsPerPage]);
+
+  const totalRows = filteredPricing.length;
+
   return {
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
+    totalRows,
     searchTerm,
     setSearchTerm,
     statusFilter,
@@ -164,6 +184,6 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     isRefreshing,
     setIsRefreshing,
     fetchProductPrices,
-    filteredPricing,
+    filteredPricing: pagedPricing,
   };
 };

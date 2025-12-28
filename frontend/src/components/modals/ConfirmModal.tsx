@@ -20,7 +20,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   secondaryMessage,
   confirmLabel = "OK",
-  cancelLabel = "Huy",
+  cancelLabel = "Hủy",
   isSubmitting = false,
 }) => {
   // Nếu không mở thì không render gì cả
@@ -60,7 +60,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             disabled={isSubmitting}
             className="px-4 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Dang xu ly..." : confirmLabel}
+            {isSubmitting ? "Đang Xử Lý..." : confirmLabel}
           </button>
         </div>
       </div>

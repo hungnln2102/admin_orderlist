@@ -185,6 +185,12 @@ export const useProductActions = ({
   }, [apiBase, isLoadingSuppliers, supplierOptions.length]);
 
   useEffect(() => {
+    if (!isLoadingSuppliers && supplierOptions.length === 0) {
+      loadSupplierOptions();
+    }
+  }, [isLoadingSuppliers, supplierOptions.length, loadSupplierOptions]);
+
+  useEffect(() => {
     if (isCreateModalOpen && bankOptions.length === 0 && !isLoadingBanks) {
       loadBankOptions();
     }

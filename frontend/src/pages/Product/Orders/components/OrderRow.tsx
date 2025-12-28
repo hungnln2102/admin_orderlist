@@ -70,8 +70,16 @@ export const OrderRow = React.memo(function OrderRow({
   const giaTriConLaiSafe = Number.isFinite(Number(giaTriConLai))
     ? Number(giaTriConLai)
     : 0;
-  const refundSafe = Number.isFinite(Number(order.can_hoan))
+  const refundFromRow = Number.isFinite(Number(order.can_hoan))
     ? Number(order.can_hoan)
+    : null;
+  const giaTriConLaiForCanceled = isCanceled
+    ? Math.max(
+        0,
+        refundFromRow !== null && Number.isFinite(giaTriConLaiSafe)
+          ? Math.min(refundFromRow, giaTriConLaiSafe)
+          : refundFromRow ?? giaTriConLaiSafe
+      )
     : giaTriConLaiSafe;
 
   const normalizedStatus = normalizeStatusValue(String(trangThaiText || ""));
@@ -93,7 +101,7 @@ export const OrderRow = React.memo(function OrderRow({
     ? "text-orange-500"
     : "text-green-500";
   const remainingDisplay = isCanceled
-    ? formatCurrency(refundSafe)
+    ? formatCurrency(giaTriConLaiForCanceled)
     : remainingValue;
 
   const handleToggle = useCallback(() => {
@@ -234,8 +242,9 @@ export const OrderRow = React.memo(function OrderRow({
                 {showActionButtons && (
                   <div className="ml-4 flex items-center gap-2">
                     {!(
-                      order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN &&
-                      order[ORDER_FIELDS.CHECK_FLAG] === true
+                      (order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN &&
+                        order[ORDER_FIELDS.CHECK_FLAG] === true) ||
+                      normalizedStatus === "can gia han"
                     ) && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
@@ -289,7 +298,7 @@ export const OrderRow = React.memo(function OrderRow({
                     Giá trị còn lại
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
-                    {formatCurrency(giaTriConLaiSafe)}
+                    {formatCurrency(giaTriConLaiForCanceled)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">

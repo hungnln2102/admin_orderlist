@@ -1,4 +1,4 @@
-const { db } = require("../../db");
+﻿const { db } = require("../../db");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { TABLES } = require("./constants");
 const { normalizeOrderRow } = require("./helpers");
@@ -21,15 +21,15 @@ const attachListRoutes = (router) => {
             const today = todayYMDInVietnam();
             const normalized = rows.map((row) =>
                 normalizeOrderRow(row, today, {
-                    // Refund/canceled table should display the stored status from DB (e.g. Chưa Hoàn/Đã Hoàn)
-                    // and must not be auto-overridden to Hết Hạn/Còn Gia Hạn based on expiry.
-                    enableAutoStatus: !(scope === "canceled" || scope === "cancelled"),
+                    // Refund/canceled table should display the stored status from DB (e.g. ChÆ°a HoÃ n/ÄÃ£ HoÃ n)
+                    // and must not be auto-overridden to Háº¿t Háº¡n/CÃ²n Gia Háº¡n based on expiry.
+                    enableAutoStatus: !(scope === "canceled" || scope === "cancelled" || scope === "expired"),
                 })
             );
             res.json(normalized);
         } catch (error) {
-            console.error("Truy vấn thất bại:", error);
-            res.status(500).json({ error: "Không thể tải danh sách đơn hàng." });
+            console.error("Truy váº¥n tháº¥t báº¡i:", error);
+            res.status(500).json({ error: "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch Ä‘Æ¡n hÃ ng." });
         }
     });
 
@@ -38,3 +38,6 @@ const attachListRoutes = (router) => {
 };
 
 module.exports = { attachListRoutes };
+
+
+

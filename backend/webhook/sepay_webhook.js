@@ -42,6 +42,7 @@ const {
   runRenewal,
   setStatusUnpaid,
 } = require("./sepay/renewal");
+const { sendRenewalNotification } = require("./sepay/notifications");
 
 const app = express();
 
@@ -260,3 +261,4 @@ module.exports.runRenewal = runRenewal;
 module.exports.queueRenewalTask = queueRenewalTask;
 module.exports.processRenewalTask = processRenewalTask;
 module.exports.fetchOrderState = fetchOrderState;
+module.exports.sendRenewalNotification = sendRenewalNotification;
