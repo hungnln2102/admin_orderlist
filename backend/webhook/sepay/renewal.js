@@ -29,9 +29,16 @@ const { sendRenewalNotification } = require("./notifications");
 
 const pendingRenewalTasks = new Map(); // orderCode -> task state
 
+const normalizeStatusText = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
 const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
   if (!orderCode) {
-    return { success: false, details: "Thieu ma don hang", processType: "error" };
+    return { success: false, details: "Thiếu mã đơn hàng", processType: "error" };
   }
 
   const client = await pool.connect();
@@ -57,7 +64,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     if (!orderRes.rows.length) {
       return {
         success: false,
-        details: `Khong tim thay don ${orderCode}`,
+        details: `Không tìm thấy đơn ${orderCode}`,
         processType: "error",
       };
     }
@@ -70,6 +77,9 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const giaBanCu = normalizeMoney(order[ORDER_COLS.price]);
     const thongTin = order[ORDER_COLS.informationOrder];
     const slot = order[ORDER_COLS.slot];
+    const rawStatus = String(order[ORDER_COLS.status] || "").trim();
+    const statusPlain = normalizeStatusText(rawStatus);
+    const checkFlagValue = order[ORDER_COLS.checkFlag];
 
     const resolveMoney = (computedValue, ...fallbackValues) => {
       if (Number.isFinite(computedValue) && computedValue > 0) {
@@ -91,16 +101,37 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     if (!hetHan) {
       return {
         success: false,
-        details: `Ngay het han khong hop le cho ${orderCode}`,
+        details: `Ngày hết hạn không hợp lệ cho đơn${orderCode}`,
         processType: "error",
       };
     }
 
     const daysLeft = Math.floor((hetHan.getTime() - Date.now()) / 86_400_000);
+
+    // Check directly against the DB value (accented) instead of normalized text.
+    const paidAndLocked =
+      rawStatus === "Đã Thanh Toán" && isTrueFlag(checkFlagValue);
+
+    // Skip auto-renewal for paid + locked orders, but allow manual (force) renewals.
+    if (paidAndLocked && !forceRenewal) {
+      return {
+        success: false,
+        details: `Bỏ qua gia hạn đơn ${orderCode} `,
+        processType: "skipped",
+      };
+    }
+    if (paidAndLocked && forceRenewal) {
+      console.log("[Renewal] Ghi đè thủ công cho đơn hàng đã thanh toán", {
+        orderCode,
+        status: statusPlain,
+        checkFlag: checkFlagValue,
+      });
+    }
+
     if (!forceRenewal && daysLeft > 4) {
       return {
         success: false,
-        details: `Bo qua, con ${daysLeft} ngay`,
+        details: `Bỏ qua, còn ${daysLeft} ngay`,
         processType: "skipped",
       };
     }
@@ -110,7 +141,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     if (!months) {
       return {
         success: false,
-        details: "Khong xac dinh thoi han san pham",
+        details: "Không xác định được thời hạn sản phẩm",
         processType: "error",
       };
     }
@@ -225,7 +256,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       try {
         await updatePaymentSupplyBalance(sourceId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {
-        console.error("Failed to update payment_supply for %s:", orderCode, balanceErr);
+        console.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp %s:", orderCode, balanceErr);
       }
     }
 
@@ -303,25 +334,26 @@ const isTrueFlag = (value) => {
 };
 
 const shouldResetStatusToUnpaid = (statusValue) =>
-  statusValue === "Cần Gia Hạn" || statusValue === "Hết Hạn";
+  statusValue === ORDER_STATUS.RENEWAL || statusValue === ORDER_STATUS.EXPIRED;
 
 const isEligibleForRenewal = (statusValue, checkFlag, orderExpired) => {
-  const statusNorm = String(statusValue || "");
+  const statusText = String(statusValue || "");
   const daysLeft = daysUntil(orderExpired);
 
   const readyForRenew =
-    (statusNorm === "Cần Gia Hạn" || statusNorm === "Hết Hạn") &&
+    (statusText === ORDER_STATUS.RENEWAL || statusText === ORDER_STATUS.EXPIRED) &&
     isNullishFlag(checkFlag) &&
     daysLeft <= 4;
 
-  const paidNeedsForce = statusNorm === "Đã Thanh Toán" && isTrueFlag(checkFlag);
+  // Do NOT auto-renew paid + locked orders.
+  const paidLocked = statusText === ORDER_STATUS.PAID && isTrueFlag(checkFlag);
 
   return {
-    eligible: readyForRenew || paidNeedsForce,
-    forceRenewal: paidNeedsForce,
-    needsStatusReset: paidNeedsForce,
+    eligible: readyForRenew && !paidLocked,
+    forceRenewal: false,
+    needsStatusReset: false,
     daysLeft,
-    statusNorm,
+    statusNorm: statusText,
   };
 };
 

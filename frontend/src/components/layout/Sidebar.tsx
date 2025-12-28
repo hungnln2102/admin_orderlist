@@ -278,10 +278,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 </div>
                 <div className="ml-3 flex-1 text-left">
                   <p className="text-sm font-semibold text-white truncate">
-                    {user?.username || "T�i kho?n"}
+                    {user?.username || "Tài Khoản"}
                   </p>
                   <p className="text-[11px] text-indigo-100/80 truncate">
-                    {user?.role ? `Role: ${user.role}` : "Chua dang nh?p"}
+                    {user?.role ? `Role: ${user.role}` : "Chưa đăng nhập"}
                   </p>
                 </div>
               </button>
@@ -289,7 +289,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 type="button"
                 onClick={handleLogout}
                 className="ml-3 w-9 h-9 flex items-center justify-center rounded-lg bg-red-500/10 text-red-200 hover:bg-red-500/20 border border-red-500/30 transition"
-                title="�ang Xu?t"
+                title="Đăng Xuất"
               >
                 <ArrowRightOnRectangleIcon className="h-5 w-5" />
               </button>
@@ -298,10 +298,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-white/15 bg-[#0f1432] shadow-2xl shadow-black/40 z-10">
                 <ul className="py-2 text-sm text-indigo-50 space-y-1">
                   {[
-                    "Th�ng tin",
-                    "Th�m Admin",
-                    "Th�m Quy?n",
-                    "�?i M?t Kh?u",
+                    "Thông tin",
+                    "Thêm Admin",
+                    "Thêm Quyền",
+                    "Đổi Mật Khẩu",
                   ].map((label) => (
                     <li key={label}>
                       <button

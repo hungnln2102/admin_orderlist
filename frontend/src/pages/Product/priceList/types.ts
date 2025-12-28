@@ -99,6 +99,8 @@ export interface DeleteProductState {
 
 export interface NewSupplyRowState {
   sourceName: string;
+  sourceId: number | null;
+  useCustomName: boolean;
   price: string;
   error: string | null;
   isSaving: boolean;

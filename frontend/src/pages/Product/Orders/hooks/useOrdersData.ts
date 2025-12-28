@@ -187,15 +187,26 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
       );
       const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
       const daysForValue = Math.max(0, effectiveRemaining);
-      const giaTriConLai =
+      let giaTriConLai =
         soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
 
       const rawRefund =
         order.can_hoan ??
         (order as Record<string, unknown>)[ORDER_FIELDS.REFUND] ??
         (order as Record<string, unknown>)["refund"];
-      const canHoanValue =
+      let canHoanValue =
         parseNumeric(rawRefund) ?? (Number.isFinite(giaTriConLai) ? giaTriConLai : null);
+
+      // For Hoàn tiền dataset, always reflect the refund column exactly.
+      if (dataset === "canceled") {
+        const refundFromDb = parseNumeric(
+          (order as Record<string, unknown>)["refund"]
+        );
+        if (refundFromDb !== null) {
+          giaTriConLai = refundFromDb;
+          canHoanValue = refundFromDb;
+        }
+      }
 
       return {
         ...order,
@@ -216,6 +227,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         ? [
             ORDER_FIELDS.CUSTOMER,
             ORDER_FIELDS.ID_ORDER,
+            ORDER_FIELDS.ID_PRODUCT,
             ORDER_FIELDS.INFORMATION_ORDER,
             ORDER_FIELDS.SUPPLY,
             ORDER_FIELDS.CONTACT,
@@ -223,12 +235,12 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         : [searchField];
     const normalizedStatusFilter =
       statusFilter === "all" ? "" : normalizeStatusValue(statusFilter);
-    const filteredOrders = ordersWithVirtualFields.filter((order) => {
-      const matchesSearch =
-        !normalizedSearchTerm ||
-        searchableFields.some((field) => {
-          const rawValue = (order as Record<string, unknown>)[field];
-          const normalizedFieldValue = normalizeSearchText(rawValue);
+      const filteredOrders = ordersWithVirtualFields.filter((order) => {
+        const matchesSearch =
+          !normalizedSearchTerm ||
+          searchableFields.some((field) => {
+            const rawValue = (order as Record<string, unknown>)[field];
+            const normalizedFieldValue = normalizeSearchText(rawValue);
           if (!normalizedFieldValue) return false;
 
           if (field === ORDER_FIELDS.ID_ORDER) {
@@ -243,14 +255,29 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           return normalizedFieldValue.includes(normalizedSearchTerm);
         });
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        normalizeStatusValue(
-          String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "")
-        ) === normalizedStatusFilter;
+        // Always allow searching by Mã đơn hàng, even if a narrower field is selected.
+        const orderCodeFallbackMatch =
+          !!normalizedOrderSearchTerm &&
+          normalizeOrderCode(order[ORDER_FIELDS.ID_ORDER]).includes(
+            normalizedOrderSearchTerm
+          );
+        const productFallbackMatch =
+          !!normalizedSearchTerm &&
+          normalizeSearchText(order[ORDER_FIELDS.ID_PRODUCT]).includes(
+            normalizedSearchTerm
+          );
 
-      return matchesSearch && matchesStatus;
-    });
+        const matchesStatus =
+          statusFilter === "all" ||
+          normalizeStatusValue(
+            String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "")
+          ) === normalizedStatusFilter;
+
+        return (
+          (matchesSearch || orderCodeFallbackMatch || productFallbackMatch) &&
+          matchesStatus
+        );
+      });
 
     // --- LOGIC SẮP XẾP ---
     filteredOrders.sort((a, b) => {

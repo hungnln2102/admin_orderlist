@@ -24,6 +24,7 @@ import { formatCurrency } from "./utils/ordersHelpers";
 const SEARCH_FIELD_OPTIONS = [
   { value: "all", label: "Tất cả cột" },
   { value: ORDER_FIELDS.ID_ORDER, label: "Mã Đơn Hàng" },
+  { value: ORDER_FIELDS.ID_PRODUCT, label: "Sản Phẩm" },
   { value: ORDER_FIELDS.INFORMATION_ORDER, label: "Thông tin" },
   { value: ORDER_FIELDS.CUSTOMER, label: "Khách Hàng" },
   { value: ORDER_FIELDS.SLOT, label: "Slot" },

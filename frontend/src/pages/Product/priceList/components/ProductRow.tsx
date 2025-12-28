@@ -13,6 +13,7 @@ import {
   NewSupplyRowState,
   ProductEditFormState,
   ProductPricingRow,
+  SupplierOption,
   SupplyPriceState,
 } from "../types";
 import {
@@ -39,6 +40,8 @@ interface ProductRowProps {
   updatedTimestamp?: string;
   supplyState?: SupplyPriceState;
   pendingNewSupply?: NewSupplyRowState | null;
+  supplierOptions: SupplierOption[];
+  isLoadingSuppliers: boolean;
   editingProductId: number | null;
   productEditForm: ProductEditFormState | null;
   productEditError: string | null;
@@ -83,8 +86,8 @@ interface ProductRowProps {
   onStartAddSupplierRow: (productId: number) => void;
   onNewSupplierInputChange: (
     productId: number,
-    field: "sourceName" | "price",
-    value: string
+    field: "sourceName" | "price" | "sourceId" | "useCustomName",
+    value: string | number | boolean | null
   ) => void;
   onCancelAddSupplierRow: (productId: number) => void;
   onConfirmAddSupplierRow: (product: ProductPricingRow) => void;
@@ -106,6 +109,8 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
   updatedTimestamp,
   supplyState,
   pendingNewSupply,
+  supplierOptions,
+  isLoadingSuppliers,
   editingProductId,
   productEditForm,
   productEditError,
@@ -760,26 +765,165 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                             );
                           }
 
+
                           if (row.kind === "new" && resolvedPendingNewSupply) {
                             const draft = resolvedPendingNewSupply;
+                            const selectValue = draft.useCustomName
+                              ? "__custom__"
+                              : draft.sourceId !== null
+                              ? `id:${draft.sourceId}`
+                              : draft.sourceName
+                              ? `name:${draft.sourceName}`
+                              : "";
+                            const hasOptions = supplierOptions.length > 0;
+
+                            const handleSupplierSelect = (
+                              event: React.ChangeEvent<HTMLSelectElement>
+                            ) => {
+                              const value = event.target.value;
+                              if (value === "__custom__") {
+                                onNewSupplierInputChange(
+                                  item.id,
+                                  "useCustomName",
+                                  true
+                                );
+                                onNewSupplierInputChange(
+                                  item.id,
+                                  "sourceName",
+                                  ""
+                                );
+                                onNewSupplierInputChange(
+                                  item.id,
+                                  "sourceId",
+                                  null
+                                );
+                                return;
+                              }
+
+                              onNewSupplierInputChange(
+                                item.id,
+                                "useCustomName",
+                                false
+                              );
+
+                              if (!value) {
+                                onNewSupplierInputChange(
+                                  item.id,
+                                  "sourceId",
+                                  null
+                                );
+                                onNewSupplierInputChange(
+                                  item.id,
+                                  "sourceName",
+                                  ""
+                                );
+                                return;
+                              }
+
+                              const matched = supplierOptions.find((option) => {
+                                const key =
+                                  option.id !== null
+                                    ? `id:${option.id}`
+                                    : `name:${option.name}`;
+                                return key === value;
+                              });
+
+                              onNewSupplierInputChange(
+                                item.id,
+                                "sourceId",
+                                matched?.id ?? null
+                              );
+                              onNewSupplierInputChange(
+                                item.id,
+                                "sourceName",
+                                matched?.name ?? value.replace(/^name:/, "").trim()
+                              );
+                            };
+
                             return (
                               <React.Fragment key={`new-${item.id}`}>
-                                <tr className="border-t border-dashed border-sky-100 bg-sky-50/40">
+                                <tr className="border-t border-dashed border-white/15 bg-slate-900/50">
                                   <td className="px-4 py-3">
-                                    <input
-                                      type="text"
-                                      className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200"
-                                      placeholder="Tên nguồn"
-                                      value={draft.sourceName}
-                                      onChange={(event) =>
-                                        onNewSupplierInputChange(
-                                          item.id,
-                                          "sourceName",
-                                          event.target.value
-                                        )
-                                      }
-                                      disabled={draft.isSaving}
-                                    />
+                                    <div className="flex flex-col gap-2">
+                                      {hasOptions && !draft.useCustomName ? (
+                                        <div className="flex items-center gap-2">
+                                          <select
+                                            className="w-60 max-w-xs rounded-lg border border-white/20 bg-slate-900/80 px-3 py-2 text-sm text-white shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300/30 disabled:opacity-60"
+                                            value={selectValue}
+                                            onChange={handleSupplierSelect}
+                                            disabled={draft.isSaving}
+                                          >
+                                            <option value="">
+                                              {isLoadingSuppliers
+                                                ? "Đang tải Nhà Cung Cấp..."
+                                                : "Chọn Nhà Cung Cấp..."}
+                                            </option>
+                                            {supplierOptions.map((option) => {
+                                              const key =
+                                                option.id !== null
+                                                  ? `id:${option.id}`
+                                                  : `name:${option.name}`;
+                                              return (
+                                                <option key={key} value={key}>
+                                                  {option.name}
+                                                </option>
+                                              );
+                                            })}
+                                            <option value="__custom__">
+                                              Nhập tên Nhà Cung Cấp khác
+                                            </option>
+                                          </select>
+                                          <button
+                                            type="button"
+                                            className="rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-indigo-300 hover:text-white"
+                                            onClick={() =>
+                                              onNewSupplierInputChange(
+                                                item.id,
+                                                "useCustomName",
+                                                true
+                                              )
+                                            }
+                                            disabled={draft.isSaving}
+                                          >
+                                            Nhập
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {hasOptions && (
+                                            <button
+                                              type="button"
+                                              className="flex items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-xs text-white/80 hover:border-indigo-300 hover:text-white"
+                                              onClick={() =>
+                                                onNewSupplierInputChange(
+                                                  item.id,
+                                                  "useCustomName",
+                                                  false
+                                                )
+                                              }
+                                              disabled={draft.isSaving}
+                                            >
+                                              <span className="text-sm">←</span>
+                                              <span className="sr-only">Chọn từ danh sách</span>
+                                            </button>
+                                          )}
+                                          <input
+                                            type="text"
+                                            className="w-60 max-w-xs rounded-lg border border-indigo-300/60 bg-white/95 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                                            placeholder="Tên NCC"
+                                            value={draft.sourceName}
+                                            onChange={(event) =>
+                                              onNewSupplierInputChange(
+                                                item.id,
+                                                "sourceName",
+                                                event.target.value
+                                              )
+                                            }
+                                            disabled={draft.isSaving}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center justify-center gap-1">
@@ -840,7 +984,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                             );
                           }
 
-                          return null;
+                                                    return null;
                         })
                       )}
                     </tbody>

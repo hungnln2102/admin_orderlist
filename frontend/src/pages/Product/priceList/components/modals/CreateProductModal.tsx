@@ -190,14 +190,14 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 Thông Tin Nhà Cung Cấp
               </p>
               <div className="space-y-4">
-                {createSuppliers.map((supplier, index) => (
+                {createSuppliers.map((supplier) => (
                   <div
                     key={supplier.id}
                     className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-inner"
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
-                        Nhà Cung Cấp #{index + 1}
+                        Nhà Cung Cấp
                       </p>
                       {createSuppliers.length > 1 && (
                         <button
@@ -212,7 +212,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
                         <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                          Tên NCC
+                          Tên Nhà Cung Cấp
                         </label>
                         <div className="mt-1 flex items-stretch gap-2">
                           <div className="flex-1">
@@ -220,7 +220,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                               <input
                                 type="text"
                                 className="w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
-                                placeholder="Nhập tên NCC"
+                                placeholder="Nhập tên Nhà Cung Cấp"
                                 value={supplier.sourceName}
                                 onChange={(event) =>
                                   onSupplierChange(
@@ -244,8 +244,8 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                               >
                                 <option value="">
                                   {isLoadingSuppliers
-                                    ? "Đang tải NCC..."
-                                    : "Chọn NCC"}
+                                    ? "Đang tải Nhà Cung Cấp..."
+                                    : "Chọn Nhà Cung Cấp"}
                                 </option>
                                 {supplierOptions.map((option) => {
                                   const optionValue =
@@ -271,8 +271,8 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             }
                             title={
                               supplier.useCustomName
-                                ? "Quay lại chọn NCC có sẵn"
-                                : "Thêm NCC mới (điền tên thủ công)"
+                                ? "Quay lại chọn Nhà Cung Cấp có sẵn"
+                                : "Thêm Nhà Cung Cấp mới (điền tên thủ công)"
                             }
                           >
                             {supplier.useCustomName ? (
@@ -430,7 +430,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   onClick={onAddSupplier}
                 >
                   <UserPlusIcon className="mr-2 h-4 w-4" />
-                  Thêm NCC
+                  Thêm Nhà Cung Cấp
                 </button>
               </div>
             </div>

@@ -125,13 +125,17 @@ const getSupplyInsights = async (_req, res) => {
       GROUP BY sp.${quoteIdent(supplyPriceCols.sourceId)}
     `;
 
-    // Tính tổng đã trả và còn nợ (import - paid) không phụ thuộc status
+    // Tính tổng đã trả và còn nợ theo trạng thái để không trừ nhầm chu kỳ đã thanh toán
     const paymentSummarySql = `
       SELECT
         ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
         SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_paid_import,
         SUM(
-          COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)
+          CASE
+            WHEN ps.${QUOTED_COLS.paymentSupply.status} = :unpaidStatus
+              THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)
+            ELSE 0
+          END
         ) AS total_unpaid_import
       FROM ${TABLES.paymentSupply} ps
       GROUP BY ps.${QUOTED_COLS.paymentSupply.sourceId}
@@ -155,7 +159,7 @@ const getSupplyInsights = async (_req, res) => {
       db.raw(monthlySql, [monthStart, nextMonthStart]),
       db.raw(summarySql),
       db.raw(productsSql),
-      db.raw(paymentSummarySql),
+      db.raw(paymentSummarySql, { unpaidStatus: STATUS.UNPAID }),
       db.raw(supplySql),
     ]);
 

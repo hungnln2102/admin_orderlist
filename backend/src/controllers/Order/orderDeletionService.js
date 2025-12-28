@@ -18,6 +18,7 @@ const deleteOrderWithArchive = async ({
         adjustSupplierDebtIfNeeded,
         calcRemainingRefund,
     } = require("./orderFinanceHelpers");
+    const { toNullableNumber } = require("../../utils/normalizers");
 
     const orderId = order?.id;
 
@@ -44,38 +45,62 @@ const deleteOrderWithArchive = async ({
         return { success: true, movedTo: "deleted", deletedOrder: normalized };
     }
 
-    const remaining = normalized.so_ngay_con_lai;
-    const isExpired = remaining !== null && remaining < 4;
-    const targetTable = isExpired ? TABLES.orderExpired : TABLES.orderCanceled;
+    const normalizedStatus = String(
+        normalized?.status ||
+        normalized?.status_auto ||
+        order?.status ||
+        ""
+    ).trim();
+    const normalizedCheckFlag =
+        normalized?.check_flag !== undefined && normalized?.check_flag !== null
+            ? normalized.check_flag
+            : (order?.check_flag ?? null);
+
+    // Only paid+checked or unpaid+unchecked orders are treated as canceled; everything else is archived as expired.
+    const shouldArchiveToCanceled =
+        (normalizedStatus === STATUS.PAID && normalizedCheckFlag === true) ||
+        (normalizedStatus === STATUS.UNPAID && normalizedCheckFlag === false);
+    const isRenewalStatus = normalizedStatus === STATUS.RENEWAL;
+
+    const targetTable = shouldArchiveToCanceled ? TABLES.orderCanceled : TABLES.orderExpired;
 
     const archiveData = { ...order };
-    const archiveIdCol = isExpired
-        ? DB_SCHEMA.ORDER_EXPIRED.COLS.ID
-        : DB_SCHEMA.ORDER_CANCELED.COLS.ID;
-    if (!archiveData[archiveIdCol]) {
-        archiveData[archiveIdCol] = await nextId(targetTable, archiveIdCol, trx);
-    }
+    const archiveIdCol = shouldArchiveToCanceled
+        ? DB_SCHEMA.ORDER_CANCELED.COLS.ID
+        : DB_SCHEMA.ORDER_EXPIRED.COLS.ID;
+    // Always use a fresh archive id to avoid PK collisions with existing archived rows.
+    archiveData[archiveIdCol] = await nextId(targetTable, archiveIdCol, trx);
 
-    if (isExpired) {
-        archiveData[DB_SCHEMA.ORDER_EXPIRED.COLS.ARCHIVED_AT] = new Date();
-    } else {
-        const refundValue = calcRemainingRefund(order, normalized);
+    if (shouldArchiveToCanceled) {
+        // Prefer an explicit refund from request body (UI sends giá trị còn lại),
+        // otherwise fall back to prorated calculation.
+        const bodyRefund =
+            toNullableNumber(reqBody?.can_hoan) ??
+            toNullableNumber(reqBody?.gia_tri_con_lai);
+        const refundValue = bodyRefund !== null && bodyRefund !== undefined
+            ? Math.max(0, bodyRefund)
+            : calcRemainingRefund(order, normalized);
         archiveData[DB_SCHEMA.ORDER_CANCELED.COLS.REFUND] = refundValue;
         archiveData.status = STATUS.PENDING_REFUND;
         archiveData.check_flag = false;
         archiveData[DB_SCHEMA.ORDER_CANCELED.COLS.CREATED_AT] = new Date();
+    } else {
+        archiveData[DB_SCHEMA.ORDER_EXPIRED.COLS.ARCHIVED_AT] = new Date();
+        // Khi chuyển sang bảng hết hạn, luôn đặt trạng thái về "Hết Hạn"
+        archiveData.status = STATUS.EXPIRED;
+        archiveData.check_flag = normalizedCheckFlag;
     }
 
-    const allowedArchiveCols = isExpired
-        ? allowedArchiveColsExpired
-        : allowedArchiveColsCanceled;
+    const allowedArchiveCols = shouldArchiveToCanceled
+        ? allowedArchiveColsCanceled
+        : allowedArchiveColsExpired;
     const preparedArchive = pruneArchiveData(archiveData, allowedArchiveCols);
 
     await trx(targetTable).insert(preparedArchive);
     await trx(TABLES.orderList).where({ id: orderId }).del();
 
     await trx.commit();
-    return { success: true, movedTo: isExpired ? "expired" : "canceled", deletedOrder: normalized };
+    return { success: true, movedTo: shouldArchiveToCanceled ? "canceled" : "expired", deletedOrder: normalized };
 };
 
 module.exports = {

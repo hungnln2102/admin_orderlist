@@ -14,6 +14,11 @@ function Pricing() {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    totalRows,
+    currentPage,
+    setCurrentPage,
+    rowsPerPage,
+    setRowsPerPage,
     pricingStats,
     filteredPricing,
     isLoading,
@@ -123,10 +128,20 @@ function Pricing() {
           items={filteredPricing}
           isLoading={isLoading}
           error={error}
+          totalRows={totalRows}
+          currentPage={currentPage}
+          rowsPerPage={rowsPerPage}
+          onPageChange={setCurrentPage}
+          onRowsPerPageChange={(rows) => {
+            setRowsPerPage(rows);
+            setCurrentPage(1);
+          }}
           expandedProductId={expandedProductId}
           supplyPriceMap={supplyPriceMap}
           statusOverrides={statusOverrides}
           updatedTimestampMap={updatedTimestampMap}
+          supplierOptions={supplierOptions}
+          isLoadingSuppliers={isLoadingSuppliers}
           editingSupplyRows={editingSupplyRows}
           supplyPriceDrafts={supplyPriceDrafts}
           savingSupplyRows={savingSupplyRows}

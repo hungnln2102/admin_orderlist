@@ -366,6 +366,8 @@ export const useSupplyActions = ({
         ...prev,
         [productId]: {
           sourceName: "",
+          sourceId: null,
+          useCustomName: false,
           price: "",
           error: null,
           isSaving: false,
@@ -376,16 +378,45 @@ export const useSupplyActions = ({
 
   const handleNewSupplierInputChange = (
     productId: number,
-    field: "sourceName" | "price",
-    value: string
+    field: "sourceName" | "price" | "sourceId" | "useCustomName",
+    value: string | number | boolean | null
   ) => {
-    const next = field === "price" ? formatVndInput(value) : value;
+    let next: string | number | boolean | null = value;
+    if (field === "price") {
+      next = formatVndInput(String(value ?? ""));
+    } else if (field === "sourceId") {
+      const numeric = Number(value);
+      next =
+        value === null || Number.isNaN(numeric) || !Number.isFinite(numeric)
+          ? null
+          : numeric;
+    } else if (field === "useCustomName") {
+      next = Boolean(value);
+    } else {
+      next = String(value ?? "");
+    }
+
     setNewSupplyRows((prev) => {
       const current = prev[productId];
       if (!current) return prev;
+      const nextRow: NewSupplyRowState = {
+        ...current,
+        [field]: next as any,
+        error: null,
+      };
+
+      if (field === "useCustomName") {
+        if (next) {
+          nextRow.sourceId = null;
+          nextRow.sourceName = "";
+        } else if (!nextRow.sourceName && current.sourceName) {
+          nextRow.sourceName = current.sourceName;
+        }
+      }
+
       return {
         ...prev,
-        [productId]: { ...current, [field]: next, error: null },
+        [productId]: nextRow,
       };
     });
   };
@@ -402,13 +433,17 @@ export const useSupplyActions = ({
     const current = newSupplyRows[product.id];
     if (!current) return;
     const trimmedName = current.sourceName.trim();
+    const resolvedSourceId =
+      current.useCustomName || current.sourceId === null
+        ? null
+        : current.sourceId;
     const parsedPrice = Number((current.price || "").replace(/\D+/g, ""));
     if (!trimmedName) {
       setNewSupplyRows((prev) => ({
         ...prev,
         [product.id]: {
           ...current,
-          error: "Vui long nhap ten nguon hop le.",
+          error: "Vui long chon hoac nhap ten nguon hop le.",
         },
       }));
       return;
@@ -439,6 +474,7 @@ export const useSupplyActions = ({
           },
           body: JSON.stringify({
             sourceName: trimmedName,
+            sourceId: resolvedSourceId,
             price: parsedPrice,
           }),
           credentials: "include",
@@ -449,7 +485,11 @@ export const useSupplyActions = ({
         throw new Error(payload?.error || "Khong the them nguon moi.");
       }
       const productKey = normalizeProductKey(product.sanPhamRaw);
-      const resolvedSourceId = Number(payload?.sourceId);
+      const responseSourceId = Number(payload?.sourceId);
+      const resolvedResponseId =
+        Number.isFinite(responseSourceId) && responseSourceId > 0
+          ? responseSourceId
+          : resolvedSourceId;
       const normalizedPrice = Number.isFinite(Number(payload?.price))
         ? Number(payload?.price)
         : parsedPrice;
@@ -461,12 +501,12 @@ export const useSupplyActions = ({
         const hasExistingRow = currentItems.some(
           (supplier) =>
             typeof supplier.sourceId === "number" &&
-            supplier.sourceId === resolvedSourceId
+            supplier.sourceId === resolvedResponseId
         );
         const nextItems = sortSupplyItems(
           hasExistingRow
             ? currentItems.map((supplier) =>
-                supplier.sourceId === resolvedSourceId
+                supplier.sourceId === resolvedResponseId
                   ? { ...supplier, price: normalizedPrice }
                   : supplier
               )
@@ -474,8 +514,9 @@ export const useSupplyActions = ({
                 ...currentItems,
                 {
                   sourceId:
-                    Number.isFinite(resolvedSourceId) && resolvedSourceId > 0
-                      ? resolvedSourceId
+                    Number.isFinite(resolvedResponseId) &&
+                    resolvedResponseId > 0
+                      ? resolvedResponseId
                       : Date.now(),
                   sourceName: trimmedName,
                   price: normalizedPrice,

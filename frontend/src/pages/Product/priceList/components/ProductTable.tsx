@@ -4,6 +4,7 @@ import {
   NewSupplyRowState,
   ProductEditFormState,
   ProductPricingRow,
+  SupplierOption,
   SupplyPriceState,
 } from "../types";
 import { normalizeProductKey } from "../utils";
@@ -11,12 +12,19 @@ import ProductRow from "./ProductRow";
 
 interface ProductTableProps {
   items: ProductPricingRow[];
+  totalRows: number;
+  currentPage: number;
+  rowsPerPage: number;
+  onPageChange: (page: number) => void;
+  onRowsPerPageChange: (rows: number) => void;
   isLoading: boolean;
   error: string | null;
   expandedProductId: number | null;
   supplyPriceMap: Record<string, SupplyPriceState>;
   statusOverrides: Record<number, boolean>;
   updatedTimestampMap: Record<number, string>;
+  supplierOptions: SupplierOption[];
+  isLoadingSuppliers: boolean;
   editingSupplyRows: Record<string, boolean>;
   supplyPriceDrafts: Record<string, string>;
   savingSupplyRows: Record<string, boolean>;
@@ -62,8 +70,8 @@ interface ProductTableProps {
   onStartAddSupplierRow: (productId: number) => void;
   onNewSupplierInputChange: (
     productId: number,
-    field: "sourceName" | "price",
-    value: string
+    field: "sourceName" | "price" | "sourceId" | "useCustomName",
+    value: string | number | boolean | null
   ) => void;
   onCancelAddSupplierRow: (productId: number) => void;
   onConfirmAddSupplierRow: (product: ProductPricingRow) => void;
@@ -79,12 +87,19 @@ interface ProductTableProps {
 
 const ProductTable: React.FC<ProductTableProps> = ({
   items,
+  totalRows,
+  currentPage,
+  rowsPerPage,
+  onPageChange,
+  onRowsPerPageChange,
   isLoading,
   error,
   expandedProductId,
   supplyPriceMap,
   statusOverrides,
   updatedTimestampMap,
+  supplierOptions,
+  isLoadingSuppliers,
   editingSupplyRows,
   supplyPriceDrafts,
   savingSupplyRows,
@@ -113,6 +128,52 @@ const ProductTable: React.FC<ProductTableProps> = ({
   onToggleStatus,
   fetchSupplyPricesForProduct,
 }) => {
+  const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+  const clampedCurrent = Math.min(Math.max(currentPage, 1), totalPages);
+  const pageOptions = [10, 20, 50];
+  const paginationItems = React.useMemo<(number | "ellipsis")[]>(() => {
+    const addPage = (page: number, target: Set<number>) => {
+      if (page >= 1 && page <= totalPages) target.add(page);
+    };
+
+    const candidatePages = new Set<number>([1, totalPages]);
+    addPage(clampedCurrent - 1, candidatePages);
+    addPage(clampedCurrent, candidatePages);
+    addPage(clampedCurrent + 1, candidatePages);
+
+    if (clampedCurrent <= 2) {
+      addPage(2, candidatePages);
+      addPage(3, candidatePages);
+      addPage(4, candidatePages);
+    }
+
+    if (clampedCurrent >= totalPages - 1) {
+      addPage(totalPages - 1, candidatePages);
+      addPage(totalPages - 2, candidatePages);
+      addPage(totalPages - 3, candidatePages);
+    }
+
+    const sorted = Array.from(candidatePages).sort((a, b) => a - b);
+    const result: (number | "ellipsis")[] = [];
+    sorted.forEach((page, index) => {
+      if (index > 0 && page - sorted[index - 1] > 1) {
+        result.push("ellipsis");
+      }
+      result.push(page);
+    });
+    return result;
+  }, [clampedCurrent, totalPages]);
+
+  const handlePageSelect = (page: number) => {
+    const nextPage = Math.min(Math.max(page, 1), totalPages);
+    onPageChange(nextPage);
+  };
+
+  const controlButtonClass =
+    "h-9 min-w-[36px] rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed";
+  const pageButtonClass =
+    "h-9 min-w-[36px] rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white/80 transition hover:bg-white/10";
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur">
       <div className="overflow-x-auto">
@@ -159,8 +220,8 @@ const ProductTable: React.FC<ProductTableProps> = ({
                   className="px-6 py-8 text-center text-sm text-white/80"
                 >
                   {error
-                    ? "KhA'ng th ¯Ÿ t §œi d ¯_ li ¯Øu. Vui lAýng th ¯- l §­i."
-                    : "KhA'ng cA3 s §œn ph §cm."}
+                    ? "Không thể tải dữ liệu. Vui lòng thử lại."
+                    : "Không có sản phẩm."}
                 </td>
               </tr>
             ) : (
@@ -183,6 +244,8 @@ const ProductTable: React.FC<ProductTableProps> = ({
                     updatedTimestamp={updatedTimestampMap[item.id]}
                     supplyState={supplyState}
                     pendingNewSupply={pendingNewSupply}
+                    supplierOptions={supplierOptions}
+                    isLoadingSuppliers={isLoadingSuppliers}
                     editingProductId={editingProductId}
                     productEditForm={productEditForm}
                     productEditError={productEditError}
@@ -215,6 +278,76 @@ const ProductTable: React.FC<ProductTableProps> = ({
             )}
           </tbody>
         </table>
+      </div>
+      <div className="flex flex-col gap-3 border-t border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white/80 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-2">
+          <span>Hiển thị</span>
+          <select
+            className="rounded-lg border border-white/20 bg-slate-900 px-3 py-1 text-white shadow-sm focus:border-indigo-400 focus:outline-none"
+            value={rowsPerPage}
+            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
+          >
+            {pageOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          <span>dòng</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className={controlButtonClass}
+            onClick={() => handlePageSelect(1)}
+            disabled={clampedCurrent === 1}
+            aria-label="Trang đầu"
+          >
+            {"<<"}
+          </button>
+          <button
+            className={controlButtonClass}
+            onClick={() => handlePageSelect(clampedCurrent - 1)}
+            disabled={clampedCurrent === 1}
+            aria-label="Trang trước"
+          >
+            {"<"}
+          </button>
+          {paginationItems.map((item, index) =>
+            item === "ellipsis" ? (
+              <span key={`ellipsis-${index}`} className="px-2 text-white/50">
+                ...
+              </span>
+            ) : (
+              <button
+                key={item}
+                className={`${pageButtonClass} ${
+                  clampedCurrent === item
+                    ? "border-indigo-400/60 bg-indigo-600/50 text-white"
+                    : ""
+                }`}
+                onClick={() => handlePageSelect(item)}
+              >
+                {item}
+              </button>
+            )
+          )}
+          <button
+            className={controlButtonClass}
+            onClick={() => handlePageSelect(clampedCurrent + 1)}
+            disabled={clampedCurrent === totalPages}
+            aria-label="Trang sau"
+          >
+            {">"}
+          </button>
+          <button
+            className={controlButtonClass}
+            onClick={() => handlePageSelect(totalPages)}
+            disabled={clampedCurrent === totalPages}
+            aria-label="Trang cuối"
+          >
+            {">>"}
+          </button>
+        </div>
       </div>
     </div>
   );
