@@ -1,6 +1,6 @@
 const { db } = require("../../../db");
 const { QUOTED_COLS, TABLES, productPriceCols, supplyPriceCols } = require("../constants");
-const { quoteIdent } = require("../../../utils/sql");
+const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
 const { parseSupplyId } = require("../helpers");
 
 const listSupplies = async (_req, res) => {
@@ -70,8 +70,8 @@ const listPaymentsBySupply = async (req, res) => {
       ps.${QUOTED_COLS.paymentSupply.id} AS id,
       ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
       COALESCE(s.${QUOTED_COLS.supply.sourceName}, '') AS source_name,
-      COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) AS import_value,
-      COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0) AS paid_value,
+      ${createNumericExtraction(`ps.${QUOTED_COLS.paymentSupply.importValue}`)} AS import_value,
+      ${createNumericExtraction(`ps.${QUOTED_COLS.paymentSupply.paid}`)} AS paid_value,
       COALESCE(ps.${QUOTED_COLS.paymentSupply.round}, '') AS round_label,
       COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
     FROM ${TABLES.paymentSupply} ps
