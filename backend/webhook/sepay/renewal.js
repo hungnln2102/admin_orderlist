@@ -7,6 +7,7 @@ const {
   TELEGRAM_CHAT_ID,
   SEND_RENEWAL_TO_TOPIC,
 } = require("./config");
+const { STATUS: ORDER_STATUS } = require("../../src/controllers/Order/constants");
 const {
   parseFlexibleDate,
   normalizeProductDuration,
