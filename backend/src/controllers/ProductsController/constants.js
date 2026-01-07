@@ -3,6 +3,8 @@ const {
   getDefinition,
   tableName,
   SCHEMA_PRODUCT,
+  SCHEMA_SUPPLIER,
+  SCHEMA_SUPPLIER_COST,
   SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
@@ -27,8 +29,8 @@ const TABLES = {
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
   priceConfig: tableName(PRICE_CONFIG_DEF.tableName, SCHEMA_PRODUCT),
-  supplyPrice: tableName(SUPPLIER_COST_DEF.tableName, SCHEMA_PRODUCT),
-  supply: tableName(SUPPLIER_DEF.tableName, SCHEMA_PRODUCT),
+  supplyPrice: tableName(SUPPLIER_COST_DEF.tableName, SCHEMA_SUPPLIER_COST),
+  supply: tableName(SUPPLIER_DEF.tableName, SCHEMA_SUPPLIER),
 };
 
 module.exports = {

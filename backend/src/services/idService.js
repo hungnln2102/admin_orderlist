@@ -1,10 +1,18 @@
 const { db } = require("../db");
-const { tableName, getDefinition, DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT } = require("../config/dbSchema");
+const {
+  tableName,
+  getDefinition,
+  DB_SCHEMA,
+  PARTNER_SCHEMA,
+  SCHEMA_PRODUCT,
+  SCHEMA_SUPPLIER,
+  SCHEMA_SUPPLIER_COST,
+} = require("../config/dbSchema");
 
 const TABLES = {
   accountStorage: tableName(DB_SCHEMA.ACCOUNT_STORAGE.TABLE),
-  supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PRODUCT),
-  supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_PRODUCT),
+  supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
+  supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_SUPPLIER_COST),
   productDesc: tableName(DB_SCHEMA.PRODUCT_DESC.TABLE),
 };
 

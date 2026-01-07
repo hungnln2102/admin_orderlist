@@ -16,9 +16,10 @@ const {
 const { normalizeSupplyStatus, formatDateOutput } = require("../../../utils/normalizers");
 const { resolveSupplyStatusColumn } = require("../helpers");
 
-// Explicit supplier tables (prefer product schema, fallback to partner for legacy DBs)
-const SUPPLIER_COST_TABLE = "product.supplier_cost";
-const SUPPLIER_PRODUCT_TABLE = "product.supplier";
+// Explicit supplier tables (prefer configured supplier schema, fallback to product/partner for legacy DBs)
+const { SCHEMA_SUPPLIER, SCHEMA_SUPPLIER_COST } = require("../../../config/dbSchema");
+const SUPPLIER_COST_TABLE = `${SCHEMA_SUPPLIER_COST}.supplier_cost`;
+const SUPPLIER_PRODUCT_TABLE = `${SCHEMA_SUPPLIER}.supplier`;
 const SUPPLIER_PARTNER_TABLE = "partner.supplier";
 let supplierTableNameCache = null;
 let supplierNameColumnCache = null;

@@ -1,5 +1,5 @@
 const { db } = require("../../db");
-const { TABLES, STATUS } = require("./constants");
+const { TABLES, STATUS, COLS } = require("./constants");
 const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
@@ -37,6 +37,9 @@ const attachCrudRoutes = (router) => {
 
         const trx = await db.transaction();
         try {
+            // Ensure we always have a numeric PK because orders.order_list.id has no default/sequence
+            payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, trx);
+
             if (payload.supply) await ensureSupplyRecord(payload.supply);
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");

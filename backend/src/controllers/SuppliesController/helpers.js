@@ -1,9 +1,9 @@
 const { db } = require("../../db");
 const { QUOTED_COLS, SUPPLY_STATUS_CANDIDATES } = require("./constants");
-const { SCHEMA_PRODUCT, SCHEMA_PARTNER } = require("../../config/dbSchema");
+const { SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_PARTNER } = require("../../config/dbSchema");
 const { normalizeSupplyStatus } = require("../../utils/normalizers");
 
-const SUPPLIER_TABLE_PRIMARY = `${SCHEMA_PARTNER}.supplier`;
+const SUPPLIER_TABLE_PRIMARY = `${SCHEMA_SUPPLIER}.supplier`;
 const SUPPLIER_TABLE_FALLBACK = `${SCHEMA_PRODUCT}.supplier`;
 let supplierTableNameCache = null;
 let supplierNameColumnCache = null;

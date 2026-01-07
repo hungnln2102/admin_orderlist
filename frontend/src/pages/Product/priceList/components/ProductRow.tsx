@@ -649,11 +649,6 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                                   <div className="text-sm font-semibold text-white">
                                     {supplier.sourceName}
                                   </div>
-                                  <div className="text-xs text-white/60">
-                                    {supplier.lastOrderDate
-                                      ? formatDateLabel(supplier.lastOrderDate)
-                                      : "-"}
-                                  </div>
                                 </td>
                                 <td className="px-4 py-3">
                                   {isRowEditing ? (

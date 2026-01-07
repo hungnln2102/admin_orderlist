@@ -5,7 +5,9 @@ const {
   PAYMENT_SUPPLY_TABLE,
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
+  SUPPLIER_TABLE,
   SUPPLIER_COLS,
+  SUPPLIER_COST_TABLE,
   SUPPLIER_COST_COLS,
   PAYMENT_SUPPLY_COLS,
   DB_SCHEMA,
@@ -22,10 +24,6 @@ const {
   roundToThousands,
   fetchProductPricing,
 } = require("./utils");
-
-// Explicit tables for supplier data (no indirection)
-const SUPPLIER_TABLE = "product.supplier";
-const SUPPLIER_COST_TABLE = "product.supplier_cost";
 
 let paymentReceiptOrderColCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
