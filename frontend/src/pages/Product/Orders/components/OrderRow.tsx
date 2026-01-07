@@ -8,6 +8,7 @@ import {
 import * as Helpers from "../../../../lib/helpers";
 import {
   formatCurrency,
+  isUnpaidNormalizedStatus,
   normalizeStatusValue,
 } from "../utils/ordersHelpers";
 import {
@@ -83,6 +84,7 @@ export const OrderRow = React.memo(function OrderRow({
     : giaTriConLaiSafe;
 
   const normalizedStatus = normalizeStatusValue(String(trangThaiText || ""));
+  const isUnpaidStatus = isUnpaidNormalizedStatus(normalizedStatus);
   const canConfirmRefund = isCanceled && normalizedStatus.includes("chua hoan");
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
@@ -253,18 +255,20 @@ export const OrderRow = React.memo(function OrderRow({
                         Đã Thanh Toán
                       </button>
                     )}
-                    <button
-                      className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40 disabled:opacity-70 disabled:cursor-not-allowed"
-                      disabled={isRenewing}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isRenewing) {
-                          onRenew(order);
-                        }
-                      }}
-                    >
-                      {isRenewing ? "Đang Gia Hạn..." : "Gia Hạn"}
-                    </button>
+                    {!isUnpaidStatus && (
+                      <button
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40 disabled:opacity-70 disabled:cursor-not-allowed"
+                        disabled={isRenewing}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isRenewing) {
+                            onRenew(order);
+                          }
+                        }}
+                      >
+                        {isRenewing ? "Đang Gia Hạn..." : "Gia Hạn"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

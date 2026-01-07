@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_CAPACITY_LIMIT,
   DEFAULT_SLOT_LIMIT,
@@ -37,17 +37,31 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
   );
   const [values, setValues] = useState<PackageFormValues>(mergedInitialValues);
 
+  const formatImportValue = useCallback((raw: string): string => {
+    const digitsOnly = raw.replace(/[^0-9]/g, "");
+    if (!digitsOnly) return "";
+    const numeric = Number(digitsOnly);
+    return Number.isFinite(numeric) ? numeric.toLocaleString("vi-VN") : "";
+  }, []);
+
   useEffect(() => {
     if (open) {
-      setValues(mergedInitialValues);
+      setValues({
+        ...mergedInitialValues,
+        import: formatImportValue(mergedInitialValues.import),
+      });
     }
-  }, [open, mergedInitialValues]);
+  }, [open, mergedInitialValues, formatImportValue]);
 
   const handleChange = (
     field: keyof PackageFormValues,
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const value = e.target.value;
+    if (field === "import") {
+      setValues((prev) => ({ ...prev, import: formatImportValue(value) }));
+      return;
+    }
     setValues((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -190,8 +204,8 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
                       Giá nhập (VND)
                     </label>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="numeric"
                       value={values.import}
                       onChange={(e) => handleChange("import", e)}
                       className="w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500"

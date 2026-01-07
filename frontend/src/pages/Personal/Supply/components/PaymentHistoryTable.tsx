@@ -9,9 +9,10 @@ const formatCurrency = Helpers.formatCurrency;
 
 interface Props {
   supplyId: number;
+  onRefreshSupplies?: () => void;
 }
 
-const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
+const PaymentHistoryTable: React.FC<Props> = ({ supplyId, onRefreshSupplies }) => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState({ round: "", import: "", paid: "", isEditing: false });
@@ -63,6 +64,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
       if (res.ok) {
         setDraft({ round: "", import: "", paid: "", isEditing: false });
         loadPayments();
+        onRefreshSupplies?.();
       }
     } catch (err) {
       console.error(err);
@@ -78,6 +80,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
       });
       setEditingId(null);
       loadPayments();
+      onRefreshSupplies?.();
     } catch (err) {
       console.error(err);
     }

@@ -1,16 +1,21 @@
 // Central mapping between UI-facing field aliases (constants.ts) and
-// the schema definitions in tableSql.ts. If a DB column name changes,
-// update it in tableSql.ts and the new value will be picked up here.
+// the schema definitions in tableSql.ts. Nếu đổi tên cột DB, sửa ở tableSql.ts.
 
 import {
   ORDER_COLS,
-  PRODUCT_PRICE_COLS,
+  VARIANT_PRICING_COLS,
   SUPPLY_COLS,
   SUPPLY_PRICE_COLS,
   PAYMENT_RECEIPT_COLS,
   REFUND_COLS,
   BANK_LIST_COLS,
   WAREHOUSE_COLS,
+  CATEGORY_COLS,
+  PRODUCT_COLS,
+  VARIANT_COLS,
+  PRODUCT_SCHEMA_DESC_COLS,
+  PRICE_CONFIG_COLS,
+  SUPPLIER_COST_COLS,
 } from "./tableSql";
 
 // ORDER_FIELDS mapping (constants.ts -> tableSql.ts)
@@ -55,12 +60,17 @@ export const PURCHASE_ORDER_FIELD_MAP = {
   CHECK_FLAG: ORDER_COLS.checkFlag,
 } as const;
 
-export const PRODUCT_PRICE_FIELD_MAP = {
-  ID: PRODUCT_PRICE_COLS.id,
-  ID_PRODUCT: PRODUCT_PRICE_COLS.product,
-  PCT_CTV: PRODUCT_PRICE_COLS.pctCtv,
-  PCT_KHACH: PRODUCT_PRICE_COLS.pctKhach,
-  IS_ACTIVE: PRODUCT_PRICE_COLS.isActive,
+export const VARIANT_PRICING_FIELD_MAP = {
+  ID: VARIANT_PRICING_COLS.id,
+  CODE: VARIANT_PRICING_COLS.code,
+  PACKAGE_NAME: VARIANT_PRICING_COLS.packageName,
+  VARIANT_NAME: VARIANT_PRICING_COLS.variantName,
+  PCT_CTV: VARIANT_PRICING_COLS.pctCtv,
+  PCT_KHACH: VARIANT_PRICING_COLS.pctKhach,
+  PCT_PROMO: VARIANT_PRICING_COLS.pctPromo,
+  IS_ACTIVE: VARIANT_PRICING_COLS.isActive,
+  UPDATED_AT: VARIANT_PRICING_COLS.updatedAt,
+  MAX_SUPPLY_PRICE: VARIANT_PRICING_COLS.maxSupplyPrice,
 } as const;
 
 export const SUPPLY_FIELD_MAP = {
@@ -112,13 +122,64 @@ export const WAREHOUSE_FIELD_MAP = {
   CREATED_AT: WAREHOUSE_COLS.createdAt,
 } as const;
 
+// PRODUCT schema mappings
+export const CATEGORY_FIELD_MAP = {
+  ID: CATEGORY_COLS.id,
+  NAME: CATEGORY_COLS.name,
+  CREATED_AT: CATEGORY_COLS.createdAt,
+} as const;
+
+export const PRODUCT_FIELD_MAP = {
+  ID: PRODUCT_COLS.id,
+  CATEGORY_ID: PRODUCT_COLS.categoryId,
+  PACKAGE_NAME: PRODUCT_COLS.packageName,
+} as const;
+
+export const VARIANT_FIELD_MAP = {
+  ID: VARIANT_COLS.id,
+  PRODUCT_ID: VARIANT_COLS.productId,
+  VARIANT_NAME: VARIANT_COLS.variantName,
+  IS_ACTIVE: VARIANT_COLS.isActive,
+  DISPLAY_NAME: VARIANT_COLS.displayName,
+} as const;
+
+export const PRODUCT_SCHEMA_DESC_FIELD_MAP = {
+  ID: PRODUCT_SCHEMA_DESC_COLS.id,
+  PRODUCT_ID: PRODUCT_SCHEMA_DESC_COLS.productId,
+  RULES: PRODUCT_SCHEMA_DESC_COLS.rules,
+  DESCRIPTION: PRODUCT_SCHEMA_DESC_COLS.description,
+  IMAGE_URL: PRODUCT_SCHEMA_DESC_COLS.imageUrl,
+} as const;
+
+export const PRICE_CONFIG_FIELD_MAP = {
+  ID: PRICE_CONFIG_COLS.id,
+  VARIANT_ID: PRICE_CONFIG_COLS.variantId,
+  PCT_CTV: PRICE_CONFIG_COLS.pctCtv,
+  PCT_KHACH: PRICE_CONFIG_COLS.pctKhach,
+  PCT_PROMO: PRICE_CONFIG_COLS.pctPromo,
+  UPDATED_AT: PRICE_CONFIG_COLS.updatedAt,
+} as const;
+
+export const SUPPLIER_COST_FIELD_MAP = {
+  ID: SUPPLIER_COST_COLS.id,
+  PRODUCT_ID: SUPPLIER_COST_COLS.productId,
+  SOURCE_ID: SUPPLIER_COST_COLS.sourceId,
+  PRICE: SUPPLIER_COST_COLS.price,
+} as const;
+
 export type OrderFieldKey = keyof typeof ORDER_FIELD_MAP;
 export type OrderExpiredFieldKey = keyof typeof ORDER_EXPIRED_FIELD_MAP;
 export type PurchaseOrderFieldKey = keyof typeof PURCHASE_ORDER_FIELD_MAP;
-export type ProductPriceFieldKey = keyof typeof PRODUCT_PRICE_FIELD_MAP;
+export type VariantPricingFieldKey = keyof typeof VARIANT_PRICING_FIELD_MAP;
 export type SupplyFieldKey = keyof typeof SUPPLY_FIELD_MAP;
 export type SupplyPriceFieldKey = keyof typeof SUPPLY_PRICE_FIELD_MAP;
 export type PaymentReceiptFieldKey = keyof typeof PAYMENT_RECEIPT_FIELD_MAP;
 export type RefundFieldKey = keyof typeof REFUND_FIELD_MAP;
 export type BankListFieldKey = keyof typeof BANK_LIST_FIELD_MAP;
 export type WarehouseFieldKey = keyof typeof WAREHOUSE_FIELD_MAP;
+export type CategoryFieldKey = keyof typeof CATEGORY_FIELD_MAP;
+export type ProductFieldKey = keyof typeof PRODUCT_FIELD_MAP;
+export type VariantFieldKey = keyof typeof VARIANT_FIELD_MAP;
+export type ProductSchemaDescFieldKey = keyof typeof PRODUCT_SCHEMA_DESC_FIELD_MAP;
+export type PriceConfigFieldKey = keyof typeof PRICE_CONFIG_FIELD_MAP;
+export type SupplierCostFieldKey = keyof typeof SUPPLIER_COST_FIELD_MAP;

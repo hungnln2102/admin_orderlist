@@ -61,6 +61,16 @@
   color: #f2f4ff;
 }
 
+/* Hide number spinners in finance inputs */
+.app-aurora input[type="number"]::-webkit-inner-spin-button,
+.app-aurora input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.app-aurora input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .app-aurora input::placeholder,
 .app-aurora textarea::placeholder {
   color: rgba(240, 242, 255, 0.55);

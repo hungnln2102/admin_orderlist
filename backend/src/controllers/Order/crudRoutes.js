@@ -53,7 +53,7 @@ const attachCrudRoutes = (router) => {
     // PUT /api/orders/:id (Update)
     router.put("/:id", async (req, res) => {
         const id = Number(req.params.id);
-        if (!id) return res.status(400).json({ error: "ID khong hop le." });
+        if (!id) return res.status(400).json({ error: "ID không hợp lệ." });
 
         const trx = await db.transaction();
         try {
@@ -76,15 +76,15 @@ const attachCrudRoutes = (router) => {
             }
             if (notFound) {
                 await trx.rollback();
-                return res.status(404).json({ error: "Khong tim thay don hang." });
+                return res.status(404).json({ error: "Không tìm thấy đơn hàng." });
             }
 
             await trx.commit();
             res.json(updated);
         } catch (error) {
             await trx.rollback();
-            console.error("Loi cap nhat don hang:", error);
-            res.status(500).json({ error: "Khong the cap nhat don hang." });
+            console.error("Lỗi cập nhật đơn hàng:", error);
+            res.status(500).json({ error: "Không thể cập nhật đơn hàng." });
         }
     });
 

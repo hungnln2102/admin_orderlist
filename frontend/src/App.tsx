@@ -7,17 +7,17 @@ import {
   useLocation,
 } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard/index";
 import Orders from "./pages/Product/Orders";
-import PackageProduct from "./pages/Product/PackageProduct";
-import ProductInfo from "./pages/Product/ProductInfo";
+import PackageProduct from "./pages/Product/PackageProduct/PackageProduct";
+import ProductInfo from "./pages/Product/ProductInfo/ProductInfo";
 import Pricing from "./pages/Product/priceList";
 import RetroLogin from "./pages/RetroLogin";
 import Sources from "./pages/Personal/Supply";
-import ShowPrice from "./pages/Personal/ShowPrice";
-import BillOrder from "./pages/Personal/bill-order";
-import Invoices from "./pages/Personal/Invoices";
-import Warehouse from "./pages/Personal/Warehouse";
+import ShowPrice from "./pages/Personal/ProductPrice";
+import BillOrder from "./pages/Personal/BillOrder";
+import Invoices from "./pages/Personal/Invoices/index";
+import Warehouse from "./pages/Personal/Storage";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

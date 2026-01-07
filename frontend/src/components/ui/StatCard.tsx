@@ -74,10 +74,10 @@ const StatCard: React.FC<StatCardProps> = ({
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
           {subtitle && (
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">
               {subtitle}
             </p>
           )}

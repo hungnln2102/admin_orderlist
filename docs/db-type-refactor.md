@@ -22,7 +22,7 @@ Goal: stop storing dates/numbers as text so the API can drop regex parsing. Run 
   - `Import` (import price), `slot` ➜ `numeric`
 - `account_storage`
   - `storage` ➜ `numeric`
-- `supply_price`
+- `supplier_cost`
   - `product_id`, `source_id` ➜ `integer`
   - `price` ➜ `numeric`
 - `payment_supply`

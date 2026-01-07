@@ -216,7 +216,7 @@ export const useCreateOrderLogic = (
     );
     const supplyLikeList: Helpers.SupplyLike[] = supplies.map((s) => ({
       id: s.id,
-      source_name: s.source_name,
+      source_name: s.supplier_name ?? s.source_name,
     }));
 
     const priceByName = Helpers.getImportPriceBySupplyName(
@@ -241,7 +241,8 @@ export const useCreateOrderLogic = (
   const handleSourceSelect = (sourceId: number) => {
     const selectedSupply = supplies.find((s) => s.id === sourceId);
     const fallbackCost = Number(formData[ORDER_FIELDS.COST] || 0);
-    const supplyName = selectedSupply?.source_name || "";
+    const supplyName =
+      selectedSupply?.supplier_name ?? selectedSupply?.source_name ?? "";
     const newBasePrice = getSupplyImportPrice(
       sourceId,
       supplyName,
@@ -251,7 +252,7 @@ export const useCreateOrderLogic = (
     setFormData((prev) => {
       const updated: Partial<Order> = {
         ...prev,
-        [ORDER_FIELDS.SUPPLY]: selectedSupply ? selectedSupply.source_name : "",
+        [ORDER_FIELDS.SUPPLY]: selectedSupply ? supplyName : "",
         [ORDER_FIELDS.COST]: newBasePrice,
       };
       if (customerType === "MAVK") {

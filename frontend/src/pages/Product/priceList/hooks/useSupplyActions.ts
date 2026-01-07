@@ -80,6 +80,7 @@ export const useSupplyActions = ({
                 ? Number(entry?.sourceId ?? entry?.source_id)
                 : index,
               sourceName:
+                entry?.supplier_name?.toString().trim() ||
                 entry?.sourceName?.toString().trim() ||
                 entry?.source_name?.toString().trim() ||
                 `NhAÿ Cung C §p #${Number(entry?.sourceId) || index + 1}`,

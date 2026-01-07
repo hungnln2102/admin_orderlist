@@ -1,19 +1,22 @@
 const { db } = require("../../../db");
-const { QUOTED_COLS, TABLES, productPriceCols, supplyPriceCols } = require("../constants");
+const { QUOTED_COLS, TABLES, variantCols, supplyPriceCols } = require("../constants");
 const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
-const { parseSupplyId } = require("../helpers");
+const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
 
 const listSupplies = async (_req, res) => {
   try {
+    const supplierTable = await resolveSupplierTableName();
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const supplierNameIdent = quoteIdent(supplierNameCol);
     const result = await db.raw(
       `
       SELECT
-        ${QUOTED_COLS.supply.id} AS id,
-        ${QUOTED_COLS.supply.sourceName} AS source_name,
-        ${QUOTED_COLS.supply.numberBank} AS number_bank,
-        ${QUOTED_COLS.supply.binBank} AS bin_bank
-      FROM ${TABLES.supply}
-      ORDER BY ${QUOTED_COLS.supply.sourceName};
+        "id" AS id,
+        ${supplierNameIdent} AS source_name,
+        "number_bank" AS number_bank,
+        "bin_bank" AS bin_bank
+      FROM ${supplierTable}
+      ORDER BY ${supplierNameIdent};
       `
     );
     res.json(result.rows || []);
@@ -29,13 +32,13 @@ const getProductsBySupply = async (req, res) => {
 
   const q = `
     SELECT DISTINCT
-      pp.${quoteIdent(productPriceCols.id)} AS id,
-      pp.${quoteIdent(productPriceCols.product)} AS san_pham
+      v.id AS id,
+      v.${quoteIdent(variantCols.displayName)} AS san_pham
     FROM ${TABLES.supplyPrice} sp
-    JOIN ${TABLES.productPrice} pp
-      ON sp.${quoteIdent(supplyPriceCols.productId)} = pp.${quoteIdent(productPriceCols.id)}
-    WHERE sp.${quoteIdent(supplyPriceCols.sourceId)} = ?
-    ORDER BY pp.${quoteIdent(productPriceCols.product)};
+    JOIN ${TABLES.variant} v
+      ON sp.${quoteIdent(supplyPriceCols.productId)} = v.id
+    WHERE sp.${quoteIdent(supplyPriceCols.supplierId)} = ?
+    ORDER BY v.${quoteIdent(variantCols.displayName)};
   `;
 
   try {
@@ -65,17 +68,20 @@ const listPaymentsBySupply = async (req, res) => {
     : 5;
   const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
   const limitPlusOne = limit + 1;
+  const supplierTable = await resolveSupplierTableName();
+  const supplierNameCol = await resolveSupplierNameColumn();
+  const supplierNameIdent = quoteIdent(supplierNameCol);
   const q = `
     SELECT
       ps.${QUOTED_COLS.paymentSupply.id} AS id,
       ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
-      COALESCE(s.${QUOTED_COLS.supply.sourceName}, '') AS source_name,
+      COALESCE(s.${supplierNameIdent}, '') AS source_name,
       ${createNumericExtraction(`ps.${QUOTED_COLS.paymentSupply.importValue}`)} AS import_value,
       ${createNumericExtraction(`ps.${QUOTED_COLS.paymentSupply.paid}`)} AS paid_value,
       COALESCE(ps.${QUOTED_COLS.paymentSupply.round}, '') AS round_label,
       COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
     FROM ${TABLES.paymentSupply} ps
-    LEFT JOIN ${TABLES.supply} s ON s.${QUOTED_COLS.supply.id} = ps.${QUOTED_COLS.paymentSupply.sourceId}
+    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = ps.${QUOTED_COLS.paymentSupply.sourceId}
     WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
     ORDER BY ps.${QUOTED_COLS.paymentSupply.id} DESC
     OFFSET ?

@@ -151,6 +151,7 @@ export const useProductActions = ({
               ? Number(idRaw)
               : null;
           const name =
+            item?.supplier_name ??
             item?.source_name ??
             item?.name ??
             item?.sourceName ??

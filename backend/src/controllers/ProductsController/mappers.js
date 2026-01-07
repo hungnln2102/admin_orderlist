@@ -1,25 +1,25 @@
 const { toNullableNumber } = require("../../utils/normalizers");
-const { productCols, supplyPriceCols, supplyCols } = require("./constants");
+const { variantCols, priceConfigCols, productSchemaCols, supplyPriceCols, supplyCols } = require("./constants");
 
 const mapProductPriceRow = (row = {}) => {
   const id =
     Number(row.id) ||
-    Number(row[productCols.id]) ||
+    Number(row[variantCols.id]) ||
     Number(row.product_id) ||
     Number(row.productId) ||
     null;
   const sanPham =
     row.san_pham ||
-    row[productCols.product] ||
+    row[variantCols.displayName] ||
     row.id_product ||
     row.product ||
     "";
-  const pctCtv = toNullableNumber(row.pct_ctv ?? row[productCols.pctCtv]);
+  const pctCtv = toNullableNumber(row.pct_ctv ?? row[priceConfigCols.pctCtv]);
   const pctKhach = toNullableNumber(
-    row.pct_khach ?? row[productCols.pctKhach]
+    row.pct_khach ?? row[priceConfigCols.pctKhach]
   );
-  const pctPromo = toNullableNumber(row.pct_promo ?? row[productCols.pctPromo]);
-  const isActiveRaw = row.is_active ?? row[productCols.isActive];
+  const pctPromo = toNullableNumber(row.pct_promo ?? row[priceConfigCols.pctPromo]);
+  const isActiveRaw = row.is_active ?? row[variantCols.isActive];
   const isActive =
     typeof isActiveRaw === "boolean"
       ? isActiveRaw
@@ -34,13 +34,13 @@ const mapProductPriceRow = (row = {}) => {
     id_product: sanPham,
     san_pham: sanPham,
     package_product:
-      row.package_product ?? row[productCols.packageProduct] ?? null,
-    package: row.package ?? row[productCols.package] ?? null,
+      row.package_product ?? row[variantCols.variantName] ?? null,
+    package: row.package ?? row[productSchemaCols.packageName] ?? null,
     pct_ctv: pctCtv,
     pct_khach: pctKhach,
     pct_promo: pctPromo,
     is_active: isActive,
-    update: row.update ?? row[productCols.updateDate] ?? null,
+    update: row.update ?? row[priceConfigCols.updatedAt] ?? null,
     max_supply_price: toNullableNumber(row.max_supply_price),
   };
 };
@@ -48,13 +48,13 @@ const mapProductPriceRow = (row = {}) => {
 const mapSupplyPriceRow = (row = {}) => ({
   source_id:
     Number(row.source_id) ||
-    Number(row[supplyPriceCols.sourceId]) ||
+    Number(row[supplyPriceCols.supplierId]) ||
     Number(row[supplyCols.id]) ||
     null,
   price: toNullableNumber(row.price ?? row[supplyPriceCols.price]) ?? null,
   source_name:
     row.source_name ||
-    row[supplyCols.sourceName] ||
+    row[supplyCols.supplierName] ||
     row.source ||
     row.name ||
     "",

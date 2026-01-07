@@ -1,7 +1,6 @@
-const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
+const { DB_SCHEMA, PARTNER_SCHEMA, tableName } = require("../../config/dbSchema");
 const { STATUS } = require("./constants");
 const { toNullableNumber } = require("../../utils/normalizers");
-const { normalizeTextInput } = require("./helpers");
 const TABLES = require("./constants").TABLES;
 
 const PAYMENT_SUPPLY_TABLE = tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE);
@@ -28,14 +27,17 @@ const calcRemainingRefund = (orderRow, normalized) => {
 };
 
 const findSupplyIdByName = async(trx, supplyNameRaw) => {
-    const normalized = normalizeTextInput(supplyNameRaw);
-    if (!normalized) return null;
+    const supplyName = supplyNameRaw === undefined || supplyNameRaw === null
+        ? ""
+        : String(supplyNameRaw);
+    if (!supplyName) return null;
+
     const row = await trx(TABLES.supply)
-        .select(DB_SCHEMA.SUPPLY.COLS.ID)
-        .whereRaw(`LOWER(TRIM("${DB_SCHEMA.SUPPLY.COLS.SOURCE_NAME}"::text)) = ?`, [normalized.toLowerCase()])
+        .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
+        .where(PARTNER_SCHEMA.SUPPLIER.COLS.SOURCE_NAME, supplyName)
         .first();
-    return row && row[DB_SCHEMA.SUPPLY.COLS.ID] !== undefined
-        ? Number(row[DB_SCHEMA.SUPPLY.COLS.ID]) || null
+    return row && row[PARTNER_SCHEMA.SUPPLIER.COLS.ID] !== undefined
+        ? Number(row[PARTNER_SCHEMA.SUPPLIER.COLS.ID]) || null
         : null;
 };
 
@@ -138,12 +140,11 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
 };
 
 const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
-    const statusValue = String(
-        orderRow?.status ||
-        normalized?.status ||
-        normalized?.status_auto ||
-        ""
-    ).trim();
+    const statusValue =
+        orderRow?.status ??
+        normalized?.status ??
+        normalized?.status_auto ??
+        "";
     const checkFlagVal = orderRow?.check_flag ?? normalized?.check_flag;
 
     const isUnpaidCase = statusValue === STATUS.UNPAID && checkFlagVal === false;
@@ -173,8 +174,8 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
 const addSupplierImportOnCheck = async(trx, beforeRow, afterRow) => {
     const prevFlag = beforeRow?.check_flag;
     const nextFlag = afterRow?.check_flag;
-    const prevStatus = String(beforeRow?.status || "").trim() || STATUS.UNPAID;
-    const nextStatus = String(afterRow?.status || "").trim() || STATUS.UNPAID;
+    const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
+    const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 
     const movedNullToFalse =
         (prevFlag === null || prevFlag === undefined) && nextFlag === false;

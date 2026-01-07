@@ -237,7 +237,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     value={selectedSupplyId ?? ""}
                     options={supplies.map((s) => ({
                       value: s.id,
-                      label: s.source_name,
+                      label: s.supplier_name ?? s.source_name,
                     }))}
                     placeholder="-- Chọn --"
                     disabled={

@@ -7,7 +7,8 @@ export type Order = Omit<ApiOrder, "cost" | "price"> & {
 
 export interface Supply {
   id: number;
-  source_name: string;
+  supplier_name: string;
+  source_name?: string;
 }
 
 export interface Product {

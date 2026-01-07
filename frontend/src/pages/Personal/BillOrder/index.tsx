@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { API_ENDPOINTS } from "../../constants";
-import { ORDER_COLS, PRODUCT_PRICE_COLS } from "../../lib/tableSql";
-import { BillOrderForm } from "./BillOrderForm";
-import { InvoicePreview } from "./InvoicePreview";
+import { API_ENDPOINTS } from "../../../constants";
+import { ORDER_COLS, VARIANT_PRICING_COLS } from "../../../lib/tableSql";
+import { BillOrderForm } from "./components/BillOrderForm";
+import { InvoicePreview } from "./components/InvoicePreview";
 import {
   DEFAULT_FORM,
   InvoiceEntry,
@@ -16,7 +16,7 @@ import {
   normalizeKey,
   resolveOrderType,
   toPositiveNumber,
-} from "./bill-order.helpers";
+} from "./helpers";
 
 const API_BASE =
   (typeof import.meta !== "undefined" &&
@@ -62,13 +62,13 @@ export default function BillOrder() {
           `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`,
           { credentials: "include" }
         );
-        if (!response.ok) throw new Error("Failed to load product_price");
+        if (!response.ok) throw new Error("Failed to load product pricing");
         const data = await response.json();
         if (isMounted && data?.items && Array.isArray(data.items)) {
           setProductPrices(data.items);
         }
       } catch (err) {
-        console.error("Không thể tải dữ liệu product_price:", err);
+        console.error("Không thể tải dữ liệu pricing:", err);
       }
     };
 
@@ -94,7 +94,7 @@ export default function BillOrder() {
   const productMap = useMemo(() => {
     const map = new Map<string, ProductPriceRow>();
     productPrices.forEach((row) => {
-      const key = normalizeKey(row?.[PRODUCT_PRICE_COLS.product]);
+      const key = normalizeKey(row?.[VARIANT_PRICING_COLS.code]);
       if (key) {
         map.set(key, row);
       }
@@ -111,11 +111,11 @@ export default function BillOrder() {
       const orderType = resolveOrderType(order?.[ORDER_COLS.idOrder] || entry.code);
       const months =
         extractMonths(order?.[ORDER_COLS.idProduct]) ||
-        extractMonths(product?.[PRODUCT_PRICE_COLS.product]);
+        extractMonths(product?.[VARIANT_PRICING_COLS.code]);
       const monthsLabel = months ? `${months} tháng` : "";
       const baseName =
-        (product?.[PRODUCT_PRICE_COLS.packageProduct] as string) ||
-        (product?.[PRODUCT_PRICE_COLS.package] as string) ||
+        (product?.[VARIANT_PRICING_COLS.variantName] as string) ||
+        (product?.[VARIANT_PRICING_COLS.packageName] as string) ||
         order?.[ORDER_COLS.idProduct] ||
         entry.code;
       const description = monthsLabel ? `${baseName} ${monthsLabel}` : baseName;
@@ -139,7 +139,7 @@ export default function BillOrder() {
 
       const discountRatio =
         orderType === "MAVK"
-          ? normalizeDiscountRatio(product?.[PRODUCT_PRICE_COLS.pctPromo])
+          ? normalizeDiscountRatio(product?.[VARIANT_PRICING_COLS.pctPromo])
           : 0;
       const discountPct = Number((discountRatio * 100).toFixed(2));
       const quantity = 1;
@@ -217,3 +217,5 @@ export default function BillOrder() {
     </div>
   );
 }
+
+

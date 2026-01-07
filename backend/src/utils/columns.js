@@ -1,4 +1,4 @@
-const { DB_SCHEMA, getDefinition } = require("../config/dbSchema");
+const { DB_SCHEMA, PRODUCT_SCHEMA, PARTNER_SCHEMA, getDefinition } = require("../config/dbSchema");
 const { quoteIdent } = require("./sql");
 
 const toCamel = (key = "") =>
@@ -16,14 +16,19 @@ const quoteColumns = (cols = {}) =>
     Object.entries(cols).map(([key, value]) => [key, quoteIdent(value)])
   );
 
-const QUOTED_COLS = Object.fromEntries(
-  Object.keys(DB_SCHEMA).map((schemaKey) => {
-    const def = getDefinition(schemaKey);
+const makeEntries = (schemaMap) =>
+  Object.keys(schemaMap).map((schemaKey) => {
+    const def = getDefinition(schemaKey, schemaMap);
     const camelKey = toCamel(schemaKey);
     if (!def) return [camelKey, {}];
     return [camelKey, quoteColumns(def.columns)];
-  })
-);
+  });
+
+const QUOTED_COLS = Object.fromEntries([
+  ...makeEntries(DB_SCHEMA),
+  ...makeEntries(PRODUCT_SCHEMA),
+  ...makeEntries(PARTNER_SCHEMA),
+]);
 
 module.exports = {
   quoteColumns,

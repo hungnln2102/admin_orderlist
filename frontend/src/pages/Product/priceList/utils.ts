@@ -1,4 +1,4 @@
-import { PRODUCT_PRICE_COLS } from "../../../lib/tableSql";
+import { VARIANT_PRICING_COLS } from "../../../lib/tableSql";
 import {
   CreateSupplierEntry,
   ProductPricingRow,
@@ -377,9 +377,9 @@ export const toFinitePrice = (value: any): number | null => {
 };
 
 export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricingRow => {
-  const packageName = cleanupLabel(row?.[PRODUCT_PRICE_COLS.package] ?? row?.package_label);
-  const packageProduct = cleanupLabel(row?.[PRODUCT_PRICE_COLS.packageProduct] ?? row?.package_product_label);
-  const sanPhamRaw = (row?.[PRODUCT_PRICE_COLS.product] ?? row?.id_product_label ?? row?.id_product ?? "").toString().trim();
+  const packageName = cleanupLabel(row?.[VARIANT_PRICING_COLS.packageName] ?? row?.package_label);
+  const packageProduct = cleanupLabel(row?.[VARIANT_PRICING_COLS.variantName] ?? row?.package_product_label);
+  const sanPhamRaw = (row?.[VARIANT_PRICING_COLS.code] ?? row?.id_product_label ?? row?.id_product ?? "").toString().trim();
 
   return {
     id: Number.isFinite(Number(row?.id)) ? Number(row?.id) : fallbackId,
@@ -387,10 +387,10 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
     packageProduct,
     sanPhamRaw,
     variantLabel: buildVariantLabel(packageProduct, sanPhamRaw),
-    pctCtv: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctCtv]),
-    pctKhach: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctKhach]),
-    pctPromo: toNumberOrNull(row?.[PRODUCT_PRICE_COLS.pctPromo]),
-    isActive: parseBoolean(row?.[PRODUCT_PRICE_COLS.isActive]),
+    pctCtv: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctCtv]),
+    pctKhach: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctKhach]),
+    pctPromo: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctPromo]),
+    isActive: parseBoolean(row?.[VARIANT_PRICING_COLS.isActive]),
     baseSupplyPrice: toNumberOrNull(row?.max_supply_price),
     wholesalePrice: toNumberOrNull(
       row?.computed_wholesale_price ?? row?.wholesale_price ?? row?.gia_si ?? row?.gia_ctv
@@ -400,8 +400,8 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
       row?.computed_promo_price ?? row?.promo_price ?? row?.gia_khuyen_mai ?? row?.gia_km
     ),
     lastUpdated:
-      typeof row?.[PRODUCT_PRICE_COLS.update] === "string"
-        ? row[PRODUCT_PRICE_COLS.update]
+      typeof row?.[VARIANT_PRICING_COLS.updatedAt] === "string"
+        ? row[VARIANT_PRICING_COLS.updatedAt]
         : typeof row?.updated_at === "string"
         ? row.updated_at
         : typeof row?.updatedAt === "string"

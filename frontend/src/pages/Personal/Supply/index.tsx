@@ -42,7 +42,7 @@ const AddSupplierModal = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          source_name: form.sourceName,
+          supplier_name: form.sourceName,
           number_bank: form.numberBank,
           bin_bank: form.bankBin,
           status: form.status,
@@ -144,7 +144,7 @@ const EditSupplierModal = ({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          source_name: form.sourceName,
+          supplier_name: form.sourceName,
           number_bank: form.numberBank,
           bin_bank: form.bankBin,
         }),
@@ -343,6 +343,7 @@ export default function Sources() {
         onDelete={setDeleteSupply}
         onView={(s: Supply) => setViewId(s.id)}
         onToggleStatus={(s: Supply) => toggleStatus(s.id, s.isActive)}
+        onRefreshSupplies={fetchSupplies}
       />
 
       <AddSupplierModal isOpen={addModal} onClose={() => setAddModal(false)} onSuccess={fetchSupplies} banks={banks} />

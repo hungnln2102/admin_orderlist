@@ -140,9 +140,9 @@ const DB_DEFINITIONS = {
     },
   },
 
-  // Supply
+  // Supplier (partner schema)
   supply: {
-    tableName: "supply",
+    tableName: "supplier",
     columns: {
       id: "id",
       sourceName: "source_name",
@@ -152,11 +152,11 @@ const DB_DEFINITIONS = {
     },
   },
   supplyPrice: {
-    tableName: "supply_price",
+    tableName: "supplier_cost",
     columns: {
       id: "id",
       productId: "product_id",
-      sourceId: "source_id",
+      sourceId: "supplier_id",
       price: "price",
     },
   },

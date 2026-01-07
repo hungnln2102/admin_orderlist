@@ -3,12 +3,16 @@ const {
   createNumericExtraction,
   quoteIdent,
 } = require("../../utils/sql");
+const { DB_SCHEMA } = require("../../config/dbSchema");
 const {
   ORDER_DEF,
   TABLES,
   CURRENT_DATE_SQL,
   normalizedYearCase,
 } = require("./constants");
+
+const ORDER_COLS = ORDER_DEF.COLS;
+const ORDER_CANCELED_COLS = DB_SCHEMA.ORDER_CANCELED.COLS;
 
 const buildStatsBindings = (periods) => ({
   prevStart: periods.previousStart,
@@ -27,37 +31,37 @@ const buildStatsQuery = () => `
   ),
   valid_orders AS (
     SELECT
-      ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
+      ${quoteIdent(ORDER_COLS.ID)} AS order_id,
       'active' as status,
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS registration_date,
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderExpired))} AS expiry_date,
-      ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
-      ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.price))} AS price_value
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
     FROM ${TABLES.orderList}
-    WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
+    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
     
     UNION ALL
     
     SELECT
-      ${quoteIdent(ORDER_DEF.columns.id)} AS order_id,
+      ${quoteIdent(ORDER_COLS.ID)} AS order_id,
       'expired' as status,
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS registration_date,
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderExpired))} AS expiry_date,
-      ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
-      ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.price))} AS price_value
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
     FROM ${TABLES.orderExpired}
-    WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
+    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
   ),
   canceled_data AS (
       SELECT
         "id" AS order_id,
         'canceled' as status,
-        ${createDateNormalization("createdate")} AS registration_date,
+        ${createDateNormalization(quoteIdent(ORDER_CANCELED_COLS.CREATED_AT))} AS registration_date,
         NULL::date AS expiry_date,
-        ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.cost))} AS cost_value,
-        ${createNumericExtraction(quoteIdent(ORDER_DEF.columns.price))} AS price_value
+        ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
+        ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
       FROM ${TABLES.orderCanceled}
-      WHERE TRIM(createdate::text) <> ''
+      WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
   ),
   all_data AS (
       SELECT *, FALSE as is_canceled FROM valid_orders
@@ -122,8 +126,8 @@ const buildYearsQuery = () => `
   ORDER BY year_value DESC;
 `;
 
-const orderPriceColumn = quoteIdent(ORDER_DEF.columns.price);
-const orderIdStringColumn = '"id_order"';
+const orderPriceColumn = quoteIdent(ORDER_COLS.PRICE);
+const orderIdStringColumn = quoteIdent(ORDER_COLS.ID_ORDER);
 
 const buildChartsQuery = () => `
   WITH params AS (
@@ -140,30 +144,30 @@ const buildChartsQuery = () => `
   income_stream AS (
     SELECT
       ${orderIdStringColumn}, 
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS event_date,
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
       ${orderPriceColumn} AS amount,
       1 AS order_count
     FROM ${TABLES.orderList}
-    WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
+    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
     
     UNION
     
     SELECT
       ${orderIdStringColumn},
-      ${createDateNormalization(quoteIdent(ORDER_DEF.columns.orderDate))} AS event_date,
+      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
       ${orderPriceColumn} AS amount,
       1 AS order_count
     FROM ${TABLES.orderExpired}
-    WHERE TRIM(${quoteIdent(ORDER_DEF.columns.orderDate)}::text) <> ''
+    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
   ),
   refund_stream AS (
     SELECT
       NULL AS id_order,
-      ${createDateNormalization("createdate")} AS event_date,
+      ${createDateNormalization(quoteIdent(ORDER_CANCELED_COLS.CREATED_AT))} AS event_date,
       (${orderPriceColumn} * -1) AS amount,
       0 AS order_count
     FROM ${TABLES.orderCanceled}
-    WHERE TRIM(createdate::text) <> ''
+    WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
       AND status = 'Đã Hoàn'
   ),
   all_transactions AS (

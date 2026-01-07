@@ -13,14 +13,14 @@ const listHandler = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("[packages] Query failed:", error);
-    res.status(500).json({ error: "Không thể tải sản phẩm đóng gói." });
+    res.status(500).json({ error: "Khong the tai san pham dang goi." });
   }
 };
 
 const createHandler = async (req, res) => {
   const { packageName } = req.body || {};
   if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
+    return res.status(400).json({ error: "Ten goi hang la bat buoc." });
   }
 
   try {
@@ -28,7 +28,7 @@ const createHandler = async (req, res) => {
     res.status(201).json(newRow);
   } catch (error) {
     console.error("[packages] Insert failed:", error);
-    res.status(500).json({ error: "Không thể tạo sản phẩm đóng gói." });
+    res.status(500).json({ error: "Khong the tao san pham dang goi." });
   }
 };
 
@@ -37,34 +37,34 @@ const updateHandler = async (req, res) => {
   const { packageName } = req.body || {};
 
   if (!id) {
-    return res.status(400).json({ error: "ID sản phẩm đóng gói là bắt buộc." });
+    return res.status(400).json({ error: "ID san pham goi hang la bat buoc." });
   }
   if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
+    return res.status(400).json({ error: "Ten goi hang la bat buoc." });
   }
 
   try {
     const updated = await updatePackageProduct(id, req.body || {});
     if (!updated) {
-      return res.status(404).json({ error: "Không tìm thấy sản phẩm đóng gói." });
+      return res.status(404).json({ error: "Khong tim thay san pham goi hang." });
     }
     res.json(updated);
   } catch (error) {
     console.error(`[packages] Update failed for id=${id}:`, error);
-    res.status(500).json({ error: "Không thể cập nhật sản phẩm đóng gói." });
+    res.status(500).json({ error: "Khong the cap nhat san pham goi hang." });
   }
 };
 
 const deleteHandler = async (req, res) => {
   const { id } = req.params;
   if (!id) {
-    return res.status(400).json({ error: "ID sản phẩm đóng gói là bắt buộc." });
+    return res.status(400).json({ error: "ID san pham goi hang la bat buoc." });
   }
 
   try {
     const deletedRows = await deletePackageProduct(id);
     if (!deletedRows || deletedRows.length === 0) {
-      return res.status(404).json({ error: "Không tìm thấy sản phẩm đóng gói." });
+      return res.status(404).json({ error: "Khong tim thay san pham goi hang." });
     }
 
     res.json({
@@ -74,14 +74,14 @@ const deleteHandler = async (req, res) => {
     });
   } catch (error) {
     console.error(`[packages] Delete failed for id=${id}:`, error);
-    res.status(500).json({ error: "Không thể xóa sản phẩm đóng gói." });
+    res.status(500).json({ error: "Khong the xoa san pham goi hang." });
   }
 };
 
 const bulkDeleteHandler = async (req, res) => {
   const { packages } = req.body || {};
   if (!Array.isArray(packages)) {
-    return res.status(400).json({ error: "Các gói phải là một mảng." });
+    return res.status(400).json({ error: "Cac goi hang phai la mot mang." });
   }
   const names = Array.from(
     new Set(
@@ -91,7 +91,7 @@ const bulkDeleteHandler = async (req, res) => {
     )
   );
   if (!names.length) {
-    return res.status(400).json({ error: "Không có tên gói nào được cung cấp." });
+    return res.status(400).json({ error: "Khong co ten goi nao duoc cung cap." });
   }
 
   try {
@@ -103,7 +103,7 @@ const bulkDeleteHandler = async (req, res) => {
     });
   } catch (error) {
     console.error("[packages] Delete failed:", error);
-    res.status(500).json({ error: "Không thể xóa sản phẩm đóng gói." });
+    res.status(500).json({ error: "Khong the xoa san pham dang goi." });
   }
 };
 

@@ -9,6 +9,7 @@ const {
 const { getNextSupplyId } = require("../../services/idService");
 const { db } = require("../../db");
 const { TABLES, COLS, STATUS } = require("./constants");
+const { PARTNER_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
 
 const normalizeRawToYMD = (value) => {
     if (!value) return null;
@@ -120,18 +121,23 @@ const ensureSupplyRecord = async(sourceName) => {
     if (!sourceName) return null;
     const name = sourceName.trim();
 
-    const exist = await db(TABLES.supply).where({ source_name: name }).first();
+    const exist = await db(TABLES.supply).where({ supplier_name: name }).first();
     if (exist) return exist.id;
 
     const nextId = await getNextSupplyId();
-    const statusColRes = await db.raw(`
+    const supplyTableName = PARTNER_SCHEMA.SUPPLIER.TABLE;
+    const statusColRes = await db.raw(
+        `
         SELECT column_name FROM information_schema.columns 
-        WHERE table_name = 'supply' AND column_name IN ('status', 'trang_thai', 'is_active') 
+        WHERE table_schema = ? AND table_name = ? 
+          AND column_name IN ('status', 'trang_thai', 'is_active') 
         LIMIT 1
-    `);
+    `,
+        [SCHEMA_PRODUCT, supplyTableName]
+    );
     const statusCol = statusColRes.rows?.[0]?.column_name;
 
-    const newSupply = { id: nextId, source_name: name };
+    const newSupply = { id: nextId, supplier_name: name };
     if (statusCol) newSupply[statusCol] = "active";
 
     await db(TABLES.supply).insert(newSupply);

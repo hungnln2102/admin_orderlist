@@ -1,57 +1,54 @@
-const { db } = require("../../db");
+﻿const { db } = require("../../db");
 const { QUOTED_COLS } = require("./constants");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, toNullableNumber } = require("../../utils/normalizers");
 const { getNextSupplyId } = require("../../services/idService");
-const { TABLES, productCols, supplyPriceCols, supplyCols } = require("./constants");
+const { TABLES, variantCols, supplyPriceCols, supplyCols, productCols } = require("./constants");
 
 const findProductIdByName = async (nameRaw) => {
-  const productName = normalizeTextInput(nameRaw).toLowerCase();
-  if (!productName) return null;
+  const normalizedInput = normalizeTextInput(nameRaw);
+  const productName = normalizedInput || "";
+  if (!productName) return { variantId: null, productId: null };
 
-  const exactSql = `
-    SELECT id
-    FROM ${TABLES.productPrice}
-    WHERE LOWER(TRIM(${quoteIdent(productCols.product)}::text)) = ?
-       OR LOWER(TRIM(${quoteIdent(productCols.packageProduct)}::text)) = ?
-       OR LOWER(TRIM(${quoteIdent(productCols.package)}::text)) = ?
-    ORDER BY id ASC
+  const variantSql = `
+    SELECT v.id AS variant_id
+    FROM ${TABLES.variant} v
+    LEFT JOIN ${TABLES.product} p
+      ON p.${quoteIdent(productCols.id)} = v.${quoteIdent(variantCols.productId)}
+    WHERE v.${quoteIdent(variantCols.displayName)} = ?
+       OR v.${quoteIdent(variantCols.variantName)} = ?
+       OR p.${quoteIdent(productCols.packageName)} = ?
     LIMIT 1;
   `;
-  const exact = await db.raw(exactSql, [productName, productName, productName]);
-  if (exact.rows && exact.rows[0] && Number.isFinite(Number(exact.rows[0].id))) {
-    return Number(exact.rows[0].id);
+  const variantRes = await db.raw(variantSql, [productName, productName, productName]);
+  const variantRow = variantRes.rows?.[0];
+  if (variantRow && Number.isFinite(Number(variantRow.variant_id))) {
+    return { variantId: Number(variantRow.variant_id), productId: null };
   }
 
+  // Fallback fuzzy match on display_name
   const fuzzySql = `
-    SELECT id
-    FROM ${TABLES.productPrice}
-    WHERE LOWER(TRIM(?)) LIKE '%' || LOWER(TRIM(${quoteIdent(
-      productCols.product
-    )}::text)) || '%'
-       OR LOWER(TRIM(?)) LIKE '%' || LOWER(TRIM(${quoteIdent(
-         productCols.packageProduct
-       )}::text)) || '%'
-       OR LOWER(TRIM(${quoteIdent(
-         productCols.product
-       )}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
-    ORDER BY id ASC
+    SELECT v.id AS variant_id
+    FROM ${TABLES.variant} v
+    WHERE LOWER(TRIM(v.${quoteIdent(variantCols.displayName)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+    ORDER BY v.id ASC
     LIMIT 1;
   `;
-  const fuzzy = await db.raw(fuzzySql, [productName, productName, productName]);
-  if (fuzzy.rows && fuzzy.rows[0] && Number.isFinite(Number(fuzzy.rows[0].id))) {
-    return Number(fuzzy.rows[0].id);
+  const fuzzy = await db.raw(fuzzySql, [productName.toLowerCase()]);
+  if (fuzzy.rows && fuzzy.rows[0] && Number.isFinite(Number(fuzzy.rows[0].variant_id))) {
+    return { variantId: Number(fuzzy.rows[0].variant_id), productId: null };
   }
-  return null;
+
+  return { variantId: null, productId: null };
 };
 
 const findSupplyIdByName = async (nameRaw) => {
   const normalized = normalizeTextInput(nameRaw).toLowerCase();
   if (!normalized) return null;
   const sql = `
-    SELECT ${QUOTED_COLS.supply.id} AS id
+    SELECT ${QUOTED_COLS.supplier.id} AS id
     FROM ${TABLES.supply}
-    WHERE LOWER(TRIM(${QUOTED_COLS.supply.sourceName}::text)) = ?
+    WHERE LOWER(TRIM(${QUOTED_COLS.supplier.supplierName}::text)) = ?
     LIMIT 1;
   `;
   const result = await db.raw(sql, [normalized]);
@@ -79,13 +76,13 @@ const ensureSupplyRecord = async (nameRaw, numberBank, binBank) => {
   try {
     const insertSql = `
       INSERT INTO ${TABLES.supply} (
-        ${QUOTED_COLS.supply.id},
-        ${QUOTED_COLS.supply.sourceName},
-        ${QUOTED_COLS.supply.numberBank},
-        ${QUOTED_COLS.supply.binBank},
-        ${QUOTED_COLS.supply.activeSupply}
+        ${QUOTED_COLS.supplier.id},
+        ${QUOTED_COLS.supplier.supplierName},
+        ${QUOTED_COLS.supplier.numberBank},
+        ${QUOTED_COLS.supplier.binBank},
+        ${QUOTED_COLS.supplier.activeSupply}
       ) VALUES (${placeholders.join(", ")}, ?)
-      RETURNING ${QUOTED_COLS.supply.id} AS id;
+      RETURNING ${QUOTED_COLS.supplier.id} AS id;
     `;
     const inserted = await db.raw(insertSql, [...baseValues, true]);
     const newId =
@@ -94,15 +91,14 @@ const ensureSupplyRecord = async (nameRaw, numberBank, binBank) => {
         : nextId;
     return Number.isFinite(newId) ? newId : nextId;
   } catch (err) {
-    // Fallback for schemas without active_supply
     const insertSql = `
       INSERT INTO ${TABLES.supply} (
-        ${QUOTED_COLS.supply.id},
-        ${QUOTED_COLS.supply.sourceName},
-        ${QUOTED_COLS.supply.numberBank},
-        ${QUOTED_COLS.supply.binBank}
+        ${QUOTED_COLS.supplier.id},
+        ${QUOTED_COLS.supplier.supplierName},
+        ${QUOTED_COLS.supplier.numberBank},
+        ${QUOTED_COLS.supplier.binBank}
       ) VALUES (${placeholders.join(", ")})
-      RETURNING ${QUOTED_COLS.supply.id} AS id;
+      RETURNING ${QUOTED_COLS.supplier.id} AS id;
     `;
     const inserted = await db.raw(insertSql, baseValues);
     const newId =
@@ -113,54 +109,65 @@ const ensureSupplyRecord = async (nameRaw, numberBank, binBank) => {
   }
 };
 
-const upsertSupplyPrice = async (productId, sourceId, price) => {
-  const parsedProductId = Number(productId);
-  const parsedSourceId = Number(sourceId);
+const upsertSupplyPrice = async (identifiers, supplierId, price, trx = db) => {
+  const idObj =
+    typeof identifiers === "object"
+      ? identifiers || {}
+      : { productId: identifiers };
+  const variantId = Number.isFinite(Number(idObj.variantId))
+    ? Number(idObj.variantId)
+    : Number.isFinite(Number(idObj.productId))
+    ? Number(idObj.productId)
+    : null;
+  const parsedSupplierId = Number(supplierId);
   const normalizedPrice = toNullableNumber(price);
-  if (!Number.isFinite(parsedProductId) || !Number.isFinite(parsedSourceId)) {
+
+  if (!Number.isFinite(variantId) || !Number.isFinite(parsedSupplierId)) {
     throw new Error("Invalid product or source id.");
   }
 
-  const existing = await db.raw(
+  const client = trx || db;
+
+  const existing = await client.raw(
     `
-    SELECT id FROM ${TABLES.supplyPrice}
+    SELECT id
+    FROM ${TABLES.supplyPrice}
     WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
-      AND ${quoteIdent(supplyPriceCols.sourceId)} = ?
+      AND ${quoteIdent(supplyPriceCols.supplierId)} = ?
     LIMIT 1;
   `,
-    [parsedProductId, parsedSourceId]
+    [variantId, parsedSupplierId]
   );
 
   if (existing.rows && existing.rows.length) {
-    await db.raw(
+    await client.raw(
       `
       UPDATE ${TABLES.supplyPrice}
       SET ${quoteIdent(supplyPriceCols.price)} = ?
       WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
-        AND ${quoteIdent(supplyPriceCols.sourceId)} = ?;
+        AND ${quoteIdent(supplyPriceCols.supplierId)} = ?;
     `,
-      [normalizedPrice, parsedProductId, parsedSourceId]
+      [normalizedPrice, variantId, parsedSupplierId]
     );
     return {
       id: existing.rows[0].id,
-      productId: parsedProductId,
-      sourceId: parsedSourceId,
+      productId: variantId,
+      supplierId: parsedSupplierId,
       price: normalizedPrice,
     };
   }
 
-  const insertPlaceholders = ["?", "?", "?"];
-  const inserted = await db.raw(
+  const inserted = await client.raw(
     `
     INSERT INTO ${TABLES.supplyPrice} (
       ${quoteIdent(supplyPriceCols.productId)},
-      ${quoteIdent(supplyPriceCols.sourceId)},
+      ${quoteIdent(supplyPriceCols.supplierId)},
       ${quoteIdent(supplyPriceCols.price)}
     )
-    VALUES (${insertPlaceholders.join(", ")})
+    VALUES (?, ?, ?)
     RETURNING id;
   `,
-    [parsedProductId, parsedSourceId, normalizedPrice]
+    [variantId, parsedSupplierId, normalizedPrice]
   );
   const newId =
     inserted.rows && inserted.rows[0] && inserted.rows[0].id !== undefined
@@ -168,8 +175,8 @@ const upsertSupplyPrice = async (productId, sourceId, price) => {
       : null;
   return {
     id: newId,
-    productId: parsedProductId,
-    sourceId: parsedSourceId,
+    productId: variantId,
+    supplierId: parsedSupplierId,
     price: normalizedPrice,
   };
 };

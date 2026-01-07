@@ -1,14 +1,14 @@
-const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
 const { createYearExtraction } = require("../../utils/sql");
 
-const ORDER_DEF = getDefinition("ORDER_LIST");
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
+const ORDER_DEF = DB_SCHEMA.ORDER_LIST;
+const PAYMENT_RECEIPT_DEF = DB_SCHEMA.PAYMENT_RECEIPT;
 
 const TABLES = {
-  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
+  orderList: tableName(ORDER_DEF.TABLE),
   orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE),
   orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE),
-  paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
+  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.TABLE),
 };
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";

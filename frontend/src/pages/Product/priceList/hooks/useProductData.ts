@@ -67,7 +67,7 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
         return;
       }
       if (!response.ok) {
-        throw new Error("KhA'ng th ¯Ÿ t §œi d ¯_ li ¯Øu s §œn ph §cm.");
+        throw new Error("Không thể tải dữ liệu sản phẩm.");
       }
       const payload = await response.json();
       const rows: any[] = Array.isArray(payload)
@@ -94,12 +94,12 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
       setStatusOverrides({});
       setUpdatedTimestampMap(initialUpdatedMap);
     } catch (err) {
-      console.error("L ¯-i khi t §œi d ¯_ li ¯Øu:", err);
+      console.error("Lỗi khi tải dữ liệu:", err);
       setProductPrices([]);
       setError(
         err instanceof Error
           ? err.message
-          : "KhA'ng th ¯Ÿ t §œi d ¯_ li ¯Øu product_price."
+          : "Không thể tải dữ liệu pricing."
       );
     } finally {
       setIsLoading(false);
@@ -187,3 +187,4 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     filteredPricing: pagedPricing,
   };
 };
+
