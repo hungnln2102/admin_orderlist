@@ -6,10 +6,12 @@ dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
 // Default schema used by existing dumps; override with DB_SCHEMA env if your DB uses another schema.
 const SCHEMA = process.env.DB_SCHEMA || "mavryk";
+// Orders schema (migrated order_* tables)
+const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || "orders";
 // Schema name for the new product namespace (same DB, different schema)
-const SCHEMA_PRODUCT = "product";
-// Schema name for partners/suppliers (stay in partner schema)
-const SCHEMA_PARTNER = "partner";
+const SCHEMA_PRODUCT = process.env.DB_SCHEMA_PRODUCT || "product";
+// Schema name for partners/suppliers
+const SCHEMA_PARTNER = process.env.DB_SCHEMA_PARTNER || "partner";
 const NOTIFICATION_GROUP_ID =
   process.env.NOTIFICATION_GROUP_ID || "-1002934465528";
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
@@ -325,6 +327,7 @@ const getDefinition = (key, schemaMap = DB_SCHEMA) => {
 module.exports = {
   // Environment + helpers
   SCHEMA,
+  SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
