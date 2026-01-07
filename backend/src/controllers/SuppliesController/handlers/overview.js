@@ -42,10 +42,8 @@ const getSupplyOverview = async (req, res) => {
           s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
           s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
           ${supplyStatusColumn ? `s."${supplyStatusColumn}"` : QUOTED_COLS.supplier.activeSupply} AS raw_status,
-          bl.${QUOTED_COLS.bankList.bankName} AS bank_name,
           COALESCE(s.${QUOTED_COLS.supplier.activeSupply}, TRUE) AS active_supply
         FROM ${supplierTable} s
-        LEFT JOIN ${TABLES.bankList} bl ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supplier.binBank}::text)
         WHERE s.${QUOTED_COLS.supplier.id} = ?
         LIMIT 1;
       `,
@@ -164,7 +162,6 @@ const getSupplyOverview = async (req, res) => {
         sourceName: supplyRow.source_name || "",
         numberBank: supplyRow.number_bank || null,
         binBank: supplyRow.bin_bank || null,
-        bankName: supplyRow.bank_name || null,
         status: supplyRow.active_supply === false ? "inactive" : normalizedStatus,
         rawStatus: supplyRow.raw_status || null,
         isActive: supplyRow.active_supply === true,

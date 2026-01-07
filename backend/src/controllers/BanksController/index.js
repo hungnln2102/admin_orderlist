@@ -1,6 +1,5 @@
 const https = require("https");
-const { db } = require("../../db");
-const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
+// No DB cache: always fetch external bank list
 
 const BANK_SOURCE_URL =
   process.env.BANK_LIST_SOURCE_URL || "https://api.vietqr.io/v2/banks";
@@ -100,50 +99,13 @@ const fetchBanksFromSource = async () => {
   return normalizeBanks(rawBanks);
 };
 
-const persistBanks = async (banks, bankTable, binCol, bankNameCol) => {
-  if (!banks.length) return;
-
-  const rows = banks.map((b) => ({
-    [binCol]: b.bin,
-    [bankNameCol]: b.bank_name,
-  }));
-
-  try {
-    await db(bankTable).insert(rows).onConflict(binCol).merge();
-  } catch (_err) {
-    // Fallback when the table has no unique constraint on BIN.
-    await db.transaction(async (trx) => {
-      await trx(bankTable).del();
-      await trx(bankTable).insert(rows);
-    });
-  }
-};
-
 const listBanks = async (_req, res) => {
-  const bankDef = DB_SCHEMA.BANK_LIST;
-  const bankTable = tableName(bankDef.TABLE);
-  const { BIN: binCol, BANK_NAME: bankNameCol } = bankDef.COLS;
-
   try {
     const banks = await fetchBanksFromSource();
-    if (banks.length) {
-      await persistBanks(banks, bankTable, binCol, bankNameCol);
-      return res.json(banks);
-    }
+    return res.json(banks);
   } catch (error) {
     console.error("[banks] External source fetch failed:", error);
-  }
-
-  try {
-    const rows = await db(bankTable)
-      .select(binCol, bankNameCol)
-      .orderBy(bankNameCol, "asc");
-    return res.json(rows || []);
-  } catch (error) {
-    console.error("[banks] Query failed:", error);
-    return res
-      .status(500)
-      .json({ error: "Khong the tai danh sach ngan hang" });
+    return res.status(500).json({ error: "Khong the tai danh sach ngan hang" });
   }
 };
 

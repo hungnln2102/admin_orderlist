@@ -10,7 +10,6 @@ const TABLES = {
   paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
   paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PRODUCT),
-  bankList: tableName(DB_SCHEMA.BANK_LIST.TABLE),
   orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
 };
 
