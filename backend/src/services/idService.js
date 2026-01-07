@@ -1,18 +1,16 @@
 const { db } = require("../db");
-const { tableName, getDefinition, DB_SCHEMA } = require("../config/dbSchema");
+const { tableName, getDefinition, DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT } = require("../config/dbSchema");
 
 const TABLES = {
   accountStorage: tableName(DB_SCHEMA.ACCOUNT_STORAGE.TABLE),
-  productPrice: tableName(DB_SCHEMA.PRODUCT_PRICE.TABLE),
-  supply: tableName(DB_SCHEMA.SUPPLY.TABLE),
-  supplyPrice: tableName(DB_SCHEMA.SUPPLY_PRICE.TABLE),
+  supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PRODUCT),
+  supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_PRODUCT),
   productDesc: tableName(DB_SCHEMA.PRODUCT_DESC.TABLE),
 };
 
 const ACCOUNT_STORAGE_COLS = getDefinition("ACCOUNT_STORAGE").columns;
-const PRODUCT_PRICE_COLS = getDefinition("PRODUCT_PRICE").columns;
-const SUPPLY_COLS = getDefinition("SUPPLY").columns;
-const SUPPLY_PRICE_COLS = getDefinition("SUPPLY_PRICE").columns;
+const SUPPLY_COLS = getDefinition("SUPPLIER", PARTNER_SCHEMA).columns;
+const SUPPLY_PRICE_COLS = getDefinition("SUPPLIER_COST", PARTNER_SCHEMA).columns;
 const PRODUCT_DESC_COLS = getDefinition("PRODUCT_DESC").columns;
 
 const nextId = async (tableName, columnName = "id", trx = db) => {
@@ -28,9 +26,6 @@ const nextId = async (tableName, columnName = "id", trx = db) => {
 const getNextAccountStorageId = (trx = db) =>
   nextId(TABLES.accountStorage, ACCOUNT_STORAGE_COLS.id, trx);
 
-const getNextProductPriceId = (trx = db) =>
-  nextId(TABLES.productPrice, PRODUCT_PRICE_COLS.id, trx);
-
 const getNextSupplyId = (trx = db) =>
   nextId(TABLES.supply, SUPPLY_COLS.id, trx);
 
@@ -43,7 +38,6 @@ const getNextProductDescId = (trx = db) =>
 module.exports = {
   nextId,
   getNextAccountStorageId,
-  getNextProductPriceId,
   getNextSupplyId,
   getNextSupplyPriceId,
   getNextProductDescId,

@@ -1,6 +1,6 @@
 import React, { useId, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { InvoiceEntry, InvoiceForm } from "./bill-order.helpers";
+import { InvoiceEntry, InvoiceForm } from "../helpers";
 
 type BillOrderFormProps = {
   form: InvoiceForm;

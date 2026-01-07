@@ -2,9 +2,17 @@
 require("dotenv").config();
 
 const { Pool } = require("pg");
-const { tableName, getDefinition, SCHEMA: DEFAULT_SCHEMA } = require("../../src/config/dbSchema");
+const {
+  tableName,
+  getDefinition,
+  SCHEMA: DEFAULT_SCHEMA,
+  SCHEMA_PRODUCT,
+  SCHEMA_PARTNER,
+  PRODUCT_SCHEMA,
+  PARTNER_SCHEMA,
+} = require("../../src/config/dbSchema");
 
-const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA || "mavryk";
+const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA;
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
   process.env.SEPAY_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || "";
@@ -39,22 +47,24 @@ const pool = new Pool({
 const ORDER_DEF = getDefinition("ORDER_LIST");
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
-const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
-const SUPPLY_DEF = getDefinition("SUPPLY");
-const SUPPLY_PRICE_DEF = getDefinition("SUPPLY_PRICE");
+const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
+const PRICE_CONFIG_DEF = getDefinition("PRICE_CONFIG", PRODUCT_SCHEMA);
+const SUPPLIER_DEF = getDefinition("SUPPLIER", PARTNER_SCHEMA);
+const SUPPLIER_COST_DEF = getDefinition("SUPPLIER_COST", PARTNER_SCHEMA);
 
 const ORDER_COLS = ORDER_DEF.columns;
 const PAYMENT_RECEIPT_COLS = PAYMENT_RECEIPT_DEF.columns;
 const PAYMENT_SUPPLY_COLS = PAYMENT_SUPPLY_DEF.columns;
-const PRODUCT_PRICE_COLS = PRODUCT_PRICE_DEF.columns;
-const SUPPLY_COLS = SUPPLY_DEF.columns;
-const SUPPLY_PRICE_COLS = SUPPLY_PRICE_DEF.columns;
-
+const VARIANT_COLS = VARIANT_DEF.columns;
+const PRICE_CONFIG_COLS = PRICE_CONFIG_DEF.columns;
+const SUPPLIER_COLS = SUPPLIER_DEF.columns;
+const SUPPLIER_COST_COLS = SUPPLIER_COST_DEF.columns;
 const PAYMENT_RECEIPT_TABLE = tableName(PAYMENT_RECEIPT_DEF.tableName, DB_SCHEMA);
 const ORDER_TABLE = tableName(ORDER_DEF.tableName, DB_SCHEMA);
-const PRODUCT_PRICE_TABLE = tableName(PRODUCT_PRICE_DEF.tableName, DB_SCHEMA);
-const SUPPLY_TABLE = tableName(SUPPLY_DEF.tableName, DB_SCHEMA);
-const SUPPLY_PRICE_TABLE = tableName(SUPPLY_PRICE_DEF.tableName, DB_SCHEMA);
+const VARIANT_TABLE = tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT);
+const PRICE_CONFIG_TABLE = tableName(PRICE_CONFIG_DEF.tableName, SCHEMA_PRODUCT);
+const SUPPLIER_TABLE = tableName(SUPPLIER_DEF.tableName, SCHEMA_PRODUCT);
+const SUPPLIER_COST_TABLE = tableName(SUPPLIER_COST_DEF.tableName, SCHEMA_PRODUCT);
 const PAYMENT_SUPPLY_TABLE = tableName(PAYMENT_SUPPLY_DEF.tableName, DB_SCHEMA);
 
 module.exports = {
@@ -76,13 +86,15 @@ module.exports = {
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
   PAYMENT_SUPPLY_COLS,
-  PRODUCT_PRICE_COLS,
-  SUPPLY_COLS,
-  SUPPLY_PRICE_COLS,
+  VARIANT_COLS,
+  PRICE_CONFIG_COLS,
+  SUPPLIER_COLS,
+  SUPPLIER_COST_COLS,
   ORDER_TABLE,
   PAYMENT_RECEIPT_TABLE,
-  PRODUCT_PRICE_TABLE,
-  SUPPLY_TABLE,
-  SUPPLY_PRICE_TABLE,
+  VARIANT_TABLE,
+  PRICE_CONFIG_TABLE,
+  SUPPLIER_TABLE,
+  SUPPLIER_COST_TABLE,
   PAYMENT_SUPPLY_TABLE,
 };

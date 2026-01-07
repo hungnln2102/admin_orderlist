@@ -1,21 +1,30 @@
 const { db } = require("../../../db");
 const { QUOTED_COLS, TABLES } = require("../constants");
 const { normalizeSupplyStatus } = require("../../../utils/normalizers");
-const { resolveSupplyStatusColumn, parseSupplyId } = require("../helpers");
+const {
+  resolveSupplyStatusColumn,
+  parseSupplyId,
+  resolveSupplierTableName,
+  resolveSupplierNameColumn,
+} = require("../helpers");
 
 const createSupply = async (req, res) => {
   console.log("[POST] /api/supplies", req.body);
-  const { source_name, number_bank, bin_bank, status, active_supply } =
-    req.body || {};
+  const body = req.body || {};
+  const source_name = body.supplier_name ?? body.source_name;
+  const { number_bank, bin_bank, status, active_supply } = body;
   if (!source_name) {
     return res.status(400).json({ error: "Tên nhà cung cấp là bắt buộc." });
   }
 
+  const supplierTable = await resolveSupplierTableName();
+  const supplierNameCol = await resolveSupplierNameColumn();
+  const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
   const fields = [
-    QUOTED_COLS.supply.sourceName,
-    QUOTED_COLS.supply.numberBank,
-    QUOTED_COLS.supply.binBank,
+    supplierNameIdent,
+    QUOTED_COLS.supplier.numberBank,
+    QUOTED_COLS.supplier.binBank,
   ];
   const values = [source_name, number_bank ?? null, bin_bank ?? null];
 
@@ -23,7 +32,7 @@ const createSupply = async (req, res) => {
     fields.push(`"${statusColumn}"`);
     values.push(status ?? active_supply ?? "active");
   } else {
-    fields.push(QUOTED_COLS.supply.activeSupply);
+    fields.push(QUOTED_COLS.supplier.activeSupply);
     values.push(active_supply !== undefined ? !!active_supply : true);
   }
 
@@ -32,15 +41,16 @@ const createSupply = async (req, res) => {
   try {
     const result = await db.raw(
       `
-      INSERT INTO ${TABLES.supply} (${fields.join(", ")})
+      INSERT INTO ${supplierTable} (${fields.join(", ")})
       VALUES (${placeholders.join(", ")})
-      RETURNING ${QUOTED_COLS.supply.id} AS id;
+      RETURNING ${QUOTED_COLS.supplier.id} AS id;
     `,
       values
     );
     const newId = result.rows?.[0]?.id;
     res.status(201).json({
       id: newId,
+      supplier_name: source_name,
       source_name,
       number_bank: number_bank ?? null,
       bin_bank: bin_bank ?? null,
@@ -61,6 +71,7 @@ const updateSupply = async (req, res) => {
   }
 
   const {
+    supplier_name: supplierNameRaw,
     source_name,
     number_bank,
     bin_bank,
@@ -68,8 +79,9 @@ const updateSupply = async (req, res) => {
     active_supply,
     bank_name,
   } = req.body || {};
+  const resolvedName = supplierNameRaw ?? source_name;
   if (
-    source_name === undefined &&
+    resolvedName === undefined &&
     number_bank === undefined &&
     bin_bank === undefined &&
     status === undefined &&
@@ -78,6 +90,9 @@ const updateSupply = async (req, res) => {
     return res.status(400).json({ error: "Không có trường nào để cập nhật" });
   }
 
+  const supplierTable = await resolveSupplierTableName();
+  const supplierNameCol = await resolveSupplierNameColumn();
+  const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
   const fields = [];
   const values = [];
@@ -87,21 +102,21 @@ const updateSupply = async (req, res) => {
     values.push(value);
   };
 
-  if (source_name !== undefined) {
-    addField(QUOTED_COLS.supply.sourceName, source_name);
+  if (resolvedName !== undefined) {
+    addField(supplierNameIdent, resolvedName);
   }
   if (number_bank !== undefined) {
-    addField(QUOTED_COLS.supply.numberBank, number_bank);
+    addField(QUOTED_COLS.supplier.numberBank, number_bank);
   }
   if (bin_bank !== undefined) {
-    addField(QUOTED_COLS.supply.binBank, bin_bank);
+    addField(QUOTED_COLS.supplier.binBank, bin_bank);
   }
   if (status !== undefined || active_supply !== undefined) {
     if (statusColumn) {
       addField(`"${statusColumn}"`, status ?? active_supply ?? null);
     } else {
       addField(
-        QUOTED_COLS.supply.activeSupply,
+        QUOTED_COLS.supplier.activeSupply,
         active_supply !== undefined ? !!active_supply : status === "active"
       );
     }
@@ -114,15 +129,15 @@ const updateSupply = async (req, res) => {
   try {
     const result = await db.raw(
       `
-      UPDATE ${TABLES.supply}
+      UPDATE ${supplierTable}
       SET ${fields.join(", ")}
-      WHERE ${QUOTED_COLS.supply.id} = ?
+      WHERE ${QUOTED_COLS.supplier.id} = ?
       RETURNING
-        ${QUOTED_COLS.supply.id} AS id,
-        ${QUOTED_COLS.supply.sourceName} AS source_name,
-        ${QUOTED_COLS.supply.numberBank} AS number_bank,
-        ${QUOTED_COLS.supply.binBank} AS bin_bank,
-        ${statusColumn ? `"${statusColumn}" AS raw_status` : `${QUOTED_COLS.supply.activeSupply} AS raw_status`}
+        ${QUOTED_COLS.supplier.id} AS id,
+        ${supplierNameIdent} AS source_name,
+        ${QUOTED_COLS.supplier.numberBank} AS number_bank,
+        ${QUOTED_COLS.supplier.binBank} AS bin_bank,
+        ${statusColumn ? `"${statusColumn}" AS raw_status` : `${QUOTED_COLS.supplier.activeSupply} AS raw_status`}
     `,
       [...values, parsedSupplyId]
     );
@@ -134,6 +149,7 @@ const updateSupply = async (req, res) => {
     const normalizedStatus = normalizeSupplyStatus(row.raw_status);
     res.json({
       id: row.id,
+      supplier_name: row.source_name,
       source_name: row.source_name,
       number_bank: row.number_bank,
       bin_bank: row.bin_bank,
@@ -156,7 +172,7 @@ const toggleSupplyActive = async (req, res) => {
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
-  const statusColumnName = statusColumn || QUOTED_COLS.supply.activeSupply;
+  const statusColumnName = statusColumn || QUOTED_COLS.supplier.activeSupply;
   const statusValue =
     statusColumn === "status" ? req.body?.status : req.body?.active ?? req.body?.is_active;
 
@@ -165,8 +181,8 @@ const toggleSupplyActive = async (req, res) => {
       `
       UPDATE ${TABLES.supply}
       SET "${statusColumnName}" = ?
-      WHERE ${QUOTED_COLS.supply.id} = ?
-      RETURNING ${QUOTED_COLS.supply.id} AS id, "${statusColumnName}" AS raw_status;
+      WHERE ${QUOTED_COLS.supplier.id} = ?
+      RETURNING ${QUOTED_COLS.supplier.id} AS id, "${statusColumnName}" AS raw_status;
     `,
       [statusValue, parsedSupplyId]
     );
@@ -200,7 +216,7 @@ const deleteSupply = async (req, res) => {
   }
   try {
     const result = await db.raw(
-      `DELETE FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supply.id} = ?`,
+      `DELETE FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supplier.id} = ?`,
       [parsedSupplyId]
     );
     if (!result.rowCount) {
@@ -224,3 +240,4 @@ module.exports = {
   toggleSupplyActive,
   deleteSupply,
 };
+

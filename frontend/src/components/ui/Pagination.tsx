@@ -41,6 +41,12 @@ export default function Pagination({
   const clampedCurrent = clamp(currentPage, 1, totalPages);
   const canPrev = clampedCurrent > 1;
   const canNext = clampedCurrent < totalPages;
+  const navButtonClass =
+    "w-10 h-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed";
+  const pageButtonClass =
+    "w-10 h-10 flex items-center justify-center rounded-xl font-semibold border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 transition";
+  const activePageClass =
+    "rounded-full bg-gradient-to-br from-[#323b74] via-[#22294f] to-[#151c39] text-white border border-[#6b74ff]/50 shadow-[0_12px_30px_-14px_rgba(107,116,255,0.8)]";
 
   const startItem = totalItems === 0 ? 0 : (clampedCurrent - 1) * safePageSize + 1;
   const endItem = Math.min(clampedCurrent * safePageSize, totalItems);
@@ -51,34 +57,35 @@ export default function Pagination({
     <div
       className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm ${className}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <button
-          className="px-2 py-1 rounded bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40"
+          className={navButtonClass}
           onClick={() => onPageChange(1)}
           disabled={!canPrev}
         >
           {"<<"}
         </button>
         <button
-          className="px-2 py-1 rounded bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40"
+          className={navButtonClass}
           onClick={() => onPageChange(clampedCurrent - 1)}
           disabled={!canPrev}
         >
           {"<"}
         </button>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {pages.map((p, idx) =>
             p === "..." ? (
-              <span key={`ellipsis-${idx}`} className="px-2 text-white/50">
+              <span
+                key={`ellipsis-${idx}`}
+                className="w-10 h-10 flex items-center justify-center text-white/50"
+              >
                 ...
               </span>
             ) : (
               <button
                 key={p}
-                className={`px-3 py-1 rounded font-semibold transition ${
-                  p === clampedCurrent
-                    ? "bg-blue-600 text-white"
-                    : "bg-white/5 text-white/80 hover:bg-white/10"
+                className={`${pageButtonClass} ${
+                  p === clampedCurrent ? activePageClass : ""
                 }`}
                 onClick={() => onPageChange(p)}
                 disabled={p === clampedCurrent}
@@ -89,14 +96,14 @@ export default function Pagination({
           )}
         </div>
         <button
-          className="px-2 py-1 rounded bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40"
+          className={navButtonClass}
           onClick={() => onPageChange(clampedCurrent + 1)}
           disabled={!canNext}
         >
           {">"}
         </button>
         <button
-          className="px-2 py-1 rounded bg-white/5 text-white/80 hover:bg-white/10 disabled:opacity-40"
+          className={navButtonClass}
           onClick={() => onPageChange(totalPages)}
           disabled={!canNext}
         >

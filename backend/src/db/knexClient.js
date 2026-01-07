@@ -21,10 +21,7 @@ if (!DATABASE_URL) {
   );
 }
 
-const searchPath = [
-  process.env.DB_SCHEMA || SCHEMA || "mavryk",
-  "mavryk",
-].filter(Boolean);
+const searchPath = [process.env.DB_SCHEMA || SCHEMA].filter(Boolean);
 
 const db = knex({
   client: "pg",

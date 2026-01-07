@@ -188,9 +188,9 @@ app.post(SEPAY_WEBHOOK_PATH, async (req, res) => {
             "Ensure supply/price result:",
             safeStringify({ orderCode: code, ensured })
           );
-          if (ensured?.sourceId && Number.isFinite(ensured.price)) {
+          if (ensured?.supplierId && Number.isFinite(ensured.price)) {
             await updatePaymentSupplyBalance(
-              ensured.sourceId,
+              ensured.supplierId,
               ensured.price,
               new Date(),
               { client }

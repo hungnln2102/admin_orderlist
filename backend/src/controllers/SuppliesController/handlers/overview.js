@@ -10,7 +10,12 @@ const {
   quoteIdent,
 } = require("../../../utils/sql");
 const { normalizeSupplyStatus } = require("../../../utils/normalizers");
-const { resolveSupplyStatusColumn, parseSupplyId } = require("../helpers");
+const {
+  resolveSupplyStatusColumn,
+  parseSupplyId,
+  resolveSupplierTableName,
+  resolveSupplierNameColumn,
+} = require("../helpers");
 
 const getSupplyOverview = async (req, res) => {
   const { supplyId } = req.params;
@@ -23,22 +28,25 @@ const getSupplyOverview = async (req, res) => {
 
   try {
     const client = db;
+    const supplierTable = await resolveSupplierTableName();
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const supplierNameIdent = quoteIdent(supplierNameCol);
     const statusColumnName = await resolveSupplyStatusColumn();
     const supplyStatusColumn = statusColumnName || null;
 
     const supplyRowResult = await client.raw(
       `
         SELECT
-          s.${QUOTED_COLS.supply.id} AS id,
-          s.${QUOTED_COLS.supply.sourceName} AS source_name,
-          s.${QUOTED_COLS.supply.numberBank} AS number_bank,
-          s.${QUOTED_COLS.supply.binBank} AS bin_bank,
-          ${supplyStatusColumn ? `s."${supplyStatusColumn}"` : QUOTED_COLS.supply.activeSupply} AS raw_status,
+          s.${QUOTED_COLS.supplier.id} AS id,
+          s.${supplierNameIdent} AS source_name,
+          s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
+          s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
+          ${supplyStatusColumn ? `s."${supplyStatusColumn}"` : QUOTED_COLS.supplier.activeSupply} AS raw_status,
           bl.${QUOTED_COLS.bankList.bankName} AS bank_name,
-          COALESCE(s.${QUOTED_COLS.supply.activeSupply}, TRUE) AS active_supply
-        FROM ${TABLES.supply} s
-        LEFT JOIN ${TABLES.bankList} bl ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
-        WHERE s.${QUOTED_COLS.supply.id} = ?
+          COALESCE(s.${QUOTED_COLS.supplier.activeSupply}, TRUE) AS active_supply
+        FROM ${supplierTable} s
+        LEFT JOIN ${TABLES.bankList} bl ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supplier.binBank}::text)
+        WHERE s.${QUOTED_COLS.supplier.id} = ?
         LIMIT 1;
       `,
       [parsedSupplyId]
@@ -180,3 +188,4 @@ const getSupplyOverview = async (req, res) => {
 };
 
 module.exports = { getSupplyOverview };
+

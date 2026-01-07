@@ -16,6 +16,7 @@ interface Props {
   onDelete: (supply: Supply) => void;
   onView: (supply: Supply) => void;
   onToggleStatus: (supply: Supply) => void;
+  onRefreshSupplies: () => void;
 }
 
 const SupplyList: React.FC<Props> = ({
@@ -27,6 +28,7 @@ const SupplyList: React.FC<Props> = ({
   onDelete,
   onView,
   onToggleStatus,
+  onRefreshSupplies,
 }) => {
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-sm">
@@ -63,6 +65,7 @@ const SupplyList: React.FC<Props> = ({
                   onDelete={onDelete}
                   onView={onView}
                   onToggleStatus={onToggleStatus}
+                  onRefreshSupplies={onRefreshSupplies}
                 />
               ))
             )}
@@ -81,6 +84,7 @@ const SupplyRow = ({
   onDelete,
   onView,
   onToggleStatus,
+  onRefreshSupplies,
 }: {
   supply: Supply;
   isExpanded: boolean;
@@ -89,6 +93,7 @@ const SupplyRow = ({
   onDelete: (supply: Supply) => void;
   onView: (supply: Supply) => void;
   onToggleStatus: (supply: Supply) => void;
+  onRefreshSupplies: () => void;
 }) => {
   return (
     <>
@@ -166,7 +171,7 @@ const SupplyRow = ({
         <tr>
           <td colSpan={8} className="px-0 pb-4 pt-0 bg-indigo-950/30">
             <div className="p-4 border-b border-white/10 shadow-inner">
-              <PaymentHistoryTable supplyId={supply.id} />
+              <PaymentHistoryTable supplyId={supply.id} onRefreshSupplies={onRefreshSupplies} />
             </div>
           </td>
         </tr>

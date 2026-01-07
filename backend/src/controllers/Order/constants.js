@@ -1,20 +1,29 @@
-const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
+const {
+    DB_SCHEMA,
+    tableName,
+    SCHEMA_PRODUCT,
+    SCHEMA_PARTNER,
+    PRODUCT_SCHEMA,
+    PARTNER_SCHEMA,
+} = require("../../config/dbSchema");
 
 const TABLES = {
     orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
     orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE),
     orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE),
-    productPrice: tableName(DB_SCHEMA.PRODUCT_PRICE.TABLE),
-    supply: tableName(DB_SCHEMA.SUPPLY.TABLE),
+    supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER),
     packageProduct: tableName(DB_SCHEMA.PACKAGE_PRODUCT.TABLE),
-    supplyPrice: tableName(DB_SCHEMA.SUPPLY_PRICE.TABLE),
+    supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_PARTNER),
+    variant: tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT),
+    priceConfig: tableName(PRODUCT_SCHEMA.PRICE_CONFIG.TABLE, SCHEMA_PRODUCT),
 };
 
 const COLS = {
     ORDER: DB_SCHEMA.ORDER_LIST.COLS,
-    PRICE: DB_SCHEMA.PRODUCT_PRICE.COLS,
-    SUPPLY_PRICE: DB_SCHEMA.SUPPLY_PRICE.COLS,
-    SUPPLY: DB_SCHEMA.SUPPLY.COLS,
+    SUPPLY_PRICE: PARTNER_SCHEMA.SUPPLIER_COST.COLS,
+    SUPPLY: PARTNER_SCHEMA.SUPPLIER.COLS,
+    VARIANT: PRODUCT_SCHEMA.VARIANT.COLS,
+    PRICE_CONFIG: PRODUCT_SCHEMA.PRICE_CONFIG.COLS,
 };
 
 // Giữ nguyên trạng thái gốc (đúng với dữ liệu hiện tại)

@@ -149,10 +149,10 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     const fallbackSoNgay = months * 30;
 
-    const { productId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
-    const sourceId = await findSupplyId(client, nguon);
-    const giaNhapSource = await fetchSupplyPrice(client, productId, sourceId);
-    const maxPriceRow = await fetchMaxSupplyPrice(client, productId);
+    const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
+    const supplierId = await findSupplyId(client, nguon);
+    const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
+    const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
 
     const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
     const latestGiaNhap = resolveMoney(
@@ -217,14 +217,16 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       normalizedPriceMax,
       pctCtv,
       pctKhach,
+      variantId,
       pctCtvNormalized:
         Number.isFinite(Number(pctCtv)) && Number(pctCtv) > 10 ? Number(pctCtv) / 100 : Number(pctCtv) || 1,
       pctKhachNormalized:
         Number.isFinite(Number(pctKhach)) && Number(pctKhach) > 10
           ? Number(pctKhach) / 100
           : Number(pctKhach) || 1,
-      sourceId,
-      productId,
+      supplierId,
+      productId: variantId || productId,
+      variantId,
       status: order[ORDER_COLS.status],
       checkFlag: order[ORDER_COLS.checkFlag],
     });
@@ -253,9 +255,9 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       orderCode,
     ]);
 
-    if (sourceId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0) {
+    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0) {
       try {
-        await updatePaymentSupplyBalance(sourceId, finalGiaNhap, ngayBatDauMoi);
+        await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {
         console.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp %s:", orderCode, balanceErr);
       }
@@ -571,3 +573,4 @@ module.exports = {
   runRenewalBatch,
   pendingRenewalTasks,
 };
+

@@ -6,7 +6,7 @@ import {
   InvoiceForm,
   InvoiceLine,
   formatCurrency,
-} from "./bill-order.helpers";
+} from "../helpers";
 
 type InvoicePreviewProps = {
   form: InvoiceForm;

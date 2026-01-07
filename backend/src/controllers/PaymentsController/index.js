@@ -1,15 +1,15 @@
 const { db, withTransaction } = require("../../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 const {
   createDateNormalization,
 } = require("../../utils/sql");
 
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
+const PAYMENT_RECEIPT_DEF = DB_SCHEMA.PAYMENT_RECEIPT;
 const TABLES = {
   paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
   paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
-  supply: tableName(DB_SCHEMA.SUPPLY.TABLE),
+  supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PRODUCT),
   bankList: tableName(DB_SCHEMA.BANK_LIST.TABLE),
   orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
 };
@@ -115,7 +115,7 @@ const confirmPaymentSupply = async (req, res) => {
       })();
 
       const supplyResult = await trx.raw(
-        `SELECT ${QUOTED_COLS.supply.sourceName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supply.id} = ? LIMIT 1;`,
+        `SELECT ${QUOTED_COLS.supplier.supplierName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supplier.id} = ? LIMIT 1;`,
         [sourceId]
       );
       const sourceName =
@@ -211,7 +211,12 @@ const confirmPaymentSupply = async (req, res) => {
           ${QUOTED_COLS.paymentSupply.paid} = ?,
           ${QUOTED_COLS.paymentSupply.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${QUOTED_COLS.paymentSupply.round}::text, ''), ' - ', ?::text))
       WHERE ${QUOTED_COLS.paymentSupply.id} = ?
-      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, ${QUOTED_COLS.paymentSupply.importValue} AS import, ${QUOTED_COLS.paymentSupply.paid} AS paid, ${QUOTED_COLS.paymentSupply.status} AS status, ${QUOTED_COLS.paymentSupply.round} AS round;
+      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, 
+                ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, 
+                ${QUOTED_COLS.paymentSupply.importValue} AS import, 
+                ${QUOTED_COLS.paymentSupply.paid} AS paid, 
+                ${QUOTED_COLS.paymentSupply.status} AS status, 
+                ${QUOTED_COLS.paymentSupply.round} AS round;
     `,
         [PAID_STATUS, normalizedPaidAmount, todayDMY, parsedPaymentId]
       );
@@ -238,11 +243,3 @@ module.exports = {
   listPaymentReceipts,
   confirmPaymentSupply,
 };
-
-
-
-
-
-
-
-

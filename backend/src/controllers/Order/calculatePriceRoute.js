@@ -1,6 +1,35 @@
-const Helpers = require("../../../helpers");
+﻿const Helpers = require("../../../helpers");
 const { db } = require("../../db");
 const { TABLES, COLS } = require("./constants");
+const { quoteIdent } = require("../../utils/sql");
+
+const fetchVariantPricing = async (productName) => {
+    const name = String(productName ?? "");
+    if (!name) return null;
+
+    const sql = `
+      SELECT
+        v.${quoteIdent(COLS.VARIANT.ID)} AS variant_id,
+        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_CTV)} AS pct_ctv,
+        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_KHACH)} AS pct_khach,
+        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_PROMO)} AS pct_promo
+      FROM ${TABLES.variant} v
+      LEFT JOIN ${TABLES.priceConfig} pc
+        ON pc.${quoteIdent(COLS.PRICE_CONFIG.VARIANT_ID)} = v.${quoteIdent(COLS.VARIANT.ID)}
+      WHERE v.${quoteIdent(COLS.VARIANT.DISPLAY_NAME)} = ?
+      ORDER BY pc.${quoteIdent(COLS.PRICE_CONFIG.UPDATED_AT)} DESC NULLS LAST
+      LIMIT 1;
+    `;
+    const res = await db.raw(sql, [name]);
+    const row = res.rows?.[0];
+    if (!row) return null;
+    return {
+        variantId: row.variant_id,
+        pctCtv: row.pct_ctv,
+        pctKhach: row.pct_khach,
+        pctPromo: row.pct_promo,
+    };
+};
 
 const attachCalculatePriceRoute = (router) => {
     router.post("/calculate-price", async(req, res) => {
@@ -11,7 +40,7 @@ const attachCalculatePriceRoute = (router) => {
         const orderId = String(id_order || "").trim();
 
         if (!productName) {
-            return res.status(400).json({ error: "Tên sản phẩm bị thiếu." });
+            return res.status(400).json({ error: "Ten san pham bat buoc." });
         }
 
         try {
@@ -24,36 +53,26 @@ const attachCalculatePriceRoute = (router) => {
 
             let effectiveSupplyId = Number(supply_id);
             if (!effectiveSupplyId && orderRow?.supply) {
-                const s = await db(TABLES.supply).where({ source_name: orderRow.supply }).first();
+                const s = await db(TABLES.supply).where({ supplier_name: orderRow.supply }).first();
                 if (s) effectiveSupplyId = s.id;
             }
             if (!effectiveSupplyId && customer_type) {
-                const s = await db(TABLES.supply).where({ source_name: customer_type }).first();
+                const s = await db(TABLES.supply).where({ supplier_name: customer_type }).first();
                 if (s) effectiveSupplyId = s.id;
             }
 
-            const searchKeys = [
-                orderRow?.id_product ? String(orderRow.id_product) : null,
-                productName,
-                productName.replace(/\s+/g, "")
-            ].filter(Boolean);
+            const variantPricing = await fetchVariantPricing(productName);
 
-            const productPricing = await db(TABLES.productPrice)
-                .whereIn(COLS.PRICE.PRODUCT, searchKeys)
-                .orWhereIn(COLS.PRICE.PACKAGE_PRODUCT, searchKeys)
-                .orWhereIn(COLS.PRICE.PACKAGE, searchKeys)
-                .first();
-
-            if (!productPricing) {
-                return res.status(400).json({ error: "Không tìm được bảng giá." });
+            if (!variantPricing?.variantId) {
+                return res.status(400).json({ error: "Khong tim thay variant cho san pham." });
             }
 
-            // Giá nhập (cost) ưu tiên theo nguồn đã chọn; Giá bán tính theo giá cao nhất.
+            // Cost ưu tiên theo nguồn đã chọn; giá bán tính theo giá cao nhất
             let importBySource = 0;
             if (effectiveSupplyId) {
                 const latestBySource = await db(TABLES.supplyPrice)
                     .select(COLS.SUPPLY_PRICE.PRICE)
-                    .where(COLS.SUPPLY_PRICE.PRODUCT_ID, productPricing.id)
+                    .where(COLS.SUPPLY_PRICE.PRODUCT_ID, variantPricing.variantId)
                     .andWhere(COLS.SUPPLY_PRICE.SOURCE_ID, effectiveSupplyId)
                     .orderBy(COLS.SUPPLY_PRICE.ID, "desc")
                     .first();
@@ -62,28 +81,26 @@ const attachCalculatePriceRoute = (router) => {
                 }
             }
 
-            // Fallback cost: dùng cost của đơn nếu có (tránh trả 0).
             if (importBySource <= 0 && orderRow?.cost) {
                 importBySource = Number(orderRow.cost) || 0;
             }
 
             const maxPriceRow = await db(TABLES.supplyPrice)
                 .max(`${COLS.SUPPLY_PRICE.PRICE} as maxPrice`)
-                .where(COLS.SUPPLY_PRICE.PRODUCT_ID, productPricing.id)
+                .where(COLS.SUPPLY_PRICE.PRODUCT_ID, variantPricing.variantId)
                 .first();
             const baseForPricing = Number(maxPriceRow?.maxPrice || 0);
 
             if (baseForPricing <= 0 && importBySource <= 0) {
-                return res.status(400).json({ error: "Không có giá NCC" });
+                return res.status(400).json({ error: "Khong co gia NCC" });
             }
 
-            // Nếu vẫn chưa có cost theo nguồn, fallback sang giá cao nhất để có giá trị hiển thị.
             const pricingBase = baseForPricing > 0 ? baseForPricing : importBySource;
             const baseImport = importBySource > 0 ? importBySource : baseForPricing;
 
-            const pctCtv = Number(productPricing.pct_ctv) || 1;
-            const pctKhach = Number(productPricing.pct_khach) || 1;
-            const pctPromo = Number(productPricing.pct_promo) || 0;
+            const pctCtv = Number(variantPricing?.pctCtv) || 1;
+            const pctKhach = Number(variantPricing?.pctKhach) || 1;
+            const pctPromo = Number(variantPricing?.pctPromo) || 0;
             const prefixCtv = (Helpers.ORDER_PREFIXES?.ctv || "MAVC").toUpperCase();
             const prefixLe = (Helpers.ORDER_PREFIXES?.le || "MAVL").toUpperCase();
             const prefixKhuyen = (Helpers.ORDER_PREFIXES?.khuyen || "MAVK").toUpperCase();
@@ -97,11 +114,9 @@ const attachCalculatePriceRoute = (router) => {
             const isTang = orderPrefix.startsWith(prefixTang) || customerTypePrefix === prefixTang;
             const isNhap = orderPrefix.startsWith(prefixNhap) || customerTypePrefix === prefixNhap;
 
-            // Tính 3 biến: Resell, Customer
             const resellRaw = pricingBase * pctCtv;
             const customerRaw = resellRaw * pctKhach;
 
-            // làm tròn về bậc nghìn: < 500 xuống, >= 500 lên (1,400 => 1,000; 1,500 => 2,000)
             const round = (v) => Math.max(0, Math.round(v / 1000) * 1000);
             const resellPrice = round(Helpers.roundGiaBanValue(resellRaw));
             const customerPrice = round(Helpers.roundGiaBanValue(customerRaw));
@@ -110,7 +125,7 @@ const attachCalculatePriceRoute = (router) => {
             const promoFactor = pctPromo > 1 ? pctPromo / 100 : pctPromo;
             const promoAmount = round(Helpers.roundGiaBanValue(customerPrice * promoFactor));
             const pricePromo = Math.max(0, customerPrice - promoAmount);
-            const promoPrice = promoAmount;
+            const promoPrice = pricePromo;
 
             let price = customerPrice;
             if (isCtv) {
@@ -148,5 +163,3 @@ const attachCalculatePriceRoute = (router) => {
 };
 
 module.exports = { attachCalculatePriceRoute };
-
-

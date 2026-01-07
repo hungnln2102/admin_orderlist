@@ -2,15 +2,11 @@ const {
   pool,
   ORDER_TABLE,
   PAYMENT_RECEIPT_TABLE,
-  PRODUCT_PRICE_TABLE,
-  SUPPLY_TABLE,
-  SUPPLY_PRICE_TABLE,
   PAYMENT_SUPPLY_TABLE,
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
-  PRODUCT_PRICE_COLS,
-  SUPPLY_COLS,
-  SUPPLY_PRICE_COLS,
+  SUPPLIER_COLS,
+  SUPPLIER_COST_COLS,
   PAYMENT_SUPPLY_COLS,
   DB_SCHEMA,
 } = require("./config");
@@ -24,9 +20,16 @@ const {
   normalizeImportValue,
   calcGiaBan,
   roundToThousands,
+  fetchProductPricing,
 } = require("./utils");
 
+// Explicit tables for supplier data (no indirection)
+const SUPPLIER_TABLE = "product.supplier";
+const SUPPLIER_COST_TABLE = "product.supplier_cost";
+
 let paymentReceiptOrderColCache = null;
+const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
+
 const getPaymentReceiptOrderColumn = async () => {
   if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
 
@@ -46,7 +49,7 @@ const getPaymentReceiptOrderColumn = async () => {
         FROM information_schema.columns
         WHERE table_schema = $1 AND table_name = $2
       `,
-      [DB_SCHEMA, "payment_receipt"]
+      [DB_SCHEMA, PAYMENT_RECEIPT_BASE_TABLE]
     );
     const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
     const found = preferred.find((c) => names.includes(c));
@@ -263,64 +266,48 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
     const supplyName = String(orderRes.rows[0].supply_name || "").trim();
     const costValue = normalizeMoney(orderRes.rows[0].cost_value);
 
-    let productId = null;
+    let variantId = null;
     if (productName) {
-      const productRes = await client.query(
-        `SELECT ${PRODUCT_PRICE_COLS.id} AS id
-         FROM ${PRODUCT_PRICE_TABLE}
-         WHERE LOWER(${PRODUCT_PRICE_COLS.product}) = LOWER($1)
-         LIMIT 1`,
-        [productName]
-      );
-
-      if (productRes.rows.length) {
-        productId = productRes.rows[0].id;
-      } else {
-        const insertProduct = await client.query(
-          `INSERT INTO ${PRODUCT_PRICE_TABLE} (${PRODUCT_PRICE_COLS.product})
-           VALUES ($1)
-           RETURNING ${PRODUCT_PRICE_COLS.id} AS id`,
-          [productName]
-        );
-        productId = insertProduct.rows[0].id;
-      }
+      const pricingInfo = await fetchProductPricing(client, productName);
+      variantId = pricingInfo?.variantId ?? null;
     }
 
-    let sourceId = null;
+    let supplierId = null;
     if (supplyName) {
-      const supplyRes = await client.query(
-        `SELECT ${SUPPLY_COLS.id} AS id
-         FROM ${SUPPLY_TABLE}
-         WHERE LOWER(${SUPPLY_COLS.sourceName}) = LOWER($1)
+    const supplyRes = await client.query(
+        `SELECT ${SUPPLIER_COLS.id} AS id
+         FROM ${SUPPLIER_TABLE}
+         WHERE LOWER(${SUPPLIER_COLS.supplierName}) = LOWER($1)
          LIMIT 1`,
         [supplyName]
       );
 
       if (supplyRes.rows.length) {
-        sourceId = supplyRes.rows[0].id;
+        supplierId = supplyRes.rows[0].id;
       } else {
         const insertSupply = await client.query(
-          `INSERT INTO ${SUPPLY_TABLE} (${SUPPLY_COLS.sourceName})
+          `INSERT INTO ${SUPPLIER_TABLE} (${SUPPLIER_COLS.supplierName})
            VALUES ($1)
-           RETURNING ${SUPPLY_COLS.id} AS id`,
+           RETURNING ${SUPPLIER_COLS.id} AS id`,
           [supplyName]
         );
-        sourceId = insertSupply.rows[0].id;
+        supplierId = insertSupply.rows[0].id;
       }
     }
 
+    const resolvedProductId = variantId;
     let supplyPriceValue = costValue || referenceImport || 0;
     let supplyPriceScaled = false;
     let rawSupplyPrice = null;
-    if (productId && sourceId) {
+    if (resolvedProductId && supplierId) {
       const priceRes = await client.query(
-        `SELECT ${SUPPLY_PRICE_COLS.price} AS price
-         FROM ${SUPPLY_PRICE_TABLE}
-         WHERE ${SUPPLY_PRICE_COLS.productId} = $1
-           AND ${SUPPLY_PRICE_COLS.sourceId} = $2
-         ORDER BY ${SUPPLY_PRICE_COLS.id} DESC
+        `SELECT ${SUPPLIER_COST_COLS.price} AS price
+         FROM ${SUPPLIER_COST_TABLE}
+         WHERE ${SUPPLIER_COST_COLS.productId} = $1
+           AND ${SUPPLIER_COST_COLS.supplierId} = $2
+         ORDER BY ${SUPPLIER_COST_COLS.id} DESC
          LIMIT 1`,
-        [productId, sourceId]
+        [resolvedProductId, supplierId]
       );
 
       if (priceRes.rows.length) {
@@ -331,17 +318,17 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
         if (supplyPriceScaled && rawSupplyPrice !== supplyPriceValue) {
           try {
             await client.query(
-              `UPDATE ${SUPPLY_PRICE_TABLE}
-               SET ${SUPPLY_PRICE_COLS.price} = $1
-             WHERE ${SUPPLY_PRICE_COLS.productId} = $2
-               AND ${SUPPLY_PRICE_COLS.sourceId} = $3`,
-              [supplyPriceValue, productId, sourceId]
+              `UPDATE ${SUPPLIER_COST_TABLE}
+               SET ${SUPPLIER_COST_COLS.price} = $1
+             WHERE ${SUPPLIER_COST_COLS.productId} = $2
+               AND ${SUPPLIER_COST_COLS.supplierId} = $3`,
+              [supplyPriceValue, resolvedProductId, supplierId]
             );
           } catch (adjustErr) {
             console.error(
-              "Failed to normalize supply_price for productId=%s, sourceId=%s:",
-              productId,
-              sourceId,
+              "Failed to normalize supplier_cost for productId=%s, sourceId=%s:",
+              resolvedProductId,
+              supplierId,
               adjustErr
             );
           }
@@ -350,16 +337,16 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
         try {
           const insertPrice = supplyPriceValue || referenceImport || costValue;
           await client.query(
-            `INSERT INTO ${SUPPLY_PRICE_TABLE} (${SUPPLY_PRICE_COLS.productId}, ${SUPPLY_PRICE_COLS.sourceId}, ${SUPPLY_PRICE_COLS.price})
+            `INSERT INTO ${SUPPLIER_COST_TABLE} (${SUPPLIER_COST_COLS.productId}, ${SUPPLIER_COST_COLS.supplierId}, ${SUPPLIER_COST_COLS.price})
              VALUES ($1, $2, $3)
-             ON CONFLICT ON CONSTRAINT supply_price_pkey DO NOTHING`,
-            [productId, sourceId, insertPrice]
+             ON CONFLICT ON CONSTRAINT supplier_cost_pkey DO NOTHING`,
+          [resolvedProductId, supplierId, insertPrice]
           );
         } catch (insertErr) {
           console.error(
-            "Insert supply_price failed, productId=%s, sourceId=%s:",
-            productId,
-            sourceId,
+            "Insert supplier_cost failed, productId=%s, sourceId=%s:",
+            resolvedProductId,
+            supplierId,
             insertErr
           );
         }
@@ -371,8 +358,9 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
       await client.query("COMMIT");
     }
     return {
-      productId,
-      sourceId,
+      productId: resolvedProductId,
+      variantId,
+      supplierId,
       price: supplyPriceValue,
       priceScaled: supplyPriceScaled,
     };

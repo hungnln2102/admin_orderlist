@@ -1,6 +1,58 @@
 const { db } = require("../../db");
-const { QUOTED_COLS, SCHEMA, SUPPLY_STATUS_CANDIDATES } = require("./constants");
+const { QUOTED_COLS, SUPPLY_STATUS_CANDIDATES } = require("./constants");
+const { SCHEMA_PRODUCT, SCHEMA_PARTNER } = require("../../config/dbSchema");
 const { normalizeSupplyStatus } = require("../../utils/normalizers");
+
+const SUPPLIER_TABLE_PRIMARY = `${SCHEMA_PARTNER}.supplier`;
+const SUPPLIER_TABLE_FALLBACK = `${SCHEMA_PRODUCT}.supplier`;
+let supplierTableNameCache = null;
+let supplierNameColumnCache = null;
+let supplyStatusColumnNameCache = null;
+let supplyStatusColumnResolved = false;
+
+const resolveSupplierTableName = async () => {
+  if (supplierTableNameCache) return supplierTableNameCache;
+  try {
+    const existsPrimary = await db("information_schema.tables")
+      .select("table_name")
+      .where({ table_schema: SCHEMA_PARTNER, table_name: "supplier" })
+      .first();
+    if (existsPrimary) {
+      supplierTableNameCache = SUPPLIER_TABLE_PRIMARY;
+      return supplierTableNameCache;
+    }
+    const existsFallback = await db("information_schema.tables")
+      .select("table_name")
+      .where({ table_schema: SCHEMA_PRODUCT, table_name: "supplier" })
+      .first();
+    supplierTableNameCache = existsFallback ? SUPPLIER_TABLE_FALLBACK : SUPPLIER_TABLE_PRIMARY;
+  } catch (error) {
+    console.warn("[supplies] fallback supplier table detection failed:", error?.message || error);
+    supplierTableNameCache = SUPPLIER_TABLE_PRIMARY;
+  }
+  return supplierTableNameCache;
+};
+
+const resolveSupplierNameColumn = async () => {
+  if (supplierNameColumnCache) return supplierNameColumnCache;
+  try {
+    const tableName = await resolveSupplierTableName();
+    const [schema, table] = tableName.includes(".")
+      ? tableName.split(".")
+      : [SCHEMA_PARTNER, tableName];
+    const res = await db("information_schema.columns")
+      .select("column_name")
+      .where({ table_schema: schema, table_name: table })
+      .whereIn("column_name", ["supplier_name", "source_name"])
+      .orderByRaw(`CASE column_name WHEN 'supplier_name' THEN 1 WHEN 'source_name' THEN 2 ELSE 3 END`)
+      .first();
+    supplierNameColumnCache = res?.column_name || "supplier_name";
+  } catch (error) {
+    console.warn("[supplies] fallback supplier name column detection failed:", error?.message || error);
+    supplierNameColumnCache = "supplier_name";
+  }
+  return supplierNameColumnCache;
+};
 
 const parseMoney = (value, fallback = 0) => {
   if (value === null || value === undefined) return fallback;
@@ -21,20 +73,20 @@ const parseSupplyId = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-let supplyStatusColumnNameCache = null;
-let supplyStatusColumnResolved = false;
-
 const resolveSupplyStatusColumn = async () => {
   if (supplyStatusColumnResolved) {
     return supplyStatusColumnNameCache;
   }
   try {
-    const schemaName = process.env.DB_SCHEMA || SCHEMA || "mavryk";
+    const tableName = await resolveSupplierTableName();
+    const [schema, table] = tableName.includes(".")
+      ? tableName.split(".")
+      : [SCHEMA_PARTNER, tableName];
     const result = await db("information_schema.columns")
       .select("column_name")
       .where({
-        table_schema: schemaName,
-        table_name: "supply",
+        table_schema: schema,
+        table_name: table,
       })
       .whereIn("column_name", SUPPLY_STATUS_CANDIDATES)
       .orderByRaw(`
@@ -61,4 +113,8 @@ module.exports = {
   parseSupplyId,
   resolveSupplyStatusColumn,
   normalizeSupplyStatus,
+  resolveSupplierTableName,
+  resolveSupplierNameColumn,
 };
+
+

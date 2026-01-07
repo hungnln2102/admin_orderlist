@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const { db } = require("../../db");
 const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { session: sessionConfig } = require("../../config/appConfig");
 
 const USERS_DEF = getDefinition("USERS");
 const USERS_TABLE = tableName(DB_SCHEMA.USERS.TABLE);
@@ -77,7 +78,7 @@ const login = async (req, res) => {
 const logout = (req, res) => {
   if (req.session) {
     req.session.destroy(() => {
-      res.clearCookie(process.env.SESSION_NAME || "mavryk.sid");
+      res.clearCookie(sessionConfig?.name);
       res.json({ success: true });
     });
   } else {

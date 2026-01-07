@@ -23,6 +23,7 @@ type Order = Omit<ApiOrder, "cost" | "price"> & {
 
 interface Supply extends Helpers.SupplyLike {
   id?: number;
+  supplier_name?: string;
   source_name?: string;
   name?: string;
 }
@@ -65,6 +66,9 @@ const normalizeDateLike = (
   return null;
 };
 
+const getSupplyName = (s?: Supply | null) =>
+  (s?.supplier_name ?? s?.source_name ?? s?.name ?? "").trim();
+
 const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<Order | null>(null);
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -77,7 +81,11 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       (baseOrderRef.current?.[ORDER_FIELDS.SUPPLY as keyof Order] as string) ||
       "";
     if (!currentSupplyName.trim()) return null;
-    return { id: -1, source_name: currentSupplyName };
+    return {
+      id: -1,
+      supplier_name: currentSupplyName,
+      source_name: currentSupplyName,
+    };
   }, []);
 
   const mergeCurrentSupply = useCallback(
@@ -85,7 +93,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       const currentSupply = getCurrentSupplyOption();
       if (currentSupply) {
         const exists = list.some(
-          (item) => item.source_name === currentSupply.source_name
+          (item) => getSupplyName(item) === getSupplyName(currentSupply)
         );
         if (!exists) {
           return [currentSupply, ...list];
@@ -199,7 +207,7 @@ const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
     (supplyId: number) => {
       const selected = supplies.find((s) => s.id === supplyId);
       const supplyName =
-        selected?.source_name ||
+        getSupplyName(selected) ||
         (formData?.[ORDER_FIELDS.SUPPLY as keyof Order] as string) ||
         "";
       setIsCustomSupply(false);
@@ -323,7 +331,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const supplySelectValue = useMemo(() => {
     if (!formData) return "";
     const found = supplies.find(
-      (s) => s.source_name === formData[ORDER_FIELDS.SUPPLY]
+      (s) => getSupplyName(s) === formData[ORDER_FIELDS.SUPPLY]
     );
     return found ? String(found.id) : "";
   }, [formData, supplies]);
@@ -459,7 +467,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                     <option value="">-- Giữ nguyên hoặc chọn --</option>
                     {supplies.map((supply) => (
                       <option key={supply.id} value={supply.id}>
-                        {supply.source_name}
+                        {getSupplyName(supply)}
                       </option>
                     ))}
                   </select>

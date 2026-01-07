@@ -4,12 +4,14 @@ const {
   pool,
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
-  PRODUCT_PRICE_COLS,
-  SUPPLY_COLS,
-  SUPPLY_PRICE_COLS,
-  PRODUCT_PRICE_TABLE,
-  SUPPLY_TABLE,
-  SUPPLY_PRICE_TABLE,
+  VARIANT_COLS,
+  PRICE_CONFIG_COLS,
+  SUPPLIER_COLS,
+  SUPPLIER_COST_COLS,
+  VARIANT_TABLE,
+  PRICE_CONFIG_TABLE,
+  SUPPLIER_TABLE,
+  SUPPLIER_COST_TABLE,
 } = require("./config");
 
 const stripAccents = (value) =>
@@ -275,56 +277,82 @@ const deriveOrderCode = (transaction) => {
 };
 
 const fetchProductPricing = async (client, productName) => {
-  const sql = `
-    SELECT ${PRODUCT_PRICE_COLS.id}, ${PRODUCT_PRICE_COLS.pctCtv}, ${PRODUCT_PRICE_COLS.pctKhach}
-    FROM ${PRODUCT_PRICE_TABLE}
-    WHERE LOWER(${PRODUCT_PRICE_COLS.product}) = LOWER($1)
+  const name = String(productName ?? "");
+  if (!name) {
+    return { productId: null, variantId: null, pctCtv: 1, pctKhach: 1, pctPromo: 0 };
+  }
+
+  // Resolve pricing from product schema: variant.display_name -> price_config
+  const variantSql = `
+    SELECT
+      v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctCtv)} AS pct_ctv,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctKhach)} AS pct_khach,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctPromo)} AS pct_promo
+    FROM ${VARIANT_TABLE} AS v
+    LEFT JOIN ${PRICE_CONFIG_TABLE} AS pc
+      ON pc.${safeIdent(PRICE_CONFIG_COLS.variantId)} = v.${safeIdent(VARIANT_COLS.id)}
+    WHERE v.${safeIdent(VARIANT_COLS.displayName)} = $1
+    ORDER BY pc.${safeIdent(PRICE_CONFIG_COLS.updatedAt)} DESC NULLS LAST
     LIMIT 1
   `;
-  const res = await client.query(sql, [productName]);
-  if (!res.rows.length) return { productId: null, pctCtv: 1, pctKhach: 1 };
-  const row = res.rows[0];
+  const variantRes = await client.query(variantSql, [name]);
+  const variantRow = variantRes.rows[0] || {};
+
   return {
-    productId: row[PRODUCT_PRICE_COLS.id],
-    pctCtv: row[PRODUCT_PRICE_COLS.pctCtv] ?? 1,
-    pctKhach: row[PRODUCT_PRICE_COLS.pctKhach] ?? 1,
+    productId: variantRow.variant_id ?? null, // supply_price now keyed by variant.id
+    variantId: variantRow.variant_id ?? null,
+    pctCtv: variantRow.pct_ctv ?? 1,
+    pctKhach: variantRow.pct_khach ?? 1,
+    pctPromo: variantRow.pct_promo ?? 0,
   };
 };
 
 const findSupplyId = async (client, supplyName) => {
   if (!supplyName) return null;
   const sql = `
-    SELECT ${SUPPLY_COLS.id}
-    FROM ${SUPPLY_TABLE}
-    WHERE LOWER(${SUPPLY_COLS.sourceName}) = LOWER($1)
+    SELECT ${SUPPLIER_COLS.id}
+    FROM ${SUPPLIER_TABLE}
+    WHERE LOWER(${SUPPLIER_COLS.supplierName}) = LOWER($1)
     LIMIT 1
   `;
   const res = await client.query(sql, [String(supplyName).trim()]);
-  return res.rows.length ? res.rows[0][SUPPLY_COLS.id] : null;
+  return res.rows.length ? res.rows[0][SUPPLIER_COLS.id] : null;
 };
 
-const fetchSupplyPrice = async (client, productId, sourceId) => {
-  if (!(productId && sourceId)) return null;
-  const sql = `
-    SELECT ${SUPPLY_PRICE_COLS.price}
-    FROM ${SUPPLY_PRICE_TABLE}
-    WHERE ${SUPPLY_PRICE_COLS.productId} = $1 AND ${SUPPLY_PRICE_COLS.sourceId} = $2
-    ORDER BY ${SUPPLY_PRICE_COLS.id} DESC
-    LIMIT 1
-  `;
-  const res = await client.query(sql, [productId, sourceId]);
-  return res.rows.length ? res.rows[0][SUPPLY_PRICE_COLS.price] : null;
+const fetchSupplyPrice = async (client, identifiers, supplierId) => {
+  const variantId = identifiers?.variantId ?? identifiers?.productId;
+  if (!supplierId) return null;
+  const candidateIds = [variantId].filter((id) => Number.isFinite(Number(id)));
+  for (const pid of candidateIds) {
+    const sql = `
+      SELECT ${SUPPLIER_COST_COLS.price}
+      FROM ${SUPPLIER_COST_TABLE}
+      WHERE ${SUPPLIER_COST_COLS.productId} = $1 AND ${SUPPLIER_COST_COLS.supplierId} = $2
+      ORDER BY ${SUPPLIER_COST_COLS.id} DESC
+      LIMIT 1
+    `;
+    const res = await client.query(sql, [pid, supplierId]);
+    if (res.rows.length) return res.rows[0][SUPPLIER_COST_COLS.price];
+  }
+  return null;
 };
 
-const fetchMaxSupplyPrice = async (client, productId) => {
-  if (!productId) return null;
-  const res = await client.query(
-    `SELECT MAX(${SUPPLY_PRICE_COLS.price}) AS price
-       FROM ${SUPPLY_PRICE_TABLE}
-       WHERE ${SUPPLY_PRICE_COLS.productId} = $1`,
-    [productId]
-  );
-  return res.rows.length ? res.rows[0].price : null;
+const fetchMaxSupplyPrice = async (client, identifiers) => {
+  const variantId = identifiers?.variantId ?? identifiers?.productId;
+  const candidateIds = [variantId].filter((id) => Number.isFinite(Number(id)));
+  for (const pid of candidateIds) {
+    const res = await client.query(
+      `SELECT MAX(${SUPPLIER_COST_COLS.price}) AS price
+         FROM ${SUPPLIER_COST_TABLE}
+         WHERE ${SUPPLIER_COST_COLS.productId} = $1`,
+      [pid]
+    );
+    if (res.rows.length && res.rows[0].price !== undefined && res.rows[0].price !== null) {
+      return res.rows[0].price;
+    }
+  }
+  return null;
 };
 
 module.exports = {

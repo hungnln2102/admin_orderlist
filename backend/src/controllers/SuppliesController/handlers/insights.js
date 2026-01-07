@@ -4,7 +4,7 @@ const {
   STATUS,
   QUOTED_COLS,
   orderCols,
-  productPriceCols,
+  variantCols,
   supplyPriceCols,
 } = require("../constants");
 const {
@@ -15,6 +15,45 @@ const {
 } = require("../../../utils/sql");
 const { normalizeSupplyStatus, formatDateOutput } = require("../../../utils/normalizers");
 const { resolveSupplyStatusColumn } = require("../helpers");
+
+// Explicit supplier tables (prefer product schema, fallback to partner for legacy DBs)
+const SUPPLIER_COST_TABLE = "product.supplier_cost";
+const SUPPLIER_PRODUCT_TABLE = "product.supplier";
+const SUPPLIER_PARTNER_TABLE = "partner.supplier";
+let supplierTableNameCache = null;
+let supplierNameColumnCache = null;
+const resolveSupplierTableName = async () => {
+  if (supplierTableNameCache) return supplierTableNameCache;
+  try {
+    const exists = await db("information_schema.tables")
+      .select("table_name")
+      .where({ table_schema: "product", table_name: "supplier" })
+      .first();
+    supplierTableNameCache = exists ? SUPPLIER_PRODUCT_TABLE : SUPPLIER_PARTNER_TABLE;
+  } catch (err) {
+    console.warn("[insights] Could not resolve supplier table, defaulting to partner.supplier:", err?.message || err);
+    supplierTableNameCache = SUPPLIER_PRODUCT_TABLE;
+  }
+  return supplierTableNameCache;
+};
+const resolveSupplierNameColumn = async () => {
+  if (supplierNameColumnCache) return supplierNameColumnCache;
+  try {
+    const tableName = await resolveSupplierTableName();
+    const [schema, table] = tableName.includes(".") ? tableName.split(".") : ["product", tableName];
+    const res = await db("information_schema.columns")
+      .select("column_name")
+      .where({ table_schema: schema, table_name: table })
+      .whereIn("column_name", ["supplier_name", "source_name"])
+      .orderByRaw(`CASE column_name WHEN 'supplier_name' THEN 1 WHEN 'source_name' THEN 2 ELSE 3 END`)
+      .first();
+    supplierNameColumnCache = res?.column_name || "supplier_name";
+  } catch (err) {
+    console.warn("[insights] Could not resolve supplier name column, defaulting to supplier_name:", err?.message || err);
+    supplierNameColumnCache = "supplier_name";
+  }
+  return supplierNameColumnCache;
+};
 
 const getSupplyInsights = async (_req, res) => {
   console.log("[GET] /api/supply-insights");
@@ -99,30 +138,30 @@ const getSupplyInsights = async (_req, res) => {
           ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
           COUNT(*) AS total_orders,
           MAX(${createDateNormalization("createdate")}) AS last_order_date
-        FROM ${TABLES.orderCanceled}
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
-        GROUP BY source_key
-      ) agg
-      WHERE source_key <> ''
+      FROM ${TABLES.orderCanceled}
+      WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+      GROUP BY source_key
+    ) agg
+    WHERE source_key <> ''
       GROUP BY source_key
     `;
 
     const productsSql = `
       SELECT
-        sp.${quoteIdent(supplyPriceCols.sourceId)} AS source_id,
+        sp.${quoteIdent(supplyPriceCols.supplierId)} AS source_id,
         ARRAY_REMOVE(
           ARRAY_AGG(
             DISTINCT NULLIF(
-              TRIM(pp.${quoteIdent(productPriceCols.product)}::text),
+              TRIM(v.${quoteIdent(variantCols.displayName)}::text),
               ''
             )
           ),
           NULL
         ) AS product_list
-      FROM ${TABLES.supplyPrice} sp
-      JOIN ${TABLES.productPrice} pp
-        ON sp.${quoteIdent(supplyPriceCols.productId)} = pp.${quoteIdent(productPriceCols.id)}
-      GROUP BY sp.${quoteIdent(supplyPriceCols.sourceId)}
+      FROM ${SUPPLIER_COST_TABLE} sp
+      LEFT JOIN ${TABLES.variant} v
+        ON sp.${quoteIdent(supplyPriceCols.productId)} = v.id
+      GROUP BY sp.${quoteIdent(supplyPriceCols.supplierId)}
     `;
 
     // Tính tổng đã trả và còn nợ theo trạng thái để không trừ nhầm chu kỳ đã thanh toán
@@ -141,18 +180,21 @@ const getSupplyInsights = async (_req, res) => {
       GROUP BY ps.${QUOTED_COLS.paymentSupply.sourceId}
     `;
 
+    const supplierTableName = await resolveSupplierTableName();
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const supplierNameIdent = quoteIdent(supplierNameCol);
     const supplySql = `
       SELECT
-        s.${QUOTED_COLS.supply.id} AS id,
-        s.${QUOTED_COLS.supply.sourceName} AS source_name,
-        s.${QUOTED_COLS.supply.numberBank} AS number_bank,
-        s.${QUOTED_COLS.supply.binBank} AS bin_bank,
+        s.${QUOTED_COLS.supplier.id} AS id,
+        s.${supplierNameIdent} AS source_name,
+        s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
+        s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
         ${statusSelect},
         COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name
-      FROM ${TABLES.supply} s
+      FROM ${supplierTableName} s
       LEFT JOIN ${TABLES.bankList} bl
-        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supply.binBank}::text)
-      ORDER BY s.${QUOTED_COLS.supply.sourceName};
+        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supplier.binBank}::text)
+      ORDER BY s.${supplierNameIdent};
     `;
 
     const [monthlyRes, summaryRes, productsRes, paymentsRes, supplyRes] = await Promise.all([
@@ -257,3 +299,4 @@ const getSupplyInsights = async (_req, res) => {
 };
 
 module.exports = { getSupplyInsights };
+

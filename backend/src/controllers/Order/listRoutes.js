@@ -28,8 +28,8 @@ const attachListRoutes = (router) => {
             );
             res.json(normalized);
         } catch (error) {
-            console.error("Truy váº¥n tháº¥t báº¡i:", error);
-            res.status(500).json({ error: "KhÃ´ng thá»ƒ táº£i danh sÃ¡ch Ä‘Æ¡n hÃ ng." });
+            console.error("Truy Vấn Thất Bại:", error);
+            res.status(500).json({ error: "Không thể tải danh sách đơn hàng." });
         }
     });
 

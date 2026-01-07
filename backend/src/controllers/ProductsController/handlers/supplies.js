@@ -3,27 +3,36 @@ const { QUOTED_COLS, supplyPriceCols, TABLES } = require("../constants");
 const { findProductIdByName, ensureSupplyRecord, upsertSupplyPrice } = require("../finders");
 const { mapSupplyPriceRow } = require("../mappers");
 const { quoteIdent } = require("../../../utils/sql");
+const {
+  resolveSupplierTableName,
+  resolveSupplierNameColumn,
+} = require("../../SuppliesController/helpers");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;
   try {
-    const productId = await findProductIdByName(productName);
-    if (!productId) {
+    const supplierTable = await resolveSupplierTableName();
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const supplierNameIdent = quoteIdent(supplierNameCol);
+    const ids = await findProductIdByName(productName);
+    const candidateIds = [ids.variantId, ids.productId].filter((id) => Number.isFinite(Number(id)));
+    if (!candidateIds.length) {
       return res.json([]);
     }
+    const placeholders = candidateIds.map(() => "?").join(", ");
     const query = `
       SELECT
-        sp.${quoteIdent(supplyPriceCols.sourceId)} AS source_id,
-        COALESCE(s.${QUOTED_COLS.supply.sourceName}, '') AS source_name
+        sp.${quoteIdent(supplyPriceCols.supplierId)} AS source_id,
+        COALESCE(s.${supplierNameIdent}, '') AS source_name
       FROM ${TABLES.supplyPrice} sp
-      LEFT JOIN ${TABLES.supply} s
-        ON s.${QUOTED_COLS.supply.id} = sp.${quoteIdent(supplyPriceCols.sourceId)}
-      WHERE sp.${quoteIdent(supplyPriceCols.productId)} = ?
-      ORDER BY COALESCE(s.${QUOTED_COLS.supply.sourceName}, sp.${quoteIdent(
-        supplyPriceCols.sourceId
+      LEFT JOIN ${supplierTable} s
+        ON s.${quoteIdent("id")} = sp.${quoteIdent(supplyPriceCols.supplierId)}
+      WHERE sp.${quoteIdent(supplyPriceCols.productId)} IN (${placeholders})
+      ORDER BY COALESCE(s.${supplierNameIdent}, sp.${quoteIdent(
+        supplyPriceCols.supplierId
       )}::text);
     `;
-    const result = await db.raw(query, [productId]);
+    const result = await db.raw(query, candidateIds);
     const rows =
       result.rows?.map((row) => ({
         id: Number(row.source_id) || null,
@@ -42,25 +51,30 @@ const getSuppliesByProductName = async (req, res) => {
 const getSupplyPricesByProductName = async (req, res) => {
   const { productName } = req.params;
   try {
-    const productId = await findProductIdByName(productName);
-    if (!productId) {
+    const supplierTable = await resolveSupplierTableName();
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const supplierNameIdent = quoteIdent(supplierNameCol);
+    const ids = await findProductIdByName(productName);
+    const candidateIds = [ids.variantId, ids.productId].filter((id) => Number.isFinite(Number(id)));
+    if (!candidateIds.length) {
       return res.json([]);
     }
+    const placeholders = candidateIds.map(() => "?").join(", ");
     const query = `
       SELECT
-        sp.${quoteIdent(supplyPriceCols.sourceId)} AS source_id,
+        sp.${quoteIdent(supplyPriceCols.supplierId)} AS source_id,
         sp.${quoteIdent(supplyPriceCols.price)} AS price,
-        COALESCE(s.${QUOTED_COLS.supply.sourceName}, '') AS source_name,
+        COALESCE(s.${supplierNameIdent}, '') AS source_name,
         NULL::text AS last_order_date
       FROM ${TABLES.supplyPrice} sp
-      LEFT JOIN ${TABLES.supply} s
-        ON s.${QUOTED_COLS.supply.id} = sp.${quoteIdent(supplyPriceCols.sourceId)}
-      WHERE sp.${quoteIdent(supplyPriceCols.productId)} = ?
-      ORDER BY COALESCE(s.${QUOTED_COLS.supply.sourceName}, sp.${quoteIdent(
-        supplyPriceCols.sourceId
+      LEFT JOIN ${supplierTable} s
+        ON s.${quoteIdent("id")} = sp.${quoteIdent(supplyPriceCols.supplierId)}
+      WHERE sp.${quoteIdent(supplyPriceCols.productId)} IN (${placeholders})
+      ORDER BY COALESCE(s.${supplierNameIdent}, sp.${quoteIdent(
+        supplyPriceCols.supplierId
       )}::text);
     `;
-    const result = await db.raw(query, [productId]);
+    const result = await db.raw(query, candidateIds);
     res.json((result.rows || []).map(mapSupplyPriceRow));
   } catch (error) {
     console.error(
@@ -75,10 +89,11 @@ const updateSupplyPriceForProduct = async (req, res) => {
   const { productId, sourceId } = req.params;
   const { price } = req.body || {};
   try {
-    const result = await upsertSupplyPrice(productId, sourceId, price);
+    const result = await upsertSupplyPrice({ productId }, sourceId, price);
     res.json({
       productId: result.productId,
-      sourceId: result.sourceId,
+      sourceId: result.supplierId,
+      supplierId: result.supplierId,
       price: result.price,
     });
   } catch (error) {
@@ -104,10 +119,11 @@ const createSupplyPriceForProduct = async (req, res) => {
     if (!resolvedSourceId) {
       return res.status(400).json({ error: "Nhà cung cấp bị thiếu hoặc không hợp lệ." });
     }
-    const result = await upsertSupplyPrice(parsedProductId, resolvedSourceId, price);
+    const result = await upsertSupplyPrice({ productId: parsedProductId }, resolvedSourceId, price);
     res.status(201).json({
       productId: result.productId,
-      sourceId: result.sourceId,
+      sourceId: result.supplierId,
+      supplierId: result.supplierId,
       price: result.price,
     });
   } catch (error) {
@@ -133,7 +149,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
       `
       DELETE FROM ${TABLES.supplyPrice}
       WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
-        AND ${quoteIdent(supplyPriceCols.sourceId)} = ?;
+        AND ${quoteIdent(supplyPriceCols.supplierId)} = ?;
     `,
       [parsedProductId, parsedSourceId]
     );

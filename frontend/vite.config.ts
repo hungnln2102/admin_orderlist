@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
     esbuild: UserConfig["esbuild"],
     define: UserConfig["define"];
 
+  const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || "http://localhost:3001";
+
   if (mode === "development") {
     build = {
       minify: false,
@@ -40,6 +42,13 @@ export default defineConfig(({ mode }) => {
       watch: {
         usePolling: true,
         interval: 300,
+      },
+      proxy: {
+        "/api": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     resolve: {

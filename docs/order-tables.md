@@ -197,14 +197,14 @@ ngay_thanh_toan text,
 so_tien numeric(15,2)
 );
 
-CREATE TABLE mavryk.supply (
+CREATE TABLE partner.supplier (
 source_name text,
 id integer NOT NULL,
 number_bank text,
 bin_bank text
 );
 
-CREATE TABLE mavryk.supply_price (
+CREATE TABLE partner.supplier_cost (
 id integer NOT NULL,
 product_id integer,
 source_id integer,

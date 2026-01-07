@@ -170,9 +170,11 @@ const ProductTable: React.FC<ProductTableProps> = ({
   };
 
   const controlButtonClass =
-    "h-9 min-w-[36px] rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed";
+    "w-10 h-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed";
   const pageButtonClass =
-    "h-9 min-w-[36px] rounded-lg border border-white/15 bg-white/5 px-3 text-sm text-white/80 transition hover:bg-white/10";
+    "w-10 h-10 flex items-center justify-center rounded-xl font-semibold border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10";
+  const activePageClass =
+    "rounded-full bg-gradient-to-br from-[#323b74] via-[#22294f] to-[#151c39] text-white border border-[#6b74ff]/50 shadow-[0_12px_30px_-14px_rgba(107,116,255,0.8)]";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur">
@@ -295,7 +297,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
           </select>
           <span>dòng</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             className={controlButtonClass}
             onClick={() => handlePageSelect(1)}
@@ -314,16 +316,17 @@ const ProductTable: React.FC<ProductTableProps> = ({
           </button>
           {paginationItems.map((item, index) =>
             item === "ellipsis" ? (
-              <span key={`ellipsis-${index}`} className="px-2 text-white/50">
+              <span
+                key={`ellipsis-${index}`}
+                className="w-10 h-10 flex items-center justify-center text-white/50"
+              >
                 ...
               </span>
             ) : (
               <button
                 key={item}
                 className={`${pageButtonClass} ${
-                  clampedCurrent === item
-                    ? "border-indigo-400/60 bg-indigo-600/50 text-white"
-                    : ""
+                  clampedCurrent === item ? activePageClass : ""
                 }`}
                 onClick={() => handlePageSelect(item)}
               >

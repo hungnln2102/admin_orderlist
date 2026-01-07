@@ -13,7 +13,7 @@ const { getNextAccountStorageId } = require("../../services/idService");
 const { pkgCols, accCols, TABLES } = require("./constants");
 
 const normalizeMatchMode = (matchMode) =>
-  matchMode === "slot" ? "slot" : pkgCols.informationOrder || "information_order";
+  matchMode === "slot" ? "slot" : "information_order";
 
 const listPackageProducts = async () => {
   const result = await db.raw(`${PACKAGE_PRODUCTS_SELECT} ORDER BY pp.id ASC`);

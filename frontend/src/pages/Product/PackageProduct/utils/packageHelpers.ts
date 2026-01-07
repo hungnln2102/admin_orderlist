@@ -345,7 +345,7 @@ export const parseNumericValue = (input: unknown): number | null => {
     return Number.isFinite(input) ? input : null;
   }
   if (typeof input === "string") {
-    const cleaned = input.replace(/[^0-9.-]/g, "");
+    const cleaned = input.replace(/[^0-9]/g, "");
     if (!cleaned) return null;
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : null;

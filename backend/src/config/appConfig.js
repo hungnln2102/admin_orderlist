@@ -13,6 +13,9 @@ const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const sessionName =
+  process.env.SESSION_NAME ||
+  `${(process.env.APP_NAME || "session").replace(/[^a-z0-9]/gi, "").toLowerCase() || "session"}.sid`;
 const isProd = process.env.NODE_ENV === "production";
 const cookieSecureEnv = (process.env.COOKIE_SECURE || "").trim().toLowerCase();
 const hasHttpOrigin = allowedOrigins.some((origin) =>
@@ -43,7 +46,7 @@ module.exports = {
     port: SEPAY_PORT,
   },
   session: {
-    name: process.env.SESSION_NAME || "mavryk.sid",
+    name: sessionName,
     secret: process.env.SESSION_SECRET || "change_this_secret",
     cookieSecure,
     cookieSameSite,

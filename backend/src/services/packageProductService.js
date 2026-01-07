@@ -1,5 +1,11 @@
 const { db } = require("../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../config/dbSchema");
+const {
+  DB_SCHEMA,
+  SCHEMA_PRODUCT,
+  PRODUCT_SCHEMA,
+  getDefinition,
+  tableName,
+} = require("../config/dbSchema");
 const {
   formatDateOutput,
   fromDbNumber,
@@ -10,13 +16,18 @@ const { QUOTED_COLS } = require("../utils/columns");
 
 const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT");
 const ACCOUNT_DEF = getDefinition("ACCOUNT_STORAGE");
-const PRODUCT_PRICE_DEF = getDefinition("PRODUCT_PRICE");
+const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
+const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 
 const TABLES = {
   packageProduct: tableName(DB_SCHEMA.PACKAGE_PRODUCT.TABLE),
   accountStorage: tableName(DB_SCHEMA.ACCOUNT_STORAGE.TABLE),
-  productPrice: tableName(DB_SCHEMA.PRODUCT_PRICE.TABLE),
+  product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
+  variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
 };
+
+const PRODUCT_SCHEMA_COLS = PRODUCT_DEF.columns;
+const VARIANT_COLS = VARIANT_DEF.columns;
 
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
@@ -45,10 +56,15 @@ const PACKAGE_PRODUCTS_SELECT = `
     ON acc.${QUOTED_COLS.accountStorage.mailFamily} = pp.${QUOTED_COLS.packageProduct.username}
   LEFT JOIN (
     SELECT
-      LOWER(TRIM(${quoteIdent(PRODUCT_PRICE_DEF.columns.package)}::text)) AS package_key,
-      ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(TRIM(${quoteIdent(PRODUCT_PRICE_DEF.columns.product)}::text), '')), NULL) AS product_codes
-    FROM ${TABLES.productPrice}
-    GROUP BY LOWER(TRIM(${quoteIdent(PRODUCT_PRICE_DEF.columns.package)}::text))
+      LOWER(TRIM(p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)}::text)) AS package_key,
+      ARRAY_REMOVE(
+        ARRAY_AGG(DISTINCT NULLIF(TRIM(v.${quoteIdent(VARIANT_COLS.displayName)}::text), '')),
+        NULL
+      ) AS product_codes
+    FROM ${TABLES.product} p
+    JOIN ${TABLES.variant} v
+      ON v.${quoteIdent(VARIANT_COLS.productId)} = p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)}
+    GROUP BY LOWER(TRIM(p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)}::text))
   ) product_codes ON product_codes.package_key = LOWER(TRIM(pp.${QUOTED_COLS.packageProduct.package}::text))
 `;
 

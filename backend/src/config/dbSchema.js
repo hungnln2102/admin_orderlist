@@ -6,6 +6,10 @@ dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
 // Default schema used by existing dumps; override with DB_SCHEMA env if your DB uses another schema.
 const SCHEMA = process.env.DB_SCHEMA || "mavryk";
+// Schema name for the new product namespace (same DB, different schema)
+const SCHEMA_PRODUCT = "product";
+// Schema name for partners/suppliers (stay in partner schema)
+const SCHEMA_PARTNER = "partner";
 const NOTIFICATION_GROUP_ID =
   process.env.NOTIFICATION_GROUP_ID || "-1002934465528";
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
@@ -122,18 +126,24 @@ const DB_SCHEMA = {
       MATCH: "match",
     },
   },
-  PRODUCT_PRICE: {
-    TABLE: "product_price",
+  MASTER_WALLETTYPES: {
+    TABLE: "master_wallettypes",
     COLS: {
       ID: "id",
-      PRODUCT: "id_product",
-      PCT_CTV: "pct_ctv",
-      PCT_KHACH: "pct_khach",
-      IS_ACTIVE: "is_active",
-      PACKAGE: "package",
-      PACKAGE_PRODUCT: "package_product",
-      UPDATE_DATE: "update",
-      PCT_PROMO: "pct_promo",
+      WALLET_NAME: "wallet_name",
+      NOTE: "note",
+      ASSET_CODE: "asset_code",
+      IS_INVESTMENT: "is_investment",
+      LINKED_WALLET_ID: "linked_wallet_id",
+    },
+  },
+  TRANS_DAILYBALANCES: {
+    TABLE: "trans_dailybalances",
+    COLS: {
+      ID: "id",
+      RECORD_DATE: "record_date",
+      WALLET_ID: "wallet_id",
+      AMOUNT: "amount",
     },
   },
   PRODUCT_DESC: {
@@ -185,25 +195,6 @@ const DB_SCHEMA = {
       BANK_NAME: "bank_name",
     },
   },
-  SUPPLY: {
-    TABLE: "supply",
-    COLS: {
-      ID: "id",
-      SOURCE_NAME: "source_name",
-      NUMBER_BANK: "number_bank",
-      BIN_BANK: "bin_bank",
-      ACTIVE_SUPPLY: "active_supply",
-    },
-  },
-  SUPPLY_PRICE: {
-    TABLE: "supply_price",
-    COLS: {
-      ID: "id",
-      PRODUCT_ID: "product_id",
-      SOURCE_ID: "source_id",
-      PRICE: "price",
-    },
-  },
   USERS: {
     TABLE: "users",
     COLS: {
@@ -220,11 +211,90 @@ const DB_SCHEMA = {
   },
 };
 
+// -----------------------
+// UPPERCASE SCHEMA PRODUCT
+// -----------------------
+const PRODUCT_SCHEMA = {
+  CATEGORY: {
+    TABLE: "category",
+    COLS: {
+      ID: "id",
+      NAME: "name",
+      CREATED_AT: "created_at",
+    },
+  },
+  PRODUCT: {
+    TABLE: "product",
+    COLS: {
+      ID: "id",
+      CATEGORY_ID: "category_id",
+      PACKAGE_NAME: "package_name",
+    },
+  },
+  VARIANT: {
+    TABLE: "variant",
+    COLS: {
+      ID: "id",
+      PRODUCT_ID: "product_id",
+      VARIANT_NAME: "variant_name",
+      IS_ACTIVE: "is_active",
+      DISPLAY_NAME: "display_name",
+    },
+  },
+  PRODUCT_DESC: {
+    TABLE: "product_desc",
+    COLS: {
+      ID: "id",
+      PRODUCT_ID: "product_id",
+      RULES: "rules",
+      DESCRIPTION: "description",
+      IMAGE_URL: "image_url",
+    },
+  },
+  PRICE_CONFIG: {
+    TABLE: "price_config",
+    COLS: {
+      ID: "id",
+      VARIANT_ID: "variant_id",
+      PCT_CTV: "pct_ctv",
+      PCT_KHACH: "pct_khach",
+      PCT_PROMO: "pct_promo",
+      UPDATED_AT: "updated_at",
+    },
+  },
+};
+
+// -----------------------
+// UPPERCASE SCHEMA SUPPLIER
+// -----------------------
+const PARTNER_SCHEMA = {
+  SUPPLIER: {
+    TABLE: "supplier",
+    COLS: {
+      ID: "id",
+      SUPPLIER_NAME: "supplier_name",
+      NUMBER_BANK: "number_bank",
+      BIN_BANK: "bin_bank",
+      ACTIVE_SUPPLY: "active_supply",
+    },
+  },
+  SUPPLIER_COST: {
+    TABLE: "supplier_cost",
+    COLS: {
+      ID: "id",
+      PRODUCT_ID: "product_id",
+      SUPPLIER_ID: "supplier_id",
+      PRICE: "price",
+    },
+  },
+};
+
 const tableName = (name, schema = SCHEMA) =>
   schema ? `${schema}.${name}` : name;
 
-const getTable = (key) => DB_SCHEMA[key] || null;
-const getColumns = (key) => (DB_SCHEMA[key] ? DB_SCHEMA[key].COLS || {} : {});
+const getTable = (key, schemaMap = DB_SCHEMA) => schemaMap[key] || null;
+const getColumns = (key, schemaMap = DB_SCHEMA) =>
+  schemaMap[key] ? schemaMap[key].COLS || {} : {};
 
 // Helpers to derive camelCase column maps on demand (per consumer)
 const toCamel = (key = "") =>
@@ -237,8 +307,8 @@ const toCamel = (key = "") =>
     )
     .join("");
 
-const getDefinition = (key) => {
-  const entry = DB_SCHEMA[key];
+const getDefinition = (key, schemaMap = DB_SCHEMA) => {
+  const entry = schemaMap[key];
   if (!entry) return null;
   const columns = Object.fromEntries(
     Object.entries(entry.COLS || {}).map(([colKey, colName]) => [
@@ -255,6 +325,7 @@ const getDefinition = (key) => {
 module.exports = {
   // Environment + helpers
   SCHEMA,
+  SCHEMA_PRODUCT,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
   tableName,
@@ -263,4 +334,8 @@ module.exports = {
   getDefinition,
   // Primary schema
   DB_SCHEMA,
+  PRODUCT_SCHEMA,
+  // Partner schema
+  SCHEMA_PARTNER,
+  PARTNER_SCHEMA,
 };
