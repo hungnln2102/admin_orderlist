@@ -9,9 +9,25 @@ const SCHEMA = process.env.DB_SCHEMA || "mavryk";
 // Orders schema (migrated order_* tables)
 const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || "orders";
 // Schema name for the new product namespace (same DB, different schema)
-const SCHEMA_PRODUCT = process.env.DB_SCHEMA_PRODUCT || "product";
+const SCHEMA_PRODUCT =
+  process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "product";
 // Schema name for partners/suppliers
-const SCHEMA_PARTNER = process.env.DB_SCHEMA_PARTNER || "partner";
+const SCHEMA_PARTNER =
+  process.env.DB_SCHEMA_PARTNER || process.env.SCHEMA_PARTNER || "partner";
+// Schema name override for supplier tables (if different from partner/product)
+const SCHEMA_SUPPLIER =
+  process.env.DB_SCHEMA_SUPPLIER ||
+  process.env.SCHEMA_SUPPLIER ||
+  SCHEMA_PARTNER ||
+  SCHEMA_PRODUCT ||
+  SCHEMA;
+// Schema for supplier_cost (may live with products in current DB)
+const SCHEMA_SUPPLIER_COST =
+  process.env.DB_SCHEMA_SUPPLIER_COST ||
+  process.env.SCHEMA_SUPPLIER_COST ||
+  SCHEMA_PRODUCT ||
+  SCHEMA_PARTNER ||
+  SCHEMA;
 const NOTIFICATION_GROUP_ID =
   process.env.NOTIFICATION_GROUP_ID || "-1002934465528";
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
@@ -335,6 +351,8 @@ module.exports = {
   SCHEMA,
   SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
+  SCHEMA_SUPPLIER,
+  SCHEMA_SUPPLIER_COST,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
   tableName,

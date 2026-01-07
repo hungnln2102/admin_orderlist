@@ -53,11 +53,11 @@ const attachCalculatePriceRoute = (router) => {
 
             let effectiveSupplyId = Number(supply_id);
             if (!effectiveSupplyId && orderRow?.supply) {
-                const s = await db(TABLES.supply).where({ supplier_name: orderRow.supply }).first();
+                const s = await db(TABLES.supplier).where({ supplier_name: orderRow.supply }).first();
                 if (s) effectiveSupplyId = s.id;
             }
             if (!effectiveSupplyId && customer_type) {
-                const s = await db(TABLES.supply).where({ supplier_name: customer_type }).first();
+                const s = await db(TABLES.supplier).where({ supplier_name: customer_type }).first();
                 if (s) effectiveSupplyId = s.id;
             }
 
@@ -70,14 +70,14 @@ const attachCalculatePriceRoute = (router) => {
             // Cost ưu tiên theo nguồn đã chọn; giá bán tính theo giá cao nhất
             let importBySource = 0;
             if (effectiveSupplyId) {
-                const latestBySource = await db(TABLES.supplyPrice)
-                    .select(COLS.SUPPLY_PRICE.PRICE)
-                    .where(COLS.SUPPLY_PRICE.PRODUCT_ID, variantPricing.variantId)
-                    .andWhere(COLS.SUPPLY_PRICE.SOURCE_ID, effectiveSupplyId)
-                    .orderBy(COLS.SUPPLY_PRICE.ID, "desc")
+                const latestBySource = await db(TABLES.supplierCost)
+                    .select(COLS.SUPPLIER_COST.PRICE)
+                    .where(COLS.SUPPLIER_COST.PRODUCT_ID, variantPricing.variantId)
+                    .andWhere(COLS.SUPPLIER_COST.SUPPLIER_ID, effectiveSupplyId)
+                    .orderBy(COLS.SUPPLIER_COST.ID, "desc")
                     .first();
-                if (latestBySource?.[COLS.SUPPLY_PRICE.PRICE] !== undefined) {
-                    importBySource = Number(latestBySource[COLS.SUPPLY_PRICE.PRICE]) || 0;
+                if (latestBySource?.[COLS.SUPPLIER_COST.PRICE] !== undefined) {
+                    importBySource = Number(latestBySource[COLS.SUPPLIER_COST.PRICE]) || 0;
                 }
             }
 
@@ -85,9 +85,9 @@ const attachCalculatePriceRoute = (router) => {
                 importBySource = Number(orderRow.cost) || 0;
             }
 
-            const maxPriceRow = await db(TABLES.supplyPrice)
-                .max(`${COLS.SUPPLY_PRICE.PRICE} as maxPrice`)
-                .where(COLS.SUPPLY_PRICE.PRODUCT_ID, variantPricing.variantId)
+            const maxPriceRow = await db(TABLES.supplierCost)
+                .max(`${COLS.SUPPLIER_COST.PRICE} as maxPrice`)
+                .where(COLS.SUPPLIER_COST.PRODUCT_ID, variantPricing.variantId)
                 .first();
             const baseForPricing = Number(maxPriceRow?.maxPrice || 0);
 

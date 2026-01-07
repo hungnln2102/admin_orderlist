@@ -32,7 +32,7 @@ const findSupplyIdByName = async(trx, supplyNameRaw) => {
         : String(supplyNameRaw);
     if (!supplyName) return null;
 
-    const row = await trx(TABLES.supply)
+    const row = await trx(TABLES.supplier)
         .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
         .where(PARTNER_SCHEMA.SUPPLIER.COLS.SOURCE_NAME, supplyName)
         .first();

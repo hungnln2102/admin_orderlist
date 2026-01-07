@@ -121,7 +121,7 @@ const ensureSupplyRecord = async(sourceName) => {
     if (!sourceName) return null;
     const name = sourceName.trim();
 
-    const exist = await db(TABLES.supply).where({ supplier_name: name }).first();
+    const exist = await db(TABLES.supplier).where({ supplier_name: name }).first();
     if (exist) return exist.id;
 
     const nextId = await getNextSupplyId();
@@ -140,7 +140,7 @@ const ensureSupplyRecord = async(sourceName) => {
     const newSupply = { id: nextId, supplier_name: name };
     if (statusCol) newSupply[statusCol] = "active";
 
-    await db(TABLES.supply).insert(newSupply);
+    await db(TABLES.supplier).insert(newSupply);
     return nextId;
 };
 

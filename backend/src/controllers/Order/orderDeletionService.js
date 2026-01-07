@@ -28,7 +28,7 @@ const deleteOrderWithArchive = async ({
     } catch (debtErr) {
         console.log("Lỗi khi trừ/cộng công nợ NCC:", {
             id: orderId,
-            supply: order?.supply,
+            supplier: order?.supplier,
             cost: order?.cost,
             status: order?.status,
             check_flag: order?.check_flag,
