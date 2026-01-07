@@ -8,14 +8,14 @@ const {
 } = require("./helpers");
 const { adjustSupplierDebtIfNeeded, calcRemainingRefund } = require("./orderFinanceHelpers");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
-const { DB_SCHEMA } = require("../../config/dbSchema");
+const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { nextId } = require("../../services/idService");
 const { deleteOrderWithArchive } = require("./orderDeletionService");
 const { updateOrderWithFinance } = require("./orderUpdateService");
-const ORDER_EXPIRED_COLS = Object.values(DB_SCHEMA.ORDER_EXPIRED.COLS || {});
-const ORDER_CANCELED_COLS = Object.values(DB_SCHEMA.ORDER_CANCELED.COLS || {});
+const ORDER_EXPIRED_COLS = Object.values(ORDERS_SCHEMA.ORDER_EXPIRED.COLS || {});
+const ORDER_CANCELED_COLS = Object.values(ORDERS_SCHEMA.ORDER_CANCELED.COLS || {});
 const ORDER_CANCELED_ALLOWED_COLS = ORDER_CANCELED_COLS.filter(
-    (col) => col && col !== DB_SCHEMA.ORDER_CANCELED.COLS.NOTE
+    (col) => col && col !== ORDERS_SCHEMA.ORDER_CANCELED.COLS.NOTE
 );
 const ORDER_EXPIRED_ALLOWED_COLS = ORDER_EXPIRED_COLS.filter(Boolean);
 
@@ -108,14 +108,14 @@ const attachCrudRoutes = (router) => {
                 order,
                 normalized,
                 reqBody: req.body,
-                helpers: {
-                    TABLES,
-                    DB_SCHEMA,
-                    STATUS,
-                    nextId,
-                    pruneArchiveData,
-                    adjustSupplierDebtIfNeeded,
-                    calcRemainingRefund,
+                    helpers: {
+                        TABLES,
+                        ORDERS_SCHEMA,
+                        STATUS,
+                        nextId,
+                        pruneArchiveData,
+                        adjustSupplierDebtIfNeeded,
+                        calcRemainingRefund,
                     allowedArchiveColsExpired: ORDER_EXPIRED_ALLOWED_COLS,
                     allowedArchiveColsCanceled: ORDER_CANCELED_ALLOWED_COLS,
                 },

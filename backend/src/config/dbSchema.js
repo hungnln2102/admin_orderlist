@@ -17,9 +17,9 @@ const NOTIFICATION_GROUP_ID =
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
 
 // -----------------------
-// UPPERCASE SCHEMA SOURCE
+// ORDERS SCHEMA (separate schema for order_* tables)
 // -----------------------
-const DB_SCHEMA = {
+const ORDERS_SCHEMA = {
   ORDER_LIST: {
     TABLE: "order_list",
     COLS: {
@@ -86,6 +86,12 @@ const DB_SCHEMA = {
       CREATED_AT: "createdate",
     },
   },
+};
+
+// -----------------------
+// UPPERCASE SCHEMA SOURCE
+// -----------------------
+const DB_SCHEMA = {
   ACCOUNT_STORAGE: {
     TABLE: "account_storage",
     COLS: {
@@ -337,6 +343,8 @@ module.exports = {
   getDefinition,
   // Primary schema
   DB_SCHEMA,
+  // Orders schema map
+  ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
   // Partner schema
   SCHEMA_PARTNER,

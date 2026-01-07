@@ -11,6 +11,7 @@ const {
   SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
+  ORDERS_SCHEMA,
 } = require("../../src/config/dbSchema");
 
 const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA;
@@ -45,7 +46,7 @@ const pool = new Pool({
 });
 
 // Table/column definitions
-const ORDER_DEF = getDefinition("ORDER_LIST");
+const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);

@@ -7,7 +7,7 @@ const deleteOrderWithArchive = async ({
 }) => {
     const {
         TABLES,
-        DB_SCHEMA,
+        ORDERS_SCHEMA,
         STATUS,
         nextId,
         pruneArchiveData,
@@ -66,8 +66,8 @@ const deleteOrderWithArchive = async ({
 
     const archiveData = { ...order };
     const archiveIdCol = shouldArchiveToCanceled
-        ? DB_SCHEMA.ORDER_CANCELED.COLS.ID
-        : DB_SCHEMA.ORDER_EXPIRED.COLS.ID;
+        ? ORDERS_SCHEMA.ORDER_CANCELED.COLS.ID
+        : ORDERS_SCHEMA.ORDER_EXPIRED.COLS.ID;
     // Always use a fresh archive id to avoid PK collisions with existing archived rows.
     archiveData[archiveIdCol] = await nextId(targetTable, archiveIdCol, trx);
 
@@ -80,12 +80,12 @@ const deleteOrderWithArchive = async ({
         const refundValue = bodyRefund !== null && bodyRefund !== undefined
             ? Math.max(0, bodyRefund)
             : calcRemainingRefund(order, normalized);
-        archiveData[DB_SCHEMA.ORDER_CANCELED.COLS.REFUND] = refundValue;
+        archiveData[ORDERS_SCHEMA.ORDER_CANCELED.COLS.REFUND] = refundValue;
         archiveData.status = STATUS.PENDING_REFUND;
         archiveData.check_flag = false;
-        archiveData[DB_SCHEMA.ORDER_CANCELED.COLS.CREATED_AT] = new Date();
+        archiveData[ORDERS_SCHEMA.ORDER_CANCELED.COLS.CREATED_AT] = new Date();
     } else {
-        archiveData[DB_SCHEMA.ORDER_EXPIRED.COLS.ARCHIVED_AT] = new Date();
+        archiveData[ORDERS_SCHEMA.ORDER_EXPIRED.COLS.ARCHIVED_AT] = new Date();
         // Khi chuyển sang bảng hết hạn, luôn đặt trạng thái về "Hết Hạn"
         archiveData.status = STATUS.EXPIRED;
         archiveData.check_flag = normalizedCheckFlag;

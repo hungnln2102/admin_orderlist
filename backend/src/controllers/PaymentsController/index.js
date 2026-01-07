@@ -1,5 +1,5 @@
 const { db, withTransaction } = require("../../db");
-const { DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT, SCHEMA_ORDERS, tableName } = require("../../config/dbSchema");
+const { DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT, SCHEMA_ORDERS, ORDERS_SCHEMA, tableName } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 const {
   createDateNormalization,
@@ -10,7 +10,7 @@ const TABLES = {
   paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
   paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PRODUCT),
-  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+  orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
 };
 
 const listPaymentReceipts = async (req, res) => {
