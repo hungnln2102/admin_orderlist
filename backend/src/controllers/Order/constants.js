@@ -1,6 +1,7 @@
 const {
     DB_SCHEMA,
     tableName,
+    SCHEMA_ORDERS,
     SCHEMA_PRODUCT,
     SCHEMA_PARTNER,
     PRODUCT_SCHEMA,
@@ -8,9 +9,9 @@ const {
 } = require("../../config/dbSchema");
 
 const TABLES = {
-    orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
-    orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE),
-    orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE),
+    orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+    orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
+    orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
     supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER),
     packageProduct: tableName(DB_SCHEMA.PACKAGE_PRODUCT.TABLE),
     supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_PARTNER),

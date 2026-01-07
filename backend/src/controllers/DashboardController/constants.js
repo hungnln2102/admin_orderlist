@@ -1,13 +1,13 @@
-const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
+const { DB_SCHEMA, tableName, SCHEMA_ORDERS } = require("../../config/dbSchema");
 const { createYearExtraction } = require("../../utils/sql");
 
 const ORDER_DEF = DB_SCHEMA.ORDER_LIST;
 const PAYMENT_RECEIPT_DEF = DB_SCHEMA.PAYMENT_RECEIPT;
 
 const TABLES = {
-  orderList: tableName(ORDER_DEF.TABLE),
-  orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE),
-  orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE),
+  orderList: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),
+  orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
+  orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.TABLE),
 };
 

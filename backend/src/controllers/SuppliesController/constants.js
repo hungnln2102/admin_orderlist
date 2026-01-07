@@ -3,6 +3,7 @@ const {
   getDefinition,
   tableName,
   SCHEMA,
+  SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
   SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
@@ -21,9 +22,9 @@ const supplyPriceCols = SUPPLY_PRICE_DEF.columns;
 const supplyCols = SUPPLY_DEF.columns;
 
 const TABLES = {
-  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE),
-  orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE),
-  orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE),
+  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+  orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
+  orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
   supply: tableName(SUPPLY_DEF.tableName, SCHEMA_PRODUCT),
   supplyPrice: tableName(SUPPLY_PRICE_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
