@@ -3,7 +3,7 @@ const {
   createNumericExtraction,
   quoteIdent,
 } = require("../../utils/sql");
-const { DB_SCHEMA } = require("../../config/dbSchema");
+const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const {
   ORDER_DEF,
   TABLES,
@@ -12,7 +12,7 @@ const {
 } = require("./constants");
 
 const ORDER_COLS = ORDER_DEF.COLS;
-const ORDER_CANCELED_COLS = DB_SCHEMA.ORDER_CANCELED.COLS;
+const ORDER_CANCELED_COLS = ORDERS_SCHEMA.ORDER_CANCELED.COLS;
 
 const buildStatsBindings = (periods) => ({
   prevStart: periods.previousStart,

@@ -8,10 +8,11 @@ const {
   SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
+  ORDERS_SCHEMA,
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 
-const ORDER_DEF = getDefinition("ORDER_LIST");
+const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const SUPPLY_PRICE_DEF = getDefinition("SUPPLIER_COST", PARTNER_SCHEMA);
 const SUPPLY_DEF = getDefinition("SUPPLIER", PARTNER_SCHEMA);
@@ -22,9 +23,9 @@ const supplyPriceCols = SUPPLY_PRICE_DEF.columns;
 const supplyCols = SUPPLY_DEF.columns;
 
 const TABLES = {
-  orderList: tableName(DB_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
-  orderExpired: tableName(DB_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
-  orderCanceled: tableName(DB_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
+  orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+  orderExpired: tableName(ORDERS_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
+  orderCanceled: tableName(ORDERS_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
   supply: tableName(SUPPLY_DEF.tableName, SCHEMA_PRODUCT),
   supplyPrice: tableName(SUPPLY_PRICE_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
