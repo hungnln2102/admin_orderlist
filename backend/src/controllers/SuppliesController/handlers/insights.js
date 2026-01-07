@@ -183,17 +183,14 @@ const getSupplyInsights = async (_req, res) => {
     const supplierTableName = await resolveSupplierTableName();
     const supplierNameCol = await resolveSupplierNameColumn();
     const supplierNameIdent = quoteIdent(supplierNameCol);
-    const supplySql = `
+  const supplySql = `
       SELECT
         s.${QUOTED_COLS.supplier.id} AS id,
         s.${supplierNameIdent} AS source_name,
         s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
         s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
-        ${statusSelect},
-        COALESCE(bl.${QUOTED_COLS.bankList.bankName}, '') AS bank_name
+        ${statusSelect}
       FROM ${supplierTableName} s
-      LEFT JOIN ${TABLES.bankList} bl
-        ON TRIM(bl.${QUOTED_COLS.bankList.bin}::text) = TRIM(s.${QUOTED_COLS.supplier.binBank}::text)
       ORDER BY s.${supplierNameIdent};
     `;
 
@@ -259,7 +256,6 @@ const getSupplyInsights = async (_req, res) => {
         sourceName: row.source_name || "",
         numberBank: row.number_bank || null,
         binBank: row.bin_bank || null,
-        bankName: row.bank_name || null,
         status: normalizedStatus || "inactive",
         rawStatus: row.raw_status || null,
         isActive: normalizedStatus !== "inactive",

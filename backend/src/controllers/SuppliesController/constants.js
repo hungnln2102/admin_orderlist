@@ -28,7 +28,6 @@ const TABLES = {
   supplyPrice: tableName(SUPPLY_PRICE_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
   paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
-  bankList: tableName(DB_SCHEMA.BANK_LIST.TABLE),
 };
 
 const STATUS = {
