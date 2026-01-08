@@ -5,18 +5,16 @@ const { Pool } = require("pg");
 const {
   tableName,
   getDefinition,
-  SCHEMA: DEFAULT_SCHEMA,
   SCHEMA_ORDERS,
+  SCHEMA_PARTNER,
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
-  SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
 } = require("../../src/config/dbSchema");
 
-const DB_SCHEMA = process.env.DB_SCHEMA || DEFAULT_SCHEMA;
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
 const SEPAY_WEBHOOK_SECRET =
   process.env.SEPAY_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || "";
@@ -47,15 +45,20 @@ const pool = new Pool({
   idleTimeoutMillis: 30_000,
 });
 
-// Table/column definitions
+// --------------------------------
+// GET table and column definitions
+// --------------------------------
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT");
-const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY");
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const PRICE_CONFIG_DEF = getDefinition("PRICE_CONFIG", PRODUCT_SCHEMA);
 const SUPPLIER_DEF = getDefinition("SUPPLIER", PARTNER_SCHEMA);
 const SUPPLIER_COST_DEF = getDefinition("SUPPLIER_COST", PARTNER_SCHEMA);
 
+// --------------------------------
+// EXPORT table and column names
+// --------------------------------
 const ORDER_COLS = ORDER_DEF.columns;
 const PAYMENT_RECEIPT_COLS = PAYMENT_RECEIPT_DEF.columns;
 const PAYMENT_SUPPLY_COLS = PAYMENT_SUPPLY_DEF.columns;
@@ -63,17 +66,27 @@ const VARIANT_COLS = VARIANT_DEF.columns;
 const PRICE_CONFIG_COLS = PRICE_CONFIG_DEF.columns;
 const SUPPLIER_COLS = SUPPLIER_DEF.columns;
 const SUPPLIER_COST_COLS = SUPPLIER_COST_DEF.columns;
-const PAYMENT_RECEIPT_TABLE = tableName(PAYMENT_RECEIPT_DEF.tableName, DB_SCHEMA);
-const ORDER_TABLE = tableName(ORDER_DEF.tableName, SCHEMA_ORDERS || DB_SCHEMA);
+
+
+// --------------------------------
+// EXPORT full table names with schema
+// --------------------------------
+const PAYMENT_RECEIPT_TABLE = tableName(
+  PAYMENT_RECEIPT_DEF.tableName,
+  SCHEMA_ORDERS
+);
+const ORDER_TABLE = tableName(ORDER_DEF.tableName, SCHEMA_ORDERS);
 const VARIANT_TABLE = tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT);
 const PRICE_CONFIG_TABLE = tableName(PRICE_CONFIG_DEF.tableName, SCHEMA_PRODUCT);
 const SUPPLIER_TABLE = tableName(SUPPLIER_DEF.tableName, SCHEMA_SUPPLIER);
 const SUPPLIER_COST_TABLE = tableName(SUPPLIER_COST_DEF.tableName, SCHEMA_SUPPLIER_COST);
-const PAYMENT_SUPPLY_TABLE = tableName(PAYMENT_SUPPLY_DEF.tableName, DB_SCHEMA);
+const PAYMENT_SUPPLY_TABLE = tableName(
+  PAYMENT_SUPPLY_DEF.tableName,
+  SCHEMA_PARTNER
+);
 
 module.exports = {
   // Env/config
-  DB_SCHEMA,
   SEPAY_WEBHOOK_PATH,
   SEPAY_WEBHOOK_SECRET,
   SEPAY_API_KEY,

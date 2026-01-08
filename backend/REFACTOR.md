@@ -13,4 +13,4 @@ Pending to finish the refactor:
 
 Notes:
 - Allowlist/front-end origins, session, and webhook configs are centralized in `src/config/appConfig.js`.
-- Knex uses `DB_SCHEMA`/`SCHEMA` to set the search path; ensure `DATABASE_URL` is set when running `npm run start:new`.
+- Knex uses the `SCHEMA_*` values to set the search path; ensure `DATABASE_URL` is set when running `npm run start:new`.

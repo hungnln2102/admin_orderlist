@@ -1,10 +1,15 @@
 const bcrypt = require("bcryptjs");
 const { db } = require("../../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const {
+  ADMIN_SCHEMA,
+  getDefinition,
+  tableName,
+  SCHEMA_ADMIN,
+} = require("../../config/dbSchema");
 const { session: sessionConfig } = require("../../config/appConfig");
 
-const USERS_DEF = getDefinition("USERS");
-const USERS_TABLE = tableName(DB_SCHEMA.USERS.TABLE);
+const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
+const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);
 
 const login = async (req, res) => {
   const { username, password } = req.body || {};

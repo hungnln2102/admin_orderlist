@@ -169,13 +169,13 @@ nguoi_gui text,
 noi_dung_ck text
 );
 
-CREATE TABLE mavryk.payment_supply (
+CREATE TABLE partner.supplier_payments (
 id integer NOT NULL,
-source_id integer,
-import integer,
-round text,
-status text,
-paid integer
+supplier_id integer,
+total_amount integer,
+payment_period text,
+payment_status text,
+amount_paid integer
 );
 
 CREATE TABLE mavryk.product_price (

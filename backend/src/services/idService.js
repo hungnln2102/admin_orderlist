@@ -2,24 +2,27 @@ const { db } = require("../db");
 const {
   tableName,
   getDefinition,
-  DB_SCHEMA,
   PARTNER_SCHEMA,
+  PRODUCT_SCHEMA,
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
 } = require("../config/dbSchema");
 
+const ACCOUNT_DEF = getDefinition("ACCOUNT_STORAGE", PRODUCT_SCHEMA);
+const PRODUCT_DESC_DEF = getDefinition("PRODUCT_DESC", PRODUCT_SCHEMA);
+
 const TABLES = {
-  accountStorage: tableName(DB_SCHEMA.ACCOUNT_STORAGE.TABLE),
+  accountStorage: tableName(ACCOUNT_DEF.tableName, SCHEMA_PRODUCT),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   supplyPrice: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_SUPPLIER_COST),
-  productDesc: tableName(DB_SCHEMA.PRODUCT_DESC.TABLE),
+  productDesc: tableName(PRODUCT_DESC_DEF.tableName, SCHEMA_PRODUCT),
 };
 
-const ACCOUNT_STORAGE_COLS = getDefinition("ACCOUNT_STORAGE").columns;
+const ACCOUNT_STORAGE_COLS = ACCOUNT_DEF.columns;
 const SUPPLY_COLS = getDefinition("SUPPLIER", PARTNER_SCHEMA).columns;
 const SUPPLY_PRICE_COLS = getDefinition("SUPPLIER_COST", PARTNER_SCHEMA).columns;
-const PRODUCT_DESC_COLS = getDefinition("PRODUCT_DESC").columns;
+const PRODUCT_DESC_COLS = PRODUCT_DESC_DEF.columns;
 
 const nextId = async (tableName, columnName = "id", trx = db) => {
   await trx.raw(`LOCK TABLE ${tableName} IN EXCLUSIVE MODE;`);

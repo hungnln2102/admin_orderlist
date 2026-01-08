@@ -10,7 +10,6 @@ const {
   SUPPLIER_COST_TABLE,
   SUPPLIER_COST_COLS,
   PAYMENT_SUPPLY_COLS,
-  DB_SCHEMA,
 } = require("./config");
 const {
   normalizeAmount,
@@ -27,6 +26,9 @@ const {
 
 let paymentReceiptOrderColCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
+const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
+  ? PAYMENT_RECEIPT_TABLE.split(".")[0]
+  : process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
 
 const getPaymentReceiptOrderColumn = async () => {
   if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
@@ -47,7 +49,7 @@ const getPaymentReceiptOrderColumn = async () => {
         FROM information_schema.columns
         WHERE table_schema = $1 AND table_name = $2
       `,
-      [DB_SCHEMA, PAYMENT_RECEIPT_BASE_TABLE]
+      [PAYMENT_RECEIPT_SCHEMA, PAYMENT_RECEIPT_BASE_TABLE]
     );
     const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
     const found = preferred.find((c) => names.includes(c));

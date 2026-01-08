@@ -1,8 +1,6 @@
 const {
-  DB_SCHEMA,
   getDefinition,
   tableName,
-  SCHEMA,
   SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
@@ -23,6 +21,7 @@ const orderCols = ORDER_DEF.columns;
 const variantCols = VARIANT_DEF.columns;
 const supplyPriceCols = SUPPLY_PRICE_DEF.columns;
 const supplyCols = SUPPLY_DEF.columns;
+const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
 
 const TABLES = {
   orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
@@ -31,7 +30,10 @@ const TABLES = {
   supply: tableName(SUPPLY_DEF.tableName, SCHEMA_SUPPLIER),
   supplyPrice: tableName(SUPPLY_PRICE_DEF.tableName, SCHEMA_SUPPLIER_COST),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
-  paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
+  paymentSupply: tableName(
+    PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
+    SCHEMA_PARTNER
+  ),
 };
 
 const STATUS = {
@@ -57,8 +59,7 @@ module.exports = {
   supplyCols,
   TABLES,
   STATUS,
+  paymentSupplyCols,
   QUOTED_COLS,
-  SCHEMA,
   SUPPLY_STATUS_CANDIDATES,
-  DB_SCHEMA,
 };

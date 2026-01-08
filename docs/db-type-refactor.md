@@ -25,8 +25,10 @@ Goal: stop storing dates/numbers as text so the API can drop regex parsing. Run 
 - `supplier_cost`
   - `product_id`, `source_id` ➜ `integer`
   - `price` ➜ `numeric`
-- `payment_supply`
-  - `import`, `paid` ➜ `numeric`
+- `supplier_payments`
+  - `supplier_id` ƒzo `integer`
+  - `total_amount`, `amount_paid` ƒzo `numeric`
+  - `payment_period`, `payment_status` ƒzo `text`
 - `warehouse`
   - `created_at` ➜ `timestamptz`
 - `users`

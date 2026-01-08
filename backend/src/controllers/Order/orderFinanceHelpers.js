@@ -1,9 +1,13 @@
-const { DB_SCHEMA, PARTNER_SCHEMA, tableName } = require("../../config/dbSchema");
+const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
 const { STATUS } = require("./constants");
 const { toNullableNumber } = require("../../utils/normalizers");
 const TABLES = require("./constants").TABLES;
 
-const PAYMENT_SUPPLY_TABLE = tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE);
+const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
+const PAYMENT_SUPPLY_TABLE = tableName(
+  PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
+  SCHEMA_PARTNER
+);
 
 const ceilToThousands = (value) => {
     const num = Number(value);
@@ -45,12 +49,12 @@ const increaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     const costValue = toNullableNumber(amount);
     if (!supplyId || !costValue || costValue <= 0) return;
 
-    const colId = DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID;
-    const colImport = DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE;
-    const colPaid = DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID;
-    const colStatus = DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS;
-    const colSourceId = DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID;
-    const colRound = DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND;
+    const colId = paymentSupplyCols.ID;
+    const colImport = paymentSupplyCols.IMPORT_VALUE;
+    const colPaid = paymentSupplyCols.PAID;
+    const colStatus = paymentSupplyCols.STATUS;
+    const colSourceId = paymentSupplyCols.SOURCE_ID;
+    const colRound = paymentSupplyCols.ROUND;
 
     const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
         .where(colSourceId, supplyId)
@@ -94,12 +98,12 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     const costValue = toNullableNumber(amount);
     if (!supplyId || !costValue || costValue <= 0) return;
 
-    const colId = DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID;
-    const colImport = DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE;
-    const colPaid = DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID;
-    const colStatus = DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS;
-    const colSourceId = DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID;
-    const colRound = DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND;
+    const colId = paymentSupplyCols.ID;
+    const colImport = paymentSupplyCols.IMPORT_VALUE;
+    const colPaid = paymentSupplyCols.PAID;
+    const colStatus = paymentSupplyCols.STATUS;
+    const colSourceId = paymentSupplyCols.SOURCE_ID;
+    const colRound = paymentSupplyCols.ROUND;
 
     const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
         .where(colSourceId, supplyId)

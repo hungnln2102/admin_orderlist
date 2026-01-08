@@ -1,14 +1,23 @@
 const { db, withTransaction } = require("../../db");
-const { DB_SCHEMA, PARTNER_SCHEMA, SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_ORDERS, ORDERS_SCHEMA, tableName } = require("../../config/dbSchema");
+const {
+  getDefinition,
+  PARTNER_SCHEMA,
+  SCHEMA_PARTNER,
+  SCHEMA_SUPPLIER,
+  SCHEMA_ORDERS,
+  ORDERS_SCHEMA,
+  tableName,
+} = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 const {
   createDateNormalization,
 } = require("../../utils/sql");
 
-const PAYMENT_RECEIPT_DEF = DB_SCHEMA.PAYMENT_RECEIPT;
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const TABLES = {
-  paymentReceipt: tableName(DB_SCHEMA.PAYMENT_RECEIPT.TABLE),
-  paymentSupply: tableName(DB_SCHEMA.PAYMENT_SUPPLY.TABLE),
+  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
+  paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
 };
@@ -39,7 +48,8 @@ const listPaymentReceipts = async (req, res) => {
       .offset(offset)
       .limit(limit);
 
-    const receipts = (rows || []).map((row) => ({
+    const normalizedRows = (rows || []).filter(Boolean);
+    const receipts = normalizedRows.map((row) => ({
       id: row.id,
       orderCode: row.orderCode,
       paidAt: row.paidAt,

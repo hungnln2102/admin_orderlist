@@ -1,11 +1,17 @@
 const { db } = require("../../db");
-const { DB_SCHEMA, tableName } = require("../../config/dbSchema");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
 const { normalizeTextInput } = require("../../utils/normalizers");
 
-const WALLET_TYPES_TABLE = tableName(DB_SCHEMA.MASTER_WALLETTYPES.TABLE);
-const DAILY_BALANCES_TABLE = tableName(DB_SCHEMA.TRANS_DAILYBALANCES.TABLE);
-const WALLET_COLS = DB_SCHEMA.MASTER_WALLETTYPES.COLS;
-const BALANCE_COLS = DB_SCHEMA.TRANS_DAILYBALANCES.COLS;
+const WALLET_TYPES_TABLE = tableName(
+  FINANCE_SCHEMA.MASTER_WALLETTYPES.TABLE,
+  SCHEMA_FINANCE
+);
+const DAILY_BALANCES_TABLE = tableName(
+  FINANCE_SCHEMA.TRANS_DAILYBALANCES.TABLE,
+  SCHEMA_FINANCE
+);
+const WALLET_COLS = FINANCE_SCHEMA.MASTER_WALLETTYPES.COLS;
+const BALANCE_COLS = FINANCE_SCHEMA.TRANS_DAILYBALANCES.COLS;
 
 const normalizeDate = (value) => {
   if (!value) return "";

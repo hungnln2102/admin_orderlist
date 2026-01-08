@@ -1,11 +1,9 @@
 const {
-  DB_SCHEMA,
   getDefinition,
   tableName,
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
-  SCHEMA_PARTNER,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
 } = require("../../config/dbSchema");
