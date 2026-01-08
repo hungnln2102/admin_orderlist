@@ -6,7 +6,15 @@ const dotenv = require("dotenv");
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
-const { SCHEMA } = require("../config/dbSchema");
+const {
+  SCHEMA_ADMIN,
+  SCHEMA_FINANCE,
+  SCHEMA_ORDERS,
+  SCHEMA_PARTNER,
+  SCHEMA_PRODUCT,
+  SCHEMA_SUPPLIER,
+  SCHEMA_SUPPLIER_COST,
+} = require("../config/dbSchema");
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -21,7 +29,19 @@ if (!DATABASE_URL) {
   );
 }
 
-const searchPath = [process.env.DB_SCHEMA || SCHEMA].filter(Boolean);
+const searchPath = Array.from(
+  new Set(
+    [
+      SCHEMA_ORDERS,
+      SCHEMA_PRODUCT,
+      SCHEMA_PARTNER,
+      SCHEMA_ADMIN,
+      SCHEMA_FINANCE,
+      SCHEMA_SUPPLIER,
+      SCHEMA_SUPPLIER_COST,
+    ].filter(Boolean)
+  )
+);
 
 const db = knex({
   client: "pg",

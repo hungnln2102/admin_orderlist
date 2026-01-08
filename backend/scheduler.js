@@ -7,7 +7,7 @@ const envPath = path.join(__dirname, ".env");
 require("dotenv").config({ path: envPath });
 const { Pool } = require("pg");
 const cron = require("node-cron");
-const { DB_SCHEMA, ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName, SCHEMA } = require("./src/config/dbSchema");
+const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("./src/config/dbSchema");
 const { backupDatabaseToDrive } = require("./src/utils/backupService");
 // Raw column names (unquoted) for reading rows returned by pg
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);

@@ -1,9 +1,14 @@
 ﻿const { db } = require("../../db");
-const { DB_SCHEMA, tableName, PRODUCT_SCHEMA, SCHEMA_PRODUCT, getDefinition } = require("../../config/dbSchema");
+const {
+  tableName,
+  PRODUCT_SCHEMA,
+  SCHEMA_PRODUCT,
+  getDefinition,
+} = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, trimToLength } = require("../../utils/normalizers");
 
-const PRODUCT_DESC_DEF = DB_SCHEMA.PRODUCT_DESC;
+const PRODUCT_DESC_DEF = PRODUCT_SCHEMA.PRODUCT_DESC;
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const productDescCols = PRODUCT_DESC_DEF.COLS;
@@ -29,7 +34,7 @@ const variantColNames = {
 };
 
 const TABLES = {
-  productDesc: tableName(DB_SCHEMA.PRODUCT_DESC.TABLE),
+  productDesc: tableName(PRODUCT_DESC_DEF.TABLE, SCHEMA_PRODUCT),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
 };

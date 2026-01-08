@@ -94,12 +94,12 @@ export const BANK_LIST_COLS = {
 // 10. WAREHOUSE (Backend: WAREHOUSE)
 export const WAREHOUSE_COLS = {
   id: "id",
-  category: "category",
-  account: "account",
-  password: "password",
+  category: "product_type",
+  account: "account_username",
+  password: "account_password",
   backupEmail: "backup_email",
-  twoFa: "two_fa",
-  status: "status",
+  twoFa: "two_fa_code",
+  status: "stock_status",
   note: "note",
   createdAt: "created_at",
 };
@@ -118,12 +118,12 @@ export const ACCOUNT_STORAGE_COLS = {
 // 12. PACKAGE_PRODUCT (Backend: PACKAGE_PRODUCT)
 export const PACKAGE_PRODUCT_COLS = {
   id: "id",
-  package: "package",
-  username: "username",
-  password: "password",
-  mail2nd: "mail_2nd",
+  package: "package_name",
+  username: "account_user",
+  password: "account_pass",
+  mail2nd: "recovery_mail",
   note: "note",
-  expired: "expired",
+  expired: "expiry_date",
   supplier: "supplier",
   cost: "cost",
   slot: "slot",
@@ -133,11 +133,11 @@ export const PACKAGE_PRODUCT_COLS = {
 // 13. PAYMENT_SUPPLY (Backend: PAYMENT_SUPPLY)
 export const PAYMENT_SUPPLY_COLS = {
   id: "id",
-  sourceId: "source_id",
-  importValue: "import", // Backend: IMPORT_VALUE -> import
-  round: "round",
-  status: "status",
-  paid: "paid",
+  sourceId: "supplier_id",
+  importValue: "total_amount", // Backend: IMPORT_VALUE -> total_amount
+  round: "payment_period",
+  status: "payment_status",
+  paid: "amount_paid",
 };
 
 // 14. USERS (Backend: USERS)
@@ -207,10 +207,10 @@ export const DB_DEFINITIONS = {
   SUPPLY_PRICE: "supplier_cost",
   PRODUCT_DESC: "product_desc",
   BANK_LIST: "bank_list",
-  WAREHOUSE: "warehouse",
+  WAREHOUSE: "product_stock",
   ACCOUNT_STORAGE: "account_storage",
   PACKAGE_PRODUCT: "package_product",
-  PAYMENT_SUPPLY: "payment_supply",
+  PAYMENT_SUPPLY: "supplier_payments",
   USERS: "users",
 };
 

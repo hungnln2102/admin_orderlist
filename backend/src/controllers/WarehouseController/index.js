@@ -1,23 +1,23 @@
 const { db } = require("../../db");
-const { DB_SCHEMA, getDefinition, tableName } = require("../../config/dbSchema");
+const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
 const { normalizeDateInput } = require("../../utils/normalizers");
 
-const warehouseDef = getDefinition("WAREHOUSE");
+const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 const cols = warehouseDef.columns;
-const warehouseTable = tableName(DB_SCHEMA.WAREHOUSE.TABLE);
+const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_PRODUCT);
 
 const listWarehouse = async (_req, res) => {
   try {
     const rows = await db(warehouseTable)
       .select({
         id: cols.id,
-        category: cols.category,
-        account: cols.account,
-        password: cols.password,
+        product_type: cols.productType,
+        account_username: cols.accountUsername,
+        account_password: cols.accountPassword,
         backup_email: cols.backupEmail,
-        two_fa: cols.twoFa,
+        two_fa: cols.twoFaCode,
         note: cols.note,
-        status: cols.status,
+        stock_status: cols.stockStatus,
         created_at: cols.createdAt,
       })
       .orderBy(cols.id, "asc");
@@ -43,13 +43,13 @@ const createWarehouse = async (req, res) => {
   try {
     const [row] = await db(warehouseTable)
       .insert({
-        [cols.category]: category ?? null,
-        [cols.account]: account ?? null,
-        [cols.password]: password ?? null,
+        [cols.productType]: category ?? null,
+        [cols.accountUsername]: account ?? null,
+        [cols.accountPassword]: password ?? null,
         [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFa]: two_fa ?? null,
+        [cols.twoFaCode]: two_fa ?? null,
         [cols.note]: note ?? null,
-        [cols.status]: status ?? null,
+        [cols.stockStatus]: status ?? null,
         [cols.createdAt]: normalizeDateInput(created_at) || new Date().toISOString(),
       })
       .returning({
@@ -58,7 +58,7 @@ const createWarehouse = async (req, res) => {
         account: cols.account,
         password: cols.password,
         backup_email: cols.backupEmail,
-        two_fa: cols.twoFa,
+        two_fa: cols.twoFaCode,
         note: cols.note,
         status: cols.status,
         created_at: cols.createdAt,
@@ -90,13 +90,13 @@ const updateWarehouse = async (req, res) => {
     const [row] = await db(warehouseTable)
       .where(cols.id, id)
       .update({
-        [cols.category]: category ?? null,
-        [cols.account]: account ?? null,
-        [cols.password]: password ?? null,
+        [cols.productType]: category ?? null,
+        [cols.accountUsername]: account ?? null,
+        [cols.accountPassword]: password ?? null,
         [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFa]: two_fa ?? null,
+        [cols.twoFaCode]: two_fa ?? null,
         [cols.note]: note ?? null,
-        [cols.status]: status ?? null,
+        [cols.stockStatus]: status ?? null,
         [cols.createdAt]: normalizeDateInput(created_at) || null,
       })
       .returning({
@@ -105,7 +105,7 @@ const updateWarehouse = async (req, res) => {
         account: cols.account,
         password: cols.password,
         backup_email: cols.backupEmail,
-        two_fa: cols.twoFa,
+        two_fa: cols.twoFaCode,
         note: cols.note,
         status: cols.status,
         created_at: cols.createdAt,

@@ -1,4 +1,11 @@
-const { DB_SCHEMA, PRODUCT_SCHEMA, PARTNER_SCHEMA, ORDERS_SCHEMA, getDefinition } = require("../config/dbSchema");
+const {
+  ADMIN_SCHEMA,
+  FINANCE_SCHEMA,
+  PRODUCT_SCHEMA,
+  PARTNER_SCHEMA,
+  ORDERS_SCHEMA,
+  getDefinition,
+} = require("../config/dbSchema");
 const { quoteIdent } = require("./sql");
 
 const toCamel = (key = "") =>
@@ -25,7 +32,8 @@ const makeEntries = (schemaMap) =>
   });
 
 const QUOTED_COLS = Object.fromEntries([
-  ...makeEntries(DB_SCHEMA),
+  ...makeEntries(ADMIN_SCHEMA),
+  ...makeEntries(FINANCE_SCHEMA),
   ...makeEntries(PRODUCT_SCHEMA),
   ...makeEntries(PARTNER_SCHEMA),
   ...makeEntries(ORDERS_SCHEMA),

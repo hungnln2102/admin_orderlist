@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { DB_SCHEMA, QUOTED_COLS, TABLES } = require("../constants");
+const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("../constants");
 const { parseMoney, parseSupplyId } = require("../helpers");
 
 const createPayment = async (req, res) => {
@@ -38,19 +38,19 @@ const createPayment = async (req, res) => {
   try {
     const result = await db(TABLES.paymentSupply)
       .insert({
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID]: parsedSupplyId,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]: totalImportRaw,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]: paidRaw,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND]: roundLabel,
-        [DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS]: statusLabel,
+        [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
+        [paymentSupplyCols.IMPORT_VALUE]: totalImportRaw,
+        [paymentSupplyCols.PAID]: paidRaw,
+        [paymentSupplyCols.ROUND]: roundLabel,
+        [paymentSupplyCols.STATUS]: statusLabel,
       })
       .returning([
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID,
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID,
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE,
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID,
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND,
-        DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS,
+        paymentSupplyCols.ID,
+        paymentSupplyCols.SOURCE_ID,
+        paymentSupplyCols.IMPORT_VALUE,
+        paymentSupplyCols.PAID,
+        paymentSupplyCols.ROUND,
+        paymentSupplyCols.STATUS,
       ]);
     if (!result?.length) {
       return res.status(500).json({
@@ -59,12 +59,12 @@ const createPayment = async (req, res) => {
     }
     const row = result[0];
     res.status(201).json({
-      id: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.ID],
-      sourceId: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.SOURCE_ID],
-      totalImport: Number(row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.IMPORT_VALUE]) || 0,
-      paid: Number(row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.PAID]) || 0,
-      round: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.ROUND] || "",
-      status: row[DB_SCHEMA.PAYMENT_SUPPLY.COLS.STATUS] || "",
+      id: row[paymentSupplyCols.ID],
+      sourceId: row[paymentSupplyCols.SOURCE_ID],
+      totalImport: Number(row[paymentSupplyCols.IMPORT_VALUE]) || 0,
+      paid: Number(row[paymentSupplyCols.PAID]) || 0,
+      round: row[paymentSupplyCols.ROUND] || "",
+      status: row[paymentSupplyCols.STATUS] || "",
     });
   } catch (error) {
     console.error(

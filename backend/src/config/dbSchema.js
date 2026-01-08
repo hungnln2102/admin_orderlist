@@ -1,39 +1,96 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-// Load env from backend root so DB_SCHEMA is always available
+// Load env from backend root so schema settings are available
 dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 
-// Default schema used by existing dumps; override with DB_SCHEMA env if your DB uses another schema.
-const SCHEMA = process.env.DB_SCHEMA || "mavryk";
-// Orders schema (migrated order_* tables)
-const SCHEMA_ORDERS = process.env.DB_SCHEMA_ORDERS || "orders";
-// Schema name for the new product namespace (same DB, different schema)
-const SCHEMA_PRODUCT =
-  process.env.DB_SCHEMA_PRODUCT || process.env.SCHEMA_PRODUCT || "product";
-// Schema name for partners/suppliers
-const SCHEMA_PARTNER =
-  process.env.DB_SCHEMA_PARTNER || process.env.SCHEMA_PARTNER || "partner";
+// Helpers to resolve schema fallbacks from env vars.
+const pickSchema = (...candidates) => candidates.find(Boolean);
+const SCHEMA_ORDERS = pickSchema(
+  process.env.DB_SCHEMA_ORDERS,
+  process.env.SCHEMA_ORDERS,
+  "orders"
+);
+const SCHEMA_PRODUCT = pickSchema(
+  process.env.DB_SCHEMA_PRODUCT,
+  process.env.SCHEMA_PRODUCT,
+  "product"
+);
+const SCHEMA_PARTNER = pickSchema(
+  process.env.DB_SCHEMA_PARTNER,
+  process.env.SCHEMA_PARTNER,
+  "partner"
+);
+const SCHEMA_ADMIN = pickSchema(
+  process.env.DB_SCHEMA_ADMIN,
+  process.env.SCHEMA_ADMIN,
+  "admin"
+);
+const SCHEMA_FINANCE = pickSchema(
+  process.env.DB_SCHEMA_FINANCE,
+  process.env.SCHEMA_FINANCE,
+  "finance"
+);
 // Schema name override for supplier tables (if different from partner/product)
-const SCHEMA_SUPPLIER =
-  process.env.DB_SCHEMA_SUPPLIER ||
-  process.env.SCHEMA_SUPPLIER ||
-  SCHEMA_PARTNER ||
-  SCHEMA_PRODUCT ||
-  SCHEMA;
+const SCHEMA_SUPPLIER = pickSchema(
+  process.env.DB_SCHEMA_SUPPLIER,
+  SCHEMA_PARTNER,
+  SCHEMA_PRODUCT
+);
 // Schema for supplier_cost (may live with products in current DB)
-const SCHEMA_SUPPLIER_COST =
-  process.env.DB_SCHEMA_SUPPLIER_COST ||
-  process.env.SCHEMA_SUPPLIER_COST ||
-  SCHEMA_PRODUCT ||
-  SCHEMA_PARTNER ||
-  SCHEMA;
+const SCHEMA_SUPPLIER_COST = pickSchema(
+  process.env.DB_SCHEMA_SUPPLIER_COST,
+  SCHEMA_PRODUCT,
+  SCHEMA_PARTNER
+);
 const NOTIFICATION_GROUP_ID =
   process.env.NOTIFICATION_GROUP_ID || "-1002934465528";
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
 
 // -----------------------
-// ORDERS SCHEMA (separate schema for order_* tables)
+// ADMIN SCHEMA
+// -----------------------
+const ADMIN_SCHEMA = {
+  USERS: {
+    TABLE: "users",
+    COLS: {
+      ID: "userid",
+      USERNAME: "username",
+      PASSWORD: "passwordhash",
+      ROLE: "role",
+      CREATED_AT: "createdat",
+    },
+  },
+};
+
+// -----------------------
+// FINANCE SCHEMA
+// -----------------------
+const FINANCE_SCHEMA = {
+  MASTER_WALLETTYPES: {
+    TABLE: "master_wallettypes",
+    COLS: {
+      ID: "id",
+      WALLET_NAME: "wallet_name",
+      NOTE: "note",
+      ASSET_CODE: "asset_code",
+      IS_INVESTMENT: "is_investment",
+      LINKED_WALLET_ID: "linked_wallet_id",
+    },
+  },
+  TRANS_DAILYBALANCES: {
+    TABLE: "trans_dailybalances",
+    COLS: {
+      ID: "id",
+      RECORD_DATE: "record_date",
+      WALLET_ID: "wallet_id",
+      AMOUNT: "amount",
+    },
+  },
+};
+
+// -----------------------
+// ORDERS SCHEMA (includes payment/refund tables)
 // -----------------------
 const ORDERS_SCHEMA = {
   ORDER_LIST: {
@@ -102,84 +159,6 @@ const ORDERS_SCHEMA = {
       CREATED_AT: "createdate",
     },
   },
-};
-
-// -----------------------
-// UPPERCASE SCHEMA SOURCE
-// -----------------------
-const DB_SCHEMA = {
-  ACCOUNT_STORAGE: {
-    TABLE: "account_storage",
-    COLS: {
-      ID: "id",
-      USERNAME: "username",
-      PASSWORD: "password",
-      MAIL_2ND: "mail_2nd",
-      MAIL_FAMILY: "mail_family",
-      STORAGE: "storage",
-      NOTE: "note",
-    },
-  },
-  WAREHOUSE: {
-    TABLE: "warehouse",
-    COLS: {
-      ID: "id",
-      CATEGORY: "category",
-      ACCOUNT: "account",
-      PASSWORD: "password",
-      BACKUP_EMAIL: "backup_email",
-      TWO_FA: "two_fa",
-      STATUS: "status",
-      NOTE: "note",
-      CREATED_AT: "created_at",
-    },
-  },
-  PACKAGE_PRODUCT: {
-    TABLE: "package_product",
-    COLS: {
-      ID: "id",
-      PACKAGE: "package",
-      USERNAME: "username",
-      PASSWORD: "password",
-      MAIL_2ND: "mail_2nd",
-      NOTE: "note",
-      EXPIRED: "expired",
-      SUPPLIER: "supplier",
-      COST: "cost",
-      SLOT: "slot",
-      MATCH: "match",
-    },
-  },
-  MASTER_WALLETTYPES: {
-    TABLE: "master_wallettypes",
-    COLS: {
-      ID: "id",
-      WALLET_NAME: "wallet_name",
-      NOTE: "note",
-      ASSET_CODE: "asset_code",
-      IS_INVESTMENT: "is_investment",
-      LINKED_WALLET_ID: "linked_wallet_id",
-    },
-  },
-  TRANS_DAILYBALANCES: {
-    TABLE: "trans_dailybalances",
-    COLS: {
-      ID: "id",
-      RECORD_DATE: "record_date",
-      WALLET_ID: "wallet_id",
-      AMOUNT: "amount",
-    },
-  },
-  PRODUCT_DESC: {
-    TABLE: "product_desc",
-    COLS: {
-      ID: "id",
-      PRODUCT_ID: "product_id",
-      RULES: "rules",
-      DESCRIPTION: "description",
-      IMAGE_URL: "image_url",
-    },
-  },
   PAYMENT_RECEIPT: {
     TABLE: "payment_receipt",
     COLS: {
@@ -192,17 +171,6 @@ const DB_SCHEMA = {
       SENDER: "sender",
     },
   },
-  PAYMENT_SUPPLY: {
-    TABLE: "payment_supply",
-    COLS: {
-      ID: "id",
-      SOURCE_ID: "source_id",
-      IMPORT_VALUE: "import",
-      ROUND: "round",
-      STATUS: "status",
-      PAID: "paid",
-    },
-  },
   REFUND: {
     TABLE: "refund",
     COLS: {
@@ -212,33 +180,34 @@ const DB_SCHEMA = {
       AMOUNT: "so_tien",
     },
   },
-  BANK_LIST: {
-    TABLE: "bank_list",
-    COLS: {
-      BIN: "bin",
-      BANK_NAME: "bank_name",
-    },
-  },
-  USERS: {
-    TABLE: "users",
-    COLS: {
-      ID: "userid",
-      USERNAME: "username",
-      PASSWORD: "passwordhash",
-      ROLE: "role",
-      CREATED_AT: "createdat",
-    },
-  },
-  PURCHASE_ORDER: {
-    TABLE: "purchase_order",
-    COLS: {},
+};
+
+const SUPPLIER_COST_DEF = {
+  TABLE: "supplier_cost",
+  COLS: {
+    ID: "id",
+    PRODUCT_ID: "product_id",
+    SUPPLIER_ID: "supplier_id",
+    PRICE: "price",
   },
 };
 
 // -----------------------
-// UPPERCASE SCHEMA PRODUCT
+// PRODUCT SCHEMA
 // -----------------------
 const PRODUCT_SCHEMA = {
+  ACCOUNT_STORAGE: {
+    TABLE: "account_storage",
+    COLS: {
+      ID: "id",
+      USERNAME: "username",
+      PASSWORD: "password",
+      MAIL_2ND: "mail_2nd",
+      MAIL_FAMILY: "mail_family",
+      STORAGE: "storage",
+      NOTE: "note",
+    },
+  },
   CATEGORY: {
     TABLE: "category",
     COLS: {
@@ -286,10 +255,41 @@ const PRODUCT_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  PRODUCT_STOCK: {
+    TABLE: "product_stock",
+    COLS: {
+      ID: "id",
+      PRODUCT_TYPE: "product_type",
+      ACCOUNT_USERNAME: "account_username",
+      ACCOUNT_PASSWORD: "account_password",
+      BACKUP_EMAIL: "backup_email",
+      TWO_FA_CODE: "two_fa_code",
+      NOTE: "note",
+      STOCK_STATUS: "stock_status",
+      CREATED_AT: "created_at",
+    },
+  },
+  PACKAGE_PRODUCT: {
+    TABLE: "package_product",
+    COLS: {
+      ID: "id",
+      PACKAGE: "package_name",
+      USERNAME: "account_user",
+      PASSWORD: "account_pass",
+      MAIL_2ND: "recovery_mail",
+      NOTE: "note",
+      EXPIRED: "expiry_date",
+      SUPPLIER: "supplier",
+      COST: "cost",
+      SLOT: "slot",
+      MATCH: "match",
+    },
+  },
+  SUPPLIER_COST: SUPPLIER_COST_DEF,
 };
 
 // -----------------------
-// UPPERCASE SCHEMA SUPPLIER
+// SUPPLIER SCHEMA
 // -----------------------
 const PARTNER_SCHEMA = {
   SUPPLIER: {
@@ -302,22 +302,25 @@ const PARTNER_SCHEMA = {
       ACTIVE_SUPPLY: "active_supply",
     },
   },
-  SUPPLIER_COST: {
-    TABLE: "supplier_cost",
+  PAYMENT_SUPPLY: {
+    TABLE: "supplier_payments",
     COLS: {
       ID: "id",
-      PRODUCT_ID: "product_id",
-      SUPPLIER_ID: "supplier_id",
-      PRICE: "price",
+      SOURCE_ID: "supplier_id",
+      IMPORT_VALUE: "total_amount",
+      ROUND: "payment_period",
+      STATUS: "payment_status",
+      PAID: "amount_paid",
     },
   },
+  SUPPLIER_COST: SUPPLIER_COST_DEF,
 };
 
-const tableName = (name, schema = SCHEMA) =>
-  schema ? `${schema}.${name}` : name;
+const tableName = (name, schema) => (schema ? `${schema}.${name}` : name);
 
-const getTable = (key, schemaMap = DB_SCHEMA) => schemaMap[key] || null;
-const getColumns = (key, schemaMap = DB_SCHEMA) =>
+const EMPTY_SCHEMA = {};
+const getTable = (key, schemaMap = EMPTY_SCHEMA) => schemaMap[key] || null;
+const getColumns = (key, schemaMap = EMPTY_SCHEMA) =>
   schemaMap[key] ? schemaMap[key].COLS || {} : {};
 
 // Helpers to derive camelCase column maps on demand (per consumer)
@@ -331,7 +334,7 @@ const toCamel = (key = "") =>
     )
     .join("");
 
-const getDefinition = (key, schemaMap = DB_SCHEMA) => {
+const getDefinition = (key, schemaMap = EMPTY_SCHEMA) => {
   const entry = schemaMap[key];
   if (!entry) return null;
   const columns = Object.fromEntries(
@@ -348,9 +351,10 @@ const getDefinition = (key, schemaMap = DB_SCHEMA) => {
 
 module.exports = {
   // Environment + helpers
-  SCHEMA,
   SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
+  SCHEMA_ADMIN,
+  SCHEMA_FINANCE,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
   NOTIFICATION_GROUP_ID,
@@ -359,8 +363,8 @@ module.exports = {
   getTable,
   getColumns,
   getDefinition,
-  // Primary schema
-  DB_SCHEMA,
+  ADMIN_SCHEMA,
+  FINANCE_SCHEMA,
   // Orders schema map
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
