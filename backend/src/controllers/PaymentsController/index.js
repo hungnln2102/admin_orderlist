@@ -9,6 +9,7 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
+const { STATUS } = require("../../utils/statuses");
 const {
   createDateNormalization,
 } = require("../../utils/sql");
@@ -133,8 +134,8 @@ const confirmPaymentSupply = async (req, res) => {
           : "";
       const trimmedSourceName = sourceName.trim();
 
-      const UNPAID_STATUS = "Chưa Thanh Toán";
-      const PAID_STATUS = "Đã Thanh Toán";
+      const UNPAID_STATUS = STATUS.UNPAID;
+      const PAID_STATUS = STATUS.PAID;
 
       let remainingImport = null;
       try {

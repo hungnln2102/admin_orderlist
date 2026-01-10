@@ -106,7 +106,7 @@ const listProductDescriptions = async (req, res) => {
     });
   } catch (error) {
     console.error("Query failed (GET /api/product-descriptions):", error);
-    res.status(500).json({ error: "Khong the tai mo ta san pham." });
+    res.status(500).json({ error: "Không thể tải mô tả sản phẩm." });
   }
 };
 
@@ -114,7 +114,7 @@ const saveProductDescription = async (req, res) => {
   const { productId, rules, description, imageUrl } = req.body || {};
   const normalizedProductId = normalizeTextInput(productId);
   if (!normalizedProductId) {
-    return res.status(400).json({ error: "productId la bat buoc." });
+    return res.status(400).json({ error: "productId là bắt buộc." });
   }
 
   // Ensure productId exists in variant.display_name
@@ -125,7 +125,7 @@ const saveProductDescription = async (req, res) => {
     [normalizedProductId]
   );
   if (!variantRes.rows?.length) {
-    return res.status(400).json({ error: "productId khong ton tai trong variant." });
+    return res.status(400).json({ error: "productId không tồn tại trong variant." });
   }
 
   const normalizedRules = trimToLength(rules ?? "", 8000) || "";
@@ -180,7 +180,7 @@ const saveProductDescription = async (req, res) => {
     res.status(201).json(mapProductDescRow(inserted.rows[0]));
   } catch (error) {
     console.error("Save failed (POST /api/product-descriptions):", error);
-    res.status(500).json({ error: "Khong the luu mo ta san pham." });
+    res.status(500).json({ error: "Không thể lưu mô tả sản phẩm." });
   }
 };
 

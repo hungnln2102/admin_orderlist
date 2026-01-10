@@ -241,23 +241,31 @@ const updatePackageProduct = async (id, payload) => {
   return updated;
 };
 
-const deletePackageProduct = async (id) => {
-  const deletedRows = await db(TABLES.packageProduct)
-    .where(pkgCols.id, id)
-    .del()
-    .returning([pkgCols.id, pkgCols.package]);
+const deletePackageProduct = async (id) =>
+  withTransaction(async (trx) => {
+    await trx(TABLES.packageProduct)
+      .where(pkgCols.id, id)
+      .update({ [pkgCols.match]: null });
+    const deletedRows = await trx(TABLES.packageProduct)
+      .where(pkgCols.id, id)
+      .del()
+      .returning([pkgCols.id, pkgCols.package]);
 
-  return deletedRows;
-};
+    return deletedRows;
+  });
 
-const bulkDeletePackages = async (names) => {
-  const deleteResult = await db(TABLES.packageProduct)
-    .whereIn(pkgCols.package, names)
-    .del()
-    .returning(pkgCols.package);
+const bulkDeletePackages = async (names) =>
+  withTransaction(async (trx) => {
+    await trx(TABLES.packageProduct)
+      .whereIn(pkgCols.package, names)
+      .update({ [pkgCols.match]: null });
+    const deleteResult = await trx(TABLES.packageProduct)
+      .whereIn(pkgCols.package, names)
+      .del()
+      .returning(pkgCols.package);
 
-  return deleteResult || [];
-};
+    return deleteResult || [];
+  });
 
 module.exports = {
   listPackageProducts,

@@ -40,7 +40,7 @@ const attachCalculatePriceRoute = (router) => {
         const orderId = String(id_order || "").trim();
 
         if (!productName) {
-            return res.status(400).json({ error: "Ten san pham bat buoc." });
+            return res.status(400).json({ error: "Tên sản phẩm bắt buộc." });
         }
 
         try {
@@ -64,7 +64,7 @@ const attachCalculatePriceRoute = (router) => {
             const variantPricing = await fetchVariantPricing(productName);
 
             if (!variantPricing?.variantId) {
-                return res.status(400).json({ error: "Khong tim thay variant cho san pham." });
+                return res.status(400).json({ error: "Không tìm thấy gói cho sản phẩm." });
             }
 
             // Cost ưu tiên theo nguồn đã chọn; giá bán tính theo giá cao nhất
@@ -92,7 +92,7 @@ const attachCalculatePriceRoute = (router) => {
             const baseForPricing = Number(maxPriceRow?.maxPrice || 0);
 
             if (baseForPricing <= 0 && importBySource <= 0) {
-                return res.status(400).json({ error: "Khong co gia NCC" });
+                return res.status(400).json({ error: "Không có giá NCC" });
             }
 
             const pricingBase = baseForPricing > 0 ? baseForPricing : importBySource;

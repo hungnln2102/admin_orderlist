@@ -98,6 +98,74 @@ const me = (req, res) => {
   return res.json({ user: req.session.user });
 };
 
+const changePassword = async (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: "Không có quyền truy cập" });
+  }
+
+  const { currentPassword, newPassword, confirmPassword } = req.body || {};
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: "Vui lòng nhập mật khẩu hiện tại và mật khẩu mới" });
+  }
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: "Mật khẩu mới không khớp" });
+  }
+
+  try {
+    const userCols = USERS_DEF.columns;
+    const sessionUser = req.session.user || {};
+    let userQuery = db(USERS_TABLE).select({
+      userid: userCols.id,
+      username: userCols.username,
+      passwordhash: userCols.password,
+    });
+
+    if (sessionUser.id && sessionUser.id !== -1) {
+      userQuery = userQuery.where(userCols.id, sessionUser.id);
+    } else if (sessionUser.username) {
+      userQuery = userQuery.whereRaw(`LOWER("${userCols.username}") = ?`, [
+        String(sessionUser.username || "").trim().toLowerCase(),
+      ]);
+    } else {
+      return res.status(401).json({ error: "Không có quyền truy cập" });
+    }
+
+    const user = await userQuery.first();
+    if (!user) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản" });
+    }
+
+    const storedHash = user.passwordhash;
+    const hashString =
+      storedHash instanceof Buffer
+        ? storedHash.toString()
+        : String(storedHash || "");
+    let isMatch = false;
+    if (hashString.startsWith("$2")) {
+      isMatch = await bcrypt.compare(currentPassword, hashString);
+    } else {
+      isMatch =
+        currentPassword === hashString || currentPassword === hashString.trim();
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Mật khẩu hiện tại không đúng" });
+    }
+
+    const newHash = await bcrypt.hash(String(newPassword), 10);
+    await db(USERS_TABLE)
+      .where(userCols.id, user.userid)
+      .update({ [userCols.password]: newHash });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("[auth] Thay đổi mật khẩu thất bại:", error);
+    return res
+      .status(500)
+      .json({ error: "Không thể thay đổi mật khẩu, vui lòng thử lại sau" });
+  }
+};
+
 const ensureDefaultAdmin = async () => {
   const usernameEnv = (process.env.DEFAULT_ADMIN_USER || "").trim();
   const passwordEnv = (process.env.DEFAULT_ADMIN_PASS || "").trim();
@@ -126,5 +194,6 @@ module.exports = {
   login,
   logout,
   me,
+  changePassword,
   ensureDefaultAdmin,
 };

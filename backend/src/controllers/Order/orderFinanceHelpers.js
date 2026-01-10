@@ -1,4 +1,5 @@
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
+const { resolveSupplierNameColumn } = require("../SuppliesController/helpers");
 const { STATUS } = require("./constants");
 const { toNullableNumber } = require("../../utils/normalizers");
 const TABLES = require("./constants").TABLES;
@@ -36,9 +37,10 @@ const findSupplyIdByName = async(trx, supplyNameRaw) => {
         : String(supplyNameRaw);
     if (!supplyName) return null;
 
+    const supplierNameCol = await resolveSupplierNameColumn();
     const row = await trx(TABLES.supplier)
         .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
-        .where(PARTNER_SCHEMA.SUPPLIER.COLS.SOURCE_NAME, supplyName)
+        .where(supplierNameCol, supplyName)
         .first();
     return row && row[PARTNER_SCHEMA.SUPPLIER.COLS.ID] !== undefined
         ? Number(row[PARTNER_SCHEMA.SUPPLIER.COLS.ID]) || null

@@ -8,6 +8,7 @@ const {
     PRODUCT_SCHEMA,
     PARTNER_SCHEMA,
 } = require("../../config/dbSchema");
+const { STATUS } = require("../../utils/statuses");
 
 const TABLES = {
     orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
@@ -29,15 +30,6 @@ const COLS = {
 };
 
 // Giữ nguyên trạng thái gốc (đúng với dữ liệu hiện tại)
-const STATUS = {
-    PAID: "Đã Thanh Toán",
-    UNPAID: "Chưa Thanh Toán",
-    EXPIRED: "Hết Hạn",
-    RENEWAL: "Cần Gia Hạn",
-    REFUNDED: "Đã Hoàn",
-    PENDING_REFUND: "Chưa Hoàn",
-    CANCELED: "Hủy",
-};
 
 module.exports = {
     TABLES,
