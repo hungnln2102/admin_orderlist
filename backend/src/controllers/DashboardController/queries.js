@@ -4,6 +4,7 @@ const {
   quoteIdent,
 } = require("../../utils/sql");
 const { ORDERS_SCHEMA } = require("../../config/dbSchema");
+const { STATUS } = require("../../utils/statuses");
 const {
   ORDER_DEF,
   TABLES,
@@ -168,7 +169,7 @@ const buildChartsQuery = () => `
       0 AS order_count
     FROM ${TABLES.orderCanceled}
     WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
-      AND status = 'Đã Hoàn'
+      AND status = '${STATUS.REFUNDED}'
   ),
   all_transactions AS (
       SELECT id_order, event_date, amount, order_count FROM income_stream

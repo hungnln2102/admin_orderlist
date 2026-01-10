@@ -66,7 +66,7 @@ const createProductPrice = async (req, res) => {
 
   const productCode = normalizeTextInput(sanPham);
   if (!productCode) {
-    return res.status(400).json({ error: "sanPham la bat buoc." });
+    return res.status(400).json({ error: "sanPham la bắt buộc." });
   }
 
   const pctCtvVal = toNullableNumber(pctCtv);
@@ -124,7 +124,7 @@ const createProductPrice = async (req, res) => {
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
     console.error("Insert failed (POST /api/product-prices):", error);
-    res.status(500).json({ error: "Khong the tao gia san pham." });
+    res.status(500).json({ error: "Không thể tạo giá sản phẩm." });
   }
 };
 
@@ -132,7 +132,7 @@ const updateProductPrice = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "ID san pham khong hop le." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
 
   const {
@@ -156,7 +156,7 @@ const updateProductPrice = async (req, res) => {
       [parsedId]
     );
     if (!variantRes.rows || !variantRes.rows.length) {
-      return res.status(404).json({ error: "Khong tim thay san pham." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     const productSchemaId = variantRes.rows[0]?.product_id || null;
 
@@ -170,7 +170,7 @@ const updateProductPrice = async (req, res) => {
     if (sanPham !== undefined) {
       const normalized = normalizeTextInput(sanPham);
       if (!normalized) {
-        return res.status(400).json({ error: "sanPham khong duoc trong." });
+        return res.status(400).json({ error: "sanPham không được để trống." });
       }
       addVariantUpdate(variantCols.displayName, normalized);
     }
@@ -219,7 +219,7 @@ const updateProductPrice = async (req, res) => {
     if (pctPromo !== undefined) addPriceUpdate(priceConfigCols.pctPromo, toNullableNumber(pctPromo));
 
     if (!variantUpdates.length && priceUpdates.length === 0 && packageName === undefined) {
-      return res.status(400).json({ error: "Khong co truong nao de cap nhat." });
+      return res.status(400).json({ error: "Không có trường nào để cập nhật." });
     }
 
     if (priceUpdates.length) {
@@ -260,7 +260,7 @@ const updateProductPrice = async (req, res) => {
     res.json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
     console.error(`Update failed (PATCH /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "Khong the cap nhat gia san pham." });
+    res.status(500).json({ error: "Không thể cập nhật giá sản phẩm." });
   }
 };
 
@@ -268,7 +268,7 @@ const toggleProductPriceStatus = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "ID san pham khong hop le." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   const isActiveBody = req.body?.is_active;
   const isActive =
@@ -286,7 +286,7 @@ const toggleProductPriceStatus = async (req, res) => {
       [isActive, parsedId]
     );
     if (!result.rows || !result.rows.length) {
-      return res.status(404).json({ error: "Khong tim thay san pham." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json({
       id: result.rows[0].id,
@@ -298,7 +298,7 @@ const toggleProductPriceStatus = async (req, res) => {
       `Update failed (PATCH /api/product-prices/${productId}/status):`,
       error
     );
-    res.status(500).json({ error: "Khong the cap nhat trang thai san pham." });
+    res.status(500).json({ error: "Không thể cập nhật trạng thái sản phẩm." });
   }
 };
 
@@ -306,7 +306,7 @@ const deleteProductPrice = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "ID san pham khong hop le." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   try {
     await db.raw(
@@ -333,7 +333,7 @@ const deleteProductPrice = async (req, res) => {
     res.json({ success: true, id: parsedId });
   } catch (error) {
     console.error(`Delete failed (DELETE /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "Khong the xoa gia san pham." });
+    res.status(500).json({ error: "Không thể xóa giá sản phẩm." });
   }
 };
 

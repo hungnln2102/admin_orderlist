@@ -11,13 +11,13 @@ const listWarehouse = async (_req, res) => {
     const rows = await db(warehouseTable)
       .select({
         id: cols.id,
-        product_type: cols.productType,
-        account_username: cols.accountUsername,
-        account_password: cols.accountPassword,
+        category: cols.productType,
+        account: cols.accountUsername,
+        password: cols.accountPassword,
         backup_email: cols.backupEmail,
         two_fa: cols.twoFaCode,
         note: cols.note,
-        stock_status: cols.stockStatus,
+        status: cols.stockStatus,
         created_at: cols.createdAt,
       })
       .orderBy(cols.id, "asc");
@@ -54,13 +54,13 @@ const createWarehouse = async (req, res) => {
       })
       .returning({
         id: cols.id,
-        category: cols.category,
-        account: cols.account,
-        password: cols.password,
+        category: cols.productType,
+        account: cols.accountUsername,
+        password: cols.accountPassword,
         backup_email: cols.backupEmail,
         two_fa: cols.twoFaCode,
         note: cols.note,
-        status: cols.status,
+        status: cols.stockStatus,
         created_at: cols.createdAt,
       });
 
@@ -101,13 +101,13 @@ const updateWarehouse = async (req, res) => {
       })
       .returning({
         id: cols.id,
-        category: cols.category,
-        account: cols.account,
-        password: cols.password,
+        category: cols.productType,
+        account: cols.accountUsername,
+        password: cols.accountPassword,
         backup_email: cols.backupEmail,
         two_fa: cols.twoFaCode,
         note: cols.note,
-        status: cols.status,
+        status: cols.stockStatus,
         created_at: cols.createdAt,
       });
 

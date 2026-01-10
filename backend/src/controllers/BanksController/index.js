@@ -105,7 +105,7 @@ const listBanks = async (_req, res) => {
     return res.json(banks);
   } catch (error) {
     console.error("[banks] External source fetch failed:", error);
-    return res.status(500).json({ error: "Khong the tai danh sach ngan hang" });
+    return res.status(500).json({ error: "Không thể tải danh sách ngân hàng" });
   }
 };
 

@@ -111,7 +111,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     // Check directly against the DB value (accented) instead of normalized text.
     const paidAndLocked =
-      rawStatus === "Đã Thanh Toán" && isTrueFlag(checkFlagValue);
+      rawStatus === ORDER_STATUS.PAID && isTrueFlag(checkFlagValue);
 
     // Skip auto-renewal for paid + locked orders, but allow manual (force) renewals.
     if (paidAndLocked && !forceRenewal) {
@@ -250,7 +250,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       formatDateDB(ngayHetHanMoi),
       finalGiaNhap,
       finalGiaBan,
-      "Chưa Thanh Toán",
+      ORDER_STATUS.UNPAID,
       false,
       orderCode,
     ]);
@@ -273,7 +273,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       NGUON: nguon,
       GIA_NHAP: finalGiaNhap,
       GIA_BAN: finalGiaBan,
-      TINH_TRANG: "Chưa Thanh Toán",
+      TINH_TRANG: ORDER_STATUS.UNPAID,
     };
 
     return { success: true, details, processType: "renewal" };
@@ -317,11 +317,11 @@ const markCheckFlagFalse = async (orderCode) => {
 const setStatusUnpaid = async (orderCode) => {
   const sql = `
     UPDATE ${ORDER_TABLE}
-    SET ${ORDER_COLS.status} = 'Chưa Thanh Toán',
+    SET ${ORDER_COLS.status} = $2,
         ${ORDER_COLS.checkFlag} = FALSE
     WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
   `;
-  await pool.query(sql, [orderCode]);
+  await pool.query(sql, [orderCode, ORDER_STATUS.UNPAID]);
 };
 
 const isNullishFlag = (value) =>

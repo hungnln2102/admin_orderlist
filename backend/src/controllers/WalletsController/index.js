@@ -71,7 +71,7 @@ const listDailyBalances = async (_req, res) => {
     console.error("[wallets] Failed to load daily balances:", error);
     res
       .status(500)
-      .json({ error: "Khong the tai du lieu dong tien tu co so du lieu." });
+      .json({ error: "Không thể tải dữ liệu đồng tiền từ cơ sở dữ liệu." });
   }
 };
 
@@ -81,10 +81,10 @@ const saveDailyBalance = async (req, res) => {
 
   const dateStr = normalizeDate(rawDate);
   if (!dateStr) {
-    return res.status(400).json({ error: "recordDate khong hop le." });
+    return res.status(400).json({ error: "recordDate không hợp lệ." });
   }
   if (!values || typeof values !== "object") {
-    return res.status(400).json({ error: "values khong hop le." });
+    return res.status(400).json({ error: "values không hợp lệ." });
   }
 
   const entries = Object.entries(values)
@@ -129,7 +129,7 @@ const saveDailyBalance = async (req, res) => {
     res.json({ ok: true, recordDate: dateStr, entries: balances });
   } catch (error) {
     console.error("[wallets] Failed to save daily balances:", error);
-    res.status(500).json({ error: "Khong the luu du lieu dong tien." });
+    res.status(500).json({ error: "Không thể lưu dữ liệu đồng tiền." });
   }
 };
 

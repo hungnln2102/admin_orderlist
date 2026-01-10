@@ -10,6 +10,7 @@ const {
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
 } = require("../../config/dbSchema");
+const { STATUS } = require("../../utils/statuses");
 const { QUOTED_COLS } = require("../../utils/columns");
 
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
@@ -36,15 +37,6 @@ const TABLES = {
   ),
 };
 
-const STATUS = {
-  UNPAID: "Chưa Thanh Toán",
-  PAID: "Đã Thanh Toán",
-  COLLECTED: "Đã Thu",
-  PAID_ALT: "Thanh Toán",
-  CANCELED: "Hủy",
-  REFUNDED: "Đã Hoàn",
-  PENDING_REFUND: "Chưa Hoàn",
-};
 
 const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "is_active"];
 

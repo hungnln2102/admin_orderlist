@@ -11,6 +11,7 @@ const {
   SUPPLIER_COST_COLS,
   PAYMENT_SUPPLY_COLS,
 } = require("./config");
+const { STATUS } = require("../../src/utils/statuses");
 const {
   normalizeAmount,
   parsePaidDate,
@@ -409,7 +410,7 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
 
     const latest = latestRes.rows[0];
     const statusLabel = String(latest?.status_label || "");
-    if (latest && statusLabel === "Chưa Thanh Toán") {
+    if (latest && statusLabel === STATUS.UNPAID) {
       await client.query(
         `UPDATE ${PAYMENT_SUPPLY_TABLE}
          SET ${PAYMENT_SUPPLY_COLS.importValue} = COALESCE(${PAYMENT_SUPPLY_COLS.importValue}, 0) + $2
@@ -425,8 +426,8 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
             ${PAYMENT_SUPPLY_COLS.status},
             ${PAYMENT_SUPPLY_COLS.paid}
           )
-          VALUES ($1, $2, $3, 'Chưa Thanh Toán', NULL)`,
-        [sourceId, priceValue, formatNote()]
+          VALUES ($1, $2, $3, $4, NULL)`,
+        [sourceId, priceValue, formatNote(), STATUS.UNPAID]
       );
     }
 

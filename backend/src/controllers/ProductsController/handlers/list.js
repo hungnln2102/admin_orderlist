@@ -29,7 +29,7 @@ const listProducts = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("Query failed (GET /api/products):", error);
-    res.status(500).json({ error: "KhA'ng th ¯Ÿ t §œi s §œn ph §cm." });
+    res.status(500).json({ error: "Không thể tải sản phẩm. Vui lòng thử lại." });
   }
 };
 
@@ -74,7 +74,7 @@ const listProductPrices = async (_req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("Query failed (GET /api/product-prices):", error);
-    res.status(500).json({ error: "KhA'ng th ¯Ÿ t §œi giA­ s §œn ph §cm." });
+    res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };
 
@@ -82,7 +82,7 @@ const getProductPriceById = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
   if (!Number.isFinite(parsedId) || parsedId <= 0) {
-    return res.status(400).json({ error: "ID s §œn ph §cm khA'ng h ¯œp l ¯Ø." });
+    return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   try {
     const query = `
@@ -122,12 +122,12 @@ const getProductPriceById = async (req, res) => {
     `;
     const result = await db.raw(query, [parsedId]);
     if (!result.rows || !result.rows.length) {
-      return res.status(404).json({ error: "KhA'ng tAªm th §y s §œn ph §cm." });
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     res.json(mapProductPriceRow(result.rows[0]));
   } catch (error) {
     console.error(`Query failed (GET /api/product-prices/${productId}):`, error);
-    res.status(500).json({ error: "KhA'ng th ¯Ÿ t §œi giA­ s §œn ph §cm." });
+    res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };
 
