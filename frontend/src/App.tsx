@@ -6,7 +6,7 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import Sidebar from "./components/layout/Sidebar";
+import Sidebar from "./components/layout/sidebar/Sidebar";
 import Dashboard from "./pages/Dashboard/index";
 import Orders from "./pages/Product/Orders";
 import PackageProduct from "./pages/Product/PackageProduct/PackageProduct";

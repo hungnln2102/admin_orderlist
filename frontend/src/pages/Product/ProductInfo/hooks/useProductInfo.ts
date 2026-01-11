@@ -83,7 +83,7 @@ export const useProductInfo = (): UseProductInfoResult => {
       setError(
         normalizeErrorMessage(
           err instanceof Error ? err.message : String(err ?? ""),
-          { fallback: "KhA'ng th ¯Ÿ t §œi danh sA­ch s §œn ph §cm." }
+          { fallback: "Không thể tải danh sách sản phẩm." }
         )
       );
     } finally {

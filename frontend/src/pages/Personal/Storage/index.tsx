@@ -33,7 +33,7 @@ export default function Storage() {
           res = await apiFetch("/api/warehouses");
         }
         if (!res.ok) {
-          throw new Error(`Khong the tai du lieu (${res.status})`);
+          throw new Error(`Không thể tải dữ liệu (${res.status})`);
         }
         const data = await res.json();
         const parsed = parsePayload(data);
@@ -41,7 +41,7 @@ export default function Storage() {
           setItems(parsed);
         }
       } catch (err: any) {
-        if (mounted) setError(err?.message || "Loi khong xac dinh");
+        if (mounted) setError(err?.message || "Lỗi không xác định");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -77,7 +77,7 @@ export default function Storage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(draft),
         });
-        if (!res.ok) throw new Error(`Tao moi that bai (${res.status})`);
+        if (!res.ok) throw new Error(`Tạo mới thất bại (${res.status})`);
         const created = await res.json();
         setItems((prev) => [...prev, created]);
         cancelEdit();
@@ -88,7 +88,7 @@ export default function Storage() {
           body: JSON.stringify(draft),
         });
         if (!res.ok) {
-          throw new Error(`Cap nhat that bai (${res.status})`);
+          throw new Error(`Cập nhật thất bại (${res.status})`);
         }
         const updated = await res.json();
         setItems((prev) =>
@@ -97,7 +97,7 @@ export default function Storage() {
         cancelEdit();
       }
     } catch (err: any) {
-      setError(err?.message || "Loi khi cap nhat");
+      setError(err?.message || "Lỗi khi cập nhật");
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export default function Storage() {
 
   const deleteRow = async (id?: number) => {
     if (!id) return;
-    if (!confirm("Ban co chac muon xoa ban ghi nay?")) return;
+    if (!confirm("Bạn có chắc muốn xóa bản ghi này?")) return;
     setLoading(true);
     setError(null);
     try {
@@ -113,12 +113,12 @@ export default function Storage() {
         method: "DELETE",
       });
       if (!res.ok) {
-        throw new Error(`Xoa that bai (${res.status})`);
+        throw new Error(`Xoá thất bại (${res.status})`);
       }
       setItems((prev) => prev.filter((it) => it.id !== id));
       if (editingId === id) cancelEdit();
     } catch (err: any) {
-      setError(err?.message || "Loi khi xoa");
+      setError(err?.message || "Lỗi khi xóa");
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,7 @@ export default function Storage() {
       backup_email: "",
       two_fa: "",
       note: "",
-      status: "Ton",
+      status: "Tồn",
     });
   };
 

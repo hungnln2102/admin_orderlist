@@ -119,7 +119,7 @@ export const splitCombinedContent = (
     .replace(/[\u0300-\u036f]/g, "");
 
   const markerRegex =
-    /(thA'ng tin\s*&\s*tA-nh nŽŸng|thA'ng tin s §œn ph §cm|mA' t §œ|n ¯Ti dung|tA-nh nŽŸng)/i;
+    /(Thông tin\s*&\s*tên sản phẩm|thông tin sản phẩm|mô tả|nội dung|tên sản phẩm)/i;
   const match = normalizedNoAccent.match(markerRegex);
   const toHtml = (val: string) =>
     val.replace(/\n+/g, "\n").split("\n").join("<br/>");

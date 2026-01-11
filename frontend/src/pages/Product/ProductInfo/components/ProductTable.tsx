@@ -29,8 +29,8 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   return (
     <div className="rounded-2xl border border-white/10 bg-[#0b1220] shadow-xl overflow-hidden">
       <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">S §œn Ph §cm</h2>
-        {loading && <span className="text-xs text-white/60">Ž?ang t §œi...</span>}
+        <h2 className="text-lg font-semibold text-white">Sản Phẩm</h2>
+        {loading && <span className="text-xs text-white/60">Đang tải...</span>}
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
@@ -44,17 +44,17 @@ export const ProductTable: React.FC<ProductTableProps> = ({
           </colgroup>
           <thead className="bg-white/5 text-white">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold"> §›nh</th>
-              <th className="px-4 py-3 text-left font-semibold">MAœ S §œn Ph §cm</th>
-              <th className="px-4 py-3 text-left font-semibold">TA¦n S §œn Ph §cm</th>
+              <th className="px-4 py-3 text-left font-semibold">Mã</th>
+              <th className="px-4 py-3 text-left font-semibold">Mã Sản Phẩm</th>
+              <th className="px-4 py-3 text-left font-semibold">Tên Sản Phẩm</th>
               <th className="px-5 py-3 text-left font-semibold border-r border-white/10 min-w-[240px]">
-                Quy T §_c
+                Quy Tắc
               </th>
               <th className="px-5 py-3 text-left font-semibold min-w-[240px] border-r border-white/10">
-                MA' T §œ
+                Mô Tả
               </th>
               <th className="px-4 py-3 text-left font-semibold min-w-[120px] text-center">
-                Thao TA­c
+                Thao Tác
               </th>
             </tr>
           </thead>
@@ -74,7 +74,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                   colSpan={6}
                   className="px-6 py-4 text-center text-sm text-white/70"
                 >
-                  KhA'ng cA3 d ¯_ li ¯Øu product_desc.
+                  Không có sản phẩm nào được hiển thị.
                 </td>
               </tr>
             )}
@@ -84,7 +84,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
                   colSpan={6}
                   className="px-6 py-4 text-center text-sm text-white/80"
                 >
-                  Ž?ang t §œi danh sA­ch...
+                  Đang tải danh sách...
                 </td>
               </tr>
             )}

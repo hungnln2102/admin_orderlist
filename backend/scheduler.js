@@ -9,6 +9,7 @@ const { Pool } = require("pg");
 const cron = require("node-cron");
 const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("./src/config/dbSchema");
 const { backupDatabaseToDrive } = require("./src/utils/backupService");
+const { STATUS } = require("./src/utils/statuses");
 // Raw column names (unquoted) for reading rows returned by pg
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const ORDER_COLS = ORDER_DEF.columns;
@@ -30,9 +31,6 @@ const runOnStart = process.env.RUN_CRON_ON_START === "true";
 const enableDbBackup = process.env.ENABLE_DB_BACKUP !== "false";
 let lastRunAt = null;
 
-const STATUS_EXPIRED = "Hết Hạn";
-const STATUS_RENEW = "Cần Gia Hạn";
-const STATUS_PAID = "Đã Thanh Toán";
 
 // Quote SQL identifiers safely
 const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
@@ -106,14 +104,14 @@ const getSqlCurrentDate = () => {
 const updateDatabaseTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
   console.log(
-    `[CRON] Bat dau cap nhat don het han / can gia han (Trigger: ${trigger}, Date: ${
+    `[CRON] Bắt đầu cập nhật đơn hết hạn / cần gia hạn (Trigger: ${trigger}, Date: ${
       process.env.MOCK_DATE || "CURRENT_DATE"
     })...`
   );
 
   if (process.env.MOCK_DATE) {
     console.warn(
-      `[TEST MODE] Dang su dung ngay gia dinh: ${process.env.MOCK_DATE}`
+      `[TEST MODE] Đang sử dụng ngày giả định: ${process.env.MOCK_DATE}`
     );
   }
 
@@ -184,11 +182,11 @@ const updateDatabaseTask = async (trigger = "cron") => {
       ON CONFLICT DO NOTHING
       RETURNING ${COL.idOrder};
     `);
-    console.log(`  - Da chuyen ${transfer.rowCount} don het han (< 0 ngay).`);
+    console.log(`  - Đã chuyển ${transfer.rowCount} đơn hết hạn (< 0 ngày).`);
     if (transfer.rows.length) {
       const idKey = ORDER_COLS.idOrder;
       console.log(
-        `    -> ID da luu: ${transfer.rows
+        `    -> ID đã lưu: ${transfer.rows
           .map((r) => r[idKey])
           .filter(Boolean)
           .join(", ")}`
@@ -198,14 +196,14 @@ const updateDatabaseTask = async (trigger = "cron") => {
     // 2a) Update 0 ngay con lai -> 'Hết Hạn'
     const dueToday = await client.query(`
       UPDATE ${TABLES.orderList}
-      SET ${COL.status} = '${STATUS_EXPIRED}',
+      SET ${COL.status} = '${STATUS.EXPIRED}',
           ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} IS DISTINCT FROM '${STATUS_PAID}')
-        AND (${COL.status} IS DISTINCT FROM '${STATUS_EXPIRED}');
+        AND (${COL.status} IS DISTINCT FROM '${STATUS.PAID}')
+        AND (${COL.status} IS DISTINCT FROM '${STATUS.EXPIRED}');
     `);
     console.log(
-      `  - Cap nhat ${dueToday.rowCount} don sang '${STATUS_EXPIRED}' (0 ngay).`
+      `  - Cập nhật ${dueToday.rowCount} đơn sang '${STATUS.EXPIRED}' (0 ngày).`
     );
 
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
@@ -214,11 +212,11 @@ const updateDatabaseTask = async (trigger = "cron") => {
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       RETURNING ${COL.idOrder};
     `);
-    console.log(`  - Da xoa ${del.rowCount} don khoi order_list.`);
+    console.log(`  - Đã xóa ${del.rowCount} đơn khỏi order_list.`);
     if (del.rows.length) {
       const idKey = ORDER_COLS.idOrder;
       console.log(
-        `    -> ID da xoa: ${del.rows
+        `    -> ID đã xóa: ${del.rows
           .map((r) => r[idKey])
           .filter(Boolean)
           .join(", ")}`
@@ -229,18 +227,18 @@ const updateDatabaseTask = async (trigger = "cron") => {
     // 2b) Update 1..4 ngay -> 'Cần Gia Hạn'
     const soon = await client.query(`
       UPDATE ${TABLES.orderList}
-      SET ${COL.status} = '${STATUS_RENEW}',
+      SET ${COL.status} = '${STATUS.RENEWAL}',
           ${COL.checkFlag} = NULL
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
-        AND (${COL.status} IS DISTINCT FROM '${STATUS_EXPIRED}')
-        AND (${COL.status} IS DISTINCT FROM '${STATUS_RENEW}');
+        AND (${COL.status} IS DISTINCT FROM '${STATUS.EXPIRED}')
+        AND (${COL.status} IS DISTINCT FROM '${STATUS.RENEWAL}');
     `);
     console.log(
-      `  - Cap nhat ${soon.rowCount} don sang '${STATUS_RENEW}' (1..4 ngay).`
+      `  - Cập nhật ${soon.rowCount} đơn sang '${STATUS.RENEWAL}' (1..4 ngày).`
     );
 
     await client.query("COMMIT");
-    console.log("[CRON] Hoan thanh cap nhat.");
+    console.log("[CRON] Hoàn thành cập nhật.");
     lastRunAt = new Date();
 
     if (enableDbBackup) {
@@ -252,7 +250,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
     }
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[CRON] Loi khi cap nhat:", err);
+    console.error("[CRON] Lỗi khi cập nhật:", err);
     throw err;
   } finally {
     client.release();
@@ -283,7 +281,7 @@ if (runOnStart) {
 }
 
 console.log(
-  `[Scheduler] Da khoi dong. Cron ${cronExpression} ${schedulerTimezone}${
+  `[Scheduler] Đã khởi động. Cron ${cronExpression} ${schedulerTimezone}${
     runOnStart ? " (run on start enabled)" : ""
   }`
 );

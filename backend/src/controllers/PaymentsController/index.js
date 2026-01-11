@@ -137,7 +137,7 @@ const confirmPaymentSupply = async (req, res) => {
       const UNPAID_STATUS = STATUS.UNPAID;
       const PAID_STATUS = STATUS.PAID;
 
-      let remainingImport = null;
+      let carryoverImport = null;
       try {
         const unpaidResult = await trx.raw(
           `
@@ -147,7 +147,7 @@ const confirmPaymentSupply = async (req, res) => {
             ${createDateNormalization(QUOTED_COLS.orderList.orderDate)} AS order_date
           FROM ${TABLES.orderList}
           WHERE ${QUOTED_COLS.orderList.status} = ?
-            AND COALESCE(${QUOTED_COLS.orderList.checkFlag}, FALSE) = FALSE
+            AND ${QUOTED_COLS.orderList.checkFlag} IS FALSE
             AND TRIM(${QUOTED_COLS.orderList.supply}::text) = TRIM(?)
           ORDER BY order_date ASC NULLS FIRST, ${QUOTED_COLS.orderList.id} ASC;
         `,
@@ -180,7 +180,8 @@ const confirmPaymentSupply = async (req, res) => {
           (acc, row) => acc + (Number(row.cost) || 0),
           0
         );
-        remainingImport = Math.max(0, totalUnpaidImport - normalizedPaidAmount);
+        const importDelta = totalUnpaidImport - normalizedPaidAmount;
+        carryoverImport = Math.abs(importDelta);
       } catch (orderErr) {
         console.error(
           "[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa",
@@ -197,20 +198,21 @@ const confirmPaymentSupply = async (req, res) => {
           FROM ${TABLES.paymentSupply} ps
           WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
             AND ps.${QUOTED_COLS.paymentSupply.status} = ?
+            AND ps.${QUOTED_COLS.paymentSupply.id} <> ?
           LIMIT 1;
         `,
-          [sourceId, UNPAID_STATUS]
+          [sourceId, UNPAID_STATUS, parsedPaymentId]
         );
         hasUnpaidCycle = unpaidCycleResult.rows?.length > 0;
       }
 
-      if (remainingImport !== null && remainingImport > 0 && sourceId && !hasUnpaidCycle) {
+      if (carryoverImport !== null && carryoverImport > 0 && sourceId && !hasUnpaidCycle) {
         await trx.raw(
           `
           INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
           VALUES (?, ?, 0, ?, ?);
         `,
-          [sourceId, remainingImport, todayDMY, UNPAID_STATUS]
+          [sourceId, carryoverImport, todayDMY, UNPAID_STATUS]
         );
       }
 

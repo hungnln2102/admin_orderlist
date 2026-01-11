@@ -12,14 +12,14 @@ export const QuoteTable: React.FC<QuoteTableProps> = ({ rows }) => {
         <tr className="text-center bg-indigo-100 text-slate-900 font-semibold">
           <th className="border border-slate-600 py-2 w-12">STT</th>
           <th className="border border-slate-600 py-2 px-2 whitespace-nowrap">
-            TEN SAN PHAM
+            TÊN SẢN PHẨM
           </th>
-          <th className="border border-slate-600 py-2 w-32">GOI</th>
-          <th className="border border-slate-600 py-2 w-28">THOI GIAN</th>
-          <th className="border border-slate-600 py-2 w-32">DON GIA</th>
-          <th className="border border-slate-600 py-2 w-28">GIAM GIA</th>
-          <th className="border border-slate-600 py-2 w-32">THANH TIEN</th>
-          <th className="border border-slate-600 py-2 w-36">GHI CHU</th>
+          <th className="border border-slate-600 py-2 w-32">GÓI</th>
+          <th className="border border-slate-600 py-2 w-28">THỜI GIAN</th>
+          <th className="border border-slate-600 py-2 w-32">ĐƠN GIÁ</th>
+          <th className="border border-slate-600 py-2 w-28">GIẢM GIÁ</th>
+          <th className="border border-slate-600 py-2 w-32">THANH TIỀN</th>
+          <th className="border border-slate-600 py-2 w-36">GHI CHÚ</th>
         </tr>
       </thead>
       <tbody>
@@ -37,9 +37,9 @@ export const QuoteTable: React.FC<QuoteTableProps> = ({ rows }) => {
             </td>
             <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">
               {row.durationMonths
-                ? `${row.durationMonths} thang`
+                ? `${row.durationMonths} tháng`
                 : row.durationDays
-                ? `${row.durationDays} ngay`
+                ? `${row.durationDays} ngày`
                 : row.term || "--"}
             </td>
             <td className="border border-slate-600 text-center px-2 py-2 text-white print:text-black">

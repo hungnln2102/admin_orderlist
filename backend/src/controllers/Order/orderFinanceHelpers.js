@@ -1,7 +1,7 @@
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
 const { resolveSupplierNameColumn } = require("../SuppliesController/helpers");
 const { STATUS } = require("./constants");
-const { toNullableNumber } = require("../../utils/normalizers");
+const { toNullableNumber, normalizeCheckFlagValue } = require("../../utils/normalizers");
 const TABLES = require("./constants").TABLES;
 
 const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
@@ -29,6 +29,17 @@ const calcRemainingRefund = (orderRow, normalized) => {
     const effectiveRemaining = Math.max(0, remainingDays);
     const computed = (price * effectiveRemaining) / totalDays;
     return Math.max(0, Math.round(computed));
+};
+
+const calcRemainingImport = (orderRow, normalized) => {
+    const baseCost = toNullableNumber(orderRow?.cost);
+    const totalDays = toNullableNumber(orderRow?.days);
+    const remainingDays = toNullableNumber(normalized?.so_ngay_con_lai);
+    if (!baseCost || baseCost <= 0) return null;
+    if (!totalDays || totalDays <= 0) return null;
+    if (remainingDays === null || remainingDays === undefined) return null;
+    const effectiveRemaining = Math.max(0, remainingDays);
+    return (baseCost * effectiveRemaining) / totalDays;
 };
 
 const findSupplyIdByName = async(trx, supplyNameRaw) => {
@@ -151,7 +162,9 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
         normalized?.status ??
         normalized?.status_auto ??
         "";
-    const checkFlagVal = orderRow?.check_flag ?? normalized?.check_flag;
+    const checkFlagVal = normalizeCheckFlagValue(
+        orderRow?.check_flag ?? normalized?.check_flag
+    );
 
     const isUnpaidCase = statusValue === STATUS.UNPAID && checkFlagVal === false;
     const isPaidCase = statusValue === STATUS.PAID && checkFlagVal === true;
@@ -161,17 +174,8 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
     const supplyId = await findSupplyIdByName(trx, orderRow?.supply);
     if (!supplyId) return;
 
-    if (isUnpaidCase) {
-        await decreaseSupplierDebt(trx, supplyId, orderRow?.cost);
-        return;
-    }
-
-    const remainingDays = toNullableNumber(normalized?.so_ngay_con_lai);
-    const totalDays = toNullableNumber(orderRow?.days);
-    const baseCost = toNullableNumber(orderRow?.cost);
-    if (!baseCost || !remainingDays || remainingDays <= 0 || !totalDays || totalDays <= 0) return;
-
-    const prorated = (baseCost * remainingDays) / totalDays;
+    const prorated = calcRemainingImport(orderRow, normalized);
+    if (!prorated || prorated <= 0) return;
     const roundedProrated = ceilToThousands(prorated);
     if (!Number.isFinite(roundedProrated) || roundedProrated <= 0) return;
     await decreaseSupplierDebt(trx, supplyId, roundedProrated);

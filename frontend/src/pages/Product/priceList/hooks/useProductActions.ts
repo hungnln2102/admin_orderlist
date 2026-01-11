@@ -260,28 +260,28 @@ export const useProductActions = ({
     const nextPctPromo = parseRatioInput(productEditForm.pctPromo);
 
     if (!nextPctCtv || nextPctCtv <= 0) {
-      setProductEditError("Tỉ giá CTV phải lớn hơn 0");
+      setProductEditError("Tỷ giá CTV phải lớn hơn 0");
       return;
     }
     if (!nextPctKhach || nextPctKhach <= 0) {
-      setProductEditError("Tỉ giá Khách phải lớn hơn 0");
+      setProductEditError("Tỷ giá Khách phải lớn hơn 0");
       return;
     }
     if (nextPctPromo !== null) {
       if (nextPctPromo < MIN_PROMO_RATIO) {
-        setProductEditError("Tỉ lệ khuyến mãi không được âm.");
+        setProductEditError("Tỷ lệ khuyến mãi không được âm.");
         return;
       }
       const promoHeadroom = Math.max(0, nextPctKhach - 1);
       if (promoHeadroom === 0 && nextPctPromo > 0) {
         setProductEditError(
-          "Tỉ giá khuyến mãi không áp dụng khi Tỉ giá Khách ở mức 1."
+          "Tỷ giá khuyến mãi không áp dụng khi Tỷ giá Khách ở mức 1."
         );
         return;
       }
       if (nextPctPromo > promoHeadroom) {
         setProductEditError(
-          `Tỉ lệ khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
+          `Tỷ lệ khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
         );
         return;
       }
@@ -549,29 +549,29 @@ export const useProductActions = ({
       return;
     }
     if (pctCtvValue !== null && pctCtvValue <= 0) {
-      setCreateError("Tỉ giá CTV phải lớn hơn 0.");
+      setCreateError("Tỷ giá CTV phải lớn hơn 0.");
       return;
     }
     if (pctKhachValue !== null && pctKhachValue <= 0) {
-      setCreateError("Tỉ giá khách phải lớn hơn 0.");
+      setCreateError("Tỷ giá khách phải lớn hơn 0.");
       return;
     }
     if (pctPromoValue !== null) {
       if (pctPromoValue < MIN_PROMO_RATIO) {
-        setCreateError("Tỉ lệ khuyến mãi không được âm.");
+        setCreateError("Tỷ lệ khuyến mãi không được âm.");
         return;
       }
       if (pctKhachValue !== null && pctKhachValue > 0) {
         const promoHeadroom = Math.max(0, pctKhachValue - 1);
         if (promoHeadroom === 0 && pctPromoValue > 0) {
           setCreateError(
-            "Tỉ giá khuyến mãi không áp dụng khi Tỉ giá Khách ở mức 1."
+            "Tỷ giá khuyến mãi không áp dụng khi Tỷ giá Khách ở mức 1."
           );
           return;
         }
         if (pctPromoValue > promoHeadroom) {
           setCreateError(
-            `Tỉ lệ khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
+            `Tỷ lệ khuyến mãi không được vượt ${promoHeadroom.toFixed(2)}`
           );
           return;
         }

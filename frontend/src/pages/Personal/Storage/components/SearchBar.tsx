@@ -26,7 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <MagnifyingGlassIcon className="h-5 w-5 text-white/60 absolute left-3 top-2.5" />
           <input
             className={`${inputClass} pl-10`}
-            placeholder="Tim theo goi, tai khoan, nha cung cap..."
+            placeholder="Tìm theo gói, tài khoản, nhà cung cấp..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -38,12 +38,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           disabled={loading}
         >
           <PlusIcon className="h-4 w-4" />
-          Them
+          Thêm mới
         </button>
         {loading && (
           <div className="text-sm text-white/80 flex items-center gap-2">
             <span className="animate-spin h-4 w-4 rounded-full border-2 border-white/40 border-t-transparent" />
-            Dang tai...
+            Đang tải...
           </div>
         )}
         {error && (

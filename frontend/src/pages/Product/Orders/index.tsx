@@ -13,10 +13,10 @@ import {
 } from "../../../constants";
 import GradientButton from "../../../components/ui/GradientButton";
 import StatCard from "../../../components/ui/StatCard";
-import ConfirmModal from "../../../components/modals/ConfirmModal";
-import ViewOrderModal from "../../../components/modals/ViewOrderModal";
-import EditOrderModal from "../../../components/modals/EditOrderModal";
-import CreateOrderModal from "../../../components/modals/CreateOrderModal";
+import ConfirmModal from "../../../components/modals/ConfirmModal/ConfirmModal";
+import ViewOrderModal from "../../../components/modals/ViewOrderModal/ViewOrderModal";
+import EditOrderModal from "../../../components/modals/EditOrderModal/EditOrderModal";
+import CreateOrderModal from "../../../components/modals/CreateOrderModal/CreateOrderModal";
 import { useOrdersData, EditableOrder } from "./hooks/useOrdersData";
 import { OrderRow } from "./components/OrderRow";
 import { formatCurrency } from "./utils/ordersHelpers";

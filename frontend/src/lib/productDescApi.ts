@@ -33,6 +33,21 @@ export interface ProductDescriptionSavePayload {
   imageUrl?: string | null;
 }
 
+export interface ProductImageUploadResponse {
+  url: string;
+  fileName?: string;
+}
+
+export interface ProductImageItem {
+  fileName: string;
+  url: string;
+}
+
+export interface ProductImageListResponse {
+  items: ProductImageItem[];
+  count: number;
+}
+
 export const saveProductDescription = async (
   payload: ProductDescriptionSavePayload
 ): Promise<ProductDescription> => {
@@ -45,7 +60,7 @@ export const saveProductDescription = async (
     const message = await response.text().catch(() => "");
     throw new Error(
       normalizeErrorMessage(message, {
-        fallback: "Khong the luu product_desc.",
+        fallback: "Không thể lưu product_desc.",
       })
     );
   }
@@ -53,7 +68,7 @@ export const saveProductDescription = async (
     | ProductDescription
     | null;
   if (!data || typeof data !== "object") {
-    throw new Error("Phan hoi khong hop le tu server.");
+    throw new Error("Phản hồi không hợp lệ từ server.");
   }
   return {
     id: Number((data as any).id) || 0,
@@ -66,6 +81,75 @@ export const saveProductDescription = async (
       (data as any).descriptionHtml || (data as any).description || "",
     imageUrl: (data as any).imageUrl ?? null,
   };
+};
+
+export const uploadProductImage = async (
+  file: File
+): Promise<ProductImageUploadResponse> => {
+  const body = new FormData();
+  body.append("image", file);
+  const response = await apiFetch("/api/product-descriptions/upload-image", {
+    method: "POST",
+    body,
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Upload failed.",
+      })
+    );
+  }
+  const data = (await response.json().catch(() => null)) as
+    | ProductImageUploadResponse
+    | null;
+  if (!data || typeof data.url !== "string") {
+    throw new Error("Invalid upload response.");
+  }
+  return data;
+};
+
+export const fetchProductImages = async (): Promise<ProductImageListResponse> => {
+  const response = await apiFetch("/api/product-descriptions/images");
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Failed to load images.",
+      })
+    );
+  }
+  const data = (await response.json().catch(() => null)) as
+    | ProductImageListResponse
+    | null;
+  if (!data || !Array.isArray(data.items)) {
+    return { items: [], count: 0 };
+  }
+  return {
+    items: data.items,
+    count:
+      typeof data.count === "number" && Number.isFinite(data.count)
+        ? data.count
+        : data.items.length,
+  };
+};
+
+export const deleteProductImage = async (fileName: string): Promise<void> => {
+  const encoded = encodeURIComponent(fileName || "");
+  const response = await apiFetch(
+    `/api/product-descriptions/images/${encoded}`,
+    {
+      method: "DELETE",
+    }
+  );
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Delete failed.",
+      })
+    );
+  }
 };
 
 export const fetchProductDescriptions = async (
@@ -89,7 +173,7 @@ export const fetchProductDescriptions = async (
     const message = await response.text().catch(() => "");
     throw new Error(
       normalizeErrorMessage(message, {
-        fallback: "Khong the tai thong tin san pham.",
+        fallback: "Không thể tải thông tin sản phẩm.",
       })
     );
   }

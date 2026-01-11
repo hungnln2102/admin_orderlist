@@ -7,6 +7,8 @@ const {
 } = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, trimToLength } = require("../../utils/normalizers");
+const fs = require("fs");
+const path = require("path");
 
 const PRODUCT_DESC_DEF = PRODUCT_SCHEMA.PRODUCT_DESC;
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
@@ -39,6 +41,42 @@ const TABLES = {
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
 };
 
+const IMAGE_DIR = path.join(__dirname, "../../../image");
+try {
+  fs.mkdirSync(IMAGE_DIR, { recursive: true });
+} catch {}
+
+const ALLOWED_IMAGE_EXTS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".bmp",
+  ".avif",
+]);
+
+const isImageFile = (filename) => {
+  const ext = path.extname(filename || "").toLowerCase();
+  return ALLOWED_IMAGE_EXTS.has(ext);
+};
+
+const findVariantForProductId = async (productId) => {
+  const query = `
+    SELECT
+      ${quoteIdent(variantColNames.id)} AS id,
+      ${quoteIdent(variantColNames.displayName)} AS display_name
+    FROM ${TABLES.variant}
+    WHERE
+      LOWER(TRIM(${quoteIdent(variantColNames.displayName)}::text)) = LOWER(TRIM(?))
+      OR LOWER(TRIM(regexp_replace(${quoteIdent(variantColNames.displayName)}::text, '--\\d+m$', '', 'i'))) = LOWER(TRIM(?))
+    LIMIT 1;
+  `;
+  const result = await db.raw(query, [productId, productId]);
+  return result.rows?.[0] || null;
+};
+
 const mapProductDescRow = (row = {}) => ({
   id: Number(row.id) || Number(row[productDescColNames.id]) || null,
   productId:
@@ -50,6 +88,65 @@ const mapProductDescRow = (row = {}) => ({
   descriptionHtml: row.description_html || row.descriptionHtml || null,
   imageUrl: row.image_url || row[productDescColNames.imageUrl] || null,
 });
+
+const buildImageUrl = (req, filename) => {
+  const host = req.get("host") || "localhost:3001";
+  const protocol = req.protocol || "http";
+  return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
+};
+
+const uploadProductImage = (req, res) => {
+  if (!req.file || !req.file.filename) {
+    return res.status(400).json({ error: "No file uploaded." });
+  }
+  return res.json({
+    fileName: req.file.filename,
+    url: buildImageUrl(req, req.file.filename),
+  });
+};
+
+const listProductImages = async (req, res) => {
+  try {
+    const entries = await fs.promises.readdir(IMAGE_DIR, { withFileTypes: true });
+    const items = entries
+      .filter((entry) => entry.isFile() && isImageFile(entry.name))
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        fileName: name,
+        url: buildImageUrl(req, name),
+      }));
+    res.json({ items, count: items.length });
+  } catch (error) {
+    console.error(
+      "List images failed (GET /api/product-descriptions/images):",
+      error
+    );
+    res.status(500).json({ error: "Failed to list images." });
+  }
+};
+
+const deleteProductImage = async (req, res) => {
+  const rawName = normalizeTextInput(req.params.fileName || "");
+  const fileName = path.basename(rawName);
+  if (!fileName || fileName !== rawName || !isImageFile(fileName)) {
+    return res.status(400).json({ error: "Invalid file name." });
+  }
+  const targetPath = path.join(IMAGE_DIR, fileName);
+  try {
+    await fs.promises.unlink(targetPath);
+    res.json({ ok: true });
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return res.status(404).json({ error: "File not found." });
+    }
+    console.error(
+      "Delete image failed (DELETE /api/product-descriptions/images):",
+      error
+    );
+    res.status(500).json({ error: "Failed to delete image." });
+  }
+};
 
 const listProductDescriptions = async (req, res) => {
   const search = normalizeTextInput(req.query.search || "");
@@ -117,22 +214,14 @@ const saveProductDescription = async (req, res) => {
     return res.status(400).json({ error: "productId là bắt buộc." });
   }
 
-  // Ensure productId exists in variant.display_name
-  const variantRes = await db.raw(
-    `SELECT ${quoteIdent(variantColNames.id)} AS id FROM ${TABLES.variant}
-     WHERE ${quoteIdent(variantColNames.displayName)} = ?
-     LIMIT 1`,
-    [normalizedProductId]
-  );
-  if (!variantRes.rows?.length) {
-    return res.status(400).json({ error: "productId không tồn tại trong variant." });
-  }
-
   const normalizedRules = trimToLength(rules ?? "", 8000) || "";
   const normalizedDescription = trimToLength(description ?? "", 8000) || "";
   const normalizedImage = trimToLength(imageUrl ?? "", 1000);
 
   try {
+    const variantRow = await findVariantForProductId(normalizedProductId);
+    const resolvedProductId = variantRow?.display_name || normalizedProductId;
+
     const existing = await db.raw(
       `
       SELECT *
@@ -140,23 +229,43 @@ const saveProductDescription = async (req, res) => {
       WHERE ${quoteIdent(productDescColNames.productId)} = ?
       LIMIT 1;
     `,
-      [normalizedProductId]
+      [resolvedProductId]
     );
+    let existingRow = existing.rows?.[0] || null;
 
-    if (existing.rows && existing.rows.length) {
+    if (!existingRow && variantRow && resolvedProductId !== normalizedProductId) {
+      const fallback = await db.raw(
+        `
+        SELECT *
+        FROM ${TABLES.productDesc}
+        WHERE ${quoteIdent(productDescColNames.productId)} = ?
+        LIMIT 1;
+      `,
+        [normalizedProductId]
+      );
+      existingRow = fallback.rows?.[0] || null;
+    }
+
+    if (!existingRow && !variantRow) {
+      return res.status(400).json({ error: "productId không tồn tại trong variant." });
+    }
+
+    if (existingRow) {
       const updateSql = `
         UPDATE ${TABLES.productDesc}
-        SET ${quoteIdent(productDescColNames.rules)} = ?,
+        SET ${quoteIdent(productDescColNames.productId)} = ?,
+            ${quoteIdent(productDescColNames.rules)} = ?,
             ${quoteIdent(productDescColNames.description)} = ?,
             ${quoteIdent(productDescColNames.imageUrl)} = ?
-        WHERE ${quoteIdent(productDescColNames.productId)} = ?
+        WHERE ${quoteIdent(productDescColNames.id)} = ?
         RETURNING *;
       `;
       const updated = await db.raw(updateSql, [
+        resolvedProductId,
         normalizedRules,
         normalizedDescription,
         normalizedImage,
-        normalizedProductId,
+        existingRow[productDescColNames.id] || existingRow.id,
       ]);
       return res.json(mapProductDescRow(updated.rows[0]));
     }
@@ -172,7 +281,7 @@ const saveProductDescription = async (req, res) => {
       RETURNING *;
     `;
     const inserted = await db.raw(insertSql, [
-      normalizedProductId,
+      resolvedProductId,
       normalizedRules,
       normalizedDescription,
       normalizedImage,
@@ -187,4 +296,7 @@ const saveProductDescription = async (req, res) => {
 module.exports = {
   listProductDescriptions,
   saveProductDescription,
+  uploadProductImage,
+  listProductImages,
+  deleteProductImage,
 };

@@ -44,14 +44,14 @@ export const StorageTable: React.FC<StorageTableProps> = ({
       <table className="min-w-full text-sm text-white">
         <thead className="bg-white/10 text-left">
           <tr>
-            <th className="px-4 py-2 font-semibold">Loai</th>
-            <th className="px-4 py-2 font-semibold">Tai khoan</th>
-            <th className="px-4 py-2 font-semibold">Mat khau</th>
-            <th className="px-4 py-2 font-semibold">Mail du phong</th>
+            <th className="px-4 py-2 font-semibold">Loại</th>
+            <th className="px-4 py-2 font-semibold">Tài khoản</th>
+            <th className="px-4 py-2 font-semibold">Mật khẩu</th>
+            <th className="px-4 py-2 font-semibold">Mail dự phòng</th>
             <th className="px-4 py-2 font-semibold">2FA</th>
-            <th className="px-4 py-2 font-semibold">Trang thai</th>
-            <th className="px-4 py-2 font-semibold">Ghi chu</th>
-            <th className="px-4 py-2 font-semibold text-center">Thao tac</th>
+            <th className="px-4 py-2 font-semibold">Trạng thái</th>
+            <th className="px-4 py-2 font-semibold">Ghi chú</th>
+            <th className="px-4 py-2 font-semibold text-center">Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -73,7 +73,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     className="p-2 rounded-lg bg-emerald-600/70 hover:bg-emerald-600 text-white transition disabled:opacity-60"
                     onClick={() => onSave(undefined)}
                     disabled={loading}
-                    title="Luu"
+                    title="Lưu"
                   >
                     <CheckIcon className="h-4 w-4" />
                   </button>
@@ -82,7 +82,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition disabled:opacity-60"
                     onClick={onCancel}
                     disabled={loading}
-                    title="Huy"
+                    title="Hủy"
                   >
                     <XMarkIcon className="h-4 w-4" />
                   </button>
@@ -93,7 +93,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
           {items.length === 0 ? (
             <tr>
               <td colSpan={7} className="px-4 py-6 text-center text-white/70">
-                Khong co hang ton kho
+                Không có hàng tồn kho
               </td>
             </tr>
           ) : (
@@ -112,7 +112,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     {isEditing ? (
                       renderInput("account", current.account)
                     ) : (
-                      <div className="font-medium">{item.account || "Chua co tai khoan"}</div>
+                      <div className="font-medium">{item.account || "Chưa có tài khoản"}</div>
                     )}
                   </td>
                   <td className="px-4 py-2">
@@ -155,7 +155,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                             className="p-2 rounded-lg bg-emerald-600/70 hover:bg-emerald-600 text-white transition disabled:opacity-60"
                             onClick={() => onSave(item.id)}
                             disabled={loading}
-                            title="Luu"
+                            title="Lưu"
                           >
                             <CheckIcon className="h-4 w-4" />
                           </button>
@@ -164,7 +164,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                             className="p-2 rounded-lg bg-rose-600/70 hover:bg-rose-600 text-white transition disabled:opacity-60"
                             onClick={() => onDelete(item.id)}
                             disabled={loading}
-                            title="Xoa"
+                            title="Xoá"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>
@@ -173,7 +173,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                             className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition disabled:opacity-60"
                             onClick={onCancel}
                             disabled={loading}
-                            title="Huy"
+                            title="Hủy"
                           >
                             <XMarkIcon className="h-4 w-4" />
                           </button>
@@ -185,7 +185,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                             className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-indigo-100 hover:text-white transition disabled:opacity-60"
                             onClick={() => onStartEdit(item)}
                             disabled={loading}
-                            title="Sua"
+                            title="Sửa"
                           >
                             <PencilSquareIcon className="h-4 w-4" />
                           </button>
@@ -194,7 +194,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                             className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-rose-200 hover:text-rose-100 transition disabled:opacity-60"
                             onClick={() => onDelete(item.id)}
                             disabled={loading}
-                            title="Xoa"
+                            title="Xoá"
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>

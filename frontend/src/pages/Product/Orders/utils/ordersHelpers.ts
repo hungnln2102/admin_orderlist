@@ -1,14 +1,6 @@
-import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS, Order } from "../../../../constants";
+import { ORDER_FIELDS, VIRTUAL_FIELDS, Order } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 
-export const STATUS_DISPLAY_LABELS: Record<string, string> = {
-  "hết hạn": ORDER_STATUSES.ORDER_EXPIRED,
-  "cần gia hạn": ORDER_STATUSES.CAN_GIA_HAN,
-  "chưa thanh toán": ORDER_STATUSES.CHUA_THANH_TOAN,
-  "đã thanh toán": ORDER_STATUSES.DA_THANH_TOAN,
-  "chưa hoàn": "Chưa Hoàn",
-  "đã hoàn": "Đã Hoàn",
-};
 
 export const formatCurrency = (value: number | string) => {
   const roundedNum = Helpers.roundGiaBanValue(value);
@@ -106,31 +98,8 @@ export const normalizeCheckFlag = (value: unknown): boolean | null => {
   return null;
 };
 
-export const normalizeStatusValue = (value: string): string => {
-  if (!value) return "";
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-};
 
-export const isUnpaidNormalizedStatus = (normalizedStatus: string): boolean => {
-  return (
-    normalizedStatus === "chua thanh toan" ||
-    normalizedStatus === "chua hoan" ||
-    normalizedStatus.includes("chua thanh toan") ||
-    normalizedStatus.includes("chua hoan")
-  );
-};
 
-export const formatStatusDisplay = (value: string): string => {
-  const normalized = normalizeStatusValue(value);
-  if (normalized && STATUS_DISPLAY_LABELS[normalized]) {
-    return STATUS_DISPLAY_LABELS[normalized];
-  }
-  return value;
-};
 
 export const parseExpiryTime = (order: Order): number => {
   const raw =

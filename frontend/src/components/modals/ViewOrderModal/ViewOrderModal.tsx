@@ -1,38 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import * as Helpers from "../../lib/helpers";
+import React, { useMemo } from "react";
+import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  API_ENDPOINTS,
-  ORDER_FIELDS,
-  VIRTUAL_FIELDS,
-  Order,
-} from "../../constants";
-import { API_BASE_URL, apiFetch } from "../../lib/api";
-
-type OrderView = Order & {
-  customer_type?: string | null;
-  trangThaiText?: string | null;
-  giaTriConLai?: number | null;
-};
-
-interface ViewOrderModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  order: OrderView | null;
-  formatCurrency: (value: number | string) => string;
-}
-
-type CalculatePriceResponse = {
-  gia_ban?: number;
-  price?: number;
-  error?: string;
-};
-
-const BANK_SHORT_CODE = "VPB";
-const ACCOUNT_NO = "9183400998";
-const ACCOUNT_NAME = "NGO LE NGOC HUNG";
-
-const API_BASE = API_BASE_URL;
+import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
+import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
+import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
+import { ViewOrderModalProps } from "./types";
+import { normalizeDateLike, parseNumberLike } from "./utils";
 
 const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
@@ -40,37 +13,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   order,
   formatCurrency,
 }) => {
-  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
-  const [priceLoading, setPriceLoading] = useState(false);
-  const [priceError, setPriceError] = useState<string | null>(null);
-
-  const normalizeDateLike = (
-    value: unknown
-  ): string | number | Date | null => {
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      value instanceof Date
-    ) {
-      return value;
-    }
-    return null;
-  };
-
-  const parseNumberLike = (value: unknown): number | null => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number") {
-      return Number.isFinite(value) ? value : null;
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) return null;
-      const parsed = Number(trimmed);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-  };
-
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
   const basePrice = Number(order?.[ORDER_FIELDS.PRICE]) || 0;
@@ -85,91 +27,15 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
     ) || null;
 
-  useEffect(() => {
-    if (!isOpen || !orderId || !productName) {
-      setCalculatedPrice(null);
-      setPriceLoading(false);
-      setPriceError(null);
-      return;
-    }
 
-    let ignore = false;
-    setCalculatedPrice(basePrice);
-
-    const payload: Record<string, unknown> = {
-      san_pham_name: productName,
-      id_product: productName,
-      id_order: orderId,
-    };
-
-    if (normalizedOrderDate) {
-      payload.order_date = normalizedOrderDate;
-    }
-
-    if (customerType) {
-      payload.customer_type = customerType;
-    }
-
-    const fetchPrice = async () => {
-      try {
-        setPriceLoading(true);
-        setPriceError(null);
-
-        const response = await apiFetch(API_ENDPOINTS.CALCULATE_PRICE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const { data, rawText } =
-          await Helpers.readJsonOrText<CalculatePriceResponse>(response);
-
-        if (!response.ok) {
-          const message =
-            (data?.error as string | undefined) ||
-            rawText ||
-            `Server responded with ${response.status}`;
-          throw new Error(message);
-        }
-
-        const result: CalculatePriceResponse = data ?? {};
-
-        if (!ignore) {
-          const backendPrice = Number(result.price ?? result.gia_ban);
-          setCalculatedPrice(
-            Number.isFinite(backendPrice) && backendPrice >= 0
-              ? backendPrice
-              : basePrice
-          );
-        }
-      } catch (error) {
-        console.error("Lỗi khi tính lại giá đơn hàng:", error);
-        if (!ignore) {
-          setPriceError(
-            "Không thể tính lại giá tự động. Đang hiển thị giá hiện có."
-          );
-          setCalculatedPrice(basePrice);
-        }
-      } finally {
-        if (!ignore) {
-          setPriceLoading(false);
-        }
-      }
-    };
-
-    fetchPrice();
-
-    return () => {
-      ignore = true;
-    };
-  }, [
+  const { calculatedPrice, priceLoading, priceError } = useCalculatedPrice({
     isOpen,
     orderId,
     productName,
     customerType,
     basePrice,
     normalizedOrderDate,
-  ]);
+  });
 
   const effectiveAmount = useMemo(() => {
     if (!order) return 0;

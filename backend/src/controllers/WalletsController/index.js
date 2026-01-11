@@ -92,7 +92,7 @@ const saveDailyBalance = async (req, res) => {
       const match = key.match(/^wallet_(\d+)$/i);
       const walletId = match ? Number(match[1]) : null;
       const raw = val === null || val === undefined ? "" : String(val);
-      const cleaned = raw.replace(/[^\d-]/g, "");
+      const cleaned = raw.replace(/[^\d.-]/g, "");
       if (!walletId || !cleaned) return null; // skip empty input
       const amount = Number(cleaned);
       return Number.isFinite(amount) ? { walletId, amount } : null;

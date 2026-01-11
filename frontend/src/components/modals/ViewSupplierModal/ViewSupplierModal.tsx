@@ -1,5 +1,4 @@
-// src/components/ViewSupplierModal.tsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   XMarkIcon,
   ClipboardDocumentListIcon,
@@ -7,69 +6,26 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
-import { apiFetch } from "../../lib/api"; // Chú ý đường dẫn lib
-import * as Helpers from "../../lib/helpers"; // Chú ý đường dẫn lib
+import { apiFetch } from "../../../lib/api";
+import * as Helpers from "../../../lib/helpers";
+import StatCard from "./components/StatCard";
+import { useSupplyOverview } from "./hooks/useSupplyOverview";
+import { ViewSupplierModalProps } from "./types";
 
-// Helper components nội bộ
-const StatCard = ({ title, value, accent, Icon }: any) => {
-  const colors = {
-    sky: "from-sky-500 via-sky-400 to-blue-500",
-    rose: "from-rose-500 via-pink-500 to-red-500",
-    violet: "from-purple-500 via-violet-500 to-indigo-500",
-    emerald: "from-emerald-500 via-emerald-400 to-lime-500",
-  }[accent as string] || "from-gray-500 to-gray-600";
-
-  return (
-    <div className="relative isolate rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/10 px-5 py-4 shadow-lg">
-      <div className="relative flex items-center gap-4">
-        <div className={`rounded-2xl bg-gradient-to-br ${colors} p-3 text-white shadow-inner`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="text-right flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{title}</p>
-          <p className="text-xl font-extrabold text-white">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default function ViewSupplierModal({ isOpen, onClose, supplyId }: { isOpen: boolean; onClose: () => void; supplyId: number | null }) {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
+export default function ViewSupplierModal({
+  isOpen,
+  onClose,
+  supplyId,
+}: ViewSupplierModalProps) {
+  const {
+    loading,
+    data,
+    error,
+    selectedPaymentId,
+    setSelectedPaymentId,
+    fetchDetail,
+  } = useSupplyOverview(isOpen, supplyId);
   const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && supplyId) {
-      fetchDetail();
-    } else {
-      setData(null);
-      setError(null);
-      setSelectedPaymentId(null);
-    }
-  }, [isOpen, supplyId]);
-
-  const fetchDetail = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/supplies/${supplyId}/overview`);
-      if (!res.ok) throw new Error("Không thể tải thông tin chi tiết");
-      const json = await res.json();
-      
-      const supply = json.supply || {};
-      const stats = json.stats || {};
-      const unpaid = Array.isArray(json.unpaidPayments) ? json.unpaidPayments : [];
-      
-      setData({ supply, stats, unpaidPayments: unpaid });
-      if (unpaid.length > 0) setSelectedPaymentId(unpaid[0].id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleConfirmPayment = async () => {
     if (!selectedPaymentId) return;

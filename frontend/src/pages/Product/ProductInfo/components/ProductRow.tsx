@@ -65,11 +65,11 @@ export const ProductRow: React.FC<ProductRowProps> = ({
   const { rulesHtml: displayRulesHtml, descriptionHtml: displayDescriptionHtml } =
     splitCombinedContent(rawRulesHtml, rawDescriptionHtml);
   const safeRulesHtml =
-    sanitizeHtmlForDisplay(displayRulesHtml) || "Ch’øa c §-p nh §-t";
+    sanitizeHtmlForDisplay(displayRulesHtml) || "Không có thông tin bán hàng";
   const safeDescriptionHtml =
     sanitizeHtmlForDisplay(
       displayDescriptionHtml || toHtmlFromPlain(item.description || "")
-    ) || "Ch’øa c §-p nh §-t";
+    ) || "Không có thông tin sản phẩm";
 
   return (
     <React.Fragment key={`${item.id}-${item.productId}`}>
@@ -132,7 +132,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
           </button>
           <button
             className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            title="S ¯-a"
+            title="Sửa"
             type="button"
             onClick={(event) => {
               event.stopPropagation();
@@ -143,7 +143,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
           </button>
           <button
             className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
-            title="XA3a"
+            title="Xóa"
             type="button"
           >
             <TrashIcon className="h-5 w-5 text-red-400" />
@@ -155,12 +155,12 @@ export const ProductRow: React.FC<ProductRowProps> = ({
           <td colSpan={6} className="px-6 py-4">
             <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 mb-3 flex flex-col items-center text-center">
               <p className="text-sm font-semibold text-white">
-                ThA'ng tin chi ti §¨t
+                Thông tin chi tiết
               </p>
               <p className="mt-2 text-white/80 leading-relaxed">
                 {stripDurationSuffix(
                   item.packageProduct || item.productName || item.productId || ""
-                ) || "Ch’øa cA3 mA' t §œ chi ti §¨t."}
+                ) || "Không có thông tin chi tiết."}
               </p>
             </div>
             <div className="flex flex-col md:flex-row gap-4">
@@ -170,7 +170,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
               <div className="flex-1 space-y-3">
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
                   <p className="text-sm font-semibold text-white">
-                    Quy t §_c b §œo hAÿnh
+                    Quy tắc bán hàng
                   </p>
                   <div
                     className="mt-2 text-white/80 leading-relaxed break-words rich-display"
@@ -182,13 +182,13 @@ export const ProductRow: React.FC<ProductRowProps> = ({
                             item.descriptionHtml ||
                               toHtmlFromPlain(item.description || "")
                           ).rulesHtml
-                        ) || "Ch’øa cA3 quy t §_c.",
+                        ) || "Không có quy tắc bán hàng.",
                     }}
                   />
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
                   <p className="text-sm font-semibold text-white">
-                    ThA'ng tin s §œn ph §cm
+                    Thông tin sản phẩm
                   </p>
                   <div
                     className="mt-2 text-white/80 leading-relaxed break-words rich-display"
@@ -201,7 +201,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
                               toHtmlFromPlain(item.description || "")
                           ).descriptionHtml ||
                             toHtmlFromPlain(item.description || "")
-                        ) || "Ch’øa cA3 n ¯Ti dung.",
+                        ) || "Không có thông tin sản phẩm.",
                     }}
                   />
                 </div>

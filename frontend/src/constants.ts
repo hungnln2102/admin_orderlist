@@ -93,6 +93,27 @@ export const CALCULATED_FIELDS = {
   ORDER_EXPIRED: "order_expired",
 };
 
+export const ORDER_CODE_PREFIXES = {
+  COLLABORATOR: "MAVC",
+  RETAIL: "MAVL",
+  PROMO: "MAVK",
+  GIFT: "MAVT",
+  IMPORT: "MAVN",
+} as const;
+
+export const DEFAULT_ORDER_CODE_PREFIX = ORDER_CODE_PREFIXES.COLLABORATOR;
+
+export const ORDER_CODE_OPTIONS = [
+  {
+    value: ORDER_CODE_PREFIXES.COLLABORATOR,
+    label: "Cộng Tác Viên",
+  },
+  { value: ORDER_CODE_PREFIXES.RETAIL, label: "Khách Lẻ" },
+  { value: ORDER_CODE_PREFIXES.PROMO, label: "Khuyến Mãi" },
+  { value: ORDER_CODE_PREFIXES.GIFT, label: "Quà Tặng" },
+  { value: ORDER_CODE_PREFIXES.IMPORT, label: "Nhập Hàng" },
+] as const;
+
 export const ORDER_STATUSES = {
   ORDER_EXPIRED: "Hết Hạn",
   CAN_GIA_HAN: "Cần Gia Hạn",

@@ -8,8 +8,6 @@ import {
 import * as Helpers from "../../../../lib/helpers";
 import {
   formatCurrency,
-  isUnpaidNormalizedStatus,
-  normalizeStatusValue,
 } from "../utils/ordersHelpers";
 import {
   CheckCircleIcon,
@@ -83,9 +81,13 @@ export const OrderRow = React.memo(function OrderRow({
       )
     : giaTriConLaiSafe;
 
-  const normalizedStatus = normalizeStatusValue(String(trangThaiText || ""));
-  const isUnpaidStatus = isUnpaidNormalizedStatus(normalizedStatus);
-  const canConfirmRefund = isCanceled && normalizedStatus.includes("chua hoan");
+  const pendingRefundStatus = "Chưa Hoàn";
+  const statusText = String(trangThaiText || "").trim();
+  const isUnpaidStatus =
+    statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
+    statusText === pendingRefundStatus;
+  const canConfirmRefund = isCanceled && statusText === pendingRefundStatus;
+  const isRenewalStatus = statusText === ORDER_STATUSES.CAN_GIA_HAN;
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
   const expiryDateDisplay = order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
@@ -246,7 +248,7 @@ export const OrderRow = React.memo(function OrderRow({
                     {!(
                       (order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN &&
                         order[ORDER_FIELDS.CHECK_FLAG] === true) ||
-                      normalizedStatus === "can gia han"
+                      isRenewalStatus
                     ) && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"

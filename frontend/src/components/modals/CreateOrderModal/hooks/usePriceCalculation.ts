@@ -1,5 +1,9 @@
-import { useCallback, useRef, useState } from "react";
-import { API_ENDPOINTS, ORDER_FIELDS } from "../../../../constants";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  API_ENDPOINTS,
+  ORDER_CODE_PREFIXES,
+  ORDER_FIELDS,
+} from "../../../../constants";
 import { apiFetch } from "../../../../lib/api";
 import * as Helpers from "../../../../lib/helpers";
 import {
@@ -33,6 +37,14 @@ export const usePriceCalculation = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const infoRef = useRef<string>("");
+  const requestSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const calculatePrice = useCallback(
     async (
@@ -41,6 +53,13 @@ export const usePriceCalculation = ({
       orderIdParam: string,
       registerDateStr: string
     ): Promise<CalculatedPriceResult | undefined> => {
+      const requestId = requestSeqRef.current + 1;
+      requestSeqRef.current = requestId;
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
       setIsLoading(true);
       setIsDataLoaded(false);
       try {
@@ -57,21 +76,26 @@ export const usePriceCalculation = ({
             order_date: normalizedOrderDate,
             customer_type: customerType,
           }),
+          signal: controller.signal,
         });
 
         const { data, rawText } =
           await Helpers.readJsonOrText<RawCalculatedPriceResult>(response);
 
+        if (requestId !== requestSeqRef.current) {
+          return undefined;
+        }
+
         if (!response.ok) {
           const message =
             (data as { error?: string } | null)?.error ||
             rawText ||
-            "Loi tinh gia tu Server.";
+            "Lỗi tính giá từ Server.";
           throw new Error(message);
         }
 
         if (!data) {
-          throw new Error("Phan hoi khong hop le tu server.");
+          throw new Error("Phản hồi không hợp lệ từ server.");
         }
 
         const raw = (data || {}) as RawCalculatedPriceResult;
@@ -99,16 +123,21 @@ export const usePriceCalculation = ({
 
         return mapped;
       } catch (error) {
-        console.error("Loi khi tinh gia:", error);
+        if ((error as { name?: string } | null)?.name === "AbortError") {
+          return undefined;
+        }
+        console.error("Lỗi khi tính giá:", error);
         setIsDataLoaded(false);
         alert(
-          `Tinh gia that bai: ${
-            error instanceof Error ? error.message : "Loi khong xac dinh"
+          `Tính giá thất bại: ${
+            error instanceof Error ? error.message : "Lỗi không xác định"
           }`
         );
         return undefined;
       } finally {
-        setIsLoading(false);
+        if (requestId === requestSeqRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [customerType]
@@ -168,7 +197,7 @@ export const usePriceCalculation = ({
             ? result.price
             : undefined;
         let giaBan = giaBanFromResult ?? prevGiaBan ?? 0;
-        if (customerType === "MAVK") {
+        if (customerType === ORDER_CODE_PREFIXES.PROMO) {
           giaBan = giaBanFromResult ?? giaNhap ?? prevGiaBan ?? 0;
         }
 
