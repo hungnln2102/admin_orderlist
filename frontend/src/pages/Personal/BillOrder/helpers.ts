@@ -1,3 +1,5 @@
+import { ORDER_CODE_PREFIXES } from "../../../constants";
+
 export type InvoiceForm = {
   invoiceCode: string;
   invoiceDate: string;
@@ -48,14 +50,29 @@ export const extractMonths = (value?: string | null): number | null => {
   return null;
 };
 
+export type OrderTypeCode =
+  | typeof ORDER_CODE_PREFIXES.COLLABORATOR
+  | typeof ORDER_CODE_PREFIXES.RETAIL
+  | typeof ORDER_CODE_PREFIXES.PROMO
+  | typeof ORDER_CODE_PREFIXES.GIFT
+  | null;
+
 export const resolveOrderType = (
   orderCode?: string | null
-): "MAVC" | "MAVL" | "MAVK" | "MAVT" | null => {
+): OrderTypeCode => {
   const upper = (orderCode || "").trim().toUpperCase();
-  if (upper.startsWith("MAVC")) return "MAVC";
-  if (upper.startsWith("MAVL")) return "MAVL";
-  if (upper.startsWith("MAVK")) return "MAVK";
-  if (upper.startsWith("MAVT")) return "MAVT";
+  if (upper.startsWith(ORDER_CODE_PREFIXES.COLLABORATOR)) {
+    return ORDER_CODE_PREFIXES.COLLABORATOR;
+  }
+  if (upper.startsWith(ORDER_CODE_PREFIXES.RETAIL)) {
+    return ORDER_CODE_PREFIXES.RETAIL;
+  }
+  if (upper.startsWith(ORDER_CODE_PREFIXES.PROMO)) {
+    return ORDER_CODE_PREFIXES.PROMO;
+  }
+  if (upper.startsWith(ORDER_CODE_PREFIXES.GIFT)) {
+    return ORDER_CODE_PREFIXES.GIFT;
+  }
   return null;
 };
 

@@ -277,7 +277,7 @@ export const buildProductOptions = (
       label,
       durationMonths: durationInfo.months,
       durationDays: durationInfo.days,
-      term: durationInfo.days ? `${durationInfo.days} ngay` : "",
+      term: durationInfo.days ? `${durationInfo.days} ngày` : "",
       unitPrice: retailPrice,
       discountValue,
       basePrice:

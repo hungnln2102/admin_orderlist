@@ -1,4 +1,7 @@
-import { Order as ApiOrder } from "../../../constants";
+import {
+  Order as ApiOrder,
+  ORDER_CODE_PREFIXES,
+} from "../../../constants";
 
 export type Order = Omit<ApiOrder, "cost" | "price"> & {
   cost: number | string;
@@ -39,7 +42,8 @@ export type RawCalculatedPriceResult = Partial<{
   order_expired: string;
 }>;
 
-export type CustomerType = "MAVC" | "MAVL" | "MAVK" | "MAVT" | "MAVN";
+export type CustomerType =
+  (typeof ORDER_CODE_PREFIXES)[keyof typeof ORDER_CODE_PREFIXES];
 
 export interface CreateOrderModalProps {
   isOpen: boolean;
@@ -67,7 +71,6 @@ export interface UseCreateOrderLogicResult {
   ) => void;
   handleProductSelect: (productName: string) => void;
   handleSourceSelect: (sourceId: number) => void;
-  handleProductChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: (e: React.FormEvent) => boolean;
 }

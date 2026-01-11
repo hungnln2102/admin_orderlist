@@ -69,7 +69,7 @@ export const useSupplyActions = ({
           { credentials: "include" }
         );
         if (!response.ok) {
-          throw new Error("KhA'ng th ¯Ÿ t §œi giA­ nh §-p");
+          throw new Error("Không thể tải giá nguồn. Vui lòng thử lại.");
         }
         const payload = await response.json();
         const mappedItems: SupplyPriceState["items"] = Array.isArray(payload)
@@ -83,7 +83,7 @@ export const useSupplyActions = ({
                 entry?.supplier_name?.toString().trim() ||
                 entry?.sourceName?.toString().trim() ||
                 entry?.source_name?.toString().trim() ||
-                `NhAÿ Cung C §p #${Number(entry?.sourceId) || index + 1}`,
+                `Nhà Cung Cấp #${Number(entry?.sourceId) || index + 1}`,
               price:
                 typeof entry?.price === "number" && Number.isFinite(entry.price)
                   ? entry.price
@@ -165,7 +165,7 @@ export const useSupplyActions = ({
             error:
               err instanceof Error
                 ? err.message
-                : "KhA'ng th ¯Ÿ t §œi giA­ nh §-p c ¯a NCC",
+                : "Không thể tải giá nguồn. Vui lòng thử lại.",
             productName: prev[key]?.productName ?? productName,
           },
         }));
@@ -242,7 +242,7 @@ export const useSupplyActions = ({
     if (!trimmedValue) {
       setSupplyRowErrors((prev) => ({
         ...prev,
-        [rowKey]: "Vui lAýng nh §-p giA­ h ¯œp l ¯Ø",
+        [rowKey]: "Vui lòng nhập giá hợp lệ.",
       }));
       return;
     }
@@ -250,7 +250,7 @@ export const useSupplyActions = ({
     if (!Number.isFinite(parsedValue) || parsedValue < 0) {
       setSupplyRowErrors((prev) => ({
         ...prev,
-        [rowKey]: "GiA­ nh §-p khA'ng Ž`’ø ¯œc th §p h’­n 0.",
+        [rowKey]: "Giá nhập không được thấp hơn 0.",
       }));
       return;
     }
@@ -271,7 +271,7 @@ export const useSupplyActions = ({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "KhA'ng th ¯Ÿ c §-p nh §-t giA­ nh §-p");
+        throw new Error(payload?.error || "Không thể cập nhật giá nguồn.");
       }
       const normalizedPrice = Number.isFinite(Number(payload?.price))
         ? Number(payload?.price)
@@ -349,7 +349,7 @@ export const useSupplyActions = ({
       setSupplyRowErrors((prev) => ({
         ...prev,
         [rowKey]:
-          err instanceof Error ? err.message : "KhA'ng th Żź c §-p nh §-t giA­ nh §-p.",
+          err instanceof Error ? err.message : "Không thể cập nhật giá nguồn.",
       }));
     } finally {
       setSavingSupplyRows((prev) => {
@@ -444,7 +444,7 @@ export const useSupplyActions = ({
         ...prev,
         [product.id]: {
           ...current,
-          error: "Vui long chon hoac nhap ten nguon hop le.",
+          error: "Vui lòng chọn hoặc nhập tên nguồn hợp lệ.",
         },
       }));
       return;
@@ -454,7 +454,7 @@ export const useSupplyActions = ({
         ...prev,
         [product.id]: {
           ...current,
-          error: "Gia nhap phai lon hon 0.",
+          error: "Giá nhập phải lớn hơn 0.",
         },
       }));
       return;
@@ -483,14 +483,21 @@ export const useSupplyActions = ({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Khong the them nguon moi.");
+        throw new Error(payload?.error || "Không thể thêm nguồn mới.");
       }
       const productKey = normalizeProductKey(product.sanPhamRaw);
       const responseSourceId = Number(payload?.sourceId);
-      const resolvedResponseId =
+      const resolvedSourceIdValue =
+        typeof resolvedSourceId === "number" &&
+        Number.isFinite(resolvedSourceId) &&
+        resolvedSourceId > 0
+          ? resolvedSourceId
+          : null;
+      const fallbackSourceId = resolvedSourceIdValue ?? Date.now();
+      const finalSourceId =
         Number.isFinite(responseSourceId) && responseSourceId > 0
           ? responseSourceId
-          : resolvedSourceId;
+          : fallbackSourceId;
       const normalizedPrice = Number.isFinite(Number(payload?.price))
         ? Number(payload?.price)
         : parsedPrice;
@@ -500,25 +507,19 @@ export const useSupplyActions = ({
         const currentState = prev[productKey];
         const currentItems = currentState?.items ?? [];
         const hasExistingRow = currentItems.some(
-          (supplier) =>
-            typeof supplier.sourceId === "number" &&
-            supplier.sourceId === resolvedResponseId
+          (supplier) => supplier.sourceId === finalSourceId
         );
         const nextItems = sortSupplyItems(
           hasExistingRow
             ? currentItems.map((supplier) =>
-                supplier.sourceId === resolvedResponseId
+                supplier.sourceId === finalSourceId
                   ? { ...supplier, price: normalizedPrice }
                   : supplier
               )
             : [
                 ...currentItems,
                 {
-                  sourceId:
-                    Number.isFinite(resolvedResponseId) &&
-                    resolvedResponseId > 0
-                      ? resolvedResponseId
-                      : Date.now(),
+                  sourceId: finalSourceId,
                   sourceName: trimmedName,
                   price: normalizedPrice,
                   lastOrderDate: null,
@@ -571,7 +572,7 @@ export const useSupplyActions = ({
           ...current,
           isSaving: false,
           error:
-            err instanceof Error ? err.message : "Khong the them nguon moi.",
+            err instanceof Error ? err.message : "Không thể thêm nguồn mới.",
         },
       }));
     }
@@ -599,7 +600,7 @@ export const useSupplyActions = ({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(payload?.error || "Khong the xoa nguon nay.");
+        throw new Error(payload?.error || "Không thể xóa nguồn này.");
       }
 
       setSupplyPriceMap((prev) => {
@@ -653,7 +654,7 @@ export const useSupplyActions = ({
       setSupplyRowErrors((prev) => ({
         ...prev,
         [rowKey]:
-          err instanceof Error ? err.message : "Khong the xoa nguon nay.",
+          err instanceof Error ? err.message : "Không thể xóa nguồn này.",
       }));
     } finally {
       setSavingSupplyRows((prev) => {

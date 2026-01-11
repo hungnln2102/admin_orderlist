@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import FinanceSummaryCard from "./FinanceSummaryCard";
 import GoldPriceTable from "./GoldPriceTable";
 import BudgetsGoals from "./BudgetsGoals";
-import WalletBalancesCard from "./WalletBalancesCard";
+import WalletBalancesCard from "./WalletBalancesCard/WalletBalancesCard";
 import { type GoldPriceRow } from "../hooks/useGoldPrices";
 import { type WalletColumn, type WalletRow } from "../hooks/useWalletBalances";
 

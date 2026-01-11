@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const session = require("express-session");
 const { allowedOrigins, session: sessionConfig } = require("./config/appConfig");
@@ -21,6 +22,7 @@ app.use(
 );
 
 app.use(express.json());
+app.use("/image", express.static(path.join(__dirname, "../image")));
 
 app.use(
   session({

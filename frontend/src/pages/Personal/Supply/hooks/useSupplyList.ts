@@ -21,7 +21,7 @@ export const useSupplyList = () => {
       const data = await res.json();
 
       const items: Supply[] = (data.supplies || []).map((item: any) => {
-        const isActive = item.isActive ?? (item.status !== "inactive" && item.status !== "tam dung");
+        const isActive = item.isActive ?? (item.status !== "inactive" && item.status !== "tạm dừng");
         return {
           ...item,
           isActive,

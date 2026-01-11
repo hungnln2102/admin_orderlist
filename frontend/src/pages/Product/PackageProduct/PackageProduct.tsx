@@ -17,7 +17,7 @@ import GradientButton from "../../../components/ui/GradientButton";
 import StatCard, { STAT_CARD_ACCENTS } from "../../../components/ui/StatCard";
 import { apiFetch } from "../../../lib/api";
 import { PackageTable } from "./components/PackageTable";
-import ConfirmModal from "../../../components/modals/ConfirmModal";
+import ConfirmModal from "../../../components/modals/ConfirmModal/ConfirmModal";
 import { CreatePackageModal } from "./components/Modals/CreatePackageModal";
 import { PackageFormModal } from "./components/Modals/PackageFormModal";
 import { PackageViewModal } from "./components/Modals/PackageViewModal";
@@ -354,7 +354,7 @@ const PackageProduct: React.FC = () => {
     const targetName = (deleteRowTarget.package || "").trim();
 
     if (targetId === undefined || targetId === null) {
-      setDeleteRowError("Khong tim thay ID goi de xoa.");
+      setDeleteRowError("Không tìm thấy ID gói để xóa.");
       return;
     }
 
@@ -367,8 +367,8 @@ const PackageProduct: React.FC = () => {
         : "";
       const statusLabel = res.status ? ` (HTTP ${res.status})` : "";
       const friendlyMessage =
-        cleanedMessage || res.statusText || "Khong the thuc hien xoa tren may chu";
-      throw new Error(`Khong the xoa goi${statusLabel}: ${friendlyMessage}`);
+        cleanedMessage || res.statusText || "Không thể thực hiện xóa trên máy chủ";
+      throw new Error(`Không thể xóa gói${statusLabel}: ${friendlyMessage}`);
     };
 
     try {
@@ -403,8 +403,8 @@ const PackageProduct: React.FC = () => {
       );
       closeDeleteRowModal();
     } catch (error) {
-      console.error("Xoa goi that bai:", error);
-      setDeleteRowError(error instanceof Error ? error.message : "Loi khong xac dinh");
+      console.error("Xóa gói thất bại:", error);
+      setDeleteRowError(error instanceof Error ? error.message : "Lỗi không xác định");
       setDeleteRowProcessing(false);
     }
   }, [
@@ -912,11 +912,11 @@ const PackageProduct: React.FC = () => {
         isOpen={Boolean(deleteRowTarget)}
         onClose={closeDeleteRowModal}
         onConfirm={confirmDeleteRow}
-        title="Xac nhan xoa goi"
-        message={`Ban co chac muon xoa goi "${deleteRowTarget?.package}"?`}
+        title="Xác nhận xóa gói"
+        message={`Bạn có chắc muốn xóa gói "${deleteRowTarget?.package}"?`}
         secondaryMessage={deleteRowError || undefined}
         confirmLabel="OK"
-        cancelLabel="Huy"
+        cancelLabel="Hủy"
         isSubmitting={deleteRowProcessing}
       />
     </div>

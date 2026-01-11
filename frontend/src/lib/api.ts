@@ -99,7 +99,7 @@ export async function fetchChartData(
 ): Promise<ChartsApiResponse> {
   const response = await apiFetch(`/api/dashboard/charts?year=${year}`);
   if (!response.ok) {
-    throw new Error("Khong the tai du lieu bieu do dashboard.");
+    throw new Error("Không thể tải dữ liệu biểu đồ dashboard.");
   }
   const payload: DashboardChartsResponse =
     (await response.json().catch(() => ({}))) || {};

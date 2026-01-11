@@ -371,12 +371,12 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
                   <p className="text-xs font-semibold uppercase tracking-wide text-purple-200">
-                    Tỉ giá
+                    Tỷ giá
                   </p>
                   <div className="mt-4 space-y-4">
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                        Tỉ giá CTV
+                        Tỷ giá CTV
                       </label>
                       <input
                         type="number"
@@ -390,7 +390,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                        Tỉ giá khách
+                        Tỷ giá khách
                       </label>
                       <input
                         type="number"
@@ -404,7 +404,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                        Tỉ giá khuyến mãi
+                        Tỷ giá khuyến mãi
                       </label>
                       <input
                         type="number"

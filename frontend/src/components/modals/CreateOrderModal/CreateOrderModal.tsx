@@ -5,7 +5,7 @@ import {
   PlusCircleIcon,
   MinusCircleIcon,
 } from "@heroicons/react/24/outline";
-import { ORDER_FIELDS } from "../../../constants";
+import { ORDER_CODE_OPTIONS, ORDER_FIELDS } from "../../../constants";
 import * as Helpers from "../../../lib/helpers";
 import SearchableSelect from "./SearchableSelect";
 import {
@@ -61,6 +61,22 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const totalDays = useMemo(
     () => Number(formData[ORDER_FIELDS.DAYS] || 0) || 0,
     [formData]
+  );
+  const productOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        value: p.san_pham,
+        label: p.san_pham,
+      })),
+    [products]
+  );
+  const supplyOptions = useMemo(
+    () =>
+      supplies.map((s) => ({
+        value: s.id,
+        label: s.supplier_name ?? s.source_name,
+      })),
+    [supplies]
   );
 
   const handlePriceInput = useCallback(
@@ -166,11 +182,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     onChange={handleCustomerTypeChange}
                     className={inputClass}
                   >
-                    <option value="MAVC">Cộng Tác Viên</option>
-                    <option value="MAVL">Khách Lẻ</option>
-                    <option value="MAVK">Khuyến Mãi</option>
-                    <option value="MAVT">Quà Tặng</option>
-                    <option value="MAVN">Nhập Hàng</option>
+                    {ORDER_CODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -217,10 +233,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <SearchableSelect
                     name={ORDER_FIELDS.ID_PRODUCT}
                     value={(formData[ORDER_FIELDS.ID_PRODUCT] as string) || ""}
-                    options={products.map((p) => ({
-                      value: p.san_pham,
-                      label: p.san_pham,
-                    }))}
+                    options={productOptions}
                     placeholder="-- Chọn --"
                     onChange={(val) => handleProductSelect(String(val))}
                     onClear={() => handleProductSelect("")}
@@ -235,10 +248,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <SearchableSelect
                     name={ORDER_FIELDS.SUPPLY}
                     value={selectedSupplyId ?? ""}
-                    options={supplies.map((s) => ({
-                      value: s.id,
-                      label: s.supplier_name ?? s.source_name,
-                    }))}
+                    options={supplyOptions}
                     placeholder="-- Chọn --"
                     disabled={
                       customMode || !formData[ORDER_FIELDS.ID_PRODUCT]

@@ -44,7 +44,7 @@ export default function ProductPrice() {
   const [quoteDate, setQuoteDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
-  const [recipient, setRecipient] = useState("Ms. Diu Nguyen");
+  const [recipient, setRecipient] = useState("");
   const [contact, setContact] = useState("");
   const [productPrices, setProductPrices] = useState<Record<string, any>[]>([]);
   const [productDescs, setProductDescs] = useState<ProductDesc[]>([]);
@@ -289,7 +289,7 @@ export default function ProductPrice() {
 
         const nextId = (nextLines.length + 1).toString();
         const durationTerm = selected?.durationDays
-          ? `${selected.durationDays} ngay`
+          ? `${selected.durationDays} ngày`
           : selected?.term || "";
         const key = normalizeProductKey(rawKey);
         const apiPricing = priceData[key];
@@ -444,26 +444,26 @@ export default function ProductPrice() {
 
             {/* Title */}
             <div className="text-center text-[20px] font-bold bg-indigo-100 text-indigo-900 py-3 tracking-wide uppercase">
-              BANG BAO GIA
+              BẢNG BÁO GIÁ
             </div>
 
             {/* Intro */}
             <div className="px-6 py-4 text-sm leading-6 text-white/90 print:text-slate-800 space-y-1">
               <p>
-                Ngay: <strong>{displayDate(quoteDate) || "..."}</strong>
+                Ngày: <strong>{displayDate(quoteDate) || "..."}</strong>
               </p>
               <p>
-                Kinh gui: <strong>{recipient}</strong>
+                Kính gửi: <strong>{recipient}</strong>
               </p>
               {contact ? (
                 <p>
-                  Thong tin lien he: <strong>{contact}</strong>
+                  Thông tin liên hệ: <strong>{contact}</strong>
                 </p>
               ) : null}
               <p className="mt-3 italic">
-                Loi mo dau, xin cam on quy khach hang da quan tam den san pham cua
-                chung toi. Chung toi xin gui den quy khach bang bao gia chi tiet nhu
-                sau:
+                Mavryk Premium Store trân trọng gửi lời cảm ơn và bản báo giá chi tiết sản phẩm theo yêu cầu của Quý khách.
+                Chúng tôi cam kết mọi sản phẩm đều đạt tiêu chuẩn chất lượng cao cấp nhất,
+                đảm bảo mang lại trải nghiệm tuyệt vời và xứng đáng với sự đầu tư của Quý khách.
               </p>
             </div>
 

@@ -9,12 +9,9 @@ import {
   OrderDatasetKey,
 } from "../../../../constants";
 import {
-  formatStatusDisplay,
-  isUnpaidNormalizedStatus,
   normalizeCheckFlag,
   normalizeOrderCode,
   normalizeSearchText,
-  normalizeStatusValue,
   parseErrorResponse,
   parseExpiryTime,
   parseNumeric,
@@ -92,6 +89,10 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
   const [renewingOrderCode, setRenewingOrderCode] = useState<string | null>(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const pendingRefundStatus = "Chưa Hoàn";
+  const isUnpaidStatus = (statusText: string) =>
+    statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
+    statusText === pendingRefundStatus;
 
   // --- HÀM FETCH DỮ LIỆU BAN ĐẦU ---
   const fetchOrders = useCallback(async () => {
@@ -176,8 +177,9 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           : fallbackRemaining ?? 0;
 
       const rawStatus =
-        (order[ORDER_FIELDS.STATUS] as string | null) || "Chưa Thanh Toán";
-      const trangThaiText = formatStatusDisplay(rawStatus.trim());
+        (order[ORDER_FIELDS.STATUS] as string | null) ||
+        ORDER_STATUSES.CHUA_THANH_TOAN;
+      const trangThaiText = String(rawStatus || "").trim();
       const checkFlagStatus = normalizeCheckFlag(
         order[ORDER_FIELDS.CHECK_FLAG]
       );
@@ -233,9 +235,9 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
             ORDER_FIELDS.CONTACT,
           ]
         : [searchField];
-    const normalizedStatusFilter =
-      statusFilter === "all" ? "" : normalizeStatusValue(statusFilter);
-      const filteredOrders = ordersWithVirtualFields.filter((order) => {
+    const statusFilterValue =
+      statusFilter === "all" ? "" : String(statusFilter || "").trim();
+    const filteredOrders = ordersWithVirtualFields.filter((order) => {
         const matchesSearch =
           !normalizedSearchTerm ||
           searchableFields.some((field) => {
@@ -267,11 +269,12 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
             normalizedSearchTerm
           );
 
+        const orderStatusText = String(
+          order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || ""
+        ).trim();
         const matchesStatus =
           statusFilter === "all" ||
-          normalizeStatusValue(
-            String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "")
-          ) === normalizedStatusFilter;
+          (statusFilterValue && orderStatusText === statusFilterValue);
 
         return (
           (matchesSearch || orderCodeFallbackMatch || productFallbackMatch) &&
@@ -281,12 +284,10 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
 
     // --- LOGIC SẮP XẾP ---
     filteredOrders.sort((a, b) => {
-      const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
-      const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "");
-      const normalizedStatusA = normalizeStatusValue(statusA);
-      const normalizedStatusB = normalizeStatusValue(statusB);
-      const unpaidA = isUnpaidNormalizedStatus(normalizedStatusA);
-      const unpaidB = isUnpaidNormalizedStatus(normalizedStatusB);
+      const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+      const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+      const unpaidA = isUnpaidStatus(statusA);
+      const unpaidB = isUnpaidStatus(statusB);
 
       if (unpaidA !== unpaidB) {
         return unpaidA ? -1 : 1;

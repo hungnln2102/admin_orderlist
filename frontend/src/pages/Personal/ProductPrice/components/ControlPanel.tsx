@@ -51,13 +51,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="no-print rounded-2xl bg-white/5 border border-white/10 shadow-lg shadow-indigo-900/30">
       <div className="border-b border-white/10 px-6 py-4">
-        <h2 className="text-lg font-semibold text-white">Thong tin bao gia</h2>
+        <h2 className="text-lg font-semibold text-white">Thông tin báo giá</h2>
       </div>
 
       <div className="px-6 py-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="space-y-1">
-            <span className="text-sm font-medium text-white">Kinh gui</span>
+            <span className="text-sm font-medium text-white">Kính gửi</span>
             <input
               type="text"
               value={recipient}
@@ -66,7 +66,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-sm font-medium text-white">Ngay</span>
+            <span className="text-sm font-medium text-white">Ngày</span>
             <input
               type="date"
               value={quoteDate}
@@ -75,14 +75,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-sm font-medium text-white">Ma bao gia</span>
+            <span className="text-sm font-medium text-white">Mã báo giá</span>
             <input value={quoteCode} readOnly className={`${inputClass} opacity-80`} />
           </label>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="space-y-1">
-            <span className="text-sm font-medium text-white">Lien he</span>
+            <span className="text-sm font-medium text-white">Liên hệ</span>
             <input
               type="text"
               value={contact}
@@ -92,31 +92,31 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             />
           </label>
           <label className="space-y-1">
-            <span className="text-sm font-medium text-white">Ghi chu (tuy chon)</span>
+            <span className="text-sm font-medium text-white">Ghi chú (tùy chọn)</span>
             <input
               type="text"
               className={inputClass}
-              placeholder="Thong tin them cho bao gia"
+              placeholder="Thông tin thêm cho báo giá"
             />
           </label>
         </div>
 
         <div className="border border-white/15 rounded-lg p-3 space-y-2">
-          <label className="text-sm font-semibold text-white block">Ma san pham</label>
+          <label className="text-sm font-semibold text-white block">Mã sản phẩm</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input
               type="text"
               value={productSearch}
               onChange={(e) => onProductSearchChange(e.target.value)}
               className={`${inputClass} text-sm`}
-              placeholder="Tim san pham..."
+              placeholder="Tìm sản phẩm..."
             />
             <button
               type="button"
               onClick={onResetSearch}
               className="px-3 py-2 text-sm rounded-lg border border-white/20 bg-white/5 text-white hover:border-white/40 transition-colors"
             >
-              Xoa Tim Kiem
+              Xóa Tìm Kiếm
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-52 overflow-y-auto rounded-lg border border-white/20 bg-white/5 p-2">
@@ -146,7 +146,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               className="rounded bg-blue-600/80 hover:bg-blue-600 text-white px-3 py-2 text-sm disabled:opacity-60"
               disabled={!selectedProductKeys.length}
             >
-              Them
+              Thêm
             </button>
             <button
               type="button"

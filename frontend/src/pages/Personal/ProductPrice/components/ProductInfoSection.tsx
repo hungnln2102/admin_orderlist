@@ -15,10 +15,10 @@ export const ProductInfoSection: React.FC<ProductInfoSectionProps> = ({
 }) => {
   const renderFallback = (
     <div>
-      <p className="font-semibold">Quy Tac</p>
-      <div className="mt-1 whitespace-pre-wrap break-words">Chua cap nhat.</div>
-      <p className="font-semibold mt-3">Thong tin san pham</p>
-      <div className="mt-1 whitespace-pre-wrap break-words">Chua cap nhat.</div>
+      <p className="font-semibold">Quy Tắc</p>
+      <div className="mt-1 whitespace-pre-wrap break-words">Chưa cập nhật.</div>
+      <p className="font-semibold mt-3">Thông tin sản phẩm</p>
+      <div className="mt-1 whitespace-pre-wrap break-words">Chưa cập nhật.</div>
     </div>
   );
 
@@ -30,23 +30,23 @@ export const ProductInfoSection: React.FC<ProductInfoSectionProps> = ({
             <div key={section.name} className="space-y-2">
               <p className="font-semibold">{section.name}</p>
               <div>
-                <p className="font-semibold">Quy Tac</p>
+                <p className="font-semibold">Quy tắc</p>
                 <div className="mt-1 whitespace-pre-wrap break-words">
-                  {section.rules || "Chua cap nhat."}
+                  {section.rules || "Chưa cập nhật."}
                 </div>
               </div>
               <div>
-                <p className="font-semibold">Thong tin san pham</p>
+                <p className="font-semibold">Thông tin sản phẩm</p>
                 <div className="mt-1 whitespace-pre-wrap break-words">
-                  {section.description || "Chua cap nhat."}
+                  {section.description || "Chưa cập nhật."}
                 </div>
               </div>
             </div>
           ))}
       <div className="pt-2 text-sm">
-        <p className="font-semibold">Moi thong tin chi tiet co the lien he:</p>
+        <p className="font-semibold">Mọi thông tin chi tiết có thể liên hệ:</p>
         <div className="mt-1 whitespace-pre-wrap">
-          - Fanpage: Mavryk - Tai Khoan Premium
+          - Fanpage: Mavryk - Tài Khoản Premium
           {"\n"}- Zalo: 0378.304.963
           {"\n"}- Telegram: @hung_culi
         </div>

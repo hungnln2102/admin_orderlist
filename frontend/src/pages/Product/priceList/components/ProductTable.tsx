@@ -192,10 +192,10 @@ const ProductTable: React.FC<ProductTableProps> = ({
                 Giá Lẻ
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Giá Khyến Mãi
+                Giá Khuyến Mãi
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Tình Trạng
+                Tình Trạng Sản Phẩm
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
                 Cập Nhật

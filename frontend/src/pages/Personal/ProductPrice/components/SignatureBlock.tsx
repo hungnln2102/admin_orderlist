@@ -9,12 +9,12 @@ export const SignatureBlock: React.FC = () => {
           Mavryk Premium Store
         </p>
         <p className="text-[12px] italic text-white/80 print:text-black">
-          (Ky, ghi ro ho ten)
+          (Ký, ghi rõ họ tên)
         </p>
         <div className="min-h-[110px] flex items-center justify-center">
           <img
             src={SIGN_IMG}
-            alt="Chu ky"
+            alt="Chữ ký"
             className="max-h-[110px] max-w-[260px]"
             style={{ objectFit: "contain" }}
             onError={(e) => {

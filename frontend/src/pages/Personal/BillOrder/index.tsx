@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { API_ENDPOINTS } from "../../../constants";
+import {
+  API_ENDPOINTS,
+  ORDER_CODE_PREFIXES,
+} from "../../../constants";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "../../../lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
@@ -127,18 +130,21 @@ export default function BillOrder() {
         toPositiveNumber(product?.computed_retail_price) || wholesalePrice;
 
       let unitPrice = retailPrice;
-      if (orderType === "MAVC") {
+      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR) {
         unitPrice = wholesalePrice;
-      } else if (orderType === "MAVT") {
+      } else if (orderType === ORDER_CODE_PREFIXES.GIFT) {
         unitPrice = 0;
-      } else if (orderType === "MAVL" || orderType === "MAVK") {
+      } else if (
+        orderType === ORDER_CODE_PREFIXES.RETAIL ||
+        orderType === ORDER_CODE_PREFIXES.PROMO
+      ) {
         unitPrice = retailPrice;
       } else {
         unitPrice = retailPrice || wholesalePrice;
       }
 
       const discountRatio =
-        orderType === "MAVK"
+        orderType === ORDER_CODE_PREFIXES.PROMO
           ? normalizeDiscountRatio(product?.[VARIANT_PRICING_COLS.pctPromo])
           : 0;
       const discountPct = Number((discountRatio * 100).toFixed(2));
