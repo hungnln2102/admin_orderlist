@@ -121,38 +121,65 @@ const normalizeBaseUrl = (value) => {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 };
 
+const isLocalBaseUrl = (baseUrl) => {
+  if (!baseUrl) return false;
+  try {
+    return isLocalHostValue(new URL(baseUrl).host);
+  } catch {
+    return false;
+  }
+};
+
+const pickBaseUrl = (...candidates) => {
+  for (const candidate of candidates) {
+    if (candidate && !isLocalBaseUrl(candidate)) return candidate;
+  }
+  return candidates.find(Boolean) || "";
+};
+
 const buildImageUrl = (req, filename) => {
   const envBase = normalizeBaseUrl(
     process.env.PUBLIC_BASE_URL || process.env.BASE_PUBLIC_URL
   );
-  if (envBase) {
-    return `${envBase}/image/${encodeURIComponent(filename)}`;
-  }
 
-  const originBase =
-    getBaseFromHeader(req, "origin") || getBaseFromHeader(req, "referer");
-  if (originBase) {
-    return `${normalizeBaseUrl(originBase)}/image/${encodeURIComponent(
-      filename
-    )}`;
-  }
+  const originBase = normalizeBaseUrl(
+    getBaseFromHeader(req, "origin") || getBaseFromHeader(req, "referer")
+  );
 
   const forwardedProto = getForwardedHeader(req, "x-forwarded-proto");
-  const forwardedHost = getForwardedHeader(req, "x-forwarded-host");
+  const forwardedHost =
+    getForwardedHeader(req, "x-forwarded-host") ||
+    getForwardedHeader(req, "x-original-host") ||
+    getForwardedHeader(req, "x-forwarded-server");
   const forwardedPort = getForwardedHeader(req, "x-forwarded-port");
 
-  if (forwardedHost) {
-    const protocol = forwardedProto || req.protocol || "http";
-    const host =
-      forwardedPort && !forwardedHost.includes(":")
-        ? `${forwardedHost}:${forwardedPort}`
-        : forwardedHost;
-    return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
-  }
-
-  const host = req.get("host") || "localhost:3001";
   const protocol = forwardedProto || req.protocol || "http";
-  return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
+  const forwardedHostValue =
+    forwardedHost && forwardedPort && !forwardedHost.includes(":")
+      ? `${forwardedHost}:${forwardedPort}`
+      : forwardedHost;
+  const forwardedBase = forwardedHostValue
+    ? normalizeBaseUrl(`${protocol}://${forwardedHostValue}`)
+    : "";
+  const hostHeader = req.get("host") || "";
+  const hostBase = hostHeader
+    ? normalizeBaseUrl(`${protocol}://${hostHeader}`)
+    : "";
+
+  const base = pickBaseUrl(envBase, originBase, forwardedBase, hostBase);
+
+  console.log("[image-url]", {
+    envBase,
+    originBase,
+    forwardedProto,
+    forwardedHost,
+    forwardedPort,
+    hostHeader,
+    pickedBase: base,
+  });
+
+  const finalBase = base || normalizeBaseUrl("http://localhost:3001");
+  return `${finalBase}/image/${encodeURIComponent(filename)}`;
 };
 
 const uploadProductImage = (req, res) => {
