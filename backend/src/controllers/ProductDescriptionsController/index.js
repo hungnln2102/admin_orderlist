@@ -1,4 +1,5 @@
 ﻿const { db } = require("../../db");
+require("dotenv").config();
 const {
   tableName,
   PRODUCT_SCHEMA,
@@ -113,21 +114,31 @@ const isLocalHostValue = (value) =>
   /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(value || "");
 
 const buildImageUrl = (req, filename) => {
-  const overrideBase = normalizeTextInput(process.env.PUBLIC_BASE_URL || "");
-  if (overrideBase) {
-    const trimmed = overrideBase.replace(/\/+$/, "");
-    return `${trimmed}/image/${encodeURIComponent(filename)}`;
-  }
-  const originBase =
-    getBaseFromHeader(req, "origin") || getBaseFromHeader(req, "referer");
-  const forwardedProto = getForwardedHeader(req, "x-forwarded-proto");
-  const forwardedHost = getForwardedHeader(req, "x-forwarded-host");
-  const host = forwardedHost || req.get("host") || "localhost:3001";
-  if (originBase && isLocalHostValue(host)) {
-    return `${originBase}/image/${encodeURIComponent(filename)}`;
-  }
-  const protocol = forwardedProto || req.protocol || "http";
-  return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
+    // 1. Lấy trực tiếp biến môi trường
+    let envBase = process.env.PUBLIC_BASE_URL;
+
+    // 2. Log ra console để kiểm tra xem Server có đọc được .env không (quan trọng)
+    // Sau khi chạy, hãy nhìn vào Terminal/PM2 logs để xem dòng này
+    console.log("DEBUG IMAGE URL - ENV:", envBase); 
+
+    // 3. Logic ưu tiên: Nếu có biến ENV thì dùng ngay
+    if (envBase && envBase.trim() !== "") {
+        // Xóa dấu gạch chéo / ở cuối nếu có để tránh bị 2 dấu //
+        const cleanBase = envBase.endsWith('/') ? envBase.slice(0, -1) : envBase;
+        return `${cleanBase}/image/${encodeURIComponent(filename)}`;
+    }
+
+    // --- Logic Fallback (Giữ nguyên logic cũ của bạn phòng hờ) ---
+    // Chỉ chạy xuống đây nếu không tìm thấy PUBLIC_BASE_URL
+    const originBase = 
+        getBaseFromHeader(req, "origin") || getBaseFromHeader(req, "referer");
+    // ... (phần code còn lại giữ nguyên)
+    const forwardedHost = getForwardedHeader(req, "x-forwarded-host");
+    const host = forwardedHost || req.get("host") || "localhost:3001";
+    
+    // Nếu vẫn là localhost thì trả về như cũ
+    const protocol = req.protocol || "http";
+    return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
 };
 
 const uploadProductImage = (req, res) => {
