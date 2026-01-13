@@ -1,5 +1,6 @@
 ﻿const { db } = require("../../db");
 require("dotenv").config();
+require('dotenv').config({ path: '.env.docker' });
 const {
   tableName,
   PRODUCT_SCHEMA,
