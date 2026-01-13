@@ -80,18 +80,21 @@ const findVariantForProductId = async (productId) => {
   return result.rows?.[0] || null;
 };
 
-const mapProductDescRow = (row = {}) => ({
-  id: Number(row.id) || Number(row[productDescColNames.id]) || null,
-  productId:
-    row.product_id || row[productDescColNames.productId] || row.productId || "",
-  productName: row.product_name || row.productName || null,
-  rules: row.rules || row[productDescColNames.rules] || "",
-  rulesHtml: row.rules_html || row.rulesHtml || null,
-  description: row.description || row[productDescColNames.description] || "",
-  descriptionHtml: row.description_html || row.descriptionHtml || null,
-  imageUrl: row.image_url || row[productDescColNames.imageUrl] || null,
-});
-
+const mapProductDescRow = (req, row = {}) => {
+  const rawImage = row.image_url || row[productDescColNames.imageUrl] || null;
+  const normalizedImage = normalizeImageUrl(req, rawImage);
+  return {
+    id: Number(row.id) || Number(row[productDescColNames.id]) || null,
+    productId:
+      row.product_id || row[productDescColNames.productId] || row.productId || "",
+    productName: row.product_name || row.productName || null,
+    rules: row.rules || row[productDescColNames.rules] || "",
+    rulesHtml: row.rules_html || row.rulesHtml || null,
+    description: row.description || row[productDescColNames.description] || "",
+    descriptionHtml: row.description_html || row.descriptionHtml || null,
+    imageUrl: normalizedImage || rawImage || null,
+  };
+};
 const getForwardedHeader = (req, headerName) => {
   const raw = req.get(headerName);
   if (!raw) return "";
@@ -180,6 +183,47 @@ const buildImageUrl = (req, filename) => {
 
   const finalBase = base || normalizeBaseUrl("http://localhost:3001");
   return `${finalBase}/image/${encodeURIComponent(filename)}`;
+};
+
+const extractImageFileName = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withoutHash = raw.split("#")[0];
+  const withoutQuery = withoutHash.split("?")[0];
+  try {
+    const url = new URL(withoutQuery);
+    return path.basename(url.pathname || "");
+  } catch {
+    if (withoutQuery.includes("/")) {
+      return path.basename(withoutQuery);
+    }
+    return withoutQuery;
+  }
+};
+
+const normalizeImageUrl = (req, value) => {
+  const raw = String(value || "").trim();
+  if (!raw || !req) return raw;
+
+  try {
+    const parsed = new URL(raw);
+    if (!isLocalHostValue(parsed.host)) {
+      return raw;
+    }
+  } catch {
+    // Not an absolute URL, continue normalization.
+  }
+
+  const fileName = extractImageFileName(raw);
+  if (!fileName || !isImageFile(fileName)) {
+    return raw;
+  }
+
+  const resolved = buildImageUrl(req, fileName);
+  if (resolved && resolved != raw) {
+    console.log("[image-url] normalized", { raw, resolved, fileName });
+  }
+  return resolved || raw;
 };
 
 const uploadProductImage = (req, res) => {
@@ -282,7 +326,7 @@ const listProductDescriptions = async (req, res) => {
     const total = Number(countResult.rows?.[0]?.total) || 0;
 
     res.json({
-      items: (result.rows || []).map(mapProductDescRow),
+      items: (result.rows || []).map((row) => mapProductDescRow(req, row)),
       count: Number(result.rowCount) || (result.rows || []).length || 0,
       total,
       offset,
@@ -304,6 +348,7 @@ const saveProductDescription = async (req, res) => {
   const normalizedRules = trimToLength(rules ?? "", 8000) || "";
   const normalizedDescription = trimToLength(description ?? "", 8000) || "";
   const normalizedImage = trimToLength(imageUrl ?? "", 1000);
+  const resolvedImageUrl = normalizeImageUrl(req, normalizedImage) || normalizedImage;
 
   try {
     const variantRow = await findVariantForProductId(normalizedProductId);
@@ -351,10 +396,10 @@ const saveProductDescription = async (req, res) => {
         resolvedProductId,
         normalizedRules,
         normalizedDescription,
-        normalizedImage,
+        resolvedImageUrl,
         existingRow[productDescColNames.id] || existingRow.id,
       ]);
-      return res.json(mapProductDescRow(updated.rows[0]));
+      return res.json(mapProductDescRow(req, updated.rows[0]));
     }
 
     const insertSql = `
@@ -371,9 +416,9 @@ const saveProductDescription = async (req, res) => {
       resolvedProductId,
       normalizedRules,
       normalizedDescription,
-      normalizedImage,
+      resolvedImageUrl,
     ]);
-    res.status(201).json(mapProductDescRow(inserted.rows[0]));
+    res.status(201).json(mapProductDescRow(req, inserted.rows[0]));
   } catch (error) {
     console.error("Save failed (POST /api/product-descriptions):", error);
     res.status(500).json({ error: "Không thể lưu mô tả sản phẩm." });
