@@ -6,6 +6,32 @@ export interface ProductDeleteResponse {
   message?: string;
 }
 
+export type ProductPriceUpdatePayload = {
+  packageName?: string;
+  categoryIds?: number[];
+  categoryColors?: Record<number, string> | Array<{ id: number; color?: string | null }>;
+};
+
+export const updateProductPrice = async (
+  productId: number,
+  payload: ProductPriceUpdatePayload
+): Promise<any> => {
+  const response = await apiFetch(`/api/product-prices/${productId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Cannot update product categories.",
+      })
+    );
+  }
+  return response.json().catch(() => ({}));
+};
+
 export const deleteProductPrice = async (
   productId: number
 ): Promise<ProductDeleteResponse> => {

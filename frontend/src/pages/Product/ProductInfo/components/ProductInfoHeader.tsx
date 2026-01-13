@@ -5,12 +5,14 @@ type ProductInfoHeaderProps = {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   onAddClick?: () => void;
+  onAddCategoryClick?: () => void;
 };
 
 export const ProductInfoHeader: React.FC<ProductInfoHeaderProps> = ({
   searchTerm,
   onSearchChange,
   onAddClick,
+  onAddCategoryClick,
 }) => {
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -31,6 +33,15 @@ export const ProductInfoHeader: React.FC<ProductInfoHeaderProps> = ({
       >
         Thêm Sản Phẩm Mới
       </button>
+      {onAddCategoryClick && (
+        <button
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow"
+          onClick={onAddCategoryClick}
+          type="button"
+        >
+          Thêm Danh Mục
+        </button>
+      )}
     </div>
   );
 };

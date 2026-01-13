@@ -213,14 +213,22 @@ const PRODUCT_SCHEMA = {
     COLS: {
       ID: "id",
       NAME: "name",
+      COLOR: "color",
       CREATED_AT: "created_at",
+    },
+  },
+  PRODUCT_CATEGORY: {
+    TABLE: "product_category",
+    COLS: {
+      PRODUCT_ID: "product_id",
+      CATEGORY_ID: "category_id",
+      COLOR: "color",
     },
   },
   PRODUCT: {
     TABLE: "product",
     COLS: {
       ID: "id",
-      CATEGORY_ID: "category_id",
       PACKAGE_NAME: "package_name",
     },
   },

@@ -59,6 +59,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
 }) => {
   const displayName =
     item.packageProduct || item.productName || item.productId || "--";
+  const categoryLabel = (item.packageName || "").trim();
   const rawRulesHtml = item.rulesHtml || toHtmlFromPlain(item.rules || "");
   const rawDescriptionHtml =
     item.descriptionHtml || toHtmlFromPlain(item.description || "");
@@ -91,6 +92,11 @@ export const ProductRow: React.FC<ProductRowProps> = ({
         </td>
         <td className="px-4 py-3 text-white">
           {stripDurationSuffix(displayName) || "--"}
+        </td>
+        <td className="px-4 py-3 text-white/80 border-r border-white/10 min-w-[160px]">
+          <span className="block truncate" title={categoryLabel || undefined}>
+            {categoryLabel || "--"}
+          </span>
         </td>
         <td className="px-5 py-3 pr-5 text-white/80 align-top border-r border-white/10 min-w-[240px]">
           <span
@@ -152,7 +158,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
       </tr>
       {isExpanded && (
         <tr className="bg-white/5">
-          <td colSpan={6} className="px-6 py-4">
+          <td colSpan={7} className="px-6 py-4">
             <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 mb-3 flex flex-col items-center text-center">
               <p className="text-sm font-semibold text-white">
                 Thông tin chi tiết

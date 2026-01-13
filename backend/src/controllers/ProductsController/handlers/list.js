@@ -2,6 +2,8 @@ const { db } = require("../../../db");
 const {
   QUOTED_COLS,
   variantCols,
+  categoryCols,
+  productCategoryCols,
   priceConfigCols,
   productSchemaCols,
   supplyPriceCols,
@@ -18,10 +20,29 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS id_product,
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
-        p.${quoteIdent(productSchemaCols.packageName)} AS package
+        p.${quoteIdent(productSchemaCols.packageName)} AS package,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'id', c.${quoteIdent(categoryCols.id)},
+              'name', c.${quoteIdent(categoryCols.name)},
+              'color', pc.${quoteIdent(productCategoryCols.color)}
+            )
+          ) FILTER (WHERE c.${quoteIdent(categoryCols.id)} IS NOT NULL),
+          '[]'::json
+        ) AS categories
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
+      LEFT JOIN ${TABLES.productCategory} pc
+        ON pc.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productSchemaCols.id)}
+      LEFT JOIN ${TABLES.category} c
+        ON c.${quoteIdent(categoryCols.id)} = pc.${quoteIdent(productCategoryCols.categoryId)}
+      GROUP BY
+        v.id,
+        v.${quoteIdent(variantCols.displayName)},
+        v.${quoteIdent(variantCols.variantName)},
+        p.${quoteIdent(productSchemaCols.packageName)}
       ORDER BY v.${quoteIdent(variantCols.displayName)};
     `;
     const result = await db.raw(query);

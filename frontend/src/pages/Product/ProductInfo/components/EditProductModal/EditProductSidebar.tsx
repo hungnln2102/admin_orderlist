@@ -53,13 +53,13 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4 py-6">
       <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-          <h3 className="text-lg font-semibold text-white">Select Image</h3>
+          <h3 className="text-lg font-semibold text-white">Chọn hình ảnh</h3>
         </div>
         <div className="p-4 space-y-4">
           {loading ? (
-            <p className="text-sm text-white/70">Loading images...</p>
+            <p className="text-sm text-white/70">Đang tải hình ảnh...</p>
           ) : images.length === 0 ? (
-            <p className="text-sm text-white/70">No images yet.</p>
+            <p className="text-sm text-white/70">Chưa có hình ảnh nào.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {images.map((item) => {
@@ -108,7 +108,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 onClick={onUploadClick}
                 disabled={uploading}
               >
-                {uploading ? "Uploading..." : "Upload New"}
+                {uploading ? "Đang tải..." : "Tải hình mới"}
               </button>
               <button
                 type="button"
@@ -116,7 +116,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 onClick={onDeleteSelected}
                 disabled={!selectedImage || deleting}
               >
-                {deleting ? "Deleting..." : "Delete Selected"}
+                {deleting ? "Đang xóa..." : "Xoá hình đã chọn"}
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -125,7 +125,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 className="px-4 py-2 text-sm font-semibold text-white/70 hover:text-white"
                 onClick={onClose}
               >
-                Cancel
+                Hủy
               </button>
               <button
                 type="button"
@@ -133,7 +133,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                 onClick={onUseSelected}
                 disabled={!selectedImage}
               >
-                Use Selected
+                Sử dụng hình đã chọn
               </button>
             </div>
           </div>

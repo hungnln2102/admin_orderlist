@@ -131,7 +131,6 @@ export const CATEGORY_FIELD_MAP = {
 
 export const PRODUCT_FIELD_MAP = {
   ID: PRODUCT_COLS.id,
-  CATEGORY_ID: PRODUCT_COLS.categoryId,
   PACKAGE_NAME: PRODUCT_COLS.packageName,
 } as const;
 

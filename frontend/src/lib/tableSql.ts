@@ -158,7 +158,6 @@ export const CATEGORY_COLS = {
 
 export const PRODUCT_COLS = {
   id: "id",
-  categoryId: "category_id",
   packageName: "package_name",
 };
 
