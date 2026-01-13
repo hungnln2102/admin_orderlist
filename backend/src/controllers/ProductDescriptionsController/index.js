@@ -89,9 +89,22 @@ const mapProductDescRow = (row = {}) => ({
   imageUrl: row.image_url || row[productDescColNames.imageUrl] || null,
 });
 
+const getForwardedHeader = (req, headerName) => {
+  const raw = req.get(headerName);
+  if (!raw) return "";
+  return String(raw).split(",")[0].trim();
+};
+
 const buildImageUrl = (req, filename) => {
-  const host = req.get("host") || "localhost:3001";
-  const protocol = req.protocol || "http";
+  const overrideBase = normalizeTextInput(process.env.PUBLIC_BASE_URL || "");
+  if (overrideBase) {
+    const trimmed = overrideBase.replace(/\/+$/, "");
+    return `${trimmed}/image/${encodeURIComponent(filename)}`;
+  }
+  const forwardedProto = getForwardedHeader(req, "x-forwarded-proto");
+  const forwardedHost = getForwardedHeader(req, "x-forwarded-host");
+  const host = forwardedHost || req.get("host") || "localhost:3001";
+  const protocol = forwardedProto || req.protocol || "http";
   return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
 };
 
