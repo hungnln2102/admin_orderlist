@@ -95,15 +95,37 @@ const getForwardedHeader = (req, headerName) => {
   return String(raw).split(",")[0].trim();
 };
 
+const getBaseFromHeader = (req, headerName) => {
+  const raw = getForwardedHeader(req, headerName);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "";
+    }
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return "";
+  }
+};
+
+const isLocalHostValue = (value) =>
+  /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i.test(value || "");
+
 const buildImageUrl = (req, filename) => {
   const overrideBase = normalizeTextInput(process.env.PUBLIC_BASE_URL || "");
   if (overrideBase) {
     const trimmed = overrideBase.replace(/\/+$/, "");
     return `${trimmed}/image/${encodeURIComponent(filename)}`;
   }
+  const originBase =
+    getBaseFromHeader(req, "origin") || getBaseFromHeader(req, "referer");
   const forwardedProto = getForwardedHeader(req, "x-forwarded-proto");
   const forwardedHost = getForwardedHeader(req, "x-forwarded-host");
   const host = forwardedHost || req.get("host") || "localhost:3001";
+  if (originBase && isLocalHostValue(host)) {
+    return `${originBase}/image/${encodeURIComponent(filename)}`;
+  }
   const protocol = forwardedProto || req.protocol || "http";
   return `${protocol}://${host}/image/${encodeURIComponent(filename)}`;
 };
