@@ -83,10 +83,10 @@ export const useCalculatedPrice = ({
           );
         }
       } catch (error) {
-        console.error("L ¯-i khi tA-nh l §­i giA­ Ž`’­n hAÿng:", error);
+        console.error("Lá»—i khi tÃ­nh láº¡i giÃ¡ Ä‘Æ¡n hÃ ng:", error);
         if (!ignore) {
           setPriceError(
-            "KhA'ng th ¯Ÿ tA-nh l §­i giA­ t ¯ñ Ž` ¯Tng. Ž?ang hi ¯Ÿn th ¯< giA­ hi ¯Øn cA3."
+            "KhÃ´ng thá»ƒ tÃ­nh láº¡i giÃ¡ Ä‘Æ¡n hÃ ng. Äang hiá»ƒn thá»‹ giÃ¡ hiá»‡n cÃ³."
           );
           setCalculatedPrice(basePrice);
         }

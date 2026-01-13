@@ -52,6 +52,23 @@ const fetchVariantView = async (variantId) => {
   return res.rows && res.rows[0] ? res.rows[0] : null;
 };
 
+const isVariantPkeyConflict = (error) =>
+  error && error.code === "23505" && error.constraint === "variant_pkey";
+
+const resetVariantSequence = async () => {
+  const tableRef = TABLES.variant;
+  const idColumn = variantCols.id || "id";
+  await db.raw(
+    `
+    SELECT setval(
+      pg_get_serial_sequence(?, ?),
+      COALESCE((SELECT MAX(${quoteIdent(idColumn)}) FROM ${tableRef}), 0)
+    );
+  `,
+    [tableRef, idColumn]
+  );
+};
+
 const createProductPrice = async (req, res) => {
   const {
     packageName,
@@ -78,47 +95,65 @@ const createProductPrice = async (req, res) => {
       : !(String(is_active || "").trim().toLowerCase() === "false");
 
   try {
-    const inserted = await db.transaction(async (trx) => {
-      const productInsert = await trx(TABLES.product)
-        .insert({
-          [productSchemaCols.packageName]: normalizeTextInput(packageName) || null,
-        })
-        .returning("id");
-      const productId = productInsert?.[0]?.id || productInsert?.[0]?.ID;
+    let inserted = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        inserted = await db.transaction(async (trx) => {
+          const productInsert = await trx(TABLES.product)
+            .insert({
+              [productSchemaCols.packageName]: normalizeTextInput(packageName) || null,
+            })
+            .returning("id");
+          const productId = productInsert?.[0]?.id || productInsert?.[0]?.ID;
 
-      const variantInsert = await trx(TABLES.variant)
-        .insert({
-          [variantCols.productId]: productId,
-          [variantCols.displayName]: productCode,
-          [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
-          [variantCols.isActive]: isActive,
-        })
-        .returning("id");
-      const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;
+          const variantInsert = await trx(TABLES.variant)
+            .insert({
+              [variantCols.productId]: productId,
+              [variantCols.displayName]: productCode,
+              [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
+              [variantCols.isActive]: isActive,
+            })
+            .returning("id");
+          const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;
 
-      await trx(TABLES.priceConfig).insert({
-        [priceConfigCols.variantId]: variantId,
-        [priceConfigCols.pctCtv]: pctCtvVal,
-        [priceConfigCols.pctKhach]: pctKhachVal,
-        [priceConfigCols.pctPromo]: pctPromoVal,
-        [priceConfigCols.updatedAt]: new Date(),
-      });
+          await trx(TABLES.priceConfig).insert({
+            [priceConfigCols.variantId]: variantId,
+            [priceConfigCols.pctCtv]: pctCtvVal,
+            [priceConfigCols.pctKhach]: pctKhachVal,
+            [priceConfigCols.pctPromo]: pctPromoVal,
+            [priceConfigCols.updatedAt]: new Date(),
+          });
 
-      if (Array.isArray(suppliers) && suppliers.length) {
-        for (const supplier of suppliers) {
-          const sourceIdRaw = supplier?.sourceId !== undefined ? supplier.sourceId : supplier?.id;
-          const sourceNameRaw = supplier?.sourceName !== undefined ? supplier.sourceName : supplier?.name;
-          const supplyId = Number.isFinite(Number(sourceIdRaw))
-            ? Number(sourceIdRaw)
-            : await ensureSupplyRecord(sourceNameRaw, supplier?.numberBank, supplier?.binBank);
-          if (!supplyId) continue;
-          const priceValue = toNullableNumber(supplier?.price);
-          await upsertSupplyPrice({ variantId }, supplyId, priceValue, trx);
+          if (Array.isArray(suppliers) && suppliers.length) {
+            for (const supplier of suppliers) {
+              const sourceIdRaw = supplier?.sourceId !== undefined ? supplier.sourceId : supplier?.id;
+              const sourceNameRaw = supplier?.sourceName !== undefined ? supplier.sourceName : supplier?.name;
+              const supplyId = Number.isFinite(Number(sourceIdRaw))
+                ? Number(sourceIdRaw)
+                : await ensureSupplyRecord(sourceNameRaw, supplier?.numberBank, supplier?.binBank);
+              if (!supplyId) continue;
+              const priceValue = toNullableNumber(supplier?.price);
+              await upsertSupplyPrice({ variantId }, supplyId, priceValue, trx);
+            }
+          }
+
+          return variantId;
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0 && isVariantPkeyConflict(error)) {
+          await resetVariantSequence();
+          continue;
         }
+        throw error;
       }
+    }
 
-      return variantId;
-    });
+    if (!inserted) {
+      throw lastError;
+    }
 
     const viewRow = await fetchVariantView(inserted);
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
