@@ -2,16 +2,27 @@ import { ProductDescription } from "../../../../lib/productDescApi";
 
 export const PAGE_SIZE = 10;
 
+export type CategoryItem = {
+  id: number;
+  name: string;
+  color?: string | null;
+};
+
 export type ProductPriceItem = {
   id: number;
   san_pham: string;
   package_product?: string | null;
   package?: string | null;
+  category?: string | null;
+  categories?: CategoryItem[] | null;
 };
 
 export type MergedProduct = ProductDescription & {
+  priceId?: number | null;
   packageProduct?: string | null;
   packageName?: string | null;
+  category?: string | null;
+  categories?: CategoryItem[];
   rulesHtml?: string | null;
   descriptionHtml?: string | null;
 };
@@ -165,6 +176,7 @@ export const mergeProducts = (
     const priceRow = normalizedId ? priceMap.get(normalizedId) : null;
     const merged: MergedProduct = {
       ...item,
+      priceId: priceRow?.id ?? null,
       productId: stripDurationSuffix(item.productId || ""),
       productName:
         item.productName ||
@@ -180,6 +192,8 @@ export const mergeProducts = (
       packageName: priceRow
         ? stripDurationSuffix(priceRow.package || priceRow.san_pham || "")
         : null,
+      category: priceRow?.category ?? null,
+      categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
         item.descriptionHtml || toHtmlFromPlain(item.description || ""),
@@ -201,6 +215,7 @@ export const mergeProducts = (
     if (!key || matched) continue;
     mergedMap.set(key, {
       id: priceItem.id,
+      priceId: priceItem.id,
       productId: stripDurationSuffix(priceItem.san_pham || ""),
       productName: stripDurationSuffix(
         priceItem.package_product || priceItem.san_pham || ""
@@ -209,6 +224,8 @@ export const mergeProducts = (
         priceItem.package_product || priceItem.san_pham || ""
       ),
       packageName: stripDurationSuffix(priceItem.package || ""),
+      category: priceItem.category ?? null,
+      categories: Array.isArray(priceItem.categories) ? priceItem.categories ?? [] : [],
       rules: "",
       rulesHtml: "",
       description: "",

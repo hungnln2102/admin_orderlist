@@ -1,5 +1,26 @@
 const { toNullableNumber } = require("../../utils/normalizers");
-const { variantCols, priceConfigCols, productSchemaCols, supplyPriceCols, supplyCols } = require("./constants");
+const {
+  variantCols,
+  priceConfigCols,
+  productSchemaCols,
+  supplyPriceCols,
+  supplyCols,
+  categoryCols,
+} = require("./constants");
+
+const parseCategories = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
 
 const mapProductPriceRow = (row = {}) => {
   const id =
@@ -29,6 +50,10 @@ const mapProductPriceRow = (row = {}) => {
           .startsWith("t") ||
         String(isActiveRaw || "").trim() === "1";
 
+  const categories = parseCategories(row.categories);
+  const categoryFallback =
+    row.category ?? row[categoryCols.name] ?? null;
+
   return {
     id,
     id_product: sanPham,
@@ -36,6 +61,8 @@ const mapProductPriceRow = (row = {}) => {
     package_product:
       row.package_product ?? row[variantCols.variantName] ?? null,
     package: row.package ?? row[productSchemaCols.packageName] ?? null,
+    category: categoryFallback,
+    categories,
     pct_ctv: pctCtv,
     pct_khach: pctKhach,
     pct_promo: pctPromo,
