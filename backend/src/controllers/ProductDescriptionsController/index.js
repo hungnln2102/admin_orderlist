@@ -1,6 +1,8 @@
-﻿const { db } = require("../../db");
-require("dotenv").config();
-require('dotenv').config({ path: '.env.docker' });
+﻿const path = require("path"); // eslint-disable-line no-unused-vars
+require("dotenv").config(); // eslint-disable-line no-unused-vars
+console.log(">>> [DEBUG] PUBLIC_BASE_URL:", process.env.PUBLIC_BASE_URL);
+
+const { db } = require("../../db");
 const {
   tableName,
   PRODUCT_SCHEMA,
@@ -10,7 +12,6 @@ const {
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, trimToLength } = require("../../utils/normalizers");
 const fs = require("fs");
-const path = require("path");
 
 const PRODUCT_DESC_DEF = PRODUCT_SCHEMA.PRODUCT_DESC;
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
