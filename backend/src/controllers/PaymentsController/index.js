@@ -135,11 +135,12 @@ const confirmPaymentSupply = async (req, res) => {
       const trimmedSourceName = sourceName.trim();
 
       const UNPAID_STATUS = STATUS.UNPAID;
+      const PROCESSING_STATUS = STATUS.PROCESSING;
       const PAID_STATUS = STATUS.PAID;
 
       let carryoverImport = null;
       try {
-        const unpaidResult = await trx.raw(
+        const processingResult = await trx.raw(
           `
           SELECT
             ${QUOTED_COLS.orderList.id} AS id,
@@ -147,17 +148,16 @@ const confirmPaymentSupply = async (req, res) => {
             ${createDateNormalization(QUOTED_COLS.orderList.orderDate)} AS order_date
           FROM ${TABLES.orderList}
           WHERE ${QUOTED_COLS.orderList.status} = ?
-            AND ${QUOTED_COLS.orderList.checkFlag} IS FALSE
             AND TRIM(${QUOTED_COLS.orderList.supply}::text) = TRIM(?)
           ORDER BY order_date ASC NULLS FIRST, ${QUOTED_COLS.orderList.id} ASC;
         `,
-        [UNPAID_STATUS, trimmedSourceName]
+        [PROCESSING_STATUS, trimmedSourceName]
         );
 
-        const unpaidRows = unpaidResult.rows || [];
+        const processingRows = processingResult.rows || [];
         let runningSum = 0;
         const orderIdsToMark = [];
-        for (const row of unpaidRows) {
+        for (const row of processingRows) {
           if (runningSum >= normalizedPaidAmount) break;
           const costValue = Number(row.cost) || 0;
           runningSum += costValue;
@@ -169,18 +169,17 @@ const confirmPaymentSupply = async (req, res) => {
             `
             UPDATE ${TABLES.orderList}
             SET ${QUOTED_COLS.orderList.status} = ?,
-                ${QUOTED_COLS.orderList.checkFlag} = TRUE
             WHERE ${QUOTED_COLS.orderList.id} = ANY(?::int[]);
           `,
             [PAID_STATUS, orderIdsToMark]
           );
         }
 
-        const totalUnpaidImport = unpaidRows.reduce(
+        const totalProcessingImport = processingRows.reduce(
           (acc, row) => acc + (Number(row.cost) || 0),
           0
         );
-        const importDelta = totalUnpaidImport - normalizedPaidAmount;
+        const importDelta = totalProcessingImport - normalizedPaidAmount;
         carryoverImport = Math.abs(importDelta);
       } catch (orderErr) {
         console.error(

@@ -83,24 +83,6 @@ export const parseNumeric = (value: unknown): number | null => {
   return null;
 };
 
-export const normalizeCheckFlag = (value: unknown): boolean | null => {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (value === 1) return true;
-    if (value === 0) return false;
-  }
-  if (typeof value === "string") {
-    const lowered = value.trim().toLowerCase();
-    if (["true", "t", "1"].includes(lowered)) return true;
-    if (["false", "f", "0"].includes(lowered)) return false;
-  }
-  return null;
-};
-
-
-
-
 export const parseExpiryTime = (order: Order): number => {
   const raw =
     sanitizeDateLike(order.expiry_date) ??

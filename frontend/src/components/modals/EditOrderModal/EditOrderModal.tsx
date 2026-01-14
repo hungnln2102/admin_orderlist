@@ -312,18 +312,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
                 className={`${inputClass} ${readOnlyClass}`}
               />
             </div>
-            <div className="flex items-center gap-3 mt-6 md:mt-8">
-              <label className="text-sm font-medium text-slate-100 mb-0">
-                Kiểm tra
-              </label>
-              <input
-                type="checkbox"
-                className="h-5 w-5 rounded border-white/30 text-indigo-300 focus:ring-indigo-400"
-                checked={Boolean(formData[ORDER_FIELDS.CHECK_FLAG])}
-                disabled
-                readOnly
-              />
-            </div>
           </div>
 
           <div>

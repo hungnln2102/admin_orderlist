@@ -1,7 +1,6 @@
 const {
     normalizeDateInput,
     toNullableNumber,
-    normalizeCheckFlagValue,
     normalizeTextInput,
     todayYMDInVietnam,
     formatYMDToDMY,
@@ -48,27 +47,7 @@ const normalizeOrderRow = (
     }
 
     const dbStatusRaw = row.status || STATUS.UNPAID;
-    let autoStatus = dbStatusRaw;
-    let autoCheckFlag = normalizeCheckFlagValue(row.check_flag);
-
-    const enableAutoStatus = options.enableAutoStatus !== false;
-
-    if (enableAutoStatus && autoStatus !== STATUS.PAID && Number.isFinite(soNgayConLai)) {
-        if (soNgayConLai <= 0) {
-            autoStatus = STATUS.EXPIRED;
-            autoCheckFlag = null;
-        } else if (soNgayConLai <= 4) {
-            autoStatus = STATUS.RENEWAL;
-            autoCheckFlag = null;
-        }
-    }
-
-    if (autoStatus === STATUS.PAID && autoCheckFlag === null) {
-        autoCheckFlag = true;
-    }
-
-    const dbCheckFlag = normalizeCheckFlagValue(row.check_flag);
-    const finalCheckFlag = dbCheckFlag !== null ? dbCheckFlag : (autoCheckFlag || null);
+    const autoStatus = dbStatusRaw;
 
     const registrationDisplay = formatYMDToDMY(registrationYmd);
     const expiryDisplay = formatYMDToDMY(expiryYmd);
@@ -84,8 +63,6 @@ const normalizeOrderRow = (
         so_ngay_con_lai: soNgayConLai,
         status: autoStatus,
         status_auto: autoStatus,
-        check_flag: finalCheckFlag,
-        check_flag_auto: autoCheckFlag,
     };
 };
 
@@ -94,7 +71,7 @@ const ORDER_WRITABLE_COLUMNS = [
     COLS.ORDER.CUSTOMER, COLS.ORDER.CONTACT, COLS.ORDER.SLOT,
     COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.ORDER_EXPIRED,
     COLS.ORDER.SUPPLY, COLS.ORDER.COST, COLS.ORDER.PRICE,
-    COLS.ORDER.NOTE, COLS.ORDER.STATUS, COLS.ORDER.CHECK_FLAG
+    COLS.ORDER.NOTE, COLS.ORDER.STATUS
 ];
 
 const sanitizeOrderWritePayload = (raw = {}) => {
@@ -107,8 +84,6 @@ const sanitizeOrderWritePayload = (raw = {}) => {
             val = normalizeDateInput(val);
         } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.DAYS) {
             val = toNullableNumber(val);
-        } else if (col === COLS.ORDER.CHECK_FLAG) {
-            val = normalizeCheckFlagValue(val);
         } else if (typeof val === "string") {
             val = val.trim();
         }

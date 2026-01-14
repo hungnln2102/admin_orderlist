@@ -1,7 +1,7 @@
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
 const { resolveSupplierNameColumn } = require("../SuppliesController/helpers");
 const { STATUS } = require("./constants");
-const { toNullableNumber, normalizeCheckFlagValue } = require("../../utils/normalizers");
+const { toNullableNumber } = require("../../utils/normalizers");
 const TABLES = require("./constants").TABLES;
 
 const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
@@ -162,14 +162,10 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
         normalized?.status ??
         normalized?.status_auto ??
         "";
-    const checkFlagVal = normalizeCheckFlagValue(
-        orderRow?.check_flag ?? normalized?.check_flag
-    );
+    const isPaidLike =
+        statusValue === STATUS.PROCESSING || statusValue === STATUS.PAID;
 
-    const isUnpaidCase = statusValue === STATUS.UNPAID && checkFlagVal === false;
-    const isPaidCase = statusValue === STATUS.PAID && checkFlagVal === true;
-
-    if (!isUnpaidCase && !isPaidCase) return;
+    if (!isPaidLike) return;
 
     const supplyId = await findSupplyIdByName(trx, orderRow?.supply);
     if (!supplyId) return;
@@ -181,18 +177,11 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
     await decreaseSupplierDebt(trx, supplyId, roundedProrated);
 };
 
-const addSupplierImportOnCheck = async(trx, beforeRow, afterRow) => {
-    const prevFlag = beforeRow?.check_flag;
-    const nextFlag = afterRow?.check_flag;
+const addSupplierImportOnProcessing = async (trx, beforeRow, afterRow) => {
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 
-    const movedNullToFalse =
-        (prevFlag === null || prevFlag === undefined) && nextFlag === false;
-    const isStillUnpaid = nextStatus === STATUS.UNPAID;
-    const wasUnpaid = prevStatus === STATUS.UNPAID;
-
-    if (!(movedNullToFalse && isStillUnpaid && wasUnpaid)) return;
+    if (prevStatus === nextStatus || nextStatus !== STATUS.PROCESSING) return;
 
     const supplyId =
         (await findSupplyIdByName(trx, afterRow?.supply)) ||
@@ -212,5 +201,5 @@ module.exports = {
     increaseSupplierDebt,
     decreaseSupplierDebt,
     adjustSupplierDebtIfNeeded,
-    addSupplierImportOnCheck,
+    addSupplierImportOnProcessing,
 };

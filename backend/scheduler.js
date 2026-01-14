@@ -51,7 +51,6 @@ const COL = {
   price: quoteIdent(ORDER_COLS.price),
   note: quoteIdent(ORDER_COLS.note),
   status: quoteIdent(ORDER_COLS.status),
-  checkFlag: quoteIdent(ORDER_COLS.checkFlag),
 };
 
 // Normalize mixed-format date columns to a proper DATE in SQL
@@ -138,8 +137,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
           ${COL.cost},
           ${COL.price},
           ${COL.note},
-          ${COL.status},
-          ${COL.checkFlag}
+          ${COL.status}
         FROM ${TABLES.orderList}
         WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
       )
@@ -159,7 +157,6 @@ const updateDatabaseTask = async (trigger = "cron") => {
           COL.price,
           COL.note,
           COL.status,
-          COL.checkFlag,
         ].join(", ")}
       )
       SELECT
@@ -176,8 +173,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
         ${COL.cost},
         ${COL.price},
         ${COL.note},
-        ${COL.status},
-        ${COL.checkFlag}
+        ${COL.status}
       FROM expired
       ON CONFLICT DO NOTHING
       RETURNING ${COL.idOrder};
@@ -192,18 +188,15 @@ const updateDatabaseTask = async (trigger = "cron") => {
           .join(", ")}`
       );
     }
-
-    // 2a) Update 0 ngay con lai -> 'Hết Hạn'
-    const dueToday = await client.query(`
+    // 2a) Update PAID -> RENEWAL when days left < 4
+    const paidToRenewal = await client.query(`
       UPDATE ${TABLES.orderList}
-      SET ${COL.status} = '${STATUS.EXPIRED}',
-          ${COL.checkFlag} = NULL
-      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} IS DISTINCT FROM '${STATUS.PAID}')
-        AND (${COL.status} IS DISTINCT FROM '${STATUS.EXPIRED}');
+      SET ${COL.status} = '${STATUS.RENEWAL}'
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 3
+        AND (${COL.status} = '${STATUS.PAID}');
     `);
     console.log(
-      `  - Cập nhật ${dueToday.rowCount} đơn sang '${STATUS.EXPIRED}' (0 ngày).`
+      `  - Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (< 4 days).`
     );
 
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
@@ -222,19 +215,15 @@ const updateDatabaseTask = async (trigger = "cron") => {
           .join(", ")}`
       );
     }
-
-    // 2) Update "Cần Gia Hạn" for orders with 1..4 days remaining (Không cần chuyển đổi kiểu dữ liệu ở đây)
-    // 2b) Update 1..4 ngay -> 'Cần Gia Hạn'
-    const soon = await client.query(`
+    // 2b) Update RENEWAL -> EXPIRED when days left = 0
+    const renewalToExpired = await client.query(`
       UPDATE ${TABLES.orderList}
-      SET ${COL.status} = '${STATUS.RENEWAL}',
-          ${COL.checkFlag} = NULL
-      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 1 AND 4
-        AND (${COL.status} IS DISTINCT FROM '${STATUS.EXPIRED}')
-        AND (${COL.status} IS DISTINCT FROM '${STATUS.RENEWAL}');
+      SET ${COL.status} = '${STATUS.EXPIRED}'
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
+        AND (${COL.status} = '${STATUS.RENEWAL}');
     `);
     console.log(
-      `  - Cập nhật ${soon.rowCount} đơn sang '${STATUS.RENEWAL}' (1..4 ngày).`
+      `  - Updated ${renewalToExpired.rowCount} orders to '${STATUS.EXPIRED}' (0 days).`
     );
 
     await client.query("COMMIT");

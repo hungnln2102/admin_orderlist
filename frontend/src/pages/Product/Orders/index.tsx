@@ -231,6 +231,7 @@ export default function Orders() {
               <option value={ORDER_STATUSES.CHUA_THANH_TOAN}>
                 Chưa thanh toán
               </option>
+              <option value={ORDER_STATUSES.DANG_XU_LY}>Đang xử lý</option>
               <option value={ORDER_STATUSES.CAN_GIA_HAN}>Cần gia hạn</option>
               <option value={ORDER_STATUSES.ORDER_EXPIRED}>Hết hạn</option>
             </select>

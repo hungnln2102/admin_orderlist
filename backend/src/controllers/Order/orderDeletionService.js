@@ -31,18 +31,8 @@ const deleteOrderWithArchive = async ({
             supplier: order?.supplier,
             cost: order?.cost,
             status: order?.status,
-            check_flag: order?.check_flag,
             error: debtErr?.message || debtErr,
         });
-    }
-
-    const isHardDelete =
-        normalized.status === STATUS.UNPAID && normalized.check_flag === null;
-
-    if (isHardDelete) {
-        await trx(TABLES.orderList).where({ id: orderId }).del();
-        await trx.commit();
-        return { success: true, movedTo: "deleted", deletedOrder: normalized };
     }
 
     const normalizedStatus = String(
@@ -51,16 +41,18 @@ const deleteOrderWithArchive = async ({
         order?.status ||
         ""
     ).trim();
-    const normalizedCheckFlag =
-        normalized?.check_flag !== undefined && normalized?.check_flag !== null
-            ? normalized.check_flag
-            : (order?.check_flag ?? null);
+    const isHardDelete = normalizedStatus === STATUS.UNPAID;
 
-    // Only paid+checked or unpaid+unchecked orders are treated as canceled; everything else is archived as expired.
+    if (isHardDelete) {
+        await trx(TABLES.orderList).where({ id: orderId }).del();
+        await trx.commit();
+        return { success: true, movedTo: "deleted", deletedOrder: normalized };
+    }
+
+    // Only paid/processing orders are treated as canceled; everything else is archived as expired.
     const shouldArchiveToCanceled =
-        (normalizedStatus === STATUS.PAID && normalizedCheckFlag === true) ||
-        (normalizedStatus === STATUS.UNPAID && normalizedCheckFlag === false);
-    const isRenewalStatus = normalizedStatus === STATUS.RENEWAL;
+        normalizedStatus === STATUS.PAID ||
+        normalizedStatus === STATUS.PROCESSING;
 
     const targetTable = shouldArchiveToCanceled ? TABLES.orderCanceled : TABLES.orderExpired;
 
@@ -82,13 +74,11 @@ const deleteOrderWithArchive = async ({
             : calcRemainingRefund(order, normalized);
         archiveData[ORDERS_SCHEMA.ORDER_CANCELED.COLS.REFUND] = refundValue;
         archiveData.status = STATUS.PENDING_REFUND;
-        archiveData.check_flag = false;
         archiveData[ORDERS_SCHEMA.ORDER_CANCELED.COLS.CREATED_AT] = new Date();
     } else {
         archiveData[ORDERS_SCHEMA.ORDER_EXPIRED.COLS.ARCHIVED_AT] = new Date();
         // Khi chuyển sang bảng hết hạn, luôn đặt trạng thái về "Hết Hạn"
         archiveData.status = STATUS.EXPIRED;
-        archiveData.check_flag = normalizedCheckFlag;
     }
 
     const allowedArchiveCols = shouldArchiveToCanceled

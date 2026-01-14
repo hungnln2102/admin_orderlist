@@ -34,8 +34,8 @@ const attachRenewRoutes = (router) => {
         try {
             const [updated] = await db(TABLES.orderCanceled)
                 .where({ id })
-                .update({ status: STATUS.REFUNDED, check_flag: false })
-                .returning(["id", "id_order", "status", "check_flag"]);
+                .update({ status: STATUS.REFUNDED })
+                .returning(["id", "id_order", "status"]);
 
             if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
             res.json({ success: true, ...updated });

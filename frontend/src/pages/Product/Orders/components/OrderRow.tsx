@@ -57,7 +57,6 @@ export const OrderRow = React.memo(function OrderRow({
     [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
     [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
     [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
-    [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: check_flag_status,
   } = order;
 
   const costValue = Number.isFinite(Number(order[ORDER_FIELDS.COST]))
@@ -81,13 +80,13 @@ export const OrderRow = React.memo(function OrderRow({
       )
     : giaTriConLaiSafe;
 
-  const pendingRefundStatus = "Chưa Hoàn";
+  const pendingRefundStatus = ORDER_STATUSES.CHO_HOAN;
   const statusText = String(trangThaiText || "").trim();
-  const isUnpaidStatus =
-    statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
-    statusText === pendingRefundStatus;
   const canConfirmRefund = isCanceled && statusText === pendingRefundStatus;
-  const isRenewalStatus = statusText === ORDER_STATUSES.CAN_GIA_HAN;
+  const canRenew =
+    statusText === ORDER_STATUSES.CAN_GIA_HAN ||
+    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
   const expiryDateDisplay = order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
@@ -245,11 +244,7 @@ export const OrderRow = React.memo(function OrderRow({
                 </div>
                 {showActionButtons && (
                   <div className="ml-4 flex items-center gap-2">
-                    {!(
-                      (order[ORDER_FIELDS.STATUS] === ORDER_STATUSES.DA_THANH_TOAN &&
-                        order[ORDER_FIELDS.CHECK_FLAG] === true) ||
-                      isRenewalStatus
-                    ) && (
+                    {canMarkPaid && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
                         onClick={stopPropagation(onMarkPaid)}
@@ -257,7 +252,7 @@ export const OrderRow = React.memo(function OrderRow({
                         Đã Thanh Toán
                       </button>
                     )}
-                    {!isUnpaidStatus && (
+                    {canRenew && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40 disabled:opacity-70 disabled:cursor-not-allowed"
                         disabled={isRenewing}
@@ -322,24 +317,6 @@ export const OrderRow = React.memo(function OrderRow({
                   <p className="mt-1 text-sm text-indigo-50 text-center">
                     {order[ORDER_FIELDS.NOTE] || "Không có ghi chú."}
                   </p>
-                </div>
-                <div className="rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
-                    Kiểm tra
-                  </p>
-                  {check_flag_status === null ? (
-                    <div className="mt-3 h-5" />
-                  ) : (
-                    <div className="mt-3 flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        checked={Boolean(check_flag_status)}
-                        readOnly
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { ORDER_FIELDS } from "../../../constants";
+import { ORDER_FIELDS, ORDER_STATUSES } from "../../../constants";
 import { Order } from "./types";
 
 /**
@@ -49,8 +49,7 @@ export const INITIAL_FORM_DATA: Partial<Order> = {
   [ORDER_FIELDS.COST]: 0,
   [ORDER_FIELDS.PRICE]: 0,
   [ORDER_FIELDS.NOTE]: "",
-  [ORDER_FIELDS.STATUS]: "Chưa Thanh Toán",
-  [ORDER_FIELDS.CHECK_FLAG]: null,
+  [ORDER_FIELDS.STATUS]: ORDER_STATUSES.CHUA_THANH_TOAN,
 };
 
 export const inputClass =
