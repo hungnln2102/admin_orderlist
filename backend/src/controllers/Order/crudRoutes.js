@@ -31,8 +31,7 @@ const attachCrudRoutes = (router) => {
 
         if (Object.keys(payload).length === 0) return res.status(400).json({ error: "Empty payload" });
 
-        payload.status = payload.status || STATUS.UNPAID;
-        payload.check_flag = null;
+        payload.status = STATUS.UNPAID;
         if (payload.supply) payload.supply = normalizeTextInput(payload.supply);
 
         const trx = await db.transaction();

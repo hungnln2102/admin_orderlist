@@ -63,7 +63,7 @@ const getSupplyOverview = async (req, res) => {
         COUNT(*) FILTER (WHERE ${statusColumn} IS DISTINCT FROM '${STATUS.REFUNDED}' AND ${statusColumn} IS DISTINCT FROM '${STATUS.PENDING_REFUND}') AS total_orders,
         COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.CANCELED}')) AS canceled_orders,
         COUNT(*) FILTER (WHERE ${statusColumn} = :unpaidStatus) AS unpaid_orders,
-        COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.PAID}', '${STATUS.COLLECTED}', '${STATUS.PAID_ALT}')) AS paid_orders
+        COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.PAID}')) AS paid_orders
       FROM ${TABLES.orderList}
       WHERE TRIM(${quoteIdent(orderCols.supply)}::text) = TRIM(:supplyName)
     `;

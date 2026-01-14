@@ -26,7 +26,7 @@ const listProducts = async (_req, res) => {
             DISTINCT jsonb_build_object(
               'id', c.${quoteIdent(categoryCols.id)},
               'name', c.${quoteIdent(categoryCols.name)},
-              'color', pc.${quoteIdent(productCategoryCols.color)}
+              'color', c.${quoteIdent(categoryCols.color)}
             )
           ) FILTER (WHERE c.${quoteIdent(categoryCols.id)} IS NOT NULL),
           '[]'::json

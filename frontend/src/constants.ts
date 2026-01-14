@@ -16,6 +16,7 @@ import {
   PRICE_CONFIG_FIELD_MAP,
   SUPPLIER_COST_FIELD_MAP,
 } from "./lib/fieldMapper";
+import { ORDER_STATUS } from "@shared/orderStatuses";
 
 export const API_ENDPOINTS = {
   ORDERS: "/api/orders",
@@ -81,7 +82,6 @@ export const VIRTUAL_FIELDS = {
   SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
   GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
   TRANG_THAI_TEXT: "trang_thai_text_virtual",
-  CHECK_FLAG_STATUS: "check_flag_status_virtual",
   ORDER_DATE_DISPLAY: "order_date_display_virtual",
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
 };
@@ -115,11 +115,15 @@ export const ORDER_CODE_OPTIONS = [
 ] as const;
 
 export const ORDER_STATUSES = {
-  ORDER_EXPIRED: "Hết Hạn",
-  CAN_GIA_HAN: "Cần Gia Hạn",
-  CHUA_THANH_TOAN: "Chưa Thanh Toán",
-  DA_THANH_TOAN: "Đã Thanh Toán",
+  ORDER_EXPIRED: ORDER_STATUS.EXPIRED,
+  CAN_GIA_HAN: ORDER_STATUS.RENEWAL,
+  CHUA_THANH_TOAN: ORDER_STATUS.UNPAID,
+  DANG_XU_LY: ORDER_STATUS.PROCESSING,
+  DA_THANH_TOAN: ORDER_STATUS.PAID,
+  CHO_HOAN: ORDER_STATUS.PENDING_REFUND,
+  DA_HOAN: ORDER_STATUS.REFUNDED,
 };
+
 
 export const STAT_CARD_ACCENTS = {
   sky: "sky",
@@ -170,46 +174,13 @@ export interface Order {
   price: string;
   note: string;
   status: string;
-  check_flag: boolean | null;
   can_hoan?: number | string;
   so_ngay_con_lai: number | null;
 
   [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
   [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
   [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
-  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
   [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
   [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
 }
 
-export interface Order {
-  id: number;
-  id_order: string;
-  id_product: string;
-  information_order: string;
-  customer: string;
-  contact: string;
-  slot: string;
-  order_date: string;
-  days: string;
-  order_expired: string;
-  registration_date?: string;
-  expiry_date?: string;
-  registration_date_display?: string;
-  expiry_date_display?: string;
-  supply: string;
-  cost: string;
-  price: string;
-  note: string;
-  status: string;
-  check_flag: boolean | null;
-  can_hoan?: number | string;
-  so_ngay_con_lai: number | null;
-
-  [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
-  [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
-  [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
-  [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: boolean | null;
-  [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
-  [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
-}

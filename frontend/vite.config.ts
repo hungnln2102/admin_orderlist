@@ -1,6 +1,8 @@
 import type { UserConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,6 +11,9 @@ export default defineConfig(({ mode }) => {
     define: UserConfig["define"];
 
   const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || "http://localhost:3001";
+  const frontendPath = resolve(dirname(fileURLToPath(import.meta.url)));
+  const rootPath = resolve(frontendPath, "..");
+  const sharedPath = resolve(rootPath, "shared");
 
   if (mode === "development") {
     build = {
@@ -43,6 +48,9 @@ export default defineConfig(({ mode }) => {
         usePolling: true,
         interval: 300,
       },
+      fs: {
+        allow: [frontendPath, rootPath, sharedPath],
+      },
       proxy: {
         "/api": {
           target: apiProxyTarget,
@@ -54,6 +62,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": "/src",
+        "@shared": sharedPath,
       },
     },
     optimizeDeps: {

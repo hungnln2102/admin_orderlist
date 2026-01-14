@@ -9,7 +9,6 @@ import {
   OrderDatasetKey,
 } from "../../../../constants";
 import {
-  normalizeCheckFlag,
   normalizeOrderCode,
   normalizeSearchText,
   parseErrorResponse,
@@ -89,7 +88,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
   const [renewingOrderCode, setRenewingOrderCode] = useState<string | null>(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const pendingRefundStatus = "Chưa Hoàn";
+  const pendingRefundStatus = ORDER_STATUSES.CHO_HOAN;
   const isUnpaidStatus = (statusText: string) =>
     statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
     statusText === pendingRefundStatus;
@@ -180,9 +179,6 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         (order[ORDER_FIELDS.STATUS] as string | null) ||
         ORDER_STATUSES.CHUA_THANH_TOAN;
       const trangThaiText = String(rawStatus || "").trim();
-      const checkFlagStatus = normalizeCheckFlag(
-        order[ORDER_FIELDS.CHECK_FLAG]
-      );
 
       const giaBan = Helpers.roundGiaBanValue(
         Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
@@ -214,7 +210,6 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         ...order,
         [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: effectiveRemaining,
         [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
-        [VIRTUAL_FIELDS.CHECK_FLAG_STATUS]: checkFlagStatus,
         [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
         [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: formattedOrderDate,
         [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: formattedExpiryDate,
@@ -465,28 +460,15 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
   const handleMarkPaid = useCallback(
     async (order: Order) => {
       if (!order || !order.id) return;
-      const statusRaw = String(order[ORDER_FIELDS.STATUS] || "");
-      const statusNorm = statusRaw
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim();
-      const checkFlag = order[ORDER_FIELDS.CHECK_FLAG];
-
+      const statusText = String(order[ORDER_FIELDS.STATUS] || "").trim();
       let payload: Partial<Order> | null = null;
-      if (statusNorm === "chua thanh toan" && (checkFlag === null || checkFlag === undefined)) {
+      if (statusText === ORDER_STATUSES.CHUA_THANH_TOAN) {
         payload = {
-          [ORDER_FIELDS.CHECK_FLAG]: false,
+          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DANG_XU_LY,
         };
-      } else if (statusNorm === "chua thanh toan" && checkFlag === false) {
+      } else if (statusText === ORDER_STATUSES.DANG_XU_LY) {
         payload = {
           [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
-          [ORDER_FIELDS.CHECK_FLAG]: true,
-        };
-      } else {
-        payload = {
-          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
-          [ORDER_FIELDS.CHECK_FLAG]: true,
         };
       }
 
@@ -628,7 +610,6 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         [ORDER_FIELDS.PRICE]: Number(updatedOrder.price ?? 0) || 0,
         [ORDER_FIELDS.NOTE]: updatedOrder.note,
         [ORDER_FIELDS.STATUS]: updatedOrder.status,
-        [ORDER_FIELDS.CHECK_FLAG]: updatedOrder.check_flag,
       };
 
       try {
@@ -673,7 +654,6 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           body: JSON.stringify({
             can_hoan: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],
             gia_tri_con_lai: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],
-            check_flag: orderToDelete[VIRTUAL_FIELDS.CHECK_FLAG_STATUS],
           }),
         }
       );

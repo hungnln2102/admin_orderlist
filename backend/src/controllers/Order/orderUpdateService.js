@@ -11,14 +11,10 @@ const updateOrderWithFinance = async ({
         normalizeOrderRow,
         todayYMDInVietnam,
     } = helpers;
-    const { addSupplierImportOnCheck } = require("./orderFinanceHelpers");
+    const { addSupplierImportOnProcessing } = require("./orderFinanceHelpers");
 
     const sanitized = sanitizeOrderWritePayload(payload);
     delete sanitized.id;
-
-    if (sanitized.status === STATUS.PAID && sanitized.check_flag === undefined) {
-        sanitized.check_flag = true;
-    }
 
     if (Object.keys(sanitized).length === 0) {
         return { error: "Không có trường nào cần cập nhật." };
@@ -39,14 +35,13 @@ const updateOrderWithFinance = async ({
     }
 
     try {
-        await addSupplierImportOnCheck(trx, beforeOrder, updatedOrder);
+        await addSupplierImportOnProcessing(trx, beforeOrder, updatedOrder);
     } catch (debtErr) {
         console.error("Lỗi cập nhật công nợ NCC:", {
             id,
             supply: updatedOrder?.supply,
             cost: updatedOrder?.cost,
             status: updatedOrder?.status,
-            check_flag: updatedOrder?.check_flag,
             error: debtErr?.message || debtErr,
         });
     }

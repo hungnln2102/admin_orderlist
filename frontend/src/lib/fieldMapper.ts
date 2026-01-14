@@ -35,7 +35,6 @@ export const ORDER_FIELD_MAP = {
   PRICE: ORDER_COLS.price,
   NOTE: ORDER_COLS.note,
   STATUS: ORDER_COLS.status,
-  CHECK_FLAG: ORDER_COLS.checkFlag,
   REFUND: ORDER_COLS.refund,
 } as const;
 
@@ -57,7 +56,6 @@ export const PURCHASE_ORDER_FIELD_MAP = {
   SUPPLY: ORDER_COLS.supply,
   COST: ORDER_COLS.cost,
   STATUS: ORDER_COLS.status,
-  CHECK_FLAG: ORDER_COLS.checkFlag,
 } as const;
 
 export const VARIANT_PRICING_FIELD_MAP = {

@@ -17,7 +17,6 @@ const SHARED_COLS = {
     price: "price",
     note: "note",
     status: "status",
-    checkFlag: "check_flag",
     refund: "refund",
   },
 };

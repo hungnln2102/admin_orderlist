@@ -27,7 +27,7 @@ const fetchVariantView = async (variantId) => {
           DISTINCT jsonb_build_object(
             'id', c.${quoteIdent(categoryCols.id)},
             'name', c.${quoteIdent(categoryCols.name)},
-            'color', pcj.${quoteIdent(productCategoryCols.color)}
+            'color', c.${quoteIdent(categoryCols.color)}
           )
         ) FILTER (WHERE c.${quoteIdent(categoryCols.id)} IS NOT NULL),
         '[]'::json
@@ -177,6 +177,7 @@ const createProductPrice = async (req, res) => {
     return res.status(400).json({ error: "sanPham là bắt buộc." });
   }
 
+  const normalizedPackageName = normalizeTextInput(packageName) || null;
   const pctCtvVal = toNullableNumber(pctCtv);
   const pctKhachVal = toNullableNumber(pctKhach);
   const pctPromoVal = toNullableNumber(pctPromo);
@@ -191,12 +192,26 @@ const createProductPrice = async (req, res) => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         inserted = await db.transaction(async (trx) => {
-          const productInsert = await trx(TABLES.product)
-            .insert({
-              [productSchemaCols.packageName]: normalizeTextInput(packageName) || null,
-            })
-            .returning("id");
-          const productId = productInsert?.[0]?.id || productInsert?.[0]?.ID;
+          const productInsertQuery = trx(TABLES.product).insert({
+            [productSchemaCols.packageName]: normalizedPackageName,
+          });
+          if (normalizedPackageName) {
+            productInsertQuery.onConflict(productSchemaCols.packageName).merge({
+              [productSchemaCols.packageName]: normalizedPackageName,
+            });
+          }
+          const productInsert = await productInsertQuery.returning("id");
+          let productId = productInsert?.[0]?.id || productInsert?.[0]?.ID;
+          if (!productId && normalizedPackageName) {
+            const existing = await trx(TABLES.product)
+              .select("id")
+              .where(productSchemaCols.packageName, normalizedPackageName)
+              .first();
+            productId = existing?.id || existing?.ID || null;
+          }
+          if (!productId) {
+            throw new Error("Unable to resolve product id.");
+          }
 
           if (Array.isArray(normalizedCategoryIds) && normalizedCategoryIds.length) {
             const rows = normalizedCategoryIds.map((categoryId) => {

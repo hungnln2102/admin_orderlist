@@ -19,11 +19,7 @@ const {
   queueRenewalTask,
   processRenewalTask,
   fetchOrderState,
-  shouldResetStatusToUnpaid,
   isEligibleForRenewal,
-  isNullishFlag,
-  markCheckFlagFalse,
-  setStatusUnpaid,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
 
@@ -65,20 +61,23 @@ router.post("/", async (req, res) => {
   const orderCode = deriveOrderCode(transaction);
   console.log("Derived order code:", orderCode);
   const extractedOrderCodes = extractOrderCodes(transaction);
+  const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
+  const normalizedExtracted = extractedOrderCodes
+    .map((code) => String(code || "").trim().toUpperCase())
+    .filter(Boolean);
   const orderCodes = Array.from(
     new Set(
-      (
-        extractedOrderCodes.length
-          ? extractedOrderCodes
-          : orderCode
-          ? [orderCode]
-          : []
-      )
-        .map((code) => String(code || "").trim().toUpperCase())
-        .filter(Boolean)
+      normalizedPrimary
+        ? [normalizedPrimary]
+        : normalizedExtracted
     )
   );
-  if (orderCodes.length > 1) {
+  if (normalizedExtracted.length > 1 && normalizedPrimary) {
+    console.warn(
+      "Multiple order codes detected; using primary only:",
+      safeStringify({ primary: normalizedPrimary, extracted: normalizedExtracted })
+    );
+  } else if (orderCodes.length > 1) {
     console.log("Extracted order codes:", safeStringify(orderCodes));
   }
   const transferAmountNormalized = normalizeAmount(
@@ -88,6 +87,7 @@ router.post("/", async (req, res) => {
   try {
     let receiptResult = null;
     const eligibilityByOrderCode = new Map();
+    const stateByOrderCode = new Map();
 
     const client = await pool.connect();
     try {
@@ -97,7 +97,6 @@ router.post("/", async (req, res) => {
         const stateRes = await client.query(
           `SELECT
             ${ORDER_COLS.status},
-            ${ORDER_COLS.checkFlag},
             ${ORDER_COLS.orderExpired}
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
@@ -105,12 +104,12 @@ router.post("/", async (req, res) => {
           [code]
         );
         const state = stateRes.rows[0] || null;
+        stateByOrderCode.set(code, state);
         eligibilityByOrderCode.set(
           code,
           state
             ? isEligibleForRenewal(
                 state[ORDER_COLS.status],
-                state[ORDER_COLS.checkFlag],
                 state[ORDER_COLS.orderExpired]
               )
             : null
@@ -150,6 +149,25 @@ router.post("/", async (req, res) => {
         }
       }
 
+      if (receiptResult?.inserted || receiptResult?.duplicate) {
+        for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+          const state = stateByOrderCode.get(code);
+          const eligibility = eligibilityByOrderCode.get(code);
+          if (!state || eligibility?.eligible) continue;
+
+          const statusValue = state[ORDER_COLS.status];
+          if (statusValue === ORDER_STATUS.UNPAID) {
+            await client.query(
+              `UPDATE ${ORDER_TABLE}
+               SET ${ORDER_COLS.status} = $2
+               WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
+                 AND ${ORDER_COLS.status} = $3`,
+              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID]
+            );
+          }
+        }
+      }
+
       await client.query("COMMIT");
     } catch (dbErr) {
       await client.query("ROLLBACK");
@@ -163,29 +181,15 @@ router.post("/", async (req, res) => {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
         const state = await fetchOrderState(code);
         if (state) {
-          const resetToUnpaid = shouldResetStatusToUnpaid(
-            state[ORDER_COLS.status]
-          );
           const eligibility = isEligibleForRenewal(
             state[ORDER_COLS.status],
-            state[ORDER_COLS.checkFlag],
             state[ORDER_COLS.orderExpired]
           );
           if (eligibility.eligible) {
             queueRenewalTask(code, {
               forceRenewal: eligibility.forceRenewal,
-              needsStatusReset: eligibility.needsStatusReset,
             });
             await processRenewalTask(code);
-          } else if (
-            eligibility.statusNorm === ORDER_STATUS.UNPAID &&
-            isNullishFlag(state[ORDER_COLS.checkFlag])
-          ) {
-            await markCheckFlagFalse(code);
-          }
-
-          if (resetToUnpaid) {
-            await setStatusUnpaid(code);
           }
         }
       }

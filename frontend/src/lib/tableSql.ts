@@ -17,7 +17,6 @@ export const ORDER_COLS = {
   price: "price",
   note: "note",
   status: "status",
-  checkFlag: "check_flag",
 };
 
 // 2. ORDER_EXPIRED (Backend: ORDER_EXPIRED - thêm archived_at)

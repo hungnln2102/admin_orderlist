@@ -30,13 +30,6 @@ const { sendRenewalNotification } = require("./notifications");
 
 const pendingRenewalTasks = new Map(); // orderCode -> task state
 
-const normalizeStatusText = (value) =>
-  String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-
 const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
   if (!orderCode) {
     return { success: false, details: "Thiếu mã đơn hàng", processType: "error" };
@@ -54,8 +47,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
         ${ORDER_COLS.informationOrder},
         ${ORDER_COLS.slot},
         ${ORDER_COLS.orderDate},
-        ${ORDER_COLS.status},
-        ${ORDER_COLS.checkFlag}
+        ${ORDER_COLS.status}
       FROM ${ORDER_TABLE}
       WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
       LIMIT 1`,
@@ -78,9 +70,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const giaBanCu = normalizeMoney(order[ORDER_COLS.price]);
     const thongTin = order[ORDER_COLS.informationOrder];
     const slot = order[ORDER_COLS.slot];
-    const rawStatus = String(order[ORDER_COLS.status] || "").trim();
-    const statusPlain = normalizeStatusText(rawStatus);
-    const checkFlagValue = order[ORDER_COLS.checkFlag];
 
     const resolveMoney = (computedValue, ...fallbackValues) => {
       if (Number.isFinite(computedValue) && computedValue > 0) {
@@ -108,26 +97,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     }
 
     const daysLeft = Math.floor((hetHan.getTime() - Date.now()) / 86_400_000);
-
-    // Check directly against the DB value (accented) instead of normalized text.
-    const paidAndLocked =
-      rawStatus === ORDER_STATUS.PAID && isTrueFlag(checkFlagValue);
-
-    // Skip auto-renewal for paid + locked orders, but allow manual (force) renewals.
-    if (paidAndLocked && !forceRenewal) {
-      return {
-        success: false,
-        details: `Bỏ qua gia hạn đơn ${orderCode} `,
-        processType: "skipped",
-      };
-    }
-    if (paidAndLocked && forceRenewal) {
-      console.log("[Renewal] Ghi đè thủ công cho đơn hàng đã thanh toán", {
-        orderCode,
-        status: statusPlain,
-        checkFlag: checkFlagValue,
-      });
-    }
 
     if (!forceRenewal && daysLeft > 4) {
       return {
@@ -228,7 +197,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       productId: variantId || productId,
       variantId,
       status: order[ORDER_COLS.status],
-      checkFlag: order[ORDER_COLS.checkFlag],
     });
 
     const updateSql = `
@@ -239,9 +207,8 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
         ${ORDER_COLS.orderExpired} = $3,
         ${ORDER_COLS.cost} = $4,
         ${ORDER_COLS.price} = $5,
-        ${ORDER_COLS.status} = $6,
-        ${ORDER_COLS.checkFlag} = $7
-      WHERE ${ORDER_COLS.idOrder} = $8
+        ${ORDER_COLS.status} = $6
+      WHERE ${ORDER_COLS.idOrder} = $7
     `;
 
     await client.query(updateSql, [
@@ -250,8 +217,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       formatDateDB(ngayHetHanMoi),
       finalGiaNhap,
       finalGiaBan,
-      ORDER_STATUS.UNPAID,
-      false,
+      ORDER_STATUS.PROCESSING,
       orderCode,
     ]);
 
@@ -273,7 +239,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       NGUON: nguon,
       GIA_NHAP: finalGiaNhap,
       GIA_BAN: finalGiaBan,
-      TINH_TRANG: ORDER_STATUS.UNPAID,
+      TINH_TRANG: ORDER_STATUS.PROCESSING,
     };
 
     return { success: true, details, processType: "renewal" };
@@ -291,7 +257,6 @@ const fetchOrderState = async (orderCode) => {
     const res = await client.query(
       `SELECT
         ${ORDER_COLS.status},
-        ${ORDER_COLS.checkFlag},
         ${ORDER_COLS.orderExpired}
       FROM ${ORDER_TABLE}
       WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
@@ -304,57 +269,17 @@ const fetchOrderState = async (orderCode) => {
   }
 };
 
-const markCheckFlagFalse = async (orderCode) => {
-  const sql = `
-    UPDATE ${ORDER_TABLE}
-    SET ${ORDER_COLS.checkFlag} = FALSE
-    WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-      AND ${ORDER_COLS.checkFlag} IS NULL
-  `;
-  await pool.query(sql, [orderCode]);
-};
-
-const setStatusUnpaid = async (orderCode) => {
-  const sql = `
-    UPDATE ${ORDER_TABLE}
-    SET ${ORDER_COLS.status} = $2,
-        ${ORDER_COLS.checkFlag} = FALSE
-    WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-  `;
-  await pool.query(sql, [orderCode, ORDER_STATUS.UNPAID]);
-};
-
-const isNullishFlag = (value) =>
-  value === null || value === undefined || value === "" || value === "null";
-
-const isTrueFlag = (value) => {
-  if (value === true) return true;
-  if (value === 1 || value === "1") return true;
-  if (typeof value === "string") {
-    return value.trim().toLowerCase() === "true";
-  }
-  return false;
-};
-
-const shouldResetStatusToUnpaid = (statusValue) =>
-  statusValue === ORDER_STATUS.RENEWAL || statusValue === ORDER_STATUS.EXPIRED;
-
-const isEligibleForRenewal = (statusValue, checkFlag, orderExpired) => {
+const isEligibleForRenewal = (statusValue, orderExpired) => {
   const statusText = String(statusValue || "");
   const daysLeft = daysUntil(orderExpired);
 
   const readyForRenew =
     (statusText === ORDER_STATUS.RENEWAL || statusText === ORDER_STATUS.EXPIRED) &&
-    isNullishFlag(checkFlag) &&
     daysLeft <= 4;
 
-  // Do NOT auto-renew paid + locked orders.
-  const paidLocked = statusText === ORDER_STATUS.PAID && isTrueFlag(checkFlag);
-
   return {
-    eligible: readyForRenew && !paidLocked,
+    eligible: readyForRenew,
     forceRenewal: false,
-    needsStatusReset: false,
     daysLeft,
     statusNorm: statusText,
   };
@@ -369,13 +294,11 @@ const queueRenewalTask = (orderCode, options = {}) => {
     orderCode: key,
     renewalDone: existing.renewalDone || false,
     telegramDone: existing.telegramDone || false,
-    statusResetDone: existing.statusResetDone || false,
     lastRenewalResult: existing.lastRenewalResult || null,
     renewalAttempts: existing.renewalAttempts || 0,
     telegramAttempts: existing.telegramAttempts || 0,
     lastError: existing.lastError || null,
     forceRenewal: existing.forceRenewal || options.forceRenewal || false,
-    needsStatusReset: existing.needsStatusReset || options.needsStatusReset || false,
   };
   pendingRenewalTasks.set(key, task);
   return task;
@@ -391,9 +314,8 @@ const processRenewalTask = async (orderCode) => {
     return { orderCode, skipped: true, reason: "not found" };
   }
 
-  const { eligible, forceRenewal, needsStatusReset } = isEligibleForRenewal(
+  const { eligible, forceRenewal } = isEligibleForRenewal(
     state[ORDER_COLS.status],
-    state[ORDER_COLS.checkFlag],
     state[ORDER_COLS.orderExpired]
   );
 
@@ -419,22 +341,6 @@ const processRenewalTask = async (orderCode) => {
         success: false,
         error: task.lastError,
         renewalDone: false,
-        telegramDone: task.telegramDone,
-      };
-    }
-  }
-
-  if (task.renewalDone && needsStatusReset && !task.statusResetDone) {
-    try {
-      await setStatusUnpaid(orderCode);
-      task.statusResetDone = true;
-    } catch (err) {
-      task.lastError = err?.message || String(err);
-      return {
-        orderCode,
-        success: false,
-        error: task.lastError,
-        renewalDone: true,
         telegramDone: task.telegramDone,
       };
     }
@@ -486,7 +392,6 @@ const fetchRenewalCandidates = async () => {
       `SELECT
         ${ORDER_COLS.idOrder} AS order_code,
         ${ORDER_COLS.status} AS status_value,
-        ${ORDER_COLS.checkFlag} AS check_flag_value,
         ${ORDER_COLS.orderExpired} AS order_expired_value
       FROM ${ORDER_TABLE}
       WHERE TRIM(${ORDER_COLS.idOrder}::text) <> ''`
@@ -498,7 +403,6 @@ const fetchRenewalCandidates = async () => {
       if (!orderCode) continue;
       const eligibility = isEligibleForRenewal(
         row.status_value,
-        row.check_flag_value,
         row.order_expired_value
       );
 
@@ -508,7 +412,6 @@ const fetchRenewalCandidates = async () => {
           forceRenewal: eligibility.forceRenewal,
           daysLeft: eligibility.daysLeft,
           status: eligibility.statusNorm,
-          needsStatusReset: eligibility.needsStatusReset,
         });
       }
     }
@@ -532,7 +435,6 @@ const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
   for (const target of targets) {
     queueRenewalTask(target.orderCode, {
       forceRenewal: target.forceRenewal,
-      needsStatusReset: target.needsStatusReset,
     });
   }
 
@@ -561,11 +463,6 @@ const isTelegramEnabled = () =>
 module.exports = {
   runRenewal,
   fetchOrderState,
-  markCheckFlagFalse,
-  setStatusUnpaid,
-  isNullishFlag,
-  isTrueFlag,
-  shouldResetStatusToUnpaid,
   isEligibleForRenewal,
   queueRenewalTask,
   processRenewalTask,

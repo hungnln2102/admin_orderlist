@@ -111,7 +111,6 @@ const ORDERS_SCHEMA = {
       PRICE: "price",
       NOTE: "note",
       STATUS: "status",
-      CHECK_FLAG: "check_flag",
     },
   },
   ORDER_EXPIRED: {
@@ -132,7 +131,6 @@ const ORDERS_SCHEMA = {
       PRICE: "price",
       NOTE: "note",
       STATUS: "status",
-      CHECK_FLAG: "check_flag",
       ARCHIVED_AT: "archived_at",
     },
   },
@@ -154,7 +152,6 @@ const ORDERS_SCHEMA = {
       PRICE: "price",
       NOTE: "note",
       STATUS: "status",
-      CHECK_FLAG: "check_flag",
       REFUND: "refund",
       CREATED_AT: "createdate",
     },
@@ -222,7 +219,6 @@ const PRODUCT_SCHEMA = {
     COLS: {
       PRODUCT_ID: "product_id",
       CATEGORY_ID: "category_id",
-      COLOR: "color",
     },
   },
   PRODUCT: {
