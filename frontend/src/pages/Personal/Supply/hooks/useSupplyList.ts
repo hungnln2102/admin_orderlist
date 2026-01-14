@@ -54,6 +54,7 @@ export const useSupplyList = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !currentStatus }),
       });
+      await fetchSupplies();
     } catch {
       setSupplies((prev) =>
         prev.map((s) => (s.id === id ? { ...s, isActive: currentStatus, status: currentStatus ? "active" : "inactive" } : s))

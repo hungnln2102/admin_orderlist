@@ -32,6 +32,7 @@ import {
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
 } from "../utils/packageHelpers";
+import { onRefresh } from "../../../../lib/refreshBus";
 
 type UsePackageDataResult = {
   data: {
@@ -125,6 +126,7 @@ export const usePackageData = (): UsePackageDataResult => {
     () => readSlotLinkPrefs()
   );
   const slotLinkPrefsRef = useRef(slotLinkPrefs);
+  const isMountedRef = useRef(true);
   const defaultTemplateFields = useMemo(
     () => PACKAGE_FIELD_OPTIONS.map((opt) => opt.value),
     []
@@ -133,6 +135,12 @@ export const usePackageData = (): UsePackageDataResult => {
   useEffect(() => {
     slotLinkPrefsRef.current = slotLinkPrefs;
   }, [slotLinkPrefs]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const persistSlotLinkPreference = useCallback(
     (id: number | string, mode: SlotLinkMode) => {
@@ -214,6 +222,39 @@ export const usePackageData = (): UsePackageDataResult => {
       cancelled = true;
     };
   }, []);
+
+  const refreshOrders = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    setOrdersLoading(true);
+    setOrdersReady(false);
+    try {
+      const res = await apiFetch(`/api/orders`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as OrderListItem[];
+      if (!isMountedRef.current) return;
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else {
+        setOrders([]);
+      }
+      setOrdersReady(true);
+    } catch (error) {
+      console.error("Failed to refresh orders for packages:", error);
+      if (isMountedRef.current) {
+        setOrders([]);
+        setOrdersReady(false);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setOrdersLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(
+    () => onRefresh(["orders"], () => void refreshOrders()),
+    [refreshOrders]
+  );
 
   const packageNames = useMemo(
     () => Array.from(new Set(rows.map((row) => row.package))).sort(),
