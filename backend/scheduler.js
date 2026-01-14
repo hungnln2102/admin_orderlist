@@ -98,7 +98,7 @@ const getSqlCurrentDate = () => {
  * Cron: 00:01 hang ngay
  * - Move expired orders (< 0 days) to table order_expired
  * - Remove them from order_list after moving
- * - Update status "Cần Gia Hạn" for orders with 1..4 days left
+ * - Update status "Cần Gia Hạn" for orders with 0..4 days left
  */
 const updateDatabaseTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
@@ -188,15 +188,15 @@ const updateDatabaseTask = async (trigger = "cron") => {
           .join(", ")}`
       );
     }
-    // 2a) Update PAID -> RENEWAL when days left < 4
+    // 2a) Update PAID -> RENEWAL when days left <= 4
     const paidToRenewal = await client.query(`
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.RENEWAL}'
-      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 3
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
         AND (${COL.status} = '${STATUS.PAID}');
     `);
     console.log(
-      `  - Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (< 4 days).`
+      `  - Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (<= 4 days).`
     );
 
     // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
