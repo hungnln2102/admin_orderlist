@@ -220,7 +220,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, supplyName }: any) => 
 };
 
 export default function Sources() {
-  const { supplies, stats, loading, fetchSupplies, setSupplies, toggleStatus } = useSupplyList();
+  const { supplies, stats, loading, fetchSupplies, toggleStatus } = useSupplyList();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [banks, setBanks] = useState<BankOption[]>([]);
@@ -291,7 +291,7 @@ export default function Sources() {
     if (deleteSupply) {
       const res = await deleteSupplyById(deleteSupply.id);
       if (res.success) {
-        setSupplies((prev) => prev.filter((s) => s.id !== deleteSupply.id));
+        await fetchSupplies();
         setDeleteSupply(null);
       } else {
         alert(res.message);

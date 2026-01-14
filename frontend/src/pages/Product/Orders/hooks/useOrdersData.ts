@@ -28,6 +28,7 @@ import {
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS as CARD_ACCENTS, StatAccent } from "../../../../components/ui/StatCard";
+import { emitRefresh } from "../../../../lib/refreshBus";
 
 export type EditableOrder = Omit<Order, "cost" | "price"> & {
   cost: number | string;
@@ -442,9 +443,9 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           );
         }
         await fetchOrders();
-
         const createdOrder: Order = await response.json();
         handleViewOrder(createdOrder);
+        emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi tạo đơn hàng:", error);
         alert(
@@ -490,6 +491,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           );
         }
         await fetchOrders();
+        emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi đánh dấu đã thanh toán:", error);
         alert(
@@ -548,6 +550,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         }
 
         await fetchOrders();
+        emitRefresh(["orders", "dashboard"]);
         alert("Gia hạn thành công.");
       } catch (error) {
         console.error("Lỗi khi gia hạn đơn:", error);
@@ -582,6 +585,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           );
         }
         await fetchOrders();
+        emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi xác nhận hoàn tiền:", error);
         alert(
@@ -628,6 +632,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
           throw new Error(errorMessage || "Lỗi khi cập nhật đơn hàng từ Máy chủ");
         }
         await fetchOrders();
+        emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi cập nhật đơn hàng:", error);
         alert(
@@ -666,6 +671,7 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
       setOrders((prevOrders) =>
         prevOrders.filter((order) => order.id !== orderToDelete.id)
       );
+      emitRefresh(["orders", "dashboard"]);
     } catch (error) {
       console.error("Lỗi khi xóa đơn hàng:", error);
       alert(
