@@ -133,11 +133,15 @@ const isLocalBaseUrl = (baseUrl) => {
   }
 };
 
-const pickBaseUrl = (...candidates) => {
+const pickBaseUrl = (envBase, originBase, forwardedBase, hostBase) => {
+  const candidates = [envBase, originBase, forwardedBase, hostBase];
   for (const candidate of candidates) {
     if (candidate && !isLocalBaseUrl(candidate)) return candidate;
   }
-  return candidates.find(Boolean) || "";
+  // When everything is localhost, prefer the backend host (serves /image).
+  if (hostBase) return hostBase;
+  if (forwardedBase) return forwardedBase;
+  return originBase || envBase || "";
 };
 
 const buildImageUrl = (req, filename) => {
