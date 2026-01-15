@@ -86,6 +86,7 @@ export const OrderRow = React.memo(function OrderRow({
   const canRenew =
     statusText === ORDER_STATUSES.CAN_GIA_HAN ||
     statusText === ORDER_STATUSES.ORDER_EXPIRED;
+  const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
   const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
@@ -220,7 +221,7 @@ export const OrderRow = React.memo(function OrderRow({
                 <button
                   onClick={stopPropagation(onDelete)}
                   className="text-red-500 hover:text-red-700 p-1 rounded"
-                  title="Xoa don hang"
+                  title="Xoá đơn hàng"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
@@ -244,12 +245,20 @@ export const OrderRow = React.memo(function OrderRow({
                 </div>
                 {showActionButtons && (
                   <div className="ml-4 flex items-center gap-2">
+                    {canStartProcessing && (
+                      <button
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
+                        onClick={stopPropagation(onMarkPaid)}
+                      >
+                        Thanh Toán
+                      </button>
+                    )}
                     {canMarkPaid && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
                         onClick={stopPropagation(onMarkPaid)}
                       >
-                        Đã Thanh Toán
+                        Thanh Toán
                       </button>
                     )}
                     {canRenew && (
@@ -328,3 +337,6 @@ export const OrderRow = React.memo(function OrderRow({
 });
 
 OrderRow.displayName = "OrderRow";
+
+
+

@@ -191,10 +191,13 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
     await postJson(url, buildPayload(true));
   } catch (err) {
     const bodyText = String(err?.body || err?.message || "");
+    const lowered = bodyText.toLowerCase();
     const isThreadError =
       err?.status === 400 &&
-      bodyText.toLowerCase().includes("message_thread_id") &&
-      bodyText.toLowerCase().includes("topic");
+      (lowered.includes("message_thread_id") ||
+        lowered.includes("message thread not found") ||
+        (lowered.includes("thread") && lowered.includes("not found")) ||
+        (lowered.includes("topic") && lowered.includes("not found")));
 
     if (isThreadError) {
       console.warn(

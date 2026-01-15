@@ -92,6 +92,28 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     [updateForm]
   );
 
+  const handleRegisterDateChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const nextDMY =
+        Helpers.formatDateToDMY(e.target.value) || e.target.value || "";
+      const computedExpiry =
+        totalDays > 0 ? calculateExpirationDate(nextDMY, totalDays) : nextDMY;
+
+      const patch: Partial<Order> = {
+        [ORDER_FIELDS.ORDER_DATE]: nextDMY,
+      };
+
+      if (computedExpiry && computedExpiry !== "N/A") {
+        patch[ORDER_FIELDS.ORDER_EXPIRED] = computedExpiry;
+      } else if (totalDays <= 0 && nextDMY) {
+        patch[ORDER_FIELDS.ORDER_EXPIRED] = nextDMY;
+      }
+
+      updateForm(patch);
+    },
+    [totalDays, updateForm]
+  );
+
   useEffect(() => {
     if (!customMode || !customProductTouched) return;
     const months =
@@ -330,11 +352,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   <div>
                     <label className={labelClass}>Ngày Đăng Ký</label>
                     <input
-                      type="text"
+                      type="date"
                       name={ORDER_FIELDS.ORDER_DATE}
-                      value={(formData[ORDER_FIELDS.ORDER_DATE] as string) || ""}
-                      readOnly
-                      className={`${inputClass} ${readOnlyClass}`}
+                      value={Helpers.convertDMYToYMD(registerDateDMY)}
+                      onChange={handleRegisterDateChange}
+                      className={inputClass}
                     />
                   </div>
                   <div>
