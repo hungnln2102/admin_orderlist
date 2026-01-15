@@ -12,6 +12,7 @@ const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { nextId } = require("../../services/idService");
 const { deleteOrderWithArchive } = require("./orderDeletionService");
 const { updateOrderWithFinance } = require("./orderUpdateService");
+const { sendOrderCreatedNotification } = require("../../services/telegramOrderNotification");
 const ORDER_EXPIRED_COLS = Object.values(ORDERS_SCHEMA.ORDER_EXPIRED.COLS || {});
 const ORDER_CANCELED_COLS = Object.values(ORDERS_SCHEMA.ORDER_CANCELED.COLS || {});
 const ORDER_CANCELED_ALLOWED_COLS = ORDER_CANCELED_COLS.filter(
@@ -44,7 +45,11 @@ const attachCrudRoutes = (router) => {
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
             await trx.commit();
-            res.status(201).json(normalizeOrderRow(newOrder, todayYMDInVietnam()));
+            const normalized = normalizeOrderRow(newOrder, todayYMDInVietnam());
+            res.status(201).json(normalized);
+            sendOrderCreatedNotification(normalized).catch((err) => {
+                console.error("[Order][Telegram] Notify failed", err);
+            });
         } catch (error) {
             await trx.rollback();
             console.error("Create failed:", error);

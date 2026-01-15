@@ -506,56 +506,39 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
 
   const handleRenewOrder = useCallback(
     async (order: Order) => {
-      if (!order) return;
+      if (!order || !order.id) return;
       const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
-      if (!orderCode) {
-        alert("Không tìm thấy mã đơn để gia hạn.");
-        return;
-      }
+      setRenewingOrderCode(orderCode || null);
 
-      const renewUrl = `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`;
-      console.log("[Renew] start", {
-        orderCode,
-        orderId: order.id,
-        apiBase: API_BASE,
-        renewUrl,
-      });
-      setRenewingOrderCode(orderCode);
+      const payload: Partial<Order> = {
+        [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DANG_XU_LY,
+      };
+
       try {
-        const response = await fetch(renewUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ forceRenewal: true }),
-        });
-
-        let responseBody: string | null = null;
-        try {
-          responseBody = await response.clone().text();
-        } catch {
-          responseBody = null;
-        }
-        console.log("[Renew] response", {
-          orderCode,
-          status: response.status,
-          body: responseBody,
-        });
+        const response = await fetch(
+          `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(order.id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          }
+        );
 
         if (!response.ok) {
           const errorMessage = await parseErrorResponse(response);
           throw new Error(
-            errorMessage ||
-              `Gia hạn thất bại (mã: ${response.status || "unknown"})`
+            errorMessage || "Loi khi cap nhat trang thai tu may chu"
           );
         }
 
         await fetchOrders();
         emitRefresh(["orders", "dashboard"]);
-        alert("Gia hạn thành công.");
+        alert("Da chuyen don sang Dang Xu Ly.");
       } catch (error) {
-        console.error("Lỗi khi gia hạn đơn:", error);
+        console.error("Loi khi chuyen trang thai gia han:", error);
         alert(
-          `Gia hạn thất bại: ${
+          `Khong the chuyen trang thai gia han: ${
             error instanceof Error ? error.message : String(error)
           }`
         );
@@ -724,3 +707,6 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
     renewingOrderCode,
   };
 };
+
+
+
