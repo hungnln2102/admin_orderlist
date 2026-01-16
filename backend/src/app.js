@@ -1,10 +1,12 @@
 const express = require("express");
 const path = require("path");
 const cors = require("cors");
+const morgan = require("morgan");
 const session = require("express-session");
 const { allowedOrigins, session: sessionConfig } = require("./config/appConfig");
 const routes = require("./routes");
 const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
+const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 
 const app = express();
 app.set("trust proxy", true);
@@ -20,6 +22,11 @@ app.use(
     credentials: true,
   })
 );
+
+// Request logging (only in development)
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+}
 
 app.use(express.json());
 app.use("/image", express.static(path.join(__dirname, "../image")));
@@ -46,5 +53,11 @@ app.get("/api", (_req, res) => {
 });
 
 app.use("/api", routes);
+
+// 404 handler - must be after all routes
+app.use(notFoundHandler);
+
+// Error handler - must be last
+app.use(errorHandler);
 
 module.exports = app;

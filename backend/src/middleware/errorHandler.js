@@ -1,0 +1,105 @@
+/**
+ * Centralized Error Handling Middleware
+ * Provides consistent error responses across the application
+ */
+
+class AppError extends Error {
+  constructor(message, statusCode = 500, code = "INTERNAL_ERROR", details = null) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+    this.isOperational = true; // Distinguish operational errors from programming errors
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+/**
+ * Error handler middleware
+ * Must be registered AFTER all routes
+ */
+const errorHandler = (err, req, res, next) => {
+  // Default error values
+  let statusCode = err.statusCode || 500;
+  let message = err.message || "Đã xảy ra lỗi không xác định";
+  let code = err.code || "INTERNAL_ERROR";
+  let details = err.details || null;
+
+  // Handle specific error types
+  if (err.name === "ValidationError") {
+    statusCode = 400;
+    code = "VALIDATION_ERROR";
+    message = "Dữ liệu không hợp lệ";
+  } else if (err.name === "UnauthorizedError") {
+    statusCode = 401;
+    code = "UNAUTHORIZED";
+    message = "Không có quyền truy cập";
+  } else if (err.code === "23505") {
+    // PostgreSQL unique violation
+    statusCode = 409;
+    code = "DUPLICATE_ENTRY";
+    message = "Dữ liệu đã tồn tại";
+  } else if (err.code === "23503") {
+    // PostgreSQL foreign key violation
+    statusCode = 400;
+    code = "FOREIGN_KEY_VIOLATION";
+    message = "Dữ liệu tham chiếu không hợp lệ";
+  }
+
+  // Log error for debugging (preserve existing console.error pattern)
+  if (statusCode >= 500) {
+    console.error("[Error Handler]", {
+      message: err.message,
+      code,
+      stack: err.stack,
+      url: req.originalUrl,
+      method: req.method,
+    });
+  }
+
+  // Send error response
+  const response = {
+    error: message,
+    code,
+  };
+
+  // Include details in development mode
+  if (process.env.NODE_ENV !== "production" && details) {
+    response.details = details;
+  }
+
+  // Include stack trace in development
+  if (process.env.NODE_ENV !== "production" && err.stack) {
+    response.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
+};
+
+/**
+ * 404 Not Found handler
+ * Must be registered BEFORE error handler but AFTER all routes
+ */
+const notFoundHandler = (req, res, next) => {
+  const error = new AppError(
+    `Không tìm thấy đường dẫn: ${req.originalUrl}`,
+    404,
+    "NOT_FOUND"
+  );
+  next(error);
+};
+
+/**
+ * Async handler wrapper to catch errors in async route handlers
+ * Usage: router.get('/path', asyncHandler(async (req, res) => { ... }))
+ */
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+module.exports = {
+  AppError,
+  errorHandler,
+  notFoundHandler,
+  asyncHandler,
+};

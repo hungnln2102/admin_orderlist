@@ -12,7 +12,7 @@ import Orders from "./pages/Product/Orders";
 import PackageProduct from "./pages/Product/PackageProduct/PackageProduct";
 import ProductInfo from "./pages/Product/ProductInfo/ProductInfo";
 import Pricing from "./pages/Product/priceList";
-import RetroLogin from "./pages/RetroLogin";
+import { LoginPage } from "@/features/auth";
 import Sources from "./pages/Personal/Supply";
 import ShowPrice from "./pages/Personal/ProductPrice";
 import BillOrder from "./pages/Personal/BillOrder";
@@ -40,7 +40,7 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<RetroLogin />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route
             path="/*"
             element={

@@ -62,11 +62,22 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": "/src",
+        "@/app": "/src/app",
+        "@/features": "/src/features",
+        "@/shared": "/src/shared",
+        "@/services": "/src/services",
+        "@/assets": "/src/assets",
+        "@/styles": "/src/styles",
         "@shared": sharedPath,
       },
     },
     optimizeDeps: {
       exclude: ["lucide-react"],
+    },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: "./src/setupTests.ts",
     },
   };
 });

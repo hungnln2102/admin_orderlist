@@ -1,0 +1,13 @@
+/* Retro Theme Variables */
+:root {
+  --retro-bg: #0b0b14;
+  --retro-card: rgba(13, 14, 26, 0.8);
+  --retro-border: rgba(255, 255, 255, 0.08);
+  --retro-text: #e5e7ff;
+  --retro-muted: #9aa4c2;
+  --retro-accent: #ff6ec7;
+  --retro-accent-2: #7c5cff;
+  --retro-glow: 0 10px 50px rgba(124, 92, 255, 0.5);
+  --glass: rgba(255, 255, 255, 0.04);
+  color-scheme: dark;
+}
