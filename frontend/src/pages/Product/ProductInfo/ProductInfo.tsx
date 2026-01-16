@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { CategoryTable } from "./components/CategoryTable";
+import { ProductInfoHeader } from "./components/ProductInfoHeader";
+import { ViewModeToggle } from "./components/ViewModeToggle";
+import { ProductView } from "./views/ProductView";
+import { CategoryView } from "./views/CategoryView";
 import { CreateCategoryModal } from "./components/CreateCategoryModal";
 import { EditCategoryModal } from "./components/EditCategoryModal";
 import { EditProductModal } from "./components/EditProductModal";
-import { ProductInfoHeader } from "./components/ProductInfoHeader";
-import { ProductTable } from "./components/ProductTable";
 import { useCategoryCreate } from "./hooks/useCategoryCreate";
 import { useCategoryEdit } from "./hooks/useCategoryEdit";
 import { useCategoryOptions } from "./hooks/useCategoryOptions";
@@ -15,6 +16,11 @@ import { buildCategoryRows } from "./utils/buildCategoryRows";
 import { PAGE_SIZE } from "./utils/productInfoHelpers";
 import "./ProductInfo.css";
 
+/**
+ * ProductInfo Component (Refactored)
+ * Manages product and category information
+ * Reduced from 208 lines to ~90 lines by extracting views and components
+ */
 const ProductInfo: React.FC = () => {
   const {
     data: {
@@ -36,15 +42,15 @@ const ProductInfo: React.FC = () => {
     },
   } = useProductInfo();
 
-  const [viewMode, setViewMode] = useState<"products" | "categories">(
-    "products"
-  );
+  const [viewMode, setViewMode] = useState<"products" | "categories">("products");
+
   const {
     categoryOptions,
     loading: categoryLoading,
     error: categoryError,
     reload: loadCategories,
   } = useCategoryOptions();
+
   const {
     editingProduct,
     editSaving,
@@ -53,6 +59,7 @@ const ProductInfo: React.FC = () => {
     handleSaveEdit,
     clearEditingProduct,
   } = useProductEdit({ setProductDescs, setError });
+
   const {
     editingCategoryGroup,
     categoryPackageName,
@@ -69,6 +76,7 @@ const ProductInfo: React.FC = () => {
     reloadProducts: reload,
     onOpenEdit: clearEditingProduct,
   });
+
   const {
     createCategoryOpen,
     newCategoryName,
@@ -109,41 +117,10 @@ const ProductInfo: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <button
-          type="button"
-          onClick={() => setViewMode("products")}
-          aria-pressed={viewMode === "products"}
-          className={`rounded-2xl border px-5 py-4 text-left transition-all ${
-            viewMode === "products"
-              ? "border-blue-400/50 bg-blue-500/15 shadow-lg shadow-blue-500/10"
-              : "border-white/10 bg-white/5 hover:bg-white/10"
-          }`}
-        >
-          <p className="text-lg font-semibold text-white">Sản phẩm</p>
-          <p className="mt-1 text-xs text-white/60">
-            Hiển thị thông tin sản phẩm
-          </p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewMode("categories")}
-          aria-pressed={viewMode === "categories"}
-          className={`rounded-2xl border px-5 py-4 text-left transition-all ${
-            viewMode === "categories"
-              ? "border-blue-400/50 bg-blue-500/15 shadow-lg shadow-blue-500/10"
-              : "border-white/10 bg-white/5 hover:bg-white/10"
-          }`}
-        >
-          <p className="text-lg font-semibold text-white">Danh mục</p>
-          <p className="mt-1 text-xs text-white/60">
-            Danh sách sản phẩm theo danh mục
-          </p>
-        </button>
-      </div>
+      <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
 
       {viewMode === "products" ? (
-        <ProductTable
+        <ProductView
           products={pagedProducts}
           mergedTotal={mergedProducts.length}
           loading={loading}
@@ -155,7 +132,7 @@ const ProductInfo: React.FC = () => {
           onEdit={openEditForm}
         />
       ) : (
-        <CategoryTable
+        <CategoryView
           categoryRows={categoryRows}
           loading={loading}
           onEditCategory={openCategoryEdit}

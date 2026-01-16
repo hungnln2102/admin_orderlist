@@ -4,12 +4,17 @@
     "description": "",
     "main": "server.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "jest",
         "start": "node index.js",
         "start:api": "node index.js",
         "start:scheduler": "node scheduler.js",
-        "dev": "npm run start:api",
-        "start:new": "node src/server.js"
+        "dev": "nodemon index.js",
+        "dev:api": "nodemon index.js",
+        "start:new": "node src/server.js",
+        "lint": "eslint \"src/**/*.js\"",
+        "lint:fix": "eslint \"src/**/*.js\" --fix",
+        "format": "prettier --write \"src/**/*.js\"",
+        "format:check": "prettier --check \"src/**/*.js\""
     },
     "keywords": [],
     "author": "",
@@ -21,15 +26,23 @@
         "dotenv": "^17.2.3",
         "express": "^5.1.0",
         "express-session": "^1.18.2",
-    "googleapis": "^169.0.0",
-    "multer": "^1.4.5-lts.1",
-    "helmet": "^8.1.0",
+        "express-validator": "^7.3.1",
+        "googleapis": "^169.0.0",
+        "helmet": "^8.1.0",
         "knex": "^3.1.0",
         "morgan": "^1.10.1",
+        "multer": "^1.4.5-lts.1",
         "node-cron": "^4.2.1",
         "pg": "^8.16.3"
     },
     "devDependencies": {
-        "concurrently": "^9.2.1"
+        "concurrently": "^9.2.1",
+        "eslint": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-node": "^11.1.0",
+        "jest": "^30.2.0",
+        "nodemon": "^3.1.11",
+        "prettier": "^3.8.0",
+        "supertest": "^7.2.2"
     }
 }

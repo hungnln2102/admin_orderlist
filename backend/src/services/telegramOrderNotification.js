@@ -228,49 +228,53 @@ const buildOrderCreatedMessage = (order, paymentNote) => {
     toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
     formatDateDMY(order.order_expired);
   const days = Number(order.days || order.total_days || 0) || 0;
-  const priceValue = `${formatCurrency(order.price || 0)} d`;
+  const priceValue = `${formatCurrency(order.price || 0)} đ`;
 
-  const EMOJI_CHECK = "\u2705";
-  const EMOJI_BELL = "\uD83D\uDD14";
-  const EMOJI_PIN = "\uD83D\uDCCC";
-  const EMOJI_RECEIPT = "\uD83E\uDDFE";
-  const EMOJI_CALENDAR = "\uD83D\uDCC5";
-  const EMOJI_HOURGLASS = "\u23F3";
-  const EMOJI_MONEY = "\uD83D\uDCB0";
-  const EMOJI_PERSON = "\uD83D\uDC64";
-  const EMOJI_CARD = "\uD83D\uDCB3";
+  // Escape HTML cho các giá trị
+  const escOrder = orderCode ? escapeHtml(orderCode) : "...";
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escCustomer = customer ? escapeHtml(customer) : "N/A";
+  const escRegister = registerDate ? escapeHtml(registerDate) : "";
+  const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
+  const escDays = days > 0 ? escapeHtml(`${days} ngày`) : "";
+  const escPrice = escapeHtml(priceValue);
+  const escStk = QR_ACCOUNT_NUMBER ? escapeHtml(QR_ACCOUNT_NUMBER) : "";
+  const escPayment = paymentNote ? escapeHtml(paymentNote) : "";
 
-  const codeOrder = orderCode ? toInlineCode(orderCode) : "...";
-  const codeProduct = productName ? toInlineCode(productName) : "N/A";
-  const codeInfo = info ? toInlineCode(info) : "N/A";
-  const codeCustomer = customer ? toInlineCode(customer) : "N/A";
-  const displayRegister = registerDate ? toPlainText(registerDate) : "";
-  const displayExpiry = expiryDate ? toPlainText(expiryDate) : "";
-  const displayDays = days > 0 ? toPlainText(`${days} ngày`) : "";
-  const displayPrice = toPlainText(priceValue);
-  const codeStk = QR_ACCOUNT_NUMBER ? toInlineCode(QR_ACCOUNT_NUMBER) : "";
-  const codePayment = paymentNote ? toInlineCode(paymentNote) : "";
+  // Tạo separator line
+  const separator1 = "━━━━━━ 📦 ━━━━━━";
+  const separator2 = "━━━━━━ 👤 ━━━━━━";
+  const separator3 = "━━━━━━ 💳 ━━━━━━";
 
   const lines = [
-    `${EMOJI_CHECK} Đơn hàng ${codeOrder || "..."} đã được tạo thành công!`,
+    `✅ Đơn hàng <code>${escOrder}</code> đã được tạo thành công!`,
     "",
-    `${EMOJI_BELL} <b>THÔNG TIN SẢN PHẨM</b>`,
-    `${EMOJI_PIN} Tên Sản Phẩm: ${codeProduct}`,
-    `${EMOJI_RECEIPT} Thông Tin Đơn Hàng: ${codeInfo}`,
-    displayRegister ? `${EMOJI_CALENDAR} Ngày Bắt đầu: ${displayRegister}` : null,
-    displayDays ? `${EMOJI_HOURGLASS} Thời hạn: ${displayDays}` : null,
-    displayExpiry ? `${EMOJI_CALENDAR} Ngày Hết hạn: ${displayExpiry}` : null,
-    `${EMOJI_MONEY} Giá bán: ${displayPrice}`,
+    separator1,
+    "🔔 <b>THÔNG TIN SẢN PHẨM</b>",
+    `📦 Tên Sản Phẩm: <b>${escProduct}</b>`,
+    `📋 Thông Tin Đơn Hàng: <code>${escInfo}</code>`,
+    escRegister ? `📅 Ngày Bắt đầu: ${escRegister}` : null,
+    escDays ? `⏳ Thời hạn: ${escDays}` : null,
+    escExpiry ? `📅 Ngày Hết hạn: ${escExpiry}` : null,
+    `💰 Giá bán: <b>${escPrice}</b>`,
     "",
-    `${EMOJI_PERSON} <b>THÔNG TIN KHÁCH HÀNG</b>`,
-    `${EMOJI_PIN} Tên Khách Hàng: ${codeCustomer}`,
+    separator2,
+    "🔶 <b>THÔNG TIN KHÁCH HÀNG</b>",
+    `👤 Tên Khách Hàng: <code>${escCustomer}</code>`,
     "",
-    `${EMOJI_CARD} <b>HƯỚNG DẪN THANH TOÁN</b>`,
-    codeStk ? `STK: ${codeStk}` : null,
-    codePayment ? `Nội dung: ${codePayment}` : null,
+    separator3,
+    "💳 <b>HƯỚNG DẪN THANH TOÁN</b>",
+    escStk ? `🏦 STK: <code>${escStk}</code>` : null,
+    escPayment ? `📝 Nội dung: <code>${escPayment}</code>` : null,
   ].filter(Boolean);
 
   return lines.join("\n");
+};
+
+const buildCopyKeyboard = ({ orderCode, paymentNote }) => {
+  // Tắt copy buttons theo yêu cầu
+  return null;
 };
 
 const sendTelegramMessage = async (payload) => {
