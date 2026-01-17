@@ -35,17 +35,17 @@ export const ProductTable: React.FC<ProductTableProps> = ({
       <div className="overflow-x-auto">
         <table className="min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
           <colgroup>
-            <col style={{ width: "8%" }} />
+            <col style={{ width: "10%" }} />
             <col style={{ width: "13%" }} />
-            <col style={{ width: "16%" }} />
+            <col style={{ width: "15%" }} />
             <col style={{ width: "12%", minWidth: "160px" }} />
             <col style={{ width: "22%", minWidth: "240px" }} />
-            <col style={{ width: "22%", minWidth: "240px" }} />
+            <col style={{ width: "21%", minWidth: "240px" }} />
             <col style={{ width: "7%", minWidth: "120px" }} />
           </colgroup>
           <thead className="bg-white/5 text-white">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">Mã</th>
+              <th className="px-4 py-3 text-left font-semibold">Hình ảnh</th>
               <th className="px-4 py-3 text-left font-semibold">Mã sản phẩm</th>
               <th className="px-4 py-3 text-left font-semibold">Tên sản phẩm</th>
               <th className="px-4 py-3 text-left font-semibold border-r border-white/10 min-w-[160px]">
@@ -75,7 +75,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
             {!loading && products.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-6 py-4 text-center text-sm text-white/70"
                 >
                   Không có sản phẩm nào được hiển thị.
@@ -85,7 +85,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
             {loading && products.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-6 py-4 text-center text-sm text-white/80"
                 >
                   Đang tải danh sách sản phẩm...

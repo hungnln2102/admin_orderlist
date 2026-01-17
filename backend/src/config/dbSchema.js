@@ -226,6 +226,7 @@ const PRODUCT_SCHEMA = {
     COLS: {
       ID: "id",
       PACKAGE_NAME: "package_name",
+      IMAGE_URL: "image_url",
     },
   },
   VARIANT: {

@@ -21,6 +21,7 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
+        p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
         COALESCE(
           json_agg(
             DISTINCT jsonb_build_object(
@@ -42,7 +43,8 @@ const listProducts = async (_req, res) => {
         v.id,
         v.${quoteIdent(variantCols.displayName)},
         v.${quoteIdent(variantCols.variantName)},
-        p.${quoteIdent(productSchemaCols.packageName)}
+        p.${quoteIdent(productSchemaCols.packageName)},
+        p.${quoteIdent(productSchemaCols.imageUrl)}
       ORDER BY v.${quoteIdent(variantCols.displayName)};
     `;
     const result = await db.raw(query);
