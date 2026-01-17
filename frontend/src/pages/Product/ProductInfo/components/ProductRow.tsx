@@ -81,7 +81,20 @@ export const ProductRow: React.FC<ProductRowProps> = ({
         onClick={() => onToggle(isExpanded ? null : Number(item.id))}
       >
         <td className="px-4 py-3">
-          <ProductAvatar item={item} />
+          {item.imageUrl ? (
+            <img
+              src={item.imageUrl}
+              alt={displayName}
+              className="h-12 w-12 rounded-lg object-cover"
+              onError={(e) => {
+                e.currentTarget.src = "https://via.placeholder.com/48?text=No+Image";
+              }}
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-lg bg-gray-700 flex items-center justify-center text-white/50 text-xs">
+              No Image
+            </div>
+          )}
         </td>
         <td className="px-4 py-3 text-white">
           <div className="flex flex-col">
@@ -158,7 +171,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
       </tr>
       {isExpanded && (
         <tr className="bg-white/5">
-          <td colSpan={7} className="px-6 py-4">
+          <td colSpan={6} className="px-6 py-4">
             <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 mb-3 flex flex-col items-center text-center">
               <p className="text-sm font-semibold text-white">
                 Thông tin chi tiết

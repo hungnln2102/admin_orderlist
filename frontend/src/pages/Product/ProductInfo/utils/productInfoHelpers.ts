@@ -15,6 +15,7 @@ export type ProductPriceItem = {
   package?: string | null;
   category?: string | null;
   categories?: CategoryItem[] | null;
+  image_url?: string | null;
 };
 
 export type MergedProduct = ProductDescription & {
@@ -23,6 +24,8 @@ export type MergedProduct = ProductDescription & {
   packageName?: string | null;
   category?: string | null;
   categories?: CategoryItem[];
+  imageUrl?: string | null;
+  packageImageUrl?: string | null;
   rulesHtml?: string | null;
   descriptionHtml?: string | null;
 };
@@ -194,6 +197,8 @@ export const mergeProducts = (
         : null,
       category: priceRow?.category ?? null,
       categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
+      imageUrl: item.imageUrl ?? priceRow?.image_url ?? null,
+      packageImageUrl: priceRow?.image_url ?? null,
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
         item.descriptionHtml || toHtmlFromPlain(item.description || ""),

@@ -35,12 +35,16 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       <div className="overflow-x-auto">
         <table className="min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
           <colgroup>
-            <col style={{ width: "36%" }} />
-            <col style={{ width: "44%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "30%" }} />
+            <col style={{ width: "40%" }} />
             <col style={{ width: "20%", minWidth: "140px" }} />
           </colgroup>
           <thead className="bg-white/5 text-white">
             <tr>
+              <th className="px-4 py-3 text-left font-semibold">
+                Hình Ảnh
+              </th>
               <th className="px-4 py-3 text-left font-semibold">
                 Gói Sản Phẩm
               </th>
@@ -52,7 +56,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             {!loading && categoryRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={3}
+                  colSpan={4}
                   className="px-6 py-4 text-center text-sm text-white/70"
                 >
                   Không có danh mục nào để hiển thị.
@@ -62,7 +66,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             {loading && categoryRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={3}
+                  colSpan={4}
                   className="px-6 py-4 text-center text-sm text-white/80"
                 >
                   Đang tải danh sách danh mục...
@@ -72,6 +76,22 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             {categoryRows.map((group) => (
               <React.Fragment key={group.key}>
                 <tr className="hover:bg-white/5">
+                  <td className="px-4 py-3">
+                    {group.imageUrl ? (
+                      <img
+                        src={group.imageUrl}
+                        alt={group.packageName}
+                        className="h-12 w-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = "https://via.placeholder.com/48?text=No+Image";
+                        }}
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg bg-gray-700 flex items-center justify-center text-white/50 text-xs">
+                        No Image
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-white font-semibold">
                     {group.packageName}
                   </td>
