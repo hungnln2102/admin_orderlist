@@ -87,6 +87,16 @@ const FINANCE_SCHEMA = {
       AMOUNT: "amount",
     },
   },
+  SAVING_GOALS: {
+    TABLE: "saving_goals",
+    COLS: {
+      ID: "id",
+      GOAL_NAME: "goal_name",
+      TARGET_AMOUNT: "target_amount",
+      PRIORITY: "priority",
+      CREATED_AT: "created_at",
+    },
+  },
 };
 
 // -----------------------

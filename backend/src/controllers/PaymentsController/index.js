@@ -168,19 +168,22 @@ const confirmPaymentSupply = async (req, res) => {
           await trx.raw(
             `
             UPDATE ${TABLES.orderList}
-            SET ${QUOTED_COLS.orderList.status} = ?,
+            SET ${QUOTED_COLS.orderList.status} = ?
             WHERE ${QUOTED_COLS.orderList.id} = ANY(?::int[]);
           `,
             [PAID_STATUS, orderIdsToMark]
           );
         }
 
+
         const totalProcessingImport = processingRows.reduce(
           (acc, row) => acc + (Number(row.cost) || 0),
           0
         );
         const importDelta = totalProcessingImport - normalizedPaidAmount;
-        carryoverImport = Math.abs(importDelta);
+        // Chỉ tạo chu kỳ mới khi còn nợ (tổng đơn > tiền thanh toán)
+        // Nếu tiền thanh toán > tổng đơn, không tạo chu kỳ mới (tránh vòng lặp vô tận)
+        carryoverImport = importDelta > 0 ? importDelta : null;
       } catch (orderErr) {
         console.error(
           "[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa",
@@ -195,9 +198,9 @@ const confirmPaymentSupply = async (req, res) => {
           `
           SELECT 1
           FROM ${TABLES.paymentSupply} ps
-          WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = ?
-            AND ps.${QUOTED_COLS.paymentSupply.status} = ?
-            AND ps.${QUOTED_COLS.paymentSupply.id} <> ?
+          WHERE ${QUOTED_COLS.paymentSupply.sourceId} = ?
+            AND ${QUOTED_COLS.paymentSupply.status} = ?
+            AND ${QUOTED_COLS.paymentSupply.id} <> ?
           LIMIT 1;
         `,
           [sourceId, UNPAID_STATUS, parsedPaymentId]

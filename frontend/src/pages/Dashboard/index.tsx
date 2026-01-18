@@ -3,10 +3,11 @@ import { FinanceSection } from "./components/FinanceSection";
 import { OverviewSection } from "./components/OverviewSection";
 import { SectionTabs } from "./components/SectionTabs";
 import { DashboardHero } from "./components/DashboardHero";
-import { budgets, currencyFormatter, financeSummary, savingGoals } from "./constants";
+import { budgets, currencyFormatter, financeSummary } from "./constants";
 import { useDashboardStats } from "./hooks/useDashboardStats";
 import { useGoldPrices } from "./hooks/useGoldPrices";
 import { useWalletBalances } from "./hooks/useWalletBalances";
+import { useSavingGoals } from "./hooks/useSavingGoals";
 
 const Dashboard: React.FC = () => {
   const {
@@ -22,6 +23,7 @@ const Dashboard: React.FC = () => {
 
   const { goldLoading, goldError, selectedGoldRows, fetchGoldPrices } = useGoldPrices();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
+  const { goals: savingGoals, totalTarget: savingGoalsTotalTarget, loading: savingGoalsLoading, refetch: refetchGoals } = useSavingGoals();
   const [activeSection, setActiveSection] = useState<"overview" | "finance">("overview");
 
   const latestGoldBid = selectedGoldRows.length ? Number(selectedGoldRows[0]?.bid || 0) || null : null;
@@ -75,6 +77,7 @@ const Dashboard: React.FC = () => {
           walletLoading={walletLoading}
           walletError={walletError}
           onRefreshWallets={fetchWalletBalances}
+          onRefetchGoals={refetchGoals}
         />
       )}
     </div>

@@ -16,7 +16,7 @@ type FinanceSummaryItem = {
 };
 
 type Budget = { name: string; used: number; total: number };
-type SavingGoal = { name: string; progress: number; saved: number; target: number; accent: string };
+type SavingGoal = { id: number; goal_name: string; target_amount: number; created_at: string };
 
 type FinanceSectionProps = {
   financeSummary: FinanceSummaryItem[];
@@ -33,6 +33,7 @@ type FinanceSectionProps = {
   walletLoading: boolean;
   walletError: string | null;
   onRefreshWallets: () => void;
+  onRefetchGoals?: () => void;
 };
 
 export const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -50,6 +51,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   walletLoading,
   walletError,
   onRefreshWallets,
+  onRefetchGoals,
 }) => {
   const goldField =
     walletColumns.find((c) => c.id === 7)?.field ||
@@ -115,6 +117,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
         walletColumns={walletColumns}
         walletRows={walletRows}
         goldValue={goldValue}
+        onRefetchGoals={onRefetchGoals}
       />
 
       <WalletBalancesCard
