@@ -7,6 +7,7 @@ const {
   resolveSupplierTableName,
   resolveSupplierNameColumn,
 } = require("../../SuppliesController/helpers");
+const { updateOrderCostsOnSupplyPriceChange } = require("../../../services/updateOrderCostsOnSupplyPriceChange");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;
@@ -90,12 +91,37 @@ const updateSupplyPriceForProduct = async (req, res) => {
   const { price } = req.body || {};
   try {
     const result = await upsertSupplyPrice({ productId }, sourceId, price);
-    res.json({
-      productId: result.productId,
-      sourceId: result.supplierId,
-      supplierId: result.supplierId,
-      price: result.price,
-    });
+    
+    // Auto-update order costs for PROCESSING and UNPAID orders
+    try {
+      const updateResult = await updateOrderCostsOnSupplyPriceChange(
+        Number(productId),
+        Number(sourceId),
+        price
+      );
+      
+      // Include update info in response (optional)
+      res.json({
+        productId: result.productId,
+        sourceId: result.supplierId,
+        supplierId: result.supplierId,
+        price: result.price,
+        ordersUpdated: updateResult.updatedCount,
+      });
+    } catch (updateError) {
+      // Log error but don't fail the price update
+      console.error("Failed to auto-update order costs:", updateError);
+      
+      // Still return success for the price update
+      res.json({
+        productId: result.productId,
+        sourceId: result.supplierId,
+        supplierId: result.supplierId,
+        price: result.price,
+        ordersUpdated: 0,
+        updateError: "Failed to update orders",
+      });
+    }
   } catch (error) {
     console.error(
       `Update failed (PATCH /api/products/${productId}/suppliers/${sourceId}/price):`,
