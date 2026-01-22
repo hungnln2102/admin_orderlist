@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # ==========================================
   # 1. DATABASE SERVICE (PostgreSQL)
@@ -58,7 +60,7 @@ services:
         VITE_API_BASE_URL: https://admin.mavrykpremium.store
     restart: always
     ports:
-      - "${FRONTEND_PORT:-8081}:80"
+      - "8081:80"
     volumes:
       # Mount code để sửa giao diện xong web tự cập nhật
       - ./frontend:/app
@@ -66,29 +68,26 @@ services:
     networks:
       - app-network
 
-
   # ==========================================
-  # 4. TLS REVERSE PROXY (Caddy)
+  # 4. NGINX REVERSE PROXY WITH SSL
   # ==========================================
-  caddy:
-    container_name: admin_orderlist-caddy
-    image: caddy:2-alpine
+  nginx:
+    container_name: admin_orderlist-nginx
+    image: nginx:alpine
     restart: always
-    profiles:
-      - caddy
-    environment:
-      CADDY_DOMAIN: ${CADDY_DOMAIN:-admin.mavrykpremium.store}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
     networks:
       - app-network
     depends_on:
       - frontend
+      - backend
 
 # ==========================================
 # NETWORKS & VOLUMES
@@ -99,6 +98,4 @@ networks:
 
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:
-
+  nginx_cache:
