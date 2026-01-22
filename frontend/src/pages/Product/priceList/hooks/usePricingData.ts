@@ -19,7 +19,9 @@ type ImportMetaEnv = {
 const API_BASE =
   (typeof import.meta !== "undefined" &&
     (import.meta as unknown as ImportMetaEnv).env?.VITE_API_BASE_URL) ||
-  (process.env.VITE_API_BASE_URL as string) ||
+  (typeof process !== "undefined"
+    ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
+    : "") ||
   "http://localhost:3001";
 
 export const usePricingData = () => {
