@@ -59,14 +59,36 @@ services:
       args:
         VITE_API_BASE_URL: https://admin.mavrykpremium.store
     restart: always
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     volumes:
       # Mount code để sửa giao diện xong web tự cập nhật
       - ./frontend:/app
       - /app/node_modules
     networks:
       - app-network
+
+
+  # ==========================================
+  # 4. TLS REVERSE PROXY (Caddy)
+  # ==========================================
+  caddy:
+    container_name: admin_orderlist-caddy
+    image: caddy:2-alpine
+    restart: always
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-admin.mavrykpremium.store}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app-network
+    depends_on:
+      - frontend
 
 # ==========================================
 # NETWORKS & VOLUMES
@@ -77,4 +99,6 @@ networks:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
 

@@ -27,7 +27,7 @@ This guide explains how to deploy the **Admin Orderlist** application to a VPS u
     ```
 
     This command will:
-    - Build the Frontend, Backend, and Database containers.
+    - Build the Frontend, Backend, Database, and Caddy (TLS) containers.
     - Start them in detached mode (`-d`).
     - Restart them automatically if they crash (`restart: always` is set).
 
@@ -49,6 +49,6 @@ Example:
 
 ## Verify Deployment
 
-- **Frontend**: http://<VPS_IP>:80
+- **Frontend**: https://<your-domain> (or http://<VPS_IP> if you are not using TLS)
 - **Backend API**: http://<VPS_IP>:3001
 - **Database**: Port 5432

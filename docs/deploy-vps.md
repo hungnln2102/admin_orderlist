@@ -25,27 +25,21 @@ Prereqs
 4) Build and run
 - `docker compose up -d --build`
 - Services:
+  - `caddy` on ports 80/443 terminating TLS and proxying to the frontend.
   - `frontend` (nginx) on port 80 serving the React build and proxying `/api` to the backend.
-  - `backend-api` on port 3001.
-  - `backend-scheduler` running cron tasks from `scheduler.js`.
+  - `backend` on port 3001.
+  - `postgres` on port 5432.
 
 5) Verify
 - `docker compose ps`
-- `docker compose logs -f backend-api`
+- `docker compose logs -f backend`
 - `curl http://localhost:3001/health` (if you add a health route) or hit any `/api/...` endpoint.
-- Browse to `http://admin.mavrykpremium.store`.
+- Browse to `https://admin.mavrykpremium.store`.
 
 6) TLS (recommend)
-- Easiest: run Traefik or Caddy as a reverse proxy to terminate HTTPS and forward to `frontend:80`.
-- Quick Caddy example:
-  - `docker run -d --name caddy --network admin_orderlist_default -p 80:80 -p 443:443 -v $PWD/Caddyfile:/etc/caddy/Caddyfile caddy`
-  - Caddyfile:
-    ```
-    admin.mavrykpremium.store {
-      reverse_proxy frontend:80
-    }
-    ```
-  - This auto-fetches Let's Encrypt certs.
+- TLS is handled by the `caddy` service in `docker-compose.yml`.
+- Set `CADDY_DOMAIN` (default: `admin.mavrykpremium.store`) before starting the stack.
+- Make sure ports 80 and 443 are open on the VPS.
 
 7) Updates
 - Pull new code, rebuild: `docker compose pull && docker compose up -d --build`
