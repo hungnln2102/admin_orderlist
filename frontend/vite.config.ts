@@ -36,9 +36,29 @@ export default defineConfig(({ mode }) => {
       "process.env.NODE_ENV": '"development"',
       __DEV__: "true",
     };
+  } else {
+    // Production configuration
+    build = {
+      minify: true,
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+          },
+        },
+      },
+    };
+
+    define = {
+      "process.env.NODE_ENV": '"production"',
+      __DEV__: "false",
+    };
   }
 
   return {
+    // Base path for assets - critical for production deployment
+    base: '/',
     plugins: [react()],
     build,
     esbuild,

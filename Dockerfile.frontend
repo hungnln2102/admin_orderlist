@@ -21,7 +21,8 @@ WORKDIR /app/frontend
 ENV npm_config_fund=false \
     npm_config_audit=false \
     npm_config_progress=false \
-    NODE_OPTIONS="--max_old_space_size=1024"
+    NODE_OPTIONS="--max_old_space_size=1024" \
+    NODE_ENV=production
 
 # Copy node_modules từ stage deps
 COPY --from=deps /app/frontend/node_modules ./node_modules
@@ -35,8 +36,13 @@ COPY shared /app/shared
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
-# Build frontend
-RUN npm run build
+# Build frontend for production
+RUN echo "Building frontend with VITE_API_BASE_URL=${VITE_API_BASE_URL}" && \
+    npm run build && \
+    echo "Build completed. Checking dist folder:" && \
+    ls -la dist/ && \
+    echo "Checking index.html:" && \
+    cat dist/index.html
 
 # Step 3 - Serve with Nginx
 FROM nginx:1.27-alpine AS runtime
