@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { XMarkIcon, Bars3Icon } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../AuthContext";
 import { menuSections } from "./menuConfig";
 import SidebarMenuSection from "./SidebarMenuSection";
@@ -49,43 +48,37 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   return (
     <>
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="bg-white p-2 rounded-lg shadow-lg border border-gray-200"
-        >
-          {isOpen ? (
-            <XMarkIcon className="h-6 w-6 text-gray-600" />
-          ) : (
-            <Bars3Icon className="h-6 w-6 text-gray-600" />
-          )}
-        </button>
-      </div>
 
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       <div
         className={`
-          fixed top-0 left-0 z-40 w-64 h-full bg-gradient-to-b from-[#0c1230] via-[#141a3c] to-[#0a0e24] shadow-2xl border-r border-white/10
-          transform transition-transform duration-300 ease-in-out
-          ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
+          fixed top-4 left-4 bottom-4 z-40 w-64 glass-panel rounded-[32px] 
+          transform transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+          ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-[110%] lg:translate-x-0 opacity-0 lg:opacity-100"}
+          border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]
         `}
       >
         <div className="flex flex-col h-full">
-          <div className="px-4 pt-6 pb-4">
-            <div className="rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 shadow-lg shadow-indigo-900/50 text-center border border-white/10">
-              <h1 className="text-lg font-bold text-white tracking-wide">
-                Admin Orderlist
-              </h1>
-              <p className="text-[11px] text-indigo-100/90 mt-1 font-medium uppercase tracking-[0.08em]">
-                Control Panel
-              </p>
+          <div className="px-5 pt-6 pb-2">
+            <div className="group relative overflow-hidden rounded-xl bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 p-[1px] transition-all hover:scale-[1.02]">
+              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 to-purple-600 opacity-10 group-hover:opacity-20 transition-opacity"></div>
+              <div className="relative rounded-[11px] bg-[#0c1222]/80 py-3 backdrop-blur-md border border-white/5 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)]">
+                <div className="animate-marquee-seamless" style={{ animationDuration: '25s' }}>
+                  <h1 className="text-[11px] font-bold text-white uppercase tracking-[0.2em] whitespace-nowrap px-6">
+                    Mavryk <span className="text-indigo-400">Store</span>
+                  </h1>
+                  {/* Duplicate for seamless loop */}
+                  <h1 className="text-[11px] font-bold text-white uppercase tracking-[0.2em] whitespace-nowrap px-6">
+                    Mavryk <span className="text-indigo-400">Store</span>
+                  </h1>
+                </div>
+              </div>
             </div>
           </div>
 

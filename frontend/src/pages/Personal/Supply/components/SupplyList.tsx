@@ -31,10 +31,10 @@ const SupplyList: React.FC<Props> = ({
   onRefreshSupplies,
 }) => {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-sm">
+    <div className="glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-black/20 text-xs uppercase text-white/60 font-semibold">
+          <thead className="bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
             <tr>
               <th className="px-4 py-3">Nhà cung cấp</th>
               <th className="px-4 py-3">Tài khoản</th>
@@ -127,8 +127,8 @@ const SupplyRow = ({
               e.stopPropagation();
               onToggleStatus(supply);
             }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
-              supply.isActive ? "bg-emerald-500 text-white" : "bg-gray-600 text-gray-300"
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+              supply.isActive ? "bg-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)]" : "bg-white/5 text-white/30 border border-white/10"
             }`}
           >
             <PowerIcon className="h-4 w-4" />
@@ -141,27 +141,27 @@ const SupplyRow = ({
                 e.stopPropagation();
                 onView(supply);
               }}
-              className="p-1 text-blue-400 hover:text-blue-300"
+              className="p-1.5 rounded-lg bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             >
-              <EyeIcon className="h-5 w-5" />
+              <EyeIcon className="h-4 w-4" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(supply);
               }}
-              className="p-1 text-green-400 hover:text-green-300"
+              className="p-1.5 rounded-lg bg-white/5 text-emerald-400 border border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all active:scale-90"
             >
-              <PencilSquareIcon className="h-5 w-5" />
+              <PencilSquareIcon className="h-4 w-4" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(supply);
               }}
-              className="p-1 text-rose-400 hover:text-rose-300"
+              className="p-1.5 rounded-lg bg-white/5 text-rose-400 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-90"
             >
-              <TrashIcon className="h-5 w-5" />
+              <TrashIcon className="h-4 w-4" />
             </button>
           </div>
         </td>

@@ -62,7 +62,7 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                 <td className="px-3 py-2 text-center">
                   <input
                     type="date"
-                    className="w-full rounded-md border border-white/20 bg-white/80 px-2 py-1 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-400"
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
                     value={newDate}
                     onChange={(e) => onDateChange(e.target.value)}
                   />
@@ -78,7 +78,7 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                           {col.sourceFields.map((field) => (
                             <input
                               key={field}
-                              className="w-full rounded-md border border-white/20 bg-white/80 px-2 py-1 text-xs text-slate-900 text-center focus:ring-2 focus:ring-indigo-400"
+                              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-white/20"
                               placeholder={field}
                               value={newValues[field] || ""}
                               onChange={(e) =>
@@ -93,7 +93,7 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                   return (
                     <td key={col.field} className="px-3 py-2 text-center">
                       <input
-                        className="w-full rounded-md border border-white/20 bg-white/80 px-2 py-1 text-xs text-slate-900 text-center focus:ring-2 focus:ring-indigo-400"
+                        className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-white/20"
                         placeholder="0"
                         value={newValues[col.field] || ""}
                         onChange={(e) => onValueChange(col.field, e.target.value)}

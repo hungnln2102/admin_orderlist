@@ -176,6 +176,8 @@ export const usePackageData = (): UsePackageDataResult => {
       } catch (error) {
         console.error("Tải sản phẩm gói thất bại:", error);
         if (!cancelled) {
+          const { handleNetworkError } = await import("@/lib/errorHandler");
+          console.error(handleNetworkError(error));
           setRows([]);
         }
       } finally {

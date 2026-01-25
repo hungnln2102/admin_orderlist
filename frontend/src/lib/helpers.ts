@@ -183,6 +183,28 @@ export const formatCurrencyPlain = (value: number): string => {
   return n > 0 ? n.toLocaleString("vi-VN") : "";
 };
 
+export const formatNumberOnTyping = (value: string): string => {
+  const raw = value.replace(/[^\d]/g, "");
+  if (!raw) return "";
+  const num = parseInt(raw, 10);
+  if (isNaN(num)) return "";
+  return num.toLocaleString("vi-VN").replace(/,/g, ".");
+};
+
+export const formatDecimalOnTyping = (value: string): string => {
+  // Allow digits and at most one dot or comma
+  let raw = value.replace(/,/g, ".");
+  raw = raw.replace(/[^\d.]/g, "");
+  
+  const parts = raw.split(".");
+  if (parts.length > 2) {
+    raw = parts[0] + "." + parts.slice(1).join("");
+  }
+  
+  return raw;
+};
+
+
 export const formatCurrencyShort = (value: number): string => {
   if (!Number.isFinite(value) || value <= 0) return "₫0";
   if (value >= 1_000_000_000) {

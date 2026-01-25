@@ -68,8 +68,8 @@ export const QrModal: React.FC<QrModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
-      <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
+      <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative z-[100]">
         <button
           className="absolute right-6 top-6 text-slate-400 hover:text-indigo-100 transition"
           onClick={onClose}
@@ -91,17 +91,17 @@ export const QrModal: React.FC<QrModalProps> = ({
               <p className="text-lg font-semibold text-sky-200">
                 Quét mã QR để thanh toán
               </p>
-              <div className="rounded-2xl bg-white p-4">
+              <div className="rounded-2xl bg-white p-4 relative z-0">
                 <img
                   src={qrImageUrl}
                   alt="QR thanh toan"
-                  className="h-64 w-64 object-contain"
+                  className="h-64 w-64 object-contain relative z-0"
                 />
               </div>
               <a
                 href={qrImageUrl}
                 download
-                className="inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400"
+                className="inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 relative z-10"
               >
                 Tải ảnh QR
               </a>

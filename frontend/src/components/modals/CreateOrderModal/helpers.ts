@@ -53,6 +53,6 @@ export const INITIAL_FORM_DATA: Partial<Order> = {
 };
 
 export const inputClass =
-  "w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-all";
-export const labelClass = "block text-sm font-medium text-gray-700 mb-1";
-export const readOnlyClass = "bg-gray-100 cursor-not-allowed";
+  "w-full transition-all";
+export const labelClass = "block text-[11px] font-black uppercase tracking-[0.15em] text-indigo-300/80 mb-2 px-1";
+export const readOnlyClass = "opacity-60 cursor-not-allowed bg-indigo-500/5";

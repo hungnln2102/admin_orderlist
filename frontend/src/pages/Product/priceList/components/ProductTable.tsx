@@ -170,14 +170,14 @@ const ProductTable: React.FC<ProductTableProps> = ({
   };
 
   const controlButtonClass =
-    "w-10 h-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed";
+    "w-10 h-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95";
   const pageButtonClass =
-    "w-10 h-10 flex items-center justify-center rounded-xl font-semibold border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10";
+    "w-10 h-10 flex items-center justify-center rounded-xl font-bold border border-white/10 bg-white/5 text-white/80 transition-all hover:bg-white/10 hover:border-white/20 active:scale-95";
   const activePageClass =
-    "rounded-full bg-gradient-to-br from-[#323b74] via-[#22294f] to-[#151c39] text-white border border-[#6b74ff]/50 shadow-[0_12px_30px_-14px_rgba(107,116,255,0.8)]";
+    "bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-white/20 shadow-[0_8px_20px_-6px_rgba(99,102,241,0.6)]";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-white shadow-lg backdrop-blur">
+    <div className="overflow-hidden rounded-[32px] border border-white/5 bg-white/5 text-white shadow-2xl backdrop-blur-xl">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-white/10 text-white">
           <thead className="bg-white/5">

@@ -16,7 +16,7 @@ type FinanceSummaryItem = {
 };
 
 type Budget = { name: string; used: number; total: number };
-type SavingGoal = { id: number; goal_name: string; target_amount: number; created_at: string };
+type SavingGoal = { id: number; goal_name: string; target_amount: number; priority: number; created_at: string };
 
 type FinanceSectionProps = {
   financeSummary: FinanceSummaryItem[];
@@ -54,23 +54,22 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   onRefetchGoals,
 }) => {
   const goldField =
-    walletColumns.find((c) => c.id === 7)?.field ||
+    walletColumns.find((c) => (c.assetCode || "").toUpperCase() !== "VND" && /vàng|gold|hana/i.test(c.name))?.field ||
     walletColumns.find((c) => (c.assetCode || "").toUpperCase() !== "VND")?.field ||
+    walletColumns.find((c) => c.id === 7)?.field ||
     null;
 
-  const goldCostField = useMemo(() => {
-    const byId = walletColumns.find((c) => c.id === 5);
-    if (byId) return byId.field;
-    const byName = walletColumns.find((c) => (c.name || "").toLowerCase().includes("hana"));
-    return byName ? byName.field : null;
-  }, [walletColumns]);
+  const goldCostField =
+    walletColumns.find((c) => (c.assetCode || "").toUpperCase() === "VND" && /hana|vàng|gold/i.test(c.name))?.field ||
+    walletColumns.find((c) => c.id === 5)?.field ||
+    null;
 
-  const totalGoldAmount = goldField
+  const totalGoldAmount = goldField && walletRows.length > 0
     ? walletRows.reduce((sum, row) => sum + (Number(row.values[goldField] || 0) || 0), 0)
     : 0;
 
   const totalGoldCostFromWallet =
-    goldCostField && walletRows.length
+    goldCostField && walletRows.length > 0
       ? walletRows.reduce((sum, row) => sum + (Number(row.values[goldCostField] || 0) || 0), 0)
       : null;
 
@@ -117,6 +116,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
         walletColumns={walletColumns}
         walletRows={walletRows}
         goldValue={goldValue}
+        goldCost={goldCost}
         onRefetchGoals={onRefetchGoals}
       />
 

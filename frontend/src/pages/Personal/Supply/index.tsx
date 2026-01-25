@@ -60,15 +60,15 @@ const AddSupplierModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Thêm Nhà Cung Cấp Mới</h3>
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
+      <div className="glass-panel-dark rounded-[32px] shadow-2xl w-full max-w-md p-8 border border-white/10 animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-2xl font-bold text-white mb-6 tracking-tight">Thêm Nhà Cung Cấp Mới</h3>
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Tên Nhà Cung Cấp</label>
+            <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 mb-2 ml-1">Tên Nhà Cung Cấp</label>
             <input
-              className="w-full border rounded-lg p-2 mt-1 focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-white/20"
               value={form.sourceName}
               onChange={(e) => setForm({ ...form, sourceName: e.target.value })}
               placeholder="Nhập tên..."
@@ -93,13 +93,13 @@ const AddSupplierModal = ({
               ))}
             </select>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+          <div className="flex justify-end gap-3 pt-4">
+            <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors">
               Hủy
             </button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <GradientButton type="submit" disabled={loading} className="!py-2.5 !px-8 text-sm">
               {loading ? "Đang xử lý..." : "Thêm Mới"}
-            </button>
+            </GradientButton>
           </div>
         </form>
       </div>
@@ -160,9 +160,9 @@ const EditSupplierModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Chỉnh Sửa Thông Tin</h3>
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
+      <div className="glass-panel-dark rounded-[32px] shadow-2xl w-full max-w-lg p-8 border border-white/10 animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-2xl font-bold text-white mb-6 tracking-tight">Chỉnh Sửa Thông Tin</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Tên Nhà Cung Cấp</label>
@@ -183,13 +183,13 @@ const EditSupplierModal = ({
             </select>
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+          <div className="flex justify-end gap-3 pt-4">
+            <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors">
               Hủy
             </button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <GradientButton type="submit" disabled={loading} className="!py-2.5 !px-8 text-sm">
               Lưu Thay Đổi
-            </button>
+            </GradientButton>
           </div>
         </form>
       </div>
@@ -200,17 +200,17 @@ const EditSupplierModal = ({
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, supplyName }: any) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl">
-        <h3 className="text-lg font-bold text-rose-600 mb-2">Xóa Nhà Cung Cấp?</h3>
-        <p className="text-gray-600 mb-6">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in">
+      <div className="glass-panel-dark rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-rose-500/20 animate-in zoom-in-95 duration-300">
+        <h3 className="text-2xl font-bold text-rose-500 mb-2 tracking-tight">Xóa Nhà Cung Cấp?</h3>
+        <p className="text-white/60 mb-8 leading-relaxed">
           Bạn có chắc muốn xóa <b>{supplyName}</b>? Hành động này không thể hoàn tác.
         </p>
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+          <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors">
             Hủy
           </button>
-          <button onClick={onConfirm} className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700">
+          <button onClick={onConfirm} className="px-6 py-2.5 bg-rose-500 text-white font-bold rounded-2xl hover:bg-rose-600 transition-all active:scale-95 shadow-lg shadow-rose-500/20">
             Xóa Vĩnh Viễn
           </button>
         </div>
@@ -301,37 +301,59 @@ export default function Sources() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex justify-between items-center">
-        <div>
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold text-white">Quản Lý Nguồn Hàng</h1>
-          <p className="text-white/60 text-sm">Theo dõi công nợ và chu kỳ thanh toán</p>
+          <p className="text-white/60 text-sm">Theo dõi công nợ và chu kỳ thanh toán từ các đối tác cung cấp.</p>
         </div>
-        <GradientButton icon={PlusIcon} onClick={() => setAddModal(true)}>
-          Thêm NCC
-        </GradientButton>
-      </div>
 
       <SupplyStatsCards stats={stats} />
 
-      <div className="bg-white/5 border border-white/10 p-4 rounded-2xl flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-          <input
-            className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-10 text-white focus:outline-none focus:border-indigo-500"
-            placeholder="Tìm kiếm..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row gap-4 items-center">
+          {/* Search Group */}
+          <div className="relative w-full lg:flex-1">
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm nhà cung cấp..."
+              className="w-full pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
+              style={{ paddingLeft: '3.25rem' }}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Filter Group */}
+          <div className="flex w-full lg:w-auto gap-3 items-center">
+            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+            <div className="relative w-full lg:w-[180px]">
+              <select
+                className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                style={{ 
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")', 
+                  backgroundPosition: 'right 1rem center', 
+                  backgroundRepeat: 'no-repeat', 
+                  backgroundSize: '1.1rem', 
+                  paddingRight: '2.5rem' 
+                }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all" className="bg-slate-900 text-white">Tất cả trạng thái</option>
+                <option value="active" className="bg-slate-900 text-white">Đang hoạt động</option>
+                <option value="inactive" className="bg-slate-900 text-white">Tạm dừng</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Action Group */}
+          <div className="flex items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+            <GradientButton icon={PlusIcon} onClick={() => setAddModal(true)} className="!py-2.5 !px-5 text-sm">
+              Thêm NCC
+            </GradientButton>
+          </div>
         </div>
-        <select
-          className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">Tất cả trạng thái</option>
-          <option value="active">Đang hoạt động</option>
-          <option value="inactive">Tạm dừng</option>
-        </select>
       </div>
 
       <SupplyList

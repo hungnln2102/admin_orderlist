@@ -86,41 +86,44 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           {row.informationUser || ""}
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <div className="text-sm text-white">
-            <span className="font-medium">{slotUsed}</span> / {totalSlots} Vị trí
+          <div className="text-sm font-bold text-white flex items-center gap-2">
+            <span className="text-indigo-400">{slotUsed}</span>
+            <span className="text-white/20">/</span>
+            <span>{totalSlots} Vị trí</span>
           </div>
-          <div className="w-full bg-white/20 rounded-full h-2 mt-1">
+          <div className="w-full bg-white/5 rounded-full h-1.5 mt-2 overflow-hidden border border-white/5">
             <div
-              className={`h-2 rounded-full ${slotColorClass}`}
+              className={`h-full rounded-full transition-all duration-500 ${slotColorClass} shadow-[0_0_8px_rgba(34,197,94,0.4)]`}
               style={{ width: `${slotAvailabilityRatio}%` }}
             />
           </div>
-          <div className="text-xs text-white/70 mt-1">
-            Còn trống: {remainingSlots}
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-2">
+            Trống: {remainingSlots}
           </div>
         </td>
         {showCapacityColumn && (
           <td className="px-6 py-4 whitespace-nowrap">
             {showRowCapacity ? (
               <>
-                <div className="text-sm text-white">
-                  <span className="font-medium">{capacityUsed}</span> /{" "}
-                  {capacityLimit} GB
+                <div className="text-sm font-bold text-white flex items-center gap-2">
+                  <span className="text-purple-400">{capacityUsed}</span>
+                  <span className="text-white/20">/</span>
+                  <span>{capacityLimit} GB</span>
                 </div>
-                <div className="w-full bg-white/20 rounded-full h-2 mt-1">
+                <div className="w-full bg-white/5 rounded-full h-1.5 mt-2 overflow-hidden border border-white/5">
                   <div
-                    className={`h-2 rounded-full ${capacityColorClass}`}
+                    className={`h-full rounded-full transition-all duration-500 ${capacityColorClass} shadow-[0_0_8px_rgba(168,85,247,0.4)]`}
                     style={{
                       width: `${capacityAvailabilityRatio}%`,
                     }}
                   />
                 </div>
-                <div className="text-xs text-white/70 mt-1">
-                  Còn trống: {remainingCapacity} GB
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-2">
+                  Trống: {remainingCapacity} GB
                 </div>
               </>
             ) : (
-              <div className="text-sm text-white/70 italic">Không có</div>
+              <div className="text-xs text-white/30 font-bold uppercase tracking-widest italic">N/A</div>
             )}
           </td>
         )}
@@ -130,15 +133,17 @@ export const PackageRow: React.FC<PackageRowProps> = ({
         <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
           {Number(row.import || 0).toLocaleString("vi-VN")} VND
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">
-          {formatDisplayDate(row.expired)}
+        <td className="px-6 py-4 whitespace-nowrap text-sm">
+          <span className="font-mono font-semibold text-white/95 tracking-wide">
+            {formatDisplayDate(row.expired) || "---"}
+          </span>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-white/80">
           {row.note || ""}
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             type="button"
             aria-label="Sửa"
             onClick={(e) => {
@@ -146,10 +151,10 @@ export const PackageRow: React.FC<PackageRowProps> = ({
               onEdit(row);
             }}
           >
-            <PencilIcon className="h-4 w-4" />
+            <PencilIcon className="h-3.5 w-3.5" />
           </button>
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-50 text-purple-600 hover:bg-purple-100 transition"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-purple-400 border border-white/10 hover:bg-purple-500/10 hover:border-purple-500/30 transition-all active:scale-90"
             type="button"
             aria-label="Xem"
             onClick={(e) => {
@@ -157,10 +162,10 @@ export const PackageRow: React.FC<PackageRowProps> = ({
               onView(row);
             }}
           >
-            <EyeIcon className="h-4 w-4" />
+            <EyeIcon className="h-3.5 w-3.5" />
           </button>
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-rose-400 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-90"
             type="button"
             aria-label="Xóa"
             onClick={(e) => {
@@ -168,7 +173,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
               onDelete(row);
             }}
           >
-            <TrashIcon className="h-4 w-4" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </button>
         </td>
       </tr>
@@ -178,61 +183,43 @@ export const PackageRow: React.FC<PackageRowProps> = ({
             colSpan={tableColumnCount}
             className="bg-indigo-900/30 px-6 py-4 text-white"
           >
-            <div className="border border-dashed border-white/40 rounded-lg p-4 space-y-4 text-center">
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  Chi Tiết Các vị trí
-                </p>
-                <p className="text-xs text-white/80">
-                  Hiển thị {totalSlots} vị trí - {slotUsed} đã dùng,{" "}
-                  {remainingSlots} còn trống
-                </p>
+            <div className="glass-panel-dark border border-white/5 bg-slate-900/40 rounded-3xl p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="text-left">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/70">
+                    Chi Tiết Các Vị Trí
+                  </p>
+                  <p className="text-xl font-bold text-white tracking-tight mt-1">
+                    Slot Distribution Maps
+                  </p>
+                </div>
+                <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-white/70">
+                  {slotUsed} Dùng / {remainingSlots} Trống
+                </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-3">
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {slotCells.map((slot) => (
                   <div
                     key={slot.slotNumber}
-                    className={`flex flex-col items-center justify-center rounded-lg border px-3 py-2 basis-1/2 sm:basis-1/3 lg:basis-1/5 min-w-[120px] ${
+                    className={`flex flex-col items-center justify-center rounded-2xl border p-4 transition-all duration-300 hover:scale-[1.05] ${
                       slot.isUsed
-                        ? "border-yellow-300 bg-yellow-50"
-                        : "border-green-200 bg-green-50"
+                        ? "border-amber-500/20 bg-amber-500/5 text-amber-200"
+                        : "border-emerald-500/20 bg-emerald-500/5 text-emerald-200"
                     }`}
-                    title={
-                      slot.assignment?.matchValue ||
-                      slot.assignment?.slotLabel ||
-                      undefined
-                    }
                   >
-                    <div className="flex items-center gap-2">
-                      <BoltIcon
-                        className={`h-5 w-5 ${
-                          slot.isUsed ? "text-yellow-500" : "text-green-500"
-                        }`}
-                      />
-                      <span
-                        className="text-sm font-semibold text-gray-900 max-w-[170px] truncate"
-                        title={
-                          slot.assignment?.slotLabel ||
-                          (slot.assignment
-                            ? undefined
-                            : `vị trí ${slot.slotNumber}`)
-                        }
-                      >
-                        {slot.assignment?.slotLabel
-                          ? slot.assignment.slotLabel
-                          : `vị trí ${slot.slotNumber}`}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className={`p-2 rounded-xl backdrop-blur-md ${slot.isUsed ? "bg-amber-500/10" : "bg-emerald-500/10"}`}>
+                        <BoltIcon className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold tracking-tight text-white/90">
+                        {slot.assignment?.slotLabel || `Slot ${slot.slotNumber}`}
                       </span>
                     </div>
-                    <p
-                      className={`text-xs mt-1 ${
-                        slot.isUsed ? "text-yellow-700" : "text-green-700"
-                      }`}
-                    >
+                    <p className={`text-[11px] font-bold uppercase tracking-widest mt-2 ${slot.isUsed ? "text-amber-500/80" : "text-emerald-500/80"}`}>
                       {slot.assignment && showRowCapacity
                         ? formatCapacityLabel(slot.assignment.capacityUnits)
-                        : slot.isUsed
-                        ? "Đã dùng"
-                        : "Còn trống"}
+                        : slot.isUsed ? "ASSIGNED" : "AVAILABLE"}
                     </p>
                   </div>
                 ))}

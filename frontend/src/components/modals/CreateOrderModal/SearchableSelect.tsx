@@ -77,17 +77,17 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       )}
 
       {open && !disabled && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-20 mt-2 w-full glass-panel-dark border-white/10 shadow-2xl max-h-60 overflow-auto animate-in fade-in slide-in-from-top-2 duration-200">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500">
+            <div className="px-4 py-3 text-sm text-indigo-300/60 italic">
               Không có kết quả
             </div>
           ) : (
             filtered.map((opt) => (
               <div
                 key={`${String(opt.value)}-${opt.label}`}
-                className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-500/15 ${
-                  opt.value === value ? "bg-gray-50" : ""
+                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors hover:bg-indigo-500/20 active:bg-indigo-500/30 ${
+                  opt.value === value ? "bg-indigo-500/10 text-indigo-300" : "text-slate-200"
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault();

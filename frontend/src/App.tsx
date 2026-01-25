@@ -49,23 +49,39 @@ function App() {
                 <ProtectedRoute>
                   <div className="min-h-screen app-aurora">
                     <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-                    <div className="transition-all duration-300 ease-in-out lg:ml-64 print-shell">
-                      <div className="h-16 lg:hidden"></div>
-                      <main className="p-0 pt-[10px] pl-[10px] max-w-none">
-                        <Routes>
-                          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                          <Route path="/dashboard" element={<Dashboard />} />
-                          <Route path="/orders" element={<Orders />} />
-                          <Route path="/package-products" element={<PackageProduct />} />
-                          <Route path="/product-info" element={<ProductInfo />} />
-                          <Route path="/sources" element={<Sources />} />
-                          <Route path="/pricing" element={<Pricing />} />
-                          <Route path="/bill-order" element={<BillOrder />} />
-                          <Route path="/show-price" element={<ShowPrice />} />
-                          <Route path="/invoices" element={<Invoices />} />
-                          <Route path="/warehouse" element={<Warehouse />} />
-                          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                        </Routes>
+                    <div className="transition-all duration-500 ease-in-out lg:ml-72 min-h-screen flex flex-col">
+                      {/* Mobile Floating Toggle (Only visible on small screens) */}
+                      {!sidebarOpen && (
+                        <div className="lg:hidden fixed top-6 left-6 z-40 animate-in fade-in duration-500">
+                          <button 
+                            onClick={() => setSidebarOpen(true)}
+                            className="p-3 rounded-2xl glass-panel-light border border-white/10 text-white shadow-2xl backdrop-blur-xl"
+                          >
+                            <span className="sr-only">Open sidebar</span>
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+
+                      <main className="flex-1 px-6 pt-8 pb-12 overflow-x-hidden">
+                        <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                          <Routes>
+                            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                            <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/orders" element={<Orders />} />
+                            <Route path="/package-products" element={<PackageProduct />} />
+                            <Route path="/product-info" element={<ProductInfo />} />
+                            <Route path="/sources" element={<Sources />} />
+                            <Route path="/pricing" element={<Pricing />} />
+                            <Route path="/bill-order" element={<BillOrder />} />
+                            <Route path="/show-price" element={<ShowPrice />} />
+                            <Route path="/invoices" element={<Invoices />} />
+                            <Route path="/warehouse" element={<Warehouse />} />
+                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                          </Routes>
+                        </div>
                       </main>
                     </div>
                   </div>

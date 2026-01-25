@@ -91,7 +91,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
               }}
             />
           ) : (
-            <div className="h-12 w-12 rounded-lg bg-gray-700 flex items-center justify-center text-white/50 text-xs">
+            <div className="h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 text-[11px] font-bold uppercase tracking-tighter text-center px-1">
               No Image
             </div>
           )}
@@ -143,14 +143,14 @@ export const ProductRow: React.FC<ProductRowProps> = ({
         </td>
         <td className="px-4 py-3 space-x-2 whitespace-nowrap text-center align-top">
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             title="Xem"
             type="button"
           >
-            <EyeIcon className="h-5 w-5 text-blue-400" />
+            <EyeIcon className="h-3.5 w-3.5" />
           </button>
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-emerald-400 border border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all active:scale-90"
             title="Sửa"
             type="button"
             onClick={(event) => {
@@ -158,14 +158,14 @@ export const ProductRow: React.FC<ProductRowProps> = ({
               onEdit(item);
             }}
           >
-            <PencilSquareIcon className="h-5 w-5 text-green-400" />
+            <PencilSquareIcon className="h-3.5 w-3.5" />
           </button>
           <button
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-rose-400 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-90"
             title="Xóa"
             type="button"
           >
-            <TrashIcon className="h-5 w-5 text-red-400" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </button>
         </td>
       </tr>

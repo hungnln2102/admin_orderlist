@@ -179,10 +179,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300">
-      <div className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col text-slate-100">
-        <div className="p-5 border-b border-slate-700 sticky top-0 bg-slate-800/80 z-10 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-white">Tạo Đơn Hàng Mới</h3>
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4">
+      <div className="glass-panel border-white/10 rounded-[32px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col text-slate-100 overflow-hidden">
+        <div className="p-6 sm:p-8 border-b border-white/5 sticky top-0 bg-[#0c1222]/80 backdrop-blur-xl z-20 flex justify-between items-center">
+          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Tạo Đơn Hàng Mới</h3>
           <button
             type="button"
             onClick={onClose}
@@ -192,10 +192,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <form onSubmit={handleSubmit}>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border p-4 rounded-lg bg-gray-50">
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl bg-white/5 border border-white/5">
                 <div>
                   <label className={labelClass}>Loại Khách Hàng</label>
                   <select
@@ -376,7 +376,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       name={ORDER_FIELDS.ORDER_EXPIRED}
                       value={(formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || ""}
                       readOnly
-                      className={`${inputClass} font-medium text-red-600 ${readOnlyClass}`}
+                      className={`${inputClass} font-bold text-rose-400 ${readOnlyClass}`}
                     />
                   </div>
                   <div>
@@ -426,7 +426,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                           Number(priceValue ?? 0)
                         )}
                         onChange={handlePriceInput(ORDER_FIELDS.PRICE)}
-                        className={`${inputClass} font-semibold text-green-700`}
+                        className={`${inputClass} font-bold text-emerald-400`}
                       />
                     ) : (
                       <input
@@ -434,7 +434,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         name={ORDER_FIELDS.PRICE}
                         value={Helpers.formatCurrency(priceValue ?? 0)}
                         readOnly
-                        className={`${inputClass} font-semibold text-green-700 ${readOnlyClass}`}
+                        className={`${inputClass} font-bold text-emerald-400 ${readOnlyClass}`}
                       />
                     )}
                   </div>
@@ -455,21 +455,21 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           </form>
         </div>
 
-        <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-end sticky bottom-0 z-10">
+        <div className="p-6 sm:p-8 border-t border-white/5 bg-[#0c1222]/50 backdrop-blur-xl flex justify-end sticky bottom-0 z-20">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-indigo-500/15 transition-colors shadow-sm mr-3"
+            className="px-8 py-2.5 text-sm font-bold text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all shadow-lg mr-4"
           >
             Hủy
           </button>
           <button
             type="submit"
             onClick={handleSubmit}
-            className={`px-6 py-2 text-base font-medium text-white rounded-lg transition-colors shadow-md ${
+            className={`px-8 py-2.5 text-sm font-bold text-white rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] ${
               isFormComplete && !isLoading
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-gray-400 cursor-not-allowed"
+                ? "bg-emerald-500 hover:bg-emerald-600 hover:scale-[1.02] active:scale-[0.98]"
+                : "bg-slate-700 opacity-50 cursor-not-allowed"
             }`}
             disabled={!isFormComplete || isLoading}
           >

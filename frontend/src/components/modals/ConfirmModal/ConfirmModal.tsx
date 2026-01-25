@@ -28,7 +28,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     // Lớp phủ nền mờ
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-300">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 transition-opacity duration-300">
       {/* Khung Modal */}
       <div className="w-full max-w-md mx-4 transform transition-all duration-300 scale-100 rounded-2xl border border-white/15 bg-gradient-to-br from-slate-900/90 via-indigo-900/85 to-slate-950/90 p-6 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.9)] backdrop-blur">
         {/* Tiêu đề */}

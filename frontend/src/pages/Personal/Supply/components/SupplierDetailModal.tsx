@@ -57,9 +57,9 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={handleClose}>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
         <div
-          className="bg-slate-900 border border-white/20 p-6 rounded-2xl text-white w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-y-auto"
+          className="glass-panel-dark border border-white/5 p-5 md:p-6 rounded-[32px] text-white w-full max-w-4xl max-h-[95vh] shadow-2xl overflow-y-auto custom-scroll"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3">
@@ -86,48 +86,48 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
             </div>
           ) : (
             <>
-              <div className="grid md:grid-cols-2 gap-4 mt-6">
-                <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-2">
-                  <h3 className="text-sm font-semibold text-white/80">Thông tin chung</h3>
-                  <div className="text-sm text-white/80 space-y-1">
-                    <div>
-                      <span className="text-white/50">Ngân hàng: </span>
-                      {bankNameResolved}
+              <div className="grid md:grid-cols-2 gap-3 mt-5">
+                <div className="bg-white/5 rounded-2xl border border-white/5 p-5 space-y-4">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Thông tin chung</h3>
+                  <div className="text-sm text-white/80 space-y-2">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-white/40">Ngân hàng</span>
+                      <span className="font-semibold text-white">{bankNameResolved}</span>
                     </div>
-                    <div>
-                      <span className="text-white/50">Số tài khoản: </span>
-                      {supply?.numberBank || "--"}
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-white/40">Số tài khoản</span>
+                      <span className="font-mono font-semibold text-white">{supply?.numberBank || "--"}</span>
                     </div>
-                    <div>
-                      <span className="text-white/50">Trạng thái: </span>
-                      {statusLabel}
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/40">Trạng thái</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase ${supply?.isActive ? "text-emerald-400 bg-emerald-500/10" : "text-white/50 bg-white/5"}`}>{statusLabel}</span>
                     </div>
                   </div>
                 </div>
-                <div className="bg-white/5 rounded-xl border border-white/10 p-4 space-y-2">
-                  <h3 className="text-sm font-semibold text-white/80">Tổng quan thanh toán</h3>
+                <div className="bg-white/5 rounded-2xl border border-white/5 p-5 space-y-4">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Tổng quan thanh toán</h3>
                   <div className="grid grid-cols-2 gap-3 text-sm text-white/80">
-                    <div className="bg-white/5 rounded-lg p-3 border border-white/5">
-                      <p className="text-white/50 text-xs">Đã thanh toán</p>
-                      <p className="text-lg font-semibold">{Helpers.formatCurrency(stats?.totalPaidAmount || 0)}</p>
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Đã trả</p>
+                      <p className="text-lg font-bold text-white mt-1">{Helpers.formatCurrency(stats?.totalPaidAmount || 0)}</p>
                     </div>
-                    <div className="bg-white/5 rounded-lg p-3 border border-white/5">
-                      <p className="text-white/50 text-xs">Còn nợ</p>
-                      <p className="text-lg font-semibold text-orange-300">{Helpers.formatCurrency(totalUnpaid)}</p>
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Còn nợ</p>
+                      <p className="text-lg font-bold text-orange-400 mt-1">{Helpers.formatCurrency(totalUnpaid)}</p>
                     </div>
-                    <div className="bg-white/5 rounded-lg p-3 border border-white/5">
-                      <p className="text-white/50 text-xs">Đơn chưa thanh toán</p>
-                      <p className="text-lg font-semibold">{stats?.unpaidOrders ?? 0}</p>
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Nợ đơn</p>
+                      <p className="text-lg font-bold text-white mt-1">{stats?.unpaidOrders ?? 0}</p>
                     </div>
-                    <div className="bg-white/5 rounded-lg p-3 border border-white/5">
-                      <p className="text-white/50 text-xs">Đơn đã thanh toán</p>
-                      <p className="text-lg font-semibold">{stats?.paidOrders ?? 0}</p>
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Đã xong</p>
+                      <p className="text-lg font-bold text-white mt-1">{stats?.paidOrders ?? 0}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-4 gap-3 mt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                 {statCards.map((card) => (
                   <div key={card.label} className="bg-white/5 rounded-lg p-3 border border-white/5">
                     <p className="text-white/50 text-xs">{card.label}</p>
@@ -136,7 +136,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 ))}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 mt-4">
+              <div className="grid md:grid-cols-2 gap-3 mt-3">
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
@@ -145,7 +145,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   {unpaidPayments.length === 0 ? (
                     <p className="text-white/50 text-sm">Không có chu kỳ nợ.</p>
                   ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scroll scroll-overlay">
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scroll scroll-overlay">
                       {unpaidPayments.map((p) => (
                         <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 border border-white/5 gap-3">
                           <div className="min-w-0">
@@ -188,7 +188,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   {monthlyOrders.length === 0 ? (
                     <p className="text-white/50 text-sm">Chưa có dữ liệu.</p>
                   ) : (
-                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scroll scroll-overlay">
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scroll scroll-overlay">
                       {monthlyOrders.map((m) => (
                         <div key={m.month} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 border border-white/5">
                           <span className="text-sm font-semibold">Tháng {m.month}</span>
@@ -200,8 +200,8 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 </div>
               </div>
 
-              <div className="mt-6 text-right">
-                <button onClick={handleClose} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white">
+              <div className="mt-4 text-right">
+                <button onClick={handleClose} className="px-10 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold transition-all active:scale-95">
                   Đóng
                 </button>
               </div>

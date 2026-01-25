@@ -97,10 +97,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   if (!isOpen || !formData) return null;
 
   return (
-    <div className="edit-order-shell fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-lg px-4 py-6">
-      <div className="edit-order-panel custom-scroll w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-800/85 via-slate-800/80 to-indigo-900/85 text-slate-100 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8),0_16px_40px_-26px_rgba(99,102,241,0.35)] backdrop-blur-xl">
-        <div className="edit-order-header flex items-center justify-between border-b border-white/15 px-6 py-4 sticky top-0 bg-white/10 backdrop-blur-md z-10 rounded-t-2xl">
-          <h3 className="text-lg font-semibold text-slate-100">
+    <div className="edit-order-shell fixed inset-0 z-70 flex items-center justify-center bg-black/55 backdrop-blur-lg p-2 sm:p-4 md:p-6">
+      <div className="edit-order-panel custom-scroll w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-800/85 via-slate-800/80 to-indigo-900/85 text-slate-100 shadow-[0_24px_70px_-28px_rgba(0,0,0,0.8),0_16px_40px_-26px_rgba(99,102,241,0.35)] backdrop-blur-xl">
+        <div className="edit-order-header flex items-center justify-between border-b border-white/15 px-4 sm:px-6 py-3 sm:py-4 sticky top-0 bg-white/10 backdrop-blur-md z-10 rounded-t-2xl">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-100">
             Chỉnh sửa đơn hàng
           </h3>
           <button
@@ -113,7 +113,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Mã đơn hàng</label>

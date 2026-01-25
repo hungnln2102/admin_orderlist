@@ -1,18 +1,16 @@
 const { db } = require("../../db");
-const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput } = require("../../utils/normalizers");
 const { categoryCols, TABLES } = require("../ProductsController/constants");
 const logger = require("../../utils/logger");
 
 const listCategories = async (_req, res) => {
   try {
-    const query = `
-      SELECT *
-      FROM ${TABLES.category}
-      ORDER BY ${quoteIdent(categoryCols.name)} ASC;
-    `;
-    const result = await db.raw(query);
-    const rows = (result.rows || [])
+    // Use Knex query builder instead of raw SQL for better maintainability
+    const rows = await db(TABLES.category)
+      .select("*")
+      .orderBy(categoryCols.name, "asc");
+    
+    const categories = rows
       .map((row) => {
         const id = Number(row[categoryCols.id] ?? row.id);
         const name = row[categoryCols.name] ?? row.name ?? "";
@@ -24,7 +22,8 @@ const listCategories = async (_req, res) => {
         };
       })
       .filter((row) => Number.isFinite(row.id) && row.id > 0 && row.name);
-    res.json(rows);
+    
+    res.json(categories);
   } catch (error) {
     logger.error("Query failed (GET /api/categories)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Cannot fetch categories." });

@@ -17,8 +17,8 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   if (!open || !receipt) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl relative z-[100]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Chi tiet bien nhan</h2>
           <button

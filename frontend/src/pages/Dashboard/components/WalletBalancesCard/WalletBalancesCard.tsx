@@ -42,7 +42,6 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   error,
   onRefresh,
   currencyFormatter,
-  goldPrice,
 }) => {
   const displayColumns = useMemo(() => buildDisplayColumns(columns), [columns]);
   const assetCodeByField = useMemo(
@@ -70,32 +69,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
     [rows, wallet5Field]
   );
 
-  const goldField = useMemo(() => {
-    const byId = columns.find((c) => c.id === 7);
-    if (byId) return byId.field;
-    const nonVnd = columns.find(
-      (c) => (c.assetCode || "").toUpperCase() !== "VND"
-    );
-    return nonVnd ? nonVnd.field : null;
-  }, [columns]);
 
-  const totalGoldAmount = useMemo(() => {
-    if (!rows.length || !goldField) return 0;
-    return rows.reduce(
-      (sum, row) => sum + (Number(row.values[goldField] || 0) || 0),
-      0
-    );
-  }, [rows, goldField]);
-
-  const goldPricePerChi = useMemo(() => {
-    if (!goldPrice) return null;
-    return goldPrice / 10; // API price is per luong, divide to get chi
-  }, [goldPrice]);
-
-  const totalGoldValue = useMemo(() => {
-    if (!goldPricePerChi || !totalGoldAmount) return null;
-    return totalGoldAmount * goldPricePerChi;
-  }, [goldPricePerChi, totalGoldAmount]);
 
   const formatValue = useCallback(
     (val: number, assetCode?: string) =>
@@ -110,8 +84,14 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   );
 
   const handleChangeValue = useCallback((field: string, value: string) => {
-    setNewValues((prev) => ({ ...prev, [field]: value }));
-  }, []);
+    const col = columns.find(c => c.field === field);
+    const isVnd = !col?.assetCode || col.assetCode.toUpperCase() === "VND";
+    
+    setNewValues((prev) => ({ 
+      ...prev, 
+      [field]: isVnd ? Helpers.formatNumberOnTyping(value) : Helpers.formatDecimalOnTyping(value)
+    }));
+  }, [columns]);
 
   const handleCancel = useCallback(() => {
     setAdding(false);
@@ -125,7 +105,11 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
     const payload: Record<string, number> = {};
     columns.forEach((col) => {
       const raw = newValues[col.field] || "";
-      const cleaned = raw.replace(/[^\d.-]/g, "");
+      const isVnd = !col.assetCode || col.assetCode.toUpperCase() === "VND";
+      
+      // For VND, dots are thousand separators -> remove them
+      // For others, dots are decimal points -> keep them
+      const cleaned = isVnd ? raw.replace(/\./g, "") : raw;
       const num = Number(cleaned || 0);
       if (cleaned) payload[col.field] = Number.isFinite(num) ? num : 0;
     });

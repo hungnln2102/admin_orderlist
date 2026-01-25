@@ -42,24 +42,24 @@ import {
 
 const SUMMARY_CARD_ACCENTS = [
   {
-    border: "border-sky-100/70",
-    glow: "from-sky-100/80 via-white/80 to-blue-100/70",
-    link: "text-sky-600 hover:text-sky-700",
+    border: "border-sky-500/30",
+    glow: "bg-sky-500/20",
+    link: "text-sky-400 hover:text-sky-300",
   },
   {
-    border: "border-emerald-100/70",
-    glow: "from-emerald-100/80 via-white/80 to-lime-100/70",
-    link: "text-emerald-600 hover:text-emerald-700",
+    border: "border-emerald-500/30",
+    glow: "bg-emerald-500/20",
+    link: "text-emerald-400 hover:text-emerald-300",
   },
   {
-    border: "border-violet-100/70",
-    glow: "from-violet-100/80 via-white/80 to-fuchsia-100/70",
-    link: "text-violet-600 hover:text-violet-700",
+    border: "border-violet-500/30",
+    glow: "bg-violet-500/20",
+    link: "text-violet-400 hover:text-violet-300",
   },
   {
-    border: "border-amber-100/70",
-    glow: "from-amber-100/80 via-white/80 to-orange-100/70",
-    link: "text-amber-600 hover:text-amber-700",
+    border: "border-amber-500/30",
+    glow: "bg-amber-500/20",
+    link: "text-amber-400 hover:text-amber-300",
   },
 ] as const;
 
@@ -618,63 +618,16 @@ const PackageProduct: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold text-white">
             Quản lý Gói Sản phẩm
           </h1>
-          <p className="mt-1 text-sm text-white/80">
+          <p className="text-sm text-white/50">
             Quản lý các loại gói sản phẩm và các gói con.
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
-          {!deleteMode ? (
-            <GradientButton
-              icon={TrashIcon}
-              onClick={() => {
-                setDeleteMode(true);
-                setPackagesMarkedForDeletion(new Set());
-              }}
-              disabled={deleteProcessing}
-            >
-              Xóa Loại gói
-            </GradientButton>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleConfirmDeletePackages}
-                className="flex items-center justify-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-600 transition disabled:opacity-60"
-                disabled={deleteProcessing}
-                title="Xác nhận xóa"
-              >
-                <CheckIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={resetDeleteSelection}
-                className="flex items-center justify-center gap-1 rounded-lg bg-white/20 px-3 py-2 text-sm font-semibold text-gray-800 shadow hover:bg-gray-300 transition disabled:opacity-60"
-                disabled={deleteProcessing}
-                title="Hủy xóa"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-          )}
-          <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick}>
-            Tạo Loại Gói
-          </GradientButton>
-          <GradientButton
-            icon={PlusIcon}
-            onClick={handleAddButtonClick}
-            disabled={!selectedPackage}
-          >
-            Thêm Gói
-          </GradientButton>
-        </div>
-      </div>
 
-      <div className="rounded-[32px] bg-gradient-to-br from-white/5 via-indigo-900/35 to-indigo-950/55 border border-white/10 p-6 shadow-[0_24px_65px_-28px_rgba(0,0,0,0.8),0_18px_42px_-26px_rgba(255,255,255,0.25)]">
+      <div className="rounded-[32px] glass-panel p-6 shadow-2xl border border-white/5">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {slotCards.map((stat) => (
             <StatCard
@@ -688,14 +641,14 @@ const PackageProduct: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/10 rounded-xl shadow-sm p-6 text-white">
+      <div className="glass-panel-dark rounded-3xl shadow-2xl p-6 text-white border border-white/5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-xl font-bold text-white tracking-tight">
               Tổng quan các loại gói
             </h2>
-            <p className="text-sm text-white/80">
-              Chọn một loại gói để xem chi tiết hoặc xóa.
+            <p className="text-sm font-medium text-white/50 tracking-wide">
+              Manage and organize your product categories
             </p>
           </div>
         </div>
@@ -715,24 +668,25 @@ const PackageProduct: React.FC = () => {
               return (
                 <div
                   key={summary.name}
-                  className={`relative isolate rounded-3xl border ${
+                  className={`relative isolate rounded-[28px] border ${
                     accent.border
-                  } bg-white/80 p-5 text-white shadow-[0_20px_50px_-35px_rgba(15,23,42,0.7)] backdrop-blur transition duration-200 ${
+                  } bg-white/5 p-6 text-white shadow-xl backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] ${
                     isSelected
-                      ? "ring-2 ring-blue-400 shadow-[0_25px_65px_-35px_rgba(37,99,235,0.7)]"
-                      : "hover:shadow-[0_30px_75px_-40px_rgba(15,23,42,0.55)]"
+                      ? "ring-2 ring-indigo-500/50 shadow-indigo-500/20"
+                      : "hover:bg-white/10 border-white/10"
                   }`}
                 >
+                  <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full blur-[40px] opacity-10 ${accent.glow}`}></div>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300/50">
                         Loại Gói
                       </p>
-                      <h3 className="text-lg font-semibold">
+                      <h3 className="text-xl font-bold tracking-tight mt-1">
                         {summary.name}
                       </h3>
-                      <p className="mt-1 text-sm text-white/80">
-                        Số lượng gói: {summary.total}
+                      <p className="mt-1 text-sm font-medium text-white/40">
+                        Số lượng: {summary.total}
                       </p>
                     </div>
                     {deleteMode ? (
@@ -773,28 +727,28 @@ const PackageProduct: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <dl className="mt-5 grid grid-cols-3 gap-4 text-sm">
-                    <div className="rounded-2xl border border-white/60 bg-white/70 p-3 text-center shadow-inner">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                  <dl className="mt-6 grid grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-2xl border border-white/5 bg-white/5 p-3 text-center transition-colors hover:bg-white/10">
+                      <dt className="text-[9px] font-bold uppercase tracking-widest text-indigo-300/40">
                         Tổng
                       </dt>
-                      <dd className="mt-1 text-2xl font-bold text-white">
+                      <dd className="mt-1 text-xl font-bold text-white">
                         {summary.total}
                       </dd>
                     </div>
-                    <div className="rounded-2xl border border-amber-100/70 bg-amber-50/60 p-3 text-center shadow-inner">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-amber-600">
+                    <div className="rounded-2xl border border-amber-500/10 bg-amber-500/5 p-3 text-center transition-colors hover:bg-amber-500/10">
+                      <dt className="text-[9px] font-bold uppercase tracking-widest text-amber-500/60">
                         Sắp hết
                       </dt>
-                      <dd className="mt-1 text-2xl font-bold text-amber-500">
+                      <dd className="mt-1 text-xl font-bold text-amber-400">
                         {summary.low}
                       </dd>
                     </div>
-                    <div className="rounded-2xl border border-rose-100/70 bg-rose-50/60 p-3 text-center shadow-inner">
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-rose-600">
+                    <div className="rounded-2xl border border-rose-500/10 bg-rose-500/5 p-3 text-center transition-colors hover:bg-rose-500/10">
+                      <dt className="text-[9px] font-bold uppercase tracking-widest text-rose-500/60">
                         Hết
                       </dt>
-                      <dd className="mt-1 text-2xl font-bold text-rose-500">
+                      <dd className="mt-1 text-xl font-bold text-rose-400">
                         {summary.out}
                       </dd>
                     </div>
@@ -808,61 +762,123 @@ const PackageProduct: React.FC = () => {
 
       {selectedPackage && (
         <>
-          <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-            <div className="grid grid-cols-3 gap-4 items-center">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+            <div className="flex flex-col lg:flex-row gap-4 items-center">
+              {/* Search Group */}
+              <div className="relative w-full lg:flex-1">
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
                 <input
                   type="text"
                   placeholder={`Tìm kiếm trong các gói của ${selectedPackage}...`}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
+                  className="w-full pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
+                  style={{ paddingLeft: '3.25rem' }}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <select
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value as StatusFilter)
-                }
-              >
-                {STATUS_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  filteredRows.length
-                    ? "bg-gray-100 text-gray-800 hover:bg-indigo-50"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                }`}
-                disabled={!filteredRows.length}
-              >
-                Xuất Excel
-              </button>
+
+              {/* Filter Group */}
+              <div className="flex w-full lg:w-auto gap-3 items-center">
+                <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+                <div className="relative w-full lg:w-[180px]">
+                  <select
+                    className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                    style={{ 
+                      backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")', 
+                      backgroundPosition: 'right 1rem center', 
+                      backgroundRepeat: 'no-repeat', 
+                      backgroundSize: '1.1rem', 
+                      paddingRight: '2.5rem' 
+                    }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  >
+                    {STATUS_FILTERS.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-slate-900 text-white">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Action Group */}
+              <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+                <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+                
+                {!deleteMode ? (
+                  <GradientButton
+                    icon={TrashIcon}
+                    onClick={() => {
+                      setDeleteMode(true);
+                      setPackagesMarkedForDeletion(new Set());
+                    }}
+                    disabled={deleteProcessing}
+                    className="!py-2 !px-4 text-xs"
+                  >
+                    Xóa Loại gói
+                  </GradientButton>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConfirmDeletePackages}
+                      className="flex items-center justify-center gap-1 rounded-xl bg-emerald-500/80 px-3 py-2 text-sm font-semibold text-white shadow-lg hover:bg-emerald-600 transition disabled:opacity-60"
+                      disabled={deleteProcessing}
+                      title="Xác nhận xóa"
+                    >
+                      <CheckIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetDeleteSelection}
+                      className="flex items-center justify-center gap-1 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-lg hover:bg-white/20 transition disabled:opacity-60"
+                      disabled={deleteProcessing}
+                      title="Hủy xóa"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+
+                <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick} className="!py-2 !px-4 text-xs">
+                  Tạo Loại Gói
+                </GradientButton>
+
+                <GradientButton
+                  icon={PlusIcon}
+                  onClick={handleAddButtonClick}
+                  disabled={!selectedPackage}
+                  className="!py-2 !px-4 text-xs"
+                >
+                  Thêm Gói
+                </GradientButton>
+
+                <button
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                    filteredRows.length
+                      ? "bg-white/5 text-white border-white/10 hover:bg-white/10"
+                      : "bg-white/5 text-white/30 border-white/5 cursor-not-allowed"
+                  }`}
+                  disabled={!filteredRows.length}
+                >
+                  Xuất Excel
+                </button>
+              </div>
             </div>
-            <div className="text-sm text-white/80">
-              Đang xem loại gói:{" "}
-              <span className="font-medium text-white">
-                {selectedPackage ?? "Tất cả"}
-              </span>
-              {statusFilter !== "all" && (
-                <>
-                  {" "}
-                  ›{" "}
-                  <span className="font-medium text-white">
-                    {
-                      STATUS_FILTERS.find(
-                        (option) => option.value === statusFilter
-                      )?.label
-                    }
-                  </span>
-                </>
-              )}
-            </div>
+          </div>
+          
+          <div className="text-xs font-medium text-indigo-300/60 flex items-center gap-2 px-4 py-1">
+            <span className="opacity-70">Đang xem:</span>
+            <span className="text-indigo-300">{selectedPackage}</span>
+            {statusFilter !== "all" && (
+              <>
+                <span className="text-white/20">/</span>
+                <span className="text-indigo-300">
+                  {STATUS_FILTERS.find((opt) => opt.value === statusFilter)?.label}
+                </span>
+              </>
+            )}
           </div>
           <PackageTable
             rows={sortedRows}

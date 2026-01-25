@@ -1,6 +1,8 @@
 import React from "react";
 import Pagination from "../../../../components/ui/Pagination";
 import { ProductRow } from "./ProductRow";
+import { ProductCard } from "./ProductCard";
+import { ResponsiveTable, TableCard } from "../../../../components/ui/ResponsiveTable";
 import { MergedProduct } from "../utils/productInfoHelpers";
 
 type ProductTableProps = {
@@ -27,12 +29,26 @@ export const ProductTable: React.FC<ProductTableProps> = ({
   onEdit,
 }) => {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0b1220] shadow-xl overflow-hidden">
+    <div className="rounded-[32px] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-xl overflow-hidden">
       <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Sản phẩm</h2>
         {loading && <span className="text-xs text-white/60">Đang tải...</span>}
       </div>
-      <div className="overflow-x-auto">
+      <ResponsiveTable
+        showCardOnMobile={true}
+        cardView={
+          <TableCard
+            data={products as unknown as any[]}
+            renderCard={(item) => (
+              <ProductCard
+                item={item as MergedProduct}
+                onEdit={onEdit}
+              />
+            )}
+            className="p-2"
+          />
+        }
+      >
         <table className="min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
           <colgroup>
             <col style={{ width: "10%" }} />
@@ -43,7 +59,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
             <col style={{ width: "21%", minWidth: "240px" }} />
             <col style={{ width: "7%", minWidth: "120px" }} />
           </colgroup>
-          <thead className="bg-white/5 text-white">
+          <thead className="bg-white/5 text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/40">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">Hình ảnh</th>
               <th className="px-4 py-3 text-left font-semibold">Mã sản phẩm</th>
@@ -94,7 +110,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTable>
       <div className="border-t border-white/10 px-4 py-3">
         <Pagination
           currentPage={currentPage}

@@ -262,7 +262,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8">
+      <div className="fixed inset-0 z-70 flex items-start justify-center bg-black/50 px-4 py-8">
         <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#0b1220] border border-white/10 shadow-2xl custom-scroll">
           <input
             ref={colorNativeInputRef}

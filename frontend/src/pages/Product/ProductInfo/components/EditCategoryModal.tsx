@@ -44,7 +44,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8">
+    <div className="fixed inset-0 z-70 flex items-start justify-center bg-black/50 px-4 py-8">
       <div className="w-full max-w-3xl rounded-2xl bg-[#0b1220] border border-white/10 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h2 className="text-lg font-semibold text-white">

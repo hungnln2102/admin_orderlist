@@ -31,8 +31,8 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
 
   return (
     <div
-      className={`w-full rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm mb-3 ${
-        isSectionActive ? "ring-2 ring-indigo-500/40" : ""
+      className={`w-full rounded-2xl border border-white/5 bg-white/0 mb-3 transition-all duration-500 ${
+        isSectionActive ? "ring-1 ring-indigo-500/30 bg-indigo-500/5 shadow-[0_20px_40px_-15px_rgba(79,70,229,0.15)]" : ""
       }`}
     >
       {isStaticSection ? (
@@ -47,11 +47,11 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
                   to={item.href}
                   onClick={onNavigate}
                   className={`
-                    group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200
+                    group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]
                     ${
                       isActive
-                        ? "bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-900/40"
-                        : "text-indigo-100/90 hover:bg-white/10 hover:text-white"
+                        ? "bg-indigo-500/20 text-white border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]"
+                        : "text-indigo-100/70 hover:bg-white/5 hover:text-white border border-transparent"
                     }
                   `}
                 >
@@ -94,11 +94,11 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
                       to={item.href}
                       onClick={onNavigate}
                       className={`
-                        group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200
+                        group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]
                         ${
                           isActive
-                            ? "bg-gradient-to-r from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-900/40"
-                            : "text-indigo-100/90 hover:bg-white/10 hover:text-white"
+                            ? "bg-indigo-500/20 text-white border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]"
+                            : "text-indigo-100/70 hover:bg-white/5 hover:text-white border border-transparent"
                         }
                       `}
                     >

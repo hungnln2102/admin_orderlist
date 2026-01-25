@@ -37,7 +37,6 @@ type OrderRowProps = {
 
 export const OrderRow = React.memo(function OrderRow({
   order,
-  index,
   isExpanded,
   showRemainingColumn,
   showActionButtons,
@@ -125,67 +124,66 @@ export const OrderRow = React.memo(function OrderRow({
     <React.Fragment>
       <tr
         onClick={handleToggle}
-        className={`cursor-pointer transition ${
-          index % 2 === 0 ? "bg-slate-900/55" : "bg-indigo-950/40"
-        } ${isExpanded ? "bg-indigo-700/25" : ""} hover:bg-indigo-600/25`}
+        className={`group/row cursor-pointer transition-all duration-500 ${isExpanded ? "z-20" : "z-10"}`}
       >
         {/* 1. GỘP ORDER + PRODUCT */}
-        <td className="px-4 py-4 text-sm font-medium text-white w-[150px] text-center">
+        <td className="px-5 py-5 first:rounded-l-[24px] last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
           <div className="flex flex-col items-center">
-            <span className="font-bold whitespace-nowrap truncate max-w-[150px]">
+            <span className="text-sm font-bold text-white tracking-wider uppercase whitespace-nowrap">
               {order[ORDER_FIELDS.ID_ORDER] || ""}
             </span>
-            <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+            <span className="text-indigo-400/80 text-[11px] font-bold mt-1 uppercase tracking-wider">
               {order[ORDER_FIELDS.ID_PRODUCT] || ""}
             </span>
           </div>
         </td>
 
         {/* INFORMATION + SLOT (text-center) */}
-        <td className="px-4 py-4 whitespace-nowrap text-sm text-white w-[140px] text-center">
+        <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
           <div className="flex flex-col items-center">
-            <span className="text-white/80 text-xs whitespace-nowrap truncate max-w-[150px]">
-              {order[ORDER_FIELDS.INFORMATION_ORDER] || ""}
+            <span className="text-indigo-100/90 text-xs font-medium tracking-wide">
+              {order[ORDER_FIELDS.INFORMATION_ORDER] || "—"}
             </span>
             {order[ORDER_FIELDS.SLOT] ? (
-              <span className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]">
+              <div className="mt-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-indigo-300/80 uppercase">
                 {order[ORDER_FIELDS.SLOT]}
-              </span>
+              </div>
             ) : null}
           </div>
         </td>
 
         {/* 2. GỘP CUSTOMER + CONTACT */}
-        <td className="px-4 py-4 text-sm text-white w-[150px] text-center">
+        <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
           <div className="flex flex-col items-center">
-            <span className="font-medium whitespace-nowrap truncate max-w-[150px]">
-              {order[ORDER_FIELDS.CUSTOMER] || ""}
+            <span className="text-sm font-bold text-white tracking-tight">
+              {order[ORDER_FIELDS.CUSTOMER] || "Khách ẩn"}
             </span>
-            <span
-              className="text-white/70 text-xs mt-0.5 whitespace-nowrap truncate max-w-[150px]"
-              title={String(order[ORDER_FIELDS.CONTACT] || "")}
-            >
+            <span className="text-white/60 text-[11px] font-medium mt-0.5 truncate max-w-[140px]">
               {order[ORDER_FIELDS.CONTACT] || ""}
             </span>
           </div>
         </td>
 
         {/* ORDER RANGE (text-center) */}
-        <td className="px-4 py-4 whitespace-nowrap truncate text-sm text-white w-[150px] text-center">
-          {orderDateDisplay && expiryDateDisplay
-            ? `${orderDateDisplay} - ${expiryDateDisplay}`
-            : orderDateDisplay || expiryDateDisplay || ""}
+        <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold text-indigo-200">
+            {orderDateDisplay || "—"}
+            <span className="text-white/20">/</span>
+            {expiryDateDisplay || "—"}
+          </div>
         </td>
         {showRemainingColumn && (
-          <td className="px-4 py-4 whitespace-nowrap truncate text-sm font-bold w-[60px] text-center">
-            <span className={remainingClass}>{remainingDisplay}</span>
+          <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
+            <span className={`text-sm font-black transition-all group-hover/row:scale-110 inline-block ${remainingClass}`}>
+              {remainingDisplay}
+            </span>
           </td>
         )}
 
         {/* STATUS (text-center) */}
-        <td className="px-4 py-4 whitespace-nowrap truncate w-[90px] text-center">
+        <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
           <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${Helpers.getStatusColor(
+            className={`inline-flex px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)] whitespace-nowrap ${Helpers.getStatusColor(
               String(trangThaiText || "")
             )}`}
           >
@@ -193,18 +191,18 @@ export const OrderRow = React.memo(function OrderRow({
           </span>
         </td>
         {/* ACTION (text-right) */}
-        <td className="px-4 py-4 whitespace-nowrap truncate text-right text-sm font-medium w-[90px]">
-          <div className="flex space-x-2 justify-end">
+        <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 last:rounded-r-[24px]">
+          <div className="flex space-x-3 justify-end">
             <button
               onClick={stopPropagation(onView)}
-              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-indigo-300/60 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all"
             >
               <EyeIcon className="h-4 w-4" />
             </button>
             {canConfirmRefund && (
               <button
                 onClick={stopPropagation(onConfirmRefund)}
-                className="text-emerald-600 hover:text-emerald-800 p-1 rounded"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-all"
                 title="Xác nhận đã giải/hoàn tiền"
               >
                 <CheckCircleIcon className="h-4 w-4" />
@@ -214,13 +212,13 @@ export const OrderRow = React.memo(function OrderRow({
               <>
                 <button
                   onClick={stopPropagation(onEdit)}
-                  className="text-green-600 hover:text-green-900 p-1 rounded"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-all"
                 >
                   <PencilIcon className="h-4 w-4" />
                 </button>
                 <button
                   onClick={stopPropagation(onDelete)}
-                  className="text-red-500 hover:text-red-700 p-1 rounded"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all"
                   title="Xoá đơn hàng"
                 >
                   <TrashIcon className="h-4 w-4" />
@@ -231,9 +229,9 @@ export const OrderRow = React.memo(function OrderRow({
         </td>
       </tr>
       {isExpanded && (
-        <tr className="bg-indigo-900/40">
-          <td colSpan={totalColumns} className="px-6 pb-6 pt-0">
-            <div className="rounded-2xl border border-dashed border-indigo-200/60 bg-indigo-600/20 p-5 shadow-lg shadow-indigo-900/30">
+        <tr className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <td colSpan={totalColumns} className="px-6 pb-8 pt-2">
+            <div className="rounded-[32px] glass-panel-light p-6 shadow-2xl border border-indigo-500/20">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex-1 text-center">
                   <p className="text-sm font-semibold text-indigo-50">

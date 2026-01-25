@@ -67,7 +67,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-2 py-4 sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-black/40 px-2 py-4 sm:px-4 sm:py-6">
       <div className="relative flex w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl max-h-[95vh]">
         <button
           className="absolute right-4 top-4 text-white/60 hover:text-white/70"

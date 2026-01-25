@@ -27,35 +27,35 @@ export const PackageTable: React.FC<PackageTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden text-white">
+    <div className="glass-panel-dark rounded-[32px] shadow-2xl overflow-hidden text-white border border-white/5">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-white/5">
+          <thead className="bg-white/5">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                 Tên Gói
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Thông Tin Gói
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Số Lượng
               </th>
               {showCapacityColumn && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-indigo-300/40 uppercase tracking-[0.2em]">
                   Dung Lượng
                 </th>
               )}
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 NCC
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Giá Nhập
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-white/90 uppercase tracking-wider">
                 Ngày Hết Hạn
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Ghi Chú
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
@@ -63,7 +63,7 @@ export const PackageTable: React.FC<PackageTableProps> = ({
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
                 <td

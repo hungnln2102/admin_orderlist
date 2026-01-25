@@ -8,19 +8,18 @@ const listSupplies = async (_req, res) => {
   try {
     const supplierTable = await resolveSupplierTableName();
     const supplierNameCol = await resolveSupplierNameColumn();
-    const supplierNameIdent = quoteIdent(supplierNameCol);
-    const result = await db.raw(
-      `
-      SELECT
-        "id" AS id,
-        ${supplierNameIdent} AS source_name,
-        "number_bank" AS number_bank,
-        "bin_bank" AS bin_bank
-      FROM ${supplierTable}
-      ORDER BY ${supplierNameIdent};
-      `
-    );
-    res.json(result.rows || []);
+    
+    // Use Knex query builder for better maintainability
+    const rows = await db(supplierTable)
+      .select({
+        id: "id",
+        source_name: supplierNameCol,
+        number_bank: "number_bank",
+        bin_bank: "bin_bank",
+      })
+      .orderBy(supplierNameCol, "asc");
+    
+    res.json(rows || []);
   } catch (error) {
     logger.error("Query failed (GET /api/supplies)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải danh sách nhà cung cấp." });
@@ -31,20 +30,20 @@ const getProductsBySupply = async (req, res) => {
   const { supplyId } = req.params;
   logger.debug(`[GET] /api/supplies/${supplyId}/products`, { supplyId });
 
-  const q = `
-    SELECT DISTINCT
-      v.id AS id,
-      v.${quoteIdent(variantCols.displayName)} AS san_pham
-    FROM ${TABLES.supplyPrice} sp
-    JOIN ${TABLES.variant} v
-      ON sp.${quoteIdent(supplyPriceCols.productId)} = v.id
-    WHERE sp.${quoteIdent(supplyPriceCols.supplierId)} = ?
-    ORDER BY v.${quoteIdent(variantCols.displayName)};
-  `;
-
   try {
-    const result = await db.raw(q, [supplyId]);
-    res.json(result.rows);
+    // Use Knex query builder with table aliases for better maintainability
+    // Using raw SQL for column references to ensure correct schema resolution
+    const rows = await db(TABLES.supplyPrice)
+      .distinct()
+      .select(
+        db.raw(`${TABLES.variant}.${variantCols.id} as id`),
+        db.raw(`${TABLES.variant}.${variantCols.displayName} as san_pham`)
+      )
+      .join(TABLES.variant, `${TABLES.supplyPrice}.${supplyPriceCols.productId}`, "=", db.raw(`${TABLES.variant}.${variantCols.id}`))
+      .where(`${TABLES.supplyPrice}.${supplyPriceCols.supplierId}`, supplyId)
+      .orderBy(db.raw(`${TABLES.variant}.${variantCols.displayName}`), "asc");
+    
+    res.json(rows || []);
   } catch (error) {
     logger.error("Query failed (GET /api/supplies/:id/products)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({

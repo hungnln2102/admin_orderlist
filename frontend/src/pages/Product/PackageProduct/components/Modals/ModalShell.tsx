@@ -18,7 +18,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
 }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/40 px-4">
       <div
         className="bg-white rounded-xl shadow-lg w-full max-w-4xl overflow-hidden"
         role="dialog"

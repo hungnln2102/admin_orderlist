@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircleIcon, PlusIcon, XCircleIcon } from "@heroicons/react/24/outline";
-import GradientButton from "../../../components/ui/GradientButton";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS } from "../../../components/ui/StatCard";
 import { apiFetch } from "../../../lib/api";
 import * as Helpers from "../../../lib/helpers";
@@ -205,22 +204,13 @@ export default function Invoices() {
       />
 
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white drop-shadow-sm">
-              Biên nhận thanh toán
-            </h1>
-            <p className="mt-1 text-sm text-white/80">
-              Theo dõi giao dịch chuyển khoản được lưu trong hệ thống
-            </p>
-          </div>
-          <GradientButton
-            icon={PlusIcon}
-            className="mt-4 sm:mt-0"
-            onClick={() => setIsQrModalOpen(true)}
-          >
-            Thêm biên nhận
-          </GradientButton>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter">
+            Biên Nhận <span className="text-indigo-400">Thanh Toán</span>
+          </h1>
+          <p className="text-sm font-medium text-indigo-200/60 uppercase tracking-[0.3em]">
+            Digital Transaction Records & Ledger
+          </p>
         </div>
 
         <StatsGrid stats={stats} />
@@ -240,6 +230,7 @@ export default function Invoices() {
           onDateEndChange={setDateEnd}
           onExport={handleExportToExcel}
           exportDisabled={exportDisabled}
+          onAddReceipt={() => setIsQrModalOpen(true)}
         />
 
         {error && <div className="text-sm text-red-600 px-1">{error}</div>}

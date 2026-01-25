@@ -11,30 +11,34 @@ const QrModal: React.FC<Props> = ({ payment, onClose }) => {
   if (!payment) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md px-4 animate-in fade-in" onClick={onClose}>
       <div
-        className="bg-slate-900 text-white rounded-2xl border border-white/10 shadow-2xl p-6 w-full max-w-sm"
+        className="glass-panel-dark text-white rounded-[32px] border border-white/10 shadow-2xl p-8 w-full max-w-sm animate-in zoom-in-95 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-white/60">Chu kỳ</p>
-            <p className="text-lg font-bold">{payment.round || "QR thanh toán"}</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Thanh toán</p>
+            <p className="text-xl font-bold tracking-tight mt-1">{payment.round || "QR Code"}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition text-white/70">
-            <XMarkIcon className="h-5 w-5" />
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-all text-white/40 hover:text-white">
+            <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
         {payment.url ? (
-          <img src={payment.url} alt="QR thanh toán" className="rounded-lg border border-white/10 bg-white p-4 w-full" />
+          <div className="bg-white p-6 rounded-[24px] shadow-inner shadow-black/20">
+            <img src={payment.url} alt="QR thanh toán" className="w-full h-auto" />
+          </div>
         ) : (
           <div className="w-full aspect-square rounded-lg border border-dashed border-white/20 flex items-center justify-center text-white/60">
             Thiếu thông tin để tạo QR
           </div>
         )}
 
-        <p className="text-xs text-white/60 text-center mt-3">Quét QR để thanh toán số tiền chu kỳ.</p>
+        <p className="text-[11px] font-medium text-white/60 text-center mt-6 leading-relaxed">
+          Quét mã QR bằng ứng dụng ngân hàng<br/>để thanh toán chu kỳ này.
+        </p>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   InvoiceLine,
   formatCurrency,
 } from "../helpers";
+import signImage from "../../../../assets/sign.png";
 
 type InvoicePreviewProps = {
   form: InvoiceForm;
@@ -84,6 +85,14 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
       #invoice-preview,
       #invoice-preview * {
         font-family: ${INVOICE_FONT_STACK} !important;
+      }
+      #invoice-preview .invoice-signature img {
+        max-width: 200px !important;
+        height: auto !important;
+        object-fit: contain !important;
+        filter: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
     }
   `;
@@ -209,8 +218,21 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
               Tổng tiền hàng: {formatCurrency(totals.subtotal)}
             </div>
 
-            <div className="mt-8 text-center text-sm italic">
-              Cảm ơn và hẹn gặp lại!
+            <div className="mt-8 space-y-4">
+              <div className="text-center text-sm italic">
+                Cảm ơn và hẹn gặp lại!
+              </div>
+              <div className="flex justify-end items-end mt-6 invoice-signature">
+                <div className="text-center">
+                  <div className="mb-2 text-sm font-semibold">Người lập hóa đơn</div>
+                  <img
+                    src={signImage}
+                    alt="Chữ ký"
+                    className="h-20 w-auto object-contain max-w-[200px]"
+                    style={{ filter: "none" }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

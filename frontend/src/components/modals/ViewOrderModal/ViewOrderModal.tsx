@@ -109,17 +109,17 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 px-4 py-6"
+      className="fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4 md:p-6"
       onClick={onClose}
     >
       {/* Modal container */}
       <div
-        className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[95vh] flex flex-col overflow-hidden text-slate-100"
+        className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[98vh] sm:max-h-[95vh] flex flex-col overflow-hidden text-slate-100"
         onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex justify-center items-center p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
-          <h3 className="text-xl font-semibold text-white">
+        <div className="flex justify-center items-center p-3 sm:p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
+          <h3 className="text-lg sm:text-xl font-semibold text-white">
             Chi tiết đơn hàng:{" "}
             <span className="text-blue-600">{order[ORDER_FIELDS.ID_ORDER]}</span>
           </h3>
@@ -133,7 +133,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto flex-grow space-y-5 text-gray-700">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
           {/* Thong tin chung */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             {/* Left */}

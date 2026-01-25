@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import * as Helpers from '../../../lib/helpers';
 
 interface AddGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  currencyFormatter: Intl.NumberFormat;
 }
 
 export const AddGoalModal: React.FC<AddGoalModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  currencyFormatter,
 }) => {
   const [goalName, setGoalName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
@@ -30,7 +29,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
       return;
     }
 
-    const amount = Number(targetAmount.replace(/[^0-9]/g, ''));
+    const amount = Number(targetAmount.replace(/\./g, ''));
     if (!amount || amount <= 0) {
       setError('Số tiền mục tiêu phải lớn hơn 0');
       return;
@@ -68,20 +67,16 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
   };
 
   const handleAmountChange = (value: string) => {
-    // Remove all non-numeric characters
-    const numericValue = value.replace(/[^0-9]/g, '');
-    setTargetAmount(numericValue);
+    setTargetAmount(Helpers.formatNumberOnTyping(value));
   };
 
   // Format the display value with thousand separators
-  const displayValue = targetAmount
-    ? Number(targetAmount).toLocaleString('vi-VN')
-    : '';
+  const displayValue = targetAmount;
 
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="relative w-full max-w-md mx-4 rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 p-6 shadow-2xl">
         {/* Close button */}
         <button

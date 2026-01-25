@@ -40,7 +40,8 @@ services:
     env_file:
       - ./backend/.env.docker # Load file cấu hình riêng cho môi trường Docker
     ports:
-      - "3001:3001"
+      - "3001:3001"   # Main API
+      - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
     volumes:
       # Mount code để sửa code xong server tự reload (Hot Reload)
       - ./backend:/app
@@ -68,26 +69,10 @@ services:
     networks:
       - app-network
 
-  # ==========================================
-  # 4. NGINX REVERSE PROXY WITH SSL
-  # ==========================================
-  nginx:
-    container_name: admin_orderlist-nginx
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - nginx_cache:/var/cache/nginx
-    networks:
-      - app-network
-    depends_on:
-      - frontend
-      - backend
+# ==========================================
+# NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
+# Admin: admin.mavrykpremium.store -> 8081 (frontend), 3001 (api), 5000 (webhook).
+# ==========================================
 
 # ==========================================
 # NETWORKS & VOLUMES
@@ -98,4 +83,3 @@ networks:
 
 volumes:
   postgres_data:
-  nginx_cache:

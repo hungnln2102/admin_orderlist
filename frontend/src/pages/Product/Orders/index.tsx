@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
 import {
@@ -9,6 +8,7 @@ import {
   ORDER_DATASET_SEQUENCE,
   ORDER_FIELDS,
   ORDER_STATUSES,
+  Order,
   OrderDatasetKey,
 } from "../../../constants";
 import GradientButton from "../../../components/ui/GradientButton";
@@ -19,6 +19,8 @@ import EditOrderModal from "../../../components/modals/EditOrderModal/EditOrderM
 import CreateOrderModal from "../../../components/modals/CreateOrderModal/CreateOrderModal";
 import { useOrdersData, EditableOrder } from "./hooks/useOrdersData";
 import { OrderRow } from "./components/OrderRow";
+import { OrderCard } from "./components/OrderCard";
+import { ResponsiveTable, TableCard } from "../../../components/ui/ResponsiveTable";
 import { formatCurrency } from "./utils/ordersHelpers";
 
 const SEARCH_FIELD_OPTIONS = [
@@ -109,35 +111,31 @@ export default function Orders() {
   return (
     <div className="space-y-6">
       {fetchError && (
-        <div className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <span>{fetchError}</span>
+        <div className="flex flex-col gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200 shadow-xl backdrop-blur-md sm:flex-row sm:items-center sm:justify-between animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse"></div>
+            <span className="font-medium">{fetchError}</span>
+          </div>
           <button
             type="button"
             onClick={reloadOrders}
-            className="rounded-md border border-red-300 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-700 transition hover:bg-red-100"
+            className="rounded-xl border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-rose-100 transition hover:bg-rose-500/30 active:scale-95"
           >
             Thử Lại
           </button>
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Quản Lý Đơn Hàng</h1>
-          <p className="mt-1 text-sm text-gray-200">
-            Quản lý và theo dõi tất cả các đơn hàng của khách hàng
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-white tracking-tight">Quản Lý <span className="text-indigo-400">Đơn Hàng</span></h1>
+          <p className="text-sm font-medium text-white/50 tracking-wide">
+            Control and monitor all customer transactions
           </p>
-        </div>
-        <div className="mt-4 sm:mt-0">
-          {isActiveDataset && (
-            <GradientButton icon={PlusIcon} onClick={openCreateModal}>
-              Tạo Đơn Hàng Mới
-            </GradientButton>
-          )}
         </div>
       </div>
 
-      <div className="rounded-[28px] bg-gradient-to-r from-indigo-200/60 via-indigo-300/55 to-slate-200/45 p-4 shadow-[0_20px_50px_-28px_rgba(0,0,0,0.5),0_14px_32px_-24px_rgba(255,255,255,0.25)] border border-white/20">
+      <div className="rounded-[32px] glass-panel-dark p-6 shadow-2xl border border-white/5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {ORDER_DATASET_SEQUENCE.map((key) => {
             const datasetKeyValue = key as OrderDatasetKey;
@@ -152,10 +150,10 @@ export default function Orders() {
                 key={key}
                 type="button"
                 onClick={() => setDatasetKey(datasetKeyValue)}
-                className={`flex items-center justify-between rounded-2xl px-5 py-4 text-left transition shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65),0_8px_22px_-18px_rgba(255,255,255,0.12)] ${
+                className={`flex items-center justify-between rounded-2xl px-6 py-4 text-left transition-all duration-300 border ${
                   isActive
-                    ? "bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500 text-white ring-1 ring-white/25"
-                    : "bg-indigo-700/70 text-indigo-100 hover:bg-indigo-600/80 ring-1 ring-white/10"
+                    ? "bg-gradient-to-br from-indigo-500/80 to-purple-600/80 text-white border-white/20 shadow-[0_12px_40px_-12px_rgba(99,102,241,0.5)] scale-[1.02]"
+                    : "bg-white/5 text-slate-400 hover:bg-white/10 border-white/5 hover:text-slate-200"
                 }`}
               >
                 <div>
@@ -191,85 +189,133 @@ export default function Orders() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-          <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row gap-4 items-center">
+          {/* Search Input Group - Now Flexible */}
+          <div className="relative w-full lg:flex-1">
+            <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
             <input
               type="text"
               placeholder="Tìm kiếm đơn hàng, khách hàng..."
-              className="w-full pl-10 pr-44 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
+              style={{ paddingLeft: '3.25rem' }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          </div>
+
+          {/* Filter Group */}
+          <div className="flex w-full lg:w-auto gap-3 items-center">
+            {/* Divider (Desktop Only) */}
+            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+
+            <div className="relative w-full lg:w-[170px]">
               <select
-                className="min-w-[140px] md:min-w-[180px] px-3 py-1.5 border border-gray-300 rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                style={{ 
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")', 
+                  backgroundPosition: 'right 1rem center', 
+                  backgroundRepeat: 'no-repeat', 
+                  backgroundSize: '1.1rem', 
+                  paddingRight: '2.5rem' 
+                }}
                 value={searchField}
                 onChange={(e) => setSearchField(e.target.value)}
               >
                 {SEARCH_FIELD_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                  <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
                     {opt.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            <div className="relative w-full lg:w-[220px]">
+              <select
+                className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                style={{ 
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")', 
+                  backgroundPosition: 'right 1rem center', 
+                  backgroundRepeat: 'no-repeat', 
+                  backgroundSize: '1.1rem', 
+                  paddingRight: '2.5rem' 
+                }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all" className="bg-slate-900 text-white">Tất cả trạng thái</option>
+                <option value={ORDER_STATUSES.DA_THANH_TOAN} className="bg-slate-900 text-white">Đã thanh toán</option>
+                <option value={ORDER_STATUSES.CHUA_THANH_TOAN} className="bg-slate-900 text-white">Chưa thanh toán</option>
+                <option value={ORDER_STATUSES.DANG_XU_LY} className="bg-slate-900 text-white">Đang xử lý</option>
+                <option value={ORDER_STATUSES.CAN_GIA_HAN} className="bg-slate-900 text-white">Cần gia hạn</option>
+                <option value={ORDER_STATUSES.ORDER_EXPIRED} className="bg-slate-900 text-white">Hết hạn</option>
+              </select>
+            </div>
           </div>
 
-          <div className="relative">
-            <FunnelIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <select
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value={ORDER_STATUSES.DA_THANH_TOAN}>
-                Đã thanh toán
-              </option>
-              <option value={ORDER_STATUSES.CHUA_THANH_TOAN}>
-                Chưa thanh toán
-              </option>
-              <option value={ORDER_STATUSES.DANG_XU_LY}>Đang xử lý</option>
-              <option value={ORDER_STATUSES.CAN_GIA_HAN}>Cần gia hạn</option>
-              <option value={ORDER_STATUSES.ORDER_EXPIRED}>Hết hạn</option>
-            </select>
+          {/* Action Group */}
+          <div className="w-full lg:w-auto">
+            {isActiveDataset && (
+              <GradientButton icon={PlusIcon} onClick={openCreateModal}>
+                Tạo Đơn Hàng Mới
+              </GradientButton>
+            )}
           </div>
         </div>
       </div>
 
       <div className="rounded-[18px] bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 border border-white/12 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-white/10 table-fixed text-white">
-            <thead className="bg-slate-900/90">
-              <tr>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
-                  ORDER/SẢN PHẨM
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[140px] whitespace-nowrap truncate">
-                  THÔNG TIN ĐƠN HÀNG
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
-                  KHÁCH HÀNG
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[150px] whitespace-nowrap truncate">
-                  HẠN ĐƠN HÀNG
-                </th>
-                {showRemainingColumn && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[60px] whitespace-nowrap truncate">
-                    {remainingLabel}
-                  </th>
+        <ResponsiveTable
+          showCardOnMobile={true}
+          cardView={
+            currentOrders.length === 0 ? (
+              <div className="p-4 text-center">
+                <div className="text-white/70 text-lg mb-2">
+                  Không tìm thấy đơn hàng
+                </div>
+                <div className="text-white/60">
+                  Thử thay đổi bộ lọc tìm kiếm
+                </div>
+              </div>
+            ) : (
+              <TableCard
+                data={currentOrders}
+                renderCard={(order) => (
+                  <OrderCard
+                    order={order as Order}
+                    showRemainingColumn={showRemainingColumn}
+                    showActionButtons={showActionButtons}
+                    isActiveDataset={isActiveDataset}
+                    isCanceled={isCanceled}
+                    renewingOrderCode={renewingOrderCode}
+                    onView={handleViewOrder}
+                    onEdit={handleEditOrder}
+                    onDelete={handleDeleteOrder}
+                    onConfirmRefund={handleConfirmRefund}
+                    onMarkPaid={handleMarkPaid}
+                    onRenew={handleRenewOrder}
+                  />
                 )}
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
-                  TRẠNG THÁI
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider w-[90px] whitespace-nowrap truncate">
-                  THAO TÁC
-                </th>
+                className="p-2"
+              />
+            )
+          }
+        >
+          <table className="min-w-full border-separate border-spacing-y-4 text-white">
+            <thead>
+              <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-center">
+                <th className="w-[150px]">ORDER / SẢN PHẨM</th>
+                <th className="w-[140px]">THÔNG TIN ĐƠN</th>
+                <th className="w-[150px]">KHÁCH HÀNG</th>
+                <th className="w-[150px]">LỊCH TRÌNH</th>
+                {showRemainingColumn && (
+                  <th className="w-[80px]">{remainingLabel}</th>
+                )}
+                <th className="w-[120px]">TRẠNG THÁI</th>
+                <th className="w-[100px] text-right pr-8">THAO TÁC</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="">
               {currentOrders.length === 0 ? (
                 <tr>
                   <td colSpan={totalColumns} className="text-center py-12">
@@ -306,7 +352,7 @@ export default function Orders() {
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTable>
 
         {filteredOrders.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 bg-slate-900/85 text-white px-4 py-3 sm:px-6">

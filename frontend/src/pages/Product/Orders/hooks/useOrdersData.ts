@@ -117,12 +117,9 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
       }
     } catch (error) {
       console.error("Lỗi khi tải đơn hàng:", error);
-      const friendlyMessage =
-        error instanceof TypeError
-          ? "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại dịch vụ backend."
-          : error instanceof Error
-          ? error.message
-          : "Có lỗi không xác định khi tải đơn hàng.";
+      // Use error handler utility for consistent error messages
+      const { handleNetworkError } = await import("@/lib/errorHandler");
+      const friendlyMessage = handleNetworkError(error);
       setFetchError(friendlyMessage);
     } finally {
       // no-op

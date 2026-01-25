@@ -38,6 +38,21 @@ if (cookieSecure === true && hasHttpOrigin) {
 
 const cookieSameSite = cookieSecure === true ? "none" : "lax";
 
+// Validate SESSION_SECRET in production
+const sessionSecret = process.env.SESSION_SECRET || "change_this_secret";
+if (isProd && (!process.env.SESSION_SECRET || sessionSecret === "change_this_secret")) {
+  const logger = require("../utils/logger");
+  logger.error(
+    "[SECURITY] SESSION_SECRET không được set hoặc đang dùng default value trong production!"
+  );
+  logger.error(
+    "[SECURITY] Vui lòng set SESSION_SECRET mạnh trong environment variables."
+  );
+  // In production, we should fail fast, but for backward compatibility, we'll warn
+  // Uncomment the line below to enforce strict validation:
+  // throw new Error("SESSION_SECRET is required in production and must not be default value");
+}
+
 module.exports = {
   port,
   allowedOrigins,
@@ -47,7 +62,7 @@ module.exports = {
   },
   session: {
     name: sessionName,
-    secret: process.env.SESSION_SECRET || "change_this_secret",
+    secret: sessionSecret,
     cookieSecure,
     cookieSameSite,
   },

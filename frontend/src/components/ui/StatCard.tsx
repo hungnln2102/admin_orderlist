@@ -8,44 +8,44 @@ export interface StatAccent {
 
 export const STAT_CARD_ACCENTS = {
   sky: {
-    border: "border-sky-100/80",
-    glow: "from-sky-100/70 via-white/80 to-blue-100/70",
-    iconBg: "bg-sky-500/90 text-white",
+    border: "border-sky-500/30",
+    glow: "bg-sky-500/20",
+    iconBg: "bg-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.5)]",
   },
   emerald: {
-    border: "border-emerald-100/80",
-    glow: "from-emerald-100/70 via-white/80 to-lime-100/70",
-    iconBg: "bg-emerald-500/90 text-white",
+    border: "border-emerald-500/30",
+    glow: "bg-emerald-500/20",
+    iconBg: "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]",
   },
   violet: {
-    border: "border-violet-100/80",
-    glow: "from-violet-100/70 via-white/80 to-fuchsia-100/70",
-    iconBg: "bg-violet-500/90 text-white",
+    border: "border-violet-500/30",
+    glow: "bg-violet-500/20",
+    iconBg: "bg-violet-500 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]",
   },
   amber: {
-    border: "border-amber-100/80",
-    glow: "from-amber-100/70 via-white/80 to-orange-100/70",
-    iconBg: "bg-amber-500/90 text-white",
+    border: "border-amber-500/30",
+    glow: "bg-amber-500/20",
+    iconBg: "bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]",
   },
   rose: {
-    border: "border-rose-100/80",
-    glow: "from-rose-100/70 via-white/80 to-pink-100/70",
-    iconBg: "bg-rose-500/90 text-white",
+    border: "border-rose-500/30",
+    glow: "bg-rose-500/20",
+    iconBg: "bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.5)]",
   },
   indigo: {
-    border: "border-indigo-100/80",
-    glow: "from-indigo-100/70 via-white/80 to-purple-100/70",
-    iconBg: "bg-indigo-500/90 text-white",
+    border: "border-indigo-500/30",
+    glow: "bg-indigo-500/20",
+    iconBg: "bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]",
   },
   slate: {
-    border: "border-slate-200/80",
-    glow: "from-slate-100/70 via-white/80 to-slate-200/70",
-    iconBg: "bg-slate-600/90 text-white",
+    border: "border-slate-500/30",
+    glow: "bg-slate-500/20",
+    iconBg: "bg-slate-500 text-white shadow-[0_0_15px_rgba(100,116,139,0.5)]",
   },
   teal: {
-    border: "border-teal-100/80",
-    glow: "from-teal-100/70 via-white/80 to-cyan-100/70",
-    iconBg: "bg-teal-500/90 text-white",
+    border: "border-teal-500/30",
+    glow: "bg-teal-500/20",
+    iconBg: "bg-teal-500 text-white shadow-[0_0_15px_rgba(20,184,166,0.5)]",
   },
 } as const;
 
@@ -70,25 +70,42 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => {
   return (
     <div
-      className="relative isolate overflow-hidden rounded-3xl border border-white/25 bg-gradient-to-br from-slate-200/70 via-indigo-200/60 to-slate-300/70 p-6 shadow-[0_18px_48px_-28px_rgba(0,0,0,0.6),0_12px_30px_-24px_rgba(255,255,255,0.22)] backdrop-blur transition-all hover:shadow-[0_22px_60px_-28px_rgba(0,0,0,0.65),0_16px_36px_-24px_rgba(255,255,255,0.24)]"
+      className={`group relative isolate overflow-hidden rounded-[32px] glass-panel p-6 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-          {subtitle && (
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">
-              {subtitle}
-            </p>
-          )}
+      {/* Dynamic Background Glow */}
+      <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
+      
+      <div className="flex items-start justify-between gap-4">
+        <div className="relative z-10">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-3">
+            {title}
+          </p>
+          <div className="flex flex-col gap-1">
+            <h3 className="text-3xl font-bold text-white tracking-tight leading-none">
+              {value}
+            </h3>
+            {subtitle && (
+              <p className="text-xs font-medium text-emerald-400/80 tracking-wide">
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
+
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 border border-white/35 shadow-inner shadow-black/15 text-slate-800"
+          className={`relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
         >
-          <Icon className={iconClassName} />
+          {/* Internal reflection */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
+          <Icon className={`${iconClassName} relative z-10`} />
         </div>
       </div>
-      {children && <div className="mt-4">{children}</div>}
+      
+      {children && (
+        <div className="mt-6 relative z-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
+          {children}
+        </div>
+      )}
     </div>
   );
 };

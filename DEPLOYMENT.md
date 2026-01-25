@@ -47,8 +47,16 @@ Example:
 
 **Note**: This script uses `scp` to copy files. It excludes `node_modules` to save time.
 
+## Unified Nginx (chung port 80 với Website)
+
+Khi chạy chung với **Website** qua **Host Nginx** (một Nginx trên máy listen 80/443):
+
+- **Admin Orderlist** không chạy container Nginx. Chỉ postgres, backend (3001 + 5000), frontend (8081).
+- Host Nginx (cấu hình từ `../Website/nginx-server.conf`) proxy `admin.mavrykpremium.store` tới 8081, 3001, 5000.
+- Deploy: `./deploy.sh` (trong thư mục `admin_orderlist`). Chi tiết xem `../Website/DEPLOY_NGINX.md`.
+
 ## Verify Deployment
 
-- **Frontend**: https://<your-domain> (or http://<VPS_IP> if you are not using TLS)
-- **Backend API**: http://<VPS_IP>:3001
+- **Frontend**: https://admin.mavrykpremium.store (qua Host Nginx) hoặc http://localhost:8081
+- **Backend API**: http://localhost:3001 | Webhook: http://localhost:5000
 - **Database**: Port 5432

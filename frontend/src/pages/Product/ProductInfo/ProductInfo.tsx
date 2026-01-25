@@ -107,7 +107,6 @@ const ProductInfo: React.FC = () => {
       <ProductInfoHeader
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
-        onAddClick={reload}
         onAddCategoryClick={openCreateCategory}
       />
 

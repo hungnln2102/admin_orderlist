@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 
 type SidebarUser = {
@@ -20,17 +20,20 @@ const SidebarAccount: React.FC<SidebarAccountProps> = ({
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   return (
-    <div className="relative p-4 border-t border-white/10 bg-white/5 backdrop-blur-sm">
+    <div className="relative p-5 mt-auto border-t border-white/5 bg-white/0 backdrop-blur-md rounded-b-[32px]">
       <div className="w-full flex items-center justify-between">
         <button
           type="button"
           onClick={() => setShowAccountMenu((prev) => !prev)}
           className="flex items-center flex-1"
         >
-          <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-md shadow-indigo-900/40">
-            <span className="text-white text-sm font-bold tracking-wide">
-              {(user?.username || "A").slice(0, 1).toUpperCase()}
-            </span>
+          <div className="group/avatar relative w-11 h-11 transition-all duration-300 transform group-hover/account:scale-105">
+            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full blur-[2px] opacity-40 group-hover/avatar:opacity-60 transition-opacity"></div>
+            <div className="relative w-full h-full bg-slate-900 border border-white/20 rounded-full flex items-center justify-center overflow-hidden shadow-[inset_0_2px_4px_rgba(255,255,255,0.1)]">
+              <span className="text-white text-base font-black tracking-tighter">
+                {(user?.username || "A").slice(0, 1).toUpperCase()}
+              </span>
+            </div>
           </div>
           <div className="ml-3 flex-1 text-left">
             <p className="text-sm font-semibold text-white truncate">
@@ -51,8 +54,8 @@ const SidebarAccount: React.FC<SidebarAccountProps> = ({
         </button>
       </div>
       {showAccountMenu && (
-        <div className="absolute bottom-16 left-4 right-4 rounded-lg border border-white/15 bg-[#0f1432] shadow-2xl shadow-black/40 z-10">
-          <ul className="py-2 text-sm text-indigo-50 space-y-1">
+        <div className="absolute bottom-[calc(100%+8px)] left-4 right-4 glass-panel rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <ul className="py-2 text-[13px] font-medium text-indigo-100/90 divide-y divide-white/5">
             {[
               "Thông Tin",
               "Thông Tin Admin",
@@ -62,7 +65,7 @@ const SidebarAccount: React.FC<SidebarAccountProps> = ({
               <li key={label}>
                 <button
                   type="button"
-                  className="w-full text-left px-4 py-2 hover:bg-white/10"
+                  className="w-full text-left px-4 py-2.5 hover:bg-indigo-500/10 hover:text-white transition-colors"
                   onClick={() => {
                     setShowAccountMenu(false);
                     if (index === 3) {

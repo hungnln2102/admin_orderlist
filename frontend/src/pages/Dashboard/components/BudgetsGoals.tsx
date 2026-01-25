@@ -35,6 +35,7 @@ interface Props {
   walletColumns: WalletColumn[];
   walletRows: WalletRow[];
   goldValue?: number | null;
+  goldCost?: number | null;
   onRefetchGoals?: () => void;
 }
 
@@ -128,7 +129,7 @@ const ExpenseBreakdownChart: React.FC<{
             {total > 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white">
-                  <div className="text-xs uppercase tracking-wide text-white/60">Tài sản</div>
+                  <div className="text-xs uppercase tracking-wide text-white/80">Tài sản</div>
                   <div className="text-lg font-bold">{currencyFormatter.format(total)}</div>
                 </div>
               </div>
@@ -181,6 +182,7 @@ const BudgetsGoals: React.FC<Props> = ({
   walletColumns,
   walletRows,
   goldValue,
+  goldCost,
   onRefetchGoals,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -234,6 +236,8 @@ const BudgetsGoals: React.FC<Props> = ({
       }
     } catch (error) {
       console.error('Error reordering goal:', error);
+      const { handleNetworkError } = await import("@/lib/errorHandler");
+      alert(handleNetworkError(error));
     }
   };
 
@@ -255,7 +259,8 @@ const BudgetsGoals: React.FC<Props> = ({
       }
     } catch (error) {
       console.error('Error deleting goal:', error);
-      alert('Không thể xóa mục tiêu. Vui lòng thử lại.');
+      const { handleNetworkError } = await import("@/lib/errorHandler");
+      alert(handleNetworkError(error));
     }
   };
 
@@ -301,52 +306,79 @@ const BudgetsGoals: React.FC<Props> = ({
 
   // Calculate asset values from wallet data
   const assetStats = useMemo(() => {
-    const latestWalletRow = walletRows?.[0];
-    if (!latestWalletRow) {
+    const latestRow = walletRows?.[0];
+    const prevRow = walletRows?.[1];
+
+    // Helpers to extract data from a row
+    const getStatsFromRow = (row: WalletRow | undefined) => {
+      if (!row) return { cash: 0, gold: 0, investment: 0, total: 0 };
+
+      const fundCol = walletColumns.find((col) => {
+        const name = String(col.name || "").toLowerCase();
+        return name.includes("quỹ") || name.includes("quy");
+      });
+
+      const goldCol = walletColumns.find((col) => {
+        const name = String(col.name || "").toLowerCase();
+        return name.includes("vàng") || name.includes("gold") || name.includes("vang");
+      });
+
+      const vndCols = walletColumns.filter((col) => {
+        const assetCode = String(col.assetCode || "").trim().toUpperCase();
+        const name = String(col.name || "").toLowerCase();
+        if (name.includes("hana") || name.includes("gold") || name.includes("vàng") || name.includes("vang")) return false;
+        if (fundCol && col.field === fundCol.field) return false;
+        return !assetCode || assetCode === "VND";
+      });
+
+      const cash = vndCols.reduce((sum, col) => sum + (Number(row.values[col.field] || 0) || 0), 0);
+      const investment = fundCol ? (Number(row.values[fundCol.field] || 0) || 0) : 0;
+      const gold = goldCol ? (Number(row.values[goldCol.field] || 0) || 0) : 0;
+
+      return { cash, gold, investment, total: cash + gold + investment };
+    };
+
+    const current = getStatsFromRow(latestRow);
+    const previous = getStatsFromRow(prevRow);
+
+    // Prioritize goldValue prop for current if available
+    if (goldValue !== undefined && goldValue !== null) {
+      current.gold = goldValue;
+      current.total = current.cash + current.gold + current.investment;
+    }
+
+    const calcChange = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return Number(((curr - prev) / prev * 100).toFixed(1));
+    };
+
+    // Gold trend logic: Use current value vs cost if cost is available
+    if (goldCost && current.gold > 0) {
+      current.total = current.cash + current.gold + current.investment;
+      // Recalculate gold change based on profit/loss from cost
+      const goldTrend = Number(((current.gold - goldCost) / goldCost * 100).toFixed(1));
+      
       return {
-        cash: 0,
-        gold: goldValue || 0,
-        investment: 0,
-        total: goldValue || 0,
+        current,
+        changes: {
+          cash: calcChange(current.cash, previous.cash),
+          gold: goldTrend,
+          investment: calcChange(current.investment, previous.investment),
+          total: calcChange(current.total, previous.total),
+        }
       };
     }
 
-    // Get "Quỹ" column first
-    const fundColumn = walletColumns.find((col) => {
-      const name = String(col.name || "").toLowerCase();
-      return name.includes("quỹ") || name.includes("quy");
-    });
-
-    // Get VND columns (cash) - exclude fund to avoid double counting
-    const vndColumns = walletColumns.filter((col) => {
-      const assetCode = String(col.assetCode || "").trim().toUpperCase();
-      const name = String(col.name || "").toLowerCase();
-      // Exclude gold/hana columns
-      if (name.includes("hana")) return false;
-      // Exclude fund column (will be counted separately as investment)
-      if (fundColumn && col.field === fundColumn.field) return false;
-      // Only VND or empty asset code
-      return !assetCode || assetCode === "VND";
-    });
-
-    const cashValue = vndColumns.reduce((sum, col) => {
-      return sum + (Number(latestWalletRow.values[col.field] || 0) || 0);
-    }, 0);
-
-    const investmentValue = fundColumn 
-      ? (Number(latestWalletRow.values[fundColumn.field] || 0) || 0)
-      : 0;
-
-    const goldVal = goldValue || 0;
-    const totalAssets = cashValue + goldVal + investmentValue;
-
     return {
-      cash: cashValue,
-      gold: goldVal,
-      investment: investmentValue,
-      total: totalAssets,
+      current,
+      changes: {
+        cash: calcChange(current.cash, previous.cash),
+        gold: calcChange(current.gold, previous.gold),
+        investment: calcChange(current.investment, previous.investment),
+        total: calcChange(current.total, previous.total),
+      }
     };
-  }, [walletRows, walletColumns, goldValue]);
+  }, [walletRows, walletColumns, goldValue, goldCost]);
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
@@ -374,26 +406,26 @@ const BudgetsGoals: React.FC<Props> = ({
         <div className="grid grid-cols-2 gap-3">
           <WeeklyStatCard 
             title="Tiền Mặt" 
-            value={currencyFormatter.format(assetStats.cash)} 
-            change={8.5} 
+            value={currencyFormatter.format(assetStats.current.cash)} 
+            change={assetStats.changes.cash} 
             icon={BanknotesIcon} 
           />
           <WeeklyStatCard 
             title="Vàng" 
-            value={currencyFormatter.format(assetStats.gold)} 
-            change={-2.3} 
+            value={currencyFormatter.format(assetStats.current.gold)} 
+            change={assetStats.changes.gold} 
             icon={WalletIcon} 
           />
           <WeeklyStatCard 
             title="Đầu Tư" 
-            value={currencyFormatter.format(assetStats.investment)} 
-            change={15.7} 
+            value={currencyFormatter.format(assetStats.current.investment)} 
+            change={assetStats.changes.investment} 
             icon={ArrowUpIcon} 
           />
           <WeeklyStatCard 
             title="Tổng Tài Sản" 
-            value={currencyFormatter.format(assetStats.total)} 
-            change={5.2} 
+            value={currencyFormatter.format(assetStats.current.total)} 
+            change={assetStats.changes.total} 
             icon={ScaleIcon} 
           />
         </div>
@@ -412,7 +444,7 @@ const BudgetsGoals: React.FC<Props> = ({
           <div className="rounded-2xl border border-white/30 bg-white/60 p-4 shadow-[0_16px_32px_-28px_rgba(0,0,0,0.4)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-white/70">Tổng quan</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-white/80">Tổng quan</p>
                 <p className="text-2xl font-semibold text-white">
                   {currencyFormatter.format(totals.totalSaved)}
                 </p>
@@ -440,7 +472,7 @@ const BudgetsGoals: React.FC<Props> = ({
                   className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
                   style={{ left: `${milestone.position}%` }}
                 >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/50 bg-slate-900/80 text-[10px] font-semibold text-white shadow-[0_8px_16px_-12px_rgba(0,0,0,0.55)]">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/70 bg-slate-900/90 text-[11px] font-semibold text-white shadow-[0_8px_16px_-12px_rgba(0,0,0,0.55)]">
                     {milestone.index}
                   </div>
                 </div>
@@ -466,7 +498,6 @@ const BudgetsGoals: React.FC<Props> = ({
                 const saved = totals.totalSaved;
                 
                 const progress = target > 0 ? Math.min(100, (saved / target) * 100) : 0;
-                const remaining = Math.max(0, target - saved);
                 
                 // Generate accent color based on index
                 const accentColors = [
@@ -558,7 +589,6 @@ const BudgetsGoals: React.FC<Props> = ({
             onRefetchGoals();
           }
         }}
-        currencyFormatter={currencyFormatter}
       />
     </div>
   );

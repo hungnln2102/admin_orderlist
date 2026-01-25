@@ -13,36 +13,38 @@ export const CategoryToggle: React.FC<CategoryToggleProps> = ({
   onChange,
 }) => {
   return (
-    <div className="rounded-[28px] bg-gradient-to-br from-slate-800/75 via-slate-800/60 to-slate-900/80 border border-white/12 p-4 shadow-[0_20px_55px_-32px_rgba(0,0,0,0.8),0_14px_36px_-28px_rgba(255,255,255,0.18)] backdrop-blur-sm flex flex-col sm:flex-row gap-3 text-slate-200">
+    <div className="rounded-[32px] glass-panel-light p-2 border border-white/5 shadow-2xl flex flex-col sm:flex-row gap-2 relative z-10 transition-all duration-500">
       {CATEGORY_OPTIONS.map((option) => {
         const isActive = activeCategory === option.value;
+        const count = counts[option.value];
         return (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`flex-1 min-w-[180px] text-left rounded-2xl border p-4 transition shadow-[0_12px_28px_-18px_rgba(0,0,0,0.65)] ${
+            className={`group relative flex-1 min-w-[200px] text-left rounded-[26px] px-6 py-5 transition-all duration-500 overflow-hidden ${
               isActive
-                ? "bg-gradient-to-r from-indigo-500 to-violet-500 text-white border-white/50 shadow-[0_16px_45px_-22px_rgba(79,70,229,0.65)]"
-                : "bg-slate-800/70 text-slate-100 border-white/12 hover:bg-slate-700/70 hover:border-white/20"
+                ? "bg-indigo-600/40 text-white shadow-[0_0_40px_rgba(99,102,241,0.25)] border border-indigo-400/30"
+                : "text-indigo-100/60 hover:text-white border border-transparent"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold drop-shadow-sm">
+            {/* Active Aura */}
+            {isActive && (
+              <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/20 rounded-full blur-3xl animate-pulse"></div>
+            )}
+            
+            <div className="relative z-10 flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-none opacity-80">
                   {option.label}
                 </p>
-                <p className="text-xs text-slate-300 mt-1">
+                <p className={`text-sm font-bold tracking-tight transition-colors ${isActive ? 'text-white' : 'text-indigo-100/70 group-hover:text-white'}`}>
                   {option.description}
                 </p>
               </div>
-              <span
-                className={`text-lg font-semibold ${
-                  isActive ? "text-white" : "text-slate-100"
-                }`}
-              >
-                {counts[option.value]}
-              </span>
+              <div className={`text-2xl font-black tracking-tighter ${isActive ? 'text-indigo-300' : 'text-indigo-200/20 group-hover:text-indigo-200/40'}`}>
+                {count.toLocaleString()}
+              </div>
             </div>
           </button>
         );

@@ -2,17 +2,26 @@ import React, { useState } from "react";
 import { EyeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { CategoryRow } from "../types";
 import { CategoryItem, stripDurationSuffix } from "../utils/productInfoHelpers";
+import Pagination from "@/components/ui/Pagination";
 
 type CategoryTableProps = {
   categoryRows: CategoryRow[];
+  allCategoryRows: CategoryRow[];
   loading: boolean;
+  currentPage: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   onEditCategory: (group: CategoryRow) => void;
   getCategoryColor: (category: CategoryItem, index: number) => string;
 };
 
 export const CategoryTable: React.FC<CategoryTableProps> = ({
   categoryRows,
+  allCategoryRows,
   loading,
+  currentPage,
+  pageSize,
+  onPageChange,
   onEditCategory,
   getCategoryColor,
 }) => {
@@ -21,14 +30,14 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   );
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0b1220] shadow-xl overflow-hidden">
+    <div className="rounded-[32px] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-xl overflow-hidden">
       <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">Danh Mục</h2>
         {loading ? (
           <span className="text-xs text-white/60">Đang tải...</span>
         ) : (
           <span className="text-xs text-white/60">
-            {categoryRows.length} danh mục
+            {allCategoryRows.length} danh mục
           </span>
         )}
       </div>
@@ -40,7 +49,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             <col style={{ width: "40%" }} />
             <col style={{ width: "20%", minWidth: "140px" }} />
           </colgroup>
-          <thead className="bg-white/5 text-white">
+          <thead className="bg-white/5 text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/70">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">
                 Hình Ảnh
@@ -53,7 +62,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {!loading && categoryRows.length === 0 && (
+            {!loading && allCategoryRows.length === 0 && (
               <tr>
                 <td
                   colSpan={4}
@@ -63,7 +72,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
                 </td>
               </tr>
             )}
-            {loading && categoryRows.length === 0 && (
+            {loading && allCategoryRows.length === 0 && (
               <tr>
                 <td
                   colSpan={4}
@@ -87,7 +96,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
                         }}
                       />
                     ) : (
-                      <div className="h-12 w-12 rounded-lg bg-gray-700 flex items-center justify-center text-white/50 text-xs">
+                      <div className="h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 text-[11px] font-bold uppercase tracking-tighter text-center px-1">
                         No Image
                       </div>
                     )}
@@ -170,6 +179,16 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           </tbody>
         </table>
       </div>
+      {!loading && allCategoryRows.length > 0 && (
+        <div className="border-t border-white/10 px-4 py-3">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={allCategoryRows.length}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+          />
+        </div>
+      )}
     </div>
   );
 };

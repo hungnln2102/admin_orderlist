@@ -322,13 +322,20 @@ const listProductDescriptions = async (req, res) => {
     `;
     const result = await db.raw(q, [...values, offset, limit]);
 
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM ${TABLES.productDesc}
-      ${whereClause};
-    `;
-    const countResult = await db.raw(countQuery, values);
-    const total = Number(countResult.rows?.[0]?.total) || 0;
+    // Use Knex for count query - simpler and more maintainable
+    let countQuery = db(TABLES.productDesc);
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      countQuery = countQuery.where(function() {
+        this.whereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.productId)}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.description)}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.rules)}::text)) LIKE ?`, [`%${searchLower}%`]);
+      });
+    }
+    
+    const countResult = await countQuery.count("* as total").first();
+    const total = Number(countResult?.total) || 0;
 
     res.json({
       items: (result.rows || []).map((row) => mapProductDescRow(req, row)),
