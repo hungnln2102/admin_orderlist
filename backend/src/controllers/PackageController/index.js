@@ -6,13 +6,14 @@ const {
   bulkDeletePackages,
 } = require("./service");
 const { pkgCols } = require("./constants");
+const logger = require("../../utils/logger");
 
 const listHandler = async (_req, res) => {
   try {
     const rows = await listPackageProducts();
     res.json(rows);
   } catch (error) {
-    console.error("[packages] Query failed:", error);
+    logger.error("[packages] Query failed", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải sản phẩm đang gói." });
   }
 };
@@ -27,7 +28,7 @@ const createHandler = async (req, res) => {
     const newRow = await createPackageProduct(req.body || {});
     res.status(201).json(newRow);
   } catch (error) {
-    console.error("[packages] Insert failed:", error);
+    logger.error("[packages] Insert failed", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tạo sản phẩm đang gói." });
   }
 };
@@ -50,7 +51,7 @@ const updateHandler = async (req, res) => {
     }
     res.json(updated);
   } catch (error) {
-    console.error(`[packages] Update failed for id=${id}:`, error);
+    logger.error("[packages] Update failed", { id, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật sản phẩm gói hàng." });
   }
 };
@@ -73,7 +74,7 @@ const deleteHandler = async (req, res) => {
       deletedNames: [],
     });
   } catch (error) {
-    console.error(`[packages] Delete failed for id=${id}:`, error);
+    logger.error("[packages] Delete failed", { id, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể xóa sản phẩm gói hàng." });
   }
 };
@@ -104,7 +105,7 @@ const bulkDeleteHandler = async (req, res) => {
       deletedNames,
     });
   } catch (error) {
-    console.error("[packages] Delete failed:", error);
+    logger.error("[packages] Bulk delete failed", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể xóa sản phẩm đang gói." });
   }
 };

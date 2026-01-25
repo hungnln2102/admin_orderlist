@@ -13,6 +13,7 @@ const {
   productCategoryCols,
   TABLES,
 } = require("../constants");
+const logger = require("../../../utils/logger");
 
 const fetchVariantView = async (variantId) => {
   const query = `
@@ -287,7 +288,7 @@ const createProductPrice = async (req, res) => {
     const viewRow = await fetchVariantView(inserted);
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
-    console.error("Insert failed (POST /api/product-prices):", error);
+    logger.error("Insert failed (POST /api/product-prices)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tạo giá sản phẩm." });
   }
 };
@@ -481,7 +482,7 @@ const updateProductPrice = async (req, res) => {
     const viewRow = await fetchVariantView(parsedId);
     res.json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
-    console.error(`Update failed (PATCH /api/product-prices/${productId}):`, error);
+    logger.error("Update failed (PATCH /api/product-prices/:productId)", { productId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật giá sản phẩm." });
   }
 };
@@ -516,10 +517,7 @@ const toggleProductPriceStatus = async (req, res) => {
       update: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(
-      `Update failed (PATCH /api/product-prices/${productId}/status):`,
-      error
-    );
+    logger.error("Update failed (PATCH /api/product-prices/:productId/status)", { productId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật trạng thái sản phẩm." });
   }
 };
@@ -554,7 +552,7 @@ const deleteProductPrice = async (req, res) => {
     }
     res.json({ success: true, id: parsedId });
   } catch (error) {
-    console.error(`Delete failed (DELETE /api/product-prices/${productId}):`, error);
+    logger.error("Delete failed (DELETE /api/product-prices/:productId)", { productId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể xóa giá sản phẩm." });
   }
 };

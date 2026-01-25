@@ -7,9 +7,10 @@ const {
   resolveSupplierTableName,
   resolveSupplierNameColumn,
 } = require("../helpers");
+const logger = require("../../../utils/logger");
 
 const createSupply = async (req, res) => {
-  console.log("[POST] /api/supplies", req.body);
+  logger.debug("[POST] /api/supplies", { body: req.body });
   const body = req.body || {};
   const source_name = body.supplier_name ?? body.source_name;
   const { number_bank, bin_bank, status, active_supply } = body;
@@ -57,13 +58,13 @@ const createSupply = async (req, res) => {
       status: status ?? active_supply ?? "active",
     });
   } catch (error) {
-    console.error("Mutation failed (POST /api/supplies):", error);
+    logger.error("Mutation failed (POST /api/supplies)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tạo nhà cung cấp." });
   }
 };
 
 const updateSupply = async (req, res) => {
-  console.log("[PATCH] /api/supplies/:supplyId", req.params, req.body);
+  logger.debug("[PATCH] /api/supplies/:supplyId", { params: req.params, body: req.body });
   const { supplyId } = req.params;
   const parsedSupplyId = Number.parseInt(supplyId, 10);
   if (!Number.isInteger(parsedSupplyId) || parsedSupplyId <= 0) {
@@ -157,14 +158,14 @@ const updateSupply = async (req, res) => {
       bank_name: bank_name ?? null,
     });
   } catch (error) {
-    console.error("Mutation failed (PATCH /api/supplies/:id):", error);
+    logger.error("Mutation failed (PATCH /api/supplies/:id)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật nhà cung cấp." });
   }
 };
 
 const toggleSupplyActive = async (req, res) => {
   const { supplyId } = req.params;
-  console.log("[PATCH] /api/supplies/:supplyId/active", req.body);
+  logger.debug("[PATCH] /api/supplies/:supplyId/active", { supplyId, body: req.body });
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
@@ -201,7 +202,7 @@ const toggleSupplyActive = async (req, res) => {
       isActive: normalizedStatus !== "inactive",
     });
   } catch (error) {
-    console.error("Mutation failed (PATCH /api/supplies/:id/active):", error);
+    logger.error("Mutation failed (PATCH /api/supplies/:id/active)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể cập nhật trạng thái nhà cung cấp.",
     });
@@ -224,10 +225,7 @@ const deleteSupply = async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    console.error(
-      `Mutation failed (DELETE /api/supplies/${parsedSupplyId}):`,
-      error
-    );
+    logger.error("Mutation failed (DELETE /api/supplies/:id)", { supplyId: parsedSupplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể xóa nhà cung cấp.",
     });

@@ -1,0 +1,147 @@
+/**
+ * Centralized logging utility using Winston
+ * Replaces console.log/error throughout the application
+ */
+
+const winston = require("winston");
+const DailyRotateFile = require("winston-daily-rotate-file");
+const path = require("path");
+const fs = require("fs");
+
+// Ensure logs directory exists
+const logsDir = path.join(__dirname, "../../logs");
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// Log levels
+const levels = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  http: 3,
+  debug: 4,
+};
+
+// Colors for console output
+const colors = {
+  error: "red",
+  warn: "yellow",
+  info: "green",
+  http: "magenta",
+  debug: "white",
+};
+
+winston.addColors(colors);
+
+// Custom format for log messages
+const logFormat = winston.format.combine(
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  winston.format.errors({ stack: true }),
+  winston.format.splat(),
+  winston.format.json()
+);
+
+// Console format (more readable)
+const consoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  winston.format.colorize({ all: true }),
+  winston.format.printf((info) => {
+    const { timestamp, level, message, ...meta } = info;
+    let metaStr = "";
+    if (Object.keys(meta).length > 0 && meta.stack === undefined) {
+      metaStr = ` ${JSON.stringify(meta)}`;
+    }
+    if (meta.stack) {
+      metaStr = `\n${meta.stack}`;
+    }
+    return `${timestamp} [${level}]: ${message}${metaStr}`;
+  })
+);
+
+// Determine log level from environment
+const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug");
+
+// Create transports
+const transports = [
+  // Console transport (always enabled)
+  new winston.transports.Console({
+    format: consoleFormat,
+    level: logLevel,
+  }),
+];
+
+// File transports (only in production or if LOG_FILE is set)
+if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
+  const logFile = process.env.LOG_FILE || path.join(logsDir, "app.log");
+  const maxSize = process.env.LOG_MAX_SIZE || "10m";
+  const maxFiles = process.env.LOG_MAX_FILES || "5";
+
+  // Daily rotate file for all logs
+  transports.push(
+    new DailyRotateFile({
+      filename: path.join(logsDir, "app-%DATE%.log"),
+      datePattern: "YYYY-MM-DD",
+      maxSize,
+      maxFiles,
+      format: logFormat,
+      level: logLevel,
+    })
+  );
+
+  // Separate file for errors
+  transports.push(
+    new DailyRotateFile({
+      filename: path.join(logsDir, "error-%DATE%.log"),
+      datePattern: "YYYY-MM-DD",
+      maxSize,
+      maxFiles,
+      format: logFormat,
+      level: "error",
+    })
+  );
+}
+
+// Create logger instance
+const logger = winston.createLogger({
+  levels,
+  level: logLevel,
+  format: logFormat,
+  transports,
+  // Don't exit on handled exceptions
+  exitOnError: false,
+});
+
+// Create a stream object for Morgan HTTP logging
+logger.stream = {
+  write: (message) => {
+    logger.http(message.trim());
+  },
+};
+
+/**
+ * Helper to log with context
+ * @param {string} level - Log level
+ * @param {string} message - Log message
+ * @param {Object} context - Additional context
+ */
+const logWithContext = (level, message, context = {}) => {
+  logger[level](message, context);
+};
+
+/**
+ * Create a child logger with default context
+ * @param {Object} defaultContext - Default context to include in all logs
+ * @returns {Object} Child logger instance
+ */
+logger.child = (defaultContext = {}) => {
+  return {
+    error: (message, context = {}) => logger.error(message, { ...defaultContext, ...context }),
+    warn: (message, context = {}) => logger.warn(message, { ...defaultContext, ...context }),
+    info: (message, context = {}) => logger.info(message, { ...defaultContext, ...context }),
+    http: (message, context = {}) => logger.http(message, { ...defaultContext, ...context }),
+    debug: (message, context = {}) => logger.debug(message, { ...defaultContext, ...context }),
+  };
+};
+
+module.exports = logger;

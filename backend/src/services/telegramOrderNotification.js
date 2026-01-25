@@ -1,23 +1,22 @@
 const https = require("https");
 const dns = require("dns");
 const { formatYMDToDMY } = require("../utils/normalizers");
+const logger = require("../utils/logger");
 
 const HTTP_TIMEOUT_MS = 10_000;
 
-const DEFAULT_NOTIFICATION_GROUP_ID = "-1002934465528";
-const DEFAULT_ORDER_TOPIC_ID = 1;
-const DEFAULT_QR_ACCOUNT_NUMBER = "9183400998";
-const DEFAULT_QR_BANK_CODE = "VPB";
-
+// All sensitive values must come from environment variables
+// No hardcoded defaults for security reasons
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_CHAT_ID =
   process.env.ORDER_NOTIFICATION_CHAT_ID ||
   process.env.TELEGRAM_CHAT_ID ||
-  DEFAULT_NOTIFICATION_GROUP_ID;
+  "";
 const TELEGRAM_ORDER_TOPIC_ID = Number.parseInt(
   process.env.ORDER_NOTIFICATION_TOPIC_ID ||
     process.env.TELEGRAM_ORDER_TOPIC_ID ||
-    DEFAULT_ORDER_TOPIC_ID,
+    process.env.ORDER_TOPIC_ID ||
+    "1",
   10
 );
 const SEND_ORDER_NOTIFICATION =
@@ -29,11 +28,11 @@ const SEND_ORDER_TO_TOPIC =
 const QR_ACCOUNT_NUMBER =
   process.env.ORDER_QR_ACCOUNT_NUMBER ||
   process.env.QR_ACCOUNT_NUMBER ||
-  DEFAULT_QR_ACCOUNT_NUMBER;
+  "";
 const QR_BANK_CODE =
   process.env.ORDER_QR_BANK_CODE ||
   process.env.QR_BANK_CODE ||
-  DEFAULT_QR_BANK_CODE;
+  "";
 const QR_NOTE_PREFIX = process.env.ORDER_QR_NOTE_PREFIX || "Thanh toan";
 const SEND_ORDER_COPY_BUTTONS =
   String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !==
@@ -123,7 +122,7 @@ const postJson = async (url, data) => {
       if (!isTransient) {
         throw err;
       }
-      console.warn("[Order][Telegram] Fetch failed, retrying with https client", {
+      logger.warn("[Order][Telegram] Fetch failed, retrying with https client", {
         code,
         status: err?.status,
       });
@@ -375,7 +374,7 @@ const sendOrderCreatedNotification = async (order) => {
         adjusted = true;
       }
       if (!adjusted) {
-        console.error("[Order][Telegram] Send failed", err);
+        logger.error("[Order][Telegram] Send failed", { error: err?.message, stack: err?.stack });
         return;
       }
     }

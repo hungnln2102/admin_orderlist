@@ -1,7 +1,8 @@
-﻿const Helpers = require("../../../helpers");
+const Helpers = require("../../../helpers");
 const { db } = require("../../db");
 const { TABLES, COLS } = require("./constants");
 const { quoteIdent } = require("../../utils/sql");
+const logger = require("../../utils/logger");
 
 const fetchVariantPricing = async (productName) => {
     const name = String(productName ?? "");
@@ -33,7 +34,7 @@ const fetchVariantPricing = async (productName) => {
 
 const attachCalculatePriceRoute = (router) => {
     router.post("/calculate-price", async(req, res) => {
-        console.log("[POST] /api/calculate-price");
+        logger.debug("[POST] /api/calculate-price");
         const { supply_id, san_pham_name, id_product, id_order, customer_type } = req.body || {};
 
         const productName = String(san_pham_name || id_product || "").trim();
@@ -156,7 +157,7 @@ const attachCalculatePriceRoute = (router) => {
             });
 
         } catch (error) {
-            console.error(`Calculation error (${orderId}):`, error);
+            logger.error("Calculation error", { orderId, error: error.message, stack: error.stack });
             res.status(500).json({ error: "System Error" });
         }
     });

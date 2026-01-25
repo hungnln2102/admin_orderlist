@@ -2,6 +2,7 @@ const { db } = require("../../db");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput } = require("../../utils/normalizers");
 const { categoryCols, TABLES } = require("../ProductsController/constants");
+const logger = require("../../utils/logger");
 
 const listCategories = async (_req, res) => {
   try {
@@ -25,7 +26,7 @@ const listCategories = async (_req, res) => {
       .filter((row) => Number.isFinite(row.id) && row.id > 0 && row.name);
     res.json(rows);
   } catch (error) {
-    console.error("Query failed (GET /api/categories):", error);
+    logger.error("Query failed (GET /api/categories)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Cannot fetch categories." });
   }
 };
@@ -63,7 +64,7 @@ const createCategory = async (req, res) => {
     };
     return res.status(201).json(created);
   } catch (error) {
-    console.error("Insert failed (POST /api/categories):", error);
+    logger.error("Insert failed (POST /api/categories)", { error: error.message, stack: error.stack });
     return res.status(500).json({ error: "Cannot create category." });
   }
 };

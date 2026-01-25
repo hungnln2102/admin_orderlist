@@ -8,6 +8,7 @@ const {
   resolveSupplierNameColumn,
 } = require("../../SuppliesController/helpers");
 const { updateOrderCostsOnSupplyPriceChange } = require("../../../services/updateOrderCostsOnSupplyPriceChange");
+const logger = require("../../../utils/logger");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;
@@ -41,10 +42,7 @@ const getSuppliesByProductName = async (req, res) => {
       })) || [];
     res.json(rows);
   } catch (error) {
-    console.error(
-      `Query failed (GET /api/products/supplies-by-name/${productName}):`,
-      error
-    );
+    logger.error("Query failed (GET /api/products/supplies-by-name/:productName)", { productName, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải nhà cung cấp cho sản phẩm." });
   }
 };
@@ -78,10 +76,7 @@ const getSupplyPricesByProductName = async (req, res) => {
     const result = await db.raw(query, candidateIds);
     res.json((result.rows || []).map(mapSupplyPriceRow));
   } catch (error) {
-    console.error(
-      `Query failed (GET /api/products/all-prices-by-name/${productName}):`,
-      error
-    );
+    logger.error("Query failed (GET /api/products/all-prices-by-name/:productName)", { productName, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải giá nhà cung cấp cho sản phẩm." });
   }
 };
@@ -110,7 +105,7 @@ const updateSupplyPriceForProduct = async (req, res) => {
       });
     } catch (updateError) {
       // Log error but don't fail the price update
-      console.error("Failed to auto-update order costs:", updateError);
+      logger.error("Failed to auto-update order costs", { productId, sourceId, error: updateError?.message, stack: updateError?.stack });
       
       // Still return success for the price update
       res.json({
@@ -123,10 +118,7 @@ const updateSupplyPriceForProduct = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(
-      `Update failed (PATCH /api/products/${productId}/suppliers/${sourceId}/price):`,
-      error
-    );
+    logger.error("Update failed (PATCH /api/products/:productId/suppliers/:sourceId/price)", { productId, sourceId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật giá nhà cung cấp." });
   }
 };
@@ -153,10 +145,7 @@ const createSupplyPriceForProduct = async (req, res) => {
       price: result.price,
     });
   } catch (error) {
-    console.error(
-      `Insert failed (POST /api/product-prices/${productId}/suppliers):`,
-      error
-    );
+    logger.error("Insert failed (POST /api/product-prices/:productId/suppliers)", { productId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể thêm giá nhà cung cấp." });
   }
 };
@@ -181,10 +170,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
     );
     res.json({ success: true });
   } catch (error) {
-    console.error(
-      `Delete failed (DELETE /api/products/${productId}/suppliers/${sourceId}):`,
-      error
-    );
+    logger.error("Delete failed (DELETE /api/products/:productId/suppliers/:sourceId)", { productId, sourceId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể xóa giá nhà cung cấp." });
   }
 };

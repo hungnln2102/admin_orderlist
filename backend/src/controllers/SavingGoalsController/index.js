@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../../db');
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require('../../config/dbSchema');
+const logger = require('../../utils/logger');
 
 const SAVING_GOALS_TABLE = tableName(FINANCE_SCHEMA.SAVING_GOALS.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.SAVING_GOALS.COLS;
@@ -33,7 +34,7 @@ router.get('/', async (req, res) => {
       totalTarget,
     });
   } catch (error) {
-    console.error('Error fetching saving goals:', error);
+    logger.error('Error fetching saving goals', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Không thể tải danh sách mục tiêu.' });
   }
 });
@@ -80,7 +81,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(newGoal);
   } catch (error) {
-    console.error('Error creating saving goal:', error);
+    logger.error('Error creating saving goal', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Không thể tạo mục tiêu mới.' });
   }
 });
@@ -136,7 +137,7 @@ router.put('/:id', async (req, res) => {
 
     res.json(updatedGoal);
   } catch (error) {
-    console.error('Error updating saving goal:', error);
+    logger.error('Error updating saving goal', { goalId, error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Không thể cập nhật mục tiêu.' });
   }
 });
@@ -178,7 +179,7 @@ router.delete('/:id', async (req, res) => {
 
     res.json({ message: 'Đã xóa mục tiêu thành công.' });
   } catch (error) {
-    console.error('Error deleting saving goal:', error);
+    logger.error('Error deleting saving goal', { goalId, error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Không thể xóa mục tiêu.' });
   }
 });
@@ -223,7 +224,7 @@ router.put('/:id/priority', async (req, res) => {
 
     res.json(updatedGoal);
   } catch (error) {
-    console.error('Error updating goal priority:', error);
+    logger.error('Error updating goal priority', { goalId, error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Không thể cập nhật thứ tự ưu tiên.' });
   }
 });

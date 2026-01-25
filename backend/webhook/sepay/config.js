@@ -22,17 +22,21 @@ const SEPAY_API_KEY = process.env.SEPAY_API_KEY || "";
 const HOST = process.env.SEPAY_HOST || "0.0.0.0";
 const PORT = Number(process.env.SEPAY_PORT) || 5000;
 
-const DEFAULT_NOTIFICATION_GROUP_ID = "-1002934465528";
-const DEFAULT_RENEWAL_TOPIC_ID = 2;
-
+// All sensitive values must come from environment variables
+// No hardcoded defaults for security reasons
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const TELEGRAM_CHAT_ID =
   process.env.RENEWAL_GROUP_ID ||
   process.env.NOTIFICATION_CHAT_ID ||
   process.env.TELEGRAM_CHAT_ID ||
-  DEFAULT_NOTIFICATION_GROUP_ID;
+  process.env.ORDER_NOTIFICATION_CHAT_ID ||
+  "";
 const TELEGRAM_TOPIC_ID = Number.parseInt(
-  process.env.RENEWAL_TOPIC_ID || process.env.TELEGRAM_TOPIC_ID || DEFAULT_RENEWAL_TOPIC_ID,
+  process.env.RENEWAL_TOPIC_ID || 
+  process.env.TELEGRAM_TOPIC_ID || 
+  process.env.ORDER_NOTIFICATION_TOPIC_ID ||
+  process.env.ORDER_TOPIC_ID ||
+  "2",
   10
 );
 const SEND_RENEWAL_TO_TOPIC =
@@ -92,8 +96,6 @@ module.exports = {
   SEPAY_API_KEY,
   HOST,
   PORT,
-  DEFAULT_NOTIFICATION_GROUP_ID,
-  DEFAULT_RENEWAL_TOPIC_ID,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   TELEGRAM_TOPIC_ID,

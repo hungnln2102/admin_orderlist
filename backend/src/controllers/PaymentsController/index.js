@@ -13,6 +13,7 @@ const { STATUS } = require("../../utils/statuses");
 const {
   createDateNormalization,
 } = require("../../utils/sql");
+const logger = require("../../utils/logger");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
@@ -62,7 +63,7 @@ const listPaymentReceipts = async (req, res) => {
 
     res.json({ receipts, count: receipts.length, offset, limit });
   } catch (error) {
-    console.error("[payments] Query failed (payment-receipts):", error);
+    logger.error("[payments] Query failed (payment-receipts)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải biên lai thanh toán." });
   }
 };
@@ -185,11 +186,11 @@ const confirmPaymentSupply = async (req, res) => {
         // Nếu tiền thanh toán > tổng đơn, không tạo chu kỳ mới (tránh vòng lặp vô tận)
         carryoverImport = importDelta > 0 ? importDelta : null;
       } catch (orderErr) {
-        console.error(
-          "[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa",
+        logger.error("[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa", {
           sourceId,
-          orderErr
-        );
+          error: orderErr?.message,
+          stack: orderErr?.stack,
+        });
       }
 
       let hasUnpaidCycle = false;
@@ -243,9 +244,9 @@ const confirmPaymentSupply = async (req, res) => {
     }
     res.json(updatedRow);
   } catch (error) {
-    console.error(
-      `[payments] Mutation failed (POST /api/payment-supply/${paymentId}/confirm):`,
-      error
+    logger.error(
+      `[payments] Mutation failed (POST /api/payment-supply/${paymentId}/confirm)`,
+      { paymentId, error: error.message, stack: error.stack }
     );
     res.status(500).json({
       error: "Không thể xác nhận thanh toán.",

@@ -23,10 +23,18 @@ const DATABASE_URL =
   "";
 
 if (!DATABASE_URL) {
-  // eslint-disable-next-line no-console
-  console.warn(
-    "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
-  );
+  // Use require here to avoid circular dependency
+  try {
+    const logger = require("../utils/logger");
+    logger.warn(
+      "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
+    );
+  } catch {
+    // Fallback if logger not available
+    console.warn(
+      "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
+    );
+  }
 }
 
 const searchPath = Array.from(

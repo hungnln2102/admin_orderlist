@@ -13,6 +13,7 @@ const { nextId } = require("../../services/idService");
 const { deleteOrderWithArchive } = require("./orderDeletionService");
 const { updateOrderWithFinance } = require("./orderUpdateService");
 const { sendOrderCreatedNotification } = require("../../services/telegramOrderNotification");
+const logger = require("../../utils/logger");
 const ORDER_EXPIRED_COLS = Object.values(ORDERS_SCHEMA.ORDER_EXPIRED.COLS || {});
 const ORDER_CANCELED_COLS = Object.values(ORDERS_SCHEMA.ORDER_CANCELED.COLS || {});
 const ORDER_CANCELED_ALLOWED_COLS = ORDER_CANCELED_COLS.filter(
@@ -26,7 +27,7 @@ const pruneArchiveData = (data, allowedCols) =>
 const attachCrudRoutes = (router) => {
     // POST /api/orders (Create)
     router.post("/", async(req, res) => {
-        console.log("[POST] /api/orders");
+        logger.info("[POST] /api/orders");
         const payload = sanitizeOrderWritePayload(req.body);
         delete payload.id;
 
@@ -48,11 +49,11 @@ const attachCrudRoutes = (router) => {
             const normalized = normalizeOrderRow(newOrder, todayYMDInVietnam());
             res.status(201).json(normalized);
             sendOrderCreatedNotification(normalized).catch((err) => {
-                console.error("[Order][Telegram] Notify failed", err);
+                logger.error("[Order][Telegram] Notify failed", { error: err.message, stack: err.stack });
             });
         } catch (error) {
             await trx.rollback();
-            console.error("Create failed:", error);
+            logger.error("Create order failed", { error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể tạo đơn hàng mới." });
         }
     });
@@ -90,7 +91,7 @@ const attachCrudRoutes = (router) => {
             res.json(updated);
         } catch (error) {
             await trx.rollback();
-            console.error("Lỗi cập nhật đơn hàng:", error);
+            logger.error("Lỗi cập nhật đơn hàng", { id, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể cập nhật đơn hàng." });
         }
     });
@@ -131,7 +132,7 @@ const attachCrudRoutes = (router) => {
             res.json(result);
         } catch (error) {
             await trx.rollback();
-            console.error("Lỗi xóa đơn hàng:", error);
+            logger.error("Lỗi xóa đơn hàng", { id, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể xóa đơn hàng." });
         }
     });

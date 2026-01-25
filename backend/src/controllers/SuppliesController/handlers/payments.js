@@ -1,10 +1,11 @@
 const { db } = require("../../../db");
 const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("../constants");
 const { parseMoney, parseSupplyId } = require("../helpers");
+const logger = require("../../../utils/logger");
 
 const createPayment = async (req, res) => {
   const { supplyId } = req.params;
-  console.log(`[POST] /api/supplies/${supplyId}/payments`, req.body);
+  logger.info(`[POST] /api/supplies/${supplyId}/payments`, { body: req.body });
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
@@ -67,10 +68,7 @@ const createPayment = async (req, res) => {
       status: row[paymentSupplyCols.STATUS] || "",
     });
   } catch (error) {
-    console.error(
-      `Mutation failed (POST /api/supplies/${supplyId}/payments):`,
-      error
-    );
+    logger.error("Mutation failed (POST /api/supplies/:supplyId/payments)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể thêm chu kỳ thanh toán.",
     });
@@ -79,10 +77,7 @@ const createPayment = async (req, res) => {
 
 const updatePaymentImport = async (req, res) => {
   const { supplyId, paymentId } = req.params;
-  console.log(
-    `[PATCH] /api/supplies/${supplyId}/payments/${paymentId}`,
-    req.body
-  );
+  logger.debug("[PATCH] /api/supplies/:supplyId/payments/:paymentId", { supplyId, paymentId, body: req.body });
 
   const parsedSupplyId = parseSupplyId(supplyId);
   const parsedPaymentId = parseSupplyId(paymentId);
@@ -136,10 +131,7 @@ const updatePaymentImport = async (req, res) => {
       status: row.status_label || "",
     });
   } catch (error) {
-    console.error(
-      `Mutation failed (PATCH /api/supplies/${supplyId}/payments/${paymentId}):`,
-      error
-    );
+    logger.error("Mutation failed (PATCH /api/supplies/:supplyId/payments/:paymentId)", { supplyId, paymentId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể cập nhật chu kỳ thanh toán.",
     });

@@ -27,6 +27,7 @@ const {
 } = require("./utils");
 const { updatePaymentSupplyBalance } = require("./payments");
 const { sendRenewalNotification } = require("./notifications");
+const logger = require("../../src/utils/logger");
 
 const pendingRenewalTasks = new Map(); // orderCode -> task state
 
@@ -170,7 +171,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       Math.round((ngayHetHanMoi.getTime() - ngayBatDauMoi.getTime()) / 86_400_000) + 1
     );
 
-    console.log("[Renewal] Calculated span", {
+    logger.info("[Renewal] Calculated span", {
       orderCode,
       months,
       fallbackSoNgay,
@@ -225,7 +226,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       try {
         await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {
-        console.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp %s:", orderCode, balanceErr);
+        logger.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp", { orderCode, error: balanceErr.message, stack: balanceErr.stack });
       }
     }
 
@@ -244,7 +245,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     return { success: true, details, processType: "renewal" };
   } catch (err) {
-    console.error("Error renewing order %s: %s", orderCode, err);
+    logger.error("Error renewing order", { orderCode, error: err.message, stack: err.stack });
     return { success: false, details: err.message || String(err), processType: "error" };
   } finally {
     client.release();
@@ -273,9 +274,12 @@ const isEligibleForRenewal = (statusValue, orderExpired) => {
   const statusText = String(statusValue || "");
   const daysLeft = daysUntil(orderExpired);
 
+  // Chỉ RENEWAL và EXPIRED mới eligible cho renewal
+  // PROCESSING là trạng thái SAU KHI renewal, không phải điều kiện để renewal
   const readyForRenew =
-    (statusText === ORDER_STATUS.RENEWAL || statusText === ORDER_STATUS.EXPIRED) &&
-    daysLeft <= 4;
+    daysLeft <= 4 &&
+    (statusText === ORDER_STATUS.RENEWAL ||
+      statusText === ORDER_STATUS.EXPIRED);
 
   return {
     eligible: readyForRenew,

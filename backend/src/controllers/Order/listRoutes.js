@@ -1,7 +1,8 @@
-﻿const { db } = require("../../db");
+const { db } = require("../../db");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { TABLES } = require("./constants");
 const { normalizeOrderRow } = require("./helpers");
+const logger = require("../../utils/logger");
 
 const attachListRoutes = (router) => {
     // GET /api/orders
@@ -11,7 +12,7 @@ const attachListRoutes = (router) => {
             (scope === "canceled" || scope === "cancelled") ? TABLES.orderCanceled :
             TABLES.orderList;
 
-        console.log(`[GET] /api/orders scope=${scope}`);
+        logger.debug(`[GET] /api/orders`, { scope });
 
         try {
             const rows = await db(table).select("*",
@@ -28,7 +29,7 @@ const attachListRoutes = (router) => {
             );
             res.json(normalized);
         } catch (error) {
-            console.error("Truy Vấn Thất Bại:", error);
+            logger.error("Truy Vấn Thất Bại", { scope, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể tải danh sách đơn hàng." });
         }
     });

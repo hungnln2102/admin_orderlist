@@ -19,6 +19,7 @@ const deleteOrderWithArchive = async ({
         calcRemainingRefund,
     } = require("./orderFinanceHelpers");
     const { toNullableNumber } = require("../../utils/normalizers");
+    const logger = require("../../utils/logger");
 
     const orderId = order?.id;
 
@@ -26,12 +27,13 @@ const deleteOrderWithArchive = async ({
     try {
         await adjustSupplierDebtIfNeeded(trx, order, normalized);
     } catch (debtErr) {
-        console.log("Lỗi khi trừ/cộng công nợ NCC:", {
+        logger.warn("Lỗi khi trừ/cộng công nợ NCC", {
             id: orderId,
-            supplier: order?.supplier,
+            supplier: order?.supply,
             cost: order?.cost,
             status: order?.status,
-            error: debtErr?.message || debtErr,
+            error: debtErr?.message || String(debtErr),
+            stack: debtErr?.stack,
         });
     }
 

@@ -22,6 +22,7 @@ const {
   isEligibleForRenewal,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
+const logger = require("../../../src/utils/logger");
 
 const router = express.Router();
 
@@ -31,35 +32,37 @@ router.get("/", (_req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  console.log("Incoming Sepay webhook headers:", {
-    authorization: req.get("Authorization"),
-    xApiKey: req.get("X-API-KEY"),
-    xSepaySignature: req.get("X-SEPAY-SIGNATURE"),
-    signature: req.get("Signature"),
-    querySignature: req.query?.signature,
+  logger.debug("Incoming Sepay webhook", {
+    headers: {
+      authorization: req.get("Authorization") ? "***" : null,
+      xApiKey: req.get("X-API-KEY") ? "***" : null,
+      xSepaySignature: req.get("X-SEPAY-SIGNATURE") ? "***" : null,
+      signature: req.get("Signature") ? "***" : null,
+      querySignature: req.query?.signature ? "***" : null,
+    },
+    bodySize: JSON.stringify(req.body).length,
   });
-  console.log("Incoming Sepay webhook raw body:", safeStringify(req.body));
 
   const signature = resolveSepaySignature(req);
   const hasValidSignature = verifySepaySignature(req.rawBody, signature);
   const hasValidApiKey = isValidApiKey(req);
   if (!(hasValidSignature || hasValidApiKey)) {
-    console.error("Webhook auth failed", {
+    logger.warn("Webhook auth failed", {
       hasValidSignature,
       hasValidApiKey,
-      receivedAuth: req.get("Authorization"),
+      hasAuth: !!req.get("Authorization"),
     });
     return res.status(403).json({ message: "Invalid Signature" });
   }
 
   const transaction = normalizeTransactionPayload(req.body);
-  console.log("Parsed transaction object:", safeStringify(transaction));
+  logger.debug("Parsed transaction", { transaction: safeStringify(transaction) });
   if (!transaction) {
     return res.status(400).json({ message: "Missing transaction" });
   }
 
   const orderCode = deriveOrderCode(transaction);
-  console.log("Derived order code:", orderCode);
+  logger.debug("Derived order code", { orderCode });
   const extractedOrderCodes = extractOrderCodes(transaction);
   const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
   const normalizedExtracted = extractedOrderCodes
@@ -73,12 +76,12 @@ router.post("/", async (req, res) => {
     )
   );
   if (normalizedExtracted.length > 1 && normalizedPrimary) {
-    console.warn(
-      "Multiple order codes detected; using primary only:",
-      safeStringify({ primary: normalizedPrimary, extracted: normalizedExtracted })
+    logger.warn(
+      "Multiple order codes detected; using primary only",
+      { primary: normalizedPrimary, extracted: normalizedExtracted }
     );
   } else if (orderCodes.length > 1) {
-    console.log("Extracted order codes:", safeStringify(orderCodes));
+    logger.debug("Extracted order codes", { orderCodes });
   }
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
@@ -134,10 +137,7 @@ router.post("/", async (req, res) => {
             referenceImport,
             client,
           });
-          console.log(
-            "Ensure supply/price result:",
-            safeStringify({ orderCode: code, ensured })
-          );
+          logger.debug("Ensure supply/price result", { orderCode: code, ensured });
           if (ensured?.supplierId && Number.isFinite(ensured.price)) {
             await updatePaymentSupplyBalance(
               ensured.supplierId,
@@ -176,7 +176,9 @@ router.post("/", async (req, res) => {
       client.release();
     }
 
-    // Renewal retry flow: only queue and retry needed actions
+    // Rule renewal: sau khi đổi trạng thái (và insert receipt), chạy gia hạn cho đơn eligible.
+    // Eligible = RENEWAL / EXPIRED (khi daysLeft <= 4).
+    // Sau khi renewal, đơn sẽ chuyển về PROCESSING (Đang Xử Lý).
     try {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
         const state = await fetchOrderState(code);
@@ -194,13 +196,12 @@ router.post("/", async (req, res) => {
         }
       }
     } catch (renewErr) {
-      console.error("Renewal flow failed:", renewErr);
+      logger.error("Renewal flow failed", { error: renewErr.message, stack: renewErr.stack });
     }
 
     return res.json({ message: "OK" });
   } catch (err) {
-    console.error("Error saving payment:", err);
-    if (err?.stack) console.error(err.stack);
+    logger.error("Error saving payment", { error: err.message, stack: err.stack });
     return res.status(500).json({ message: "Internal Error" });
   }
 });

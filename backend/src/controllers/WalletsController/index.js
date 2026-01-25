@@ -1,6 +1,7 @@
 const { db } = require("../../db");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
 const { normalizeTextInput } = require("../../utils/normalizers");
+const logger = require("../../utils/logger");
 
 const WALLET_TYPES_TABLE = tableName(
   FINANCE_SCHEMA.MASTER_WALLETTYPES.TABLE,
@@ -68,7 +69,7 @@ const listDailyBalances = async (_req, res) => {
       rows: Array.from(rowsByDate.values()),
     });
   } catch (error) {
-    console.error("[wallets] Failed to load daily balances:", error);
+    logger.error("[wallets] Failed to load daily balances", { error: error.message, stack: error.stack });
     res
       .status(500)
       .json({ error: "Không thể tải dữ liệu đồng tiền từ cơ sở dữ liệu." });
@@ -128,7 +129,7 @@ const saveDailyBalance = async (req, res) => {
 
     res.json({ ok: true, recordDate: dateStr, entries: balances });
   } catch (error) {
-    console.error("[wallets] Failed to save daily balances:", error);
+    logger.error("[wallets] Failed to save daily balances", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể lưu dữ liệu đồng tiền." });
   }
 };

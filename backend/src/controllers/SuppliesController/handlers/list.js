@@ -2,6 +2,7 @@ const { db } = require("../../../db");
 const { QUOTED_COLS, TABLES, variantCols, supplyPriceCols } = require("../constants");
 const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
 const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
+const logger = require("../../../utils/logger");
 
 const listSupplies = async (_req, res) => {
   try {
@@ -21,14 +22,14 @@ const listSupplies = async (_req, res) => {
     );
     res.json(result.rows || []);
   } catch (error) {
-    console.error("Query failed (GET /api/supplies):", error);
+    logger.error("Query failed (GET /api/supplies)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải danh sách nhà cung cấp." });
   }
 };
 
 const getProductsBySupply = async (req, res) => {
   const { supplyId } = req.params;
-  console.log(`[GET] /api/supplies/${supplyId}/products`);
+  logger.debug(`[GET] /api/supplies/${supplyId}/products`, { supplyId });
 
   const q = `
     SELECT DISTINCT
@@ -45,7 +46,7 @@ const getProductsBySupply = async (req, res) => {
     const result = await db.raw(q, [supplyId]);
     res.json(result.rows);
   } catch (error) {
-    console.error("Query failed (GET /api/supplies/:id/products):", error);
+    logger.error("Query failed (GET /api/supplies/:id/products)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải sản phẩm cho nhà cung cấp này.",
     });
@@ -54,7 +55,7 @@ const getProductsBySupply = async (req, res) => {
 
 const listPaymentsBySupply = async (req, res) => {
   const { supplyId } = req.params;
-  console.log(`[GET] /api/supplies/${supplyId}/payments`, req.query);
+  logger.debug(`[GET] /api/supplies/${supplyId}/payments`, { supplyId, query: req.query });
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
@@ -108,7 +109,7 @@ const listPaymentsBySupply = async (req, res) => {
       nextOffset: offset + payments.length,
     });
   } catch (error) {
-    console.error("Query failed (GET /api/supplies/:id/payments):", error);
+    logger.error("Query failed (GET /api/supplies/:id/payments)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải lịch sử thanh toán cho nhà cung cấp này.",
     });

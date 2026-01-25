@@ -16,10 +16,11 @@ const {
   resolveSupplierTableName,
   resolveSupplierNameColumn,
 } = require("../helpers");
+const logger = require("../../../utils/logger");
 
 const getSupplyOverview = async (req, res) => {
   const { supplyId } = req.params;
-  console.log(`[GET] /api/supplies/${supplyId}/overview`);
+  logger.debug(`[GET] /api/supplies/${supplyId}/overview`, { supplyId });
 
   const parsedSupplyId = parseSupplyId(supplyId);
   if (!parsedSupplyId) {
@@ -177,7 +178,7 @@ const getSupplyOverview = async (req, res) => {
       unpaidPayments,
     });
   } catch (error) {
-    console.error("Query failed (GET /api/supplies/:id/overview):", error);
+    logger.error("Query failed (GET /api/supplies/:id/overview)", { supplyId, error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải thông tin nhà cung cấp.",
     });

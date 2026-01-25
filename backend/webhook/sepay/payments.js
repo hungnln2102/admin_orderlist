@@ -24,6 +24,7 @@ const {
   roundToThousands,
   fetchProductPricing,
 } = require("./utils");
+const logger = require("../../src/utils/logger");
 
 let paymentReceiptOrderColCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
@@ -55,13 +56,12 @@ const getPaymentReceiptOrderColumn = async () => {
     const names = res.rows.map((r) => String(r.column_name || "").toLowerCase());
     const found = preferred.find((c) => names.includes(c));
     paymentReceiptOrderColCache = found || names[0] || "id_order";
-    console.log(
-      `[Webhook] payment_receipt order column resolved to '${paymentReceiptOrderColCache}' (candidates: ${preferred.join(
-        ", "
-      )})`
-    );
+    logger.debug("[Webhook] payment_receipt order column resolved", {
+      column: paymentReceiptOrderColCache,
+      candidates: preferred,
+    });
   } catch (err) {
-    console.error("Failed to resolve payment_receipt column list:", err);
+    logger.error("Failed to resolve payment_receipt column list", { error: err?.message, stack: err?.stack });
     paymentReceiptOrderColCache = "id_order";
   }
   return paymentReceiptOrderColCache;
@@ -190,15 +190,9 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
     `;
-    console.log("[Webhook] payment_receipt SQL:", sql.trim(), {
-      params: [
-        orderCode,
-        paidDate,
-        amount,
-        receiverAccount,
-        senderParsed || "",
-        noteValue,
-      ],
+    logger.debug("[Webhook] payment_receipt SQL", {
+      sql: sql.trim(),
+      params: [orderCode, paidDate, amount, receiverAccount, senderParsed || "", noteValue],
     });
 
     const insertRes = await client.query(sql, [
@@ -326,12 +320,12 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
               [supplyPriceValue, resolvedProductId, supplierId]
             );
           } catch (adjustErr) {
-            console.error(
-              "Failed to normalize supplier_cost for productId=%s, sourceId=%s:",
-              resolvedProductId,
-              supplierId,
-              adjustErr
-            );
+            logger.error("Failed to normalize supplier_cost", {
+              productId: resolvedProductId,
+              sourceId: supplierId,
+              error: adjustErr?.message,
+              stack: adjustErr?.stack,
+            });
           }
         }
       } else {
@@ -344,12 +338,12 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
           [resolvedProductId, supplierId, insertPrice]
           );
         } catch (insertErr) {
-          console.error(
-            "Insert supplier_cost failed, productId=%s, sourceId=%s:",
-            resolvedProductId,
-            supplierId,
-            insertErr
-          );
+          logger.error("Insert supplier_cost failed", {
+            productId: resolvedProductId,
+            sourceId: supplierId,
+            error: insertErr?.message,
+            stack: insertErr?.stack,
+          });
         }
         supplyPriceValue = supplyPriceValue || referenceImport || costValue;
       }

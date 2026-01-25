@@ -12,6 +12,7 @@ const updateOrderWithFinance = async ({
         todayYMDInVietnam,
     } = helpers;
     const { addSupplierImportOnProcessing } = require("./orderFinanceHelpers");
+    const logger = require("../../utils/logger");
 
     const sanitized = sanitizeOrderWritePayload(payload);
     delete sanitized.id;
@@ -37,12 +38,13 @@ const updateOrderWithFinance = async ({
     try {
         await addSupplierImportOnProcessing(trx, beforeOrder, updatedOrder);
     } catch (debtErr) {
-        console.error("Lỗi cập nhật công nợ NCC:", {
+        logger.error("Lỗi cập nhật công nợ NCC", {
             id,
             supply: updatedOrder?.supply,
             cost: updatedOrder?.cost,
             status: updatedOrder?.status,
-            error: debtErr?.message || debtErr,
+            error: debtErr?.message || String(debtErr),
+            stack: debtErr?.stack,
         });
     }
 

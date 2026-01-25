@@ -1,6 +1,7 @@
 const { db } = require("../../db");
 const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
 const { normalizeDateInput } = require("../../utils/normalizers");
+const logger = require("../../utils/logger");
 
 const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 const cols = warehouseDef.columns;
@@ -23,7 +24,7 @@ const listWarehouse = async (_req, res) => {
       .orderBy(cols.id, "asc");
     res.json(rows || []);
   } catch (error) {
-    console.error("[warehouse] Query failed:", error);
+    logger.error("[warehouse] Query failed", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải kho hàng." });
   }
 };
@@ -66,7 +67,7 @@ const createWarehouse = async (req, res) => {
 
     res.status(201).json(row);
   } catch (error) {
-    console.error("[warehouse] Insert failed:", error);
+    logger.error("[warehouse] Insert failed", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tạo kho hàng." });
   }
 };
@@ -116,7 +117,7 @@ const updateWarehouse = async (req, res) => {
     }
     res.json(row);
   } catch (error) {
-    console.error(`[warehouse] Update failed for id=${id}:`, error);
+    logger.error("[warehouse] Update failed", { id, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể cập nhật kho hàng." });
   }
 };
@@ -132,7 +133,7 @@ const deleteWarehouse = async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    console.error(`[warehouse] Delete failed for id=${id}:`, error);
+    logger.error("[warehouse] Delete failed", { id, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể xóa kho hàng." });
   }
 };

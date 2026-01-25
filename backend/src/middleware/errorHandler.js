@@ -3,6 +3,8 @@
  * Provides consistent error responses across the application
  */
 
+const logger = require("../utils/logger");
+
 class AppError extends Error {
   constructor(message, statusCode = 500, code = "INTERNAL_ERROR", details = null) {
     super(message);
@@ -46,14 +48,24 @@ const errorHandler = (err, req, res, next) => {
     message = "Dữ liệu tham chiếu không hợp lệ";
   }
 
-  // Log error for debugging (preserve existing console.error pattern)
+  // Log error for debugging
   if (statusCode >= 500) {
-    console.error("[Error Handler]", {
+    logger.error("Error Handler", {
       message: err.message,
       code,
       stack: err.stack,
       url: req.originalUrl,
       method: req.method,
+      statusCode,
+    });
+  } else {
+    // Log non-500 errors at warn level
+    logger.warn("Error Handler", {
+      message: err.message,
+      code,
+      url: req.originalUrl,
+      method: req.method,
+      statusCode,
     });
   }
 

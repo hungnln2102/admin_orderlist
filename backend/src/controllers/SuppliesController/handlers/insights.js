@@ -15,6 +15,7 @@ const {
 } = require("../../../utils/sql");
 const { normalizeSupplyStatus, formatDateOutput } = require("../../../utils/normalizers");
 const { resolveSupplyStatusColumn } = require("../helpers");
+const logger = require("../../../utils/logger");
 
 // Explicit supplier tables (prefer configured supplier schema, fallback to product/partner for legacy DBs)
 const { SCHEMA_SUPPLIER, SCHEMA_SUPPLIER_COST } = require("../../../config/dbSchema");
@@ -32,7 +33,7 @@ const resolveSupplierTableName = async () => {
       .first();
     supplierTableNameCache = exists ? SUPPLIER_PRODUCT_TABLE : SUPPLIER_PARTNER_TABLE;
   } catch (err) {
-    console.warn("[insights] Could not resolve supplier table, defaulting to partner.supplier:", err?.message || err);
+    logger.warn("[insights] Could not resolve supplier table, defaulting to partner.supplier", { error: err?.message || err });
     supplierTableNameCache = SUPPLIER_PRODUCT_TABLE;
   }
   return supplierTableNameCache;
@@ -50,14 +51,14 @@ const resolveSupplierNameColumn = async () => {
       .first();
     supplierNameColumnCache = res?.column_name || "supplier_name";
   } catch (err) {
-    console.warn("[insights] Could not resolve supplier name column, defaulting to supplier_name:", err?.message || err);
+    logger.warn("[insights] Could not resolve supplier name column, defaulting to supplier_name", { error: err?.message || err });
     supplierNameColumnCache = "supplier_name";
   }
   return supplierNameColumnCache;
 };
 
 const getSupplyInsights = async (_req, res) => {
-  console.log("[GET] /api/supply-insights");
+  logger.debug("[GET] /api/supply-insights");
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     .toISOString()
@@ -288,7 +289,7 @@ const getSupplyInsights = async (_req, res) => {
     );
     res.json({ stats, supplies });
   } catch (error) {
-    console.error("Query failed (GET /api/supply-insights):", error);
+    logger.error("Query failed (GET /api/supply-insights)", { error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải thông tin chi tiết về nguồn cung.",
     });

@@ -1,6 +1,7 @@
 const express = require("express");
 const { isValidApiKey } = require("../auth");
 const { runRenewalBatch } = require("../renewal");
+const logger = require("../../../src/utils/logger");
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.post("/retry", async (req, res) => {
     });
     res.json({ message: "OK", ...summary });
   } catch (err) {
-    console.error("Renewal retry failed:", err);
+    logger.error("Renewal retry failed", { error: err?.message, stack: err?.stack });
     res.status(500).json({ message: "Internal Error" });
   }
 });

@@ -10,6 +10,7 @@ const cron = require("node-cron");
 const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("./src/config/dbSchema");
 const { backupDatabaseToDrive } = require("./src/utils/backupService");
 const { STATUS } = require("./src/utils/statuses");
+const logger = require("./src/utils/logger");
 // Raw column names (unquoted) for reading rows returned by pg
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const ORDER_COLS = ORDER_DEF.columns;
@@ -102,14 +103,13 @@ const getSqlCurrentDate = () => {
  */
 const updateDatabaseTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate(); // Lấy ngày thực tế hoặc ngày giả định
-  console.log(
-    `[CRON] Bắt đầu cập nhật đơn hết hạn / cần gia hạn (Trigger: ${trigger}, Date: ${
-      process.env.MOCK_DATE || "CURRENT_DATE"
-    })...`
+  logger.info(
+    `[CRON] Bắt đầu cập nhật đơn hết hạn / cần gia hạn`,
+    { trigger, date: process.env.MOCK_DATE || "CURRENT_DATE" }
   );
 
   if (process.env.MOCK_DATE) {
-    console.warn(
+    logger.warn(
       `[TEST MODE] Đang sử dụng ngày giả định: ${process.env.MOCK_DATE}`
     );
   }
@@ -119,6 +119,12 @@ const updateDatabaseTask = async (trigger = "cron") => {
     await client.query("BEGIN");
 
     // 1) Move expired orders (< 0 days) to expired table
+    // Chỉ chuyển đơn PAID / RENEWAL / EXPIRED. Không chuyển PROCESSING (đã nhận webhook, chưa confirm)
+    const statusExpiredEligible = [
+      `'${STATUS.PAID}'`,
+      `'${STATUS.RENEWAL}'`,
+      `'${STATUS.EXPIRED}'`,
+    ].join(", ");
     const transfer = await client.query(`
       WITH expired AS (
         SELECT
@@ -140,6 +146,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
           ${COL.status}
         FROM ${TABLES.orderList}
         WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
+          AND (${COL.status} IN (${statusExpiredEligible}))
       )
       INSERT INTO ${TABLES.orderExpired} (
         ${[
@@ -178,15 +185,14 @@ const updateDatabaseTask = async (trigger = "cron") => {
       ON CONFLICT DO NOTHING
       RETURNING ${COL.idOrder};
     `);
-    console.log(`  - Đã chuyển ${transfer.rowCount} đơn hết hạn (< 0 ngày).`);
+    logger.info(`Đã chuyển ${transfer.rowCount} đơn hết hạn (< 0 ngày)`);
     if (transfer.rows.length) {
       const idKey = ORDER_COLS.idOrder;
-      console.log(
-        `    -> ID đã lưu: ${transfer.rows
-          .map((r) => r[idKey])
-          .filter(Boolean)
-          .join(", ")}`
-      );
+      const orderIds = transfer.rows
+        .map((r) => r[idKey])
+        .filter(Boolean)
+        .join(", ");
+      logger.debug(`ID đã lưu: ${orderIds}`);
     }
     // 2a) Update PAID -> RENEWAL when days left <= 4
     const paidToRenewal = await client.query(`
@@ -195,25 +201,25 @@ const updateDatabaseTask = async (trigger = "cron") => {
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
         AND (${COL.status} = '${STATUS.PAID}');
     `);
-    console.log(
-      `  - Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (<= 4 days).`
+    logger.info(
+      `Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (<= 4 days)`
     );
 
-    // Remove moved orders from order_list (Không cần chuyển đổi kiểu dữ liệu ở đây)
+    // Remove moved orders from order_list. Cùng điều kiện với transfer: chỉ PAID/RENEWAL/EXPIRED
     const del = await client.query(`
       DELETE FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
+        AND (${COL.status} IN (${statusExpiredEligible}))
       RETURNING ${COL.idOrder};
     `);
-    console.log(`  - Đã xóa ${del.rowCount} đơn khỏi order_list.`);
+    logger.info(`Đã xóa ${del.rowCount} đơn khỏi order_list`);
     if (del.rows.length) {
       const idKey = ORDER_COLS.idOrder;
-      console.log(
-        `    -> ID đã xóa: ${del.rows
-          .map((r) => r[idKey])
-          .filter(Boolean)
-          .join(", ")}`
-      );
+      const orderIds = del.rows
+        .map((r) => r[idKey])
+        .filter(Boolean)
+        .join(", ");
+      logger.debug(`ID đã xóa: ${orderIds}`);
     }
     // 2b) Update RENEWAL -> EXPIRED when days left = 0
     const renewalToExpired = await client.query(`
@@ -222,24 +228,24 @@ const updateDatabaseTask = async (trigger = "cron") => {
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
         AND (${COL.status} = '${STATUS.RENEWAL}');
     `);
-    console.log(
-      `  - Updated ${renewalToExpired.rowCount} orders to '${STATUS.EXPIRED}' (0 days).`
+    logger.info(
+      `Updated ${renewalToExpired.rowCount} orders to '${STATUS.EXPIRED}' (0 days)`
     );
 
     await client.query("COMMIT");
-    console.log("[CRON] Hoàn thành cập nhật.");
+    logger.info("[CRON] Hoàn thành cập nhật");
     lastRunAt = new Date();
 
     if (enableDbBackup) {
       try {
         await backupDatabaseToDrive();
       } catch (backupErr) {
-        console.error("[CRON] Backup database failed:", backupErr);
+        logger.error("[CRON] Backup database failed", { error: backupErr.message, stack: backupErr.stack });
       }
     }
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[CRON] Lỗi khi cập nhật:", err);
+    logger.error("[CRON] Lỗi khi cập nhật", { error: err.message, stack: err.stack });
     throw err;
   } finally {
     client.release();
@@ -248,7 +254,7 @@ const updateDatabaseTask = async (trigger = "cron") => {
 
 const runCronSafe = (source) =>
   updateDatabaseTask(source).catch((err) =>
-    console.error(`[CRON] Failed during ${source}:`, err)
+    logger.error(`[CRON] Failed during ${source}`, { error: err.message, stack: err.stack })
   );
 
 // Allow manual trigger when this file is required directly (useful for debugging)
@@ -269,10 +275,9 @@ if (runOnStart) {
   runCronSafe("startup");
 }
 
-console.log(
-  `[Scheduler] Đã khởi động. Cron ${cronExpression} ${schedulerTimezone}${
-    runOnStart ? " (run on start enabled)" : ""
-  }`
+logger.info(
+  `[Scheduler] Đã khởi động`,
+  { cronExpression, schedulerTimezone, runOnStart }
 );
 
 module.exports = {

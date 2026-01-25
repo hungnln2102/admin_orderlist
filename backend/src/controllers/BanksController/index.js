@@ -1,4 +1,5 @@
 const https = require("https");
+const logger = require("../../utils/logger");
 // No DB cache: always fetch external bank list
 
 const BANK_SOURCE_URL =
@@ -104,7 +105,7 @@ const listBanks = async (_req, res) => {
     const banks = await fetchBanksFromSource();
     return res.json(banks);
   } catch (error) {
-    console.error("[banks] External source fetch failed:", error);
+    logger.error("[banks] External source fetch failed", { error: error.message, stack: error.stack });
     return res.status(500).json({ error: "Không thể tải danh sách ngân hàng" });
   }
 };

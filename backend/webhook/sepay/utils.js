@@ -248,7 +248,8 @@ const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallba
     }
     return basePrice || fallback;
   } catch (err) {
-    console.error("Error calculating gia_ban for %s: %s", orderId, err);
+    const logger = require("../../src/utils/logger");
+    logger.error("Error calculating gia_ban", { orderId, error: err?.message, stack: err?.stack });
     return basePrice || fallback;
   }
 };

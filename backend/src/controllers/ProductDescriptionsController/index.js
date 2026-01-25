@@ -1,6 +1,7 @@
-﻿const path = require("path"); // eslint-disable-line no-unused-vars
+const path = require("path"); // eslint-disable-line no-unused-vars
 require("dotenv").config(); // eslint-disable-line no-unused-vars
-console.log(">>> [DEBUG] PUBLIC_BASE_URL:", process.env.PUBLIC_BASE_URL);
+const logger = require("../../utils/logger");
+logger.debug("PUBLIC_BASE_URL", { url: process.env.PUBLIC_BASE_URL });
 
 const { db } = require("../../db");
 const {
@@ -175,7 +176,7 @@ const buildImageUrl = (req, filename) => {
 
   const base = pickBaseUrl(envBase, originBase, forwardedBase, hostBase);
 
-  console.log("[image-url]", {
+  logger.debug("[image-url]", {
     envBase,
     originBase,
     forwardedProto,
@@ -225,7 +226,7 @@ const normalizeImageUrl = (req, value) => {
 
   const resolved = buildImageUrl(req, fileName);
   if (resolved && resolved != raw) {
-    console.log("[image-url] normalized", { raw, resolved, fileName });
+    logger.debug("[image-url] normalized", { raw, resolved, fileName });
   }
   return resolved || raw;
 };
@@ -253,9 +254,9 @@ const listProductImages = async (req, res) => {
       }));
     res.json({ items, count: items.length });
   } catch (error) {
-    console.error(
-      "List images failed (GET /api/product-descriptions/images):",
-      error
+    logger.error(
+      "List images failed (GET /api/product-descriptions/images)",
+      { error: error.message, stack: error.stack }
     );
     res.status(500).json({ error: "Failed to list images." });
   }
@@ -275,9 +276,9 @@ const deleteProductImage = async (req, res) => {
     if (error && error.code === "ENOENT") {
       return res.status(404).json({ error: "File not found." });
     }
-    console.error(
-      "Delete image failed (DELETE /api/product-descriptions/images):",
-      error
+    logger.error(
+      "Delete image failed (DELETE /api/product-descriptions/images)",
+      { fileName, error: error.message, stack: error.stack }
     );
     res.status(500).json({ error: "Failed to delete image." });
   }
@@ -337,7 +338,7 @@ const listProductDescriptions = async (req, res) => {
       limit,
     });
   } catch (error) {
-    console.error("Query failed (GET /api/product-descriptions):", error);
+    logger.error("Query failed (GET /api/product-descriptions)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải mô tả sản phẩm." });
   }
 };
@@ -424,7 +425,7 @@ const saveProductDescription = async (req, res) => {
     ]);
     res.status(201).json(mapProductDescRow(req, inserted.rows[0]));
   } catch (error) {
-    console.error("Save failed (POST /api/product-descriptions):", error);
+    logger.error("Save failed (POST /api/product-descriptions)", { productId: normalizedProductId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể lưu mô tả sản phẩm." });
   }
 };

@@ -12,6 +12,7 @@ const {
   parsePaidDate,
   extractSenderFromContent,
 } = require("./utils");
+const logger = require("../../src/utils/logger");
 
 const HTTP_TIMEOUT_MS = 10_000;
 
@@ -99,7 +100,7 @@ const postJson = async (url, data) => {
       if (!isTransient) {
         throw err;
       }
-      console.warn("[Telegram] Fetch failed, retrying with https client", {
+      logger.warn("[Telegram] Fetch failed, retrying with https client", {
         code,
         status: err?.status,
       });
@@ -160,7 +161,7 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   const sendEnabled =
     SEND_RENEWAL_TO_TOPIC !== false && String(SEND_RENEWAL_TO_TOPIC) !== "false";
   if (!renewalResult || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn("[Renewal][Telegram] Skip send: missing data/config", {
+    logger.warn("[Renewal][Telegram] Skip send: missing data/config", {
       hasResult: Boolean(renewalResult),
       hasToken: Boolean(TELEGRAM_BOT_TOKEN),
       hasChat: Boolean(TELEGRAM_CHAT_ID),
@@ -183,7 +184,7 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
   };
 
   try {
-    console.log("[Renewal][Telegram] Sending notification", {
+    logger.debug("[Renewal][Telegram] Sending notification", {
       orderCode,
       chat: TELEGRAM_CHAT_ID,
       topic: TELEGRAM_TOPIC_ID,
@@ -200,21 +201,21 @@ const sendRenewalNotification = async (orderCode, renewalResult) => {
         (lowered.includes("topic") && lowered.includes("not found")));
 
     if (isThreadError) {
-      console.warn(
+      logger.warn(
         "Thông báo gia hạn Telegram thất bại do thiếu chủ đề; đang thử lại mà không có topic_id",
-        err
+        { error: err?.message, status: err?.status }
       );
       try {
         await postJson(url, buildPayload(false));
-        console.log("Thông báo gia hạn Telegram được gửi lại mà không có topic_id sau lỗi chủ đề");
+        logger.info("Thông báo gia hạn Telegram được gửi lại mà không có topic_id sau lỗi chủ đề", { orderCode });
         return;
       } catch (retryErr) {
-        console.error("Gửi thông báo gia hạn Telegram thất bại sau khi thử lại:", retryErr);
+        logger.error("Gửi thông báo gia hạn Telegram thất bại sau khi thử lại", { orderCode, error: retryErr?.message });
         return;
       }
     }
 
-    console.error("Không thể gửi thông báo gia hạn Telegram:", err);
+    logger.error("Không thể gửi thông báo gia hạn Telegram", { orderCode, error: err?.message, stack: err?.stack });
   }
 };
 

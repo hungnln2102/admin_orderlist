@@ -11,6 +11,7 @@ const {
 } = require("../constants");
 const { quoteIdent } = require("../../../utils/sql");
 const { mapProductPriceRow } = require("../mappers");
+const logger = require("../../../utils/logger");
 
 const listProducts = async (_req, res) => {
   try {
@@ -51,7 +52,7 @@ const listProducts = async (_req, res) => {
     const rows = (result.rows || []).map(mapProductPriceRow);
     res.json(rows);
   } catch (error) {
-    console.error("Query failed (GET /api/products):", error);
+    logger.error("Query failed (GET /api/products)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải sản phẩm. Vui lòng thử lại." });
   }
 };
@@ -96,7 +97,7 @@ const listProductPrices = async (_req, res) => {
     const rows = (result.rows || []).map(mapProductPriceRow);
     res.json(rows);
   } catch (error) {
-    console.error("Query failed (GET /api/product-prices):", error);
+    logger.error("Query failed (GET /api/product-prices)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };
@@ -149,7 +150,7 @@ const getProductPriceById = async (req, res) => {
     }
     res.json(mapProductPriceRow(result.rows[0]));
   } catch (error) {
-    console.error(`Query failed (GET /api/product-prices/${productId}):`, error);
+    logger.error("Query failed (GET /api/product-prices/:productId)", { productId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải giá sản phẩm." });
   }
 };

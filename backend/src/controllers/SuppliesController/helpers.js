@@ -2,6 +2,7 @@ const { db } = require("../../db");
 const { QUOTED_COLS, SUPPLY_STATUS_CANDIDATES } = require("./constants");
 const { SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_PARTNER } = require("../../config/dbSchema");
 const { normalizeSupplyStatus } = require("../../utils/normalizers");
+const logger = require("../../utils/logger");
 
 const SUPPLIER_TABLE_PRIMARY = `${SCHEMA_SUPPLIER}.supplier`;
 const SUPPLIER_TABLE_FALLBACK = `${SCHEMA_PRODUCT}.supplier`;
@@ -27,7 +28,7 @@ const resolveSupplierTableName = async () => {
       .first();
     supplierTableNameCache = existsFallback ? SUPPLIER_TABLE_FALLBACK : SUPPLIER_TABLE_PRIMARY;
   } catch (error) {
-    console.warn("[supplies] fallback supplier table detection failed:", error?.message || error);
+    logger.warn("[supplies] fallback supplier table detection failed", { error: error?.message || error });
     supplierTableNameCache = SUPPLIER_TABLE_PRIMARY;
   }
   return supplierTableNameCache;
@@ -48,7 +49,7 @@ const resolveSupplierNameColumn = async () => {
       .first();
     supplierNameColumnCache = res?.column_name || "supplier_name";
   } catch (error) {
-    console.warn("[supplies] fallback supplier name column detection failed:", error?.message || error);
+    logger.warn("[supplies] fallback supplier name column detection failed", { error: error?.message || error });
     supplierNameColumnCache = "supplier_name";
   }
   return supplierNameColumnCache;
@@ -100,7 +101,7 @@ const resolveSupplyStatusColumn = async () => {
     supplyStatusColumnNameCache =
       result?.[0]?.column_name ? result[0].column_name : null;
   } catch (error) {
-    console.warn("Không tìm thấy trường trạng thái nhà cung cấp:", error.message || error);
+    logger.warn("Không tìm thấy trường trạng thái nhà cung cấp", { error: error?.message || error });
     supplyStatusColumnNameCache = null;
   } finally {
     supplyStatusColumnResolved = true;

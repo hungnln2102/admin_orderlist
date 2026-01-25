@@ -1,6 +1,7 @@
 const sepayWebhookApp = require("../../../webhook/sepay_webhook");
 const { db } = require("../../db");
 const { TABLES, STATUS } = require("./constants");
+const logger = require("../../utils/logger");
 
 const attachRenewRoutes = (router) => {
     // POST /renew
@@ -14,14 +15,14 @@ const attachRenewRoutes = (router) => {
             const result = await sepayWebhookApp.runRenewal(orderCode, { forceRenewal });
             if (result?.success) {
                 if (typeof sepayWebhookApp.sendRenewalNotification === "function") {
-                    sepayWebhookApp.sendRenewalNotification(orderCode, result).catch(console.error);
+                    sepayWebhookApp.sendRenewalNotification(orderCode, result).catch((err) => logger.error("sendRenewalNotification failed", { orderCode, error: err?.message }));
                 }
                 return res.json(result);
             }
             const status = result?.processType === "skipped" ? 409 : 400;
             return res.status(status).json({ error: result?.details || "Gia hạn thất bại", result });
         } catch (error) {
-            console.error(`Lỗi gia hạn đơn hàng(${orderCode}):`, error);
+            logger.error("Lỗi gia hạn đơn hàng", { orderCode, error: error.message, stack: error.stack });
             return res.status(500).json({ error: "Không thể gia hạn đơn hàng." });
         }
     });
@@ -40,7 +41,7 @@ const attachRenewRoutes = (router) => {
             if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
             res.json({ success: true, ...updated });
         } catch (error) {
-            console.error("Lỗi hoàn tiền:", error);
+            logger.error("Lỗi hoàn tiền", { id, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể đánh dấu hoàn tiền." });
         }
     });

@@ -1,5 +1,6 @@
 const { fetchDashboardStats, fetchDashboardYears, fetchDashboardCharts } = require("./service");
 const { timezoneCandidate } = require("./constants");
+const logger = require("../../utils/logger");
 
 const resolveCurrentYear = () => {
   try {
@@ -19,7 +20,7 @@ const dashboardStats = async (_req, res) => {
     const payload = await fetchDashboardStats();
     res.json(payload);
   } catch (error) {
-    console.error("[dashboard] Query failed (stats):", error);
+    logger.error("[dashboard] Query failed (stats)", { error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải dữ liệu.",
     });
@@ -31,7 +32,7 @@ const dashboardYears = async (_req, res) => {
     const years = await fetchDashboardYears();
     res.json({ years });
   } catch (error) {
-    console.error("[dashboard] Query failed (years):", error);
+    logger.error("[dashboard] Query failed (years)", { error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải danh sách năm.",
     });
@@ -50,7 +51,7 @@ const dashboardCharts = async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error("[dashboard] Query failed (charts):", error);
+    logger.error("[dashboard] Query failed (charts)", { error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải biểu đồ.",
     });

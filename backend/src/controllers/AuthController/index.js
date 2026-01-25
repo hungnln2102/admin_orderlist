@@ -7,6 +7,7 @@ const {
   SCHEMA_ADMIN,
 } = require("../../config/dbSchema");
 const { session: sessionConfig } = require("../../config/appConfig");
+const logger = require("../../utils/logger");
 
 const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
 const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);
@@ -73,7 +74,7 @@ const login = async (req, res) => {
     };
     return res.json({ user: req.session.user });
   } catch (error) {
-    console.error("[auth] Đăng nhập thất bại:", error);
+    logger.error("[auth] Đăng nhập thất bại", { error: error.message, stack: error.stack, username: normalizedUsername });
     return res
       .status(500)
       .json({ error: "Không thể đăng nhập, vui lòng thử lại sau" });
@@ -159,7 +160,7 @@ const changePassword = async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    console.error("[auth] Thay đổi mật khẩu thất bại:", error);
+    logger.error("[auth] Thay đổi mật khẩu thất bại", { error: error.message, stack: error.stack, userId: sessionUser.id });
     return res
       .status(500)
       .json({ error: "Không thể thay đổi mật khẩu, vui lòng thử lại sau" });
@@ -184,9 +185,9 @@ const ensureDefaultAdmin = async () => {
       [userCols.password]: await bcrypt.hash(passwordEnv, 10),
       [userCols.role]: "admin",
     });
-    console.log(`[AUTH] Đã tạo người dùng quản trị '${usernameEnv}'`);
+    logger.info(`[AUTH] Đã tạo người dùng quản trị`, { username: usernameEnv });
   } catch (err) {
-    console.error("[AUTH] Lỗi khi tạo Admin:", err);
+    logger.error("[AUTH] Lỗi khi tạo Admin", { error: err.message, stack: err.stack, username: usernameEnv });
   }
 };
 
