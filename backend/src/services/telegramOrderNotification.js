@@ -287,7 +287,29 @@ const sendTelegramPhoto = async (payload) => {
 };
 
 const sendOrderCreatedNotification = async (order) => {
+  // Diagnostic logging
+  logger.info("[Order][Telegram] sendOrderCreatedNotification called", {
+    hasOrder: !!order,
+    orderId: order?.id || order?.id_order || "N/A",
+    SEND_ORDER_NOTIFICATION,
+    hasBotToken: !!TELEGRAM_BOT_TOKEN,
+    botTokenLength: TELEGRAM_BOT_TOKEN?.length || 0,
+    TELEGRAM_CHAT_ID,
+    TELEGRAM_ORDER_TOPIC_ID,
+    SEND_ORDER_TO_TOPIC,
+  });
+
   if (!SEND_ORDER_NOTIFICATION || !order || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    logger.warn("[Order][Telegram] Notification skipped", {
+      reason: !SEND_ORDER_NOTIFICATION ? "SEND_ORDER_NOTIFICATION is false" :
+              !order ? "No order provided" :
+              !TELEGRAM_BOT_TOKEN ? "No bot token" :
+              !TELEGRAM_CHAT_ID ? "No chat ID" : "Unknown",
+      SEND_ORDER_NOTIFICATION,
+      hasOrder: !!order,
+      hasBotToken: !!TELEGRAM_BOT_TOKEN,
+      hasChatId: !!TELEGRAM_CHAT_ID,
+    });
     return;
   }
 
@@ -357,24 +379,51 @@ const sendOrderCreatedNotification = async (order) => {
   let includeButtons = true;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
+      logger.info("[Order][Telegram] Sending notification", {
+        attempt: attempt + 1,
+        hasQrUrl: !!qrUrl,
+        includeTopic,
+        includeButtons,
+        orderCode,
+      });
+
       if (qrUrl) {
         await sendTelegramPhoto(buildPayload(includeTopic, includeButtons));
       } else {
         await sendTelegramMessage(buildPayload(includeTopic, includeButtons));
       }
+
+      logger.info("[Order][Telegram] Notification sent successfully", {
+        orderCode,
+        attempt: attempt + 1,
+      });
       return;
     } catch (err) {
+      logger.warn("[Order][Telegram] Send attempt failed", {
+        attempt: attempt + 1,
+        error: err?.message,
+        status: err?.status,
+        body: err?.body,
+      });
+
       let adjusted = false;
       if (includeTopic && isThreadError(err)) {
+        logger.info("[Order][Telegram] Retrying without topic ID");
         includeTopic = false;
         adjusted = true;
       }
       if (includeButtons && isCopyButtonError(err)) {
+        logger.info("[Order][Telegram] Retrying without copy buttons");
         includeButtons = false;
         adjusted = true;
       }
       if (!adjusted) {
-        logger.error("[Order][Telegram] Send failed", { error: err?.message, stack: err?.stack });
+        logger.error("[Order][Telegram] Send failed permanently", { 
+          error: err?.message, 
+          stack: err?.stack,
+          status: err?.status,
+          body: err?.body,
+        });
         return;
       }
     }

@@ -22,6 +22,10 @@ const router = express.Router();
 
 router.use("/auth", authRoutes);
 
+// Test endpoint for Telegram notifications (before auth for easy testing)
+const testTelegramRoutes = require("./testTelegram");
+router.use("/test-telegram", testTelegramRoutes);
+
 // Protect everything else
 router.use(authGuard);
 
