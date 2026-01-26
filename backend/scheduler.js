@@ -342,9 +342,18 @@ const notifyZeroDaysRemainingTask = async (trigger = "cron") => {
           customer_name: normalized.customer,
           id_product: normalized.id_product || normalized.idProduct,
           idProduct: normalized.id_product || normalized.idProduct,
+          information_order: normalized.information_order || normalized.informationOrder,
+          informationOrder: normalized.information_order || normalized.informationOrder,
+          slot: normalized.slot,
+          registration_date_display: normalized.registration_date_display,
+          registration_date_str: normalized.registration_date_str,
+          order_date: normalized.order_date || normalized.registration_date,
+          days: normalized.days || normalized.total_days,
+          total_days: normalized.days || normalized.total_days,
           expiry_date_display: normalized.expiry_date_display,
           expiry_date_str: normalized.expiry_date_display,
           order_expired: normalized.order_expired || normalized.expiry_date,
+          price: normalized.price,
         };
       });
 

@@ -431,7 +431,41 @@ const sendOrderCreatedNotification = async (order) => {
 };
 
 /**
+ * Build message thông báo đơn hết hạn ngắn gọn
+ * @param {Object} order - Đơn hàng
+ * @param {number} index - Thứ tự đơn (1-based)
+ * @param {number} total - Tổng số đơn
+ */
+const buildExpiredOrderMessage = (order, index, total) => {
+  const orderCode = toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim();
+  const productName = toSafeString(order.id_product || order.idProduct).trim();
+  const info = toSafeString(order.information_order || order.informationOrder).trim();
+  const slot = toSafeString(order.slot).trim();
+
+  // Escape HTML
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "N/A";
+  
+  // Sử dụng toInlineCode để escape và format mã đơn với <code> tag
+  const orderCodeDisplay = toInlineCode(orderCode) || "...";
+
+  const lines = [
+    `📦 <b>Đơn hàng hết hạn (${index}/${total})</b>`,
+    `Sản phẩm: <b>${escProduct}</b>`,
+    `🆔 Mã đơn: ${orderCodeDisplay}`,
+    "",
+    `— <b>THÔNG TIN SẢN PHẨM</b> —`,
+    `📝 Mô tả: ${escInfo}`,
+    `📌 Slot: ${escSlot}`,
+  ].filter(Boolean);
+
+  return lines.join("\n");
+};
+
+/**
  * Gửi thông báo về các đơn có số ngày còn lại = 0 vào topic mới
+ * Mỗi đơn sẽ được gửi thành một tin nhắn riêng
  * @param {Array} orders - Danh sách các đơn hàng có số ngày còn lại = 0
  */
 const sendZeroDaysRemainingNotification = async (orders = []) => {
@@ -461,31 +495,7 @@ const sendZeroDaysRemainingNotification = async (orders = []) => {
     return;
   }
 
-  // Tạo message thông báo
-  const orderList = orders.map((order, index) => {
-    const orderCode = toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim();
-    const customer = toSafeString(order.customer || order.customer_name).trim();
-    const productName = toSafeString(order.id_product || order.idProduct).trim();
-    const expiryDate = toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
-      formatDateDMY(order.order_expired);
-    
-    return `${index + 1}. <b>${escapeHtml(orderCode)}</b> - ${escapeHtml(customer)}${productName ? ` (${escapeHtml(productName)})` : ""}${expiryDate ? ` - Hết hạn: ${escapeHtml(expiryDate)}` : ""}`;
-  }).join("\n");
-
-  const message = `⚠️ <b>THÔNG BÁO: CÁC ĐƠN HẰNG CÓ SỐ NGÀY CÒN LẠI = 0</b>\n\n${orderList}\n\n📊 Tổng cộng: <b>${orders.length}</b> đơn hàng`;
-
-  const buildPayload = (includeTopic = true) => {
-    const payload = {
-      chat_id: TELEGRAM_CHAT_ID,
-      text: message,
-      parse_mode: "HTML",
-    };
-    if (includeTopic && Number.isFinite(ZERO_DAYS_TOPIC_ID)) {
-      payload.message_thread_id = ZERO_DAYS_TOPIC_ID;
-    }
-    return payload;
-  };
-
+  const total = orders.length;
   const isThreadError = (err) => {
     const bodyText = String(err?.body || err?.message || "");
     const lowered = bodyText.toLowerCase();
@@ -498,42 +508,84 @@ const sendZeroDaysRemainingNotification = async (orders = []) => {
     );
   };
 
-  let includeTopic = true;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      logger.info("[Order][Telegram] Sending zero days notification", {
-        attempt: attempt + 1,
-        includeTopic,
-        ordersCount: orders.length,
-      });
+  // Gửi từng đơn một tin nhắn riêng
+  for (let i = 0; i < orders.length; i++) {
+    const order = orders[i];
+    const index = i + 1;
+    const message = buildExpiredOrderMessage(order, index, total);
 
-      await sendTelegramMessage(buildPayload(includeTopic));
+    const buildPayload = (includeTopic = true) => {
+      const payload = {
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: "HTML",
+      };
+      if (includeTopic && Number.isFinite(ZERO_DAYS_TOPIC_ID)) {
+        payload.message_thread_id = ZERO_DAYS_TOPIC_ID;
+      }
+      return payload;
+    };
 
-      logger.info("[Order][Telegram] Zero days notification sent successfully", {
-        attempt: attempt + 1,
-        ordersCount: orders.length,
-      });
-      return;
-    } catch (err) {
-      logger.warn("[Order][Telegram] Send attempt failed", {
-        attempt: attempt + 1,
-        error: err?.message,
-        status: err?.status,
-        body: err?.body,
-      });
+    let includeTopic = true;
+    let sent = false;
 
-      if (includeTopic && isThreadError(err)) {
-        logger.info("[Order][Telegram] Retrying without topic ID");
-        includeTopic = false;
-      } else {
-        logger.error("[Order][Telegram] Send failed permanently", { 
-          error: err?.message, 
-          stack: err?.stack,
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        logger.info("[Order][Telegram] Sending expired order notification", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          total,
+          orderCode: order.id_order || order.idOrder,
+          includeTopic,
+        });
+
+        await sendTelegramMessage(buildPayload(includeTopic));
+
+        logger.info("[Order][Telegram] Expired order notification sent successfully", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          total,
+          orderCode: order.id_order || order.idOrder,
+        });
+        sent = true;
+        break;
+      } catch (err) {
+        logger.warn("[Order][Telegram] Send attempt failed", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          orderCode: order.id_order || order.idOrder,
+          error: err?.message,
           status: err?.status,
           body: err?.body,
         });
-        return;
+
+        if (includeTopic && isThreadError(err)) {
+          logger.info("[Order][Telegram] Retrying without topic ID");
+          includeTopic = false;
+        } else {
+          logger.error("[Order][Telegram] Send failed permanently for order", {
+            orderIndex: index,
+            orderCode: order.id_order || order.idOrder,
+            error: err?.message,
+            stack: err?.stack,
+            status: err?.status,
+            body: err?.body,
+          });
+          break;
+        }
       }
+    }
+
+    if (!sent) {
+      logger.error("[Order][Telegram] Failed to send notification for order", {
+        orderIndex: index,
+        orderCode: order.id_order || order.idOrder,
+      });
+    }
+
+    // Delay nhỏ giữa các tin nhắn để tránh rate limit
+    if (i < orders.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
 };
