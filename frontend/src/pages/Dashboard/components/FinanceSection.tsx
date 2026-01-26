@@ -77,7 +77,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   const latestAsk = goldRows.length ? Number(goldRows[0]?.ask || 0) || null : null;
   const goldPricePerChiSell = latestAsk ? latestAsk / 10 : null;
 
-  const goldValue = goldPricePerChiSell ? totalGoldAmount * goldPricePerChiSell : null;
+  const goldValue = goldPricePerChiBuy ? totalGoldAmount * goldPricePerChiBuy : null;
   const goldCost =
     totalGoldCostFromWallet !== null
       ? totalGoldCostFromWallet

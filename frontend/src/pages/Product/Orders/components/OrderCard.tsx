@@ -10,7 +10,7 @@ import {
   TrashIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import { Order, ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../../constants";
+import { Order, ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { formatCurrency } from "../utils/ordersHelpers";
 
@@ -18,7 +18,6 @@ type OrderCardProps = {
   order: Order;
   showRemainingColumn: boolean;
   showActionButtons: boolean;
-  isActiveDataset: boolean;
   isCanceled: boolean;
   renewingOrderCode: string | null;
   onView: (order: Order) => void;
@@ -33,7 +32,6 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   order,
   showRemainingColumn,
   showActionButtons,
-  isActiveDataset,
   isCanceled,
   onView,
   onEdit,
@@ -49,101 +47,126 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] || 0);
 
   const statusColors: Record<string, string> = {
-    paid: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-    unpaid: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-    expired: "bg-rose-500/20 text-rose-300 border-rose-500/30",
-    canceled: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+    [ORDER_STATUSES.DA_THANH_TOAN]: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    [ORDER_STATUSES.CHUA_THANH_TOAN]: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+    [ORDER_STATUSES.ORDER_EXPIRED]: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+    [ORDER_STATUSES.CAN_GIA_HAN]: "bg-sky-500/20 text-sky-300 border-sky-500/30",
+    [ORDER_STATUSES.CHO_HOAN]: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+    [ORDER_STATUSES.DA_HOAN]: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    [ORDER_STATUSES.DANG_XU_LY]: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
   };
 
-  const statusStr = String(status).toLowerCase();
-  const statusColor = statusColors[statusStr] || "bg-indigo-500/20 text-indigo-300 border-indigo-500/30";
+  const statusText = String(status || "").trim();
+  const statusColor = statusColors[statusText] || "bg-slate-500/20 text-slate-300 border-slate-500/30";
+  const statusStr = statusText; // Keep for background accent logic below
 
   return (
-    <div className="relative group overflow-hidden glass-panel rounded-[20px] p-3.5 transition-all duration-500 hover:border-indigo-500/30 shadow-xl border border-white/5">
-      {/* Background Accent */}
-      <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-500/5 rounded-full blur-2xl"></div>
+    <div className="relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 hover:border-indigo-500/40 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-900/50">
+      {/* Background Glow */}
+      <div className={`absolute -right-10 -top-10 w-28 h-28 rounded-full blur-3xl opacity-10 transition-all duration-700 group-hover:opacity-20 ${
+        statusStr === ORDER_STATUSES.DA_THANH_TOAN ? 'bg-emerald-500' : 
+        statusStr === ORDER_STATUSES.CHUA_THANH_TOAN ? 'bg-amber-500' : 
+        (statusStr === ORDER_STATUSES.ORDER_EXPIRED || statusStr === ORDER_STATUSES.CHO_HOAN) ? 'bg-rose-500' :
+        'bg-indigo-500'
+      }`}></div>
 
-      <div className="relative z-10 flex flex-col gap-3">
-        {/* Row 1: ID & Status */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-[13px] font-bold text-white tracking-widest uppercase truncate shrink-0">
+      <div className="relative z-10 flex flex-col gap-4">
+        {/* Row 1: Header (Stacked Layout for Intuition) */}
+        <div className="flex flex-col gap-2.5">
+          {/* Top: Order ID on its own line */}
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></span>
+            <h3 className="text-[12px] sm:text-sm font-bold text-white tracking-widest uppercase truncate leading-none">
               {orderCode}
             </h3>
-            <div className="h-3 w-px bg-white/10 shrink-0"></div>
-            <p className="text-[11px] font-bold text-indigo-400/80 uppercase tracking-tight truncate">
-              {product}
+          </div>
+
+          {/* Bottom: Product Tag & Status Tag on the same row */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Product - Separate Pill/Tag */}
+            <div className="inline-flex self-start px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md min-w-0">
+              <p className="text-[10px] sm:text-[11px] font-bold text-indigo-300 uppercase tracking-wide truncate max-w-[140px] sm:max-w-[200px]">
+                {product}
+              </p>
+            </div>
+            <span className={`px-2.5 py-1 shrink-0 rounded-xl text-[10px] font-bold uppercase tracking-wide border shadow-lg ${statusColor}`}>
+              {status}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 2: Info Block (Glassy card inside) */}
+        <div className="flex items-center justify-between gap-4 p-3.5 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm group-hover:bg-white/[0.08] transition-colors">
+          <div className="flex flex-col min-w-0">
+            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Khách hàng</span>
+            <p className="text-[13px] font-bold text-white truncate">{customer}</p>
+          </div>
+          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-white/10">
+            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Tổng tiền</span>
+            <p className="text-sm sm:text-base font-black text-indigo-200 tabular-nums">
+              {formatCurrency(price)}
             </p>
           </div>
-          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap ${statusColor}`}>
-            {status}
-          </span>
         </div>
 
-        {/* Row 2: Customer & Main Info */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col min-w-0">
-            <span className="text-[11px] font-bold text-white/50 uppercase tracking-widest leading-none mb-1">Khách hàng</span>
-            <p className="text-xs font-bold text-white truncate">{customer}</p>
-          </div>
-          <div className="flex flex-col items-end shrink-0">
-            <span className="text-[11px] font-bold text-white/50 uppercase tracking-widest leading-none mb-1 text-right">Giá</span>
-            <p className="text-xs font-black text-white">{formatCurrency(price)}</p>
-          </div>
-        </div>
-
-        {/* Row 3: Timelines & Quick Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-          <div className="flex items-center gap-3">
+        {/* Row 3: Timelines & Premium Actions */}
+        <div className="flex items-center justify-between pt-1">
+          {/* Timeline */}
+          <div className="flex items-center gap-4">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">Hạn đơn</span>
-              <p className="text-[10px] font-bold text-indigo-200/80">
+              <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1">Hạn đơn</span>
+              <p className="text-[11px] font-bold text-slate-300 tabular-nums">
                 {expiryDate ? Helpers.formatDateToDMY(expiryDate) : "—"}
               </p>
             </div>
             {showRemainingColumn && (
-              <div className="flex flex-col border-l border-white/5 pl-3">
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">Còn</span>
-                <p className={`text-[10px] font-black ${remaining <= 3 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              <div className="flex flex-col border-l border-white/10 pl-4">
+                <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1">Còn</span>
+                <p className={`text-[11px] font-black tabular-nums transition-all ${
+                  remaining <= 3 ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]' : 'text-emerald-400'
+                }`}>
                   {remaining} ngày
                 </p>
               </div>
             )}
           </div>
 
-          {/* Action Buttons Group - Smaller */}
+          {/* Intuitive Action Icons */}
           {showActionButtons && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-indigo-300/40"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] active:scale-90"
                 onClick={() => onView(order)}
+                title="Xem"
               >
-                <EyeIcon className="h-4 w-4" />
+                <EyeIcon className="h-5 w-5" />
               </button>
               
               {onConfirmRefund && isCanceled && statusStr === "cho_hoan" && (
                 <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-90"
                   onClick={() => onConfirmRefund(order)}
                 >
-                  <CheckCircleIcon className="h-4 w-4" />
+                  <CheckCircleIcon className="h-5 w-5" />
                 </button>
               )}
 
-              {isActiveDataset && !isCanceled && (
+              {!isCanceled && (
                 <button
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-90"
                   onClick={() => onEdit(order)}
+                  title="Sửa"
                 >
-                  <PencilIcon className="h-4 w-4" />
+                  <PencilIcon className="h-5 w-5" />
                 </button>
               )}
               
               <button
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-rose-500/5 border border-rose-500/10 text-rose-400/60"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500/70 hover:bg-rose-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(244,63,94,0.3)] active:scale-90"
                 onClick={() => onDelete(order)}
+                title="Xóa"
               >
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className="h-5 w-5" />
               </button>
             </div>
           )}

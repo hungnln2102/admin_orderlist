@@ -103,13 +103,13 @@ export default function Orders() {
   }, []);
 
   const showRemainingColumn = datasetKey !== "expired";
-  const showActionButtons = datasetKey !== "expired";
+  const showActionButtons = true; // Luôn hiện nút thao tác cho mọi tap (theo yêu cầu)
   const isCanceled = datasetKey === "canceled";
   const remainingLabel = isCanceled ? "Giá Trị Còn Lại" : "Còn Lại";
   const totalColumns = showRemainingColumn ? 7 : 6;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {fetchError && (
         <div className="flex flex-col gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-200 shadow-xl backdrop-blur-md sm:flex-row sm:items-center sm:justify-between animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -135,7 +135,7 @@ export default function Orders() {
         </div>
       </div>
 
-      <div className="rounded-[32px] glass-panel-dark p-6 shadow-2xl border border-white/5">
+      <div className="rounded-[32px] glass-panel-dark p-4 shadow-2xl border border-white/5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {ORDER_DATASET_SEQUENCE.map((key) => {
             const datasetKeyValue = key as OrderDatasetKey;
@@ -175,8 +175,8 @@ export default function Orders() {
         </div>
       </div>
 
-      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="rounded-[24px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {updatedStats.map((stat) => (
             <StatCard
               key={stat.name}
@@ -285,7 +285,6 @@ export default function Orders() {
                     order={order as Order}
                     showRemainingColumn={showRemainingColumn}
                     showActionButtons={showActionButtons}
-                    isActiveDataset={isActiveDataset}
                     isCanceled={isCanceled}
                     renewingOrderCode={renewingOrderCode}
                     onView={handleViewOrder}
@@ -309,7 +308,7 @@ export default function Orders() {
                 <th className="w-[150px]">KHÁCH HÀNG</th>
                 <th className="w-[150px]">LỊCH TRÌNH</th>
                 {showRemainingColumn && (
-                  <th className="w-[80px]">{remainingLabel}</th>
+                  <th className="w-[100px] whitespace-nowrap">{remainingLabel}</th>
                 )}
                 <th className="w-[120px]">TRẠNG THÁI</th>
                 <th className="w-[100px] text-right pr-8">THAO TÁC</th>
@@ -336,7 +335,6 @@ export default function Orders() {
                     isExpanded={expandedOrderId === order.id}
                     showRemainingColumn={showRemainingColumn}
                     showActionButtons={showActionButtons}
-                    isActiveDataset={isActiveDataset}
                     isCanceled={isCanceled}
                     totalColumns={totalColumns}
                     renewingOrderCode={renewingOrderCode}

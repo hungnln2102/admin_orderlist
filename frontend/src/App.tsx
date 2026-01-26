@@ -65,7 +65,7 @@ function App() {
                         </div>
                       )}
 
-                      <main className="flex-1 px-6 pt-8 pb-12 overflow-x-hidden">
+                      <main className="flex-1 px-6 pt-4 pb-12 overflow-x-hidden">
                         <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
                           <Routes>
                             <Route path="/" element={<Navigate to="/dashboard" replace />} />

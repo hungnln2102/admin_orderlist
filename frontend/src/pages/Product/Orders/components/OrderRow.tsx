@@ -22,7 +22,6 @@ type OrderRowProps = {
   isExpanded: boolean;
   showRemainingColumn: boolean;
   showActionButtons: boolean;
-  isActiveDataset: boolean;
   isCanceled: boolean;
   totalColumns: number;
   renewingOrderCode: string | null;
@@ -40,7 +39,6 @@ export const OrderRow = React.memo(function OrderRow({
   isExpanded,
   showRemainingColumn,
   showActionButtons,
-  isActiveDataset,
   isCanceled,
   totalColumns,
   renewingOrderCode,
@@ -129,10 +127,10 @@ export const OrderRow = React.memo(function OrderRow({
         {/* 1. GỘP ORDER + PRODUCT */}
         <td className="px-5 py-5 first:rounded-l-[24px] last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
           <div className="flex flex-col items-center">
-            <span className="text-sm font-bold text-white tracking-wider uppercase whitespace-nowrap">
+            <span className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase">
               {order[ORDER_FIELDS.ID_ORDER] || ""}
             </span>
-            <span className="text-indigo-400/80 text-[11px] font-bold mt-1 uppercase tracking-wider">
+            <span className="text-indigo-400/80 text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider">
               {order[ORDER_FIELDS.ID_PRODUCT] || ""}
             </span>
           </div>
@@ -208,7 +206,7 @@ export const OrderRow = React.memo(function OrderRow({
                 <CheckCircleIcon className="h-4 w-4" />
               </button>
             )}
-            {isActiveDataset && (
+            {!isCanceled && (
               <>
                 <button
                   onClick={stopPropagation(onEdit)}

@@ -66,26 +66,25 @@ const StatCard: React.FC<StatCardProps> = ({
   accent,
   subtitle,
   children,
-  iconClassName = "h-6 w-6",
 }) => {
   return (
     <div
-      className={`group relative isolate overflow-hidden rounded-[32px] glass-panel p-6 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
+      className={`group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
     >
       {/* Dynamic Background Glow */}
       <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
       
       <div className="flex items-start justify-between gap-4">
         <div className="relative z-10">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-3">
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-1.5">
             {title}
           </p>
           <div className="flex flex-col gap-1">
-            <h3 className="text-3xl font-bold text-white tracking-tight leading-none">
+            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none">
               {value}
             </h3>
             {subtitle && (
-              <p className="text-xs font-medium text-emerald-400/80 tracking-wide">
+              <p className="text-[10px] sm:text-xs font-medium text-emerald-400/80 tracking-wide">
                 {subtitle}
               </p>
             )}
@@ -93,11 +92,11 @@ const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         <div
-          className={`relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
+          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
         >
           {/* Internal reflection */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
-          <Icon className={`${iconClassName} relative z-10`} />
+          <Icon className="h-5 w-5 relative z-10" />
         </div>
       </div>
       
