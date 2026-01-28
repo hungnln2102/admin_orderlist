@@ -503,39 +503,38 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
 
   const handleRenewOrder = useCallback(
     async (order: Order) => {
-      if (!order || !order.id) return;
-      const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
-      setRenewingOrderCode(orderCode || null);
+      if (!order) return;
 
-      const payload: Partial<Order> = {
-        [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DANG_XU_LY,
-      };
+      const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+      if (!orderCode) return;
+
+      setRenewingOrderCode(orderCode);
 
       try {
         const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(order.id)}`,
+          `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`,
           {
-            method: "PUT",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ forceRenewal: true }),
           }
         );
 
         if (!response.ok) {
           const errorMessage = await parseErrorResponse(response);
           throw new Error(
-            errorMessage || "Loi khi cap nhat trang thai tu may chu"
+            errorMessage || "Không thể gia hạn thủ công cho đơn hàng."
           );
         }
 
         await fetchOrders();
         emitRefresh(["orders", "dashboard"]);
-        alert("Da chuyen don sang Dang Xu Ly.");
+        alert("Gia hạn đơn hàng thành công. Đơn đã được xử lý renewal thủ công.");
       } catch (error) {
-        console.error("Loi khi chuyen trang thai gia han:", error);
+        console.error("Lỗi khi chạy gia hạn thủ công:", error);
         alert(
-          `Khong the chuyen trang thai gia han: ${
+          `Không thể gia hạn đơn hàng: ${
             error instanceof Error ? error.message : String(error)
           }`
         );
