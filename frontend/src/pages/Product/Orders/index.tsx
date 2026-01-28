@@ -300,7 +300,7 @@ export default function Orders() {
             )
           }
         >
-          <table className="min-w-full border-separate border-spacing-y-4 text-white">
+          <table className="min-w-full table-fixed border-separate border-spacing-y-4 text-white">
             <thead>
               <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-center">
                 <th className="w-[150px]">ORDER / SẢN PHẨM</th>

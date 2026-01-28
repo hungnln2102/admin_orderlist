@@ -126,7 +126,18 @@ router.post("/", async (req, res) => {
           orderCodes.length > 1 ? null : transferAmountNormalized;
 
         for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+          const state = stateByOrderCode.get(code);
           const eligibility = eligibilityByOrderCode.get(code);
+
+          // Trường hợp đặc biệt:
+          // - Đơn đã ở trạng thái PAID thì không cộng thêm tiền NCC,
+          //   kể cả khi khách hàng chuyển khoản thêm lần nữa.
+          if (state && state[ORDER_COLS.status] === ORDER_STATUS.PAID) {
+            logger.info("[Webhook] Skip supplier import for already PAID order", {
+              orderCode: code,
+            });
+            continue;
+          }
 
           // Avoid double supplier import updates for renewal flows:
           // - Renewal path already calls updatePaymentSupplyBalance() inside runRenewal().

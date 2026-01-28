@@ -22,6 +22,7 @@ import { CreatePackageModal } from "./components/Modals/CreatePackageModal";
 import { PackageFormModal } from "./components/Modals/PackageFormModal";
 import { PackageViewModal } from "./components/Modals/PackageViewModal";
 import { usePackageData } from "./hooks/usePackageData";
+import { showAppNotification } from "@/lib/notifications";
 import {
   DEFAULT_CAPACITY_LIMIT,
   DEFAULT_SLOT_LIMIT,
@@ -284,11 +285,13 @@ const PackageProduct: React.FC = () => {
       }
     } catch (error) {
       console.error("Xóa nhóm thất bại:", error);
-      alert(
-        `Xóa nhóm thất bại: ${
+      showAppNotification({
+        type: "error",
+        title: "Lỗi xóa loại gói",
+        message: `Xóa nhóm thất bại: ${
           error instanceof Error ? error.message : "Lỗi không xác định"
-        }`
-      );
+        }`,
+      });
     } finally {
       setDeleteProcessing(false);
       resetDeleteSelection();

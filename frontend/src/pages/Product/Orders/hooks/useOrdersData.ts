@@ -27,8 +27,12 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
 } from "@heroicons/react/24/outline";
-import { STAT_CARD_ACCENTS as CARD_ACCENTS, StatAccent } from "../../../../components/ui/StatCard";
+import {
+  STAT_CARD_ACCENTS as CARD_ACCENTS,
+  StatAccent,
+} from "../../../../components/ui/StatCard";
 import { emitRefresh } from "../../../../lib/refreshBus";
+import { showAppNotification } from "@/lib/notifications";
 
 export type EditableOrder = Omit<Order, "cost" | "price"> & {
   cost: number | string;
@@ -445,11 +449,13 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi tạo đơn hàng:", error);
-        alert(
-          `Lỗi khi tạo đơn hàng: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi tạo đơn hàng",
+          message: `Lỗi khi tạo đơn hàng: ${
             error instanceof Error ? error.message : String(error)
-          }`
-        );
+          }`,
+        });
       }
     },
     [closeCreateModal, fetchOrders, handleViewOrder]
@@ -491,11 +497,13 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi đánh dấu đã thanh toán:", error);
-        alert(
-          `Không thể đánh dấu đã thanh toán: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi cập nhật thanh toán",
+          message: `Không thể đánh dấu đã thanh toán: ${
             error instanceof Error ? error.message : String(error)
-          }`
-        );
+          }`,
+        });
       }
     },
     [fetchOrders]
@@ -530,14 +538,21 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
 
         await fetchOrders();
         emitRefresh(["orders", "dashboard"]);
-        alert("Gia hạn đơn hàng thành công. Đơn đã được xử lý renewal thủ công.");
+        showAppNotification({
+          type: "success",
+          title: "Gia hạn thành công",
+          message:
+            "Gia hạn đơn hàng thành công.\nĐơn đã được xử lý renewal thủ công.",
+        });
       } catch (error) {
         console.error("Lỗi khi chạy gia hạn thủ công:", error);
-        alert(
-          `Không thể gia hạn đơn hàng: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi gia hạn",
+          message: `Không thể gia hạn đơn hàng: ${
             error instanceof Error ? error.message : String(error)
-          }`
-        );
+          }`,
+        });
       } finally {
         setRenewingOrderCode(null);
       }
@@ -567,11 +582,13 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi xác nhận hoàn tiền:", error);
-        alert(
-          `Lỗi khi xác nhận hoàn tiền: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi xác nhận hoàn tiền",
+          message: `Lỗi khi xác nhận hoàn tiền: ${
             error instanceof Error ? error.message : String(error)
-          }`
-        );
+          }`,
+        });
       }
     },
     [fetchOrders]
@@ -614,11 +631,13 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi cập nhật đơn hàng:", error);
-        alert(
-          `Lỗi khi cập nhật đơn hàng: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi cập nhật đơn hàng",
+          message: `Lỗi khi cập nhật đơn hàng: ${
             error instanceof Error ? error.message : String(error)
-          }`
-        );
+          }`,
+        });
       }
     },
     [closeEditModal, fetchOrders]
@@ -653,11 +672,13 @@ export const useOrdersData = (dataset: OrderDatasetKey) => {
       emitRefresh(["orders", "dashboard"]);
     } catch (error) {
       console.error("Lỗi khi xóa đơn hàng:", error);
-      alert(
-        `Lỗi khi xóa đơn hàng: ${
+      showAppNotification({
+        type: "error",
+        title: "Lỗi xóa đơn hàng",
+        message: `Lỗi khi xóa đơn hàng: ${
           error instanceof Error ? error.message : String(error)
-        }`
-      );
+        }`,
+      });
     } finally {
       setOrderToDelete(null);
     }

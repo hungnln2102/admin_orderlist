@@ -14,6 +14,7 @@ const packagesRoutes = require("./packagesRoutes");
 const walletRoutes = require("./walletRoutes");
 const warehouseRoutes = require("./warehouseRoutes");
 const schedulerRoutes = require("./schedulerRoutes");
+const salesSummaryRoutes = require("./salesSummaryRoutes");
 const savingGoalsController = require("../controllers/SavingGoalsController");
 const { runSchedulerNow } = require("../controllers/SchedulerController");
 const { authGuard } = require("../middleware/authGuard");
@@ -45,6 +46,7 @@ router.use("/warehouses", warehouseRoutes);
 router.use("/scheduler", schedulerRoutes);
 router.get("/run-scheduler", runSchedulerNow);
 router.get("/supply-insights", suppliesController.getSupplyInsights);
+router.use("/sales-summary", salesSummaryRoutes);
 router.use("/saving-goals", savingGoalsController);
 
 module.exports = router;

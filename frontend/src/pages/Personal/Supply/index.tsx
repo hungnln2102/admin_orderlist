@@ -9,6 +9,7 @@ import SupplyList from "./components/SupplyList";
 import SupplierDetailModal from "./components/SupplierDetailModal";
 import { useSupplyList } from "./hooks/useSupplyList";
 import { normalizeText } from "./utils/supplies";
+import { showAppNotification } from "@/lib/notifications";
 
 const AddSupplierModal = ({
   isOpen,
@@ -294,7 +295,11 @@ export default function Sources() {
         await fetchSupplies();
         setDeleteSupply(null);
       } else {
-        alert(res.message);
+        showAppNotification({
+          type: "error",
+          title: "Lỗi xóa nhà cung cấp",
+          message: res.message || "Không thể xóa nhà cung cấp.",
+        });
       }
     }
   };

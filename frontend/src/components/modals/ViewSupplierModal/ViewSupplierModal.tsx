@@ -11,6 +11,7 @@ import * as Helpers from "../../../lib/helpers";
 import StatCard from "./components/StatCard";
 import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";
+import { showAppNotification } from "@/lib/notifications";
 
 export default function ViewSupplierModal({
   isOpen,
@@ -40,7 +41,11 @@ export default function ViewSupplierModal({
       if (!res.ok) throw new Error("Lỗi xác nhận thanh toán");
       await fetchDetail();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Lỗi hệ thống");
+      showAppNotification({
+        type: "error",
+        title: "Lỗi xác nhận thanh toán",
+        message: err instanceof Error ? err.message : "Lỗi hệ thống",
+      });
     } finally {
       setConfirming(false);
     }

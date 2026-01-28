@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { ORDER_FIELDS, Order as ApiOrder } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
+import { showAppNotification } from "@/lib/notifications";
 import { calculateExpirationDate, convertDMYToYMD } from "../helpers";
 import { Order } from "../types";
 
@@ -76,7 +77,11 @@ export const useOrderSubmit = ({
         return true;
       }
 
-      alert("Vui lòng điền đầy đủ các thông tin");
+      showAppNotification({
+        type: "error",
+        title: "Thiếu thông tin",
+        message: "Vui lòng điền đầy đủ các thông tin.",
+      });
       return false;
     },
     [formData, isLoading, onSave, updateForm]

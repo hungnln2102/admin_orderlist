@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { apiFetch } from "../../../../lib/api";
 import { Supply, SupplyStats } from "../types";
+import { showAppNotification } from "@/lib/notifications";
 
 export const useSupplyList = () => {
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -57,9 +58,21 @@ export const useSupplyList = () => {
       await fetchSupplies();
     } catch {
       setSupplies((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, isActive: currentStatus, status: currentStatus ? "active" : "inactive" } : s))
+        prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                isActive: currentStatus,
+                status: currentStatus ? "active" : "inactive",
+              }
+            : s
+        )
       );
-      alert("Không thể cập nhật trạng thái");
+      showAppNotification({
+        type: "error",
+        title: "Lỗi cập nhật trạng thái",
+        message: "Không thể cập nhật trạng thái",
+      });
     }
   };
 

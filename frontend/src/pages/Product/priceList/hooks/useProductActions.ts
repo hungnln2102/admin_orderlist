@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type React from "react";
 import { deleteProductPrice } from "../../../../lib/productPricesApi";
 import { API_ENDPOINTS } from "../../../../constants";
+import { showAppNotification } from "@/lib/notifications";
 import {
   BankOption,
   CreateProductFormState,
@@ -749,7 +750,11 @@ export const useProductActions = ({
         }
         return next;
       });
-      alert("Cập nhật thất bại. Vui lòng thử lại");
+      showAppNotification({
+        type: "error",
+        title: "Lỗi cập nhật trạng thái giá",
+        message: "Cập nhật thất bại. Vui lòng thử lại.",
+      });
     }
   };
 

@@ -124,39 +124,39 @@ export const OrderRow = React.memo(function OrderRow({
         onClick={handleToggle}
         className={`group/row cursor-pointer transition-all duration-500 ${isExpanded ? "z-20" : "z-10"}`}
       >
-        {/* 1. GỘP ORDER + PRODUCT */}
+        {/* 1. GỘP ORDER + PRODUCT (truncate để không tràn) */}
         <td className="px-5 py-5 first:rounded-l-[24px] last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-          <div className="flex flex-col items-center">
-            <span className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase">
+          <div className="flex flex-col items-center max-w-[200px]">
+            <span className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase truncate max-w-full">
               {order[ORDER_FIELDS.ID_ORDER] || ""}
             </span>
-            <span className="text-indigo-400/80 text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider">
+            <span className="text-indigo-400/80 text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider truncate max-w-full">
               {order[ORDER_FIELDS.ID_PRODUCT] || ""}
             </span>
           </div>
         </td>
 
-        {/* INFORMATION + SLOT (text-center) */}
+        {/* INFORMATION + SLOT (text-center, truncate chuỗi dài) */}
         <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-          <div className="flex flex-col items-center">
-            <span className="text-indigo-100/90 text-xs font-medium tracking-wide">
+          <div className="flex flex-col items-center max-w-[260px] w-full">
+            <span className="text-indigo-100/90 text-xs font-medium tracking-wide text-center truncate max-w-full">
               {order[ORDER_FIELDS.INFORMATION_ORDER] || "—"}
             </span>
             {order[ORDER_FIELDS.SLOT] ? (
-              <div className="mt-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-indigo-300/80 uppercase">
+              <div className="mt-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-indigo-300/80 uppercase max-w-[220px] truncate">
                 {order[ORDER_FIELDS.SLOT]}
               </div>
             ) : null}
           </div>
         </td>
 
-        {/* 2. GỘP CUSTOMER + CONTACT */}
+        {/* 2. GỘP CUSTOMER + CONTACT (truncate tên + link/contact) */}
         <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-          <div className="flex flex-col items-center">
-            <span className="text-sm font-bold text-white tracking-tight">
+          <div className="flex flex-col items-center max-w-[200px]">
+            <span className="text-sm font-bold text-white tracking-tight truncate max-w-full text-center">
               {order[ORDER_FIELDS.CUSTOMER] || "Khách ẩn"}
             </span>
-            <span className="text-white/60 text-[11px] font-medium mt-0.5 truncate max-w-[140px]">
+            <span className="text-white/60 text-[11px] font-medium mt-0.5 truncate max-w-full text-center">
               {order[ORDER_FIELDS.CONTACT] || ""}
             </span>
           </div>

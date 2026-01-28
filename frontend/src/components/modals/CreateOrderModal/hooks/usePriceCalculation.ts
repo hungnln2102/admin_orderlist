@@ -6,6 +6,7 @@ import {
 } from "../../../../constants";
 import { apiFetch } from "../../../../lib/api";
 import * as Helpers from "../../../../lib/helpers";
+import { showAppNotification } from "@/lib/notifications";
 import {
   calculateExpirationDate,
   convertDMYToYMD,
@@ -128,11 +129,13 @@ export const usePriceCalculation = ({
         }
         console.error("Lỗi khi tính giá:", error);
         setIsDataLoaded(false);
-        alert(
-          `Tính giá thất bại: ${
+        showAppNotification({
+          type: "error",
+          title: "Lỗi tính giá",
+          message: `Tính giá thất bại: ${
             error instanceof Error ? error.message : "Lỗi không xác định"
-          }`
-        );
+          }`,
+        });
         return undefined;
       } finally {
         if (requestId === requestSeqRef.current) {

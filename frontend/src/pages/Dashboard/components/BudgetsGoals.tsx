@@ -13,6 +13,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { WalletColumn, WalletRow } from "../hooks/useWalletBalances";
 import { AddGoalModal } from "./AddGoalModal";
+import { showAppNotification } from "@/lib/notifications";
 
 interface Budget {
   name: string;
@@ -235,9 +236,13 @@ const BudgetsGoals: React.FC<Props> = ({
         onRefetchGoals();
       }
     } catch (error) {
-      console.error('Error reordering goal:', error);
+      console.error("Error reordering goal:", error);
       const { handleNetworkError } = await import("@/lib/errorHandler");
-      alert(handleNetworkError(error));
+      showAppNotification({
+        type: "error",
+        title: "Lỗi sắp xếp mục tiêu",
+        message: handleNetworkError(error),
+      });
     }
   };
 
@@ -258,9 +263,13 @@ const BudgetsGoals: React.FC<Props> = ({
         onRefetchGoals();
       }
     } catch (error) {
-      console.error('Error deleting goal:', error);
+      console.error("Error deleting goal:", error);
       const { handleNetworkError } = await import("@/lib/errorHandler");
-      alert(handleNetworkError(error));
+      showAppNotification({
+        type: "error",
+        title: "Lỗi xóa mục tiêu",
+        message: handleNetworkError(error),
+      });
     }
   };
 
