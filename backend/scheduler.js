@@ -391,51 +391,6 @@ cron.schedule(
   }
 );
 
-/**
- * Cron: Mỗi 15 phút
- * - Làm mới dữ liệu tổng hợp bán hàng cho 30 ngày gần nhất
- */
-const { refreshSalesSummary } = require("./src/services/salesSummaryService");
-
-const refreshSalesSummaryTask = async (trigger = "cron") => {
-  logger.info(
-    `[CRON] Bắt đầu làm mới materialized views cho sales summary`,
-    { trigger }
-  );
-
-  try {
-    const result = await refreshSalesSummary();
-    logger.info(
-      `[CRON] Hoàn thành làm mới sales summary materialized views`,
-      { result }
-    );
-  } catch (err) {
-    logger.error("[CRON] Lỗi khi làm mới sales summary materialized views", {
-      error: err.message,
-      stack: err.stack,
-    });
-    throw err;
-  }
-};
-
-const runSalesSummarySafe = (source) =>
-  refreshSalesSummaryTask(source).catch((err) =>
-    logger.error(`[CRON] Sales summary refresh failed during ${source}`, {
-      error: err.message,
-      stack: err.stack,
-    })
-  );
-
-// Cron job chạy mỗi 15 phút
-cron.schedule(
-  "*/15 * * * *", // Mỗi 15 phút
-  () => runSalesSummarySafe("cron"),
-  {
-    scheduled: true,
-    timezone: schedulerTimezone,
-  }
-);
-
 logger.info(
   `[Scheduler] Đã khởi động`,
   { cronExpression, schedulerTimezone, runOnStart }
@@ -444,7 +399,6 @@ logger.info(
 module.exports = {
   updateDatabaseTask,
   notifyZeroDaysRemainingTask,
-  refreshSalesSummaryTask,
   getSchedulerStatus: () => ({
     timezone: schedulerTimezone,
     cronExpression,

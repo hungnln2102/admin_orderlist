@@ -134,10 +134,21 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     if (latestCycle) {
         const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
         const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
-        const nextImport = currentImport - costValue;
+        let nextImport = currentImport - costValue;
+
+        let roundValue = latestCycle[colRound] != null ? String(latestCycle[colRound]) : formatNote();
+        if (nextImport < 0) {
+            const absDebt = Math.abs(nextImport);
+            nextImport = 0;
+            roundValue = roundValue.trim()
+                ? `${roundValue} | NCC còn nợ: ${absDebt}`
+                : `NCC còn nợ: ${absDebt}`;
+        }
+
         const updatePayload = {
             [colImport]: nextImport,
             [colPaid]: currentPaid,
+            [colRound]: roundValue,
         };
         if (latestCycle[colStatus] !== undefined) {
             updatePayload[colStatus] = latestCycle[colStatus];
@@ -146,11 +157,13 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
             .where(colId, latestCycle[colId])
             .update(updatePayload);
     } else {
+        const absDebt = costValue;
+        const roundValue = `NCC còn nợ: ${absDebt}`;
         await trx(PAYMENT_SUPPLY_TABLE).insert({
             [colSourceId]: supplyId,
-            [colImport]: -costValue,
+            [colImport]: 0,
             [colPaid]: 0,
-            [colRound]: formatNote(),
+            [colRound]: roundValue,
             [colStatus]: STATUS.UNPAID,
         });
     }
