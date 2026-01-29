@@ -580,26 +580,36 @@ export const useProductActions = ({
     }
     const normalizedSuppliers = createSuppliers
       .map<SupplierPayload | null>((entry) => {
-        const name = entry.sourceName.trim();
+        const name = (entry.sourceName || "").trim();
         const numericPrice = Number((entry.price || "").replace(/\D+/g, ""));
         const price =
           Number.isFinite(numericPrice) && numericPrice > 0 ? numericPrice : null;
-        if (!name && price === null) return null;
+        const rawSourceId = entry.sourceId;
+        const sourceIdNum =
+          rawSourceId !== null &&
+          rawSourceId !== undefined &&
+          Number.isFinite(Number(rawSourceId))
+            ? Number(rawSourceId)
+            : undefined;
+        if (!sourceIdNum && !name) return null;
         return {
-          sourceId:
-            entry.sourceId !== null && Number.isFinite(entry.sourceId)
-              ? entry.sourceId
-              : undefined,
+          sourceId: sourceIdNum,
           sourceName: name || undefined,
           price,
-          numberBank: entry.numberBank.trim() || undefined,
-          binBank: entry.bankBin.trim() || undefined,
+          numberBank: (entry.numberBank || "").trim() || undefined,
+          binBank: (entry.bankBin || "").trim() || undefined,
         };
       })
       .filter(
         (entry): entry is SupplierPayload =>
-          Boolean(entry && (entry.sourceId !== undefined || entry.sourceName))
+          Boolean(entry && (entry.sourceId !== undefined || (entry.sourceName && entry.sourceName.length > 0)))
       );
+
+    if (normalizedSuppliers.length === 0) {
+      setCreateError("Vui lòng chọn hoặc nhập ít nhất một Nhà Cung Cấp và giá nhập.");
+      return;
+    }
+
     setIsSubmittingCreate(true);
     setCreateError(null);
 
@@ -610,12 +620,12 @@ export const useProductActions = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          packageName: trimmedPackage,
-          packageProduct: trimmedProduct,
+          packageName: trimmedPackage || undefined,
+          packageProduct: trimmedProduct || undefined,
           sanPham: trimmedSanPham,
-          pctCtv: pctCtvValue,
-          pctKhach: pctKhachValue,
-          pctPromo: pctPromoValue,
+          pctCtv: pctCtvValue ?? undefined,
+          pctKhach: pctKhachValue ?? undefined,
+          pctPromo: pctPromoValue ?? undefined,
           suppliers: normalizedSuppliers,
         }),
         credentials: "include",

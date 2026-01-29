@@ -123,6 +123,7 @@ function Pricing() {
           onSearchChange={setSearchTerm}
           onStatusChange={setStatusFilter}
           onRefresh={handleRefreshAll}
+          onAddProduct={handleOpenCreateModal}
         />
         <ProductTable
           items={filteredPricing}

@@ -66,36 +66,39 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const inputBase =
+    "mt-1 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all";
+  const labelBase = "text-xs font-semibold text-slate-300 uppercase tracking-wide";
+
   return (
-    <div className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-black/40 px-2 py-4 sm:px-4 sm:py-6">
-      <div className="relative flex w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl max-h-[95vh]">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/50 px-2 py-4 sm:px-4 sm:py-6" style={{ zIndex: 9999 }}>
+      <div className="relative flex w-full max-w-5xl flex-col rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/95 via-slate-700/90 to-slate-900/95 shadow-2xl max-h-[95vh] backdrop-blur-sm" style={{ zIndex: 10000 }}>
         <button
-          className="absolute right-4 top-4 text-white/60 hover:text-white/70"
+          className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors"
           onClick={onClose}
         >
           <XMarkIcon className="h-6 w-6" />
         </button>
         <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
           <div>
-            <h2 className="text-xl font-bold text-sky-100">Thêm Sản Phẩm mới</h2>
-            <p className="text-base text-sky-200/90">
+            <h2 className="text-xl font-bold text-white">Thêm Sản Phẩm mới</h2>
+            <p className="text-base text-slate-300">
               Nhập Thông tin Sản Phẩm, Nhà Cung Cấp, Tỷ Giá
             </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-sky-100/40 p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">
+            <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
                 Thông Tin Sản Phẩm
               </p>
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Sản Phẩm
-                  </label>
+                  <label className={labelBase}>Sản Phẩm</label>
                   <input
                     type="text"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                    className={inputBase}
+                    placeholder="Nhập tên sản phẩm"
                     value={createForm.packageName}
                     onChange={(event) =>
                       onFormChange("packageName", event.target.value)
@@ -103,12 +106,11 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Gói Sản Phẩm
-                  </label>
+                  <label className={labelBase}>Gói Sản Phẩm</label>
                   <input
                     type="text"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                    className={inputBase}
+                    placeholder="Nhập gói sản phẩm"
                     value={createForm.packageProduct}
                     onChange={(event) =>
                       onFormChange("packageProduct", event.target.value)
@@ -116,12 +118,11 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Mã Sản Phẩm
-                  </label>
+                  <label className={labelBase}>Mã Sản Phẩm</label>
                   <input
                     type="text"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                    className={inputBase}
+                    placeholder="Nhập mã sản phẩm"
                     value={createForm.sanPham}
                     onChange={(event) =>
                       onFormChange("sanPham", event.target.value)
@@ -130,20 +131,19 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-white via-purple-50 to-purple-100/40 p-5 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
+            <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
                 Tỷ Giá
               </p>
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Tỷ Giá CTV
-                  </label>
+                  <label className={labelBase}>Tỷ Giá CTV</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                    placeholder="0.00"
                     value={createForm.pctCtv}
                     onChange={(event) =>
                       onFormChange("pctCtv", event.target.value)
@@ -151,14 +151,13 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Tỷ Giá Khách
-                  </label>
+                  <label className={labelBase}>Tỷ Giá Khách</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                    placeholder="0.00"
                     value={createForm.pctKhach}
                     onChange={(event) =>
                       onFormChange("pctKhach", event.target.value)
@@ -166,14 +165,13 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                    Tỷ Giá Khuyến Mãi
-                  </label>
+                  <label className={labelBase}>Tỷ Giá Khuyến Mãi</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                    placeholder="0.00"
                     value={createForm.pctPromo}
                     onChange={(event) =>
                       onFormChange("pctPromo", event.target.value)
@@ -184,16 +182,16 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white via-gray-50 to-gray-100/40 p-5 shadow-sm">
+          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
             <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
                 Thông Tin Nhà Cung Cấp
               </p>
               <div className="space-y-4">
                 {createSuppliers.map((supplier) => (
                   <div
                     key={supplier.id}
-                    className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-inner"
+                    className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-inner"
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
@@ -202,7 +200,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                       {createSuppliers.length > 1 && (
                         <button
                           type="button"
-                          className="text-xs text-red-500 hover:text-red-600"
+                          className="text-xs text-red-400 hover:text-red-300"
                           onClick={() => onRemoveSupplier(supplier.id)}
                         >
                           Xóa
@@ -211,7 +209,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
-                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
+                        <label className={labelBase}>
                           Tên Nhà Cung Cấp
                         </label>
                         <div className="mt-1 flex items-stretch gap-2">
@@ -219,7 +217,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             {supplier.useCustomName ? (
                               <input
                                 type="text"
-                                className="w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                className={inputBase}
                                 placeholder="Nhập tên Nhà Cung Cấp"
                                 value={supplier.sourceName}
                                 onChange={(event) =>
@@ -232,7 +230,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                               />
                             ) : (
                               <select
-                                className="supplier-select w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                                className={`${inputBase} cursor-pointer`}
                                 value={
                                   supplier.sourceId !== null
                                     ? String(supplier.sourceId)
@@ -242,7 +240,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                   onSupplierSelectChange(supplier.id, event.target.value)
                                 }
                               >
-                                <option value="">
+                                <option value="" className="bg-slate-800 text-slate-300">
                                   {isLoadingSuppliers
                                     ? "Đang tải Nhà Cung Cấp..."
                                     : "Chọn Nhà Cung Cấp"}
@@ -253,7 +251,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                       ? String(option.id)
                                       : option.name;
                                   return (
-                                    <option key={optionValue} value={optionValue}>
+                                    <option key={optionValue} value={optionValue} className="bg-slate-800 text-white">
                                       {option.name}
                                     </option>
                                   );
@@ -263,7 +261,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                           </div>
                           <button
                             type="button"
-                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-300/70 bg-white/90 text-blue-600 hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-60"
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-slate-700/80 text-indigo-300 hover:bg-indigo-500/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-60 transition-colors"
                             onClick={() =>
                               supplier.useCustomName
                                 ? onSupplierSelectChange(supplier.id, "")
@@ -284,12 +282,10 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                          Giá Nhập
-                        </label>
+                        <label className={labelBase}>Giá Nhập</label>
                         <input
                           type="text"
-                          className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                          className={inputBase}
                           value={formatVndDisplay(supplier.price)}
                           onChange={(event) =>
                             onSupplierPriceInput(supplier.id, event.target.value)
@@ -298,9 +294,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                          Số Tài Khoản
-                        </label>
+                        <label className={labelBase}>Số Tài Khoản</label>
                         {(() => {
                           const isLocked =
                             !supplier.useCustomName &&
@@ -309,7 +303,8 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                           return (
                             <input
                               type="text"
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                              className={`${inputBase} disabled:opacity-60 disabled:cursor-not-allowed`}
+                              placeholder="Nhập số tài khoản"
                               value={supplier.numberBank}
                               onChange={(event) =>
                                 onSupplierChange(
@@ -319,19 +314,12 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 )
                               }
                               disabled={isLocked}
-                              style={
-                                isLocked
-                                  ? { opacity: 0.7, cursor: "not-allowed" }
-                                  : undefined
-                              }
                             />
                           );
                         })()}
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                          Ngân Hàng
-                        </label>
+                        <label className={labelBase}>Ngân Hàng</label>
                         {(() => {
                           const isLocked =
                             !supplier.useCustomName &&
@@ -339,7 +327,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             Boolean(supplier.bankBin || supplier.numberBank);
                           return (
                             <select
-                              className="mt-1 w-full rounded-xl border border-gray-200 bg-white/90 px-3 py-2 text-sm focus:border-blue-300 focus:ring-2 focus:ring-blue-200"
+                              className={`${inputBase} cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
                               value={supplier.bankBin}
                               onChange={(event) =>
                                 onSupplierChange(
@@ -349,15 +337,10 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 )
                               }
                               disabled={isLocked}
-                              style={
-                                isLocked
-                                  ? { opacity: 0.7, cursor: "not-allowed" }
-                                  : undefined
-                              }
                             >
-                              <option value="">Chọn Ngân Hàng</option>
+                              <option value="" className="bg-slate-800 text-slate-300">Chọn Ngân Hàng</option>
                               {bankOptions.map((bank) => (
-                                <option key={bank.bin} value={bank.bin}>
+                                <option key={bank.bin} value={bank.bin} className="bg-slate-800 text-white">
                                   {bank.name}
                                 </option>
                               ))}
@@ -365,7 +348,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                           );
                         })()}
                         {isLoadingBanks && (
-                          <p className="mt-1 text-[11px] text-white/60">
+                          <p className="mt-1 text-[11px] text-slate-400">
                             Đang Tải Danh Sách Ngân Hàng...
                           </p>
                         )}
@@ -389,13 +372,13 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                 )
                               : null;
                           return (
-                            <div className="mt-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 shadow-inner">
-                              <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">
+                            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 shadow-inner">
+                              <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
                                 Xem trước giá
                               </p>
                               <div className="mt-2 grid gap-3 md:grid-cols-2">
                                 <div className="flex flex-col gap-1">
-                                  <span className="text-[11px] uppercase text-white/60">
+                                  <span className="text-[11px] uppercase text-slate-400">
                                     Giá sỉ (theo Tỷ giá CTV)
                                   </span>
                                   <span className="text-sm font-semibold text-white">
@@ -405,7 +388,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                                   </span>
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                  <span className="text-[11px] uppercase text-white/60">
+                                  <span className="text-[11px] uppercase text-slate-400">
                                     Giá lẻ (theo Tỷ giá Khách)
                                   </span>
                                   <span className="text-sm font-semibold text-white">
@@ -426,7 +409,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
               <div className="flex justify-center">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-full border border-dashed border-blue-300 px-4 py-2 text-sm font-semibold text-blue-600 hover:border-blue-400 hover:text-blue-700"
+                  className="inline-flex items-center rounded-full border border-dashed border-white/30 px-4 py-2 text-sm font-semibold text-indigo-300 hover:border-indigo-400/60 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors"
                   onClick={onAddSupplier}
                 >
                   <UserPlusIcon className="mr-2 h-4 w-4" />
@@ -437,14 +420,14 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
           </div>
 
           {createError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+            <div className="rounded-xl border border-red-400/50 bg-red-500/20 px-4 py-2 text-sm text-red-200">
               {createError}
             </div>
           )}
           <div className="flex justify-end gap-3">
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center rounded-xl border border-white/20 bg-slate-700/60 px-5 py-2 text-sm font-semibold text-slate-200 shadow-sm transition hover:bg-slate-600/60 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClose}
               disabled={isSubmitting}
             >

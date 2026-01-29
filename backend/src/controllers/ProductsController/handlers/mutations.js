@@ -178,7 +178,12 @@ const createProductPrice = async (req, res) => {
     return res.status(400).json({ error: "sanPham là bắt buộc." });
   }
 
-  const normalizedPackageName = normalizeTextInput(packageName) || null;
+  // Use unique placeholder when package name is empty so product insert always returns an id
+  const rawPackageName = normalizeTextInput(packageName);
+  const normalizedPackageName =
+    rawPackageName && rawPackageName.length > 0
+      ? rawPackageName
+      : `__pkg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   const pctCtvVal = toNullableNumber(pctCtv);
   const pctKhachVal = toNullableNumber(pctKhach);
   const pctPromoVal = toNullableNumber(pctPromo);
@@ -196,19 +201,19 @@ const createProductPrice = async (req, res) => {
           const productInsertQuery = trx(TABLES.product).insert({
             [productSchemaCols.packageName]: normalizedPackageName,
           });
-          if (normalizedPackageName) {
+          if (rawPackageName && rawPackageName.length > 0) {
             productInsertQuery.onConflict(productSchemaCols.packageName).merge({
               [productSchemaCols.packageName]: normalizedPackageName,
             });
           }
           const productInsert = await productInsertQuery.returning("id");
-          let productId = productInsert?.[0]?.id || productInsert?.[0]?.ID;
-          if (!productId && normalizedPackageName) {
+          let productId = productInsert?.[0]?.id ?? productInsert?.[0]?.ID ?? null;
+          if (!productId && rawPackageName && rawPackageName.length > 0) {
             const existing = await trx(TABLES.product)
               .select("id")
               .where(productSchemaCols.packageName, normalizedPackageName)
               .first();
-            productId = existing?.id || existing?.ID || null;
+            productId = existing?.id ?? existing?.ID ?? null;
           }
           if (!productId) {
             throw new Error("Unable to resolve product id.");
@@ -289,7 +294,9 @@ const createProductPrice = async (req, res) => {
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
     logger.error("Insert failed (POST /api/product-prices)", { error: error.message, stack: error.stack });
-    res.status(500).json({ error: "Không thể tạo giá sản phẩm." });
+    const message = error && error.message ? String(error.message) : "Không thể tạo giá sản phẩm.";
+    const status = message.includes("Unable to resolve") || message.includes("bắt buộc") ? 400 : 500;
+    res.status(status).json({ error: message });
   }
 };
 
