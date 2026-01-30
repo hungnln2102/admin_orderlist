@@ -235,7 +235,8 @@ export const mergeProducts = (
       rulesHtml: "",
       description: "",
       descriptionHtml: "",
-      imageUrl: null,
+      imageUrl: priceItem.image_url ?? null,
+      packageImageUrl: priceItem.image_url ?? null,
     });
   }
 
