@@ -58,7 +58,7 @@ const ProductInfo: React.FC = () => {
     closeEditForm,
     handleSaveEdit,
     clearEditingProduct,
-  } = useProductEdit({ setProductDescs, setError });
+  } = useProductEdit({ setProductDescs, setError, reloadProducts: reload });
 
   const {
     editingCategoryGroup,

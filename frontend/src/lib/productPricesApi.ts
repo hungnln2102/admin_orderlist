@@ -7,7 +7,8 @@ export interface ProductDeleteResponse {
 }
 
 export type ProductPriceUpdatePayload = {
-  packageName?: string;
+  packageName?: string | null;
+  packageProduct?: string | null;
   categoryIds?: number[];
   categoryColors?: Record<number, string> | Array<{ id: number; color?: string | null }>;
   imageUrl?: string | null;

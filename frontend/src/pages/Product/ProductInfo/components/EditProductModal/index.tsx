@@ -26,6 +26,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     title: "Chỉnh sửa thông tin sản phẩm",
     productId: "Mã sản phẩm",
     productName: "Tên sản phẩm / Loại gói sản phẩm",
+    packageName: "Gói sản phẩm",
     imageUrl: "Đường dẫn hình ảnh sản phẩm",
     rules: "Quy tắc sản phẩm",
     description: "Mô tả sản phẩm",
@@ -42,6 +43,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       productName:
         stripDurationSuffix(product?.packageProduct || product?.productName || "") ||
         "",
+      packageName: product?.packageName || "",
       rules: product?.rules || "",
       rulesHtml: product?.rulesHtml || toHtmlFromPlain(product?.rules || ""),
       description: product?.description || "",
@@ -49,6 +51,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         product?.descriptionHtml ||
         toHtmlFromPlain(product?.description || ""),
       imageUrl: product?.imageUrl || "",
+      priceId: product?.priceId ?? null,
     }),
     [product]
   );
@@ -277,9 +280,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               <EditProductSidebar
                 form={form}
-                labels={{ productId: labels.productId, productName: labels.productName }}
+                labels={{ productId: labels.productId, productName: labels.productName, packageName: labels.packageName }}
                 onProductIdChange={(value) => setForm((prev) => ({ ...prev, productId: value }))}
                 onProductNameChange={(value) => setForm((prev) => ({ ...prev, productName: value }))}
+                onPackageNameChange={(value) => setForm((prev) => ({ ...prev, packageName: value }))}
                 onImageUrlChange={(value) => setForm((prev) => ({ ...prev, imageUrl: value }))}
               />
               <EditProductContent

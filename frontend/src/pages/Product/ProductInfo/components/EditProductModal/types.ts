@@ -3,11 +3,13 @@ import { MergedProduct } from "../../utils/productInfoHelpers";
 export type EditFormState = {
   productId: string;
   productName: string;
+  packageName: string;
   rules: string;
   rulesHtml: string;
   description: string;
   descriptionHtml: string;
   imageUrl: string;
+  priceId: number | null;
 };
 
 export type SavePayload = EditFormState;

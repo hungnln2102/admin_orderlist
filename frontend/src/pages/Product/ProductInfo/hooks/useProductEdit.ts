@@ -3,6 +3,7 @@ import {
   ProductDescription,
   saveProductDescription,
 } from "../../../../lib/productDescApi";
+import { updateProductPrice } from "../../../../lib/productPricesApi";
 import { normalizeErrorMessage } from "../../../../lib/textUtils";
 import { SavePayload } from "../components/EditProductModal";
 import {
@@ -13,6 +14,7 @@ import {
 type UseProductEditParams = {
   setProductDescs: React.Dispatch<React.SetStateAction<ProductDescription[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
+  reloadProducts: () => Promise<void>;
 };
 
 type UseProductEditResult = {
@@ -27,6 +29,7 @@ type UseProductEditResult = {
 export const useProductEdit = ({
   setProductDescs,
   setError,
+  reloadProducts,
 }: UseProductEditParams): UseProductEditResult => {
   const [editingProduct, setEditingProduct] = useState<MergedProduct | null>(
     null
@@ -50,7 +53,9 @@ export const useProductEdit = ({
     async (form: SavePayload) => {
       if (!editingProduct) return;
       setEditSaving(true);
-      const payload = {
+      
+      // Payload for product_desc table
+      const descPayload = {
         productId: form.productId.trim() || editingProduct.productId || "",
         rules: form.rulesHtml || form.rules,
         description: form.descriptionHtml || form.description,
@@ -58,7 +63,18 @@ export const useProductEdit = ({
       };
 
       try {
-        const saved = await saveProductDescription(payload);
+        // Save product description
+        const saved = await saveProductDescription(descPayload);
+        
+        // Also update variant/product info if we have a priceId
+        const priceId = form.priceId ?? editingProduct.priceId;
+        if (priceId && Number.isFinite(priceId)) {
+          await updateProductPrice(priceId, {
+            packageName: form.packageName.trim() || null,
+            packageProduct: form.productName.trim() || null,
+          });
+        }
+        
         const rulesHtml =
           saved.rulesHtml || saved.rules || form.rulesHtml || form.rules || "";
         const descriptionHtml =
@@ -75,6 +91,7 @@ export const useProductEdit = ({
             stripDurationSuffix(
               form.productName || editingProduct.productName || ""
             ) || editingProduct.productName,
+          packageName: form.packageName || editingProduct.packageName,
           rules: saved.rules || "",
           rulesHtml,
           description: saved.description || "",
@@ -121,6 +138,9 @@ export const useProductEdit = ({
         });
 
         setEditingProduct(null);
+        
+        // Reload to get fresh data from server
+        await reloadProducts();
       } catch (err) {
         setError(
           normalizeErrorMessage(
@@ -132,7 +152,7 @@ export const useProductEdit = ({
         setEditSaving(false);
       }
     },
-    [editingProduct, setProductDescs, setError]
+    [editingProduct, setProductDescs, setError, reloadProducts]
   );
 
   return {
