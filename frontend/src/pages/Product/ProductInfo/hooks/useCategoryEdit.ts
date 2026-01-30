@@ -15,6 +15,8 @@ type UseCategoryEditResult = {
   editingCategoryGroup: CategoryRow | null;
   categoryPackageName: string;
   setCategoryPackageName: React.Dispatch<React.SetStateAction<string>>;
+  categoryImageUrl: string;
+  setCategoryImageUrl: React.Dispatch<React.SetStateAction<string>>;
   selectedCategoryIds: number[];
   categorySaving: boolean;
   categorySaveError: string | null;
@@ -32,6 +34,7 @@ export const useCategoryEdit = ({
   const [editingCategoryGroup, setEditingCategoryGroup] =
     useState<CategoryRow | null>(null);
   const [categoryPackageName, setCategoryPackageName] = useState("");
+  const [categoryImageUrl, setCategoryImageUrl] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [categorySaving, setCategorySaving] = useState(false);
   const [categorySaveError, setCategorySaveError] = useState<string | null>(
@@ -42,6 +45,7 @@ export const useCategoryEdit = ({
     (group: CategoryRow) => {
       setEditingCategoryGroup(group);
       setCategoryPackageName(group.packageName || "");
+      setCategoryImageUrl(group.imageUrl || "");
       const initialIds = (group.categories || [])
         .map((category) => Number(category.id))
         .filter((id) => Number.isFinite(id));
@@ -105,6 +109,7 @@ export const useCategoryEdit = ({
         packageName: trimmedPackageName,
         categoryIds: selectedCategoryIds,
         categoryColors: colorMap,
+        imageUrl: categoryImageUrl.trim() || null,
       });
       await reloadProducts();
       setEditingCategoryGroup(null);
@@ -121,6 +126,7 @@ export const useCategoryEdit = ({
   }, [
     editingCategoryGroup,
     categoryPackageName,
+    categoryImageUrl,
     selectedCategoryIds,
     categoryOptions,
     reloadProducts,
@@ -130,6 +136,8 @@ export const useCategoryEdit = ({
     editingCategoryGroup,
     categoryPackageName,
     setCategoryPackageName,
+    categoryImageUrl,
+    setCategoryImageUrl,
     selectedCategoryIds,
     categorySaving,
     categorySaveError,

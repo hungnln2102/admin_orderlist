@@ -64,6 +64,8 @@ const ProductInfo: React.FC = () => {
     editingCategoryGroup,
     categoryPackageName,
     setCategoryPackageName,
+    categoryImageUrl,
+    setCategoryImageUrl,
     selectedCategoryIds,
     categorySaving,
     categorySaveError,
@@ -157,11 +159,13 @@ const ProductInfo: React.FC = () => {
         <EditCategoryModal
           open={Boolean(editingCategoryGroup)}
           packageName={categoryPackageName}
+          imageUrl={categoryImageUrl}
           categoryOptions={categoryOptions}
           selectedCategoryIds={selectedCategoryIds}
           saving={categorySaving || categoryLoading}
           error={categorySaveError || categoryError}
           onPackageNameChange={setCategoryPackageName}
+          onImageUrlChange={setCategoryImageUrl}
           onToggleCategory={handleToggleCategory}
           onClose={closeCategoryEdit}
           onSave={handleSaveCategory}

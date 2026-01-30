@@ -1,15 +1,18 @@
 import React from "react";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { CategoryItem } from "../utils/productInfoHelpers";
+import { ProductImagePicker } from "./ProductImagePicker";
 
 type EditCategoryModalProps = {
   open: boolean;
   packageName: string;
+  imageUrl: string;
   categoryOptions: CategoryItem[];
   selectedCategoryIds: number[];
   saving: boolean;
   error?: string | null;
   onPackageNameChange: (value: string) => void;
+  onImageUrlChange: (value: string) => void;
   onToggleCategory: (categoryId: number) => void;
   onClose: () => void;
   onSave: () => void;
@@ -32,11 +35,13 @@ const getCategoryColor = (category: CategoryItem, index: number): string =>
 export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   open,
   packageName,
+  imageUrl,
   categoryOptions,
   selectedCategoryIds,
   saving,
   error,
   onPackageNameChange,
+  onImageUrlChange,
   onToggleCategory,
   onClose,
   onSave,
@@ -60,16 +65,22 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           </button>
         </div>
         <div className="px-5 py-5 space-y-5">
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-white/60 mb-2">
-              Gói sản phẩm
-            </label>
-            <input
-              type="text"
-              value={packageName}
-              onChange={(event) => onPackageNameChange(event.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              placeholder="Nhập tên gói sản phẩm"
+          <div className="flex gap-5">
+            <div className="flex-1">
+              <label className="block text-xs uppercase tracking-wide text-white/60 mb-2">
+                Gói sản phẩm
+              </label>
+              <input
+                type="text"
+                value={packageName}
+                onChange={(event) => onPackageNameChange(event.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                placeholder="Nhập tên gói sản phẩm"
+              />
+            </div>
+            <ProductImagePicker
+              imageUrl={imageUrl}
+              onImageUrlChange={onImageUrlChange}
             />
           </div>
 

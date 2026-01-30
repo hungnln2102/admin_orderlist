@@ -54,6 +54,7 @@ if (process.env.NODE_ENV === "production") {
 
 app.use(express.json());
 app.use("/image", express.static(path.join(__dirname, "../image")));
+app.use("/image_product", express.static(path.join(__dirname, "../image_product")));
 
 app.use(
   session({

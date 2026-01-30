@@ -23,6 +23,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.displayName)} AS san_pham,
       v.${quoteIdent(variantCols.variantName)} AS package_product,
       p.${quoteIdent(productSchemaCols.packageName)} AS package,
+      p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
       COALESCE(
         json_agg(
           DISTINCT jsonb_build_object(
@@ -68,6 +69,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.displayName)},
       v.${quoteIdent(variantCols.variantName)},
       p.${quoteIdent(productSchemaCols.packageName)},
+      p.${quoteIdent(productSchemaCols.imageUrl)},
       pc.${quoteIdent(priceConfigCols.pctCtv)},
       pc.${quoteIdent(priceConfigCols.pctKhach)},
       pc.${quoteIdent(priceConfigCols.pctPromo)},
@@ -317,6 +319,7 @@ const updateProductPrice = async (req, res) => {
     pctKhach,
     pctPromo,
     is_active,
+    imageUrl,
   } = req.body || {};
   const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
   const colorOverrides = normalizeCategoryColors(categoryColors);
@@ -372,15 +375,27 @@ const updateProductPrice = async (req, res) => {
       );
     }
 
-    if (productSchemaId && packageName !== undefined) {
-      await db.raw(
-        `
-        UPDATE ${TABLES.product}
-        SET ${quoteIdent(productSchemaCols.packageName)} = ?
-        WHERE ${quoteIdent(productSchemaCols.id)} = ?;
-      `,
-        [normalizeTextInput(packageName) || null, productSchemaId]
-      );
+    if (productSchemaId && (packageName !== undefined || imageUrl !== undefined)) {
+      const productUpdates = [];
+      const productValues = [];
+      if (packageName !== undefined) {
+        productUpdates.push(`${quoteIdent(productSchemaCols.packageName)} = ?`);
+        productValues.push(normalizeTextInput(packageName) || null);
+      }
+      if (imageUrl !== undefined) {
+        productUpdates.push(`${quoteIdent(productSchemaCols.imageUrl)} = ?`);
+        productValues.push(normalizeTextInput(imageUrl) || null);
+      }
+      if (productUpdates.length) {
+        await db.raw(
+          `
+          UPDATE ${TABLES.product}
+          SET ${productUpdates.join(", ")}
+          WHERE ${quoteIdent(productSchemaCols.id)} = ?;
+        `,
+          [...productValues, productSchemaId]
+        );
+      }
     }
 
     if (productSchemaId && Array.isArray(normalizedCategoryIds)) {
@@ -447,6 +462,7 @@ const updateProductPrice = async (req, res) => {
       !variantUpdates.length &&
       priceUpdates.length === 0 &&
       packageName === undefined &&
+      imageUrl === undefined &&
       !Array.isArray(normalizedCategoryIds)
     ) {
       return res.status(400).json({ error: "Không có trường nào để cập nhật." });

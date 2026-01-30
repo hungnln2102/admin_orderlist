@@ -10,6 +10,7 @@ export type ProductPriceUpdatePayload = {
   packageName?: string;
   categoryIds?: number[];
   categoryColors?: Record<number, string> | Array<{ id: number; color?: string | null }>;
+  imageUrl?: string | null;
 };
 
 export const updateProductPrice = async (
