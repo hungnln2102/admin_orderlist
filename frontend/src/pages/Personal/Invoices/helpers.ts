@@ -65,6 +65,7 @@ export const QR_BANK_INFO = {
   accountHolder: "NGO LE NGOC HUNG",
   accountNumber: "9183400998",
   bankBin: "970432",
+  bankCode: "VPB", // VietQR short code
 };
 
 export const parseDMYDate = (value: string): number | null => {

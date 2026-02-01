@@ -69,6 +69,7 @@ export default function ViewSupplierModal({
       bankCode: supply.binBank,
       amount: Math.max(0, amount),
       description: desc,
+      accountName: supply.nameBank || "",
     });
   }, [supply, selectedPayment]);
 

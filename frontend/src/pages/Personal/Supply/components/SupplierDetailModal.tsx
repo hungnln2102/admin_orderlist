@@ -1,10 +1,9 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import * as Helpers from "../../../../lib/helpers";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
-import QrModal from "./QrModal";
 
 interface Props {
   isOpen: boolean;
@@ -16,17 +15,50 @@ interface Props {
 
 const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks = [], onRefreshList }) => {
   const { overview, loading, error, fetchOverview, setError } = useSupplyDetail(supplyId, isOpen);
-  const { confirmingId, qrPayment, confirmPayment, showQrForPayment, setQrPayment } = usePayments({
+  const { confirmingId, confirmPayment } = usePayments({
     supply: overview?.supply,
     fetchOverview,
     onRefreshList,
   });
+  const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
 
-  if (!isOpen || !supplyId) return null;
-
+  // Tính toán các giá trị từ overview (phải đặt trước useMemo)
   const supply = overview?.supply;
   const stats = overview?.stats;
   const unpaidPayments: any[] = overview?.unpaidPayments || [];
+  const selectedPayment = unpaidPayments.find((p) => p.id === selectedPaymentId) || unpaidPayments[0] || null;
+
+  // useMemo phải được gọi trước conditional return
+  const qrImageUrl = useMemo(() => {
+    if (!supply || !selectedPayment) return null;
+    const amount = Number(selectedPayment.totalImport || selectedPayment.import_value || 0);
+    const desc = selectedPayment.round || `PAY ${supply.id}`;
+    if (!supply.numberBank || !supply.binBank) return null;
+    
+    return Helpers.buildSepayQrUrl({
+      accountNumber: supply.numberBank,
+      bankCode: supply.binBank,
+      amount: Math.max(0, amount),
+      description: desc,
+      accountName: supply.nameBank || supply.sourceName || "",
+    });
+  }, [supply, selectedPayment]);
+
+  const handleConfirmPayment = async (paymentId: number) => {
+    const result = await confirmPayment(paymentId);
+    if (!result.success) {
+      setError(result.error || "Không thể thanh toán chu kỳ");
+    }
+  };
+
+  const handleClose = () => {
+    setSelectedPaymentId(null);
+    onClose();
+  };
+
+  // Early return sau khi tất cả hooks đã được gọi
+  if (!isOpen || !supplyId) return null;
+
   const totalUnpaid = unpaidPayments.reduce((sum, p) => sum + Math.max(0, (p.totalImport || 0) - (p.paid || 0)), 0);
   const monthlyOrders: Array<{ month: number; orders: number }> = stats?.monthlyOrders || [];
   const statusLabel = supply?.isActive ? "Đang hoạt động" : "Tạm dừng";
@@ -43,18 +75,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     { label: "Đã hủy", value: stats?.canceledOrders ?? 0 },
   ];
 
-  const handleConfirmPayment = async (paymentId: number) => {
-    const result = await confirmPayment(paymentId);
-    if (!result.success) {
-      setError(result.error || "Không thể thanh toán chu kỳ");
-    }
-  };
-
-  const handleClose = () => {
-    setQrPayment(null);
-    onClose();
-  };
-
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
@@ -62,17 +82,14 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
           className="glass-panel-dark border border-white/5 p-5 md:p-6 rounded-[32px] text-white w-full max-w-4xl max-h-[95vh] shadow-2xl overflow-y-auto custom-scroll"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-white/60">Chi tiết Supplier #{supplyId}</p>
-              <h2 className="text-2xl font-bold">{supply?.sourceName || "Đang tải..."}</h2>
-              {supply && (
-                <span className={`inline-flex mt-2 px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>{statusLabel}</span>
-              )}
+          <div className="flex items-center justify-between">
+            <div className="flex-1" />
+            <h2 className="text-xl font-bold text-center">Chi tiết Nhà Cung Cấp</h2>
+            <div className="flex-1 flex justify-end">
+              <button onClick={handleClose} className="p-2 rounded-full hover:bg-white/10 transition text-white/70" aria-label="Đóng">
+                <XMarkIcon className="h-6 w-6" />
+              </button>
             </div>
-            <button onClick={handleClose} className="p-2 rounded-full hover:bg-white/10 transition text-white/70" aria-label="Đóng">
-              <XMarkIcon className="h-6 w-6" />
-            </button>
           </div>
 
           {loading ? (
@@ -90,6 +107,10 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 <div className="bg-white/5 rounded-2xl border border-white/5 p-5 space-y-4">
                   <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80">Thông tin chung</h3>
                   <div className="text-sm text-white/80 space-y-2">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <span className="text-white/40">Tên NCC</span>
+                      <span className="font-bold text-white">{supply?.sourceName || "--"}</span>
+                    </div>
                     <div className="flex justify-between items-center border-b border-white/5 pb-2">
                       <span className="text-white/40">Ngân hàng</span>
                       <span className="font-semibold text-white">{bankNameResolved}</span>
@@ -136,7 +157,8 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 ))}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3 mt-3">
+              <div className="grid md:grid-cols-2 gap-3 mt-3 items-start">
+                {/* Chu kỳ chưa thanh toán + QR code */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
@@ -145,41 +167,55 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   {unpaidPayments.length === 0 ? (
                     <p className="text-white/50 text-sm">Không có chu kỳ nợ.</p>
                   ) : (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scroll scroll-overlay">
-                      {unpaidPayments.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 border border-white/5 gap-3">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">{p.round || "Chu kỳ"}</p>
-                            <p className="text-xs text-white/60">{p.status}</p>
-                          </div>
-                          <div className="text-right text-sm">
-                            <p>Nhập: {Helpers.formatCurrency(p.totalImport || 0)}</p>
-                            <p className="text-white/60 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
-                          </div>
-                          <div className="flex-shrink-0">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => showQrForPayment(p)}
-                                className="px-3 py-1.5 text-xs rounded-lg bg-indigo-500 text-white hover:bg-indigo-600"
-                              >
-                                Xem QR
-                              </button>
-                              <button
-                                disabled={confirmingId === p.id}
-                                onClick={() => handleConfirmPayment(p.id)}
-                                className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60"
-                              >
-                                {confirmingId === p.id ? "Đang xử lý..." : "Thanh toán"}
-                              </button>
+                    <>
+                      {/* Danh sách chu kỳ với nút thanh toán */}
+                      <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scroll scroll-overlay mb-3">
+                        {unpaidPayments.map((p) => (
+                          <div
+                            key={p.id}
+                            onClick={() => setSelectedPaymentId(p.id)}
+                            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border transition cursor-pointer ${
+                              (selectedPayment?.id === p.id) 
+                                ? "border-indigo-500 bg-indigo-500/20" 
+                                : "border-white/5 bg-white/5 hover:bg-white/10"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm truncate">{p.round || "Chu kỳ"}</p>
+                              <p className="text-xs text-white/60">{p.status}</p>
                             </div>
+                            <div className="text-right text-sm mr-2">
+                              <p className="text-rose-400 font-semibold">{Helpers.formatCurrency(p.totalImport || 0)}</p>
+                              <p className="text-white/40 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
+                            </div>
+                            <button
+                              disabled={confirmingId === p.id}
+                              onClick={(e) => { e.stopPropagation(); handleConfirmPayment(p.id); }}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60 font-semibold transition flex-shrink-0"
+                            >
+                              {confirmingId === p.id ? "..." : "Thanh toán"}
+                            </button>
                           </div>
+                        ))}
+                      </div>
+
+                      {/* QR Code hiển thị trực tiếp */}
+                      {selectedPayment && (
+                        <div className="flex justify-center mt-2">
+                          {qrImageUrl ? (
+                            <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
+                          ) : (
+                            <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">
+                              Thiếu thông tin NH
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
                 </div>
 
+                {/* Đơn theo tháng */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Đơn theo tháng</h3>
@@ -188,7 +224,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   {monthlyOrders.length === 0 ? (
                     <p className="text-white/50 text-sm">Chưa có dữ liệu.</p>
                   ) : (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scroll scroll-overlay">
+                    <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scroll scroll-overlay">
                       {monthlyOrders.map((m) => (
                         <div key={m.month} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 border border-white/5">
                           <span className="text-sm font-semibold">Tháng {m.month}</span>
@@ -209,8 +245,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
           )}
         </div>
       </div>
-
-      <QrModal payment={qrPayment} onClose={() => setQrPayment(null)} />
     </>
   );
 };

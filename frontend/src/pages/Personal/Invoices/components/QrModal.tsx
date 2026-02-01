@@ -45,9 +45,10 @@ export const QrModal: React.FC<QrModalProps> = ({
   const qrImageUrl = useMemo(() => {
     return Helpers.buildSepayQrUrl({
       accountNumber: QR_BANK_INFO.accountNumber,
-      bankCode: QR_BANK_INFO.bankBin,
+      bankCode: QR_BANK_INFO.bankCode,
       amount: parsedAmount,
       description: noteDraft.trim(),
+      accountName: QR_BANK_INFO.accountHolder,
     });
   }, [parsedAmount, noteDraft]);
 

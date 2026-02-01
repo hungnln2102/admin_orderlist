@@ -67,14 +67,16 @@ export const usePayments = ({
       return `${day}/${month}/${year}`;
     })();
 
-    const accountNumber = isPositive ? supply?.numberBank || "" : "MAVPRE";
-    const bankCode = isPositive ? supply?.binBank || "" : "970432"; // VPBank BIN
+    const accountNumber = isPositive ? supply?.numberBank || "" : "9183400998";
+    const bankCode = isPositive ? supply?.binBank || "" : "VPB"; // VietQR short code
+    const accountName = isPositive ? supply?.nameBank || "" : "NGO LE NGOC HUNG";
 
     const url = buildSepayQrUrl({
       accountNumber,
       bankCode,
       amount,
       description: payment.round || today,
+      accountName,
     });
 
     setQrPayment({

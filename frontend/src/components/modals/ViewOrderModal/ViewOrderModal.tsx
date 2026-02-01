@@ -105,6 +105,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     bankCode: BANK_SHORT_CODE,
     amount: safeQrAmount,
     description: qrMessage,
+    accountName: ACCOUNT_NAME,
   });
 
   return (

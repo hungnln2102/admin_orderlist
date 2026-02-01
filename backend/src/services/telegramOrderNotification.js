@@ -25,14 +25,9 @@ const SEND_ORDER_NOTIFICATION =
 const SEND_ORDER_TO_TOPIC =
   String(process.env.SEND_ORDER_TO_TOPIC || "true").toLowerCase() !== "false";
 
-const QR_ACCOUNT_NUMBER =
-  process.env.ORDER_QR_ACCOUNT_NUMBER ||
-  process.env.QR_ACCOUNT_NUMBER ||
-  "";
-const QR_BANK_CODE =
-  process.env.ORDER_QR_BANK_CODE ||
-  process.env.QR_BANK_CODE ||
-  "";
+const QR_ACCOUNT_NUMBER = process.env.ORDER_QR_ACCOUNT_NUMBER || "9183400998";
+const QR_BANK_CODE = process.env.ORDER_QR_BANK_CODE || "VPB";
+const QR_ACCOUNT_NAME = process.env.ORDER_QR_ACCOUNT_NAME || "NGO LE NGOC HUNG";
 const QR_NOTE_PREFIX = process.env.ORDER_QR_NOTE_PREFIX || "Thanh toan";
 const SEND_ORDER_COPY_BUTTONS =
   String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !==
@@ -148,14 +143,16 @@ const formatCurrency = (value) => {
   }
 };
 
-const buildSepayQrUrl = ({ accountNumber, bankCode, amount, description }) => {
+/**
+ * Build VietQR URL with compact.png format
+ * Format: https://img.vietqr.io/image/{BANK_CODE}-{ACCOUNT}-compact.png?amount={amount}&addInfo={description}&accountName={name}
+ */
+const buildSepayQrUrl = ({ accountNumber, bankCode, amount, description, accountName }) => {
   const acc = String(accountNumber || "").trim();
   const bank = String(bankCode || "").trim();
   if (!acc || !bank) return "";
 
   const params = new URLSearchParams();
-  params.set("acc", acc);
-  params.set("bank", bank);
 
   const numericAmount = Number(amount);
   if (Number.isFinite(numericAmount) && numericAmount > 0) {
@@ -164,15 +161,21 @@ const buildSepayQrUrl = ({ accountNumber, bankCode, amount, description }) => {
 
   const desc = String(description || "").trim();
   if (desc) {
-    params.set("des", desc);
+    params.set("addInfo", desc);
   }
 
-  return `https://qr.sepay.vn/img?${params.toString()}`;
+  const name = String(accountName || "").trim();
+  if (name) {
+    params.set("accountName", name);
+  }
+
+  const queryString = params.toString();
+  return `https://img.vietqr.io/image/${bank}-${acc}-compact.png${queryString ? `?${queryString}` : ""}`;
 };
 
 /**
  * Build VietQR URL for due order notifications (giống mavrykstore_bot)
- * Format: https://img.vietqr.io/image/VPB-{account}-compact2.png?amount={amount}&addInfo={orderCode}&accountName={name}
+ * Format: https://img.vietqr.io/image/VPB-{account}-compact.png?amount={amount}&addInfo={orderCode}&accountName={name}
  */
 const buildVietQrUrl = ({ amount, orderCode }) => {
   const numericAmount = Number(amount);
@@ -183,7 +186,7 @@ const buildVietQrUrl = ({ amount, orderCode }) => {
   params.set("addInfo", `Thanh toan ${orderCode}`);
   params.set("accountName", "NGO LE NGOC HUNG");
   
-  return `https://img.vietqr.io/image/VPB-9183400998-compact2.png?${params.toString()}`;
+  return `https://img.vietqr.io/image/VPB-9183400998-compact.png?${params.toString()}`;
 };
 
 const toSafeString = (value) => (value === undefined || value === null ? "" : String(value));
@@ -338,6 +341,7 @@ const sendOrderCreatedNotification = async (order) => {
     bankCode: QR_BANK_CODE,
     amount,
     description: paymentNote,
+    accountName: QR_ACCOUNT_NAME,
   });
   const caption = buildOrderCreatedMessage(order, paymentNote);
 

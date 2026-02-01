@@ -301,21 +301,25 @@ export interface SepayQrOptions {
   bankCode: string;
   amount?: number | null;
   description?: string;
+  accountName?: string;
 }
 
+/**
+ * Build VietQR URL with compact.png format
+ * Format: https://img.vietqr.io/image/{BANK_CODE}-{ACCOUNT}-compact.png?amount={amount}&addInfo={description}&accountName={name}
+ */
 export const buildSepayQrUrl = ({
   accountNumber,
   bankCode,
   amount,
   description,
+  accountName,
 }: SepayQrOptions): string => {
   const acc = (accountNumber || "").trim();
   const bank = (bankCode || "").trim();
   if (!acc || !bank) return "";
 
   const params = new URLSearchParams();
-  params.set("acc", acc);
-  params.set("bank", bank);
 
   const numericAmount = Number(amount);
   if (Number.isFinite(numericAmount) && numericAmount > 0) {
@@ -324,10 +328,16 @@ export const buildSepayQrUrl = ({
 
   const desc = (description || "").trim();
   if (desc) {
-    params.set("des", desc);
+    params.set("addInfo", desc);
   }
 
-  return `https://qr.sepay.vn/img?${params.toString()}`;
+  const name = (accountName || "").trim();
+  if (name) {
+    params.set("accountName", name);
+  }
+
+  const queryString = params.toString();
+  return `https://img.vietqr.io/image/${bank}-${acc}-compact.png${queryString ? `?${queryString}` : ""}`;
 };
 
 /**
