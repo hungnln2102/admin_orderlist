@@ -170,6 +170,22 @@ const buildSepayQrUrl = ({ accountNumber, bankCode, amount, description }) => {
   return `https://qr.sepay.vn/img?${params.toString()}`;
 };
 
+/**
+ * Build VietQR URL for due order notifications (giống mavrykstore_bot)
+ * Format: https://img.vietqr.io/image/VPB-{account}-compact2.png?amount={amount}&addInfo={orderCode}&accountName={name}
+ */
+const buildVietQrUrl = ({ amount, orderCode }) => {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) return "";
+  
+  const params = new URLSearchParams();
+  params.set("amount", Math.round(numericAmount).toString());
+  params.set("addInfo", `Thanh toan ${orderCode}`);
+  params.set("accountName", "NGO LE NGOC HUNG");
+  
+  return `https://img.vietqr.io/image/VPB-9183400998-compact2.png?${params.toString()}`;
+};
+
 const toSafeString = (value) => (value === undefined || value === null ? "" : String(value));
 const escapeHtml = (value) =>
   toSafeString(value)
@@ -431,6 +447,54 @@ const sendOrderCreatedNotification = async (order) => {
 };
 
 /**
+ * Build message thông báo đơn cần gia hạn (còn 4 ngày)
+ * Caption copy từ mavrykstore_bot - _build_caption_pretty
+ * Format: Plain text (không dùng HTML parse_mode)
+ * @param {Object} order - Đơn hàng
+ * @param {number} index - Thứ tự đơn (1-based)
+ * @param {number} total - Tổng số đơn
+ */
+const buildDueOrderMessage = (order, index, total) => {
+  const orderCode = toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim();
+  const productName = toSafeString(order.id_product || order.idProduct).trim() || "N/A";
+  const info = toSafeString(order.information_order || order.informationOrder).trim();
+  const slot = toSafeString(order.slot).trim();
+  const customer = toSafeString(order.customer || order.customer_name).trim() || "---";
+  const registerDate = toSafeString(order.registration_date_display || order.registration_date_str).trim();
+  const expiryDate = toSafeString(order.expiry_date_display || order.expiry_date_str).trim();
+  const days = Number(order.days || order.total_days || 0) || 0;
+  const daysLeft = Number(order.days_left) || 4;
+  const price = Number(order.price || 0) || 0;
+  const priceDisplay = price > 0 ? `${formatCurrency(price)} VND` : "Chưa Xác Định";
+
+  const lines = [
+    `📦 Đơn hàng đến hạn (${index}/${total})`,
+    `🛒 Sản phẩm: ${productName}`,
+    `🆔 Mã đơn: ${orderCode || "..."}`,
+    `⏳ Còn lại: ${daysLeft} ngày`,
+    `——— 🧾 THÔNG TIN SẢN PHẨM ———`,
+    info ? `📝 Mô tả: ${info}` : null,
+    slot ? `📌 Slot: ${slot}` : null,
+    registerDate ? `📅 Ngày đăng ký: ${registerDate}` : null,
+    days > 0 ? `⏱️ Thời hạn: ${days} ngày` : null,
+    expiryDate ? `📆 Ngày hết hạn: ${expiryDate}` : null,
+    `💰 Giá bán: ${priceDisplay}`,
+    `——— 🤝 THÔNG TIN KHÁCH HÀNG ———`,
+    `👤 Tên: ${customer}`,
+    `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
+    `🏦 Ngân hàng: VP Bank`,
+    `🏧 STK: 9183400998`,
+    `👤 Tên: NGO LE NGOC HUNG`,
+    `📝 Nội dung: Thanh toán ${orderCode}`,
+    ``,
+    `⚠️ Vui lòng ghi đúng mã đơn trong nội dung chuyển khoản để xử lý nhanh.`,
+    `🙏 Trân trọng cảm ơn quý khách!`,
+  ].filter((line) => line !== null);
+
+  return lines.join("\n");
+};
+
+/**
  * Build message thông báo đơn hết hạn ngắn gọn
  * @param {Object} order - Đơn hàng
  * @param {number} index - Thứ tự đơn (1-based)
@@ -590,9 +654,172 @@ const sendZeroDaysRemainingNotification = async (orders = []) => {
   }
 };
 
+/**
+ * Gửi thông báo về các đơn cần gia hạn (còn 4 ngày) vào topic
+ * Chạy lúc 7:00 sáng hàng ngày
+ * @param {Array} orders - Danh sách các đơn hàng cần gia hạn
+ */
+const sendFourDaysRemainingNotification = async (orders = []) => {
+  const FOUR_DAYS_TOPIC_ID = Number.parseInt(
+    process.env.FOUR_DAYS_TOPIC_ID || process.env.DUE_ORDER_TOPIC_ID || "12",
+    10
+  );
+
+  logger.info("[Order][Telegram] sendFourDaysRemainingNotification called", {
+    ordersCount: orders.length,
+    hasBotToken: !!TELEGRAM_BOT_TOKEN,
+    TELEGRAM_CHAT_ID,
+    FOUR_DAYS_TOPIC_ID,
+  });
+
+  if (!SEND_ORDER_NOTIFICATION || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    logger.warn("[Order][Telegram] Four days notification skipped", {
+      reason: !SEND_ORDER_NOTIFICATION ? "SEND_ORDER_NOTIFICATION is false" :
+              !TELEGRAM_BOT_TOKEN ? "No bot token" :
+              !TELEGRAM_CHAT_ID ? "No chat ID" : "Unknown",
+    });
+    return;
+  }
+
+  if (!orders || orders.length === 0) {
+    logger.info("[Order][Telegram] No orders with 4 days remaining to notify");
+    return;
+  }
+
+  const total = orders.length;
+  const isThreadError = (err) => {
+    const bodyText = String(err?.body || err?.message || "");
+    const lowered = bodyText.toLowerCase();
+    return (
+      err?.status === 400 &&
+      (lowered.includes("message_thread_id") ||
+        lowered.includes("message thread not found") ||
+        (lowered.includes("thread") && lowered.includes("not found")) ||
+        (lowered.includes("topic") && lowered.includes("not found")))
+    );
+  };
+
+  // Gửi header message
+  try {
+    const headerPayload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: `☀️ THÔNG BÁO GIA HẠN (7:00 Sáng) ☀️\n\nPhát hiện ${total} đơn hàng cần gia hạn (còn 4 ngày):`,
+    };
+    if (Number.isFinite(FOUR_DAYS_TOPIC_ID)) {
+      headerPayload.message_thread_id = FOUR_DAYS_TOPIC_ID;
+    }
+    await sendTelegramMessage(headerPayload);
+  } catch (err) {
+    logger.warn("[Order][Telegram] Failed sending header message", { error: err?.message });
+  }
+
+  // Gửi từng đơn một tin nhắn riêng (có QR code như mavrykstore_bot)
+  for (let i = 0; i < orders.length; i++) {
+    const order = orders[i];
+    const index = i + 1;
+    const orderCode = toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim();
+    const price = Number(order.price || 0) || 0;
+    const caption = buildDueOrderMessage(order, index, total);
+    const qrUrl = buildVietQrUrl({ amount: price, orderCode });
+
+    const buildPhotoPayload = (includeTopic = true) => {
+      const payload = {
+        chat_id: TELEGRAM_CHAT_ID,
+        photo: qrUrl,
+        caption: caption,
+        // Không dùng parse_mode để gửi plain text như mavrykstore_bot
+      };
+      if (includeTopic && Number.isFinite(FOUR_DAYS_TOPIC_ID)) {
+        payload.message_thread_id = FOUR_DAYS_TOPIC_ID;
+      }
+      return payload;
+    };
+
+    const buildTextPayload = (includeTopic = true) => {
+      const payload = {
+        chat_id: TELEGRAM_CHAT_ID,
+        text: caption,
+      };
+      if (includeTopic && Number.isFinite(FOUR_DAYS_TOPIC_ID)) {
+        payload.message_thread_id = FOUR_DAYS_TOPIC_ID;
+      }
+      return payload;
+    };
+
+    let includeTopic = true;
+    let sent = false;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        logger.info("[Order][Telegram] Sending due order notification", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          total,
+          orderCode,
+          hasQrUrl: !!qrUrl,
+          includeTopic,
+        });
+
+        // Gửi ảnh QR nếu có, không thì gửi text
+        if (qrUrl) {
+          await sendTelegramPhoto(buildPhotoPayload(includeTopic));
+        } else {
+          await sendTelegramMessage(buildTextPayload(includeTopic));
+        }
+
+        logger.info("[Order][Telegram] Due order notification sent successfully", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          total,
+          orderCode,
+        });
+        sent = true;
+        break;
+      } catch (err) {
+        logger.warn("[Order][Telegram] Send attempt failed", {
+          attempt: attempt + 1,
+          orderIndex: index,
+          orderCode,
+          error: err?.message,
+          status: err?.status,
+          body: err?.body,
+        });
+
+        if (includeTopic && isThreadError(err)) {
+          logger.info("[Order][Telegram] Retrying without topic ID");
+          includeTopic = false;
+        } else {
+          logger.error("[Order][Telegram] Send failed permanently for order", {
+            orderIndex: index,
+            orderCode,
+            error: err?.message,
+            stack: err?.stack,
+            status: err?.status,
+            body: err?.body,
+          });
+          break;
+        }
+      }
+    }
+
+    if (!sent) {
+      logger.error("[Order][Telegram] Failed to send notification for order", {
+        orderIndex: index,
+        orderCode: order.id_order || order.idOrder,
+      });
+    }
+
+    // Delay nhỏ giữa các tin nhắn để tránh rate limit
+    if (i < orders.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+};
+
 module.exports = {
   buildSepayQrUrl,
   buildOrderCreatedMessage,
   sendOrderCreatedNotification,
   sendZeroDaysRemainingNotification,
+  sendFourDaysRemainingNotification,
 };

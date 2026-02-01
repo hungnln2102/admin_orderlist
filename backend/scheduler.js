@@ -11,7 +11,7 @@ const { ORDERS_SCHEMA, SCHEMA_ORDERS, getDefinition, tableName } = require("./sr
 const { backupDatabaseToDrive } = require("./src/utils/backupService");
 const { STATUS } = require("./src/utils/statuses");
 const logger = require("./src/utils/logger");
-const { sendZeroDaysRemainingNotification } = require("./src/services/telegramOrderNotification");
+const { sendZeroDaysRemainingNotification, sendFourDaysRemainingNotification } = require("./src/services/telegramOrderNotification");
 const { normalizeOrderRow } = require("./src/controllers/Order/helpers");
 const { todayYMDInVietnam } = require("./src/utils/normalizers");
 // Raw column names (unquoted) for reading rows returned by pg
@@ -280,12 +280,12 @@ if (runOnStart) {
 
 /**
  * Cron: 18:00 hàng ngày
- * - Thông báo các đơn có số ngày còn lại = 0 vào Telegram topic mới
+ * - Thông báo các đơn có số ngày còn lại = 0 và trạng thái "Hết Hạn" vào Telegram
  */
 const notifyZeroDaysRemainingTask = async (trigger = "cron") => {
   const sqlDate = getSqlCurrentDate();
   logger.info(
-    `[CRON] Bắt đầu thông báo các đơn có số ngày còn lại = 0`,
+    `[CRON] Bắt đầu thông báo các đơn hết hạn (số ngày còn lại = 0, trạng thái = Hết Hạn)`,
     { trigger, date: process.env.MOCK_DATE || "CURRENT_DATE" }
   );
 
@@ -297,12 +297,8 @@ const notifyZeroDaysRemainingTask = async (trigger = "cron") => {
 
   const client = await pool.connect();
   try {
-    // Query các đơn có số ngày còn lại = 0
-    // Chỉ lấy các đơn có status PAID hoặc RENEWAL (không lấy PROCESSING)
-    const statusEligible = [
-      `'${STATUS.PAID}'`,
-      `'${STATUS.RENEWAL}'`,
-    ].join(", ");
+    // Query các đơn có số ngày còn lại = 0 và trạng thái "Hết Hạn"
+    const statusEligible = `'${STATUS.EXPIRED}'`;
 
     const result = await client.query(`
       SELECT
@@ -322,11 +318,11 @@ const notifyZeroDaysRemainingTask = async (trigger = "cron") => {
         ${COL.status}
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} IN (${statusEligible}))
+        AND (${COL.status} = ${statusEligible})
       ORDER BY ${COL.idOrder}
     `);
 
-    logger.info(`Tìm thấy ${result.rowCount} đơn có số ngày còn lại = 0`);
+    logger.info(`Tìm thấy ${result.rowCount} đơn hết hạn (ngày còn lại = 0, trạng thái = Hết Hạn)`);
 
     if (result.rows.length > 0) {
       // Normalize orders để có format giống như API trả về
@@ -360,10 +356,10 @@ const notifyZeroDaysRemainingTask = async (trigger = "cron") => {
       // Gửi thông báo
       await sendZeroDaysRemainingNotification(normalizedOrders);
     } else {
-      logger.info("[CRON] Không có đơn nào có số ngày còn lại = 0");
+      logger.info("[CRON] Không có đơn nào hết hạn (ngày còn lại = 0, trạng thái = Hết Hạn)");
     }
   } catch (err) {
-    logger.error("[CRON] Lỗi khi thông báo đơn có số ngày còn lại = 0", {
+    logger.error("[CRON] Lỗi khi thông báo đơn hết hạn", {
       error: err.message,
       stack: err.stack,
     });
@@ -391,6 +387,119 @@ cron.schedule(
   }
 );
 
+/**
+ * Cron: 07:00 hàng ngày
+ * - Thông báo các đơn cần gia hạn (còn 4 ngày) vào Telegram
+ */
+const notifyFourDaysRemainingTask = async (trigger = "cron") => {
+  const sqlDate = getSqlCurrentDate();
+  logger.info(
+    `[CRON] Bắt đầu thông báo các đơn cần gia hạn (còn 4 ngày)`,
+    { trigger, date: process.env.MOCK_DATE || "CURRENT_DATE" }
+  );
+
+  if (process.env.MOCK_DATE) {
+    logger.warn(
+      `[TEST MODE] Đang sử dụng ngày giả định: ${process.env.MOCK_DATE}`
+    );
+  }
+
+  const client = await pool.connect();
+  try {
+    // Query các đơn có số ngày còn lại = 4 và status = RENEWAL (Cần Gia Hạn)
+    const statusEligible = `'${STATUS.RENEWAL}'`;
+
+    const result = await client.query(`
+      SELECT
+        ${COL.idOrder},
+        ${COL.idProduct},
+        ${COL.informationOrder},
+        ${COL.customer},
+        ${COL.contact},
+        ${COL.slot},
+        ${normalizeDateSQL(COL.orderDate)} AS ${COL.orderDate},
+        ${intFromTextSQL(COL.days)} AS ${COL.days},
+        ${expiryDateSQL()} AS ${COL.orderExpired},
+        ${COL.supply},
+        ${COL.cost},
+        ${COL.price},
+        ${COL.note},
+        ${COL.status},
+        ( ${expiryDateSQL()} - ${sqlDate} ) AS days_left
+      FROM ${TABLES.orderList}
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 4
+        AND (${COL.status} = ${statusEligible})
+      ORDER BY ${COL.idOrder}
+    `);
+
+    logger.info(`Tìm thấy ${result.rowCount} đơn cần gia hạn (còn 4 ngày)`);
+
+    if (result.rows.length > 0) {
+      // Normalize orders để có format giống như API trả về
+      const today = todayYMDInVietnam();
+      const normalizedOrders = result.rows.map((row) => {
+        const normalized = normalizeOrderRow(row, today);
+        return {
+          id_order: normalized.id_order || normalized.idOrder,
+          idOrder: normalized.id_order || normalized.idOrder,
+          order_code: normalized.id_order || normalized.idOrder,
+          orderCode: normalized.id_order || normalized.idOrder,
+          customer: normalized.customer,
+          customer_name: normalized.customer,
+          contact: normalized.contact,
+          customer_link: normalized.contact,
+          id_product: normalized.id_product || normalized.idProduct,
+          idProduct: normalized.id_product || normalized.idProduct,
+          information_order: normalized.information_order || normalized.informationOrder,
+          informationOrder: normalized.information_order || normalized.informationOrder,
+          slot: normalized.slot,
+          registration_date_display: normalized.registration_date_display,
+          registration_date_str: normalized.registration_date_str,
+          order_date: normalized.order_date || normalized.registration_date,
+          days: normalized.days || normalized.total_days,
+          total_days: normalized.days || normalized.total_days,
+          expiry_date_display: normalized.expiry_date_display,
+          expiry_date_str: normalized.expiry_date_display,
+          order_expired: normalized.order_expired || normalized.expiry_date,
+          price: normalized.price,
+          days_left: row.days_left || 4,
+        };
+      });
+
+      // Gửi thông báo
+      await sendFourDaysRemainingNotification(normalizedOrders);
+    } else {
+      logger.info("[CRON] Không có đơn nào cần gia hạn (còn 4 ngày)");
+    }
+  } catch (err) {
+    logger.error("[CRON] Lỗi khi thông báo đơn cần gia hạn (còn 4 ngày)", {
+      error: err.message,
+      stack: err.stack,
+    });
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+const runFourDaysNotificationSafe = (source) =>
+  notifyFourDaysRemainingTask(source).catch((err) =>
+    logger.error(`[CRON] Four days notification failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
+// Cron job chạy lúc 07:00 hàng ngày - Thông báo đơn cần gia hạn (còn 4 ngày)
+cron.schedule(
+  "0 7 * * *", // 07:00 mỗi ngày
+  () => runFourDaysNotificationSafe("cron"),
+  {
+    scheduled: true,
+    timezone: schedulerTimezone,
+  }
+);
+
 logger.info(
   `[Scheduler] Đã khởi động`,
   { cronExpression, schedulerTimezone, runOnStart }
@@ -399,6 +508,7 @@ logger.info(
 module.exports = {
   updateDatabaseTask,
   notifyZeroDaysRemainingTask,
+  notifyFourDaysRemainingTask,
   getSchedulerStatus: () => ({
     timezone: schedulerTimezone,
     cronExpression,
