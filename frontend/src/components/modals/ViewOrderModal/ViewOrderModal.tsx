@@ -37,11 +37,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     normalizedOrderDate,
   });
 
-  const effectiveAmount = useMemo(() => {
-    if (!order) return 0;
-    const fallback = Number(order[ORDER_FIELDS.PRICE]) || 0;
-    return Math.max(0, calculatedPrice ?? fallback);
-  }, [order, calculatedPrice]);
+  // QR code luôn dùng giá đơn hàng (số tiền khách cần thanh toán), không dùng giá tính lại từ API
+  // (tránh trường hợp thêm nguồn mới → API trả giá bảng giá mới → QR sai so với giá đã nhập)
+  const qrAmountFromOrder = useMemo(
+    () => Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0),
+    [order]
+  );
 
   if (!isOpen || !order) return null;
 
@@ -95,11 +96,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     Helpers.formatDateToDMY(expirySource) ||
     String((order[ORDER_FIELDS.ORDER_EXPIRED] as string) || "");
 
-  // VietQR
-  const qrAmount = effectiveAmount;
+  // VietQR: dùng giá đơn hàng (qrAmountFromOrder), không dùng giá tính lại (effectiveAmount)
   const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
-  const normalizedAmount = Math.max(0, Number(qrAmount) || 0);
-  const safeQrAmount = Helpers.roundGiaBanValue(normalizedAmount);
+  const safeQrAmount = Helpers.roundGiaBanValue(qrAmountFromOrder);
   const qrCodeImageUrl = Helpers.buildSepayQrUrl({
     accountNumber: ACCOUNT_NO,
     bankCode: BANK_SHORT_CODE,
@@ -275,9 +274,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <p>
                 Số tiền:{" "}
                 <strong className="text-xl text-red-600">
-                  {priceLoading
-                    ? "Đang tính..."
-                    : formatCurrency(safeQrAmount)}
+                  {formatCurrency(safeQrAmount)}
                 </strong>
               </p>
               {priceError && (

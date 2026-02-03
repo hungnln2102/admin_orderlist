@@ -350,11 +350,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6">
                   <div>
-                    <label className={labelClass}>Ngày Đăng Ký</label>
+                    <label className={labelClass}>Ngày Đăng Ký (dd/mm/yyyy)</label>
                     <input
-                      type="date"
+                      type="text"
                       name={ORDER_FIELDS.ORDER_DATE}
-                      value={Helpers.convertDMYToYMD(registerDateDMY)}
+                      value={registerDateDMY}
+                      placeholder="dd/mm/yyyy"
                       onChange={handleRegisterDateChange}
                       className={inputClass}
                     />

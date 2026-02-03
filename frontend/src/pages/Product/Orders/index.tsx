@@ -190,9 +190,9 @@ export default function Orders() {
       </div>
 
       <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row gap-4 items-center">
-          {/* Search Input Group - Now Flexible */}
-          <div className="relative w-full lg:flex-1">
+        <div className="flex flex-col lg:flex-row lg:flex-wrap gap-4 items-stretch lg:items-center">
+          {/* Search: luôn đủ rộng để thấy placeholder; khi chật thì hàng 2 (filter + nút) wrap xuống */}
+          <div className="relative w-full lg:flex-1 lg:min-w-[280px]">
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
             <input
               type="text"
@@ -204,12 +204,12 @@ export default function Orders() {
             />
           </div>
 
-          {/* Filter Group */}
-          <div className="flex w-full lg:w-auto gap-3 items-center">
+          {/* Filter + Nút gom một nhóm, không shrink; khi không đủ chỗ thì cả nhóm wrap xuống dòng */}
+          <div className="flex flex-wrap gap-3 items-center w-full lg:w-auto lg:flex-shrink-0">
             {/* Divider (Desktop Only) */}
-            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
+            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1" aria-hidden />
 
-            <div className="relative w-full lg:w-[170px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[140px] lg:w-[170px]">
               <select
                 className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
                 style={{ 
@@ -230,7 +230,7 @@ export default function Orders() {
               </select>
             </div>
 
-            <div className="relative w-full lg:w-[220px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[160px] lg:w-[220px]">
               <select
                 className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
                 style={{ 
@@ -251,13 +251,10 @@ export default function Orders() {
                 <option value={ORDER_STATUSES.ORDER_EXPIRED} className="bg-slate-900 text-white">Hết hạn</option>
               </select>
             </div>
-          </div>
 
-          {/* Action Group */}
-          <div className="w-full lg:w-auto">
             {isActiveDataset && (
               <GradientButton icon={PlusIcon} onClick={openCreateModal}>
-                Tạo Đơn Hàng Mới
+                Tạo Đơn
               </GradientButton>
             )}
           </div>

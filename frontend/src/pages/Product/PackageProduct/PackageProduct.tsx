@@ -654,6 +654,9 @@ const PackageProduct: React.FC = () => {
               Manage and organize your product categories
             </p>
           </div>
+          <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick} className="!py-2 !px-4 text-xs shrink-0">
+            Tạo Loại Gói
+          </GradientButton>
         </div>
         {packageSummaries.length === 0 ? (
           <p className="mt-6 text-sm text-white/70">
@@ -843,10 +846,6 @@ const PackageProduct: React.FC = () => {
                     </button>
                   </div>
                 )}
-
-                <GradientButton icon={PlusIcon} onClick={handleCreateButtonClick} className="!py-2 !px-4 text-xs">
-                  Tạo Loại Gói
-                </GradientButton>
 
                 <GradientButton
                   icon={PlusIcon}
