@@ -7,6 +7,7 @@ const {
   productCols,
   variantCols,
   productSchemaCols,
+  productDescCols,
   priceConfigCols,
   supplyPriceCols,
   categoryCols,
@@ -23,7 +24,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.displayName)} AS san_pham,
       v.${quoteIdent(variantCols.variantName)} AS package_product,
       p.${quoteIdent(productSchemaCols.packageName)} AS package,
-      p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
+      COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
       COALESCE(
         json_agg(
           DISTINCT jsonb_build_object(
@@ -43,6 +44,13 @@ const fetchVariantView = async (variantId) => {
     FROM ${TABLES.variant} v
     LEFT JOIN ${TABLES.product} p
       ON p.${quoteIdent(productCols.id)} = v.${quoteIdent(variantCols.productId)}
+    LEFT JOIN LATERAL (
+      SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
+      FROM ${TABLES.productDesc} pd2
+      WHERE TRIM(pd2.${quoteIdent(productDescCols.productId)}::text) = TRIM(v.${quoteIdent(variantCols.displayName)}::text)
+      ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
+      LIMIT 1
+    ) pd ON TRUE
     LEFT JOIN ${TABLES.productCategory} pcj
       ON pcj.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productCols.id)}
     LEFT JOIN ${TABLES.category} c
@@ -70,6 +78,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.variantName)},
       p.${quoteIdent(productSchemaCols.packageName)},
       p.${quoteIdent(productSchemaCols.imageUrl)},
+      pd.desc_image_url,
       pc.${quoteIdent(priceConfigCols.pctCtv)},
       pc.${quoteIdent(priceConfigCols.pctKhach)},
       pc.${quoteIdent(priceConfigCols.pctPromo)},
@@ -397,6 +406,7 @@ const updateProductPrice = async (req, res) => {
         );
       }
     }
+
 
     if (productSchemaId && Array.isArray(normalizedCategoryIds)) {
       let existingColors = null;

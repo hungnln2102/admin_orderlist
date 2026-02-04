@@ -1,11 +1,11 @@
 const { db } = require("../../../db");
 const {
-  QUOTED_COLS,
   variantCols,
   categoryCols,
   productCategoryCols,
   priceConfigCols,
   productSchemaCols,
+  productDescCols,
   supplyPriceCols,
   TABLES,
 } = require("../constants");
@@ -22,7 +22,7 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
+        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         COALESCE(
           json_agg(
             DISTINCT jsonb_build_object(
@@ -36,6 +36,13 @@ const listProducts = async (_req, res) => {
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
+      LEFT JOIN LATERAL (
+        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
+        FROM ${TABLES.productDesc} pd2
+        WHERE TRIM(pd2.${quoteIdent(productDescCols.productId)}::text) = TRIM(v.${quoteIdent(variantCols.displayName)}::text)
+        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
+        LIMIT 1
+      ) pd ON TRUE
       LEFT JOIN ${TABLES.productCategory} pc
         ON pc.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productSchemaCols.id)}
       LEFT JOIN ${TABLES.category} c
@@ -45,7 +52,8 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)},
         v.${quoteIdent(variantCols.variantName)},
         p.${quoteIdent(productSchemaCols.packageName)},
-        p.${quoteIdent(productSchemaCols.imageUrl)}
+        p.${quoteIdent(productSchemaCols.imageUrl)},
+        pd.desc_image_url
       ORDER BY v.${quoteIdent(variantCols.displayName)};
     `;
     const result = await db.raw(query);
@@ -66,7 +74,7 @@ const listProductPrices = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
+        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         pc.${quoteIdent(priceConfigCols.pctCtv)} AS pct_ctv,
         pc.${quoteIdent(priceConfigCols.pctKhach)} AS pct_khach,
         pc.${quoteIdent(priceConfigCols.pctPromo)} AS pct_promo,
@@ -76,6 +84,13 @@ const listProductPrices = async (_req, res) => {
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
+      LEFT JOIN LATERAL (
+        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
+        FROM ${TABLES.productDesc} pd2
+        WHERE TRIM(pd2.${quoteIdent(productDescCols.productId)}::text) = TRIM(v.${quoteIdent(variantCols.displayName)}::text)
+        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
+        LIMIT 1
+      ) pd ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           pc.${quoteIdent(priceConfigCols.pctCtv)},
@@ -117,7 +132,7 @@ const getProductPriceById = async (req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        p.${quoteIdent(productSchemaCols.imageUrl)} AS image_url,
+        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         pc.${quoteIdent(priceConfigCols.pctCtv)} AS pct_ctv,
         pc.${quoteIdent(priceConfigCols.pctKhach)} AS pct_khach,
         pc.${quoteIdent(priceConfigCols.pctPromo)} AS pct_promo,
@@ -127,6 +142,13 @@ const getProductPriceById = async (req, res) => {
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
+      LEFT JOIN LATERAL (
+        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
+        FROM ${TABLES.productDesc} pd2
+        WHERE TRIM(pd2.${quoteIdent(productDescCols.productId)}::text) = TRIM(v.${quoteIdent(variantCols.displayName)}::text)
+        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
+        LIMIT 1
+      ) pd ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           pc.${quoteIdent(priceConfigCols.pctCtv)},
