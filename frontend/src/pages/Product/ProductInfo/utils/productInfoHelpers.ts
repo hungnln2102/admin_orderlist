@@ -26,6 +26,7 @@ export type MergedProduct = ProductDescription & {
   categories?: CategoryItem[];
   imageUrl?: string | null;
   packageImageUrl?: string | null;
+  shortDescription?: string | null;
   rulesHtml?: string | null;
   descriptionHtml?: string | null;
 };

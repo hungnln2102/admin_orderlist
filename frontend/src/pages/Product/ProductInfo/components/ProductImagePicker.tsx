@@ -248,30 +248,30 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
 
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wide text-white/60 mb-2">
+      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">
         Hình ảnh sản phẩm
       </label>
-      <div className="relative aspect-video w-full max-w-[200px] overflow-hidden rounded-xl border border-white/10 bg-black/20">
+      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 shadow-sm backdrop-blur-sm">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt="Product"
-            className="h-full w-full object-contain"
+            className="h-full w-full object-contain p-3"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <PhotoIcon className="h-10 w-10 text-white/20" />
+            <PhotoIcon className="h-16 w-16 text-white/20" />
           </div>
         )}
         <button
           type="button"
-          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
+          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity backdrop-blur-sm"
           onClick={handleOpenPicker}
         >
-          <span className="rounded-lg border border-white/70 bg-black/40 px-3 py-1.5 text-xs font-semibold text-white shadow-lg backdrop-blur-sm">
+          <span className="rounded-xl border border-white/70 bg-black/60 px-4 py-2.5 text-sm font-semibold text-white shadow-lg backdrop-blur-sm">
             {imageUrl ? "Thay đổi" : "Chọn ảnh"}
           </span>
         </button>

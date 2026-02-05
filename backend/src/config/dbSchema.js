@@ -254,6 +254,7 @@ const PRODUCT_SCHEMA = {
     COLS: {
       ID: "id",
       PRODUCT_ID: "product_id",
+      SHORT_DESC: "short_desc",
       RULES: "rules",
       DESCRIPTION: "description",
       IMAGE_URL: "image_url",

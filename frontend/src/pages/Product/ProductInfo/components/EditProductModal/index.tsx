@@ -1,19 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
-  normalizeRichHtmlForSave,
   stripDurationSuffix,
   toHtmlFromPlain,
 } from "../../utils/productInfoHelpers";
-import { LinkModal } from "../LinkModal";
-import { EditProductContent } from "./EditProductContent";
-import { EditProductFooter } from "./EditProductFooter";
-import { EditProductHeader } from "./EditProductHeader";
-import { EditProductSidebar } from "./EditProductSidebar";
-import { RichTextToolbar } from "./RichTextToolbar";
+import ImageUpload from "./ImageUpload";
+import RichTextEditor from "./RichTextEditor";
 import {
   EditFormState,
   EditProductModalProps,
-  EditorContext,
 } from "./types";
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
@@ -22,21 +17,6 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const labels = {
-    title: "Chỉnh sửa thông tin sản phẩm",
-    productId: "Mã sản phẩm",
-    productName: "Tên sản phẩm / Loại gói sản phẩm",
-    packageName: "Gói sản phẩm",
-    imageUrl: "Đường dẫn hình ảnh sản phẩm",
-    rules: "Quy tắc sản phẩm",
-    description: "Mô tả sản phẩm",
-    cancel: "Hủy bỏ",
-    save: "Lưu thay đổi",
-    saving: "Đang Lưu...",
-    headingPrompt: "Chọn heading (1-6):",
-    headingDefault: "2",
-  };
-
   const initialForm = useMemo<EditFormState>(
     () => ({
       productId: stripDurationSuffix(product?.productId || ""),
@@ -44,6 +24,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         stripDurationSuffix(product?.packageProduct || product?.productName || "") ||
         "",
       packageName: product?.packageName || "",
+      shortDescription: product?.shortDescription || "",
       rules: product?.rules || "",
       rulesHtml: product?.rulesHtml || toHtmlFromPlain(product?.rules || ""),
       description: product?.description || "",
@@ -57,267 +38,175 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   );
 
   const [form, setForm] = useState<EditFormState>(initialForm);
-  const [activeEditor, setActiveEditor] = useState<EditorContext | null>(null);
-  const rulesEditorRef = useRef<HTMLDivElement | null>(null);
-  const descriptionEditorRef = useRef<HTMLDivElement | null>(null);
-  const savedSelectionRef = useRef<Range | null>(null);
-  const typingFromEditorRef = useRef(false);
-  const [openColorType, setOpenColorType] = useState<
-    "foreColor" | "hiliteColor" | null
-  >(null);
-  const [colorInput, setColorInput] = useState("#38bdf8");
-  const colorNativeInputRef = useRef<HTMLInputElement | null>(null);
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("https://");
-  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!product) return;
     setForm(initialForm);
-    setActiveEditor(null);
-    setLinkModalOpen(false);
-    setLinkUrl("https://");
-    setLinkError(null);
   }, [initialForm, product]);
 
-  const getActiveEditorEl = (): HTMLDivElement | null => {
-    return activeEditor === "rules"
-      ? rulesEditorRef.current
-      : descriptionEditorRef.current;
+  const handleSubmit = () => {
+    onSave(form);
   };
-
-  const syncRichText = (
-    field: EditorContext,
-    element: HTMLDivElement | null
-  ) => {
-    if (!element) return;
-    const selection = document.getSelection();
-    const range =
-      selection && selection.rangeCount > 0
-        ? selection.getRangeAt(0).cloneRange()
-        : null;
-
-    const html = normalizeRichHtmlForSave(element.innerHTML);
-    const text = element.innerText;
-    typingFromEditorRef.current = true;
-    setForm((prev) => ({
-      ...prev,
-      [field]: text,
-      [`${field}Html`]: html,
-    }));
-
-    const shouldRestore = document.activeElement === element;
-    if (range && shouldRestore) {
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-  };
-
-  useEffect(() => {
-    const target = rulesEditorRef.current;
-    if (!target) return;
-    if (typingFromEditorRef.current) {
-      typingFromEditorRef.current = false;
-      return;
-    }
-    target.innerHTML = form.rulesHtml || toHtmlFromPlain(form.rules);
-  }, [form.rules, form.rulesHtml]);
-
-  useEffect(() => {
-    const target = descriptionEditorRef.current;
-    if (!target) return;
-    if (typingFromEditorRef.current) {
-      typingFromEditorRef.current = false;
-      return;
-    }
-    target.innerHTML =
-      form.descriptionHtml || toHtmlFromPlain(form.description);
-  }, [form.description, form.descriptionHtml]);
-
-  useEffect(() => {
-    if (!openColorType) return;
-    const input = colorNativeInputRef.current;
-    if (!input) return;
-    requestAnimationFrame(() => {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-      } else {
-        input.click();
-      }
-    });
-  }, [openColorType]);
-
-  const saveCurrentSelection = () => {
-    const target = getActiveEditorEl();
-    if (!target) {
-      savedSelectionRef.current = null;
-      return;
-    }
-    const selection = document.getSelection();
-    if (
-      selection &&
-      selection.rangeCount > 0 &&
-      target.contains(selection.focusNode)
-    ) {
-      savedSelectionRef.current = selection.getRangeAt(0).cloneRange();
-    } else {
-      savedSelectionRef.current = null;
-    }
-  };
-
-  const applyRichCommand = (
-    command: string,
-    value?: string,
-    restoreSelection = false
-  ) => {
-    const target = getActiveEditorEl();
-    if (!target) return;
-    if (restoreSelection && savedSelectionRef.current) {
-      const selection = document.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(savedSelectionRef.current);
-      }
-    } else {
-      saveCurrentSelection();
-    }
-    target.focus();
-    document.execCommand(command, false, value);
-    syncRichText(activeEditor || "rules", target);
-  };
-
-  const openLinkModal = () => {
-    const target = getActiveEditorEl();
-    if (!target) return;
-    saveCurrentSelection();
-    setLinkUrl("https://");
-    setLinkError(null);
-    setLinkModalOpen(true);
-  };
-
-  const closeLinkModal = () => {
-    setLinkModalOpen(false);
-    setLinkError(null);
-    setLinkUrl("https://");
-  };
-
-  const applyLink = () => {
-    const target = getActiveEditorEl();
-    if (!target) {
-      setLinkError("Vui lòng chọn nút dung trước khi chọn link.");
-      return;
-    }
-    const trimmed = linkUrl.trim();
-    if (!/^https?:\/\//i.test(trimmed)) {
-      setLinkError("URL phải bắt đầu bằng http:// hoặc https://");
-      return;
-    }
-    target.focus();
-    const selection = document.getSelection();
-    if (selection && savedSelectionRef.current) {
-      selection.removeAllRanges();
-      selection.addRange(savedSelectionRef.current);
-    }
-    document.execCommand("createLink", false, trimmed);
-    syncRichText(activeEditor || "rules", target);
-    closeLinkModal();
-  };
-
-  const openColorPicker = (
-    type: "foreColor" | "hiliteColor",
-    context: EditorContext
-  ) => {
-    setActiveEditor(context);
-    saveCurrentSelection();
-    setOpenColorType(type);
-    setColorInput(type === "hiliteColor" ? "#fef08a" : "#38bdf8");
-  };
-
-  const applyColor = (color: string) => {
-    const command = openColorType;
-    if (!command) return;
-    setColorInput(color);
-    setOpenColorType(null);
-    applyRichCommand(command, color, true);
-  };
-
-  const handleNativeColorChange = (value: string) => {
-    if (!value) {
-      setOpenColorType(null);
-      return;
-    }
-    setColorInput(value);
-    applyColor(value);
-  };
-
-  const renderToolbar = (context: EditorContext) => (
-    <RichTextToolbar
-      context={context}
-      onCommand={applyRichCommand}
-      onOpenLink={openLinkModal}
-      onOpenColor={openColorPicker}
-      headingPrompt={labels.headingPrompt}
-      headingDefault={labels.headingDefault}
-    />
-  );
 
   if (!product) return null;
 
+  const inputBase =
+    "w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all";
+
+  const labelBase =
+    "text-xs font-semibold text-slate-300 uppercase tracking-wide";
+
   return (
-    <>
-      <div className="fixed inset-0 z-70 flex items-start justify-center bg-black/50 px-4 py-8">
-        <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#0b1220] border border-white/10 shadow-2xl custom-scroll">
-          <input
-            ref={colorNativeInputRef}
-            type="color"
-            className="rich-color-native"
-            value={colorInput}
-            onChange={(event) => handleNativeColorChange(event.target.value)}
-            onBlur={() => setOpenColorType(null)}
-          />
-          <EditProductHeader title={labels.title} />
-          <div className="px-5 py-4">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-              <EditProductSidebar
-                form={form}
-                labels={{ productId: labels.productId, productName: labels.productName, packageName: labels.packageName }}
-                onProductIdChange={(value) => setForm((prev) => ({ ...prev, productId: value }))}
-                onProductNameChange={(value) => setForm((prev) => ({ ...prev, productName: value }))}
-                onPackageNameChange={(value) => setForm((prev) => ({ ...prev, packageName: value }))}
-                onImageUrlChange={(value) => setForm((prev) => ({ ...prev, imageUrl: value }))}
-              />
-              <EditProductContent
-                labels={{ rules: labels.rules, description: labels.description }}
-                rulesEditorRef={rulesEditorRef}
-                descriptionEditorRef={descriptionEditorRef}
-                rulesEditorKey={(product?.id ?? "rules") + "-editor"}
-                descriptionEditorKey={(product?.id ?? "description") + "-editor"}
-                renderToolbar={renderToolbar}
-                onFocusEditor={(context) => setActiveEditor(context)}
-                onSyncEditor={syncRichText}
-              />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="relative flex w-full max-w-7xl flex-col rounded-[32px] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl max-h-[95vh] overflow-hidden">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 z-10 rounded-full bg-slate-800/80 p-2 text-slate-400 backdrop-blur-sm transition-all hover:bg-slate-700 hover:text-white"
+          aria-label="Close"
+        >
+          <XMarkIcon className="h-6 w-6" />
+        </button>
+
+        {/* Content */}
+        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+          {/* Header */}
+          <div className="text-center">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Chỉnh sửa thông tin sản phẩm
+            </h2>
+          </div>
+
+          {/* Two Column Layout */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left Column: Image Upload + Basic Info */}
+            <div className="lg:col-span-1 space-y-5">
+              {/* Image Upload */}
+              <div style={{ height: "400px" }}>
+                <ImageUpload
+                  imageUrl={form.imageUrl}
+                  onImageChange={(url) => setForm((prev) => ({ ...prev, imageUrl: url }))}
+                  onImageRemove={() => setForm((prev) => ({ ...prev, imageUrl: "" }))}
+                />
+              </div>
+
+              {/* Basic Product Info */}
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm">
+                <h3 className="mb-4 text-lg font-semibold text-white">
+                  Thông Tin Cơ Bản
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className={labelBase}>Mã Sản Phẩm</label>
+                    <input
+                      type="text"
+                      value={form.productId}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, productId: e.target.value }))
+                      }
+                      placeholder="Nhập mã sản phẩm..."
+                      className={inputBase}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelBase}>Tên Sản Phẩm</label>
+                    <input
+                      type="text"
+                      value={form.productName}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, productName: e.target.value }))
+                      }
+                      placeholder="Nhập tên sản phẩm..."
+                      className={inputBase}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelBase}>Gói Sản Phẩm</label>
+                    <input
+                      type="text"
+                      value={form.packageName}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, packageName: e.target.value }))
+                      }
+                      placeholder="Nhập gói sản phẩm..."
+                      className={inputBase}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelBase}>Mô Tả Ngắn</label>
+                    <textarea
+                      value={form.shortDescription}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, shortDescription: e.target.value }))
+                      }
+                      rows={3}
+                      placeholder="Nhập mô tả ngắn về sản phẩm..."
+                      className={inputBase}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Rich Text Editors */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* Rich Text Editors */}
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm backdrop-blur-sm space-y-4">
+                <RichTextEditor
+                  label="Quy Tắc Sản Phẩm"
+                  value={form.rulesHtml || ""}
+                  onChange={(value) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      rulesHtml: value,
+                      rules: value.replace(/<[^>]*>/g, ""),
+                    }));
+                  }}
+                  placeholder="Nhập quy tắc sản phẩm..."
+                  minHeight="150px"
+                />
+                <RichTextEditor
+                  label="Mô Tả Sản Phẩm"
+                  value={form.descriptionHtml || ""}
+                  onChange={(value) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      descriptionHtml: value,
+                      description: value.replace(/<[^>]*>/g, ""),
+                    }));
+                  }}
+                  placeholder="Nhập mô tả chi tiết sản phẩm..."
+                  minHeight="200px"
+                />
+              </div>
             </div>
           </div>
-          <EditProductFooter
-            saving={saving}
-            onClose={onClose}
-            onSave={() => onSave(form)}
-            labels={{ cancel: labels.cancel, save: labels.save, saving: labels.saving }}
-          />
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-xl border border-white/20 bg-transparent px-6 py-3 font-semibold text-white transition-all hover:bg-white/10 disabled:opacity-50"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saving}
+              className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-3 font-semibold text-white shadow-lg transition-all hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50"
+            >
+              {saving ? "Đang Lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
         </div>
       </div>
-      <LinkModal
-        open={!!product && linkModalOpen}
-        url={linkUrl}
-        error={linkError}
-        onChange={(value) => {
-          setLinkUrl(value);
-          setLinkError(null);
-        }}
-        onClose={closeLinkModal}
-        onConfirm={applyLink}
-      />
-    </>
+    </div>
   );
 };
 

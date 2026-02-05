@@ -92,6 +92,7 @@ const DB_DEFINITIONS = {
     columns: {
       id: "id",
       productId: "product_id",
+      shortDesc: "short_desc",
       rules: "rules",
       description: "description",
       imageUrl: "image_url",

@@ -1,7 +1,6 @@
 import React from "react";
 import {
   MinusIcon,
-  PlusIcon,
   UserPlusIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -72,116 +71,119 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/50 px-2 py-4 sm:px-4 sm:py-6" style={{ zIndex: 9999 }}>
-      <div className="relative flex w-full max-w-5xl flex-col rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/95 via-slate-700/90 to-slate-900/95 shadow-2xl max-h-[95vh] backdrop-blur-sm" style={{ zIndex: 10000 }}>
+      <div className="relative flex w-full max-w-4xl flex-col rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/95 via-slate-700/90 to-slate-900/95 shadow-2xl backdrop-blur-sm" style={{ zIndex: 10000 }}>
         <button
-          className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors"
+          className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors z-10"
           onClick={onClose}
         >
           <XMarkIcon className="h-6 w-6" />
         </button>
-        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+        
+        <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8">
           <div>
             <h2 className="text-xl font-bold text-white">Thêm Sản Phẩm mới</h2>
             <p className="text-base text-slate-300">
-              Nhập Thông tin Sản Phẩm, Nhà Cung Cấp, Tỷ Giá
+              Nhập Thông tin Sản Phẩm, Tỷ Giá và Nhà Cung Cấp
             </p>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
-                Thông Tin Sản Phẩm
-              </p>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <label className={labelBase}>Sản Phẩm</label>
-                  <input
-                    type="text"
-                    className={inputBase}
-                    placeholder="Nhập tên sản phẩm"
-                    value={createForm.packageName}
-                    onChange={(event) =>
-                      onFormChange("packageName", event.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={labelBase}>Gói Sản Phẩm</label>
-                  <input
-                    type="text"
-                    className={inputBase}
-                    placeholder="Nhập gói sản phẩm"
-                    value={createForm.packageProduct}
-                    onChange={(event) =>
-                      onFormChange("packageProduct", event.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={labelBase}>Mã Sản Phẩm</label>
-                  <input
-                    type="text"
-                    className={inputBase}
-                    placeholder="Nhập mã sản phẩm"
-                    value={createForm.sanPham}
-                    onChange={(event) =>
-                      onFormChange("sanPham", event.target.value)
-                    }
-                  />
-                </div>
+          {/* Basic Product Info */}
+          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300 mb-4">
+              Thông Tin Cơ Bản
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className={labelBase}>Mã Sản Phẩm</label>
+                <input
+                  type="text"
+                  className={inputBase}
+                  placeholder="Nhập mã sản phẩm"
+                  value={createForm.packageName}
+                  onChange={(event) =>
+                    onFormChange("packageName", event.target.value)
+                  }
+                />
               </div>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
-                Tỷ Giá
-              </p>
-              <div className="mt-4 space-y-4">
-                <div>
-                  <label className={labelBase}>Tỷ Giá CTV</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-                    placeholder="0.00"
-                    value={createForm.pctCtv}
-                    onChange={(event) =>
-                      onFormChange("pctCtv", event.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={labelBase}>Tỷ Giá Khách</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-                    placeholder="0.00"
-                    value={createForm.pctKhach}
-                    onChange={(event) =>
-                      onFormChange("pctKhach", event.target.value)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className={labelBase}>Tỷ Giá Khuyến Mãi</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-                    placeholder="0.00"
-                    value={createForm.pctPromo}
-                    onChange={(event) =>
-                      onFormChange("pctPromo", event.target.value)
-                    }
-                  />
-                </div>
+              <div>
+                <label className={labelBase}>Tên Sản Phẩm</label>
+                <input
+                  type="text"
+                  className={inputBase}
+                  placeholder="Nhập tên sản phẩm"
+                  value={createForm.sanPham}
+                  onChange={(event) =>
+                    onFormChange("sanPham", event.target.value)
+                  }
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelBase}>Gói Sản Phẩm</label>
+                <input
+                  type="text"
+                  className={inputBase}
+                  placeholder="Nhập gói sản phẩm"
+                  value={createForm.packageProduct}
+                  onChange={(event) =>
+                    onFormChange("packageProduct", event.target.value)
+                  }
+                />
               </div>
             </div>
           </div>
 
+          {/* Pricing Ratios */}
+          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300 mb-4">
+              Tỷ Giá
+            </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className={labelBase}>Tỷ Giá CTV</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  placeholder="0.00"
+                  value={createForm.pctCtv}
+                  onChange={(event) =>
+                    onFormChange("pctCtv", event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label className={labelBase}>Tỷ Giá Khách</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  placeholder="0.00"
+                  value={createForm.pctKhach}
+                  onChange={(event) =>
+                    onFormChange("pctKhach", event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label className={labelBase}>Tỷ Giá Khuyến Mãi</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  placeholder="0.00"
+                  value={createForm.pctPromo}
+                  onChange={(event) =>
+                    onFormChange("pctPromo", event.target.value)
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Supplier Information */}
           <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
             <div className="flex flex-col gap-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">
@@ -191,7 +193,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 {createSuppliers.map((supplier) => (
                   <div
                     key={supplier.id}
-                    className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 shadow-inner"
+                    className="rounded-xl border border-white/10 bg-slate-900/40 p-4"
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">
@@ -200,245 +202,197 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                       {createSuppliers.length > 1 && (
                         <button
                           type="button"
-                          className="text-xs text-red-400 hover:text-red-300"
                           onClick={() => onRemoveSupplier(supplier.id)}
+                          className="text-red-400 hover:text-red-300 transition-colors"
                         >
-                          Xóa
+                          <MinusIcon className="h-5 w-5" />
                         </button>
                       )}
                     </div>
+
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
-                        <label className={labelBase}>
-                          Tên Nhà Cung Cấp
-                        </label>
-                        <div className="mt-1 flex items-stretch gap-2">
-                          <div className="flex-1">
-                            {supplier.useCustomName ? (
-                              <input
-                                type="text"
-                                className={inputBase}
-                                placeholder="Nhập tên Nhà Cung Cấp"
-                                value={supplier.sourceName}
-                                onChange={(event) =>
-                                  onSupplierChange(
-                                    supplier.id,
-                                    "sourceName",
-                                    event.target.value
-                                  )
-                                }
-                              />
-                            ) : (
-                              <select
-                                className={`${inputBase} cursor-pointer`}
-                                value={
-                                  supplier.sourceId !== null
-                                    ? String(supplier.sourceId)
-                                    : supplier.sourceName
-                                }
-                                onChange={(event) =>
-                                  onSupplierSelectChange(supplier.id, event.target.value)
-                                }
-                              >
-                                <option value="" className="bg-slate-800 text-slate-300">
-                                  {isLoadingSuppliers
-                                    ? "Đang tải Nhà Cung Cấp..."
-                                    : "Chọn Nhà Cung Cấp"}
-                                </option>
-                                {supplierOptions.map((option) => {
-                                  const optionValue =
-                                    option.id !== null
-                                      ? String(option.id)
-                                      : option.name;
-                                  return (
-                                    <option key={optionValue} value={optionValue} className="bg-slate-800 text-white">
-                                      {option.name}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-slate-700/80 text-indigo-300 hover:bg-indigo-500/30 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-60 transition-colors"
-                            onClick={() =>
-                              supplier.useCustomName
-                                ? onSupplierSelectChange(supplier.id, "")
-                                : onEnableCustomSupplier(supplier.id)
+                        <label className={labelBase}>Tên Nhà Cung Cấp</label>
+                        {supplier.useCustomName ? (
+                          <input
+                            type="text"
+                            className={inputBase}
+                            placeholder="Nhập tên nhà cung cấp"
+                            value={supplier.sourceName}
+                            onChange={(e) =>
+                              onSupplierChange(
+                                supplier.id,
+                                "sourceName",
+                                e.target.value
+                              )
                             }
-                            title={
-                              supplier.useCustomName
-                                ? "Quay lại chọn Nhà Cung Cấp có sẵn"
-                                : "Thêm Nhà Cung Cấp mới (điền tên thủ công)"
-                            }
-                          >
-                            {supplier.useCustomName ? (
-                              <MinusIcon className="h-5 w-5" />
-                            ) : (
-                              <PlusIcon className="h-5 w-5" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className={labelBase}>Giá Nhập</label>
-                        <input
-                          type="text"
-                          className={inputBase}
-                          value={formatVndDisplay(supplier.price)}
-                          onChange={(event) =>
-                            onSupplierPriceInput(supplier.id, event.target.value)
-                          }
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className={labelBase}>Số Tài Khoản</label>
-                        {(() => {
-                          const isLocked =
-                            !supplier.useCustomName &&
-                            Boolean(supplier.sourceId) &&
-                            Boolean(supplier.bankBin || supplier.numberBank);
-                          return (
-                            <input
-                              type="text"
-                              className={`${inputBase} disabled:opacity-60 disabled:cursor-not-allowed`}
-                              placeholder="Nhập số tài khoản"
-                              value={supplier.numberBank}
-                              onChange={(event) =>
-                                onSupplierChange(
-                                  supplier.id,
-                                  "numberBank",
-                                  event.target.value
-                                )
-                              }
-                              disabled={isLocked}
-                            />
-                          );
-                        })()}
-                      </div>
-                      <div>
-                        <label className={labelBase}>Ngân Hàng</label>
-                        {(() => {
-                          const isLocked =
-                            !supplier.useCustomName &&
-                            Boolean(supplier.sourceId) &&
-                            Boolean(supplier.bankBin || supplier.numberBank);
-                          return (
+                          />
+                        ) : (
+                          <div className="relative">
                             <select
-                              className={`${inputBase} cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
-                              value={supplier.bankBin}
-                              onChange={(event) =>
-                                onSupplierChange(
-                                  supplier.id,
-                                  "bankBin",
-                                  event.target.value
-                                )
+                              className={inputBase}
+                              value={supplier.sourceId ?? ""}
+                              onChange={(e) =>
+                                onSupplierSelectChange(supplier.id, e.target.value)
                               }
-                              disabled={isLocked}
+                              disabled={isLoadingSuppliers}
                             >
-                              <option value="" className="bg-slate-800 text-slate-300">Chọn Ngân Hàng</option>
-                              {bankOptions.map((bank) => (
-                                <option key={bank.bin} value={bank.bin} className="bg-slate-800 text-white">
-                                  {bank.name}
+                              <option value="">Chọn Nhà Cung Cấp</option>
+                              {supplierOptions.map((opt) => (
+                                <option key={opt.id} value={opt.id ?? ""}>
+                                  {opt.name}
                                 </option>
                               ))}
                             </select>
-                          );
-                        })()}
-                        {isLoadingBanks && (
-                          <p className="mt-1 text-[11px] text-slate-400">
-                            Đang Tải Danh Sách Ngân Hàng...
-                          </p>
-                        )}
-                      </div>
-                      <div className="md:col-span-2">
-                        {(() => {
-                          const basePrice = Number(
-                            (supplier.price || "").replace(/\D+/g, "")
-                          );
-                          const pctCtvValue = parseRatioInput(createForm.pctCtv);
-                          const pctKhachValue = parseRatioInput(createForm.pctKhach);
-                          const wholesalePreview =
-                            basePrice && pctCtvValue
-                              ? multiplyValue(basePrice, pctCtvValue)
-                              : null;
-                          const retailPreview =
-                            pctKhachValue && (wholesalePreview || basePrice)
-                              ? multiplyValue(
-                                  wholesalePreview || basePrice,
-                                  pctKhachValue
-                                )
-                              : null;
-                          return (
-                            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 shadow-inner">
-                              <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-                                Xem trước giá
-                              </p>
-                              <div className="mt-2 grid gap-3 md:grid-cols-2">
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-[11px] uppercase text-slate-400">
-                                    Giá sỉ (theo Tỷ giá CTV)
-                                  </span>
-                                  <span className="text-sm font-semibold text-white">
-                                    {wholesalePreview
-                                      ? formatCurrencyValue(wholesalePreview)
-                                      : "-"}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-[11px] uppercase text-slate-400">
-                                    Giá lẻ (theo Tỷ giá Khách)
-                                  </span>
-                                  <span className="text-sm font-semibold text-white">
-                                    {retailPreview
-                                      ? formatCurrencyValue(retailPreview)
-                                      : "-"}
-                                  </span>
-                                </div>
+                            {isLoadingSuppliers && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
                               </div>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onEnableCustomSupplier(supplier.id)}
+                          className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          {supplier.useCustomName
+                            ? "← Chọn từ danh sách"
+                            : "+ Thêm nhà cung cấp mới"}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className={labelBase}>Giá Nhập</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className={inputBase}
+                            placeholder="0"
+                            value={formatCurrencyValue(supplier.price)}
+                            onChange={(e) =>
+                              onSupplierPriceInput(supplier.id, e.target.value)
+                            }
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                            VNĐ
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={labelBase}>Số Tài Khoản</label>
+                        <input
+                          type="text"
+                          className={inputBase}
+                          placeholder="Nhập số tài khoản"
+                          value={supplier.numberBank}
+                          onChange={(e) =>
+                            onSupplierChange(
+                              supplier.id,
+                              "numberBank",
+                              e.target.value
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelBase}>Ngân Hàng</label>
+                        <div className="relative">
+                          <select
+                            className={inputBase}
+                            value={supplier.bankBin}
+                            onChange={(e) =>
+                              onSupplierChange(supplier.id, "bankBin", e.target.value)
+                            }
+                            disabled={isLoadingBanks}
+                          >
+                            <option value="">Chọn Ngân Hàng</option>
+                            {bankOptions.map((opt) => (
+                              <option key={opt.bin} value={opt.bin}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </select>
+                          {isLoadingBanks && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
                             </div>
-                          );
-                        })()}
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Price Calculations */}
+                    {supplier.price && (
+                      <div className="mt-4 grid gap-2 rounded-lg border border-white/5 bg-slate-950/30 p-3 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">
+                            Xem Trước Giá (theo Tỷ Giá CTV):
+                          </span>
+                          <span className="font-semibold text-white">
+                            {formatVndDisplay(
+                              multiplyValue(
+                                supplier.price,
+                                parseRatioInput(createForm.pctCtv)
+                              )
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">
+                            Giá Lẻ (theo Tỷ Giá Khách):
+                          </span>
+                          <span className="font-semibold text-white">
+                            {formatVndDisplay(
+                              multiplyValue(
+                                supplier.price,
+                                parseRatioInput(createForm.pctKhach)
+                              )
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
-              </div>
-              <div className="flex justify-center">
+
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-full border border-dashed border-white/30 px-4 py-2 text-sm font-semibold text-indigo-300 hover:border-indigo-400/60 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors"
                   onClick={onAddSupplier}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-white/20 bg-slate-900/20 px-4 py-3 text-sm font-semibold text-indigo-300 transition-all hover:border-indigo-400/50 hover:bg-slate-800/40 hover:text-indigo-200"
                 >
-                  <UserPlusIcon className="mr-2 h-4 w-4" />
+                  <UserPlusIcon className="h-5 w-5" />
                   Thêm Nhà Cung Cấp
                 </button>
               </div>
             </div>
           </div>
 
+          {/* Error Message */}
           {createError && (
-            <div className="rounded-xl border border-red-400/50 bg-red-500/20 px-4 py-2 text-sm text-red-200">
-              {createError}
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4">
+              <p className="text-sm text-red-300">{createError}</p>
             </div>
           )}
-          <div className="flex justify-end gap-3">
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
             <button
               type="button"
-              className="inline-flex items-center rounded-xl border border-white/20 bg-slate-700/60 px-5 py-2 text-sm font-semibold text-slate-200 shadow-sm transition hover:bg-slate-600/60 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onClose}
               disabled={isSubmitting}
+              className="rounded-xl border border-white/20 bg-transparent px-6 py-3 font-semibold text-white transition-all hover:bg-white/10 disabled:opacity-50"
             >
-              Hủy Bỏ
+              Hủy bỏ
             </button>
             <GradientButton
-              className="px-5 py-2 text-sm font-semibold"
               onClick={onSubmit}
               disabled={isSubmitting}
+              className="px-6 py-3"
             >
-              {isSubmitting ? "Đang Lưu..." : "Lưu Sản Phẩm"}
+              {isSubmitting ? "Đang Lưu..." : "Thêm Sản Phẩm"}
             </GradientButton>
           </div>
         </div>

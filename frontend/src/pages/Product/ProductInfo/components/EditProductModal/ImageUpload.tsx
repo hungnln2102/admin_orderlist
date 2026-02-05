@@ -1,37 +1,34 @@
 import React, { useRef, useState } from "react";
+import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
-  deleteProductImage,
   fetchProductImages,
   uploadProductImage,
-} from "../../../../../lib/productDescApi";
-import { EditFormState } from "./types";
+  deleteProductImage,
+  ProductImageItem,
+} from "../../../../../lib/productImagesApi";
 
-type EditProductSidebarLabels = {
-  productId: string;
-  productName: string;
-  packageName: string;
-};
+interface ImageUploadProps {
+  imageUrl?: string;
+  onImageChange: (url: string) => void;
+  onImageRemove: () => void;
+}
 
-type ImageItem = {
-  fileName: string;
-  url: string;
-};
-
-type ImagePickerModalProps = {
+// Image Picker Modal Component
+interface ImagePickerModalProps {
   open: boolean;
-  images: ImageItem[];
-  selectedImage: ImageItem | null;
+  images: ProductImageItem[];
+  selectedImage: ProductImageItem | null;
   loading: boolean;
   uploading: boolean;
   deleting: boolean;
   error: string | null;
   uploadError: string | null;
   onClose: () => void;
-  onSelect: (item: ImageItem) => void;
+  onSelect: (item: ProductImageItem) => void;
   onUseSelected: () => void;
   onUploadClick: () => void;
   onDeleteSelected: () => void;
-};
+}
 
 const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   open,
@@ -51,10 +48,10 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4 py-6">
-      <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-6">
+      <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-          <h3 className="text-lg font-semibold text-white">Chọn hình ảnh</h3>
+          <h3 className="text-lg font-semibold text-white">Chọn hình ảnh sản phẩm</h3>
         </div>
         <div className="p-4 space-y-4">
           {loading ? (
@@ -62,7 +59,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           ) : images.length === 0 ? (
             <p className="text-sm text-white/70">Chưa có hình ảnh nào.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
               {images.map((item) => {
                 const isSelected = selectedImage?.fileName === item.fileName;
                 return (
@@ -71,12 +68,12 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
                     type="button"
                     className={`rounded-xl border p-2 text-left transition ${
                       isSelected
-                        ? "border-blue-400 ring-2 ring-blue-400/40"
+                        ? "border-indigo-400 ring-2 ring-indigo-400/40"
                         : "border-white/10 hover:border-white/30"
                     }`}
                     onClick={() => onSelect(item)}
                   >
-                    <div className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-black/30">
+                    <div className="aspect-square w-full overflow-hidden rounded-lg bg-black/30">
                       <img
                         src={item.url}
                         alt={item.fileName}
@@ -130,7 +127,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                 onClick={onUseSelected}
                 disabled={!selectedImage}
               >
@@ -144,52 +141,27 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   );
 };
 
-type EditProductSidebarProps = {
-  form: EditFormState;
-  labels: EditProductSidebarLabels;
-  onProductIdChange: (value: string) => void;
-  onProductNameChange: (value: string) => void;
-  onPackageNameChange: (value: string) => void;
-  onImageUrlChange: (value: string) => void;
-};
-
-export const EditProductSidebar: React.FC<EditProductSidebarProps> = ({
-  form,
-  labels,
-  onProductIdChange,
-  onProductNameChange,
-  onPackageNameChange,
-  onImageUrlChange,
-}) => (
-  <SidebarContent
-    form={form}
-    labels={labels}
-    onProductIdChange={onProductIdChange}
-    onProductNameChange={onProductNameChange}
-    onPackageNameChange={onPackageNameChange}
-    onImageUrlChange={onImageUrlChange}
-  />
-);
-
-const SidebarContent: React.FC<EditProductSidebarProps> = ({
-  form,
-  labels,
-  onProductIdChange,
-  onProductNameChange,
-  onPackageNameChange,
-  onImageUrlChange,
+// Main ImageUpload Component
+const ImageUpload: React.FC<ImageUploadProps> = ({
+  imageUrl,
+  onImageChange,
+  onImageRemove,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Image Picker State
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [images, setImages] = useState<ProductImageItem[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imagesError, setImagesError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ProductImageItem | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadImages = async (preferred?: ImageItem | null) => {
+  // Load images from server
+  const loadImages = async (preferred?: ProductImageItem | null) => {
     setImagesLoading(true);
     setImagesError(null);
     try {
@@ -206,8 +178,8 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
               item.url === nextSelected?.url
           ) || null;
       }
-      if (!nextSelected && form.imageUrl) {
-        nextSelected = items.find((item) => item.url === form.imageUrl) || null;
+      if (!nextSelected && imageUrl) {
+        nextSelected = items.find((item) => item.url === imageUrl) || null;
       }
       if (!nextSelected && items.length) {
         nextSelected = items[0];
@@ -221,6 +193,7 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
     }
   };
 
+  // Open picker modal
   const handleOpenPicker = () => {
     setPickerOpen(true);
     setImagesError(null);
@@ -228,15 +201,47 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
     void loadImages();
   };
 
-  const handleClosePicker = () => {
-    setPickerOpen(false);
+  // Local file upload handlers
+  const handleFileSelect = (file: File) => {
+    if (file && file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          onImageChange(e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
   };
 
-  const handleFileChange = async (
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  // Server upload handler
+  const handleServerUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
@@ -245,7 +250,7 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
     setUploadError(null);
     try {
       const result = await uploadProductImage(file);
-      onImageUrlChange(result.url);
+      onImageChange(result.url);
       const preferred = result.fileName
         ? { fileName: result.fileName, url: result.url }
         : null;
@@ -261,7 +266,7 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
 
   const handleUseSelected = () => {
     if (!selectedImage) return;
-    onImageUrlChange(selectedImage.url);
+    onImageChange(selectedImage.url);
     setPickerOpen(false);
   };
 
@@ -271,8 +276,8 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
     setImagesError(null);
     try {
       await deleteProductImage(selectedImage.fileName);
-      if (form.imageUrl === selectedImage.url) {
-        onImageUrlChange("");
+      if (imageUrl === selectedImage.url) {
+        onImageRemove();
       }
       await loadImages(null);
     } catch (err) {
@@ -283,75 +288,62 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
   };
 
   return (
-    <div className="space-y-4 lg:col-span-2">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-        <div className="relative aspect-[4/5] min-h-[300px] overflow-hidden rounded-xl border border-white/10 bg-black/20">
-          {form.imageUrl ? (
-            <img
-              src={form.imageUrl}
-              alt="Product preview"
-              className="h-full w-full object-contain"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="h-full w-full" />
-          )}
-          <button
-            type="button"
-            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/70 bg-black/40 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-sm hover:border-white hover:bg-black/50 disabled:opacity-60"
-            onClick={handleOpenPicker}
-          >
-            Upload
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
+    <div className="relative h-full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleServerUpload}
+        className="hidden"
+      />
+      
+      {imageUrl ? (
+        <div className="relative h-full rounded-2xl overflow-hidden border border-white/15 bg-slate-950/40 group">
+          <img
+            src={imageUrl}
+            alt="Product preview"
+            className="w-full h-full object-cover"
           />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleOpenPicker}
+              className="px-4 py-2 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors"
+            >
+              Chọn từ Server
+            </button>
+            <button
+              type="button"
+              onClick={onImageRemove}
+              className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+            >
+              Xóa
+            </button>
+          </div>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-white/70 mb-1">
-            {labels.productId}
-          </label>
-          <input
-            type="text"
-            value={form.productId}
-            onChange={(e) => onProductIdChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          />
+      ) : (
+        <div
+          onClick={handleOpenPicker}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`h-full rounded-2xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center gap-4 p-6 ${
+            isDragging
+              ? "border-indigo-400 bg-indigo-500/20"
+              : "border-white/20 bg-slate-950/40 hover:border-indigo-400/60 hover:bg-slate-900/60"
+          }`}
+        >
+          <PhotoIcon className="h-16 w-16 text-slate-400" />
+          <div className="text-center">
+            <p className="text-sm font-semibold text-white mb-1">
+              Chọn hình ảnh sản phẩm
+            </p>
+            <p className="text-xs text-slate-400">
+              Nhấp để chọn từ server hoặc kéo thả file
+            </p>
+          </div>
         </div>
-
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-white/70 mb-1">
-            {labels.productName}
-          </label>
-          <input
-            type="text"
-            value={form.productName}
-            onChange={(e) => onProductNameChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs uppercase tracking-wide text-white/70 mb-1">
-            {labels.packageName}
-          </label>
-          <input
-            type="text"
-            value={form.packageName}
-            onChange={(e) => onPackageNameChange(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          />
-        </div>
-      </div>
+      )}
 
       <ImagePickerModal
         open={pickerOpen}
@@ -362,12 +354,14 @@ const SidebarContent: React.FC<EditProductSidebarProps> = ({
         deleting={deleting}
         error={imagesError}
         uploadError={uploadError}
-        onClose={handleClosePicker}
+        onClose={() => setPickerOpen(false)}
         onSelect={setSelectedImage}
         onUseSelected={handleUseSelected}
-        onUploadClick={handleUploadClick}
+        onUploadClick={() => fileInputRef.current?.click()}
         onDeleteSelected={handleDeleteSelected}
       />
     </div>
   );
 };
+
+export default ImageUpload;

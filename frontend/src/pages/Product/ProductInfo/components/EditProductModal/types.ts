@@ -4,6 +4,7 @@ export type EditFormState = {
   productId: string;
   productName: string;
   packageName: string;
+  shortDescription: string;
   rules: string;
   rulesHtml: string;
   description: string;

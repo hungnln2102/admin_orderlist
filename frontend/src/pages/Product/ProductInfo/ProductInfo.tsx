@@ -169,6 +169,7 @@ const ProductInfo: React.FC = () => {
           onToggleCategory={handleToggleCategory}
           onClose={closeCategoryEdit}
           onSave={handleSaveCategory}
+          onCategoriesReload={loadCategories}
         />
       )}
 

@@ -68,7 +68,81 @@ const createCategory = async (req, res) => {
   }
 };
 
+const updateCategory = async (req, res) => {
+  const id = Number(req.params?.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
+
+  const name = normalizeTextInput(req.body?.name);
+  const color = normalizeTextInput(req.body?.color) || null;
+
+  if (!name && color === null) {
+    return res.status(400).json({ error: "At least one field (name or color) is required." });
+  }
+
+  try {
+    const updatePayload = {};
+    if (name) {
+      updatePayload[categoryCols.name] = name;
+    }
+    if (categoryCols.color) {
+      updatePayload[categoryCols.color] = color;
+    }
+
+    const returningCols = [categoryCols.id, categoryCols.name];
+    if (categoryCols.color) {
+      returningCols.push(categoryCols.color);
+    }
+
+    const result = await db(TABLES.category)
+      .where(categoryCols.id, id)
+      .update(updatePayload)
+      .returning(returningCols);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: "Category not found." });
+    }
+
+    const row = result[0];
+    const updated = {
+      id: Number(row[categoryCols.id] ?? row.id),
+      name: String(row[categoryCols.name] ?? row.name ?? "").trim(),
+      color: row[categoryCols.color] ?? row.color ?? null,
+    };
+
+    return res.json(updated);
+  } catch (error) {
+    logger.error(`Update failed (PUT /api/categories/${id})`, { error: error.message, stack: error.stack });
+    return res.status(500).json({ error: "Cannot update category." });
+  }
+};
+
+const deleteCategory = async (req, res) => {
+  const id = Number(req.params?.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
+
+  try {
+    const deleted = await db(TABLES.category)
+      .where(categoryCols.id, id)
+      .del();
+
+    if (deleted === 0) {
+      return res.status(404).json({ error: "Category not found." });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    logger.error(`Delete failed (DELETE /api/categories/${id})`, { error: error.message, stack: error.stack });
+    return res.status(500).json({ error: "Cannot delete category." });
+  }
+};
+
 module.exports = {
   listCategories,
   createCategory,
+  updateCategory,
+  deleteCategory,
 };
