@@ -3,8 +3,8 @@ import "./Pricing.css";
 import PricingFilters from "./components/PricingFilters";
 import PricingStats from "./components/PricingStats";
 import ProductTable from "./components/ProductTable";
-import CreateProductModal from "./components/modals/CreateProductModal";
-import DeleteProductModal from "./components/modals/DeleteProductModal";
+import CreateProductModal from "./components/Modals/CreateProductModal";
+import DeleteProductModal from "./components/Modals/DeleteProductModal";
 import { usePricingData } from "./hooks/usePricingData";
 import { parseRatioInput } from "./utils";
 

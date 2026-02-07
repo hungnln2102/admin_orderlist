@@ -40,11 +40,11 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   );
 
   return (
-    <div className="bg-transparent overflow-visible">
-      <table className="min-w-full border-separate border-spacing-y-4 text-white">
-        <thead>
-          <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
-            <th className="w-[120px]">LOẠI</th>
+    <div className="storage-table bg-transparent overflow-visible">
+      <table className="storage-table__table min-w-full border-separate border-spacing-y-4 text-white">
+        <thead className="storage-table__head">
+          <tr className="storage-table__head-row [&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
+            <th className="storage-table__th w-[120px]">LOẠI</th>
             <th className="w-[180px]">TÀI KHOẢN</th>
             <th className="w-[140px]">MẬT KHẨU</th>
             <th className="w-[180px]">MAIL DỰ PHÒNG</th>

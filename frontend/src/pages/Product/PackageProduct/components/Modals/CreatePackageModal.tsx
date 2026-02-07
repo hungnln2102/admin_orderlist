@@ -1,37 +1,67 @@
 import React, { useEffect, useState } from "react";
 import { ModalShell } from "./ModalShell";
 import { PACKAGE_FIELD_OPTIONS, PackageField } from "../../utils/packageHelpers";
+import { apiFetch } from "@/lib/api";
+
+export type ProductPackageOption = { id: number; package_name: string };
 
 export type CreatePackageModalProps = {
   open: boolean;
+  initialProductId: number | null;
   initialName: string;
   initialFields: PackageField[];
   mode: "create" | "edit";
   onClose: () => void;
-  onSubmit: (name: string, fields: PackageField[]) => void;
+  onSubmit: (packageId: number, productName: string, fields: PackageField[]) => void;
 };
 
 export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
   open,
+  initialProductId,
   initialName,
   initialFields,
   onClose,
   onSubmit,
   mode,
 }) => {
-  const [name, setName] = useState(initialName);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(initialProductId);
+  const [selectedProductName, setSelectedProductName] = useState(initialName);
   const [fields, setFields] = useState<Set<PackageField>>(
     new Set(initialFields)
   );
   const [error, setError] = useState<string | null>(null);
+  const [packages, setPackages] = useState<ProductPackageOption[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setName(initialName);
+      setSelectedProductId(initialProductId);
+      setSelectedProductName(initialName);
       setFields(new Set(initialFields));
       setError(null);
     }
-  }, [open, initialFields, initialName]);
+  }, [open, initialFields, initialName, initialProductId]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setPackagesLoading(true);
+    apiFetch("/api/products/packages")
+      .then((res) => res.json())
+      .then((data: ProductPackageOption[]) => {
+        if (cancelled || !Array.isArray(data)) return;
+        setPackages(data);
+      })
+      .catch(() => {
+        if (!cancelled) setPackages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPackagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const toggleField = (field: PackageField) => {
     setFields((prev) => {
@@ -51,24 +81,25 @@ export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Vui lòng nhập tên loại gói.");
+    const productId = selectedProductId != null ? Number(selectedProductId) : null;
+    const name = selectedProductName?.trim() ?? "";
+    if (productId == null || !Number.isFinite(productId) || productId < 1) {
+      setError("Vui lòng chọn loại gói (sản phẩm).");
       return;
     }
     if (fields.size === 0) {
       setError("Vui lòng chọn ít nhất một trường dữ liệu.");
       return;
     }
-    onSubmit(trimmed, Array.from(fields));
+    onSubmit(productId, name || String(productId), Array.from(fields));
   };
 
   return (
     <ModalShell
       open={open}
       title={
-        mode === "edit" && initialName
-          ? `Chỉnh sửa loại gói: ${initialName}`
+        mode === "edit" && (initialName || initialProductId != null)
+          ? `Chỉnh sửa loại gói: ${initialName || initialProductId}`
           : "Tạo loại gói sản phẩm mới"
       }
       onClose={onClose}
@@ -92,22 +123,46 @@ export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tên Loại Gói
+            Tên Loại Gói (chọn từ Sản phẩm)
           </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ví dụ: Google One, Netflix, Spotify..."
-            className={`w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 ${
-              mode === "edit" ? "bg-gray-100 cursor-not-allowed" : ""
-            }`}
-            disabled={mode === "edit"}
-          />
+          {packagesLoading ? (
+            <p className="text-sm text-white/70 py-2">Đang tải danh sách...</p>
+          ) : (
+            <select
+              value={selectedProductId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                const id = v === "" ? null : Number(v);
+                const opt = packages.find((p) => p.id === id);
+                setSelectedProductId(id != null && Number.isFinite(id) ? id : null);
+                setSelectedProductName(opt?.package_name ?? "");
+              }}
+              className={`w-full border border-white/40 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 ${
+                mode === "edit" ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+              disabled={mode === "edit"}
+            >
+              <option value="">
+                {mode === "create"
+                  ? "-- Chọn loại gói (sản phẩm) --"
+                  : (initialName || initialProductId) ?? "--"}
+              </option>
+              {mode === "edit" &&
+                initialProductId != null &&
+                !packages.some((p) => p.id === initialProductId) && (
+                  <option value={initialProductId}>{initialName || initialProductId}</option>
+                )}
+              {packages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.package_name}
+                </option>
+              ))}
+            </select>
+          )}
           {mode === "edit" && (
             <p className="text-xs text-white/70 mt-1">
-              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói
-              giữ nguyên.
+              Bạn chỉ có thể chỉnh sửa các trường dữ liệu, tên loại gói giữ
+              nguyên.
             </p>
           )}
         </div>

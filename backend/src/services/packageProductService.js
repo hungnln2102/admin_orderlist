@@ -29,7 +29,8 @@ const VARIANT_COLS = VARIANT_DEF.columns;
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
     pp.${QUOTED_COLS.packageProduct.id} AS package_id,
-    pp.${QUOTED_COLS.packageProduct.package} AS package_name,
+    pp.${QUOTED_COLS.packageProduct.packageId} AS product_id,
+    p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
     pp.${QUOTED_COLS.packageProduct.username} AS package_username,
     pp.${QUOTED_COLS.packageProduct.password} AS package_password,
     pp.${QUOTED_COLS.packageProduct.mail2nd} AS package_mail_2nd,
@@ -49,20 +50,19 @@ const PACKAGE_PRODUCTS_SELECT = `
     acc.${QUOTED_COLS.accountStorage.mailFamily} AS account_mail_family,
     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
   FROM ${TABLES.packageProduct} pp
+  LEFT JOIN ${TABLES.product} p ON p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)} = pp.${QUOTED_COLS.packageProduct.packageId}
   LEFT JOIN ${TABLES.accountStorage} acc
     ON acc.${QUOTED_COLS.accountStorage.mailFamily} = pp.${QUOTED_COLS.packageProduct.username}
   LEFT JOIN (
     SELECT
-      LOWER(TRIM(p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)}::text)) AS package_key,
+      v.${quoteIdent(VARIANT_COLS.productId)} AS product_id,
       ARRAY_REMOVE(
         ARRAY_AGG(DISTINCT NULLIF(TRIM(v.${quoteIdent(VARIANT_COLS.displayName)}::text), '')),
         NULL
       ) AS product_codes
-    FROM ${TABLES.product} p
-    JOIN ${TABLES.variant} v
-      ON v.${quoteIdent(VARIANT_COLS.productId)} = p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)}
-    GROUP BY LOWER(TRIM(p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)}::text))
-  ) product_codes ON product_codes.package_key = LOWER(TRIM(pp.${QUOTED_COLS.packageProduct.package}::text))
+    FROM ${TABLES.variant} v
+    GROUP BY v.${quoteIdent(VARIANT_COLS.productId)}
+  ) product_codes ON product_codes.product_id = pp.${QUOTED_COLS.packageProduct.packageId}
 `;
 
 const summarizePackageInformation = (user, pass, mail) =>
@@ -90,9 +90,11 @@ const mapPackageProductRow = (row) => {
         .map((code) => (typeof code === "string" ? code.trim() : ""))
         .filter((code) => Boolean(code))
     : [];
+  const productId = row.product_id != null ? getRowId(row, "product_id", "productId", "PRODUCT_ID") : null;
   return {
     id: packageId,
-    package: row.package_name || "",
+    productId: productId != null ? Number(productId) : null,
+    package: (row.package_name != null && row.package_name !== "") ? String(row.package_name).trim() : "",
     information: informationSummary,
     informationUser,
     informationPass,

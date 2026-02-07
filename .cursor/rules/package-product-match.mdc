@@ -1,0 +1,18 @@
+---
+description: Rule Match cột cho Gói Sản Phẩm (Package Product)
+globs: 
+  - "frontend/src/pages/Product/PackageProduct/**"
+  - "backend/src/controllers/PackageController/**"
+  - "backend/src/services/packageProductService.js"
+---
+
+# Package Product – Match với đơn hàng
+
+- **Cột Match được chọn khi tạo gói** (và khi sửa gói), không so sánh cả hai cột cùng lúc.
+- **Match với cột Slot**: So sánh **tài khoản gói** (email trong Thông tin gói / `informationUser`) với **cột slot** của đơn hàng.
+- **Match với cột Information**: So sánh **tài khoản gói** với **cột information** của đơn (`information_order`).
+- Chỉ dùng đúng **một** cột theo giá trị `match` đã lưu (`"slot"` hoặc `"information_order"`); frontend map `"information_order"` → mode `"information"`.
+- **Validation**: Khi chọn Match, Thông tin gói (Tài khoản) bắt buộc; backend trả 400 nếu thiếu, frontend disable Lưu và hiển thị cảnh báo.
+- Logic match nằm trong `packageMatchUtils.ts` (`orderBelongsToPackageByProduct`, `orderMatchesPackageLink`, `computeAugmentationForPackage`). Chuẩn hóa link: lowercase, bỏ khoảng trắng; match sản phẩm: product code từ API hoặc prefix 6 ký tự tên gói (normalizeIdentifier).
+
+Khi sửa logic Match: giữ đúng rule trên, không so sánh cả slot và information cùng lúc.

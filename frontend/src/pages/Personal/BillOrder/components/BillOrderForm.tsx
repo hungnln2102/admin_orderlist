@@ -36,12 +36,12 @@ export const BillOrderForm: React.FC<BillOrderFormProps> = ({
   };
 
   return (
-    <div className="rounded-2xl bg-white shadow-md border border-slate-200 print-hidden">
-      <div className="border-b border-slate-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-white">Thông tin hóa đơn</h2>
+    <div className="bill-order-form rounded-2xl bg-white shadow-md border border-slate-200 print-hidden">
+      <div className="bill-order-form__header border-b border-slate-200 px-6 py-4">
+        <h2 className="bill-order-form__title text-lg font-semibold text-white">Thông tin hóa đơn</h2>
       </div>
 
-      <form className="px-6 py-5 space-y-4" onSubmit={onSubmit}>
+      <form className="bill-order-form__form px-6 py-5 space-y-4" onSubmit={onSubmit}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
             <label

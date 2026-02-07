@@ -11,6 +11,7 @@ export type PackageField =
 export type SlotLinkMode = "information" | "slot";
 export type PackageRow = {
   id: number;
+  productId?: number | null;
   package: string;
   information: string | null;
   informationUser?: string | null;
@@ -86,6 +87,7 @@ export type NormalizedOrderRecord = {
 };
 export type PackageTemplate = {
   name: string;
+  productId?: number | null;
   fields: PackageField[];
   isCustom?: boolean;
 };

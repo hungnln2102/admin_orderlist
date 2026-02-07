@@ -266,7 +266,11 @@ export const formatVndInput = (raw: string): string => {
 
 export const formatVndDisplay = (value: string | number): string => {
   if (value === null || value === undefined) return "";
-  const digits = String(value).replace(/\D+/g, "");
+  const raw =
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.round(value)
+      : value;
+  const digits = String(raw).replace(/\D+/g, "");
   if (!digits) return "";
   const num = Number(digits);
   if (!Number.isFinite(num)) return "";

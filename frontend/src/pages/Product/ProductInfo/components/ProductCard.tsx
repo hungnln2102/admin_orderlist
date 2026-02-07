@@ -34,9 +34,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   ) || "Không có thông tin sản phẩm";
 
   return (
-    <div className="glass-panel-dark rounded-2xl p-4 border border-white/5 space-y-4 shadow-xl">
-      {/* Header with image and product ID */}
-      <div className="flex items-start gap-3">
+    <div className="product-card glass-panel-dark rounded-2xl p-4 border border-white/5 space-y-4 shadow-xl">
+      <div className="product-card__header flex items-start gap-3">
         {item.imageUrl ? (
           <img
             src={item.imageUrl}

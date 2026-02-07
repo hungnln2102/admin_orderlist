@@ -9,9 +9,9 @@ import {
 import Sidebar from "./components/layout/sidebar/Sidebar";
 import Dashboard from "./pages/Dashboard/index";
 import Orders from "./pages/Product/Orders";
-import PackageProduct from "./pages/Product/PackageProduct/PackageProduct";
-import ProductInfo from "./pages/Product/ProductInfo/ProductInfo";
-import Pricing from "./pages/Product/priceList";
+import PackageProduct from "./pages/Product/PackageProduct";
+import ProductInfo from "./pages/Product/ProductInfo";
+import Pricing from "./pages/Product/PriceList";
 import { LoginPage } from "@/features/auth";
 import Sources from "./pages/Personal/Supply";
 import ShowPrice from "./pages/Personal/ProductPrice";

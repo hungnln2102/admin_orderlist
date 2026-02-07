@@ -43,11 +43,11 @@ class ErrorBoundary extends Component<Props, State> {
       const isDevelopment = import.meta.env?.DEV ?? false;
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 p-4">
-          <div className="max-w-2xl w-full bg-white rounded-lg shadow-xl p-8">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-red-100 rounded-full mb-4">
+        <div className="error-boundary min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-red-100 p-4">
+          <div className="error-boundary__container max-w-2xl w-full bg-white rounded-lg shadow-xl p-8">
+            <div className="error-boundary__icon-wrap flex items-center justify-center w-16 h-16 mx-auto bg-red-100 rounded-full mb-4">
               <svg
-                className="w-8 h-8 text-red-600"
+                className="error-boundary__icon w-8 h-8 text-red-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -61,15 +61,15 @@ class ErrorBoundary extends Component<Props, State> {
               </svg>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+            <h1 className="error-boundary__title text-2xl font-bold text-gray-900 text-center mb-2">
               Đã xảy ra lỗi
             </h1>
-            <p className="text-gray-600 text-center mb-6">
+            <p className="error-boundary__message text-gray-600 text-center mb-6">
               Ứng dụng gặp sự cố không mong muốn. Vui lòng thử tải lại trang.
             </p>
 
             {isDevelopment && this.state.error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="error-boundary__details mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <h2 className="text-sm font-semibold text-red-800 mb-2">
                   Chi tiết lỗi (Development Mode):
                 </h2>
@@ -80,16 +80,16 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            <div className="flex gap-4 justify-center">
+            <div className="error-boundary__actions flex gap-4 justify-center">
               <button
                 onClick={this.handleReload}
-                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="error-boundary__btn error-boundary__btn--reload px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 Tải lại trang
               </button>
               <button
                 onClick={() => window.history.back()}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="error-boundary__btn error-boundary__btn--back px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
                 Quay lại
               </button>

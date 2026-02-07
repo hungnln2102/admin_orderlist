@@ -61,47 +61,40 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const statusStr = statusText; // Keep for background accent logic below
 
   return (
-    <div className="relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 hover:border-indigo-500/40 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-900/50">
-      {/* Background Glow */}
-      <div className={`absolute -right-10 -top-10 w-28 h-28 rounded-full blur-3xl opacity-10 transition-all duration-700 group-hover:opacity-20 ${
+    <div className="order-card relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 hover:border-indigo-500/40 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-900/50">
+      <div className={`order-card__glow absolute -right-10 -top-10 w-28 h-28 rounded-full blur-3xl opacity-10 transition-all duration-700 group-hover:opacity-20 ${
         statusStr === ORDER_STATUSES.DA_THANH_TOAN ? 'bg-emerald-500' : 
         statusStr === ORDER_STATUSES.CHUA_THANH_TOAN ? 'bg-amber-500' : 
         (statusStr === ORDER_STATUSES.ORDER_EXPIRED || statusStr === ORDER_STATUSES.CHO_HOAN) ? 'bg-rose-500' :
         'bg-indigo-500'
       }`}></div>
 
-      <div className="relative z-10 flex flex-col gap-4">
-        {/* Row 1: Header (Stacked Layout for Intuition) */}
-        <div className="flex flex-col gap-2.5">
-          {/* Top: Order ID on its own line */}
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></span>
-            <h3 className="text-[12px] sm:text-sm font-bold text-white tracking-widest uppercase truncate leading-none">
+      <div className="order-card__inner relative z-10 flex flex-col gap-4">
+        <div className="order-card__header flex flex-col gap-2.5">
+          <div className="order-card__title-row flex items-center gap-2">
+            <span className="order-card__dot w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></span>
+            <h3 className="order-card__title text-[12px] sm:text-sm font-bold text-white tracking-widest uppercase truncate leading-none">
               {orderCode}
             </h3>
           </div>
-
-          {/* Bottom: Product Tag & Status Tag on the same row */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Product - Separate Pill/Tag */}
-            <div className="inline-flex self-start px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md min-w-0">
+          <div className="order-card__tags flex items-center justify-between gap-2">
+            <div className="order-card__product-tag inline-flex self-start px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold text-indigo-300 uppercase tracking-wide truncate max-w-[140px] sm:max-w-[200px]">
                 {product}
               </p>
             </div>
-            <span className={`px-2.5 py-1 shrink-0 rounded-xl text-[10px] font-bold uppercase tracking-wide border shadow-lg ${statusColor}`}>
+            <span className={`order-card__status px-2.5 py-1 shrink-0 rounded-xl text-[10px] font-bold uppercase tracking-wide border shadow-lg ${statusColor}`}>
               {status}
             </span>
           </div>
         </div>
 
-        {/* Row 2: Info Block (Glassy card inside) */}
-        <div className="flex items-center justify-between gap-4 p-3.5 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm group-hover:bg-white/[0.08] transition-colors">
-          <div className="flex flex-col min-w-0">
+        <div className="order-card__info flex items-center justify-between gap-4 p-3.5 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm group-hover:bg-white/[0.08] transition-colors">
+          <div className="order-card__customer flex flex-col min-w-0">
             <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Khách hàng</span>
             <p className="text-[13px] font-bold text-white truncate">{customer}</p>
           </div>
-          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-white/10">
+          <div className="order-card__price flex flex-col items-end shrink-0 pl-4 border-l border-white/10">
             <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">Tổng tiền</span>
             <p className="text-sm sm:text-base font-black text-indigo-200 tabular-nums">
               {formatCurrency(price)}
@@ -109,18 +102,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({
           </div>
         </div>
 
-        {/* Row 3: Timelines & Premium Actions */}
-        <div className="flex items-center justify-between pt-1">
-          {/* Timeline */}
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col">
+        <div className="order-card__footer flex items-center justify-between pt-1">
+          <div className="order-card__timeline flex items-center gap-4">
+            <div className="order-card__timeline-item flex flex-col">
               <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1">Hạn đơn</span>
               <p className="text-[11px] font-bold text-slate-300 tabular-nums">
                 {expiryDate ? Helpers.formatDateToDMY(expiryDate) : "—"}
               </p>
             </div>
             {showRemainingColumn && (
-              <div className="flex flex-col border-l border-white/10 pl-4">
+              <div className="order-card__timeline-item flex flex-col border-l border-white/10 pl-4">
                 <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1">Còn</span>
                 <p className={`text-[11px] font-black tabular-nums transition-all ${
                   remaining <= 3 ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]' : 'text-emerald-400'
@@ -131,9 +122,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             )}
           </div>
 
-          {/* Intuitive Action Icons */}
           {showActionButtons && (
-            <div className="flex items-center gap-2">
+            <div className="order-card__actions flex items-center gap-2">
               <button
                 className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] active:scale-90"
                 onClick={() => onView(order)}

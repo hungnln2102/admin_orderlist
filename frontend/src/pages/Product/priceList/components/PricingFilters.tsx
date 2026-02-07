@@ -27,11 +27,10 @@ const PricingFilters: React.FC<PricingFiltersProps> = ({
   onAddProduct,
 }) => {
   return (
-    <div className="space-y-4">
-      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row gap-4 items-center">
-          {/* Search Group */}
-          <div className="relative w-full lg:flex-1">
+    <div className="pricing-filters space-y-4">
+      <div className="pricing-filters__panel rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+        <div className="pricing-filters__row flex flex-col lg:flex-row gap-4 items-center">
+          <div className="pricing-filters__search relative w-full lg:flex-1">
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opaciy-70" />
             <input
               type="text"

@@ -464,6 +464,86 @@ const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
 const isTelegramEnabled = () =>
   Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID && SEND_RENEWAL_TO_TOPIC !== false);
 
+/**
+ * Tính lại giá bán và giá nhập theo giá hiện tại (product/supplier cost).
+ * Dùng trước khi gửi thông báo Telegram "đơn cần gia hạn" để caption và QR dùng đúng giá mới.
+ * Không ghi DB.
+ * @param {object} client - pg client (từ pool.connect())
+ * @param {object} orderRow - 1 row đơn hàng (có id_product, supply, cost, price)
+ * @returns {{ price: number, cost: number }} - Giá bán và giá nhập đã tính (fallback về giá cũ nếu lỗi)
+ */
+const computeOrderCurrentPrice = async (client, orderRow) => {
+  const fallbackPrice = normalizeMoney(orderRow?.[ORDER_COLS.price] ?? 0);
+  const fallbackCost = normalizeMoney(orderRow?.[ORDER_COLS.cost] ?? 0);
+
+  const resolveMoney = (computedValue, ...fallbackValues) => {
+    if (Number.isFinite(computedValue) && computedValue > 0) return Math.round(computedValue);
+    for (const candidate of fallbackValues) {
+      if (candidate === null || candidate === undefined) continue;
+      const normalized = normalizeMoney(candidate);
+      if (Number.isFinite(normalized) && normalized > 0) return normalized;
+    }
+    const lastDefined = fallbackValues.find((c) => c !== null && c !== undefined);
+    return lastDefined !== undefined ? normalizeMoney(lastDefined) : 0;
+  };
+
+  try {
+    const sanPham = orderRow?.[ORDER_COLS.idProduct];
+    const nguon = orderRow?.[ORDER_COLS.supply];
+    const giaNhapCu = normalizeMoney(orderRow?.[ORDER_COLS.cost]);
+    const giaBanCu = normalizeMoney(orderRow?.[ORDER_COLS.price]);
+
+    if (!sanPham) {
+      return { price: fallbackPrice, cost: fallbackCost };
+    }
+
+    const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
+    const supplierId = await findSupplyId(client, nguon);
+    const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
+    const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
+
+    const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
+    const latestGiaNhap = resolveMoney(normalizedNhap?.value, giaNhapSource, giaNhapCu);
+
+    const normalizedPriceMax = normalizeImportValue(
+      maxPriceRow,
+      latestGiaNhap || giaNhapCu || undefined
+    );
+    const priceMax = resolveMoney(
+      normalizedPriceMax?.value,
+      maxPriceRow,
+      giaBanCu,
+      latestGiaNhap
+    );
+    const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
+
+    const finalGiaBanRaw = calcGiaBan({
+      orderId: orderRow?.[ORDER_COLS.idOrder] || "",
+      giaNhap: latestGiaNhap,
+      priceMax: effectivePriceMax,
+      pctCtv,
+      pctKhach,
+      giaBanFallback: giaBanCu,
+    });
+
+    const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);
+    const finalGiaBan = resolveMoney(
+      roundToThousands(finalGiaBanRaw || 0),
+      effectivePriceMax,
+      giaBanCu,
+      latestGiaNhap
+    );
+
+    return { price: finalGiaBan, cost: finalGiaNhap };
+  } catch (err) {
+    logger.warn("[Renewal] computeOrderCurrentPrice failed, using stored price", {
+      orderCode: orderRow?.[ORDER_COLS.idOrder],
+      error: err?.message,
+    });
+    return { price: fallbackPrice, cost: fallbackCost };
+  }
+};
+
 module.exports = {
   runRenewal,
   fetchOrderState,
@@ -473,5 +553,6 @@ module.exports = {
   fetchRenewalCandidates,
   runRenewalBatch,
   pendingRenewalTasks,
+  computeOrderCurrentPrice,
 };
 

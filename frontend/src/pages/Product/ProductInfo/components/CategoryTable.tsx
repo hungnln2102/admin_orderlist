@@ -30,9 +30,9 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   );
 
   return (
-    <div className="rounded-[32px] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-xl overflow-hidden">
-      <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white">Danh Mục</h2>
+    <div className="category-table rounded-[32px] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-xl overflow-hidden">
+      <div className="category-table__header border-b border-white/10 px-4 py-3 flex items-center justify-between">
+        <h2 className="category-table__title text-lg font-semibold text-white">Danh Mục</h2>
         {loading ? (
           <span className="text-xs text-white/60">Đang tải...</span>
         ) : (
@@ -41,17 +41,17 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           </span>
         )}
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
+      <div className="category-table__inner overflow-x-auto">
+        <table className="category-table__table min-w-full table-fixed divide-y divide-white/10 text-sm text-white/90">
           <colgroup>
             <col style={{ width: "10%" }} />
             <col style={{ width: "30%" }} />
             <col style={{ width: "40%" }} />
             <col style={{ width: "20%", minWidth: "140px" }} />
           </colgroup>
-          <thead className="bg-white/5 text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/70">
+          <thead className="category-table__head bg-white/5 text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/70">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">
+              <th className="category-table__th px-4 py-3 text-left font-semibold">
                 Hình Ảnh
               </th>
               <th className="px-4 py-3 text-left font-semibold">

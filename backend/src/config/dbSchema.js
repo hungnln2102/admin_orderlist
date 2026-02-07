@@ -289,7 +289,7 @@ const PRODUCT_SCHEMA = {
     TABLE: "package_product",
     COLS: {
       ID: "id",
-      PACKAGE: "package_name",
+      PACKAGE_ID: "package_id",
       USERNAME: "account_user",
       PASSWORD: "account_pass",
       MAIL_2ND: "recovery_mail",

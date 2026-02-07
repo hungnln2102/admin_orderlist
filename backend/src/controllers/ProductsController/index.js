@@ -2,6 +2,7 @@ const {
   listProducts,
   listProductPrices,
   getProductPriceById,
+  listProductPackages,
 } = require("./handlers/list");
 const {
   createProductPrice,
@@ -21,6 +22,7 @@ module.exports = {
   listProducts,
   listProductPrices,
   getProductPriceById,
+  listProductPackages,
   createProductPrice,
   updateProductPrice,
   toggleProductPriceStatus,

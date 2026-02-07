@@ -67,6 +67,7 @@ const SUMMARY_CARD_ACCENTS = [
 const PackageProduct: React.FC = () => {
   const {
     data: {
+      rows,
       templates,
       filteredRows,
       sortedRows,
@@ -92,6 +93,7 @@ const PackageProduct: React.FC = () => {
   } = usePackageData();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createInitialProductId, setCreateInitialProductId] = useState<number | null>(null);
   const [createInitialName, setCreateInitialName] = useState("");
   const [createInitialFields, setCreateInitialFields] = useState<PackageField[]>(
     PACKAGE_FIELD_OPTIONS.map((opt) => opt.value)
@@ -166,6 +168,7 @@ const PackageProduct: React.FC = () => {
   const handleCreateButtonClick = () => {
     if (selectedPackage && selectedTemplate) {
       openCreateModal({
+        productId: selectedTemplate.productId ?? null,
         name: selectedPackage,
         fields: selectedTemplate.fields,
         mode: "edit",
@@ -179,6 +182,7 @@ const PackageProduct: React.FC = () => {
     if (!selectedPackage) return;
     if (!selectedTemplate) {
       openCreateModal({
+        productId: null,
         name: selectedPackage,
         fields: defaultTemplateFields,
         mode: "create",
@@ -190,10 +194,12 @@ const PackageProduct: React.FC = () => {
 
   const openCreateModal = useCallback(
     (options?: {
+      productId?: number | null;
       name?: string;
       fields?: PackageField[];
       mode?: "create" | "edit";
     }) => {
+      setCreateInitialProductId(options?.productId ?? null);
       setCreateInitialName(options?.name ?? "");
       setCreateInitialFields(
         options?.fields && options.fields.length > 0
@@ -207,18 +213,40 @@ const PackageProduct: React.FC = () => {
   );
 
   const handleCreateTemplate = useCallback(
-    (name: string, fields: PackageField[]) => {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      setTemplates((prev) => {
-        const next = prev.filter((tpl) => tpl.name !== trimmed);
-        next.push({ name: trimmed, fields, isCustom: true });
-        return next.sort((a, b) => a.name.localeCompare(b.name));
-      });
-      setCreateModalOpen(false);
-      handleCategorySelect(trimmed);
+    async (packageId: number, productName: string, fields: PackageField[]) => {
+      if (!Number.isFinite(packageId) || packageId < 1) return;
+      try {
+        const res = await apiFetch("/api/package-products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            packageId,
+            slotLimit: 0,
+            matchMode: null,
+            informationUser: null,
+            informationPass: null,
+            informationMail: null,
+            note: null,
+            supplier: null,
+            importPrice: null,
+            expired: null,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const created = (await res.json()) as PackageRow;
+        setRows((prev) => [...prev, created]);
+        setCreateModalOpen(false);
+        handleCategorySelect(created.package ?? productName);
+      } catch (err) {
+        console.error("Tạo loại gói thất bại:", err);
+        showAppNotification({
+          type: "error",
+          title: "Lỗi tạo loại gói",
+          message: err instanceof Error ? err.message : "Không thể tạo loại gói.",
+        });
+      }
     },
-    [handleCategorySelect, setTemplates]
+    [handleCategorySelect, setRows]
   );
 
   const handleEditTemplateFields = useCallback(
@@ -226,6 +254,7 @@ const PackageProduct: React.FC = () => {
       const template =
         templates.find((tpl) => tpl.name === packageName) ?? null;
       openCreateModal({
+        productId: template?.productId ?? null,
         name: packageName,
         fields: template?.fields ?? defaultTemplateFields,
         mode: "edit",
@@ -256,31 +285,32 @@ const PackageProduct: React.FC = () => {
       return;
     }
     setDeleteProcessing(true);
-    const packages = Array.from(packagesMarkedForDeletion);
+    const names = Array.from(packagesMarkedForDeletion);
+    const packageIds = names
+      .map((name) => rows.find((r) => (r.package || "").trim() === name)?.productId)
+      .filter((id): id is number => id != null && Number.isFinite(id));
+    if (packageIds.length === 0) {
+      setDeleteProcessing(false);
+      resetDeleteSelection();
+      return;
+    }
     try {
       const res = await apiFetch(`/api/package-products/bulk-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packages }),
+        body: JSON.stringify({ packageIds }),
       });
       if (!res.ok) {
         const message = await res.text();
         throw new Error(message || `HTTP ${res.status}`);
       }
-      const data = (await res.json().catch(() => ({}))) as {
-        deletedNames?: string[];
-      };
-      const deletedNames = Array.isArray(data.deletedNames)
-        ? data.deletedNames
-        : packages;
-
       setRows((prev) =>
-        prev.filter((row) => !deletedNames.includes((row.package || "").trim()))
+        prev.filter((row) => !packageIds.includes(row.productId ?? -1))
       );
       setTemplates((prev) =>
-        prev.filter((tpl) => !deletedNames.includes(tpl.name))
+        prev.filter((tpl) => !packageIds.includes(tpl.productId ?? -1))
       );
-      if (selectedPackage && deletedNames.includes(selectedPackage)) {
+      if (selectedPackage && names.includes(selectedPackage)) {
         handleCategorySelect("all");
       }
     } catch (error) {
@@ -303,6 +333,7 @@ const PackageProduct: React.FC = () => {
     handleCategorySelect,
     setRows,
     setTemplates,
+    rows,
   ]);
 
   const openEditModal = useCallback(
@@ -448,7 +479,7 @@ const PackageProduct: React.FC = () => {
           )
         : "";
       const payload = {
-        packageName: selectedTemplate.name,
+        packageId: selectedTemplate.productId ?? undefined,
         informationUser: includePackageInfo
           ? values.informationUser || null
           : null,
@@ -535,7 +566,6 @@ const PackageProduct: React.FC = () => {
           )
         : "";
       const payload = {
-        packageName: template.name,
         informationUser: includePackageInfo
           ? values.informationUser || null
           : null,
@@ -896,6 +926,7 @@ const PackageProduct: React.FC = () => {
 
       <CreatePackageModal
         open={createModalOpen}
+        initialProductId={createInitialProductId}
         initialName={createInitialName}
         initialFields={createInitialFields}
         mode={createModalMode}

@@ -11,6 +11,8 @@ type UseCalculatedPriceParams = {
   customerType?: string;
   basePrice: number;
   normalizedOrderDate: string | null;
+  /** true = không gọi API, dùng basePrice (form sau khi tạo đơn) */
+  skipRecalc?: boolean;
 };
 
 export const useCalculatedPrice = ({
@@ -20,6 +22,7 @@ export const useCalculatedPrice = ({
   customerType,
   basePrice,
   normalizedOrderDate,
+  skipRecalc = false,
 }: UseCalculatedPriceParams) => {
   const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
@@ -35,6 +38,12 @@ export const useCalculatedPrice = ({
 
     let ignore = false;
     setCalculatedPrice(basePrice);
+
+    if (skipRecalc) {
+      setPriceLoading(false);
+      setPriceError(null);
+      return;
+    }
 
     const payload: Record<string, unknown> = {
       san_pham_name: productName,
@@ -109,6 +118,7 @@ export const useCalculatedPrice = ({
     normalizedOrderDate,
     orderId,
     productName,
+    skipRecalc,
   ]);
 
   return { calculatedPrice, priceLoading, priceError };

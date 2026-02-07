@@ -23,7 +23,7 @@ const listPackageProducts = async () => {
 
 const createPackageProduct = async (payload) => {
   const {
-    packageName,
+    packageId,
     informationUser,
     informationPass,
     informationMail,
@@ -41,7 +41,11 @@ const createPackageProduct = async (payload) => {
     matchMode,
   } = payload || {};
 
-  const trimmedPackageName = packageName.trim();
+  const productIdNum = packageId != null ? Number(packageId) : null;
+  if (productIdNum == null || !Number.isFinite(productIdNum) || productIdNum < 1) {
+    throw new Error("packageId (product id) là bắt buộc.");
+  }
+
   const normalizedExpired = normalizeDateInput(expired);
   const normalizedSlotLimit = toNullableNumber(slotLimit);
   const normalizedMatchMode = normalizeMatchMode(matchMode);
@@ -49,7 +53,7 @@ const createPackageProduct = async (payload) => {
   const newRow = await withTransaction(async (trx) => {
     const [pkgRow] = await trx(TABLES.packageProduct)
       .insert({
-        [pkgCols.package]: trimmedPackageName,
+        [pkgCols.packageId]: productIdNum,
         [pkgCols.username]: informationUser || null,
         [pkgCols.password]: informationPass || null,
         [pkgCols.mail2nd]: informationMail || null,
@@ -95,7 +99,8 @@ const createPackageProduct = async (payload) => {
     // Fallback mapping if fetch fails
     return mapPackageProductRow({
       package_id: packageId,
-      package_name: trimmedPackageName,
+      product_id: productIdNum,
+      package_name: null,
       package_username: informationUser || null,
       package_password: informationPass || null,
       package_mail_2nd: informationMail || null,
@@ -122,7 +127,6 @@ const createPackageProduct = async (payload) => {
 
 const updatePackageProduct = async (id, payload) => {
   const {
-    packageName,
     informationUser,
     informationPass,
     informationMail,
@@ -155,7 +159,6 @@ const updatePackageProduct = async (id, payload) => {
     const [updatedPkg] = await trx(TABLES.packageProduct)
       .where(pkgCols.id, id)
       .update({
-        [pkgCols.package]: packageName.trim(),
         [pkgCols.username]: informationUser || null,
         [pkgCols.password]: informationPass || null,
         [pkgCols.mail2nd]: informationMail || null,
@@ -217,7 +220,8 @@ const updatePackageProduct = async (id, payload) => {
 
     return mapPackageProductRow({
       package_id: packageId ?? id,
-      package_name: packageName.trim(),
+      product_id: null,
+      package_name: null,
       package_username: informationUser || null,
       package_password: informationPass || null,
       package_mail_2nd: informationMail || null,
@@ -249,20 +253,21 @@ const deletePackageProduct = async (id) =>
     const deletedRows = await trx(TABLES.packageProduct)
       .where(pkgCols.id, id)
       .del()
-      .returning([pkgCols.id, pkgCols.package]);
+      .returning([pkgCols.id, pkgCols.packageId]);
 
     return deletedRows;
   });
 
-const bulkDeletePackages = async (names) =>
+const bulkDeletePackages = async (productIds) =>
   withTransaction(async (trx) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) return [];
     await trx(TABLES.packageProduct)
-      .whereIn(pkgCols.package, names)
+      .whereIn(pkgCols.packageId, productIds)
       .update({ [pkgCols.match]: null });
     const deleteResult = await trx(TABLES.packageProduct)
-      .whereIn(pkgCols.package, names)
+      .whereIn(pkgCols.packageId, productIds)
       .del()
-      .returning(pkgCols.package);
+      .returning([pkgCols.id, pkgCols.packageId]);
 
     return deleteResult || [];
   });

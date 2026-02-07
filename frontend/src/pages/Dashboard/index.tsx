@@ -41,7 +41,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard space-y-6">
       <DashboardHero />
 
       <SectionTabs activeSection={activeSection} onChange={setActiveSection} />

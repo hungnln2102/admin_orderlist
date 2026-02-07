@@ -69,18 +69,17 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => {
   return (
     <div
-      className={`group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
+      className={`stat-card group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
     >
-      {/* Dynamic Background Glow */}
-      <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
+      <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
       
-      <div className="flex items-start justify-between gap-4">
-        <div className="relative z-10">
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-1.5">
+      <div className="stat-card__content flex items-start justify-between gap-4">
+        <div className="stat-card__text relative z-10">
+          <p className="stat-card__title text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-1.5">
             {title}
           </p>
           <div className="flex flex-col gap-1">
-            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight leading-none">
+            <h3 className="stat-card__value text-xl sm:text-2xl font-bold text-white tracking-tight leading-none">
               {value}
             </h3>
             {subtitle && (
@@ -92,7 +91,7 @@ const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         <div
-          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
+          className={`stat-card__icon relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
         >
           {/* Internal reflection */}
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>

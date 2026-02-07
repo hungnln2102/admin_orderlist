@@ -97,6 +97,12 @@ EXPIRED (daysLeft < 0) → Xóa khỏi order_list, chuyển sang order_expired
 - **KHÔNG** chuyển PROCESSING (đã nhận webhook, chưa confirm PAID)
 - Điều này bảo vệ đơn đã thanh toán nhưng chưa được confirm
 
+### Thông báo Telegram "Cần gia hạn" (7:00) – tính lại giá trước khi gửi
+
+- Cron **07:00** gửi thông báo các đơn **RENEWAL** còn đúng **4 ngày** vào Telegram.
+- **Trước khi gửi**: hệ thống **tính lại giá bán** (và giá nhập) theo giá hiện tại (product/supplier cost, price_config) qua `computeOrderCurrentPrice`.
+- Caption tin nhắn và **QR thanh toán** dùng **giá đã tính lại**, không dùng giá lưu trong đơn. Nếu tính lỗi thì fallback về giá lưu trong DB.
+
 ---
 
 ## Flowchart tổng quan

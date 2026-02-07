@@ -11,6 +11,7 @@ import {
   Order,
   OrderDatasetKey,
 } from "../../../constants";
+import { SEARCH_FIELD_OPTIONS } from "./constants";
 import GradientButton from "../../../components/ui/GradientButton";
 import StatCard from "../../../components/ui/StatCard";
 import ConfirmModal from "../../../components/modals/ConfirmModal/ConfirmModal";
@@ -22,16 +23,6 @@ import { OrderRow } from "./components/OrderRow";
 import { OrderCard } from "./components/OrderCard";
 import { ResponsiveTable, TableCard } from "../../../components/ui/ResponsiveTable";
 import { formatCurrency } from "./utils/ordersHelpers";
-
-const SEARCH_FIELD_OPTIONS = [
-  { value: "all", label: "Tất cả cột" },
-  { value: ORDER_FIELDS.ID_ORDER, label: "Mã Đơn Hàng" },
-  { value: ORDER_FIELDS.ID_PRODUCT, label: "Sản Phẩm" },
-  { value: ORDER_FIELDS.INFORMATION_ORDER, label: "Thông tin" },
-  { value: ORDER_FIELDS.CUSTOMER, label: "Khách Hàng" },
-  { value: ORDER_FIELDS.SLOT, label: "Slot" },
-  { value: ORDER_FIELDS.SUPPLY, label: "Nguồn" },
-] as const;
 
 export default function Orders() {
   const [datasetKey, setDatasetKey] = useState<OrderDatasetKey>("active");
@@ -60,6 +51,7 @@ export default function Orders() {
     setRowsPerPage,
     isModalOpen,
     isViewModalOpen,
+    viewModalSource,
     isEditModalOpen,
     isCreateModalOpen,
     orderToView,
@@ -442,6 +434,7 @@ export default function Orders() {
         onClose={closeViewModal}
         order={orderToView}
         formatCurrency={formatCurrency}
+        keepOrderPrice={viewModalSource === "create"}
       />
       <EditOrderModal
         isOpen={isEditModalOpen}

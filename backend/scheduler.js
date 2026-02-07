@@ -13,6 +13,7 @@ const { STATUS } = require("./src/utils/statuses");
 const logger = require("./src/utils/logger");
 const { sendZeroDaysRemainingNotification, sendFourDaysRemainingNotification } = require("./src/services/telegramOrderNotification");
 const { normalizeOrderRow } = require("./src/controllers/Order/helpers");
+const { computeOrderCurrentPrice } = require("./webhook/sepay/renewal");
 const { todayYMDInVietnam } = require("./src/utils/normalizers");
 // Raw column names (unquoted) for reading rows returned by pg
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
@@ -435,11 +436,13 @@ const notifyFourDaysRemainingTask = async (trigger = "cron") => {
     logger.info(`Tìm thấy ${result.rowCount} đơn cần gia hạn (còn 4 ngày)`);
 
     if (result.rows.length > 0) {
-      // Normalize orders để có format giống như API trả về
+      // Normalize orders và tính lại giá theo giá hiện tại trước khi gửi Telegram (caption + QR)
       const today = todayYMDInVietnam();
-      const normalizedOrders = result.rows.map((row) => {
+      const normalizedOrders = [];
+      for (const row of result.rows) {
         const normalized = normalizeOrderRow(row, today);
-        return {
+        const computed = await computeOrderCurrentPrice(client, row);
+        normalizedOrders.push({
           id_order: normalized.id_order || normalized.idOrder,
           idOrder: normalized.id_order || normalized.idOrder,
           order_code: normalized.id_order || normalized.idOrder,
@@ -461,10 +464,10 @@ const notifyFourDaysRemainingTask = async (trigger = "cron") => {
           expiry_date_display: normalized.expiry_date_display,
           expiry_date_str: normalized.expiry_date_display,
           order_expired: normalized.order_expired || normalized.expiry_date,
-          price: normalized.price,
+          price: computed.price,
           days_left: row.days_left || 4,
-        };
-      });
+        });
+      }
 
       // Gửi thông báo
       await sendFourDaysRemainingNotification(normalizedOrders);

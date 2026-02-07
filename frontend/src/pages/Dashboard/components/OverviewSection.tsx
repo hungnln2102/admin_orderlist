@@ -22,10 +22,10 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   onYearChange,
 }) => {
   return (
-    <>
+    <div className="overview-section">
       <OverviewStats stats={stats} />
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-1 xl:grid-cols-2">
+      <div className="overview-section__charts grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-1 xl:grid-cols-2">
         <RevenueChartCard
           data={revenueData}
           availableYears={availableYears}
@@ -34,7 +34,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         />
         <OrderChartCard data={orderData} />
       </div>
-    </>
+    </div>
   );
 };
 

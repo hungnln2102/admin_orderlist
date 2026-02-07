@@ -1,14 +1,13 @@
 import React from "react";
 
 export const DashboardHero: React.FC = () => (
-  <div className="relative group overflow-hidden rounded-[32px] glass-panel-light p-8 lg:p-10 transition-all duration-700 holographic-hover">
-    {/* Animated Decorative Element */}
-    <div className="absolute -right-20 -top-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] animate-pulse"></div>
-    <div className="absolute -left-20 -bottom-20 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
+  <div className="dashboard-hero relative group overflow-hidden rounded-[32px] glass-panel-light p-8 lg:p-10 transition-all duration-700 holographic-hover">
+    <div className="dashboard-hero__glow dashboard-hero__glow--right absolute -right-20 -top-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] animate-pulse"></div>
+    <div className="dashboard-hero__glow dashboard-hero__glow--left absolute -left-20 -bottom-20 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
 
-    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-      <div className="space-y-2">
-        <h1 className="text-4xl lg:text-5xl font-bold text-white tracking-tighter">
+    <div className="dashboard-hero__content relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="dashboard-hero__text space-y-2">
+        <h1 className="dashboard-hero__title text-4xl lg:text-5xl font-bold text-white tracking-tighter">
           Bảng Điều <span className="text-indigo-400">Khiển</span>
         </h1>
         <p className="text-sm font-medium text-indigo-200/60 uppercase tracking-[0.3em]">

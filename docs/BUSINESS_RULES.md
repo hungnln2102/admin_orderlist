@@ -180,6 +180,68 @@ await db("order_canceled").where({ id }).update({ status: STATUS.REFUNDED });
 
 ---
 
+## 8. Thông tin sản phẩm – Thêm mới & Chỉnh sửa
+
+### Mapping 3 cột (đúng)
+
+| Ô trên form       | Bảng.cột              | API / state   |
+|-------------------|------------------------|---------------|
+| **Tên Sản Phẩm**  | `product.package_name` | `packageName` |
+| **Gói Sản Phẩm**  | `variant.variant_name`| `packageProduct` |
+| **Mã Sản Phẩm**   | `variant.display_name`| `sanPham`     |
+
+### Rule
+
+- **Tên Sản Phẩm** (`product.package_name`) và **Gói Sản Phẩm** (`variant.variant_name`) **được phép trùng** với sản phẩm khác.
+- **Mã Sản Phẩm** (`variant.display_name`) **bắt buộc duy nhất** trong toàn hệ thống. Không được trùng với bất kỳ variant nào đã có.
+- Khi **thêm sản phẩm mới** (theo repo admin_orderlist): Insert `product` với `package_name`; nếu đã có product cùng `package_name` thì **reuse** (onConflict merge), không tạo product mới. Sau đó tạo `variant` với `display_name` = Mã Sản Phẩm. Như vậy nhiều variant (nhiều Mã) có thể cùng một Gói (một product). Chỉ **Mã Sản Phẩm** là unique → trùng Mã → 400 "Mã Sản Phẩm đã tồn tại. Vui lòng chọn mã khác."
+- Khi **chỉnh sửa sản phẩm** (PATCH): Cho phép đổi Tên / Gói. Đổi Mã sang giá trị đã tồn tại → 400 "Mã Sản Phẩm đã tồn tại." Nếu sửa Gói sang tên đã tồn tại mà DB có unique trên `product.package_name` → lỗi 23505; có thể chạy migration 003 để bỏ unique (khi đó cần logic khác cho create) hoặc giữ unique và reuse như server.
+
+### Code location
+
+- **Backend**: [backend/src/controllers/ProductsController/handlers/mutations.js](backend/src/controllers/ProductsController/handlers/mutations.js) – `createProductPrice` (POST /api/product-prices), `updateProductPrice` (PATCH /api/product-prices/:productId). Xử lý lỗi 23505: constraint `display_name`/variant → 400 Mã trùng; constraint `package_name` → 400 + hướng dẫn chạy migration.
+- **Frontend**: Form thêm/sửa ở Bảng giá (PriceList) và Thông tin sản phẩm (ProductInfo); validation chỉ bắt buộc Mã hợp lệ, không cấm trùng Tên/Gói.
+
+---
+
+## 9. Gói Sản Phẩm (Package Product) – Match với đơn hàng
+
+### Rule (ghi nhớ)
+
+- **Tên Sản Phẩm & Gói Sản Phẩm có thể trùng; chỉ Mã Sản Phẩm là duy nhất** (chi tiết tại mục 8): Trong form Thông tin sản phẩm (tạo/sửa), **Tên Sản Phẩm** (`product.name`) và **Gói Sản Phẩm** (`product.package_name`) được phép trùng với sản phẩm khác. Chỉ **Mã Sản Phẩm** (variant `display_name`) bắt buộc unique. DB không được có unique constraint trên `product.package_name` (nếu còn thì chạy migration `database/migrations/003_drop_product_package_name_unique.sql`).
+- **Loại gói gắn với Sản phẩm (FK)**: Bảng `package_product` có cột **`package_id`** (khóa ngoại → `product.id`). Khi tạo loại gói, chọn product từ dropdown; API nhận `packageId` (product id). Tên hiển thị lấy từ `product.package_name` qua JOIN. API dropdown: `GET /api/products/packages` trả về `[{ id, package_name }]`. Không còn đồng bộ tên khi đổi tên Product — join theo id nên luôn đúng.
+- **Cột Match được chọn khi tạo gói**, không đổi sau đó (trừ khi sửa gói).
+- **Match với cột Slot**: So sánh **tài khoản gói** (email trong "Thông tin gói" / `informationUser`) với **cột slot** của đơn hàng. Đơn match khi giá trị slot (sau chuẩn hóa) trùng với tài khoản gói.
+- **Match với cột Information**: So sánh **tài khoản gói** với **cột information** của đơn hàng (`information_order`). Đơn match khi giá trị information (sau chuẩn hóa) trùng với tài khoản gói.
+- **Chỉ dùng đúng một cột** theo lựa chọn khi tạo gói: không so sánh cả hai cột cùng lúc.
+- **Validation**: Khi chọn Match (Slot hoặc Information), **Thông tin gói (Tài khoản)** là bắt buộc. Backend trả 400 nếu thiếu; frontend disable nút Lưu và hiển thị cảnh báo.
+
+### Quy trình match 3 bước
+
+1. **Gói → Sản phẩm → Variants → Lọc đơn**: `pp.package_id` = `product.id` (JOIN). Lấy danh sách variants (product_codes) của product đó. Chỉ xét đơn trong `order_list` có `id_product` (chuẩn hóa) thuộc các variant đó; nếu không có variant thì so sánh tuyệt đối với tên gói (từ product.package_name).
+2. **So sánh tài khoản với cột match**: Dùng **tài khoản gói** (`account_user` / informationUser) so sánh với **một** cột đã chọn: **slot** hoặc **information_order**. Đơn match khi giá trị cột đó (sau chuẩn hóa) trùng với tài khoản gói.
+3. **Cột hiển thị**: Nếu match theo **slot** → lấy giá trị **information** của đơn đưa vào vị trí slot trong gói; nếu match theo **information** → lấy giá trị **slot** của đơn đưa vào vị trí information trong gói.
+
+### Chuẩn hóa so sánh
+
+- **Link (tài khoản gói vs slot/information)**: lowercase, bỏ khoảng trắng (`normalizeMatchKey`).
+- **Đơn thuộc gói (package_id → product → variant)**: So sánh **tuyệt đối**. Đơn chỉ thuộc gói khi (1) `id_product` (chuẩn hóa) nằm trong danh sách variant của product (product.id = `pp.package_id`), hoặc (2) không có variant thì so sánh chuỗi chuẩn hóa: `normalizeIdentifier(id_product)` = `normalizeIdentifier(product.package_name)`. Không dùng prefix / startsWith / includes.
+
+### Code location
+
+- **Backend**: [backend/src/config/dbSchema.js](backend/src/config/dbSchema.js) – PACKAGE_PRODUCT.COLS có `PACKAGE_ID: "package_id"`. [backend/src/services/packageProductService.js](backend/src/services/packageProductService.js) – JOIN `product` ON `p.id = pp.package_id`, lấy `product_codes` theo `product_id`. [backend/src/controllers/PackageController/service.js](backend/src/controllers/PackageController/service.js) – create/update dùng `packageId`; bulk delete theo `package_id`. [backend/src/controllers/PackageController/index.js](backend/src/controllers/PackageController/index.js) – `validateMatchRequiresAccount()`: trả 400 khi match chọn nhưng `informationUser` trống.
+- **Frontend match logic**: [frontend/src/pages/Product/PackageProduct/utils/packageMatchUtils.ts](frontend/src/pages/Product/PackageProduct/utils/packageMatchUtils.ts) – `orderBelongsToPackageByProduct`, `orderMatchesPackageLink`, `computeAugmentationForPackage`. Hook [usePackageData.ts](frontend/src/pages/Product/PackageProduct/hooks/usePackageData.ts) gọi `computeAugmentationForPackage` cho từng gói.
+- **Link keys**: [packageHelpers.ts](frontend/src/pages/Product/PackageProduct/utils/packageHelpers.ts) – `buildPackageLinkKeys(row)` = chuẩn hóa `row.informationUser`.
+- **Form validation**: [PackageFormModal.tsx](frontend/src/pages/Product/PackageProduct/components/Modals/PackageFormModal.tsx) – khi `slotLinkMode` là slot hoặc information mà `informationUser` trống thì disable Lưu và hiển thị cảnh báo.
+
+### Khi "Số lượng" luôn 0 / không match
+
+1. **Kiểm tra cột match của gói**: Gói có thể được tạo trước khi có cột `match` → trong DB `match` = `null` → frontend mặc định dùng "information". Cần mở **Sửa gói** và chọn lại **Match với Slot** hoặc **Match với Information** rồi lưu.
+2. **Đơn phải cùng sản phẩm/gói**: Đơn chỉ được tính vào "X / Y Vị trí" nếu `id_product` (chuẩn hóa) trùng **tuyệt đối** với một product code từ API (variant) hoặc với tên gói chuẩn hóa (khi không có variant).
+3. **Giá trị so khớp**: Đơn chỉ match khi **cột đã chọn** (slot hoặc information) chứa đúng tài khoản gói (chuẩn hóa: lowercase, bỏ khoảng trắng).
+
+---
+
 ## Chạy Test
 
 ```bash

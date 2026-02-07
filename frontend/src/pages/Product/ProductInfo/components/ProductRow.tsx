@@ -75,12 +75,12 @@ export const ProductRow: React.FC<ProductRowProps> = ({
   return (
     <React.Fragment key={`${item.id}-${item.productId}`}>
       <tr
-        className={`hover:bg-white/5 cursor-pointer ${
+        className={`product-row ${isExpanded ? "product-row--expanded" : ""} hover:bg-white/5 cursor-pointer ${
           isExpanded ? "bg-white/5" : ""
         }`}
         onClick={() => onToggle(isExpanded ? null : Number(item.id))}
       >
-        <td className="px-4 py-3">
+        <td className="product-row__cell px-4 py-3">
           {item.imageUrl ? (
             <img
               src={item.imageUrl}
@@ -141,7 +141,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
             }}
           />
         </td>
-        <td className="px-4 py-3 space-x-2 whitespace-nowrap text-center align-top">
+        <td className="product-row__actions px-4 py-3 space-x-2 whitespace-nowrap text-center align-top">
           <button
             className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             title="Xem"

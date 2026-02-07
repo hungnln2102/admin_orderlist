@@ -13,6 +13,39 @@ const { quoteIdent } = require("../../../utils/sql");
 const { mapProductPriceRow } = require("../mappers");
 const logger = require("../../../utils/logger");
 
+/**
+ * GET /api/products/packages
+ * Trả về danh sách product (id, package_name) để dropdown chọn loại gói.
+ * package_product.package_name phải trùng với product.package_name.
+ */
+const listProductPackages = async (_req, res) => {
+  try {
+    const query = `
+      SELECT
+        p.${quoteIdent(productSchemaCols.id)} AS id,
+        p.${quoteIdent(productSchemaCols.packageName)} AS package_name
+      FROM ${TABLES.product} p
+      WHERE p.${quoteIdent(productSchemaCols.packageName)} IS NOT NULL
+        AND TRIM(p.${quoteIdent(productSchemaCols.packageName)}::text) != ''
+      ORDER BY p.${quoteIdent(productSchemaCols.packageName)};
+    `;
+    const result = await db.raw(query);
+    const rows = (result.rows || []).map((row) => ({
+      id: row.id,
+      package_name: row.package_name ?? row.packageName ?? null,
+    }));
+    res.json(rows);
+  } catch (error) {
+    logger.error("Query failed (GET /api/products/packages)", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: "Không thể tải danh sách gói sản phẩm. Vui lòng thử lại.",
+    });
+  }
+};
+
 const listProducts = async (_req, res) => {
   try {
     const query = `
@@ -183,4 +216,5 @@ module.exports = {
   listProducts,
   listProductPrices,
   getProductPriceById,
+  listProductPackages,
 };

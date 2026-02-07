@@ -11,6 +11,8 @@ export interface ViewOrderModalProps {
   onClose: () => void;
   order: OrderView | null;
   formatCurrency: (value: number | string) => string;
+  /** true = mở sau khi tạo đơn: giữ QR và giá bán theo form tạo đơn; false = mở từ icon xem: tính lại giá */
+  keepOrderPrice?: boolean;
 }
 
 export type CalculatePriceResponse = {

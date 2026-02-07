@@ -209,6 +209,8 @@ const createProductPrice = async (req, res) => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         inserted = await db.transaction(async (trx) => {
+          // Rule (theo repo admin_orderlist): Gói (package_name) có thể trùng — reuse product khi cùng package_name.
+          // Chỉ Mã Sản Phẩm (display_name) là unique. Insert product, nếu trùng package_name thì merge (reuse).
           const productInsertQuery = trx(TABLES.product).insert({
             [productSchemaCols.packageName]: normalizedPackageName,
           });
@@ -305,6 +307,20 @@ const createProductPrice = async (req, res) => {
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
     logger.error("Insert failed (POST /api/product-prices)", { error: error.message, stack: error.stack });
+    const code = error && error.code;
+    const constraint = error && error.constraint;
+    if (code === "23505" && constraint) {
+      if (String(constraint).toLowerCase().includes("display_name") || String(constraint).toLowerCase().includes("variant")) {
+        return res.status(400).json({
+          error: "Mã Sản Phẩm đã tồn tại. Vui lòng chọn mã khác.",
+        });
+      }
+      if (String(constraint).includes("package_name")) {
+        return res.status(400).json({
+          error: "Tên Gói Sản Phẩm không được trùng theo ràng buộc DB. Nếu đúng rule (Tên/Gói có thể trùng, chỉ Mã SP là unique): chạy migration database/migrations/003_drop_product_package_name_unique.sql.",
+        });
+      }
+    }
     const message = error && error.message ? String(error.message) : "Không thể tạo giá sản phẩm.";
     const status = message.includes("Unable to resolve") || message.includes("bắt buộc") ? 400 : 500;
     res.status(status).json({ error: message });
@@ -498,14 +514,29 @@ const updateProductPrice = async (req, res) => {
           [...priceValues, parsedId]
         );
       } else {
-        const cols = [priceConfigCols.variantId, ...priceUpdates.map((u) => u.split(" = ")[0].replace(/"/g, ""))];
-        const placeholders = Array.from({ length: priceUpdates.length + 1 }, () => "?");
+        const updatesWithPlaceholders = priceUpdates.filter((u) => u.includes("?"));
+        const cols = [
+          priceConfigCols.variantId,
+          ...updatesWithPlaceholders.map((u) => u.split(" = ")[0].replace(/"/g, "")),
+          priceConfigCols.updatedAt,
+        ];
+        const placeholders = [
+          ...Array.from({ length: updatesWithPlaceholders.length + 1 }, () => "?"),
+          "NOW()",
+        ];
+        const conflictSetParts = updatesWithPlaceholders.map(
+          (u) => {
+            const colName = u.split(" = ")[0].replace(/"/g, "");
+            return `${quoteIdent(colName)} = EXCLUDED.${quoteIdent(colName)}`;
+          }
+        );
+        conflictSetParts.push(`${quoteIdent(priceConfigCols.updatedAt)} = NOW()`);
         await db.raw(
           `
           INSERT INTO ${TABLES.priceConfig} (${cols.map(quoteIdent).join(", ")})
           VALUES (${placeholders.join(", ")})
           ON CONFLICT (${quoteIdent(priceConfigCols.variantId)})
-          DO UPDATE SET ${priceUpdates.join(", ")};
+          DO UPDATE SET ${conflictSetParts.join(", ")};
         `,
           [parsedId, ...priceValues]
         );
@@ -516,7 +547,22 @@ const updateProductPrice = async (req, res) => {
     res.json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {
     logger.error("Update failed (PATCH /api/product-prices/:productId)", { productId, error: error.message, stack: error.stack });
-    res.status(500).json({ error: "Không thể cập nhật giá sản phẩm." });
+    const code = error && error.code;
+    const constraint = error && error.constraint;
+    if (code === "23505" && constraint) {
+      if (String(constraint).includes("package_name")) {
+        return res.status(400).json({
+          error: "Tên Gói Sản Phẩm không được trùng theo ràng buộc DB. Nếu đúng rule (Tên/Gói có thể trùng, chỉ Mã SP là unique): chạy migration database/migrations/003_drop_product_package_name_unique.sql.",
+        });
+      }
+      if (String(constraint).toLowerCase().includes("display_name") || String(constraint).toLowerCase().includes("variant")) {
+        return res.status(400).json({
+          error: "Mã Sản Phẩm đã tồn tại. Vui lòng chọn mã khác.",
+        });
+      }
+    }
+    const message = error && error.message ? String(error.message) : "Không thể cập nhật giá sản phẩm.";
+    res.status(500).json({ error: message });
   }
 };
 

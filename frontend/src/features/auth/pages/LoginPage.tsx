@@ -14,8 +14,8 @@ const LoginPage: React.FC = () => {
   const { email, password, error, loading, setEmail, setPassword, handleSubmit } = useLogin();
 
   return (
-    <div className="retro-login">
-      <div className="retro-shell">
+    <div className="login-page retro-login">
+      <div className="login-page__shell retro-shell">
         <LoginBackground />
         <LoginCard>
           <LoginForm

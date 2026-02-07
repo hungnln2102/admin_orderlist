@@ -12,6 +12,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   onClose,
   order,
   formatCurrency,
+  keepOrderPrice = false,
 }) => {
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
@@ -27,7 +28,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
     ) || null;
 
-
   const { calculatedPrice, priceLoading, priceError } = useCalculatedPrice({
     isOpen,
     orderId,
@@ -35,14 +35,20 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     customerType,
     basePrice,
     normalizedOrderDate,
+    skipRecalc: keepOrderPrice,
   });
 
-  // QR code luôn dùng giá đơn hàng (số tiền khách cần thanh toán), không dùng giá tính lại từ API
-  // (tránh trường hợp thêm nguồn mới → API trả giá bảng giá mới → QR sai so với giá đã nhập)
+  // QR luôn dùng giá đơn hàng (số tiền lưu trong đơn)
   const qrAmountFromOrder = useMemo(
     () => Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0),
     [order]
   );
+
+  // Giá bán hiển thị: sau khi tạo đơn = giữ theo form; bấm icon xem = giá tính lại
+  const displayAmount = keepOrderPrice
+    ? qrAmountFromOrder
+    : (calculatedPrice ?? qrAmountFromOrder);
+  const safeDisplayAmount = Helpers.roundGiaBanValue(displayAmount);
 
   if (!isOpen || !order) return null;
 
@@ -96,7 +102,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     Helpers.formatDateToDMY(expirySource) ||
     String((order[ORDER_FIELDS.ORDER_EXPIRED] as string) || "");
 
-  // VietQR: dùng giá đơn hàng (qrAmountFromOrder), không dùng giá tính lại (effectiveAmount)
   const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
   const safeQrAmount = Helpers.roundGiaBanValue(qrAmountFromOrder);
   const qrCodeImageUrl = Helpers.buildSepayQrUrl({
@@ -109,17 +114,15 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4 md:p-6"
+      className="view-order-modal fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4 md:p-6"
       onClick={onClose}
     >
-      {/* Modal container */}
       <div
-        className="bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[98vh] sm:max-h-[95vh] flex flex-col overflow-hidden text-slate-100"
+        className="view-order-modal__container bg-slate-900/90 border border-white/10 rounded-lg shadow-[0_18px_48px_-28px_rgba(0,0,0,0.8)] w-full max-w-3xl transform transition-all duration-300 scale-100 max-h-[98vh] sm:max-h-[95vh] flex flex-col overflow-hidden text-slate-100"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex justify-center items-center p-3 sm:p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
-          <h3 className="text-lg sm:text-xl font-semibold text-white">
+        <div className="view-order-modal__header flex justify-center items-center p-3 sm:p-4 border-b bg-slate-800/80 rounded-t-lg sticky top-0 z-10">
+          <h3 className="view-order-modal__title text-lg sm:text-xl font-semibold text-white">
             Chi tiết đơn hàng:{" "}
             <span className="text-blue-600">{order[ORDER_FIELDS.ID_ORDER]}</span>
           </h3>
@@ -132,8 +135,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
+        <div className="view-order-modal__body p-4 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
           {/* Thong tin chung */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
             {/* Left */}
@@ -241,8 +243,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           {/* Divider */}
           <hr className="my-4 border-white/10" />
 
-          {/* QR Code */}
-          <div className="text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
+          <div className="view-order-modal__qr text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
             <h4 className="text-lg font-semibold text-indigo-100 mb-3">
               Quét mã QR để thanh toán (VietQR)
             </h4>
@@ -274,9 +275,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <p>
                 Số tiền:{" "}
                 <strong className="text-xl text-red-600">
-                  {formatCurrency(safeQrAmount)}
+                  {formatCurrency(keepOrderPrice ? safeQrAmount : safeDisplayAmount)}
                 </strong>
               </p>
+              {!keepOrderPrice && priceLoading && (
+                <p className="text-xs text-slate-400">Đang tính lại giá...</p>
+              )}
               {priceError && (
                 <p className="text-xs text-red-500">{priceError}</p>
               )}

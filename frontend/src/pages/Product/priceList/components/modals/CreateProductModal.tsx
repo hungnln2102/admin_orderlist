@@ -12,10 +12,10 @@ import {
   SupplierOption,
 } from "../../types";
 import {
-  formatCurrencyValue,
   formatVndDisplay,
   multiplyValue,
   parseRatioInput,
+  roundToNearestThousand,
 } from "../../utils";
 
 interface CreateProductModalProps {
@@ -94,11 +94,11 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className={labelBase}>Mã Sản Phẩm</label>
+                <label className={labelBase}>Tên Sản Phẩm</label>
                 <input
                   type="text"
                   className={inputBase}
-                  placeholder="Nhập mã sản phẩm"
+                  placeholder="Nhập tên sản phẩm"
                   value={createForm.packageName}
                   onChange={(event) =>
                     onFormChange("packageName", event.target.value)
@@ -106,18 +106,6 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 />
               </div>
               <div>
-                <label className={labelBase}>Tên Sản Phẩm</label>
-                <input
-                  type="text"
-                  className={inputBase}
-                  placeholder="Nhập tên sản phẩm"
-                  value={createForm.sanPham}
-                  onChange={(event) =>
-                    onFormChange("sanPham", event.target.value)
-                  }
-                />
-              </div>
-              <div className="md:col-span-2">
                 <label className={labelBase}>Gói Sản Phẩm</label>
                 <input
                   type="text"
@@ -126,6 +114,18 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   value={createForm.packageProduct}
                   onChange={(event) =>
                     onFormChange("packageProduct", event.target.value)
+                  }
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelBase}>Mã Sản Phẩm</label>
+                <input
+                  type="text"
+                  className={inputBase}
+                  placeholder="Nhập mã sản phẩm"
+                  value={createForm.sanPham}
+                  onChange={(event) =>
+                    onFormChange("sanPham", event.target.value)
                   }
                 />
               </div>
@@ -269,7 +269,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                             type="text"
                             className={inputBase}
                             placeholder="0"
-                            value={formatCurrencyValue(supplier.price)}
+                            value={supplier.price}
                             onChange={(e) =>
                               onSupplierPriceInput(supplier.id, e.target.value)
                             }
@@ -324,37 +324,51 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Price Calculations */}
-                    {supplier.price && (
-                      <div className="mt-4 grid gap-2 rounded-lg border border-white/5 bg-slate-950/30 p-3 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">
-                            Xem Trước Giá (theo Tỷ Giá CTV):
-                          </span>
-                          <span className="font-semibold text-white">
-                            {formatVndDisplay(
-                              multiplyValue(
-                                supplier.price,
-                                parseRatioInput(createForm.pctCtv)
-                              )
-                            )}
-                          </span>
+                    {/* Price Calculations: Giá CTV = Giá nhập × Tỷ giá CTV; Giá Lẻ = Giá CTV × Tỷ giá Khách */}
+                    {(() => {
+                      const priceNum = supplier.price
+                        ? Number(String(supplier.price).replace(/\D/g, ""))
+                        : null;
+                      const hasPrice =
+                        priceNum != null &&
+                        Number.isFinite(priceNum) &&
+                        priceNum > 0;
+                      const ctvPriceRaw = hasPrice
+                        ? multiplyValue(
+                            priceNum,
+                            parseRatioInput(createForm.pctCtv)
+                          )
+                        : null;
+                      const retailPriceRaw =
+                        ctvPriceRaw != null
+                          ? multiplyValue(
+                              ctvPriceRaw,
+                              parseRatioInput(createForm.pctKhach)
+                            )
+                          : null;
+                      const ctvPrice = roundToNearestThousand(ctvPriceRaw);
+                      const retailPrice = roundToNearestThousand(retailPriceRaw);
+                      return hasPrice ? (
+                        <div className="mt-4 grid gap-2 rounded-lg border border-white/5 bg-slate-950/30 p-3 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">
+                              Xem Trước Giá (theo Tỷ Giá CTV):
+                            </span>
+                            <span className="font-semibold text-white">
+                              {formatVndDisplay(ctvPrice)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">
+                              Giá Lẻ (từ giá CTV × Tỷ Giá Khách):
+                            </span>
+                            <span className="font-semibold text-white">
+                              {formatVndDisplay(retailPrice)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">
-                            Giá Lẻ (theo Tỷ Giá Khách):
-                          </span>
-                          <span className="font-semibold text-white">
-                            {formatVndDisplay(
-                              multiplyValue(
-                                supplier.price,
-                                parseRatioInput(createForm.pctKhach)
-                              )
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                      ) : null;
+                    })()}
                   </div>
                 ))}
 

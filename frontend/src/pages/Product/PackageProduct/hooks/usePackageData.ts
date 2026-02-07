@@ -2,12 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../../../lib/api";
 import {
   AugmentedRow,
-  DEFAULT_CAPACITY_LIMIT,
-  DEFAULT_SLOT_CAPACITY_UNIT,
-  DEFAULT_SLOT_LIMIT,
   OrderListItem,
   PACKAGE_FIELD_OPTIONS,
-  PackageSlotAssignment,
   PackageField,
   PackageRow,
   PackageTemplate,
@@ -16,22 +12,17 @@ import {
   StatusFilter,
   NormalizedOrderRecord,
   buildIdentifierKeys,
-  buildPackageLinkKeys,
-  buildSlotLabelVariants,
   enhancePackageRow,
-  extractCapacityUnitsFromOrder,
   getSlotAvailabilityState,
-  normalizeIdentifier,
   normalizeMatchKey,
   normalizeProductCodeValue,
   normalizeSlotKey,
-  parseNumericValue,
   toCleanString,
-  resolveOrderDisplayValue,
   stripCapacityFields,
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
 } from "../utils/packageHelpers";
+import { computeAugmentationForPackage } from "../utils/packageMatchUtils";
 import { onRefresh } from "../../../../lib/refreshBus";
 
 type UsePackageDataResult = {
@@ -77,39 +68,6 @@ type UsePackageDataResult = {
     persistSlotLinkPreference: (id: number | string, mode: SlotLinkMode) => void;
     applySlotLinkPrefs: (row: PackageRow) => PackageRow;
   };
-};
-
-const buildOrderLookupKey = (
-  record: NormalizedOrderRecord,
-  fallbackIndex: number
-): string => {
-  const base = record.base;
-  if (base?.id !== undefined && base?.id !== null) {
-    return `id:${base.id}`;
-  }
-  if (base?.id_order !== undefined && base?.id_order !== null) {
-    return `code:${base.id_order}`;
-  }
-  return `${record.productKey || record.infoKey}-${fallbackIndex}`;
-};
-
-const collectOrdersByProductCodes = (
-  codes: Set<string>,
-  orderMap: Map<string, NormalizedOrderRecord[]>
-): NormalizedOrderRecord[] => {
-  if (codes.size === 0) return [];
-  const collected = new Map<string, NormalizedOrderRecord>();
-  codes.forEach((code) => {
-    const records = orderMap.get(code);
-    if (!records?.length) return;
-    records.forEach((record) => {
-      const key = buildOrderLookupKey(record, collected.size);
-      if (!collected.has(key)) {
-        collected.set(key, record);
-      }
-    });
-  });
-  return Array.from(collected.values());
 };
 
 export const usePackageData = (): UsePackageDataResult => {
@@ -269,6 +227,8 @@ export const usePackageData = (): UsePackageDataResult => {
       let changed = false;
       packageNames.forEach((name) => {
         if (!name) return;
+        const firstRow = rows.find((row) => row.package === name);
+        const productId = firstRow?.productId ?? null;
         const hasCapacityConfigured = rows.some(
           (row) => row.package === name && row.hasCapacityField
         );
@@ -279,6 +239,7 @@ export const usePackageData = (): UsePackageDataResult => {
             : stripCapacityFields(defaultTemplateFields);
           map.set(name, {
             name,
+            productId,
             fields: inferredFields,
             isCustom: false,
           });
@@ -291,7 +252,7 @@ export const usePackageData = (): UsePackageDataResult => {
           existing.fields.includes("capacity")
         ) {
           const strippedFields = stripCapacityFields(existing.fields);
-          map.set(name, { ...existing, fields: strippedFields });
+          map.set(name, { ...existing, productId: existing.productId ?? productId, fields: strippedFields });
           changed = true;
         }
       });
@@ -304,22 +265,27 @@ export const usePackageData = (): UsePackageDataResult => {
 
   const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
     return orders.map((order) => {
-      const productKeys = buildIdentifierKeys(order.id_product ?? "");
-      const infoKeys = buildIdentifierKeys(order.information_order ?? "");
+      const idProduct =
+        (order.id_product ?? order.idProduct ?? "") as string;
+      const informationOrder =
+        (order.information_order ?? order.informationOrder ?? "") as string;
+      const slot = order.slot;
+      const productKeys = buildIdentifierKeys(idProduct);
+      const infoKeys = buildIdentifierKeys(informationOrder);
       return {
         base: order,
         productKey: productKeys.normalized,
         productLettersKey: productKeys.lettersOnly,
         infoKey: infoKeys.normalized,
         infoLettersKey: infoKeys.lettersOnly,
-        slotDisplay: toCleanString(order.slot),
-        slotKey: normalizeSlotKey(order.slot),
-        slotMatchKey: normalizeMatchKey(order.slot),
-        informationDisplay: toCleanString(order.information_order),
-        informationKey: normalizeSlotKey(order.information_order),
-        informationMatchKey: normalizeMatchKey(order.information_order),
+        slotDisplay: toCleanString(slot),
+        slotKey: normalizeSlotKey(slot),
+        slotMatchKey: normalizeMatchKey(slot),
+        informationDisplay: toCleanString(informationOrder),
+        informationKey: normalizeSlotKey(informationOrder),
+        informationMatchKey: normalizeMatchKey(informationOrder),
         customerDisplay: toCleanString(order.customer as string | null),
-        productCodeNormalized: normalizeProductCodeValue(order.id_product),
+        productCodeNormalized: normalizeProductCodeValue(idProduct),
       };
     });
   }, [orders]);
@@ -339,228 +305,15 @@ export const usePackageData = (): UsePackageDataResult => {
 
   const computedRows: AugmentedRow[] = useMemo(
     () =>
-      rows.map((item) => {
-        const includeCapacity = Boolean(item.hasCapacityField);
-        const slotLimitRaw = parseNumericValue(item.slot);
-        const slotLimit =
-          slotLimitRaw && slotLimitRaw > 0
-            ? Math.floor(slotLimitRaw)
-            : DEFAULT_SLOT_LIMIT;
-        const slotUsedRaw = parseNumericValue((item as PackageRow).slotUsed);
-        const packageCode = normalizeIdentifier(item.package);
-        const packageLettersCode = packageCode.replace(/[0-9]/g, "");
-        const slotMode = item.slotLinkMode ?? "information";
-        const displayColumn =
-          slotMode === "information" ? "slot" : "information";
-        const matchColumn = displayColumn === "slot" ? "information" : "slot";
-        const packageLinkKeys = buildPackageLinkKeys(item);
-        const normalizedProductCodes = item.normalizedProductCodes ?? [];
-        const productCodeSet =
-          normalizedProductCodes.length > 0
-            ? new Set(normalizedProductCodes)
-            : null;
-        const shouldMatchOrders =
-          ordersReady &&
-          orderMatchers.length > 0 &&
-          (productCodeSet?.size || packageCode.length > 0);
-
-        const matchesByProductCodes = (record: NormalizedOrderRecord) => {
-          if (!productCodeSet || productCodeSet.size === 0) return false;
-          return (
-            !!record.productCodeNormalized &&
-            productCodeSet.has(record.productCodeNormalized)
-          );
-        };
-
-        const matchesByPackageName = (record: NormalizedOrderRecord) => {
-          if (!packageCode) return false;
-          const productMatch =
-            (!!record.productKey &&
-              (record.productKey.startsWith(packageCode) ||
-                record.productKey.includes(packageCode))) ||
-            (!!packageLettersCode &&
-              !!record.productLettersKey &&
-              (record.productLettersKey.startsWith(packageLettersCode) ||
-                record.productLettersKey.includes(packageLettersCode)));
-          const infoMatch =
-            (!!record.infoKey &&
-              (record.infoKey.startsWith(packageCode) ||
-                record.infoKey.includes(packageCode))) ||
-            (!!packageLettersCode &&
-              !!record.infoLettersKey &&
-              (record.infoLettersKey.startsWith(packageLettersCode) ||
-                record.infoLettersKey.includes(packageLettersCode)));
-          return productMatch || infoMatch;
-        };
-
-        const matchesProductRecord = (record: NormalizedOrderRecord) => {
-          return matchesByProductCodes(record) || matchesByPackageName(record);
-        };
-
-        const matchesLinkRecord = (record: NormalizedOrderRecord) => {
-          if (packageLinkKeys.length === 0) return true;
-          const linkValue =
-            matchColumn === "slot"
-              ? record.slotMatchKey
-              : record.informationMatchKey;
-          if (!linkValue) return false;
-          return packageLinkKeys.some(
-            (pkgKey) =>
-              pkgKey === linkValue ||
-              pkgKey.includes(linkValue) ||
-              linkValue.includes(pkgKey)
-          );
-        };
-
-        const candidateOrders =
-          shouldMatchOrders && productCodeSet?.size
-            ? collectOrdersByProductCodes(productCodeSet, ordersByProductCode)
-            : null;
-
-        const relevantOrders = shouldMatchOrders
-          ? (() => {
-              const combined = new Map<string, NormalizedOrderRecord>();
-
-              const addOrder = (record: NormalizedOrderRecord) => {
-                const key = buildOrderLookupKey(record, combined.size);
-                if (!combined.has(key)) {
-                  combined.set(key, record);
-                }
-              };
-
-              candidateOrders?.forEach(addOrder);
-
-              // If price-list product codes don't match order product codes,
-              // fall back to matching by package name so seats aren't missed.
-              orderMatchers.forEach((record) => {
-                if (matchesProductRecord(record)) {
-                  addOrder(record);
-                }
-              });
-
-              return Array.from(combined.values()).filter((record) =>
-                matchesLinkRecord(record)
-              );
-            })()
-          : [];
-
-        const seenOrderIds = new Set<string>();
-        const slotAssignments: PackageSlotAssignment[] = [];
-        if (shouldMatchOrders) {
-          relevantOrders.forEach((orderRecord) => {
-            const displayValue = resolveOrderDisplayValue(
-              orderRecord,
-              displayColumn
-            );
-            const matchValueRaw =
-              matchColumn === "slot"
-                ? orderRecord.slotDisplay
-                : orderRecord.informationDisplay;
-            const matchValue =
-              matchValueRaw || orderRecord.customerDisplay || "";
-            const uniqueKey =
-              orderRecord.base?.id !== undefined &&
-              orderRecord.base?.id !== null
-                ? `id:${orderRecord.base.id}`
-                : orderRecord.base?.id_order !== undefined &&
-                  orderRecord.base?.id_order !== null
-                ? `code:${orderRecord.base.id_order}`
-                : `${matchValue}-${slotAssignments.length}`;
-            if (seenOrderIds.has(uniqueKey)) return;
-            seenOrderIds.add(uniqueKey);
-            const label = displayValue || matchValue;
-            const labelVariants = buildSlotLabelVariants(
-              orderRecord,
-              displayColumn,
-              label
-            );
-            if (labelVariants.length === 0) return;
-            const capacityUnits = includeCapacity
-              ? extractCapacityUnitsFromOrder(packageCode, orderRecord)
-              : null;
-            labelVariants.forEach((slotLabel) => {
-              const resolvedLabel = slotLabel || label || "";
-              if (!resolvedLabel) return;
-              slotAssignments.push({
-                slotLabel: resolvedLabel,
-                matchValue: matchValue || resolvedLabel,
-                sourceOrderId: orderRecord.base?.id ?? null,
-                sourceOrderCode:
-                  (orderRecord.base?.id_order as string | number | null) ??
-                  null,
-                displayColumn,
-                matchColumn,
-                capacityUnits,
-              });
-            });
-          });
-        }
-
-        const slotUsageCount =
-          slotAssignments.length > 0
-            ? slotAssignments.length
-            : slotUsedRaw !== null
-            ? Math.max(Math.floor(slotUsedRaw), 0)
-            : 0;
-        const slotUsed = Math.min(slotUsageCount, slotLimit);
-        const remainingSlots = Math.max(slotLimit - slotUsed, 0);
-
-        let capacityLimit = 0;
-        let capacityUsed = 0;
-        let remainingCapacity = 0;
-        if (includeCapacity) {
-          const capacityLimitRaw = parseNumericValue(item.capacity);
-          capacityLimit =
-            capacityLimitRaw && capacityLimitRaw > 0
-              ? Math.floor(capacityLimitRaw)
-              : DEFAULT_CAPACITY_LIMIT;
-          const capacityUsedRaw = parseNumericValue(
-            (item as PackageRow).capacityUsed
-          );
-          const derivedCapacityUnits =
-            slotAssignments.length > 0
-              ? slotAssignments.reduce(
-                  (total, assignment) =>
-                    total +
-                    (assignment.capacityUnits ?? DEFAULT_SLOT_CAPACITY_UNIT),
-                  0
-                )
-              : slotUsageCount * DEFAULT_SLOT_CAPACITY_UNIT;
-          const fallbackCapacityUsed = Math.min(
-            derivedCapacityUnits,
-            capacityLimit
-          );
-          capacityUsed = Math.min(
-            Math.max(
-              capacityUsedRaw !== null
-                ? Math.floor(capacityUsedRaw)
-                : fallbackCapacityUsed,
-              0
-            ),
-            capacityLimit
-          );
-          remainingCapacity = Math.max(capacityLimit - capacityUsed, 0);
-        }
-        const matchedOrders = shouldMatchOrders
-          ? relevantOrders.map((entry) => entry.base)
-          : [];
-        return {
-          ...item,
-          slotUsed,
-          slotLimit,
-          remainingSlots,
-          capacityLimit,
-          capacityUsed,
-          remainingCapacity,
-          slotAssignments,
-          matchedOrders,
-          packageCode,
-          hasCapacityField: includeCapacity,
-          productCodes: item.productCodes ?? [],
-          normalizedProductCodes,
-          matchModeValue: item.matchModeValue ?? item.match ?? null,
-        };
-      }),
+      rows.map((item) => ({
+        ...item,
+        ...computeAugmentationForPackage({
+          item,
+          orderMatchers,
+          ordersByProductCode,
+          ordersReady,
+        }),
+      })),
     [rows, orderMatchers, ordersReady, ordersByProductCode]
   );
 

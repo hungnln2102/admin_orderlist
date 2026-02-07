@@ -27,57 +27,57 @@ export const PackageTable: React.FC<PackageTableProps> = ({
   };
 
   return (
-    <div className="glass-panel-dark rounded-[32px] shadow-2xl overflow-hidden text-white border border-white/5">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-white/5">
-          <thead className="bg-white/5">
+    <div className="package-table glass-panel-dark rounded-[32px] shadow-2xl overflow-hidden text-white border border-white/5">
+      <div className="package-table__inner overflow-x-auto">
+        <table className="package-table__table min-w-full divide-y divide-white/5">
+          <thead className="package-table__head bg-white/5">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
+              <th className="package-table__th px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">
                 Tên Gói
               </th>
-              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
+              <th className="package-table__th px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Thông Tin Gói
               </th>
-              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
+              <th className="package-table__th px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Số Lượng
               </th>
               {showCapacityColumn && (
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-indigo-300/40 uppercase tracking-[0.2em]">
+                <th className="package-table__th px-6 py-4 text-left text-[10px] font-bold text-indigo-300/40 uppercase tracking-[0.2em]">
                   Dung Lượng
                 </th>
               )}
-              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
+              <th className="package-table__th px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 NCC
               </th>
-              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
+              <th className="package-table__th px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Giá Nhập
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/90 uppercase tracking-wider">
+              <th className="package-table__th px-6 py-3 text-left text-xs font-medium text-white/90 uppercase tracking-wider">
                 Ngày Hết Hạn
               </th>
-              <th className="px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
+              <th className="package-table__th px-6 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.2em]">
                 Ghi Chú
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
+              <th className="package-table__th px-6 py-3 text-left text-xs font-medium text-white/80 uppercase tracking-wider">
                 Thao Tác
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="package-table__body divide-y divide-white/5">
             {loading ? (
-              <tr>
+              <tr className="package-table__loading-row">
                 <td
                   colSpan={tableColumnCount}
-                  className="px-6 py-8 text-center text-white/80 text-sm"
+                  className="package-table__loading-cell px-6 py-8 text-center text-white/80 text-sm"
                 >
                   Đang Tải Dữ Liệu...
                 </td>
               </tr>
             ) : rows.length === 0 ? (
-              <tr>
+              <tr className="package-table__empty-row">
                 <td
                   colSpan={tableColumnCount}
-                  className="px-6 py-8 text-center text-white/80 text-sm"
+                  className="package-table__empty-cell px-6 py-8 text-center text-white/80 text-sm"
                 >
                   Không có gói nào để hiển thị.
                 </td>

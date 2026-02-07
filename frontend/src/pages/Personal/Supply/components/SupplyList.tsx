@@ -31,12 +31,12 @@ const SupplyList: React.FC<Props> = ({
   onRefreshSupplies,
 }) => {
   return (
-    <div className="glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
+    <div className="supply-list glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
+      <div className="supply-list__inner overflow-x-auto">
+        <table className="supply-list__table w-full text-left">
+          <thead className="supply-list__head bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
             <tr>
-              <th className="px-4 py-3">Nhà cung cấp</th>
+              <th className="supply-list__th px-4 py-3">Nhà cung cấp</th>
               <th className="px-4 py-3">Tài khoản</th>
               <th className="px-4 py-3">Tháng này</th>
               <th className="px-4 py-3">Lần cuối</th>

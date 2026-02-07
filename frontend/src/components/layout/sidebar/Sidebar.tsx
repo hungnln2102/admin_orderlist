@@ -51,21 +51,21 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          className="sidebar__backdrop lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       <div
-        className={`
+        className={`sidebar ${isOpen ? "sidebar--open" : "sidebar--closed"}
           fixed top-4 left-4 bottom-4 z-40 w-64 glass-panel rounded-[32px] 
           transform transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
           ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-[110%] lg:translate-x-0 opacity-0 lg:opacity-100"}
           border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)]
         `}
       >
-        <div className="flex flex-col h-full">
-          <div className="px-5 pt-6 pb-2">
+        <div className="sidebar__inner flex flex-col h-full">
+          <div className="sidebar__brand px-5 pt-6 pb-2">
             <div className="group relative overflow-hidden rounded-xl bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 p-[1px] transition-all hover:scale-[1.02]">
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 to-purple-600 opacity-10 group-hover:opacity-20 transition-opacity"></div>
               <div className="relative rounded-[11px] bg-[#0c1222]/80 py-3 backdrop-blur-md border border-white/5 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)]">
@@ -82,7 +82,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 pb-6 overflow-y-auto space-y-2">
+          <nav className="sidebar__nav flex-1 px-3 pb-6 overflow-y-auto space-y-2">
             {menuSections.map((section, index) => (
               <SidebarMenuSection
                 key={section.title}

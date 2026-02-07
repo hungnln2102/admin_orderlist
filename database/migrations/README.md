@@ -1,5 +1,25 @@
 # Database Migrations
 
+## Local: Sửa lỗi "Tên Gói Sản Phẩm không được trùng"
+
+Nếu **chỉ môi trường local** báo lỗi duplicate package_name (server chạy bình thường), nghĩa là DB local vẫn còn unique constraint trên `product.package_name`. Chạy migration 003 **một lần** trên DB local:
+
+```bash
+# Từ thư mục gốc project (thay your_database bằng tên DB local, ví dụ mydtbmav)
+psql -U postgres -d your_database -f database/migrations/003_drop_product_package_name_unique.sql
+```
+
+Hoặc dùng connection string trong `.env`:
+
+```bash
+# PowerShell (Windows)
+$env:PGPASSWORD = "your_password"; psql -h localhost -U postgres -d mydtbmav -f database/migrations/003_drop_product_package_name_unique.sql
+```
+
+Sau khi chạy xong, thêm/sửa sản phẩm với Tên Gói trùng nhau sẽ không còn lỗi; chỉ **Mã Sản Phẩm** là bắt buộc unique.
+
+---
+
 ## Quy trình Migration
 
 ### 1. Tạo Migration mới

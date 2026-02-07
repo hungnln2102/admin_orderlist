@@ -65,8 +65,15 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
     setValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const matchRequiresAccountError =
+    (values.slotLinkMode === "slot" || values.slotLinkMode === "information") &&
+    !(values.informationUser ?? "").trim()
+      ? "Khi chọn Match theo Slot hoặc Information, Thông tin gói (Tài khoản) là bắt buộc."
+      : null;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (matchRequiresAccountError) return;
     onSubmit(values);
   };
 
@@ -104,8 +111,10 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
             Hủy
           </button>
           <button
+            type="submit"
             onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+            disabled={!!matchRequiresAccountError}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {mode === "add" ? "Lưu gói" : "Lưu thay đổi"}
           </button>
@@ -356,6 +365,11 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
             <b>Link theo vị trí:</b> So khớp thông tin gói với mã vị trí (slot) khai báo trong đơn hàng.
             <br />
           </p>
+          {matchRequiresAccountError && (
+            <p className="text-sm text-amber-400 mt-2" role="alert">
+              {matchRequiresAccountError}
+            </p>
+          )}
         </div>
         {template.fields.length === 0 && (
           <p className="text-sm text-white/80">

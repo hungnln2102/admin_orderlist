@@ -18,10 +18,26 @@ const listHandler = async (_req, res) => {
   }
 };
 
+const validateMatchRequiresAccount = (body) => {
+  const matchMode = body?.matchMode ?? body?.match;
+  if (matchMode !== "slot" && matchMode !== "information_order") return null;
+  const informationUser = (body?.informationUser ?? body?.account_user ?? "").trim();
+  if (!informationUser) {
+    return "Khi chọn Match theo Slot hoặc Information, Thông tin gói (tài khoản/email) là bắt buộc.";
+  }
+  return null;
+};
+
 const createHandler = async (req, res) => {
-  const { packageName } = req.body || {};
-  if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
+  const body = req.body || {};
+  const packageId = body.packageId ?? body.package_id;
+  const idNum = packageId != null ? Number(packageId) : NaN;
+  if (!Number.isFinite(idNum) || idNum < 1) {
+    return res.status(400).json({ error: "Loại gói (product id) là bắt buộc." });
+  }
+  const matchError = validateMatchRequiresAccount(body);
+  if (matchError) {
+    return res.status(400).json({ error: matchError });
   }
 
   try {
@@ -35,13 +51,14 @@ const createHandler = async (req, res) => {
 
 const updateHandler = async (req, res) => {
   const { id } = req.params;
-  const { packageName } = req.body || {};
+  const body = req.body || {};
 
   if (!id) {
     return res.status(400).json({ error: "ID sản phẩm gói hàng là bắt buộc." });
   }
-  if (!packageName || typeof packageName !== "string" || !packageName.trim()) {
-    return res.status(400).json({ error: "Tên gói hàng là bắt buộc." });
+  const matchError = validateMatchRequiresAccount(body);
+  if (matchError) {
+    return res.status(400).json({ error: matchError });
   }
 
   try {
@@ -80,29 +97,22 @@ const deleteHandler = async (req, res) => {
 };
 
 const bulkDeleteHandler = async (req, res) => {
-  const { packages } = req.body || {};
-  if (!Array.isArray(packages)) {
-    return res.status(400).json({ error: "Các gói hàng phải là một mảng." });
-  }
-  const names = Array.from(
-    new Set(
-      packages
-        .map((name) => (typeof name === "string" ? name.trim() : ""))
-        .filter(Boolean)
-    )
-  );
-  if (!names.length) {
-    return res.status(400).json({ error: "Không có tên gói nào được cung cấp." });
+  const { packageIds, packages } = req.body || {};
+  const ids = Array.isArray(packageIds)
+    ? packageIds
+    : Array.isArray(packages)
+      ? packages.map((x) => (typeof x === "number" ? x : Number(x))).filter(Number.isFinite)
+      : [];
+  const uniqueIds = [...new Set(ids)].filter((id) => id >= 1);
+  if (!uniqueIds.length) {
+    return res.status(400).json({ error: "Cần ít nhất một package_id (product id) để xóa." });
   }
 
   try {
-    const deleteResult = await bulkDeletePackages(names);
-    const deletedNames = deleteResult
-      .map((row) => row[pkgCols.package] || row.package || row.package_name)
-      .filter(Boolean);
+    const deleteResult = await bulkDeletePackages(uniqueIds);
     res.json({
       deleted: deleteResult.length,
-      deletedNames,
+      deletedIds: uniqueIds,
     });
   } catch (error) {
     logger.error("[packages] Bulk delete failed", { error: error.message, stack: error.stack });
