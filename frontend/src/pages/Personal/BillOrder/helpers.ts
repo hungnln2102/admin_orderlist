@@ -52,6 +52,7 @@ export const extractMonths = (value?: string | null): number | null => {
 
 export type OrderTypeCode =
   | typeof ORDER_CODE_PREFIXES.COLLABORATOR
+  | typeof ORDER_CODE_PREFIXES.STUDENT
   | typeof ORDER_CODE_PREFIXES.RETAIL
   | typeof ORDER_CODE_PREFIXES.PROMO
   | typeof ORDER_CODE_PREFIXES.GIFT
@@ -63,6 +64,9 @@ export const resolveOrderType = (
   const upper = (orderCode || "").trim().toUpperCase();
   if (upper.startsWith(ORDER_CODE_PREFIXES.COLLABORATOR)) {
     return ORDER_CODE_PREFIXES.COLLABORATOR;
+  }
+  if (upper.startsWith(ORDER_CODE_PREFIXES.STUDENT)) {
+    return ORDER_CODE_PREFIXES.STUDENT;
   }
   if (upper.startsWith(ORDER_CODE_PREFIXES.RETAIL)) {
     return ORDER_CODE_PREFIXES.RETAIL;

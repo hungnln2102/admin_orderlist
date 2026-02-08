@@ -107,6 +107,7 @@ const attachCalculatePriceRoute = (router) => {
             const prefixKhuyen = (Helpers.ORDER_PREFIXES?.khuyen || "MAVK").toUpperCase();
             const prefixTang = (Helpers.ORDER_PREFIXES?.tang || "MAVT").toUpperCase();
             const prefixNhap = (Helpers.ORDER_PREFIXES?.nhap || "MAVN").toUpperCase();
+            const prefixSinhVien = (Helpers.ORDER_PREFIXES?.sinhvien || "MAVS").toUpperCase();
             const orderPrefix = orderId.toUpperCase();
             const customerTypePrefix = String(customer_type || "").toUpperCase();
             const isCtv = orderPrefix.startsWith(prefixCtv) || customerTypePrefix === prefixCtv;
@@ -114,6 +115,7 @@ const attachCalculatePriceRoute = (router) => {
             const isKhuyen = orderPrefix.startsWith(prefixKhuyen) || customerTypePrefix === prefixKhuyen;
             const isTang = orderPrefix.startsWith(prefixTang) || customerTypePrefix === prefixTang;
             const isNhap = orderPrefix.startsWith(prefixNhap) || customerTypePrefix === prefixNhap;
+            const isSinhVien = orderPrefix.startsWith(prefixSinhVien) || customerTypePrefix === prefixSinhVien;
 
             const resellRaw = pricingBase * pctCtv;
             const customerRaw = resellRaw * pctKhach;
@@ -129,7 +131,7 @@ const attachCalculatePriceRoute = (router) => {
             const promoPrice = pricePromo;
 
             let price = customerPrice;
-            if (isCtv) {
+            if (isCtv || isSinhVien) {
                 price = resellPrice;
             } else if (isLe) {
                 price = customerPrice;

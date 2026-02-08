@@ -37,7 +37,8 @@ const buildStatsQuery = () => `
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
-      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
+      ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
     FROM ${TABLES.orderList}
     WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
     
@@ -49,7 +50,8 @@ const buildStatsQuery = () => `
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
-      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
+      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
+      ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
     FROM ${TABLES.orderExpired}
     WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
   ),
@@ -60,7 +62,8 @@ const buildStatsQuery = () => `
         ${createDateNormalization(quoteIdent(ORDER_CANCELED_COLS.CREATED_AT))} AS registration_date,
         NULL::date AS expiry_date,
         ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
-        ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value
+        ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
+        ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
       FROM ${TABLES.orderCanceled}
       WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
   ),
@@ -91,12 +94,14 @@ const buildStatsQuery = () => `
     END), 0) AS total_imports_previous,
     
     COALESCE(SUM(CASE
-      WHEN registration_date BETWEEN params.curr_start AND params.curr_end THEN price_value - cost_value
+      WHEN registration_date BETWEEN params.curr_start AND params.curr_end
+        AND payment_status = '${STATUS.PAID}' THEN price_value - cost_value
       ELSE 0
     END), 0) AS total_profit_current,
     
     COALESCE(SUM(CASE
-      WHEN registration_date BETWEEN params.prev_start AND params.prev_end THEN price_value - cost_value
+      WHEN registration_date BETWEEN params.prev_start AND params.prev_end
+        AND payment_status = '${STATUS.PAID}' THEN price_value - cost_value
       ELSE 0
     END), 0) AS total_profit_previous,
     

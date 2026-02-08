@@ -6,6 +6,7 @@ const ORDER_PREFIXES = {
   khuyen: "MAVK", // khuyến mãi
   tang: "MAVT", // tặng
   nhap: "MAVN", // nhập
+  sinhvien: "MAVS", // sinh viên (giá như CTV)
   // Back-compat alias
   thuong: "MAVT",
 };
