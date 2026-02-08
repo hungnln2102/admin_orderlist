@@ -79,13 +79,17 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           isExpanded ? "bg-indigo-900/30" : ""
         } cursor-pointer text-white`}
       >
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-          {row.package}
+        <td className="package-row__cell px-5 py-4 text-sm font-medium text-white">
+          <div className="truncate" title={row.package || ""}>
+            {row.package}
+          </div>
         </td>
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm text-white/80">
-          {row.informationUser || ""}
+        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
+          <div className="truncate" title={row.informationUser || ""}>
+            {row.informationUser || ""}
+          </div>
         </td>
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap">
+        <td className="package-row__cell px-5 py-4">
           <div className="package-row__slot-summary text-sm font-bold text-white flex items-center gap-2">
             <span className="text-indigo-400">{slotUsed}</span>
             <span className="text-white/20">/</span>
@@ -102,7 +106,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           </div>
         </td>
         {showCapacityColumn && (
-          <td className="package-row__cell px-6 py-4 whitespace-nowrap">
+          <td className="package-row__cell px-5 py-4">
             {showRowCapacity ? (
               <>
                 <div className="text-sm font-bold text-white flex items-center gap-2">
@@ -127,21 +131,25 @@ export const PackageRow: React.FC<PackageRowProps> = ({
             )}
           </td>
         )}
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm text-white/80">
-          {row.supplier || ""}
+        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
+          <div className="truncate" title={row.supplier || ""}>
+            {row.supplier || ""}
+          </div>
         </td>
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm text-white">
+        <td className="package-row__cell px-5 py-4 text-sm text-white whitespace-nowrap">
           {Number(row.import || 0).toLocaleString("vi-VN")} VND
         </td>
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm">
+        <td className="package-row__cell px-5 py-4 text-sm whitespace-nowrap">
           <span className="font-mono font-semibold text-white/95 tracking-wide">
             {formatDisplayDate(row.expired) || "---"}
           </span>
         </td>
-        <td className="package-row__cell px-6 py-4 whitespace-nowrap text-sm text-white/80">
-          {row.note || ""}
+        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
+          <div className="truncate" title={row.note || ""}>
+            {row.note || ""}
+          </div>
         </td>
-        <td className="package-row__actions px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+        <td className="package-row__actions px-5 py-4 whitespace-nowrap text-sm font-medium space-x-1">
           <button
             className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             type="button"

@@ -238,6 +238,7 @@ const buildOrderCreatedMessage = (order, paymentNote) => {
     toSafeString(order.id_order || order.idOrder || order.order_code || order.orderCode).trim();
   const productName = toSafeString(order.id_product || order.idProduct).trim();
   const info = toSafeString(order.information_order || order.informationOrder).trim();
+  const slot = toSafeString(order.slot).trim();
   const customer = toSafeString(order.customer || order.customer_name).trim();
   const registerDate =
     toSafeString(order.registration_date_display || order.registration_date_str).trim() ||
@@ -252,6 +253,7 @@ const buildOrderCreatedMessage = (order, paymentNote) => {
   const escOrder = orderCode ? escapeHtml(orderCode) : "...";
   const escProduct = productName ? escapeHtml(productName) : "N/A";
   const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "";
   const escCustomer = customer ? escapeHtml(customer) : "N/A";
   const escRegister = registerDate ? escapeHtml(registerDate) : "";
   const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
@@ -272,6 +274,7 @@ const buildOrderCreatedMessage = (order, paymentNote) => {
     "🔔 <b>THÔNG TIN SẢN PHẨM</b>",
     `📦 Tên Sản Phẩm: <b>${escProduct}</b>`,
     `📋 Thông Tin Đơn Hàng: <code>${escInfo}</code>`,
+    escSlot ? `📌 Slot: <code>${escSlot}</code>` : null,
     escRegister ? `📅 Ngày Bắt đầu: ${escRegister}` : null,
     escDays ? `⏳ Thời hạn: ${escDays}` : null,
     escExpiry ? `📅 Ngày Hết hạn: ${escExpiry}` : null,

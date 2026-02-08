@@ -132,7 +132,7 @@ export default function BillOrder() {
         toPositiveNumber(product?.computed_retail_price) || wholesalePrice;
 
       let unitPrice = retailPrice;
-      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR) {
+      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR || orderType === ORDER_CODE_PREFIXES.STUDENT) {
         unitPrice = wholesalePrice;
       } else if (orderType === ORDER_CODE_PREFIXES.GIFT) {
         unitPrice = 0;
