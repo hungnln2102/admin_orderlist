@@ -291,16 +291,16 @@ export default function Orders() {
         >
           <table className="min-w-full table-fixed border-separate border-spacing-y-4 text-white">
             <thead>
-              <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-center">
-                <th className="w-[150px]">ORDER / SẢN PHẨM</th>
-                <th className="w-[140px]">THÔNG TIN ĐƠN</th>
-                <th className="w-[150px]">KHÁCH HÀNG</th>
-                <th className="w-[150px]">LỊCH TRÌNH</th>
+              <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:pb-2 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:sm:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-center">
+                <th className="w-[14%]">ORDER / SẢN PHẨM</th>
+                <th className="w-[18%]">THÔNG TIN ĐƠN</th>
+                <th className="w-[14%]">KHÁCH HÀNG</th>
+                <th className="w-[16%]">LỊCH TRÌNH</th>
                 {showRemainingColumn && (
-                  <th className="w-[100px] whitespace-nowrap">{remainingLabel}</th>
+                  <th className="w-[8%] whitespace-nowrap">{remainingLabel}</th>
                 )}
-                <th className="w-[120px]">TRẠNG THÁI</th>
-                <th className="w-[100px] text-right pr-8">THAO TÁC</th>
+                <th className="w-[12%]">TRẠNG THÁI</th>
+                <th className="w-[18%] text-right pr-4">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="">

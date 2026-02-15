@@ -33,14 +33,18 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   showRemainingColumn,
   showActionButtons,
   isCanceled,
+  renewingOrderCode,
   onView,
   onEdit,
   onDelete,
   onConfirmRefund,
+  onMarkPaid,
+  onRenew,
 }) => {
   const orderCode = order[ORDER_FIELDS.ID_ORDER] || "--";
   const customer = order[ORDER_FIELDS.CUSTOMER] || "--";
   const product = order[ORDER_FIELDS.ID_PRODUCT] || "--";
+  const supply = order[ORDER_FIELDS.SUPPLY] || "";
   const expiryDate = order[ORDER_FIELDS.ORDER_EXPIRED] || "";
   const status = order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "";
   const price = Number(order[ORDER_FIELDS.PRICE] || 0);
@@ -58,7 +62,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
   const statusText = String(status || "").trim();
   const statusColor = statusColors[statusText] || "bg-slate-500/20 text-slate-300 border-slate-500/30";
-  const statusStr = statusText; // Keep for background accent logic below
+  const statusStr = statusText;
+
+  // Determine which action buttons to show (matching OrderRow logic)
+  const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+  const canRenew =
+    statusText === ORDER_STATUSES.CAN_GIA_HAN ||
+    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+  const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
+  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
+  const isRenewing = renewingOrderCode === orderCodeText;
 
   return (
     <div className="order-card relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 hover:border-indigo-500/40 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-900/50">
@@ -77,15 +90,45 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               {orderCode}
             </h3>
           </div>
-          <div className="order-card__tags flex items-center justify-between gap-2">
+          <div className="order-card__tags flex items-center flex-wrap gap-2">
             <div className="order-card__product-tag inline-flex self-start px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold text-indigo-300 uppercase tracking-wide truncate max-w-[140px] sm:max-w-[200px]">
                 {product}
               </p>
             </div>
+            {supply && (
+              <div className="order-card__supply-tag inline-flex self-start px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 backdrop-blur-md min-w-0">
+                <p className="text-[10px] sm:text-[11px] font-bold text-purple-300 uppercase tracking-wide truncate max-w-[120px] sm:max-w-[160px]">
+                  NCC: {supply}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="order-card__status-row flex items-center justify-between gap-2">
             <span className={`order-card__status px-2.5 py-1 shrink-0 rounded-xl text-[10px] font-bold uppercase tracking-wide border shadow-lg ${statusColor}`}>
               {status}
             </span>
+            {showActionButtons && (canStartProcessing || canMarkPaid || canRenew) && (
+              <div className="flex items-center gap-2">
+                {(canStartProcessing || canMarkPaid) && onMarkPaid && (
+                  <button
+                    className="inline-flex px-2.5 py-0.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase tracking-wide transition-all hover:bg-emerald-500/30 active:scale-95 shadow-lg"
+                    onClick={(e) => { e.stopPropagation(); onMarkPaid(order); }}
+                  >
+                    Thanh Toán
+                  </button>
+                )}
+                {canRenew && onRenew && (
+                  <button
+                    className="inline-flex px-2.5 py-0.5 rounded-xl bg-blue-500/20 border border-blue-500/30 text-[10px] font-bold text-blue-300 uppercase tracking-wide transition-all hover:bg-blue-500/30 active:scale-95 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={isRenewing}
+                    onClick={(e) => { e.stopPropagation(); if (!isRenewing) onRenew(order); }}
+                  >
+                    {isRenewing ? "Đang Gia Hạn..." : "Gia Hạn"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
