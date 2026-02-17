@@ -134,16 +134,9 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     if (latestCycle) {
         const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
         const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
-        let nextImport = currentImport - costValue;
+        const nextImport = currentImport - costValue;
 
-        let roundValue = latestCycle[colRound] != null ? String(latestCycle[colRound]) : formatNote();
-        if (nextImport < 0) {
-            const absDebt = Math.abs(nextImport);
-            nextImport = 0;
-            roundValue = roundValue.trim()
-                ? `${roundValue} | NCC còn nợ: ${absDebt}`
-                : `NCC còn nợ: ${absDebt}`;
-        }
+        const roundValue = latestCycle[colRound] != null ? String(latestCycle[colRound]) : formatNote();
 
         const updatePayload = {
             [colImport]: nextImport,
@@ -157,19 +150,18 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
             .where(colId, latestCycle[colId])
             .update(updatePayload);
     } else {
-        const absDebt = costValue;
-        const roundValue = `NCC còn nợ: ${absDebt}`;
         await trx(PAYMENT_SUPPLY_TABLE).insert({
             [colSourceId]: supplyId,
-            [colImport]: 0,
+            [colImport]: -costValue,
             [colPaid]: 0,
-            [colRound]: roundValue,
+            [colRound]: formatNote(),
             [colStatus]: STATUS.UNPAID,
         });
     }
 };
 
 const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
+    const logger = require("../../utils/logger");
     const statusValue =
         orderRow?.status ??
         normalized?.status ??
@@ -178,15 +170,51 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
     const isPaidLike =
         statusValue === STATUS.PROCESSING || statusValue === STATUS.PAID;
 
-    if (!isPaidLike) return;
+    if (!isPaidLike) {
+        logger.debug("[Finance] adjustSupplierDebtIfNeeded skipped: status not PROCESSING/PAID", {
+            status: statusValue,
+            orderId: orderRow?.id,
+        });
+        return;
+    }
 
-    const supplyId = await findSupplyIdByName(trx, orderRow?.supply);
-    if (!supplyId) return;
+    const supplyName = orderRow?.supply;
+    const supplyId = await findSupplyIdByName(trx, supplyName);
+    if (!supplyId) {
+        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: supplier not found", {
+            supply: supplyName,
+            orderId: orderRow?.id,
+        });
+        return;
+    }
 
     const prorated = calcRemainingImport(orderRow, normalized);
-    if (!prorated || prorated <= 0) return;
+    if (!prorated || prorated <= 0) {
+        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: no prorated cost", {
+            cost: orderRow?.cost,
+            days: orderRow?.days,
+            so_ngay_con_lai: normalized?.so_ngay_con_lai,
+            prorated,
+            orderId: orderRow?.id,
+        });
+        return;
+    }
     const roundedProrated = ceilToThousands(prorated);
-    if (!Number.isFinite(roundedProrated) || roundedProrated <= 0) return;
+    if (!Number.isFinite(roundedProrated) || roundedProrated <= 0) {
+        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: rounded prorated is 0", {
+            prorated,
+            roundedProrated,
+            orderId: orderRow?.id,
+        });
+        return;
+    }
+
+    logger.info("[Finance] Decreasing supplier debt", {
+        supplyId,
+        supplyName,
+        roundedProrated,
+        orderId: orderRow?.id,
+    });
     await decreaseSupplierDebt(trx, supplyId, roundedProrated);
 };
 

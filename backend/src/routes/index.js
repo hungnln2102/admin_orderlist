@@ -27,6 +27,31 @@ router.use("/auth", authRoutes);
 const testTelegramRoutes = require("./testTelegram");
 router.use("/test-telegram", testTelegramRoutes);
 
+// Frontend error reporting endpoint (before auth so it always works)
+const { notifyError } = require("../utils/telegramErrorNotifier");
+let lastFrontendReport = 0;
+router.post("/error-report", (req, res) => {
+  // Simple rate limit: 1 report per second
+  const now = Date.now();
+  if (now - lastFrontendReport < 1000) {
+    return res.status(429).json({ ok: false });
+  }
+  lastFrontendReport = now;
+
+  const { message, stack, url, extra } = req.body || {};
+  if (!message) return res.status(400).json({ ok: false });
+
+  notifyError({
+    message: String(message).slice(0, 500),
+    source: "frontend",
+    url: String(url || "").slice(0, 200),
+    stack: String(stack || "").slice(0, 500),
+    extra: extra ? String(extra).slice(0, 200) : undefined,
+  });
+
+  res.json({ ok: true });
+});
+
 // Protect everything else
 router.use(authGuard);
 

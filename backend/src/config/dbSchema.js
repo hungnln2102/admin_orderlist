@@ -44,7 +44,7 @@ const SCHEMA_SUPPLIER_COST = pickSchema(
   SCHEMA_PARTNER
 );
 const NOTIFICATION_GROUP_ID =
-  process.env.NOTIFICATION_GROUP_ID || "-1002934465528";
+  process.env.TELEGRAM_CHAT_ID || "-1002934465528";
 const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
 
 // -----------------------

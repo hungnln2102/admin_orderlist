@@ -102,6 +102,31 @@ if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
   );
 }
 
+// Telegram error notification transport
+try {
+  const { notifyError } = require("./telegramErrorNotifier");
+  const TelegramTransport = class extends winston.Transport {
+    log(info, callback) {
+      setImmediate(() => {
+        // Skip errors from the notifier itself to avoid loops
+        if (String(info.message || "").includes("[ErrorNotifier]")) return;
+        notifyError({
+          message: info.message,
+          source: "backend",
+          url: info.url,
+          method: info.method,
+          stack: info.stack || info[Symbol.for("splat")]?.[0]?.stack,
+          extra: info.statusCode ? `Status: ${info.statusCode}` : undefined,
+        });
+      });
+      callback();
+    }
+  };
+  transports.push(new TelegramTransport({ level: "error" }));
+} catch (err) {
+  console.warn("[Logger] Could not load Telegram error notifier:", err.message);
+}
+
 // Create logger instance
 const logger = winston.createLogger({
   levels,

@@ -112,7 +112,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               <div className="flex items-center gap-2">
                 {(canStartProcessing || canMarkPaid) && onMarkPaid && (
                   <button
-                    className="inline-flex px-2.5 py-0.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase tracking-wide transition-all hover:bg-emerald-500/30 active:scale-95 shadow-lg"
+                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase tracking-wide transition-all hover:bg-emerald-500/30 active:scale-95 shadow-lg"
                     onClick={(e) => { e.stopPropagation(); onMarkPaid(order); }}
                   >
                     Thanh Toán
@@ -120,7 +120,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 )}
                 {canRenew && onRenew && (
                   <button
-                    className="inline-flex px-2.5 py-0.5 rounded-xl bg-blue-500/20 border border-blue-500/30 text-[10px] font-bold text-blue-300 uppercase tracking-wide transition-all hover:bg-blue-500/30 active:scale-95 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-blue-500/20 border border-blue-500/30 text-[10px] font-bold text-blue-300 uppercase tracking-wide transition-all hover:bg-blue-500/30 active:scale-95 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
                     disabled={isRenewing}
                     onClick={(e) => { e.stopPropagation(); if (!isRenewing) onRenew(order); }}
                   >

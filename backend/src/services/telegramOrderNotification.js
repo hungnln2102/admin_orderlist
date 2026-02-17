@@ -8,22 +8,16 @@ const HTTP_TIMEOUT_MS = 10_000;
 // All sensitive values must come from environment variables
 // No hardcoded defaults for security reasons
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_CHAT_ID =
-  process.env.ORDER_NOTIFICATION_CHAT_ID ||
-  process.env.TELEGRAM_CHAT_ID ||
-  "";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const TELEGRAM_ORDER_TOPIC_ID = Number.parseInt(
-  process.env.ORDER_NOTIFICATION_TOPIC_ID ||
-    process.env.TELEGRAM_ORDER_TOPIC_ID ||
-    process.env.ORDER_TOPIC_ID ||
-    "1",
+  process.env.TELEGRAM_ORDER_TOPIC_ID || "1",
   10
 );
 const SEND_ORDER_NOTIFICATION =
   String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !==
   "false";
 const SEND_ORDER_TO_TOPIC =
-  String(process.env.SEND_ORDER_TO_TOPIC || "true").toLowerCase() !== "false";
+  String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
 
 const QR_ACCOUNT_NUMBER = process.env.ORDER_QR_ACCOUNT_NUMBER || "9183400998";
 const QR_BANK_CODE = process.env.ORDER_QR_BANK_CODE || "VPB";
@@ -34,7 +28,13 @@ const SEND_ORDER_COPY_BUTTONS =
   "false";
 
 const preferIpv4Lookup = (hostname, options, cb) =>
-  dns.lookup(hostname, { ...options, family: 4, all: false }, cb);
+  dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
+    if (err || !address) {
+      // IPv4 lookup failed, fall back to default lookup
+      return dns.lookup(hostname, { ...options, all: false }, cb);
+    }
+    cb(null, address, family);
+  });
 
 const sendWithHttps = (url, payload, headers = { "Content-Type": "application/json" }) =>
   new Promise((resolve, reject) => {
@@ -668,7 +668,7 @@ const sendZeroDaysRemainingNotification = async (orders = []) => {
  */
 const sendFourDaysRemainingNotification = async (orders = []) => {
   const FOUR_DAYS_TOPIC_ID = Number.parseInt(
-    process.env.FOUR_DAYS_TOPIC_ID || process.env.DUE_ORDER_TOPIC_ID || "12",
+    process.env.FOUR_DAYS_TOPIC_ID || "12",
     10
   );
 

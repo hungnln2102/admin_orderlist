@@ -32,6 +32,23 @@ class ErrorBoundary extends Component<Props, State> {
       error,
       errorInfo,
     });
+
+    // Report to backend for Telegram notification
+    try {
+      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001';
+      fetch(`${apiBase}/api/error-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: error?.message || String(error),
+          stack: error?.stack,
+          url: window.location.href,
+          extra: errorInfo?.componentStack?.slice(0, 200),
+        }),
+      }).catch(() => {});
+    } catch {
+      // Never let error reporting break the app
+    }
   }
 
   handleReload = (): void => {

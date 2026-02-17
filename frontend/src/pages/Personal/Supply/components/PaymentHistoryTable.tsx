@@ -110,6 +110,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId, onRefreshSupplies }) =
           <tr>
             <th className="px-4 py-2">Chu Kỳ</th>
             <th className="px-4 py-2">Tổng Nhập</th>
+            <th className="px-4 py-2">Còn Nợ</th>
             <th className="px-4 py-2">Đã Thanh Toán</th>
             <th className="px-4 py-2">Trạng Thái</th>
             <th className="px-4 py-2 text-right">Thao Tác</th>
@@ -134,6 +135,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId, onRefreshSupplies }) =
                   onChange={(e) => setDraft({ ...draft, import: formatMoneyInput(e.target.value) })}
                 />
               </td>
+              <td className="px-4 py-2 text-xs italic opacity-70">—</td>
               <td className="px-4 py-2">
                 <input
                   className="bg-transparent border-b border-white/30 w-full focus:outline-none text-white"
@@ -156,13 +158,13 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId, onRefreshSupplies }) =
 
           {loading ? (
             <tr>
-              <td colSpan={5} className="text-center py-4">
+              <td colSpan={6} className="text-center py-4">
                 Đang tải...
               </td>
             </tr>
           ) : payments.length === 0 ? (
             <tr>
-              <td colSpan={5} className="text-center py-4 opacity-50">
+              <td colSpan={6} className="text-center py-4 opacity-50">
                 Chưa có dữ liệu thanh toán
               </td>
             </tr>
@@ -180,8 +182,11 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId, onRefreshSupplies }) =
                         onChange={(e) => setEditValue(formatMoneyInput(e.target.value))}
                       />
                     ) : (
-                      formatCurrency(p.totalImport)
+                      p.totalImport >= 0 ? formatCurrency(p.totalImport) : "—"
                     )}
+                  </td>
+                  <td className={`px-4 py-2 ${p.totalImport < 0 ? "text-rose-400 font-semibold" : ""}`}>
+                    {p.totalImport < 0 ? formatCurrency(Math.abs(p.totalImport)) : "—"}
                   </td>
                   <td className="px-4 py-2">{formatCurrency(p.paid)}</td>
                   <td className="px-4 py-2">{p.status}</td>
