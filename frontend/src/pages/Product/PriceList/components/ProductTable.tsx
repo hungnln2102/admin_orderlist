@@ -9,6 +9,7 @@ import {
 } from "../types";
 import { normalizeProductKey } from "../utils";
 import ProductRow from "./ProductRow";
+import { PriceCard } from "./PriceCard";
 
 interface ProductTableProps {
   items: ProductPricingRow[];
@@ -178,7 +179,99 @@ const ProductTable: React.FC<ProductTableProps> = ({
 
   return (
     <div className="overflow-hidden rounded-[32px] border border-white/5 bg-white/5 text-white shadow-2xl backdrop-blur-xl">
-      <div className="overflow-x-auto">
+      {/* ───── Mobile card view (< md) ───── */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className="px-6 py-8 text-center text-sm text-white/80">
+            Đang Tải Dữ Liệu...
+          </div>
+        ) : items.length === 0 ? (
+          <div className="px-6 py-8 text-center text-sm text-white/80">
+            {error ? "Không thể tải dữ liệu. Vui lòng thử lại." : "Không có sản phẩm."}
+          </div>
+        ) : (
+          <div className="p-3 space-y-3">
+            {items.map((item) => {
+              const isExpanded = expandedProductId === item.id;
+              const isDeletingCurrent =
+                deleteProductState.product?.id === item.id && deleteProductState.loading;
+              const productKey = normalizeProductKey(item.sanPhamRaw);
+              const supplyState = supplyPriceMap[productKey];
+              const pendingNewSupply = newSupplyRows[item.id] || null;
+
+              return (
+                <div key={`card-${item.id}`}>
+                  <PriceCard
+                    item={item}
+                    isExpanded={isExpanded}
+                    statusOverride={statusOverrides[item.id]}
+                    updatedTimestamp={updatedTimestampMap[item.id]}
+                    isDeletingProduct={isDeletingCurrent}
+                    onToggleProductDetails={onToggleProductDetails}
+                    onStartProductEdit={(e, product) => {
+                    if (!isExpanded) {
+                      onToggleProductDetails(product);
+                    }
+                    onStartProductEdit(e, product);
+                  }}
+                    onRequestDeleteProduct={onRequestDeleteProduct}
+                    onToggleStatus={onToggleStatus}
+                  />
+                  {/* Expanded detail rendered via ProductRow inside a table wrapper */}
+                  {isExpanded && (
+                    <div className="mt-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/60">
+                      <table className="w-full text-white">
+                        <tbody>
+                          <ProductRow
+                            item={item}
+                            productKey={productKey}
+                            isExpanded={true}
+                            statusOverride={statusOverrides[item.id]}
+                            updatedTimestamp={updatedTimestampMap[item.id]}
+                            supplyState={supplyState}
+                            pendingNewSupply={pendingNewSupply}
+                            supplierOptions={supplierOptions}
+                            isLoadingSuppliers={isLoadingSuppliers}
+                            editingProductId={editingProductId}
+                            productEditForm={productEditForm}
+                            productEditError={productEditError}
+                            isSavingProductEdit={isSavingProductEdit}
+                            isDeletingProduct={isDeletingCurrent}
+                            editingSupplyRows={editingSupplyRows}
+                            supplyPriceDrafts={supplyPriceDrafts}
+                            savingSupplyRows={savingSupplyRows}
+                            supplyRowErrors={supplyRowErrors}
+                            onToggleProductDetails={onToggleProductDetails}
+                            onStartProductEdit={onStartProductEdit}
+                            onProductEditChange={onProductEditChange}
+                            onCancelProductEdit={onCancelProductEdit}
+                            onSubmitProductEdit={onSubmitProductEdit}
+                            onRequestDeleteProduct={onRequestDeleteProduct}
+                            onStartEditingSupply={onStartEditingSupply}
+                            onSupplyInputChange={onSupplyInputChange}
+                            onCancelSupplyEditing={onCancelSupplyEditing}
+                            onConfirmSupplyEditing={onConfirmSupplyEditing}
+                            onStartAddSupplierRow={onStartAddSupplierRow}
+                            onNewSupplierInputChange={onNewSupplierInputChange}
+                            onCancelAddSupplierRow={onCancelAddSupplierRow}
+                            onConfirmAddSupplierRow={onConfirmAddSupplierRow}
+                            onDeleteSupplyRow={onDeleteSupplyRow}
+                            onToggleStatus={onToggleStatus}
+                            fetchSupplyPricesForProduct={fetchSupplyPricesForProduct}
+                          />
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ───── Desktop table view (>= md) ───── */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-white/10 text-white">
           <thead className="bg-white/5">
             <tr>

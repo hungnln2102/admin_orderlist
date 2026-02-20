@@ -27,7 +27,12 @@ let lastSentAt = 0;
 const preferIpv4Lookup = (hostname, options, cb) =>
   dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
     if (err || !address) {
-      return dns.lookup(hostname, { ...options, all: false }, cb);
+      return dns.lookup(hostname, options, (err2, addr2, fam2) => {
+        if (err2 || !addr2) {
+          return cb(err2 || new Error(`Cannot resolve ${hostname}`));
+        }
+        cb(null, addr2, fam2);
+      });
     }
     cb(null, address, family);
   });

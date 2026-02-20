@@ -19,6 +19,9 @@ interface Props {
   onRefreshSupplies: () => void;
 }
 
+import { ResponsiveTable, TableCard } from "../../../../components/ui/ResponsiveTable";
+import { SupplyCard } from "./SupplyCard";
+
 const SupplyList: React.FC<Props> = ({
   supplies,
   loading,
@@ -32,7 +35,32 @@ const SupplyList: React.FC<Props> = ({
 }) => {
   return (
     <div className="supply-list glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
-      <div className="supply-list__inner overflow-x-auto">
+      <ResponsiveTable
+        className="supply-list__inner"
+        showCardOnMobile={true}
+        cardView={
+            loading ? (
+                <div className="p-8 text-center text-white/50">Đang tải...</div>
+            ) : supplies.length === 0 ? (
+                <div className="p-8 text-center text-white/50">Chưa có nhà cung cấp nào</div>
+            ) : (
+                <TableCard
+                    data={supplies as unknown as Record<string, unknown>[]}
+                    renderCard={(item) => (
+                        <SupplyCard
+                            supply={item as unknown as Supply}
+                            onToggleStatus={onToggleStatus}
+                            onView={onView}
+                        /*... callback props ...*/
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                        />
+                    )}
+                    className="p-4"
+                />
+            )
+        }
+      >
         <table className="supply-list__table w-full text-left">
           <thead className="supply-list__head bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
             <tr>
@@ -50,10 +78,16 @@ const SupplyList: React.FC<Props> = ({
           <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-white/50">
+                <td colSpan={9} className="text-center py-8 text-white/50">
                   Đang tải...
                 </td>
               </tr>
+            ) : supplies.length === 0 ? (
+                <tr>
+                    <td colSpan={9} className="text-center py-8 text-white/50">
+                        Chưa có nhà cung cấp nào
+                    </td>
+                </tr>
             ) : (
               supplies.map((supply) => (
                 <SupplyRow
@@ -71,7 +105,7 @@ const SupplyList: React.FC<Props> = ({
             )}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTable>
     </div>
   );
 };

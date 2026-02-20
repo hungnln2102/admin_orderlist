@@ -292,10 +292,10 @@ export default function Orders() {
           <table className="min-w-full table-fixed border-separate border-spacing-y-4 text-white">
             <thead>
               <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:pb-2 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:sm:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-center">
-                <th className="w-[14%]">ORDER / SẢN PHẨM</th>
+                <th className="w-[14%]">SẢN PHẨM</th>
                 <th className="w-[18%]">THÔNG TIN ĐƠN</th>
                 <th className="w-[14%]">KHÁCH HÀNG</th>
-                <th className="w-[16%]">LỊCH TRÌNH</th>
+                <th className="w-[16%]">THỜI HẠN</th>
                 {showRemainingColumn && (
                   <th className="w-[8%] whitespace-nowrap">{remainingLabel}</th>
                 )}

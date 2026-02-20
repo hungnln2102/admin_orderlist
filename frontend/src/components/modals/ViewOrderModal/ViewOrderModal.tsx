@@ -135,9 +135,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
           </button>
         </div>
 
-        <div className="view-order-modal__body p-4 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
+        <div className="view-order-modal__body p-3 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
           {/* Thong tin chung */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-xs sm:text-sm">
             {/* Left */}
             <dl className="space-y-2">
               <div className="flex justify-between border-b pb-1">
@@ -152,11 +152,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                   {order[ORDER_FIELDS.ID_PRODUCT]}
                 </dd>
               </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">
+              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1">
+                <dt className="font-medium text-slate-400 sm:w-1/3 mb-1 sm:mb-0">
                   Thông Tin Sản Phẩm:
                 </dt>
-                <dd className="text-slate-100 w-2/3 text-right break-words">
+                <dd className="text-slate-100 w-full sm:w-2/3 text-left sm:text-right break-words">
                   {order[ORDER_FIELDS.INFORMATION_ORDER]}
                 </dd>
               </div>
@@ -166,9 +166,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                   {order[ORDER_FIELDS.SLOT]}
                 </dd>
               </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Ghi Chú:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
+              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1">
+                <dt className="font-medium text-slate-400 sm:w-1/3 mb-1 sm:mb-0">Ghi Chú:</dt>
+                <dd className="text-slate-100 w-full sm:w-2/3 text-left sm:text-right break-words">
                   {order[ORDER_FIELDS.NOTE] || "-"}
                 </dd>
               </div>
@@ -194,11 +194,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                   {order[ORDER_FIELDS.CUSTOMER]}
                 </dd>
               </div>
-              <div className="flex justify-between border-b pb-1 items-start">
-                <dt className="font-medium text-slate-400 w-1/3 shrink-0">
+              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1 items-start">
+                <dt className="font-medium text-slate-400 sm:w-1/3 shrink-0 mb-1 sm:mb-0">
                   Liên Hệ:
                 </dt>
-                <dd className="w-2/3 text-right break-all">
+                <dd className="w-full sm:w-2/3 text-left sm:text-right break-all">
                   <a
                     href={order[ORDER_FIELDS.CONTACT] as string}
                     target="_blank"
@@ -252,7 +252,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
                 <img
                   src={qrCodeImageUrl}
                   alt={`QR Code thanh toán ${order[ORDER_FIELDS.ID_ORDER]}`}
-                  className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40"
+                  className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40 w-full max-w-[240px] sm:max-w-[280px] h-auto"
                   width={280}
                   height={280}
                 />

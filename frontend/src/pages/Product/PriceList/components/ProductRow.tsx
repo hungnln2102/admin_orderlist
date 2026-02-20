@@ -217,7 +217,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
   return (
     <React.Fragment>
       <tr
-        className="cursor-pointer bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 transition hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70"
+        className="hidden md:table-row cursor-pointer bg-gradient-to-r from-indigo-950/70 via-slate-900/60 to-indigo-950/70 transition hover:from-indigo-900/70 hover:via-indigo-800/50 hover:to-indigo-900/70"
         onClick={() => onToggleProductDetails(item)}
       >
         <td className="whitespace-nowrap px-6 py-4">
@@ -317,10 +317,10 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       </tr>
       {isEditingProduct && currentEditForm && (
         <tr>
-          <td colSpan={7} className="px-6 pb-6">
-            <div className="space-y-6 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 px-6 py-5 text-white shadow-lg">
+          <td colSpan={7} className="px-2 md:px-6 pb-4 md:pb-6">
+            <div className="space-y-4 md:space-y-6 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 px-3 py-4 md:px-6 md:py-5 text-white shadow-lg">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-lg">
                   <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">
                     Thông Tin Sản Phẩm
                   </p>
@@ -369,7 +369,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-lg">
                   <p className="text-xs font-semibold uppercase tracking-wide text-purple-200">
                     Tỷ giá
                   </p>
@@ -420,7 +420,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                 </div>
               </div>
               {currentEditForm && (
-                <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/70 via-slate-900/70 to-indigo-950/80 p-4 shadow-lg backdrop-blur">
+                <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/70 via-slate-900/70 to-indigo-950/80 p-3 md:p-4 shadow-lg backdrop-blur">
                   <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-white/80 sm:flex-row sm:items-center sm:justify-between">
                     <span>Giá dự kiến theo tỉ giá</span>
                     <span className="font-medium normal-case text-amber-200">
@@ -431,15 +431,15 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                     </span>
                   </div>
                   <div
-                    className={`mt-4 grid gap-3 text-center text-sm ${
+                    className={`mt-3 md:mt-4 grid gap-2 md:gap-3 text-center text-sm grid-cols-2 ${
                       showPreviewPromo ? "md:grid-cols-3" : "md:grid-cols-2"
                     }`}
                   >
-                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
-                      <p className="text-xs uppercase text-white/70">
+                    <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
+                      <p className="text-[10px] md:text-xs uppercase text-white/70">
                         Giá Sỉ dự kiến
                       </p>
-                      <p className="mt-1 text-lg font-semibold text-white">
+                      <p className="mt-1 text-base md:text-lg font-semibold text-white">
                         {formatCurrencyValue(previewWholesalePrice)}
                       </p>
                       <p className="text-[11px] text-white/70">
@@ -448,11 +448,11 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                           : "Nhập tỉ giá CTV"}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
-                      <p className="text-xs uppercase text-white/70">
+                    <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
+                      <p className="text-[10px] md:text-xs uppercase text-white/70">
                         Giá Khách dự kiến
                       </p>
-                      <p className="mt-1 text-lg font-semibold text-white">
+                      <p className="mt-1 text-base md:text-lg font-semibold text-white">
                         {formatCurrencyValue(previewRetailPrice)}
                       </p>
                       <p className="text-[11px] text-white/70">
@@ -462,11 +462,11 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                       </p>
                     </div>
                     {showPreviewPromo && (
-                      <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 shadow-lg backdrop-blur-sm">
-                        <p className="text-xs uppercase text-white/70">
+                      <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
+                        <p className="text-[10px] md:text-xs uppercase text-white/70">
                           Giá Khuyến mãi dự kiến
                         </p>
-                        <p className="mt-1 text-lg font-semibold text-white">
+                        <p className="mt-1 text-base md:text-lg font-semibold text-white">
                           {formatCurrencyValue(previewPromoPrice)}
                         </p>
                         <p className="text-[11px] text-white/70">
@@ -486,7 +486,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
               <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-4 md:px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={onCancelProductEdit}
                   disabled={isSavingProductEdit}
                 >
@@ -494,7 +494,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 px-4 md:px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 hover:opacity-90 disabled:opacity-60"
                   onClick={onSubmitProductEdit}
                   disabled={isSavingProductEdit}
                 >
@@ -507,55 +507,55 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       )}
       {isExpanded && (
         <tr>
-          <td colSpan={7} className="px-6 pb-6">
-            <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-4 text-white">
-              <div className="space-y-4 rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 px-6 py-5 text-white shadow-lg">
+          <td colSpan={7} className="px-2 md:px-6 pb-4 md:pb-6">
+            <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-2 md:p-4 text-white">
+              <div className="space-y-4 rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 px-3 py-4 md:px-6 md:py-5 text-white shadow-lg">
                 <div className="text-center">
                   <p className="text-sm font-semibold text-white">
                     Chi tiết giá sản phẩm
                   </p>
                 </div>
                 <div
-                  className={`grid gap-4 text-center ${
+                  className={`grid gap-2 md:gap-4 text-center grid-cols-2 ${
                     hasPromoForRow ? "md:grid-cols-4" : "md:grid-cols-3"
                   }`}
                 >
-                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                    <p className="text-xs uppercase text-white/70">
+                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
+                    <p className="text-[10px] md:text-xs uppercase text-white/70">
                       Giá nguồn thấp nhất
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-white">
+                    <p className="mt-1 text-base md:text-lg font-semibold text-white">
                       {formatCurrencyValue(cheapestPrice)}
                     </p>
-                    <p className="text-xs text-white/70">
+                    <p className="text-[10px] md:text-xs text-white/70 truncate max-w-full">
                       {cheapestSupplierName}
                     </p>
                   </div>
-                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                    <p className="text-xs uppercase text-white/70">
+                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
+                    <p className="text-[10px] md:text-xs uppercase text-white/70">
                       Giá sỉ hiện tại
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-white">
+                    <p className="mt-1 text-base md:text-lg font-semibold text-white">
                       {formatCurrencyValue(item.wholesalePrice)}
                     </p>
                   </div>
-                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                    <p className="text-xs uppercase text-white/70">
+                  <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
+                    <p className="text-[10px] md:text-xs uppercase text-white/70">
                       Giá khách hiện tại
                     </p>
-                    <p className="mt-1 text-lg font-semibold text-white">
+                    <p className="mt-1 text-base md:text-lg font-semibold text-white">
                       {formatCurrencyValue(item.retailPrice)}
                     </p>
                   </div>
                   {hasPromoForRow && (
-                    <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-                      <p className="text-xs uppercase text-white/70">
-                        Giá khuyến mãi hiện tại
+                    <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
+                      <p className="text-[10px] md:text-xs uppercase text-white/70">
+                        Giá KM hiện tại
                       </p>
-                      <p className="mt-1 text-lg font-semibold text-white">
+                      <p className="mt-1 text-base md:text-lg font-semibold text-white">
                         {formatCurrencyValue(item.promoPrice)}
                       </p>
-                      <p className="text-xs text-white/70">
+                      <p className="text-[10px] md:text-xs text-white/70">
                         {formatPromoPercent(item.pctPromo) ?? "-"}
                       </p>
                     </div>
@@ -576,10 +576,10 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                   <table className="w-full text-sm">
                     <thead className="bg-white/5 text-[11px] uppercase tracking-wide text-white/70">
                       <tr>
-                        <th className="px-4 py-2 text-left">NCC</th>
-                        <th className="px-4 py-2 text-center">Giá nhập</th>
-                        <th className="px-4 py-2 text-center">Lợi nhuận</th>
-                        <th className="px-4 py-2 text-center">Thao tác</th>
+                        <th className="px-2 md:px-4 py-2 text-left">NCC</th>
+                        <th className="px-2 md:px-4 py-2 text-center">Giá nhập</th>
+                        <th className="hidden md:table-cell px-4 py-2 text-center">Lợi nhuận</th>
+                        <th className="px-2 md:px-4 py-2 text-center">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -645,18 +645,18 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                                 key={rowKey}
                                 className="border-t border-dashed border-white/10"
                               >
-                                <td className="px-4 py-3">
-                                  <div className="text-sm font-semibold text-white">
+                                <td className="px-2 md:px-4 py-3">
+                                  <div className="text-xs md:text-sm font-semibold text-white truncate max-w-[80px] md:max-w-none">
                                     {supplier.sourceName}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-2 md:px-4 py-3">
                                   {isRowEditing ? (
                                     <div className="flex flex-col items-center gap-1">
                                       <div className="flex items-center gap-1">
                                         <input
                                           type="text"
-                                          className="w-28 rounded-lg border border-white/25 bg-white/5 px-2 py-1 text-center text-sm text-white placeholder:text-white/50 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/30 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                          className="w-20 md:w-28 rounded-lg border border-white/25 bg-white/5 px-2 py-1 text-center text-xs md:text-sm text-white placeholder:text-white/50 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/30 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                           value={inputValue}
                                           onChange={(event) =>
                                             onSupplyInputChange(
@@ -671,26 +671,26 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                                           đ
                                         </span>
                                       </div>
-                                      <span className="text-[11px] text-white/60">
+                                      <span className="hidden md:inline text-[11px] text-white/60">
                                         Nhập giá mới
                                       </span>
                                     </div>
                                   ) : (
                                     <div className="flex justify-center">
-                                      <span className="inline-flex min-w-[112px] justify-center rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white">
+                                      <span className="inline-flex min-w-0 md:min-w-[112px] justify-center rounded-lg bg-white/10 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white">
                                         {displayPrice}
                                       </span>
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 text-center text-xs text-white/70">
+                                <td className="hidden md:table-cell px-4 py-3 text-center text-xs text-white/70">
                                   {formatProfitRange(
                                     supplier.price,
                                     item.wholesalePrice,
                                     item.retailPrice
                                   )}
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-2 md:px-4 py-3">
                                   {isRowEditing ? (
                                     <div className="flex items-center justify-center gap-2">
                                       <button
@@ -838,12 +838,12 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                             return (
                               <React.Fragment key={`new-${item.id}`}>
                                 <tr className="border-t border-dashed border-white/15 bg-slate-900/50">
-                                  <td className="px-4 py-3">
+                                  <td className="px-2 md:px-4 py-3">
                                     <div className="flex flex-col gap-2">
                                       {hasOptions && !draft.useCustomName ? (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
                                           <select
-                                            className="w-60 max-w-xs rounded-lg border border-white/20 bg-slate-900/80 px-3 py-2 text-sm text-white shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300/30 disabled:opacity-60"
+                                            className="w-full md:w-60 md:max-w-xs rounded-lg border border-white/20 bg-slate-900/80 px-2 md:px-3 py-2 text-xs md:text-sm text-white shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300/30 disabled:opacity-60"
                                             value={selectValue}
                                             onChange={handleSupplierSelect}
                                             disabled={draft.isSaving}
@@ -920,11 +920,11 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-2 md:px-4 py-3">
                                     <div className="flex items-center justify-center gap-1">
                                       <input
                                         type="text"
-                                        className="w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                        className="w-20 md:w-28 rounded-lg border border-sky-200 bg-white px-2 py-1 text-center text-xs md:text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-200 appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                         placeholder="Giá nhập"
                                         value={draft.price}
                                         onChange={(event) =>
@@ -941,10 +941,10 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
                                       </span>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3 text-center text-xs text-white/70">
+                                  <td className="hidden md:table-cell px-4 py-3 text-center text-xs text-white/70">
                                     -
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-2 md:px-4 py-3">
                                     <div className="flex items-center justify-center gap-2">
                                       <button
                                         type="button"

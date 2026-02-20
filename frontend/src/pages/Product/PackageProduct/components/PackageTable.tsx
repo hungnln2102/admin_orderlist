@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PackageRow } from "./PackageRow";
+import { PackageCard } from "./PackageCard";
 import { AugmentedRow } from "../utils/packageHelpers";
 
 type PackageTableProps = {
@@ -28,7 +29,34 @@ export const PackageTable: React.FC<PackageTableProps> = ({
 
   return (
     <div className="package-table glass-panel-dark rounded-[32px] shadow-2xl overflow-hidden text-white border border-white/5">
-      <div className="package-table__inner overflow-x-auto">
+      {/* ───── Mobile card view (< md) ───── */}
+      <div className="md:hidden">
+        {loading ? (
+          <div className="px-6 py-8 text-center text-white/80 text-sm">
+            Đang Tải Dữ Liệu...
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="px-6 py-8 text-center text-white/80 text-sm">
+            Không có gói nào để hiển thị.
+          </div>
+        ) : (
+          <div className="p-3 space-y-3">
+            {rows.map((item, idx) => (
+              <PackageCard
+                key={`card-${item.id}-${idx}`}
+                row={item}
+                showCapacityColumn={showCapacityColumn}
+                onEdit={onEdit}
+                onView={onView}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ───── Desktop table view (>= md) ───── */}
+      <div className="package-table__inner overflow-x-auto hidden md:block">
         <table className="package-table__table w-full table-fixed divide-y divide-white/5">
           <colgroup>
             <col className="w-[13%]" />

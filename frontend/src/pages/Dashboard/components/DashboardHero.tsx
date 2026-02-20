@@ -14,11 +14,10 @@ export const DashboardHero: React.FC = () => (
           Digital Control Hub & Analysis
         </p>
       </div>
-      <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+      {/* <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
         <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Secure Uplink Verified</span>
-      </div>
+      </div> */}
     </div>
   </div>
 );
-
