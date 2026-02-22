@@ -16,7 +16,7 @@ const walletRoutes = require("./walletRoutes");
 const warehouseRoutes = require("./warehouseRoutes");
 const schedulerRoutes = require("./schedulerRoutes");
 const savingGoalsController = require("../controllers/SavingGoalsController");
-const { runSchedulerNow } = require("../controllers/SchedulerController");
+const { runSchedulerNow, runFourDaysNotificationNow } = require("../controllers/SchedulerController");
 const { authGuard } = require("../middleware/authGuard");
 
 const router = express.Router();
@@ -26,6 +26,9 @@ router.use("/auth", authRoutes);
 // Test endpoint for Telegram notifications (before auth for easy testing)
 const testTelegramRoutes = require("./testTelegram");
 router.use("/test-telegram", testTelegramRoutes);
+
+// Manual trigger: gửi thông báo đơn đến hạn (trước authGuard để dễ test)
+router.get("/run-due-notification", runFourDaysNotificationNow);
 
 // Frontend error reporting endpoint (before auth so it always works)
 const { notifyError } = require("../utils/telegramErrorNotifier");

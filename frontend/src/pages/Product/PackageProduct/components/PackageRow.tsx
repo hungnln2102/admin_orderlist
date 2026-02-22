@@ -79,17 +79,17 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           isExpanded ? "bg-indigo-900/30" : ""
         } cursor-pointer text-white`}
       >
-        <td className="package-row__cell px-5 py-4 text-sm font-medium text-white">
-          <div className="truncate" title={row.package || ""}>
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] font-medium text-white">
+          <div className="whitespace-normal break-words line-clamp-2" title={row.package || ""}>
             {row.package}
           </div>
         </td>
-        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
-          <div className="truncate" title={row.informationUser || ""}>
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] text-white/80">
+          <div className="whitespace-normal break-all line-clamp-1" title={row.informationUser || ""}>
             {row.informationUser || ""}
           </div>
         </td>
-        <td className="package-row__cell px-5 py-4">
+        <td className="package-row__cell px-1 py-4 lg:px-2">
           <div className="package-row__slot-summary text-sm font-bold text-white flex items-center gap-2">
             <span className="text-indigo-400">{slotUsed}</span>
             <span className="text-white/20">/</span>
@@ -106,7 +106,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           </div>
         </td>
         {showCapacityColumn && (
-          <td className="package-row__cell px-5 py-4">
+          <td className="package-row__cell px-1 py-4 lg:px-2">
             {showRowCapacity ? (
               <>
                 <div className="text-sm font-bold text-white flex items-center gap-2">
@@ -131,25 +131,26 @@ export const PackageRow: React.FC<PackageRowProps> = ({
             )}
           </td>
         )}
-        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] text-white/80">
           <div className="truncate" title={row.supplier || ""}>
             {row.supplier || ""}
           </div>
         </td>
-        <td className="package-row__cell px-5 py-4 text-sm text-white whitespace-nowrap">
-          {Number(row.import || 0).toLocaleString("vi-VN")} VND
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] text-white whitespace-nowrap">
+          {Number(row.import || 0).toLocaleString("vi-VN")} <span className="text-[10px] text-white/50">VND</span>
         </td>
-        <td className="package-row__cell px-5 py-4 text-sm whitespace-nowrap">
-          <span className="font-mono font-semibold text-white/95 tracking-wide">
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] whitespace-nowrap">
+          <span className="font-mono font-semibold text-white/95 tracking-tight">
             {formatDisplayDate(row.expired) || "---"}
           </span>
         </td>
-        <td className="package-row__cell px-5 py-4 text-sm text-white/80">
-          <div className="truncate" title={row.note || ""}>
+        <td className="package-row__cell px-1 py-4 lg:px-2 text-[12px] text-white/80">
+          <div className="whitespace-normal break-words line-clamp-1" title={row.note || ""}>
             {row.note || ""}
           </div>
         </td>
-        <td className="package-row__actions px-5 py-4 whitespace-nowrap text-sm font-medium space-x-1">
+        <td className="package-row__actions px-1 py-4 lg:px-2 whitespace-nowrap text-sm font-medium">
+          <div className="flex items-center justify-center gap-1 flex-wrap md:flex-nowrap">
           <button
             className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
             type="button"
@@ -183,6 +184,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </button>
+          </div>
         </td>
       </tr>
       {isExpanded && (

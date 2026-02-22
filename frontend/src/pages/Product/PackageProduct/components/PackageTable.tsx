@@ -57,47 +57,48 @@ export const PackageTable: React.FC<PackageTableProps> = ({
 
       {/* ───── Desktop table view (>= md) ───── */}
       <div className="package-table__inner overflow-x-auto hidden md:block">
-        <table className="package-table__table w-full table-fixed divide-y divide-white/5">
+        <div className="inline-block min-w-full align-middle">
+          <table className="package-table__table w-full table-fixed divide-y divide-white/5">
           <colgroup>
-            <col className="w-[13%]" />
-            <col className="w-[18%]" />
-            <col className="w-[11%]" />
-            {showCapacityColumn && <col className="w-[10%]" />}
-            <col className="w-[8%]" />
+            <col className={showCapacityColumn ? "w-[12%]" : "w-[14%]"} />
+            <col className={showCapacityColumn ? "w-[17%]" : "w-[20%]"} />
             <col className="w-[10%]" />
+            {showCapacityColumn && <col className="w-[8%]" />}
+            <col className={showCapacityColumn ? "w-[8%]" : "w-[9%]"} />
+            <col className={showCapacityColumn ? "w-[10%]" : "w-[11%]"} />
             <col className="w-[10%]" />
-            <col className="w-[12%]" />
-            <col className="w-[8%]" />
+            <col className={showCapacityColumn ? "w-[15%]" : "w-[17%]"} />
+            <col className="w-[10%]" />
           </colgroup>
           <thead className="package-table__head bg-white/5">
             <tr>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Tên Gói
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Thông Tin Gói
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Số Lượng
               </th>
               {showCapacityColumn && (
-                <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+                <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                   Dung Lượng
                 </th>
               )}
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 NCC
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Giá Nhập
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Ngày Hết Hạn
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-left text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Ghi Chú
               </th>
-              <th className="package-table__th px-5 py-4 text-left text-[11px] font-bold text-indigo-300/70 uppercase tracking-[0.15em]">
+              <th className="package-table__th px-2 py-4 lg:px-4 text-center text-[10px] font-bold text-indigo-300/70 uppercase tracking-widest whitespace-nowrap">
                 Thao Tác
               </th>
             </tr>
@@ -138,6 +139,7 @@ export const PackageTable: React.FC<PackageTableProps> = ({
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

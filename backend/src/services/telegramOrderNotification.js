@@ -467,8 +467,12 @@ const buildDueOrderMessage = (order, index, total) => {
   const info = toSafeString(order.information_order || order.informationOrder).trim();
   const slot = toSafeString(order.slot).trim();
   const customer = toSafeString(order.customer || order.customer_name).trim() || "---";
-  const registerDate = toSafeString(order.registration_date_display || order.registration_date_str).trim();
-  const expiryDate = toSafeString(order.expiry_date_display || order.expiry_date_str).trim();
+  const registerDate =
+    toSafeString(order.registration_date_display || order.registration_date_str).trim() ||
+    formatDateDMY(order.order_date);
+  const expiryDate =
+    toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
+    formatDateDMY(order.order_expired);
   const days = Number(order.days || order.total_days || 0) || 0;
   const daysLeft = Number(order.days_left) || 4;
   const price = Number(order.price || 0) || 0;
