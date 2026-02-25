@@ -21,13 +21,14 @@ const productDescCols = PRODUCT_DESC_DEF.COLS;
 const productCols = PRODUCT_DEF.columns;
 const variantCols = VARIANT_DEF.columns;
 
-// Normalize column names for easier reuse
+// Bảng product_desc: id, variant_id, rules, description, image_url, short_desc
 const productDescColNames = {
   id: productDescCols.ID,
-  productId: productDescCols.PRODUCT_ID,
+  variantId: productDescCols.VARIANT_ID,
   rules: productDescCols.RULES,
   description: productDescCols.DESCRIPTION,
   imageUrl: productDescCols.IMAGE_URL,
+  shortDesc: productDescCols.SHORT_DESC,
 };
 const productColNames = {
   id: productCols.ID || productCols.id,
@@ -70,7 +71,8 @@ const findVariantForProductId = async (productId) => {
   const query = `
     SELECT
       ${quoteIdent(variantColNames.id)} AS id,
-      ${quoteIdent(variantColNames.displayName)} AS display_name
+      ${quoteIdent(variantColNames.displayName)} AS display_name,
+      ${quoteIdent(variantColNames.variantName)} AS variant_name
     FROM ${TABLES.variant}
     WHERE
       LOWER(TRIM(${quoteIdent(variantColNames.displayName)}::text)) = LOWER(TRIM(?))
@@ -86,14 +88,15 @@ const mapProductDescRow = (req, row = {}) => {
   const normalizedImage = normalizeImageUrl(req, rawImage);
   return {
     id: Number(row.id) || Number(row[productDescColNames.id]) || null,
-    productId:
-      row.product_id || row[productDescColNames.productId] || row.productId || "",
-    productName: row.product_name || row.productName || null,
+    variantId: row.variant_id != null ? Number(row.variant_id) : (row[productDescColNames.variantId] != null ? Number(row[productDescColNames.variantId]) : null),
+    productId: row.product_id ?? row.productId ?? "",
+    productName: row.product_name ?? row.productName ?? null,
     rules: row.rules || row[productDescColNames.rules] || "",
     rulesHtml: row.rules_html || row.rulesHtml || null,
     description: row.description || row[productDescColNames.description] || "",
     descriptionHtml: row.description_html || row.descriptionHtml || null,
     imageUrl: normalizedImage || rawImage || null,
+    shortDesc: row.short_desc ?? row[productDescColNames.shortDesc] ?? null,
   };
 };
 const getForwardedHeader = (req, headerName) => {
@@ -288,7 +291,7 @@ const listProductDescriptions = async (req, res) => {
   const search = normalizeTextInput(req.query.search || "");
   const limitParam = Number(req.query.limit);
   const offsetParam = Number(req.query.offset);
-  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : 50;
+  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 2000) : 500;
   const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
 
   try {
@@ -297,12 +300,14 @@ const listProductDescriptions = async (req, res) => {
     if (search) {
       whereFragments.push(
         `(
-          LOWER(TRIM(${quoteIdent(productDescColNames.productId)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
-          OR LOWER(TRIM(${quoteIdent(productDescColNames.description)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
-          OR LOWER(TRIM(${quoteIdent(productDescColNames.rules)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+          LOWER(TRIM(v.${quoteIdent(variantColNames.displayName)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+          OR LOWER(TRIM(v.${quoteIdent(variantColNames.variantName)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+          OR LOWER(TRIM(pd.${quoteIdent(productDescColNames.description)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+          OR LOWER(TRIM(pd.${quoteIdent(productDescColNames.rules)}::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
+          OR LOWER(TRIM(COALESCE(pd.${quoteIdent(productDescColNames.shortDesc)}, '')::text)) LIKE '%' || LOWER(TRIM(?)) || '%'
         )`
       );
-      values.push(search, search, search);
+      values.push(search, search, search, search, search);
     }
     const whereClause = whereFragments.length
       ? `WHERE ${whereFragments.join(" AND ")}`
@@ -311,10 +316,10 @@ const listProductDescriptions = async (req, res) => {
     const q = `
       SELECT
         pd.*,
+        v.${quoteIdent(variantColNames.displayName)} AS product_id,
         v.${quoteIdent(variantColNames.variantName)} AS product_name
       FROM ${TABLES.productDesc} pd
-      LEFT JOIN ${TABLES.variant} v
-        ON TRIM(v.${quoteIdent(variantColNames.displayName)}::text) = TRIM(pd.${quoteIdent(productDescColNames.productId)}::text)
+      LEFT JOIN ${TABLES.variant} v ON v.${quoteIdent(variantColNames.id)} = pd.${quoteIdent(productDescColNames.variantId)}
       ${whereClause}
       ORDER BY pd.${quoteIdent(productDescColNames.id)} ASC
       OFFSET ?
@@ -322,18 +327,23 @@ const listProductDescriptions = async (req, res) => {
     `;
     const result = await db.raw(q, [...values, offset, limit]);
 
-    // Use Knex for count query - simpler and more maintainable
-    let countQuery = db(TABLES.productDesc);
-    
+    let countQuery = db(TABLES.productDesc).leftJoin(
+      TABLES.variant,
+      `${TABLES.variant}.${variantColNames.id}`,
+      `${TABLES.productDesc}.${productDescColNames.variantId}`
+    );
     if (search) {
       const searchLower = search.toLowerCase();
+      const vDisp = variantColNames.displayName;
+      const vName = variantColNames.variantName;
       countQuery = countQuery.where(function() {
-        this.whereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.productId)}::text)) LIKE ?`, [`%${searchLower}%`])
-          .orWhereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.description)}::text)) LIKE ?`, [`%${searchLower}%`])
-          .orWhereRaw(`LOWER(TRIM(${quoteIdent(productDescColNames.rules)}::text)) LIKE ?`, [`%${searchLower}%`]);
+        this.whereRaw(`LOWER(TRIM(${TABLES.variant}.${vDisp}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(${TABLES.variant}.${vName}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(${TABLES.productDesc}.${productDescColNames.description}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(${TABLES.productDesc}.${productDescColNames.rules}::text)) LIKE ?`, [`%${searchLower}%`])
+          .orWhereRaw(`LOWER(TRIM(COALESCE(${TABLES.productDesc}.${productDescColNames.shortDesc}, '')::text)) LIKE ?`, [`%${searchLower}%`]);
       });
     }
-    
     const countResult = await countQuery.count("* as total").first();
     const total = Number(countResult?.total) || 0;
 
@@ -351,7 +361,7 @@ const listProductDescriptions = async (req, res) => {
 };
 
 const saveProductDescription = async (req, res) => {
-  const { productId, rules, description, imageUrl } = req.body || {};
+  const { productId, rules, description, imageUrl, shortDesc } = req.body || {};
   const normalizedProductId = normalizeTextInput(productId);
   if (!normalizedProductId) {
     return res.status(400).json({ error: "productId là bắt buộc." });
@@ -359,78 +369,71 @@ const saveProductDescription = async (req, res) => {
 
   const normalizedRules = trimToLength(rules ?? "", 8000) || "";
   const normalizedDescription = trimToLength(description ?? "", 8000) || "";
+  const normalizedShortDesc = trimToLength(shortDesc ?? "", 2000) || "";
   const normalizedImage = trimToLength(imageUrl ?? "", 1000);
   const resolvedImageUrl = normalizeImageUrl(req, normalizedImage) || normalizedImage;
 
   try {
     const variantRow = await findVariantForProductId(normalizedProductId);
-    const resolvedProductId = variantRow?.display_name || normalizedProductId;
+    if (!variantRow || variantRow.id == null) {
+      return res.status(400).json({ error: "productId không tồn tại trong variant." });
+    }
+    const variantId = Number(variantRow.id);
 
     const existing = await db.raw(
       `
       SELECT *
       FROM ${TABLES.productDesc}
-      WHERE ${quoteIdent(productDescColNames.productId)} = ?
+      WHERE ${quoteIdent(productDescColNames.variantId)} = ?
       LIMIT 1;
     `,
-      [resolvedProductId]
+      [variantId]
     );
-    let existingRow = existing.rows?.[0] || null;
-
-    if (!existingRow && variantRow && resolvedProductId !== normalizedProductId) {
-      const fallback = await db.raw(
-        `
-        SELECT *
-        FROM ${TABLES.productDesc}
-        WHERE ${quoteIdent(productDescColNames.productId)} = ?
-        LIMIT 1;
-      `,
-        [normalizedProductId]
-      );
-      existingRow = fallback.rows?.[0] || null;
-    }
-
-    if (!existingRow && !variantRow) {
-      return res.status(400).json({ error: "productId không tồn tại trong variant." });
-    }
+    const existingRow = existing.rows?.[0] || null;
 
     if (existingRow) {
       const updateSql = `
         UPDATE ${TABLES.productDesc}
-        SET ${quoteIdent(productDescColNames.productId)} = ?,
-            ${quoteIdent(productDescColNames.rules)} = ?,
+        SET ${quoteIdent(productDescColNames.rules)} = ?,
             ${quoteIdent(productDescColNames.description)} = ?,
-            ${quoteIdent(productDescColNames.imageUrl)} = ?
+            ${quoteIdent(productDescColNames.imageUrl)} = ?,
+            ${quoteIdent(productDescColNames.shortDesc)} = ?
         WHERE ${quoteIdent(productDescColNames.id)} = ?
         RETURNING *;
       `;
       const updated = await db.raw(updateSql, [
-        resolvedProductId,
         normalizedRules,
         normalizedDescription,
         resolvedImageUrl,
+        normalizedShortDesc,
         existingRow[productDescColNames.id] || existingRow.id,
       ]);
-      return res.json(mapProductDescRow(req, updated.rows[0]));
+      const row = updated.rows[0];
+      const withProductId = { ...row, product_id: variantRow.display_name, product_name: variantRow.variant_name || variantRow.display_name };
+      return res.json(mapProductDescRow(req, withProductId));
     }
 
     const insertSql = `
       INSERT INTO ${TABLES.productDesc} (
-        ${quoteIdent(productDescColNames.productId)},
+        ${quoteIdent(productDescColNames.variantId)},
         ${quoteIdent(productDescColNames.rules)},
         ${quoteIdent(productDescColNames.description)},
-        ${quoteIdent(productDescColNames.imageUrl)}
+        ${quoteIdent(productDescColNames.imageUrl)},
+        ${quoteIdent(productDescColNames.shortDesc)}
       )
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?)
       RETURNING *;
     `;
     const inserted = await db.raw(insertSql, [
-      resolvedProductId,
+      variantId,
       normalizedRules,
       normalizedDescription,
       resolvedImageUrl,
+      normalizedShortDesc,
     ]);
-    res.status(201).json(mapProductDescRow(req, inserted.rows[0]));
+    const row = inserted.rows[0];
+    const withProductId = { ...row, product_id: variantRow.display_name, product_name: variantRow.variant_name };
+    res.status(201).json(mapProductDescRow(req, withProductId));
   } catch (error) {
     logger.error("Save failed (POST /api/product-descriptions)", { productId: normalizedProductId, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể lưu mô tả sản phẩm." });

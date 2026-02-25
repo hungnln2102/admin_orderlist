@@ -162,7 +162,7 @@ const getSupplyInsights = async (_req, res) => {
         ) AS product_list
       FROM ${SUPPLIER_COST_TABLE} sp
       LEFT JOIN ${TABLES.variant} v
-        ON sp.${quoteIdent(supplyPriceCols.productId)} = v.id
+        ON sp.${quoteIdent(supplyPriceCols.variantId)} = v.id
       GROUP BY sp.${quoteIdent(supplyPriceCols.supplierId)}
     `;
 

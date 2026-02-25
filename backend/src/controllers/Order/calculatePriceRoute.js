@@ -73,7 +73,7 @@ const attachCalculatePriceRoute = (router) => {
             if (effectiveSupplyId) {
                 const latestBySource = await db(TABLES.supplierCost)
                     .select(COLS.SUPPLIER_COST.PRICE)
-                    .where(COLS.SUPPLIER_COST.PRODUCT_ID, variantPricing.variantId)
+                    .where(COLS.SUPPLIER_COST.VARIANT_ID, variantPricing.variantId)
                     .andWhere(COLS.SUPPLIER_COST.SUPPLIER_ID, effectiveSupplyId)
                     .orderBy(COLS.SUPPLIER_COST.ID, "desc")
                     .first();
@@ -88,7 +88,7 @@ const attachCalculatePriceRoute = (router) => {
 
             const maxPriceRow = await db(TABLES.supplierCost)
                 .max(`${COLS.SUPPLIER_COST.PRICE} as maxPrice`)
-                .where(COLS.SUPPLIER_COST.PRODUCT_ID, variantPricing.variantId)
+                .where(COLS.SUPPLIER_COST.VARIANT_ID, variantPricing.variantId)
                 .first();
             const baseForPricing = Number(maxPriceRow?.maxPrice || 0);
 

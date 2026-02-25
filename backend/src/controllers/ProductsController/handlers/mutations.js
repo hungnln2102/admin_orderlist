@@ -47,7 +47,7 @@ const fetchVariantView = async (variantId) => {
     LEFT JOIN LATERAL (
       SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
       FROM ${TABLES.productDesc} pd2
-      WHERE TRIM(pd2.${quoteIdent(productDescCols.productId)}::text) = TRIM(v.${quoteIdent(variantCols.displayName)}::text)
+      WHERE pd2.${quoteIdent(productDescCols.variantId)} = v.${quoteIdent(variantCols.id)}
       ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
       LIMIT 1
     ) pd ON TRUE
@@ -69,7 +69,7 @@ const fetchVariantView = async (variantId) => {
     LEFT JOIN LATERAL (
       SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
       FROM ${TABLES.supplyPrice} sp
-      WHERE sp.${quoteIdent(supplyPriceCols.productId)} = v.id
+      WHERE sp.${quoteIdent(supplyPriceCols.variantId)} = v.id
     ) spagg ON TRUE
     WHERE v.id = ?
     GROUP BY
@@ -611,7 +611,7 @@ const deleteProductPrice = async (req, res) => {
     await db.raw(
       `
       DELETE FROM ${TABLES.supplyPrice}
-      WHERE ${quoteIdent(supplyPriceCols.productId)} = ?;
+      WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?;
     `,
       [parsedId]
     );

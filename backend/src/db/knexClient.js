@@ -9,11 +9,15 @@ dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
 const {
   SCHEMA_ADMIN,
   SCHEMA_FINANCE,
+  SCHEMA_IDENTITY,
   SCHEMA_ORDERS,
   SCHEMA_PARTNER,
   SCHEMA_PRODUCT,
+  SCHEMA_PROMOTION,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
+  SCHEMA_WALLET,
+  SCHEMA_FORM_DESC,
 } = require("../config/dbSchema");
 
 const DATABASE_URL =
@@ -47,6 +51,10 @@ const searchPath = Array.from(
       SCHEMA_FINANCE,
       SCHEMA_SUPPLIER,
       SCHEMA_SUPPLIER_COST,
+      SCHEMA_IDENTITY,
+      SCHEMA_PROMOTION,
+      SCHEMA_WALLET,
+      SCHEMA_FORM_DESC,
     ].filter(Boolean)
   )
 );

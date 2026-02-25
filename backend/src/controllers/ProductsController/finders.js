@@ -1,4 +1,4 @@
-﻿const { db } = require("../../db");
+const { db } = require("../../db");
 const { QUOTED_COLS } = require("./constants");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, toNullableNumber } = require("../../utils/normalizers");
@@ -132,7 +132,7 @@ const upsertSupplyPrice = async (identifiers, supplierId, price, trx = db) => {
     `
     SELECT id
     FROM ${TABLES.supplyPrice}
-    WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
+    WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?
       AND ${quoteIdent(supplyPriceCols.supplierId)} = ?
     LIMIT 1;
   `,
@@ -144,7 +144,7 @@ const upsertSupplyPrice = async (identifiers, supplierId, price, trx = db) => {
       `
       UPDATE ${TABLES.supplyPrice}
       SET ${quoteIdent(supplyPriceCols.price)} = ?
-      WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
+      WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?
         AND ${quoteIdent(supplyPriceCols.supplierId)} = ?;
     `,
       [normalizedPrice, variantId, parsedSupplierId]
@@ -160,7 +160,7 @@ const upsertSupplyPrice = async (identifiers, supplierId, price, trx = db) => {
   const inserted = await client.raw(
     `
     INSERT INTO ${TABLES.supplyPrice} (
-      ${quoteIdent(supplyPriceCols.productId)},
+      ${quoteIdent(supplyPriceCols.variantId)},
       ${quoteIdent(supplyPriceCols.supplierId)},
       ${quoteIdent(supplyPriceCols.price)}
     )

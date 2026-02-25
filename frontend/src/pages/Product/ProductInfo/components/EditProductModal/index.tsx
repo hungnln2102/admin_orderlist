@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import {
-  stripDurationSuffix,
-  toHtmlFromPlain,
-} from "../../utils/productInfoHelpers";
+import { toHtmlFromPlain } from "../../utils/productInfoHelpers";
 import ImageUpload from "./ImageUpload";
 import RichTextEditor from "./RichTextEditor";
 import {
@@ -19,10 +16,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
 }) => {
   const initialForm = useMemo<EditFormState>(
     () => ({
-      productId: stripDurationSuffix(product?.productId || ""),
+      productId: product?.productId || "",
       productName:
-        stripDurationSuffix(product?.packageProduct || product?.productName || "") ||
-        "",
+        product?.packageProduct || product?.productName || "",
       packageName: product?.packageName || "",
       shortDescription: product?.shortDescription || "",
       rules: product?.rules || "",

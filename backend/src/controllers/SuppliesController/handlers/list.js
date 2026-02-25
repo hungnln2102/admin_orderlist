@@ -39,7 +39,7 @@ const getProductsBySupply = async (req, res) => {
         db.raw(`${TABLES.variant}.${variantCols.id} as id`),
         db.raw(`${TABLES.variant}.${variantCols.displayName} as san_pham`)
       )
-      .join(TABLES.variant, `${TABLES.supplyPrice}.${supplyPriceCols.productId}`, "=", db.raw(`${TABLES.variant}.${variantCols.id}`))
+      .join(TABLES.variant, `${TABLES.supplyPrice}.${supplyPriceCols.variantId}`, "=", db.raw(`${TABLES.variant}.${variantCols.id}`))
       .where(`${TABLES.supplyPrice}.${supplyPriceCols.supplierId}`, supplyId)
       .orderBy(db.raw(`${TABLES.variant}.${variantCols.displayName}`), "asc");
     

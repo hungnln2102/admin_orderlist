@@ -13,28 +13,34 @@ src/
 │   ├── database.js      # Database connection config
 │   └── dbSchema.js      # Database schema definitions
 ├── controllers/         # Route controllers (business logic)
-│   ├── Order/           # Order management
-│   ├── AuthController/  # Authentication
+│   ├── Order/           # Order management (crud, list, renew, helpers, …)
+│   ├── AuthController/
 │   ├── DashboardController/
 │   └── ...
-├── middleware/          # Express middleware
-│   ├── authGuard.js     # Authentication middleware
-│   ├── errorHandler.js  # Centralized error handling
-│   └── validateRequest.js # Request validation
+├── middleware/          # authGuard, errorHandler, validateRequest, rateLimiter, csrfProtection
 ├── routes/              # API route definitions
-│   ├── index.js         # Main router
+│   ├── index.js         # Main router (auth, system, then authGuard, then feature routes)
+│   ├── systemRoutes.js  # error-report, run-due-notification (no auth)
 │   ├── ordersRoutes.js
 │   └── ...
-├── services/            # Business logic services
-│   ├── idService.js     # ID generation
-│   └── telegramOrderNotification.js # Telegram integration
-├── utils/               # Utility functions
-│   └── normalizers.js   # Data normalization helpers
-├── db/                  # Database setup
-│   └── index.js         # Knex instance
+├── scheduler/           # Cron jobs (đơn hết hạn, thông báo Telegram)
+│   ├── config.js        # pool, timezone, cron expression, getSqlCurrentDate
+│   ├── sqlHelpers.js    # COL, TABLES, normalizeDateSQL, expiryDateSQL
+│   ├── tasks/           # updateDatabaseTask, notifyZeroDays, notifyFourDays
+│   └── index.js         # Wire cron schedules, exports for SchedulerController
+├── schema/              # tables.js (re-export dbSchema)
+├── services/            # idService, orderService, telegramOrderNotification, …
+├── utils/               # orderHelpers, logger, normalizers, backupService, …
+├── db/                  # Knex instance
 ├── app.js               # Express app configuration
-└── server.js            # Server entry point
+└── server.js            # Server entry point (app.listen + sepay webhook)
 ```
+
+Root-level (backend/):
+- `index.js` → requires `src/server`
+- `helpers.js` → re-exports `src/utils/orderHelpers`
+- `scheduler.js` → re-exports `src/scheduler`
+- `webhook/` → Sepay webhook server
 
 ## Key Components
 

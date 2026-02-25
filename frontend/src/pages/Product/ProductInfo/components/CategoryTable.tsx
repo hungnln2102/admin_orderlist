@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { EyeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { CategoryRow } from "../types";
-import { CategoryItem, stripDurationSuffix } from "../utils/productInfoHelpers";
+import { CategoryItem } from "../utils/productInfoHelpers";
 import Pagination from "@/components/ui/Pagination";
 
 type CategoryTableProps = {
@@ -92,14 +92,10 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
                         alt={group.packageName}
                         className="h-12 w-12 rounded-lg object-cover"
                         onError={(e) => {
-                          e.currentTarget.src = "https://via.placeholder.com/48?text=No+Image";
+                          e.currentTarget.style.display = "none";
                         }}
                       />
-                    ) : (
-                      <div className="h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 text-[11px] font-bold uppercase tracking-tighter text-center px-1">
-                        No Image
-                      </div>
-                    )}
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-white font-semibold">
                     {group.packageName}
@@ -147,15 +143,12 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
                     <td colSpan={3} className="px-6 py-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                         {group.items.map((item) => {
-                          const productCode = stripDurationSuffix(
-                            item.productId || ""
-                          );
-                          const productLabel = stripDurationSuffix(
+                          const productCode = item.productId || "";
+                          const productLabel =
                             item.packageProduct ||
-                              item.productName ||
-                              item.productId ||
-                              ""
-                          );
+                            item.productName ||
+                            item.productId ||
+                            "";
                           return (
                             <div
                               key={`${group.key}-${item.id}-${item.productId}`}

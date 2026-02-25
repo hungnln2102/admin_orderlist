@@ -56,7 +56,7 @@ export const SUPPLY_COLS = {
 // 6. SUPPLIER_COST (Backend: partner.supplier_cost)
 export const SUPPLY_PRICE_COLS = {
   id: "id",
-  productId: "product_id",
+  variantId: "variant_id",
   sourceId: "supplier_id",
   price: "price",
 };
@@ -187,8 +187,8 @@ export const PRICE_CONFIG_COLS = {
 
 export const SUPPLIER_COST_COLS = {
   id: "id",
-  productId: "product_id",
-  sourceId: "source_id",
+  variantId: "variant_id",
+  sourceId: "supplier_id",
   price: "price",
 };
 

@@ -31,6 +31,26 @@ const SCHEMA_FINANCE = pickSchema(
   process.env.SCHEMA_FINANCE,
   "finance"
 );
+const SCHEMA_IDENTITY = pickSchema(
+  process.env.DB_SCHEMA_IDENTITY,
+  process.env.SCHEMA_IDENTITY,
+  "identity"
+);
+const SCHEMA_PROMOTION = pickSchema(
+  process.env.DB_SCHEMA_PROMOTION,
+  process.env.SCHEMA_PROMOTION,
+  "promotion"
+);
+const SCHEMA_WALLET = pickSchema(
+  process.env.DB_SCHEMA_WALLET,
+  process.env.SCHEMA_WALLET,
+  "wallet"
+);
+const SCHEMA_FORM_DESC = pickSchema(
+  process.env.DB_SCHEMA_FORM_DESC,
+  process.env.SCHEMA_FORM_DESC,
+  "form_desc"
+);
 // Schema name override for supplier tables (if different from partner/product)
 const SCHEMA_SUPPLIER = pickSchema(
   process.env.DB_SCHEMA_SUPPLIER,
@@ -95,6 +115,137 @@ const FINANCE_SCHEMA = {
       TARGET_AMOUNT: "target_amount",
       PRIORITY: "priority",
       CREATED_AT: "created_at",
+    },
+  },
+};
+
+// -----------------------
+// FORM_DESC SCHEMA
+// -----------------------
+const FORM_DESC_SCHEMA = {
+  FORM_NAME: {
+    TABLE: "form_name",
+    COLS: {
+      ID: "id",
+      NAME: "name",
+      DESCRIPTION: "description",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  FORM_INPUT: {
+    TABLE: "form_input",
+    COLS: {
+      ID: "id",
+      FORM_ID: "form_id",
+      INPUT_ID: "input_id",
+      SORT_ORDER: "sort_order",
+    },
+  },
+  INPUTS: {
+    TABLE: "inputs",
+    COLS: {
+      ID: "id",
+      INPUT_NAME: "input_name",
+      INPUT_TYPE: "input_type",
+      CREATED_AT: "created_at",
+    },
+  },
+};
+
+// -----------------------
+// IDENTITY SCHEMA (accounts, roles)
+// -----------------------
+const IDENTITY_SCHEMA = {
+  ACCOUNTS: {
+    TABLE: "accounts",
+    COLS: {
+      ID: "id",
+      EMAIL: "email",
+      PASSWORD_HASH: "password_hash",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+      USERNAME: "username",
+      SUSPENDED_UNTIL: "suspended_until",
+      BAN_REASON: "ban_reason",
+      UPDATED_AT: "updated_at",
+      ROLE_ID: "role_id",
+    },
+  },
+  ROLES: {
+    TABLE: "roles",
+    COLS: {
+      ID: "id",
+      CODE: "code",
+      NAME: "name",
+    },
+  },
+};
+
+// -----------------------
+// PROMOTION SCHEMA
+// -----------------------
+const PROMOTION_SCHEMA = {
+  ACCOUNT_PROMOTIONS: {
+    TABLE: "account_promotions",
+    COLS: {
+      ID: "id",
+      ACCOUNT_ID: "account_id",
+      PROMOTION_ID: "promotion_id",
+      STATUS: "status",
+      ASSIGNED_AT: "assigned_at",
+      USED_AT: "used_at",
+      USAGE_LIMIT_PER_USER: "usage_limit_per_user",
+    },
+  },
+  PROMOTION_CODES: {
+    TABLE: "promotion_codes",
+    COLS: {
+      ID: "id",
+      CODE: "code",
+      DISCOUNT_PERCENT: "discount_percent",
+      MAX_DISCOUNT_AMOUNT: "max_discount_amount",
+      MIN_ORDER_AMOUNT: "min_order_amount",
+      DESCRIPTION: "description",
+      STATUS: "status",
+      IS_PUBLIC: "is_public",
+      USAGE_LIMIT: "usage_limit",
+      USED_COUNT: "used_count",
+      START_AT: "start_at",
+      END_AT: "end_at",
+      CREATED_AT: "created_at",
+    },
+  },
+};
+
+// -----------------------
+// WALLET SCHEMA
+// -----------------------
+const WALLET_SCHEMA = {
+  WALLET_TRANSACTIONS: {
+    TABLE: "wallet_transactions",
+    COLS: {
+      ID: "id",
+      TRANSACTION_ID: "transaction_id",
+      ACCOUNT_ID: "account_id",
+      TYPE: "type",
+      DIRECTION: "direction",
+      AMOUNT: "amount",
+      BALANCE_BEFORE: "balance_before",
+      BALANCE_AFTER: "balance_after",
+      PROMO_CODE: "promo_code",
+      CREATED_AT: "created_at",
+      METHOD: "method",
+      PROMOTION_ID: "promotion_id",
+    },
+  },
+  WALLETS: {
+    TABLE: "wallets",
+    COLS: {
+      ACCOUNT_ID: "account_id",
+      BALANCE: "balance",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
     },
   },
 };
@@ -193,7 +344,7 @@ const SUPPLIER_COST_DEF = {
   TABLE: "supplier_cost",
   COLS: {
     ID: "id",
-    PRODUCT_ID: "product_id",
+    VARIANT_ID: "variant_id",
     SUPPLIER_ID: "supplier_id",
     PRICE: "price",
   },
@@ -253,11 +404,11 @@ const PRODUCT_SCHEMA = {
     TABLE: "product_desc",
     COLS: {
       ID: "id",
-      PRODUCT_ID: "product_id",
-      SHORT_DESC: "short_desc",
+      VARIANT_ID: "variant_id",
       RULES: "rules",
       DESCRIPTION: "description",
       IMAGE_URL: "image_url",
+      SHORT_DESC: "short_desc",
     },
   },
   PRICE_CONFIG: {
@@ -370,6 +521,10 @@ module.exports = {
   SCHEMA_ORDERS,
   SCHEMA_PRODUCT,
   SCHEMA_ADMIN,
+  SCHEMA_IDENTITY,
+  SCHEMA_PROMOTION,
+  SCHEMA_WALLET,
+  SCHEMA_FORM_DESC,
   SCHEMA_FINANCE,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
@@ -381,6 +536,11 @@ module.exports = {
   getDefinition,
   ADMIN_SCHEMA,
   FINANCE_SCHEMA,
+  IDENTITY_SCHEMA,
+  PROMOTION_SCHEMA,
+  WALLET_SCHEMA,
+   // Form description schema
+  FORM_DESC_SCHEMA,
   // Orders schema map
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,

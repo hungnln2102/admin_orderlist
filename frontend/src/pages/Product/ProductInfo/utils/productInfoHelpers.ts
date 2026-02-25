@@ -45,8 +45,9 @@ export const stripDurationSuffix = (value: string): string => {
 export const toHtmlFromPlain = (value: string): string =>
   (value || "").replace(/\n/g, "<br/>");
 
+/** Chuẩn hóa key để so khớp (không split/bỏ suffix, lấy đúng display_name). */
 export const normalizeProductKey = (value: string): string =>
-  stripDurationSuffix(value).toLowerCase();
+  (value || "").trim().toLowerCase();
 
 export const escapeHtml = (value: string): string =>
   value
@@ -155,6 +156,10 @@ export const splitCombinedContent = (
   };
 };
 
+/**
+ * Gộp dữ liệu: nguồn từ product_desc + bảng giá.
+ * Không lọc trùng: mọi dòng từ product_desc đều giữ nguyên, bổ sung thêm dòng chỉ có ở bảng giá.
+ */
 export const mergeProducts = (
   productDescs: ProductDescription[],
   productPriceList: ProductPriceItem[],
@@ -173,42 +178,31 @@ export const mergeProducts = (
     });
   });
 
-  const mergedMap = new Map<string, MergedProduct>();
+  const merged: MergedProduct[] = [];
+  const descKeys = new Set<string>();
 
   for (const item of productDescs) {
     const normalizedId = normalizeProductKey(item.productId || "");
+    if (normalizedId) descKeys.add(normalizedId);
     const priceRow = normalizedId ? priceMap.get(normalizedId) : null;
-    const merged: MergedProduct = {
+    merged.push({
       ...item,
       priceId: priceRow?.id ?? null,
-      productId: stripDurationSuffix(item.productId || ""),
+      productId: item.productId || "",
       productName:
         item.productName ||
-        (priceRow
-          ? stripDurationSuffix(
-              priceRow.package_product || priceRow.san_pham || ""
-            )
-          : null) ||
+        (priceRow ? (priceRow.package_product || priceRow.san_pham || "") : null) ||
         item.productId,
-      packageProduct: priceRow
-        ? stripDurationSuffix(priceRow.package_product || priceRow.san_pham || "")
-        : null,
-      packageName: priceRow
-        ? stripDurationSuffix(priceRow.package || priceRow.san_pham || "")
-        : null,
+      packageProduct: priceRow ? (priceRow.package_product || priceRow.san_pham || "") : null,
+      packageName: priceRow ? (priceRow.package || priceRow.san_pham || "") : null,
       category: priceRow?.category ?? null,
       categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
-      imageUrl: item.imageUrl ?? priceRow?.image_url ?? null,
-      packageImageUrl: priceRow?.image_url ?? null,
+      imageUrl: item.imageUrl ?? null,
+      packageImageUrl: item.imageUrl ?? null,
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
         item.descriptionHtml || toHtmlFromPlain(item.description || ""),
-    };
-    const key = normalizedId || normalizeProductKey(merged.productName || "");
-    if (!key) continue;
-    if (!mergedMap.has(key)) {
-      mergedMap.set(key, merged);
-    }
+    });
   }
 
   for (const priceItem of productPriceList) {
@@ -216,35 +210,31 @@ export const mergeProducts = (
     const packageKey = normalizeProductKey(priceItem.package_product || "");
     const key = sanKey || packageKey;
     const matched =
-      (sanKey && mergedMap.has(sanKey)) ||
-      (packageKey && mergedMap.has(packageKey));
+      (sanKey && descKeys.has(sanKey)) ||
+      (packageKey && descKeys.has(packageKey));
     if (!key || matched) continue;
-    mergedMap.set(key, {
+    merged.push({
       id: priceItem.id,
       priceId: priceItem.id,
-      productId: stripDurationSuffix(priceItem.san_pham || ""),
-      productName: stripDurationSuffix(
-        priceItem.package_product || priceItem.san_pham || ""
-      ),
-      packageProduct: stripDurationSuffix(
-        priceItem.package_product || priceItem.san_pham || ""
-      ),
-      packageName: stripDurationSuffix(priceItem.package || ""),
+      productId: priceItem.san_pham || "",
+      productName: priceItem.package_product || priceItem.san_pham || "",
+      packageProduct: priceItem.package_product || priceItem.san_pham || "",
+      packageName: priceItem.package || "",
       category: priceItem.category ?? null,
       categories: Array.isArray(priceItem.categories) ? priceItem.categories ?? [] : [],
       rules: "",
       rulesHtml: "",
       description: "",
       descriptionHtml: "",
-      imageUrl: priceItem.image_url ?? null,
-      packageImageUrl: priceItem.image_url ?? null,
+      imageUrl: null,
+      packageImageUrl: null,
     });
   }
 
-  let merged = Array.from(mergedMap.values());
+  let result = merged;
 
   if (search) {
-    merged = merged.filter((item) => {
+    result = result.filter((item) => {
       const haystack = `${item.productId || ""} ${item.productName || ""} ${
         item.description || ""
       } ${item.rules || ""}`
@@ -254,5 +244,5 @@ export const mergeProducts = (
     });
   }
 
-  return merged;
+  return result;
 };

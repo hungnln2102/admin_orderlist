@@ -67,7 +67,7 @@ export const useProductInfo = (): UseProductInfoResult => {
     setError(null);
     try {
       const [descResponse, priceResponse] = await Promise.all([
-        fetchProductDescriptions({}),
+        fetchProductDescriptions({ limit: 1000 }),
         apiFetch("/api/products"),
       ]);
       const priceData = (await priceResponse.json().catch(() => [])) as

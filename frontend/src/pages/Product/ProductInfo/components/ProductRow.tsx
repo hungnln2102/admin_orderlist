@@ -6,10 +6,8 @@ import {
 } from "@heroicons/react/24/outline";
 import {
   MergedProduct,
-  getInitials,
   sanitizeHtmlForDisplay,
   splitCombinedContent,
-  stripDurationSuffix,
   toHtmlFromPlain,
 } from "../utils/productInfoHelpers";
 
@@ -25,11 +23,8 @@ const ProductAvatar: React.FC<{
   size?: "small" | "large";
 }> = ({ item, size = "small" }) => {
   const displayName = item.productName || item.productId || "--";
-  const initials = getInitials(displayName);
   const dimensions =
     size === "large" ? "w-32 h-32 text-2xl" : "w-12 h-12 text-xs";
-  const baseClasses =
-    "rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold";
 
   if (item.imageUrl) {
     return (
@@ -44,11 +39,7 @@ const ProductAvatar: React.FC<{
     );
   }
 
-  return (
-    <div className={`${dimensions} ${baseClasses}`}>
-      <span>{initials}</span>
-    </div>
-  );
+  return null;
 };
 
 export const ProductRow: React.FC<ProductRowProps> = ({
@@ -87,24 +78,20 @@ export const ProductRow: React.FC<ProductRowProps> = ({
               alt={displayName}
               className="h-12 w-12 rounded-lg object-cover"
               onError={(e) => {
-                e.currentTarget.src = "https://via.placeholder.com/48?text=No+Image";
+                e.currentTarget.style.display = "none";
               }}
             />
-          ) : (
-            <div className="h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 text-[11px] font-bold uppercase tracking-tighter text-center px-1">
-              No Image
-            </div>
-          )}
+          ) : null}
         </td>
         <td className="px-4 py-3 text-white">
           <div className="flex flex-col">
             <span className="font-semibold text-white">
-              {stripDurationSuffix(item.productId || "") || "--"}
+              {item.productId || "--"}
             </span>
           </div>
         </td>
         <td className="px-4 py-3 text-white">
-          {stripDurationSuffix(displayName) || "--"}
+          {displayName || "--"}
         </td>
         <td className="px-4 py-3 text-white/80 border-r border-white/10 min-w-[160px]">
           <span className="block truncate" title={categoryLabel || undefined}>
@@ -177,9 +164,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
                 Thông tin chi tiết
               </p>
               <p className="mt-2 text-white/80 leading-relaxed">
-                {stripDurationSuffix(
-                  item.packageProduct || item.productName || item.productId || ""
-                ) || "Không có thông tin chi tiết."}
+                {item.packageProduct || item.productName || item.productId || "Không có thông tin chi tiết."}
               </p>
             </div>
             <div className="flex flex-col md:flex-row gap-4">

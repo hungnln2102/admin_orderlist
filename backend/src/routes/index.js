@@ -1,5 +1,6 @@
 const express = require("express");
 const authRoutes = require("./authRoutes");
+const systemRoutes = require("./systemRoutes");
 const dashboardRoutes = require("./dashboardRoutes");
 const ordersRoutes = require("./ordersRoutes");
 const suppliesRoutes = require("./suppliesRoutes");
@@ -16,49 +17,25 @@ const walletRoutes = require("./walletRoutes");
 const warehouseRoutes = require("./warehouseRoutes");
 const schedulerRoutes = require("./schedulerRoutes");
 const savingGoalsController = require("../controllers/SavingGoalsController");
-const { runSchedulerNow, runFourDaysNotificationNow } = require("../controllers/SchedulerController");
+const { runSchedulerNow } = require("../controllers/SchedulerController");
 const { authGuard } = require("../middleware/authGuard");
+const testTelegramRoutes = require("./testTelegram");
+const accountsRoutes = require("./accountsRoutes");
+const promotionCodesRoutes = require("./promotionCodesRoutes");
+const formsRoutes = require("./formsRoutes");
 
 const router = express.Router();
 
 router.use("/auth", authRoutes);
-
-// Test endpoint for Telegram notifications (before auth for easy testing)
-const testTelegramRoutes = require("./testTelegram");
 router.use("/test-telegram", testTelegramRoutes);
+router.use("/", systemRoutes);
 
-// Manual trigger: gửi thông báo đơn đến hạn (trước authGuard để dễ test)
-router.get("/run-due-notification", runFourDaysNotificationNow);
-
-// Frontend error reporting endpoint (before auth so it always works)
-const { notifyError } = require("../utils/telegramErrorNotifier");
-let lastFrontendReport = 0;
-router.post("/error-report", (req, res) => {
-  // Simple rate limit: 1 report per second
-  const now = Date.now();
-  if (now - lastFrontendReport < 1000) {
-    return res.status(429).json({ ok: false });
-  }
-  lastFrontendReport = now;
-
-  const { message, stack, url, extra } = req.body || {};
-  if (!message) return res.status(400).json({ ok: false });
-
-  notifyError({
-    message: String(message).slice(0, 500),
-    source: "frontend",
-    url: String(url || "").slice(0, 200),
-    stack: String(stack || "").slice(0, 500),
-    extra: extra ? String(extra).slice(0, 200) : undefined,
-  });
-
-  res.json({ ok: true });
-});
-
-// Protect everything else
 router.use(authGuard);
 
 router.use("/dashboard", dashboardRoutes);
+router.use("/", accountsRoutes);
+router.use("/", promotionCodesRoutes);
+router.use("/", formsRoutes);
 router.use("/orders", ordersRoutes);
 router.use("/supplies", suppliesRoutes);
 router.use("/", paymentsRoutes);

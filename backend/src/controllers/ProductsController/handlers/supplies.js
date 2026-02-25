@@ -29,7 +29,7 @@ const getSuppliesByProductName = async (req, res) => {
       FROM ${TABLES.supplyPrice} sp
       LEFT JOIN ${supplierTable} s
         ON s.${quoteIdent("id")} = sp.${quoteIdent(supplyPriceCols.supplierId)}
-      WHERE sp.${quoteIdent(supplyPriceCols.productId)} IN (${placeholders})
+      WHERE sp.${quoteIdent(supplyPriceCols.variantId)} IN (${placeholders})
       ORDER BY COALESCE(s.${supplierNameIdent}, sp.${quoteIdent(
         supplyPriceCols.supplierId
       )}::text);
@@ -68,7 +68,7 @@ const getSupplyPricesByProductName = async (req, res) => {
       FROM ${TABLES.supplyPrice} sp
       LEFT JOIN ${supplierTable} s
         ON s.${quoteIdent("id")} = sp.${quoteIdent(supplyPriceCols.supplierId)}
-      WHERE sp.${quoteIdent(supplyPriceCols.productId)} IN (${placeholders})
+      WHERE sp.${quoteIdent(supplyPriceCols.variantId)} IN (${placeholders})
       ORDER BY COALESCE(s.${supplierNameIdent}, sp.${quoteIdent(
         supplyPriceCols.supplierId
       )}::text);
@@ -163,7 +163,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
     await db.raw(
       `
       DELETE FROM ${TABLES.supplyPrice}
-      WHERE ${quoteIdent(supplyPriceCols.productId)} = ?
+      WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?
         AND ${quoteIdent(supplyPriceCols.supplierId)} = ?;
     `,
       [parsedProductId, parsedSourceId]

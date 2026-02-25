@@ -1,5 +1,5 @@
 import { CategoryRow } from "../types";
-import { MergedProduct, stripDurationSuffix } from "./productInfoHelpers";
+import { MergedProduct } from "./productInfoHelpers";
 
 export const buildCategoryRows = (
   mergedProducts: MergedProduct[]
@@ -13,7 +13,7 @@ export const buildCategoryRows = (
       groups.set(key, {
         key,
         packageName: packageLabel,
-        imageUrl: item.packageImageUrl ?? null,
+        imageUrl: item.imageUrl ?? null,
         categories: [],
         items: [],
       });
@@ -44,12 +44,8 @@ export const buildCategoryRows = (
           })
         ),
         items: [...group.items].sort((left, right) => {
-          const leftKey = stripDurationSuffix(
-            left.productId || left.packageProduct || left.productName || ""
-          );
-          const rightKey = stripDurationSuffix(
-            right.productId || right.packageProduct || right.productName || ""
-          );
+          const leftKey = left.productId || left.packageProduct || left.productName || "";
+          const rightKey = right.productId || right.packageProduct || right.productName || "";
           return leftKey.localeCompare(rightKey, "vi", { sensitivity: "base" });
         }),
       };

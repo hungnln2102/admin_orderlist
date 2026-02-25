@@ -329,7 +329,7 @@ const fetchSupplyPrice = async (client, identifiers, supplierId) => {
     const sql = `
       SELECT ${SUPPLIER_COST_COLS.price}
       FROM ${SUPPLIER_COST_TABLE}
-      WHERE ${SUPPLIER_COST_COLS.productId} = $1 AND ${SUPPLIER_COST_COLS.supplierId} = $2
+      WHERE ${SUPPLIER_COST_COLS.variantId} = $1 AND ${SUPPLIER_COST_COLS.supplierId} = $2
       ORDER BY ${SUPPLIER_COST_COLS.id} DESC
       LIMIT 1
     `;
@@ -346,7 +346,7 @@ const fetchMaxSupplyPrice = async (client, identifiers) => {
     const res = await client.query(
       `SELECT MAX(${SUPPLIER_COST_COLS.price}) AS price
          FROM ${SUPPLIER_COST_TABLE}
-         WHERE ${SUPPLIER_COST_COLS.productId} = $1`,
+         WHERE ${SUPPLIER_COST_COLS.variantId} = $1`,
       [pid]
     );
     if (res.rows.length && res.rows[0].price !== undefined && res.rows[0].price !== null) {

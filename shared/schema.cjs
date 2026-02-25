@@ -98,6 +98,34 @@ const DB_DEFINITIONS = {
       imageUrl: "image_url",
     },
   },
+  formName: {
+    tableName: "form_name",
+    columns: {
+      id: "id",
+      name: "name",
+      description: "description",
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+    },
+  },
+  formInput: {
+    tableName: "form_input",
+    columns: {
+      id: "id",
+      formId: "form_id",
+      inputId: "input_id",
+      sortOrder: "sort_order",
+    },
+  },
+  inputs: {
+    tableName: "inputs",
+    columns: {
+      id: "id",
+      inputName: "input_name",
+      inputType: "input_type",
+      createdAt: "created_at",
+    },
+  },
 
   // Payments
   paymentReceipt: {
@@ -155,7 +183,7 @@ const DB_DEFINITIONS = {
     tableName: "supplier_cost",
     columns: {
       id: "id",
-      productId: "product_id",
+      variantId: "variant_id",
       sourceId: "supplier_id",
       price: "price",
     },

@@ -97,22 +97,35 @@ Frontend: http://localhost:5173
 admin_orderlist/
 ├── backend/
 │   ├── src/
-│   │   ├── config/          # Configuration files
-│   │   ├── controllers/     # Route controllers
-│   │   ├── middleware/      # Express middleware
-│   │   ├── routes/          # API routes
-│   │   ├── services/        # Business logic
-│   │   ├── utils/           # Utility functions
-│   │   └── app.js           # Express app setup
-│   ├── index.js             # Entry point
+│   │   ├── config/          # Configuration (app, database, dbSchema)
+│   │   ├── controllers/     # Route controllers (Order, Auth, Dashboard, …)
+│   │   ├── middleware/      # authGuard, errorHandler, rateLimiter, …
+│   │   ├── routes/          # API routes (auth, orders, system, …)
+│   │   ├── scheduler/       # Cron: cập nhật đơn hết hạn, thông báo Telegram
+│   │   │   ├── config.js
+│   │   │   ├── sqlHelpers.js
+│   │   │   └── tasks/       # updateDatabase, notifyZeroDays, notifyFourDays
+│   │   ├── schema/          # Re-export db schema
+│   │   ├── services/        # Business logic (id, order, telegram, …)
+│   │   ├── utils/           # orderHelpers, logger, normalizers, …
+│   │   ├── app.js           # Express app setup
+│   │   └── server.js        # Server entry
+│   ├── webhook/             # Sepay webhook server
+│   ├── helpers.js           # Re-export → src/utils/orderHelpers
+│   ├── scheduler.js         # Re-export → src/scheduler
+│   ├── index.js             # Entry point → src/server
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── pages/           # Page components
-│   │   ├── lib/             # Utilities
-│   │   └── App.tsx          # Main app component
+│   │   ├── components/      # auth (ProtectedRoute), layout (MainLayout, Sidebar), modals, ui
+│   │   ├── features/       # auth (login)
+│   │   ├── pages/           # Dashboard, Product/*, Personal/*
+│   │   ├── routes/         # AppRoutes (định nghĩa Route)
+│   │   ├── lib/             # api, notifications, helpers
+│   │   └── App.tsx          # Router + AuthProvider + ProtectedRoute + MainLayout
 │   └── package.json
+├── shared/                  # Code dùng chung (orderStatuses, schema)
+├── database/                # Migrations, seeds
 ├── .env                     # Environment variables
 └── README.md
 ```

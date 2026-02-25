@@ -8,7 +8,7 @@ import { normalizeErrorMessage } from "../../../../lib/textUtils";
 import { SavePayload } from "../components/EditProductModal";
 import {
   MergedProduct,
-  stripDurationSuffix,
+  normalizeProductKey,
 } from "../utils/productInfoHelpers";
 
 type UseProductEditParams = {
@@ -88,9 +88,7 @@ export const useProductEdit = ({
           id: saved.id || editingProduct.id,
           productId: saved.productId,
           productName:
-            stripDurationSuffix(
-              form.productName || editingProduct.productName || ""
-            ) || editingProduct.productName,
+            form.productName || editingProduct.productName || editingProduct.productName,
           packageName: form.packageName || editingProduct.packageName,
           rules: saved.rules || "",
           rulesHtml,
@@ -100,12 +98,11 @@ export const useProductEdit = ({
         };
 
         setProductDescs((prev) => {
-          const targetKey = stripDurationSuffix(
+          const targetKey = normalizeProductKey(
             saved.productId || editingProduct.productId || ""
-          ).toLowerCase();
+          );
           const idx = prev.findIndex(
-            (p) =>
-              stripDurationSuffix(p.productId || "").toLowerCase() === targetKey
+            (p) => normalizeProductKey(p.productId || "") === targetKey
           );
           if (idx === -1) {
             return [

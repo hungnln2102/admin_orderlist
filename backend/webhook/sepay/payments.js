@@ -298,7 +298,7 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
       const priceRes = await client.query(
         `SELECT ${SUPPLIER_COST_COLS.price} AS price
          FROM ${SUPPLIER_COST_TABLE}
-         WHERE ${SUPPLIER_COST_COLS.productId} = $1
+         WHERE ${SUPPLIER_COST_COLS.variantId} = $1
            AND ${SUPPLIER_COST_COLS.supplierId} = $2
          ORDER BY ${SUPPLIER_COST_COLS.id} DESC
          LIMIT 1`,
@@ -315,7 +315,7 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
             await client.query(
               `UPDATE ${SUPPLIER_COST_TABLE}
                SET ${SUPPLIER_COST_COLS.price} = $1
-             WHERE ${SUPPLIER_COST_COLS.productId} = $2
+             WHERE ${SUPPLIER_COST_COLS.variantId} = $2
                AND ${SUPPLIER_COST_COLS.supplierId} = $3`,
               [supplyPriceValue, resolvedProductId, supplierId]
             );
@@ -332,7 +332,7 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
         try {
           const insertPrice = supplyPriceValue || referenceImport || costValue;
           await client.query(
-            `INSERT INTO ${SUPPLIER_COST_TABLE} (${SUPPLIER_COST_COLS.productId}, ${SUPPLIER_COST_COLS.supplierId}, ${SUPPLIER_COST_COLS.price})
+            `INSERT INTO ${SUPPLIER_COST_TABLE} (${SUPPLIER_COST_COLS.variantId}, ${SUPPLIER_COST_COLS.supplierId}, ${SUPPLIER_COST_COLS.price})
              VALUES ($1, $2, $3)
              ON CONFLICT ON CONSTRAINT supplier_cost_pkey DO NOTHING`,
           [resolvedProductId, supplierId, insertPrice]
