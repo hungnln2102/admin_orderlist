@@ -112,10 +112,32 @@ const confirmPaymentSupply = async (req, res) => {
       }
       const paymentRow = paymentResult.rows[0];
       const sourceId = Number(paymentRow.source_id);
+      const importValue = Number(paymentRow.import) || 0;
+
+      // Chu kỳ âm (điều chỉnh hoàn tiền / NCC trả mình): chỉ chuyển trạng thái Đã Thanh Toán,
+      // không đổi import_value, không đánh dấu đơn, không tạo carryover.
+      if (importValue < 0) {
+        const updateNegativeResult = await trx.raw(
+          `
+          UPDATE ${TABLES.paymentSupply}
+          SET ${QUOTED_COLS.paymentSupply.status} = ?
+          WHERE ${QUOTED_COLS.paymentSupply.id} = ?
+          RETURNING ${QUOTED_COLS.paymentSupply.id} AS id,
+                    ${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
+                    ${QUOTED_COLS.paymentSupply.importValue} AS import,
+                    ${QUOTED_COLS.paymentSupply.paid} AS paid,
+                    ${QUOTED_COLS.paymentSupply.status} AS status,
+                    ${QUOTED_COLS.paymentSupply.round} AS round;
+        `,
+          [STATUS.PAID, parsedPaymentId]
+        );
+        return updateNegativeResult.rows?.[0] || null;
+      }
+
       const normalizedPaidAmount =
         hasPaidAmount && paidAmountNumber !== null
           ? paidAmountNumber
-          : Number(paymentRow.import) || 0;
+          : importValue;
 
       const todayDMY = (() => {
         const now = new Date();

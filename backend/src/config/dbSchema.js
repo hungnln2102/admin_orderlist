@@ -51,6 +51,12 @@ const SCHEMA_FORM_DESC = pickSchema(
   process.env.SCHEMA_FORM_DESC,
   "form_desc"
 );
+// Bảng inputs có thể ở schema khác (vd: public) - dùng DB_SCHEMA_INPUTS nếu cần
+const SCHEMA_INPUTS = pickSchema(
+  process.env.DB_SCHEMA_INPUTS,
+  process.env.SCHEMA_INPUTS,
+  SCHEMA_FORM_DESC
+);
 // Schema name override for supplier tables (if different from partner/product)
 const SCHEMA_SUPPLIER = pickSchema(
   process.env.DB_SCHEMA_SUPPLIER,
@@ -525,6 +531,7 @@ module.exports = {
   SCHEMA_PROMOTION,
   SCHEMA_WALLET,
   SCHEMA_FORM_DESC,
+  SCHEMA_INPUTS,
   SCHEMA_FINANCE,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,

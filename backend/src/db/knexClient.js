@@ -18,6 +18,7 @@ const {
   SCHEMA_SUPPLIER_COST,
   SCHEMA_WALLET,
   SCHEMA_FORM_DESC,
+  SCHEMA_INPUTS,
 } = require("../config/dbSchema");
 
 const DATABASE_URL =
@@ -55,6 +56,7 @@ const searchPath = Array.from(
       SCHEMA_PROMOTION,
       SCHEMA_WALLET,
       SCHEMA_FORM_DESC,
+      SCHEMA_INPUTS,
     ].filter(Boolean)
   )
 );

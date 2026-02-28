@@ -1,5 +1,27 @@
 # Database Migrations
 
+## Form thông tin: Liên kết bảng inputs
+
+**Nếu bảng `inputs` đã có sẵn** ở schema khác (vd: `public`), thêm vào `.env`:
+```
+DB_SCHEMA_INPUTS=public
+```
+(hoặc tên schema chứa bảng inputs của bạn)
+
+**Nếu chưa có**, chạy migration để tạo schema `form_desc` và bảng `inputs`:
+
+```bash
+# Dùng connection string từ .env (ví dụ DATABASE_URL hoặc PGHOST, PGUSER, PGPASSWORD, PGDATABASE)
+psql "$DATABASE_URL" -f database/migrations/004_create_form_desc_schema.sql
+```
+
+Hoặc với Docker:
+```bash
+docker exec -i admin_orderlist-postgres psql -U postgres -d mydtbmav < database/migrations/004_create_form_desc_schema.sql
+```
+
+---
+
 ## Local: Sửa lỗi "Tên Gói Sản Phẩm không được trùng"
 
 Nếu **chỉ môi trường local** báo lỗi duplicate package_name (server chạy bình thường), nghĩa là DB local vẫn còn unique constraint trên `product.package_name`. Chạy migration 003 **một lần** trên DB local:

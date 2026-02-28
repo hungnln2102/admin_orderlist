@@ -69,8 +69,10 @@ const increaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     const colSourceId = paymentSupplyCols.SOURCE_ID;
     const colRound = paymentSupplyCols.ROUND;
 
+    // Chỉ cộng vào chu kỳ đang "Chưa Thanh Toán" (tránh ghi đè chu kỳ đã PAID)
     const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
         .where(colSourceId, supplyId)
+        .andWhere(colStatus, STATUS.UNPAID)
         .orderBy(colId, "desc")
         .first();
 
@@ -90,9 +92,8 @@ const increaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
             [colImport]: nextImport,
             [colPaid]: currentPaid,
         };
-        if (latestCycle[colStatus] !== undefined) {
-            updatePayload[colStatus] = latestCycle[colStatus];
-        }
+        // Giữ nguyên status UNPAID
+        if (latestCycle[colStatus] !== undefined) updatePayload[colStatus] = latestCycle[colStatus];
         await trx(PAYMENT_SUPPLY_TABLE)
             .where(colId, latestCycle[colId])
             .update(updatePayload);
@@ -118,8 +119,11 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
     const colSourceId = paymentSupplyCols.SOURCE_ID;
     const colRound = paymentSupplyCols.ROUND;
 
+    // Trừ vào chu kỳ UNPAID nếu có; nếu không có chu kỳ UNPAID (đã PAID hết),
+    // tạo một dòng điều chỉnh âm để thể hiện NCC đang "dư/hoàn" lại.
     const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
         .where(colSourceId, supplyId)
+        .andWhere(colStatus, STATUS.UNPAID)
         .orderBy(colId, "desc")
         .first();
 
@@ -143,9 +147,7 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
             [colPaid]: currentPaid,
             [colRound]: roundValue,
         };
-        if (latestCycle[colStatus] !== undefined) {
-            updatePayload[colStatus] = latestCycle[colStatus];
-        }
+        if (latestCycle[colStatus] !== undefined) updatePayload[colStatus] = latestCycle[colStatus];
         await trx(PAYMENT_SUPPLY_TABLE)
             .where(colId, latestCycle[colId])
             .update(updatePayload);
@@ -154,7 +156,7 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
             [colSourceId]: supplyId,
             [colImport]: -costValue,
             [colPaid]: 0,
-            [colRound]: formatNote(),
+            [colRound]: `ADJ - ${formatNote()}`,
             [colStatus]: STATUS.UNPAID,
         });
     }

@@ -3,8 +3,9 @@
     "version": "1.0.0",
     "description": "",
     "main": "server.js",
-    "scripts": {
-        "test": "jest",
+"scripts": {
+    "test": "jest",
+    "test:form-info": "node scripts/test-form-info-supertest.js",
         "start": "node index.js",
         "start:api": "node index.js",
         "start:scheduler": "node scheduler.js",

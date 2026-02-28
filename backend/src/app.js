@@ -6,7 +6,13 @@ const session = require("express-session");
 const helmet = require("helmet");
 const { allowedOrigins, session: sessionConfig } = require("./config/appConfig");
 const routes = require("./routes");
-const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
+const { authGuard, AUTH_OPEN_PATHS } = require("./middleware/authGuard");
+const formInfoRoutes = require("./routes/formInfoRoutes");
+const {
+  listForms,
+  listInputs,
+  getFormDetail,
+} = require("./controllers/FormDescController");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { apiLimiter } = require("./middleware/rateLimiter");
 const { generateToken, verifyToken, addTokenToResponse } = require("./middleware/csrfProtection");
@@ -73,11 +79,8 @@ app.use(
 );
 
 // CSRF Protection (optional - enable via ENABLE_CSRF=true)
-// Generate token for all requests (frontend can get it from header)
 app.use("/api", generateToken);
 app.use("/api", addTokenToResponse);
-// Verify token only for state-changing operations (POST, PUT, PATCH, DELETE)
-// Note: CSRF is disabled by default, set ENABLE_CSRF=true to enable
 app.use("/api", verifyToken);
 
 // Convenience ping + auth-open route hint
@@ -89,10 +92,11 @@ app.get("/api", (_req, res) => {
   });
 });
 
-// Apply general rate limiting to all API routes
-// Specific endpoints (like auth) have stricter limiters applied in their route files
 app.use("/api", apiLimiter);
-
+// Form info - đăng ký trực tiếp để tránh 404 (Express 5 router behavior)
+app.get("/api/form-info/forms", authGuard, listForms);
+app.get("/api/form-info/inputs", authGuard, listInputs);
+app.get("/api/form-info/forms/:formId", authGuard, getFormDetail);
 app.use("/api", routes);
 
 // 404 handler - must be after all routes

@@ -4,6 +4,7 @@ import * as Helpers from "../../../../lib/helpers";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
+import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../../../../components/modals/ViewOrderModal/constants";
 
 interface Props {
   isOpen: boolean;
@@ -29,16 +30,29 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   const selectedPayment = unpaidPayments.find((p) => p.id === selectedPaymentId) || unpaidPayments[0] || null;
 
   // useMemo phải được gọi trước conditional return
+  // Còn nợ âm = NCC trả mình → QR dùng STK của tôi; số tiền = số dương.
   const qrImageUrl = useMemo(() => {
     if (!supply || !selectedPayment) return null;
-    const amount = Number(selectedPayment.totalImport || selectedPayment.import_value || 0);
+    const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
+    const paid = Number(selectedPayment.paid ?? 0);
     const desc = selectedPayment.round || `PAY ${supply.id}`;
+    const isNegative = raw < 0;
+    const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
+    if (amount <= 0) return null;
+    if (isNegative) {
+      return Helpers.buildSepayQrUrl({
+        accountNumber: ACCOUNT_NO,
+        bankCode: BANK_SHORT_CODE,
+        amount,
+        description: desc,
+        accountName: ACCOUNT_NAME,
+      });
+    }
     if (!supply.numberBank || !supply.binBank) return null;
-    
     return Helpers.buildSepayQrUrl({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
-      amount: Math.max(0, amount),
+      amount,
       description: desc,
       accountName: supply.nameBank || supply.sourceName || "",
     });
@@ -185,8 +199,18 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                               <p className="text-xs text-white/60">{p.status}</p>
                             </div>
                             <div className="text-right text-sm mr-2">
-                              <p className="text-rose-400 font-semibold">{Helpers.formatCurrency(p.totalImport || 0)}</p>
-                              <p className="text-white/40 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
+                              {(() => {
+                                const raw = Number(p.totalImport ?? p.import_value ?? 0);
+                                const display = raw < 0 ? Math.abs(raw) : raw;
+                                return (
+                                  <>
+                                    <p className={raw < 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
+                                      {Helpers.formatCurrency(display)}{raw < 0 ? " (NCC trả bạn)" : ""}
+                                    </p>
+                                    <p className="text-white/40 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
+                                  </>
+                                );
+                              })()}
                             </div>
                             <button
                               disabled={confirmingId === p.id}

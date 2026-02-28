@@ -420,6 +420,274 @@ const tests = {
     
     return { passed, supplyId };
   },
+
+  /**
+   * Test: Xóa đơn - (1) Số ngày còn lại tính từ expiry - today,
+   * (2) order_canceled.days = số ngày còn lại, (3) Trừ NCC đúng prorated.
+   */
+  async test6_DeleteOrder_RemainingDaysAndOrderCanceledDays() {
+    console.log("\n=== TEST 6: Xóa đơn - Số ngày còn lại + order_canceled.days + trừ NCC ===");
+
+    const supplyName = "TEST_SUPPLIER_6";
+    const supplyId = await createTestSupplier(supplyName);
+    const initialDebt = await getSupplierDebt(supplyId);
+
+    const remainingDaysExpected = 20;
+    const totalDays = 30;
+    const cost = 300000;
+    const orderExpiredDate = addDays(new Date(), remainingDaysExpected);
+    const orderDate = addDays(new Date(), -(totalDays - remainingDaysExpected));
+
+    const orderData = {
+      id_order: `TEST_${Date.now()}`,
+      id_product: "Test Product",
+      customer: "Test Customer",
+      supply: supplyName,
+      cost,
+      price: 450000,
+      days: totalDays,
+      order_date: formatDate(orderDate),
+      order_expired: formatDate(orderExpiredDate),
+    };
+
+    const order = await createOrder(orderData);
+
+    const trx1 = await db.transaction();
+    try {
+      await updateOrderWithFinance({
+        trx: trx1,
+        id: order.id,
+        payload: { status: STATUS.PROCESSING },
+        helpers: {
+          TABLES,
+          STATUS,
+          sanitizeOrderWritePayload,
+          normalizeOrderRow,
+          todayYMDInVietnam,
+        },
+      });
+      await trx1.commit();
+    } catch (err) {
+      await trx1.rollback();
+      throw err;
+    }
+
+    const debtAfterProcessing = await getSupplierDebt(supplyId);
+
+    const trx2 = await db.transaction();
+    let deletedResult;
+    let normalized;
+    try {
+      const orderRow = await trx2(TABLES.orderList).where({ id: order.id }).first();
+      normalized = normalizeOrderRow(orderRow, todayYMDInVietnam());
+      deletedResult = await deleteOrderWithArchive({
+        trx: trx2,
+        order: orderRow,
+        normalized,
+        reqBody: {},
+        helpers: {
+          TABLES,
+          ORDERS_SCHEMA,
+          STATUS,
+          nextId,
+          pruneArchiveData,
+          allowedArchiveColsExpired: ORDER_EXPIRED_ALLOWED_COLS,
+          allowedArchiveColsCanceled: ORDER_CANCELED_ALLOWED_COLS,
+        },
+      });
+    } catch (err) {
+      await trx2.rollback();
+      throw err;
+    }
+
+    const debtAfterDelete = await getSupplierDebt(supplyId);
+    const canceledRow = await db(TABLES.orderCanceled).where({ id_order: order.id_order }).first();
+
+    const daysCol = ORDERS_SCHEMA.ORDER_CANCELED.COLS.DAYS;
+    const orderCanceledDays = canceledRow ? canceledRow[daysCol] : null;
+    const expectedProrated = Math.ceil((remainingDaysExpected / totalDays) * cost / 1000) * 1000;
+    const expectedDebt = debtAfterProcessing - expectedProrated;
+
+    console.log(`  - so_ngay_con_lai (từ expiry - today): ${normalized?.so_ngay_con_lai}`);
+    console.log(`  - order_canceled.days (note số ngày còn lại): ${orderCanceledDays}`);
+    console.log(`  - Debt sau PROCESSING: ${debtAfterProcessing}`);
+    console.log(`  - Debt sau xóa: ${debtAfterDelete}`);
+    console.log(`  - Prorated trừ NCC: ${expectedProrated}`);
+
+    const passedDays = Number(orderCanceledDays) === remainingDaysExpected;
+    const passedDebt = Math.abs(debtAfterDelete - expectedDebt) < 1000;
+    const passedMoved = deletedResult.movedTo === "canceled";
+    const passed = passedDays && passedDebt && passedMoved;
+
+    console.log(`  ✓ ${passedDays ? "PASS" : "FAIL"}: order_canceled.days = ${remainingDaysExpected}`);
+    console.log(`  ✓ ${passedDebt ? "PASS" : "FAIL"}: NCC trừ đúng prorated`);
+    console.log(`  ✓ ${passedMoved ? "PASS" : "FAIL"}: Moved to canceled`);
+    console.log(`  => ${passed ? "PASS" : "FAIL"}`);
+
+    return { passed, supplyId };
+  },
+
+  /**
+   * Test: Nếu chu kỳ NCC đã PAID (không còn UNPAID), khi xóa đơn cần tạo dòng điều chỉnh âm
+   * để total_amount (import_value) âm đúng nghĩa "trừ NCC".
+   */
+  async test7_DeleteOrder_WhenAllCyclesPaid_InsertNegativeAdjustment() {
+    console.log("\n=== TEST 7: Xóa đơn khi chu kỳ đã PAID - tạo adjustment âm cho NCC ===");
+
+    const supplyName = "TEST_SUPPLIER_7";
+    const supplyId = await createTestSupplier(supplyName);
+
+    const remainingDaysExpected = 20;
+    const totalDays = 30;
+    const cost = 300000;
+    const orderExpiredDate = addDays(new Date(), remainingDaysExpected);
+    const orderDate = addDays(new Date(), -(totalDays - remainingDaysExpected));
+
+    const orderData = {
+      id_order: `TEST_${Date.now()}`,
+      id_product: "Test Product",
+      customer: "Test Customer",
+      supply: supplyName,
+      cost,
+      price: 450000,
+      days: totalDays,
+      order_date: formatDate(orderDate),
+      order_expired: formatDate(orderExpiredDate),
+    };
+
+    const order = await createOrder(orderData);
+
+    // UNPAID -> PROCESSING: tạo/cộng công nợ NCC (cycle UNPAID)
+    const trx1 = await db.transaction();
+    try {
+      await updateOrderWithFinance({
+        trx: trx1,
+        id: order.id,
+        payload: { status: STATUS.PROCESSING },
+        helpers: {
+          TABLES,
+          STATUS,
+          sanitizeOrderWritePayload,
+          normalizeOrderRow,
+          todayYMDInVietnam,
+        },
+      });
+      await trx1.commit();
+    } catch (err) {
+      await trx1.rollback();
+      throw err;
+    }
+
+    // Giả lập chu kỳ NCC đã thanh toán hết: set status = PAID và paid = import_value
+    const latestUnpaid = await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.SOURCE_ID, supplyId)
+      .andWhere(PAYMENT_SUPPLY_COLS.STATUS, STATUS.UNPAID)
+      .orderBy(PAYMENT_SUPPLY_COLS.ID, "desc")
+      .first();
+
+    if (!latestUnpaid) {
+      throw new Error("Không tìm thấy chu kỳ UNPAID để giả lập thanh toán.");
+    }
+
+    const importValue = Number(latestUnpaid[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.ID, latestUnpaid[PAYMENT_SUPPLY_COLS.ID])
+      .update({
+        [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.PAID,
+        [PAYMENT_SUPPLY_COLS.PAID]: importValue,
+      });
+
+    // Xóa đơn: vì không còn UNPAID cycle -> phải insert dòng điều chỉnh âm
+    const trx2 = await db.transaction();
+    try {
+      const orderRow = await trx2(TABLES.orderList).where({ id: order.id }).first();
+      const normalized = normalizeOrderRow(orderRow, todayYMDInVietnam());
+      await deleteOrderWithArchive({
+        trx: trx2,
+        order: orderRow,
+        normalized,
+        reqBody: {},
+        helpers: {
+          TABLES,
+          ORDERS_SCHEMA,
+          STATUS,
+          nextId,
+          pruneArchiveData,
+          allowedArchiveColsExpired: ORDER_EXPIRED_ALLOWED_COLS,
+          allowedArchiveColsCanceled: ORDER_CANCELED_ALLOWED_COLS,
+        },
+      });
+    } catch (err) {
+      await trx2.rollback();
+      throw err;
+    }
+
+    const adjustmentRow = await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.SOURCE_ID, supplyId)
+      .orderBy(PAYMENT_SUPPLY_COLS.ID, "desc")
+      .first();
+
+    const adjustmentImport = Number(adjustmentRow?.[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const expectedProrated = Math.ceil((remainingDaysExpected / totalDays) * cost / 1000) * 1000;
+
+    console.log(`  - Latest import_value: ${adjustmentImport}`);
+    console.log(`  - Expected adjustment: ${-expectedProrated}`);
+
+    const passed = adjustmentImport === -expectedProrated;
+    console.log(`  ✓ ${passed ? "PASS" : "FAIL"}: Tạo dòng adjustment âm đúng số tiền trừ NCC`);
+
+    return { passed, supplyId };
+  },
+
+  /**
+   * Test: Confirm chu kỳ âm (NCC trả mình) - chỉ đổi status PAID, KHÔNG đổi import_value.
+   * Sau bấm Thanh toán, total_amount (import_value) vẫn âm.
+   */
+  async test8_ConfirmNegativeCycle_OnlyStatusChange() {
+    console.log("\n=== TEST 8: Confirm chu kỳ âm - chỉ đổi status, import vẫn âm ===");
+
+    const supplyName = "TEST_SUPPLIER_8";
+    const supplyId = await createTestSupplier(supplyName);
+    const negativeAmount = -150000;
+
+    const [inserted] = await db(PAYMENT_SUPPLY_TABLE)
+      .insert({
+        [PAYMENT_SUPPLY_COLS.SOURCE_ID]: supplyId,
+        [PAYMENT_SUPPLY_COLS.IMPORT_VALUE]: negativeAmount,
+        [PAYMENT_SUPPLY_COLS.PAID]: 0,
+        [PAYMENT_SUPPLY_COLS.ROUND]: `ADJ - ${formatDate(new Date())}`,
+        [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.UNPAID,
+      })
+      .returning(PAYMENT_SUPPLY_COLS.ID);
+
+    const paymentId = inserted[PAYMENT_SUPPLY_COLS.ID];
+    const beforeConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
+
+    if (Number(beforeConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE]) >= 0) {
+      throw new Error("Chuẩn bị test: row phải có import_value âm");
+    }
+
+    await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.ID, paymentId)
+      .update({ [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.PAID });
+
+    const afterConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
+    const importAfter = Number(afterConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const statusAfter = String(afterConfirm[PAYMENT_SUPPLY_COLS.STATUS] || "").trim();
+
+    console.log(`  - Import trước confirm: ${negativeAmount}`);
+    console.log(`  - Import sau confirm: ${importAfter}`);
+    console.log(`  - Status sau confirm: ${statusAfter}`);
+
+    const passedImport = importAfter === negativeAmount;
+    const passedStatus = statusAfter === STATUS.PAID;
+    const passed = passedImport && passedStatus;
+
+    console.log(`  ✓ ${passedImport ? "PASS" : "FAIL"}: import_value vẫn âm sau confirm`);
+    console.log(`  ✓ ${passedStatus ? "PASS" : "FAIL"}: status = Đã Thanh Toán`);
+
+    return { passed, supplyId };
+  },
 };
 
 // Run all tests

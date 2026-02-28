@@ -11,18 +11,23 @@ const { TABLES, COLS, STATUS } = require("./constants");
 const { PARTNER_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
 
 const normalizeRawToYMD = (value) => {
-    if (!value) return null;
-    const s = String(value).trim();
-    const match =
-        s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/) ||
-        s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/) ||
-        s.match(/^(\d{4})(\d{2})(\d{2})$/);
-
-    if (!match) return null;
-    if (s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/)) {
-        return `${match[3]}-${match[2]}-${match[1]}`;
+    if (value === undefined || value === null) return null;
+    if (value instanceof Date) {
+        const y = value.getFullYear();
+        const m = String(value.getMonth() + 1).padStart(2, "0");
+        const d = String(value.getDate()).padStart(2, "0");
+        return Number.isFinite(y) && Number.isFinite(value.getTime()) ? `${y}-${m}-${d}` : null;
     }
-    return `${match[1]}-${match[2]}-${match[3]}`;
+    const s = String(value).trim();
+    if (!s) return null;
+    // Cho phép có thêm phần sau ngày (vd: "28/02/2026 00:00", "2026-02-28T00:00:00")
+    const ymdMatch = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+    if (ymdMatch) return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+    const dmyMatch = s.match(/^(\d{2})[-/](\d{2})[-/](\d{4})/);
+    if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2]}-${dmyMatch[1]}`;
+    const compactMatch = s.match(/^(\d{4})(\d{2})(\d{2})/);
+    if (compactMatch) return `${compactMatch[1]}-${compactMatch[2]}-${compactMatch[3]}`;
+    return null;
 };
 
 const normalizeOrderRow = (
@@ -36,14 +41,17 @@ const normalizeOrderRow = (
     const registrationYmd = normalizeRawToYMD(registrationRaw);
     const expiryYmd = normalizeRawToYMD(expiryRaw);
 
+    // Số ngày còn lại = (order_expired - hôm nay), dùng UTC để tránh lệch timezone
     let soNgayConLai = null;
     if (expiryYmd && todayYmd) {
-        const d1 = new Date(expiryYmd);
-        const d2 = new Date(todayYmd);
-        soNgayConLai = Math.floor((d1 - d2) / (24 * 60 * 60 * 1000));
+        const [ey, em, ed] = expiryYmd.split("-").map(Number);
+        const [ty, tm, td] = todayYmd.split("-").map(Number);
+        const expiryUtc = Date.UTC(ey, em - 1, ed);
+        const todayUtc = Date.UTC(ty, tm - 1, td);
+        soNgayConLai = Math.floor((expiryUtc - todayUtc) / (24 * 60 * 60 * 1000));
     }
-    if (!Number.isFinite(soNgayConLai)) {
-        soNgayConLai = toNullableNumber(row.days);
+    if (!Number.isFinite(soNgayConLai) || soNgayConLai < 0) {
+        soNgayConLai = null;
     }
 
     const dbStatusRaw = row.status || STATUS.UNPAID;

@@ -12,6 +12,7 @@ import StatCard from "./components/StatCard";
 import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";
 import { showAppNotification } from "@/lib/notifications";
+import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../ViewOrderModal/constants";
 
 export default function ViewSupplierModal({
   isOpen,
@@ -33,10 +34,11 @@ export default function ViewSupplierModal({
     setConfirming(true);
     try {
       const payment = data.unpaidPayments.find((p: any) => p.id === selectedPaymentId);
+      const importVal = Number(payment?.totalImport ?? payment?.import_value ?? 0);
       const res = await apiFetch(`/api/payment-supply/${selectedPaymentId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paidAmount: payment?.totalImport || payment?.import_value }),
+        body: JSON.stringify(importVal >= 0 ? { paidAmount: importVal } : {}),
       });
       if (!res.ok) throw new Error("Lỗi xác nhận thanh toán");
       await fetchDetail();
@@ -58,16 +60,29 @@ export default function ViewSupplierModal({
   const unpaidPayments = data?.unpaidPayments || [];
   const selectedPayment = unpaidPayments.find((p: any) => p.id === selectedPaymentId);
 
+  // Còn nợ âm = NCC trả mình → QR dùng STK của tôi, số tiền = số dương.
   const qrImageUrl = useMemo(() => {
     if (!supply || !selectedPayment) return null;
-    const amount = Number(selectedPayment.totalImport || selectedPayment.import_value || 0);
+    const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
+    const paid = Number(selectedPayment.paid ?? 0);
     const desc = selectedPayment.round || `PAY ${supply.id}`;
+    const isNegative = raw < 0;
+    const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
+    if (amount <= 0) return null;
+    if (isNegative) {
+      return Helpers.buildSepayQrUrl({
+        accountNumber: ACCOUNT_NO,
+        bankCode: BANK_SHORT_CODE,
+        amount,
+        description: desc,
+        accountName: ACCOUNT_NAME,
+      });
+    }
     if (!supply.numberBank || !supply.binBank) return null;
-    
     return Helpers.buildSepayQrUrl({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
-      amount: Math.max(0, amount),
+      amount,
       description: desc,
       accountName: supply.nameBank || "",
     });
@@ -127,11 +142,18 @@ export default function ViewSupplierModal({
                         )}
                         <div className="flex-1 space-y-3 w-full">
                            <h3 className="text-xl font-bold">{selectedPayment.round}</h3>
-                           <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div><p className="text-white/60">Chủ TK</p><p>{supply.sourceName}</p></div>
-                              <div><p className="text-white/60">Số Tiền</p><p className="text-rose-400 font-bold text-lg">{Helpers.formatCurrency(selectedPayment.totalImport || selectedPayment.import_value)}</p></div>
-                              <div className="col-span-2"><p className="text-white/60">Nội dung</p><p className="font-mono bg-black/30 p-2 rounded">{selectedPayment.round}</p></div>
-                           </div>
+                           {(() => {
+                             const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
+                             const isNegative = raw < 0;
+                             const displayAmount = isNegative ? Math.abs(raw) : raw;
+                             return (
+                               <div className="grid grid-cols-2 gap-4 text-sm">
+                                 <div><p className="text-white/60">Chủ TK</p><p>{isNegative ? ACCOUNT_NAME : supply.sourceName}</p></div>
+                                 <div><p className="text-white/60">Số Tiền</p><p className="text-rose-400 font-bold text-lg">{Helpers.formatCurrency(displayAmount)}{isNegative ? " (NCC chuyển cho bạn)" : ""}</p></div>
+                                 <div className="col-span-2"><p className="text-white/60">Nội dung</p><p className="font-mono bg-black/30 p-2 rounded">{selectedPayment.round}</p></div>
+                               </div>
+                             );
+                           })()}
                            <div className="pt-4 flex justify-end">
                               <button disabled={confirming} onClick={handleConfirmPayment} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold disabled:opacity-50">
                                 {confirming ? "Đang xử lý..." : "Xác nhận đã chuyển khoản"}

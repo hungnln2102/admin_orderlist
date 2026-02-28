@@ -23,7 +23,8 @@ const deleteOrderWithArchive = async ({
 
     const orderId = order?.id;
 
-    // Điều chỉnh công nợ NCC (nếu cần), không chặn flow khi lỗi.
+    // Thứ tự: (1) so_ngay_con_lai đã được tính ở crudRoutes qua normalizeOrderRow(expiry - today).
+    // (2) Tính tiền NCC prorated theo so_ngay_con_lai rồi trừ vào NCC.
     try {
         await adjustSupplierDebtIfNeeded(trx, order, normalized);
     } catch (debtErr) {
@@ -66,6 +67,12 @@ const deleteOrderWithArchive = async ({
     archiveData[archiveIdCol] = await nextId(targetTable, archiveIdCol, trx);
 
     if (shouldArchiveToCanceled) {
+        // Cột days trong order_canceled = số ngày còn lại tại thời điểm hủy (note)
+        const soNgayConLai = normalized?.so_ngay_con_lai;
+        archiveData[ORDERS_SCHEMA.ORDER_CANCELED.COLS.DAYS] =
+            soNgayConLai != null && Number.isFinite(Number(soNgayConLai))
+                ? Number(soNgayConLai)
+                : null;
         // Prefer an explicit refund from request body (UI sends giá trị còn lại),
         // otherwise fall back to prorated calculation.
         const bodyRefund =

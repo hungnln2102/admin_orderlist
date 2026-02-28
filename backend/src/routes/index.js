@@ -22,8 +22,7 @@ const { authGuard } = require("../middleware/authGuard");
 const testTelegramRoutes = require("./testTelegram");
 const accountsRoutes = require("./accountsRoutes");
 const promotionCodesRoutes = require("./promotionCodesRoutes");
-const formsRoutes = require("./formsRoutes");
-
+const formInfoRoutes = require("./formInfoRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -33,9 +32,9 @@ router.use("/", systemRoutes);
 router.use(authGuard);
 
 router.use("/dashboard", dashboardRoutes);
+router.use("/form-info", formInfoRoutes);
 router.use("/", accountsRoutes);
 router.use("/", promotionCodesRoutes);
-router.use("/", formsRoutes);
 router.use("/orders", ordersRoutes);
 router.use("/supplies", suppliesRoutes);
 router.use("/", paymentsRoutes);
