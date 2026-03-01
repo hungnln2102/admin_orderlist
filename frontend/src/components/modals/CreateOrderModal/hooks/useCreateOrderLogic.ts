@@ -161,6 +161,8 @@ export const useCreateOrderLogic = (
     isLoading,
     updateForm,
     onSave,
+    selectedSupplyId,
+    products,
   });
 
   return {

@@ -17,6 +17,8 @@ import {
   type InputDto,
 } from "@/lib/formsApi";
 import { ModalShell } from "../PackageProduct/components/Modals/ModalShell";
+import CreateInputModal from "./CreateInputModal";
+import CreateFormModal from "./CreateFormModal";
 
 type FormInfoTab = "form" | "input";
 
@@ -42,6 +44,8 @@ export default function FormInfo() {
   const [viewData, setViewData] = useState<FormDetailView | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
+  const [createInputOpen, setCreateInputOpen] = useState(false);
+  const [createFormOpen, setCreateFormOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,11 +142,36 @@ export default function FormInfo() {
   };
 
   const handleCreateForm = () => {
-    console.log("Tạo form");
+    setCreateFormOpen(true);
+  };
+
+  const handleCreateFormClose = () => {
+    setCreateFormOpen(false);
+  };
+
+  const handleCreateFormSuccess = (
+    item: FormInfoItem & { inputIds?: number[] }
+  ) => {
+    const mapped: FormInfoItem = {
+      id: item.id,
+      name: item.name || "Chưa đặt tên",
+      description: item.description || "Không có mô tả",
+    };
+    setItems((prev) => [mapped, ...prev]);
+    setCreateFormOpen(false);
   };
 
   const handleCreateInput = () => {
-    console.log("Tạo input");
+    setCreateInputOpen(true);
+  };
+
+  const handleCreateInputClose = () => {
+    setCreateInputOpen(false);
+  };
+
+  const handleCreateInputSuccess = (item: InputDto) => {
+    setInputItems((prev) => [item, ...prev]);
+    setCreateInputOpen(false);
   };
 
   return (
@@ -498,6 +527,19 @@ export default function FormInfo() {
           </div>
         </div>
       </ModalShell>
+
+      <CreateInputModal
+        isOpen={createInputOpen}
+        onClose={handleCreateInputClose}
+        onSuccess={handleCreateInputSuccess}
+      />
+
+      <CreateFormModal
+        isOpen={createFormOpen}
+        onClose={handleCreateFormClose}
+        onSuccess={handleCreateFormSuccess}
+        inputItems={inputItems}
+      />
     </div>
   );
 }

@@ -59,6 +59,7 @@ const getSupplyOverview = async (req, res) => {
     const normalizedStatus = normalizeSupplyStatus(supplyRow.raw_status);
 
     const statusColumn = quoteIdent(orderCols.status);
+    const idSupplyCol = quoteIdent(orderCols.idSupply);
     const statsQuery = `
       SELECT
         COUNT(*) FILTER (WHERE ${statusColumn} IS DISTINCT FROM '${STATUS.REFUNDED}' AND ${statusColumn} IS DISTINCT FROM '${STATUS.PENDING_REFUND}') AS total_orders,
@@ -66,14 +67,14 @@ const getSupplyOverview = async (req, res) => {
         COUNT(*) FILTER (WHERE ${statusColumn} = :unpaidStatus) AS unpaid_orders,
         COUNT(*) FILTER (WHERE ${statusColumn} IN ('${STATUS.PAID}')) AS paid_orders
       FROM ${TABLES.orderList}
-      WHERE TRIM(${quoteIdent(orderCols.supply)}::text) = TRIM(:supplyName)
+      WHERE ${idSupplyCol} = :supplyId
     `;
     const monthlyQuery = `
       SELECT
         EXTRACT(MONTH FROM ${createDateNormalization("order_date")}) AS month_num,
         COUNT(*) AS monthly_orders
       FROM ${TABLES.orderList}
-      WHERE TRIM(supply::text) = TRIM(:supplyName)
+      WHERE ${idSupplyCol} = :supplyId
       GROUP BY month_num
       ORDER BY month_num;
     `;

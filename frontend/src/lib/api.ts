@@ -9,12 +9,17 @@ const RAW_API_BASE: string = (() => {
       ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
       : "";
   if (envBase) return envBase;
+  // Dev: dùng "" → qua Vite proxy (same-origin), tránh lỗi localhost khác nhau giữa các máy
+  const isDev =
+    typeof import.meta !== "undefined" &&
+    (import.meta as any).env?.DEV === true;
+  if (isDev) return "";
   return "http://localhost:3001";
 })();
 
 function normalizeBaseUrl(value: string): string {
   const v = (value || "").trim();
-  if (!v) return "http://localhost:3001";
+  if (!v) return ""; // relative → Vite proxy
   if (/^:\\d+/.test(v)) return `http://localhost${v}`; // fix ":3001" -> http://localhost:3001
   if (/^localhost:\\d+/.test(v)) return `http://${v}`; // add protocol if missing
   if (!/^https?:\/\//i.test(v)) return `http://${v}`;

@@ -172,9 +172,124 @@ const listInputs = async (_req, res) => {
   }
 };
 
+const createInput = async (req, res) => {
+  try {
+    if (!INPUT_DEF) {
+      return res.status(500).json({
+        error: "Thiếu cấu hình bảng inputs trong FORM_DESC_SCHEMA",
+      });
+    }
+
+    const { name, type } = req.body || {};
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    const trimmedType = typeof type === "string" ? type.trim().toLowerCase() : "text";
+
+    if (!trimmedName) {
+      return res.status(400).json({
+        error: "Tên input không được để trống",
+      });
+    }
+
+    const cols = INPUT_DEF.columns;
+
+    const [inserted] = await db(INPUTS_TABLE)
+      .insert({
+        [cols.inputName]: trimmedName,
+        [cols.inputType]: trimmedType || "text",
+      })
+      .returning("*");
+
+    const row = inserted || {};
+    res.status(201).json({
+      id: row[cols.id] ?? row.id,
+      name: row[cols.inputName] ?? row.input_name ?? trimmedName,
+      type: row[cols.inputType] ?? row.input_type ?? trimmedType,
+      createdAt: row[cols.createdAt] ?? row.created_at ?? null,
+    });
+  } catch (error) {
+    logger.error("[forms] Query failed (createInput)", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: "Không thể tạo input.",
+    });
+  }
+};
+
+const createForm = async (req, res) => {
+  try {
+    if (!FORM_NAME_DEF || !FORM_INPUT_DEF) {
+      return res.status(500).json({
+        error: "Thiếu cấu hình bảng form trong FORM_DESC_SCHEMA",
+      });
+    }
+
+    const { name, description, inputIds } = req.body || {};
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    const trimmedDesc = typeof description === "string" ? description.trim() : "";
+    const ids = Array.isArray(inputIds)
+      ? inputIds
+          .map((v) => Number(v))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+
+    if (!trimmedName) {
+      return res.status(400).json({
+        error: "Tên form không được để trống",
+      });
+    }
+
+    const fCols = FORM_NAME_DEF.columns;
+    const fiCols = FORM_INPUT_DEF.columns;
+
+    const [inserted] = await db(FORM_NAME_TABLE)
+      .insert({
+        [fCols.name]: trimmedName,
+        [fCols.description]: trimmedDesc || null,
+      })
+      .returning("*");
+
+    const formRow = inserted || {};
+    const formId = formRow[fCols.id] ?? formRow.id;
+    if (!formId) {
+      return res.status(500).json({
+        error: "Không thể tạo form",
+      });
+    }
+
+    if (ids.length > 0) {
+      const rows = ids.map((inputId, idx) => ({
+        [fiCols.formId]: formId,
+        [fiCols.inputId]: inputId,
+        [fiCols.sortOrder]: idx,
+      }));
+      await db(FORM_INPUT_TABLE).insert(rows);
+    }
+
+    res.status(201).json({
+      id: formId,
+      name: formRow[fCols.name] ?? formRow.name ?? trimmedName,
+      description: formRow[fCols.description] ?? formRow.description ?? (trimmedDesc || null),
+      inputIds: ids,
+      createdAt: formRow[fCols.createdAt] ?? formRow.created_at ?? null,
+    });
+  } catch (error) {
+    logger.error("[forms] Query failed (createForm)", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: "Không thể tạo form.",
+    });
+  }
+};
+
 module.exports = {
   listForms,
   getFormDetail,
   listInputs,
+  createInput,
+  createForm,
 };
 

@@ -12,7 +12,8 @@ export const ORDER_COLS = {
   orderDate: "order_date",
   days: "days",
   orderExpired: "order_expired", // Khớp với ORDER_EXPIRED trong dbSchema
-  supply: "supply",
+  idSupply: "supply_id", // DB column - API trả về supply (tên NCC) qua JOIN supplier
+  supply: "supply", // Tên NCC (từ API response - backend JOIN supplier trả về)
   cost: "cost",
   price: "price",
   note: "note",

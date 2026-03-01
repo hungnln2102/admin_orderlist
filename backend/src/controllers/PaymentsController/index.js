@@ -147,16 +147,6 @@ const confirmPaymentSupply = async (req, res) => {
         return `${day}/${month}/${year}`;
       })();
 
-      const supplyResult = await trx.raw(
-        `SELECT ${QUOTED_COLS.supplier.supplierName} AS source_name FROM ${TABLES.supply} WHERE ${QUOTED_COLS.supplier.id} = ? LIMIT 1;`,
-        [sourceId]
-      );
-      const sourceName =
-        supplyResult.rows?.[0]?.source_name !== undefined
-          ? supplyResult.rows[0].source_name
-          : "";
-      const trimmedSourceName = sourceName.trim();
-
       const UNPAID_STATUS = STATUS.UNPAID;
       const PROCESSING_STATUS = STATUS.PROCESSING;
       const PAID_STATUS = STATUS.PAID;
@@ -171,10 +161,10 @@ const confirmPaymentSupply = async (req, res) => {
             ${createDateNormalization(QUOTED_COLS.orderList.orderDate)} AS order_date
           FROM ${TABLES.orderList}
           WHERE ${QUOTED_COLS.orderList.status} = ?
-            AND TRIM(${QUOTED_COLS.orderList.supply}::text) = TRIM(?)
+            AND ${QUOTED_COLS.orderList.idSupply} = ?
           ORDER BY order_date ASC NULLS FIRST, ${QUOTED_COLS.orderList.id} ASC;
         `,
-        [PROCESSING_STATUS, trimmedSourceName]
+        [PROCESSING_STATUS, sourceId]
         );
 
         const processingRows = processingResult.rows || [];

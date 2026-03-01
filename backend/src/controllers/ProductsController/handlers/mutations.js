@@ -601,6 +601,8 @@ const toggleProductPriceStatus = async (req, res) => {
   }
 };
 
+const { isVariantReferencedByOrders } = require("../../../services/orderReferenceCheck");
+
 const deleteProductPrice = async (req, res) => {
   const { productId } = req.params;
   const parsedId = Number(productId);
@@ -608,6 +610,12 @@ const deleteProductPrice = async (req, res) => {
     return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
   }
   try {
+    const referenced = await isVariantReferencedByOrders(parsedId);
+    if (referenced) {
+      return res.status(409).json({
+        error: "Không thể xóa sản phẩm đang được tham chiếu bởi đơn hàng (đơn đang hoạt động, hết hạn hoặc đã hủy).",
+      });
+    }
     await db.raw(
       `
       DELETE FROM ${TABLES.supplyPrice}

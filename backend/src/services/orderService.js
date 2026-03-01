@@ -5,10 +5,12 @@
 
 const { db } = require("../db");
 const { TABLES, STATUS, COLS } = require("../controllers/Order/constants");
+const { ORDERS_SCHEMA } = require("../config/dbSchema");
 const {
   normalizeOrderRow,
   sanitizeOrderWritePayload,
   ensureSupplyRecord,
+  normalizeTextInput,
 } = require("../controllers/Order/helpers");
 const { nextId } = require("./idService");
 const { todayYMDInVietnam } = require("../utils/normalizers");
@@ -24,7 +26,15 @@ const createOrder = async (orderData, trx = null) => {
   const shouldCommit = !trx; // Only commit if we created the transaction
 
   try {
-    const payload = sanitizeOrderWritePayload(orderData);
+    const raw = { ...orderData };
+    if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
+      const name = normalizeTextInput(String(raw.supply));
+      if (name) {
+        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplyRecord(name);
+      }
+      delete raw.supply;
+    }
+    const payload = sanitizeOrderWritePayload(raw);
     delete payload.id;
 
     if (Object.keys(payload).length === 0) {
@@ -36,11 +46,6 @@ const createOrder = async (orderData, trx = null) => {
 
     // Ensure we have a numeric PK
     payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, transaction);
-
-    // Ensure supply record exists
-    if (payload.supply) {
-      await ensureSupplyRecord(payload.supply);
-    }
 
     // Insert order
     const [newOrder] = await transaction(TABLES.orderList).insert(payload).returning("*");
@@ -127,15 +132,18 @@ const updateOrder = async (id, updateData, trx = null) => {
   const shouldCommit = !trx;
 
   try {
-    const payload = sanitizeOrderWritePayload(updateData);
+    const raw = { ...updateData };
+    if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
+      const name = normalizeTextInput(String(raw.supply));
+      if (name) {
+        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplyRecord(name);
+      }
+      delete raw.supply;
+    }
+    const payload = sanitizeOrderWritePayload(raw);
 
     if (Object.keys(payload).length === 0) {
       throw new Error("Empty payload");
-    }
-
-    // Ensure supply record exists if supply is being updated
-    if (payload.supply) {
-      await ensureSupplyRecord(payload.supply);
     }
 
     const [updated] = await transaction(TABLES.orderList)

@@ -19,7 +19,6 @@ const {
   addMonthsClamped,
   addDays,
   fetchProductPricing,
-  findSupplyId,
   fetchSupplyPrice,
   fetchMaxSupplyPrice,
   daysUntil,
@@ -42,7 +41,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       `SELECT
         ${ORDER_COLS.idProduct},
         ${ORDER_COLS.orderExpired},
-        ${ORDER_COLS.supply},
+        ${ORDER_COLS.idSupply},
         ${ORDER_COLS.cost},
         ${ORDER_COLS.price},
         ${ORDER_COLS.informationOrder},
@@ -66,7 +65,9 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const order = orderRes.rows[0];
     const sanPham = order[ORDER_COLS.idProduct];
     const hetHan = parseFlexibleDate(order[ORDER_COLS.orderExpired]);
-    const nguon = order[ORDER_COLS.supply];
+    const idSupplyRaw = order[ORDER_COLS.idSupply];
+    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
+      ? Number(idSupplyRaw) : null;
     const giaNhapCu = normalizeMoney(order[ORDER_COLS.cost]);
     const giaBanCu = normalizeMoney(order[ORDER_COLS.price]);
     const thongTin = order[ORDER_COLS.informationOrder];
@@ -120,7 +121,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const fallbackSoNgay = months * 30;
 
     const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
-    const supplierId = await findSupplyId(client, nguon);
     const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
     const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
 
@@ -237,7 +237,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       SLOT: slot,
       NGAY_DANG_KY: formatDateDMY(ngayBatDauMoi),
       HET_HAN: formatDateDMY(ngayHetHanMoi),
-      NGUON: nguon,
+      NGUON: supplierId != null ? String(supplierId) : "",
       GIA_NHAP: finalGiaNhap,
       GIA_BAN: finalGiaBan,
       TINH_TRANG: ORDER_STATUS.PROCESSING,
@@ -489,7 +489,9 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
 
   try {
     const sanPham = orderRow?.[ORDER_COLS.idProduct];
-    const nguon = orderRow?.[ORDER_COLS.supply];
+    const idSupplyRaw = orderRow?.[ORDER_COLS.idSupply];
+    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
+      ? Number(idSupplyRaw) : null;
     const giaNhapCu = normalizeMoney(orderRow?.[ORDER_COLS.cost]);
     const giaBanCu = normalizeMoney(orderRow?.[ORDER_COLS.price]);
 
@@ -498,7 +500,6 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
     }
 
     const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
-    const supplierId = await findSupplyId(client, nguon);
     const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
     const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
 

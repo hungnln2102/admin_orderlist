@@ -9,6 +9,8 @@ const {
   listForms,
   listInputs,
   getFormDetail,
+  createInput,
+  createForm,
 } = require("../controllers/FormDescController");
 
 const router = express.Router();
@@ -16,5 +18,7 @@ const router = express.Router();
 router.get("/forms", listForms);
 router.get("/inputs", listInputs);
 router.get("/forms/:formId", getFormDetail);
+router.post("/forms", createForm);
+router.post("/inputs", createInput);
 
 module.exports = router;

@@ -32,7 +32,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         ${normalizeDateSQL(COL.orderDate)} AS ${COL.orderDate},
         ${intFromTextSQL(COL.days)} AS ${COL.days},
         ${expiryDateSQL()} AS ${COL.orderExpired},
-        ${COL.supply},
+        ${COL.idSupply},
         ${COL.cost},
         ${COL.price},
         ${COL.note},

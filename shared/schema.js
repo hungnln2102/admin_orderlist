@@ -12,7 +12,7 @@ const SHARED_COLS = {
     orderDate: "order_date",
     days: "days",
     orderExpired: "order_expired",
-    supply: "supply",
+    idSupply: "id_supply",
     cost: "cost",
     price: "price",
     note: "note",

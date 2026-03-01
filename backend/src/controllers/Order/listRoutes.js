@@ -2,7 +2,15 @@ const { db } = require("../../db");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { TABLES } = require("./constants");
 const { normalizeOrderRow } = require("./helpers");
+const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
+
+const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
+const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
+const supplierNameCol = "supplier_name"; // Cột tên NCC
+const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
+const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME;
 
 const attachListRoutes = (router) => {
     // GET /api/orders
@@ -15,10 +23,17 @@ const attachListRoutes = (router) => {
         logger.debug(`[GET] /api/orders`, { scope });
 
         try {
-            const rows = await db(table).select("*",
-                db.raw("order_date::text as order_date_raw"),
-                db.raw("order_expired::text as order_expired_raw")
-            );
+            // Cả 3 bảng order_list, order_expired, order_canceled đều có supply_id
+            const rows = await db(table)
+                .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
+                .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`)
+                .select(
+                    `${table}.*`,
+                    db.raw(`${table}.order_date::text as order_date_raw`),
+                    db.raw(`${table}.order_expired::text as order_expired_raw`),
+                    db.raw(`COALESCE(${TABLES.variant}.${variantNameCol}::text, ${table}.${idProductCol}::text) as id_product`),
+                    db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
+                );
             const today = todayYMDInVietnam();
             const normalized = rows.map((row) =>
                 normalizeOrderRow(row, today, {

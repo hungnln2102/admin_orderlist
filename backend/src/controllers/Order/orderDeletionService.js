@@ -28,9 +28,10 @@ const deleteOrderWithArchive = async ({
     try {
         await adjustSupplierDebtIfNeeded(trx, order, normalized);
     } catch (debtErr) {
+        const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
         logger.warn("Lỗi khi trừ/cộng công nợ NCC", {
             id: orderId,
-            supplier: order?.supply,
+            supply_id: order?.[supplyIdCol],
             cost: order?.cost,
             status: order?.status,
             error: debtErr?.message || String(debtErr),

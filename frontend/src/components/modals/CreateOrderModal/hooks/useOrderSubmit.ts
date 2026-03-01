@@ -3,13 +3,15 @@ import { ORDER_FIELDS, Order as ApiOrder } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { showAppNotification } from "@/lib/notifications";
 import { calculateExpirationDate, convertDMYToYMD } from "../helpers";
-import { Order } from "../types";
+import { Order, Product } from "../types";
 
 type UseOrderSubmitParams = {
   formData: Partial<Order>;
   isLoading: boolean;
   updateForm: (patch: Partial<Order>) => void;
   onSave: (newOrderData: Partial<Order> | Order) => void;
+  selectedSupplyId: number | null;
+  products: Product[];
 };
 
 export const useOrderSubmit = ({
@@ -17,15 +19,18 @@ export const useOrderSubmit = ({
   isLoading,
   updateForm,
   onSave,
+  selectedSupplyId,
+  products,
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
       e.preventDefault();
 
+      const supplyFilled = selectedSupplyId != null || (formData?.[ORDER_FIELDS.SUPPLY] as string);
       const requiredFieldsFilled =
         formData &&
         formData[ORDER_FIELDS.ID_PRODUCT] &&
-        formData[ORDER_FIELDS.SUPPLY] &&
+        supplyFilled &&
         formData[ORDER_FIELDS.CUSTOMER] &&
         formData[ORDER_FIELDS.INFORMATION_ORDER];
 
@@ -62,6 +67,12 @@ export const useOrderSubmit = ({
           ? convertDMYToYMD(expiryDMY)
           : normalizedRegister;
 
+        const productName = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
+        const matchedProduct = products.find(
+          (p) => (p.san_pham || "").trim() === productName.trim()
+        );
+        const variantId = matchedProduct?.id;
+
         const dataToSave: Partial<ApiOrder> = {
           ...formData,
           [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
@@ -72,6 +83,13 @@ export const useOrderSubmit = ({
           [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
           [ORDER_FIELDS.NOTE]: formData[ORDER_FIELDS.NOTE] || null,
         };
+
+        if (selectedSupplyId != null) {
+          (dataToSave as Record<string, unknown>).supply_id = selectedSupplyId;
+        }
+        if (variantId != null && Number.isFinite(variantId)) {
+          (dataToSave as Record<string, unknown>).id_product = variantId;
+        }
 
         onSave(dataToSave as Order);
         return true;
@@ -84,7 +102,7 @@ export const useOrderSubmit = ({
       });
       return false;
     },
-    [formData, isLoading, onSave, updateForm]
+    [formData, isLoading, onSave, updateForm, selectedSupplyId, products]
   );
 
   return { handleSubmit };

@@ -1,4 +1,4 @@
-const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
+const { PARTNER_SCHEMA, ORDERS_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
 const { resolveSupplierNameColumn } = require("../SuppliesController/helpers");
 const { STATUS } = require("./constants");
 const { toNullableNumber } = require("../../utils/normalizers");
@@ -180,11 +180,14 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
         return;
     }
 
-    const supplyName = orderRow?.supply;
-    const supplyId = await findSupplyIdByName(trx, supplyName);
+    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+    const supplyId = orderRow?.[supplyIdCol] != null
+        ? Number(orderRow[supplyIdCol]) || null
+        : await findSupplyIdByName(trx, orderRow?.supply);
     if (!supplyId) {
         logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: supplier not found", {
-            supply: supplyName,
+            supply_id: orderRow?.[supplyIdCol],
+            supply: orderRow?.supply,
             orderId: orderRow?.id,
         });
         return;
@@ -213,7 +216,6 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
 
     logger.info("[Finance] Decreasing supplier debt", {
         supplyId,
-        supplyName,
         roundedProrated,
         orderId: orderRow?.id,
     });
@@ -226,7 +228,10 @@ const addSupplierImportOnProcessing = async (trx, beforeRow, afterRow) => {
 
     if (prevStatus === nextStatus || nextStatus !== STATUS.PROCESSING) return;
 
+    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
     const supplyId =
+        (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
+        (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
         (await findSupplyIdByName(trx, afterRow?.supply)) ||
         (await findSupplyIdByName(trx, beforeRow?.supply));
     if (!supplyId) return;

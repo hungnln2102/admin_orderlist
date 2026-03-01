@@ -242,7 +242,7 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
     const orderRes = await client.query(
       `SELECT
         ${ORDER_COLS.idProduct} AS product_name,
-        ${ORDER_COLS.supply} AS supply_name,
+        ${ORDER_COLS.idSupply} AS id_supply,
         ${ORDER_COLS.cost} AS cost_value
       FROM ${ORDER_TABLE}
       WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
@@ -258,36 +258,16 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
     }
 
     const productName = String(orderRes.rows[0].product_name || "").trim();
-    const supplyName = String(orderRes.rows[0].supply_name || "").trim();
+    const idSupplyRaw = orderRes.rows[0].id_supply;
+    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
+      ? Number(idSupplyRaw) || null
+      : null;
     const costValue = normalizeMoney(orderRes.rows[0].cost_value);
 
     let variantId = null;
     if (productName) {
       const pricingInfo = await fetchProductPricing(client, productName);
       variantId = pricingInfo?.variantId ?? null;
-    }
-
-    let supplierId = null;
-    if (supplyName) {
-    const supplyRes = await client.query(
-        `SELECT ${SUPPLIER_COLS.id} AS id
-         FROM ${SUPPLIER_TABLE}
-         WHERE LOWER(${SUPPLIER_COLS.supplierName}) = LOWER($1)
-         LIMIT 1`,
-        [supplyName]
-      );
-
-      if (supplyRes.rows.length) {
-        supplierId = supplyRes.rows[0].id;
-      } else {
-        const insertSupply = await client.query(
-          `INSERT INTO ${SUPPLIER_TABLE} (${SUPPLIER_COLS.supplierName})
-           VALUES ($1)
-           RETURNING ${SUPPLIER_COLS.id} AS id`,
-          [supplyName]
-        );
-        supplierId = insertSupply.rows[0].id;
-      }
     }
 
     const resolvedProductId = variantId;

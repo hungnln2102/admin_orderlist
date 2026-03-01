@@ -42,6 +42,38 @@ export async function fetchFormNames(): Promise<FormNameDto[]> {
   return data.items;
 }
 
+export interface CreateFormData {
+  name: string;
+  description?: string;
+  inputIds: number[];
+}
+
+export interface CreateFormResponse {
+  id: number;
+  name: string | null;
+  description: string | null;
+  inputIds: number[];
+  createdAt?: string | null;
+}
+
+export async function createForm(data: CreateFormData): Promise<CreateFormResponse> {
+  const res = await apiFetch(`${FORM_INFO_BASE}/forms`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: data.name?.trim() ?? "",
+      description: (data.description ?? "").trim() || null,
+      inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
+    }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.error ?? "Không thể tạo form";
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 interface InputsResponse {
   items?: InputDto[];
 }
@@ -63,6 +95,28 @@ export async function fetchInputs(): Promise<InputDto[]> {
     return [];
   }
   return data.items;
+}
+
+export interface CreateInputData {
+  name: string;
+  type: string;
+}
+
+export async function createInput(data: CreateInputData): Promise<InputDto> {
+  const res = await apiFetch(`${FORM_INFO_BASE}/inputs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: data.name?.trim() ?? "",
+      type: (data.type ?? "text").trim().toLowerCase(),
+    }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.error ?? "Không thể tạo input";
+    throw new Error(msg);
+  }
+  return res.json();
 }
 
 export async function fetchFormDetail(

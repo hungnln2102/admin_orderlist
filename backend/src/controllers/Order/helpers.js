@@ -8,7 +8,7 @@ const {
 const { getNextSupplyId } = require("../../services/idService");
 const { db } = require("../../db");
 const { TABLES, COLS, STATUS } = require("./constants");
-const { PARTNER_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
+const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
 
 const normalizeRawToYMD = (value) => {
     if (value === undefined || value === null) return null;
@@ -78,7 +78,7 @@ const ORDER_WRITABLE_COLUMNS = [
     COLS.ORDER.ID_ORDER, COLS.ORDER.ID_PRODUCT, COLS.ORDER.INFORMATION_ORDER,
     COLS.ORDER.CUSTOMER, COLS.ORDER.CONTACT, COLS.ORDER.SLOT,
     COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.ORDER_EXPIRED,
-    COLS.ORDER.SUPPLY, COLS.ORDER.COST, COLS.ORDER.PRICE,
+    COLS.ORDER.ID_SUPPLY, COLS.ORDER.COST, COLS.ORDER.PRICE,
     COLS.ORDER.NOTE, COLS.ORDER.STATUS
 ];
 
@@ -90,7 +90,7 @@ const sanitizeOrderWritePayload = (raw = {}) => {
         let val = raw[col];
         if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.ORDER_EXPIRED) {
             val = normalizeDateInput(val);
-        } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.DAYS) {
+        } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.DAYS || col === COLS.ORDER.ID_SUPPLY) {
             val = toNullableNumber(val);
         } else if (typeof val === "string") {
             val = val.trim();
@@ -98,6 +98,26 @@ const sanitizeOrderWritePayload = (raw = {}) => {
         sanitized[col] = val;
     });
     return sanitized;
+};
+
+/**
+ * Resolve product name (display_name) to variant id.
+ * Returns null if not found.
+ */
+const resolveProductToVariantId = async(productNameOrId) => {
+    if (productNameOrId == null) return null;
+    const num = Number(productNameOrId);
+    if (Number.isFinite(num) && num > 0) return num;
+    const name = String(productNameOrId).trim();
+    if (!name) return null;
+    const displayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME || "display_name";
+    const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME || "variant_name";
+    const row = await db(TABLES.variant)
+        .where(displayNameCol, name)
+        .orWhere(variantNameCol, name)
+        .select(PRODUCT_SCHEMA.VARIANT.COLS.ID)
+        .first();
+    return row ? Number(row[PRODUCT_SCHEMA.VARIANT.COLS.ID]) || null : null;
 };
 
 const ensureSupplyRecord = async(sourceName) => {
@@ -133,5 +153,6 @@ module.exports = {
     ORDER_WRITABLE_COLUMNS,
     sanitizeOrderWritePayload,
     ensureSupplyRecord,
+    resolveProductToVariantId,
     normalizeTextInput,
 };

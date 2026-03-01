@@ -34,8 +34,11 @@ const validations = {
   orderCode: () =>
     body("id_order").trim().notEmpty().withMessage("Mã đơn hàng không được để trống"),
 
+  // id_product: variant id (number) hoặc tên sản phẩm (string)
   productId: () =>
-    body("id_product").trim().notEmpty().withMessage("Mã sản phẩm không được để trống"),
+    body("id_product")
+      .custom((val) => val != null && val !== "")
+      .withMessage("Mã sản phẩm không được để trống"),
 
   customer: () =>
     body("customer").trim().notEmpty().withMessage("Tên khách hàng không được để trống"),

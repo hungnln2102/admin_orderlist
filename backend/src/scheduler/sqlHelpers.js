@@ -21,7 +21,7 @@ const COL = {
   orderDate: quoteIdent(ORDER_COLS.orderDate),
   days: quoteIdent(ORDER_COLS.days),
   orderExpired: quoteIdent(ORDER_COLS.orderExpired),
-  supply: quoteIdent(ORDER_COLS.supply),
+  idSupply: quoteIdent(ORDER_COLS.idSupply),
   cost: quoteIdent(ORDER_COLS.cost),
   price: quoteIdent(ORDER_COLS.price),
   note: quoteIdent(ORDER_COLS.note),

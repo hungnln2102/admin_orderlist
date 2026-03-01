@@ -1,6 +1,7 @@
 const Helpers = require("../../../helpers");
 const { db } = require("../../db");
 const { TABLES, COLS } = require("./constants");
+const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
 const logger = require("../../utils/logger");
 
@@ -45,17 +46,17 @@ const attachCalculatePriceRoute = (router) => {
         }
 
         try {
+            const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
             const orderRow = orderId ?
                 await db(TABLES.orderList)
-                .select("id_product", "price", "cost", "supply")
+                .select("id_product", "price", "cost", supplyIdCol)
                 .where({ id_order: orderId })
                 .first() :
                 null;
 
             let effectiveSupplyId = Number(supply_id);
-            if (!effectiveSupplyId && orderRow?.supply) {
-                const s = await db(TABLES.supplier).where({ supplier_name: orderRow.supply }).first();
-                if (s) effectiveSupplyId = s.id;
+            if (!effectiveSupplyId && orderRow?.[supplyIdCol] != null) {
+                effectiveSupplyId = Number(orderRow[supplyIdCol]) || 0;
             }
             if (!effectiveSupplyId && customer_type) {
                 const s = await db(TABLES.supplier).where({ supplier_name: customer_type }).first();

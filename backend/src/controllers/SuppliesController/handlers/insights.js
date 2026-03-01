@@ -74,6 +74,7 @@ const getSupplyInsights = async (_req, res) => {
       ? `${statusColumnIdent}::text AS raw_status`
       : "NULL AS raw_status";
 
+    const idSupplyCol = quoteIdent(orderCols.idSupply);
     const monthlySql = `
       WITH params AS (
         SELECT ?::date AS curr_start, ?::date AS curr_end
@@ -84,29 +85,29 @@ const getSupplyInsights = async (_req, res) => {
         COALESCE(SUM(import_value), 0) AS monthly_import_value
       FROM (
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
           ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
         FROM ${TABLES.orderList}, params
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        WHERE ${idSupplyCol} IS NOT NULL
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
         UNION ALL
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
           ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
         FROM ${TABLES.orderExpired}, params
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        WHERE ${idSupplyCol} IS NOT NULL
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
         UNION ALL
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
           ${createDateNormalization("createdate")} AS order_date
         FROM ${TABLES.orderCanceled}, params
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        WHERE ${idSupplyCol} IS NOT NULL
           AND ${createDateNormalization("createdate")} >= params.curr_start
           AND ${createDateNormalization("createdate")} < params.curr_end
       ) m
@@ -121,30 +122,30 @@ const getSupplyInsights = async (_req, res) => {
         MAX(last_order_date) AS last_order_date
       FROM (
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           COUNT(*) AS total_orders,
           MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
         FROM ${TABLES.orderList}
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        WHERE ${idSupplyCol} IS NOT NULL
         GROUP BY source_key
         UNION ALL
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           COUNT(*) AS total_orders,
           MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
         FROM ${TABLES.orderExpired}
-        WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
+        WHERE ${idSupplyCol} IS NOT NULL
         GROUP BY source_key
         UNION ALL
         SELECT
-          ${createSourceKey(quoteIdent(orderCols.supply))} AS source_key,
+          ${createSourceKey(idSupplyCol)} AS source_key,
           COUNT(*) AS total_orders,
           MAX(${createDateNormalization("createdate")}) AS last_order_date
-      FROM ${TABLES.orderCanceled}
-      WHERE TRIM(${quoteIdent(orderCols.supply)}::text) <> ''
-      GROUP BY source_key
-    ) agg
-    WHERE source_key <> ''
+        FROM ${TABLES.orderCanceled}
+        WHERE ${idSupplyCol} IS NOT NULL
+        GROUP BY source_key
+      ) agg
+      WHERE source_key <> ''
       GROUP BY source_key
     `;
 
@@ -237,7 +238,7 @@ const getSupplyInsights = async (_req, res) => {
     });
 
     const supplies = (supplyRes.rows || []).map((row) => {
-      const sourceKey = makeSourceKey(row.source_name);
+      const sourceKey = makeSourceKey(String(row.id));
       const monthly = monthlyMap.get(sourceKey) || {
         monthly_orders: 0,
         monthly_import_value: 0,
