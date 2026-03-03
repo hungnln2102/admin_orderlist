@@ -4,6 +4,7 @@ const { normalizeOrderRow } = require("../../controllers/Order/helpers");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { STATUS } = require("../../utils/statuses");
 const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
+const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 
 function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
   return async function notifyZeroDaysRemainingTask(trigger = "cron") {
@@ -49,8 +50,15 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
 
       if (result.rows.length > 0) {
         const today = todayYMDInVietnam();
+        const variantIds = result.rows.map((r) => r.id_product).filter((id) => id != null);
+        const nameMap = await fetchVariantDisplayNames(client, variantIds);
+        const idProductKey = "id_product";
         const normalizedOrders = result.rows.map((row) => {
           const normalized = normalizeOrderRow(row, today);
+          const rawIdProduct = row[idProductKey] ?? normalized.id_product ?? normalized.idProduct;
+          const productDisplay = rawIdProduct != null && nameMap.get(Number(rawIdProduct)) != null
+            ? nameMap.get(Number(rawIdProduct))
+            : (typeof rawIdProduct === "string" ? rawIdProduct : String(rawIdProduct ?? ""));
           return {
             id_order: normalized.id_order || normalized.idOrder,
             idOrder: normalized.id_order || normalized.idOrder,
@@ -58,8 +66,8 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
             orderCode: normalized.id_order || normalized.idOrder,
             customer: normalized.customer,
             customer_name: normalized.customer,
-            id_product: normalized.id_product || normalized.idProduct,
-            idProduct: normalized.id_product || normalized.idProduct,
+            id_product: productDisplay || normalized.id_product || normalized.idProduct,
+            idProduct: productDisplay || normalized.id_product || normalized.idProduct,
             information_order: normalized.information_order || normalized.informationOrder,
             informationOrder: normalized.information_order || normalized.informationOrder,
             slot: normalized.slot,

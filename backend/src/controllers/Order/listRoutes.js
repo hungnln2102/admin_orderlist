@@ -10,7 +10,7 @@ const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name"; // Cột tên NCC
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
-const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME;
+const variantDisplayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
 
 const attachListRoutes = (router) => {
     // GET /api/orders
@@ -31,7 +31,9 @@ const attachListRoutes = (router) => {
                     `${table}.*`,
                     db.raw(`${table}.order_date::text as order_date_raw`),
                     db.raw(`${table}.order_expired::text as order_expired_raw`),
-                    db.raw(`COALESCE(${TABLES.variant}.${variantNameCol}::text, ${table}.${idProductCol}::text) as id_product`),
+                    // id_product trong response luôn là display_name của variant nếu có,
+                    // fallback sang giá trị gốc trong bảng orders.* (thường là variant_id).
+                    db.raw(`COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`),
                     db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
                 );
             const today = todayYMDInVietnam();

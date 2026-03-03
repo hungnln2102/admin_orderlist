@@ -2,9 +2,9 @@ const logger = require("../../utils/logger");
 const { sendFourDaysRemainingNotification } = require("../../services/telegramOrderNotification");
 const { normalizeOrderRow } = require("../../controllers/Order/helpers");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
-const { STATUS } = require("../../utils/statuses");
 const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
+const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 
 function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
   return async function notifyFourDaysRemainingTask(trigger = "cron") {
@@ -20,8 +20,8 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
 
     const client = await pool.connect();
     try {
-      const statusEligible = `'${STATUS.RENEWAL}'`;
-
+      // Chỉ check đúng điều kiện: số ngày còn lại = 4.
+      // Không ràng buộc thêm theo trạng thái; trạng thái dùng chỉ để hiển thị.
       const result = await client.query(`
       SELECT
         ${COL.idOrder},
@@ -41,7 +41,6 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         ( ${expiryDateSQL()} - ${sqlDate} ) AS days_left
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 4
-        AND (${COL.status} = ${statusEligible})
       ORDER BY ${COL.idOrder}
     `);
 
@@ -49,10 +48,16 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
 
       if (result.rows.length > 0) {
         const today = todayYMDInVietnam();
+        const variantIds = result.rows.map((r) => r.id_product).filter((id) => id != null);
+        const nameMap = await fetchVariantDisplayNames(client, variantIds);
         const normalizedOrders = [];
         for (const row of result.rows) {
           const normalized = normalizeOrderRow(row, today);
           const computed = await computeOrderCurrentPrice(client, row);
+          const rawIdProduct = row.id_product ?? normalized.id_product ?? normalized.idProduct;
+          const productDisplay = rawIdProduct != null && nameMap.get(Number(rawIdProduct)) != null
+            ? nameMap.get(Number(rawIdProduct))
+            : (typeof rawIdProduct === "string" ? rawIdProduct : String(rawIdProduct ?? ""));
           normalizedOrders.push({
             id_order: normalized.id_order || normalized.idOrder,
             idOrder: normalized.id_order || normalized.idOrder,
@@ -62,8 +67,8 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
             customer_name: normalized.customer,
             contact: normalized.contact,
             customer_link: normalized.contact,
-            id_product: normalized.id_product || normalized.idProduct,
-            idProduct: normalized.id_product || normalized.idProduct,
+            id_product: productDisplay || normalized.id_product || normalized.idProduct,
+            idProduct: productDisplay || normalized.id_product || normalized.idProduct,
             information_order: normalized.information_order || normalized.informationOrder,
             informationOrder: normalized.information_order || normalized.informationOrder,
             slot: normalized.slot,

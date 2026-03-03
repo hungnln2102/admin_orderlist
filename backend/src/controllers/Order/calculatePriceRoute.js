@@ -5,25 +5,41 @@ const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
 const logger = require("../../utils/logger");
 
-const fetchVariantPricing = async (productName) => {
-    const name = String(productName ?? "");
-    if (!name) return null;
+const fetchVariantPricing = async (productNameOrId) => {
+    const raw = String(productNameOrId ?? "").trim();
+    if (!raw) return null;
 
-    const sql = `
-      SELECT
-        v.${quoteIdent(COLS.VARIANT.ID)} AS variant_id,
-        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_CTV)} AS pct_ctv,
-        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_KHACH)} AS pct_khach,
-        pc.${quoteIdent(COLS.PRICE_CONFIG.PCT_PROMO)} AS pct_promo
-      FROM ${TABLES.variant} v
-      LEFT JOIN ${TABLES.priceConfig} pc
-        ON pc.${quoteIdent(COLS.PRICE_CONFIG.VARIANT_ID)} = v.${quoteIdent(COLS.VARIANT.ID)}
-      WHERE v.${quoteIdent(COLS.VARIANT.DISPLAY_NAME)} = ?
-      ORDER BY pc.${quoteIdent(COLS.PRICE_CONFIG.UPDATED_AT)} DESC NULLS LAST
-      LIMIT 1;
-    `;
-    const res = await db.raw(sql, [name]);
-    const row = res.rows?.[0];
+    // Hỗ trợ cả:
+    // - Truyền thẳng variant_id (số)
+    // - Truyền display_name
+    // - Truyền variant_name
+    const num = Number(raw);
+    const baseQuery = db(TABLES.variant)
+        .leftJoin(
+            TABLES.priceConfig,
+            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.VARIANT_ID}`,
+            `${TABLES.variant}.${COLS.VARIANT.ID}`
+        )
+        .select(
+            `${TABLES.variant}.${COLS.VARIANT.ID} as variant_id`,
+            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_CTV} as pct_ctv`,
+            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_KHACH} as pct_khach`,
+            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_PROMO} as pct_promo`
+        )
+        .orderBy(`${TABLES.priceConfig}.${COLS.PRICE_CONFIG.UPDATED_AT}`, "desc")
+        .orderBy(`${TABLES.variant}.${COLS.VARIANT.ID}`, "asc")
+        .limit(1);
+
+    if (Number.isFinite(num) && num > 0) {
+        baseQuery.where(`${TABLES.variant}.${COLS.VARIANT.ID}`, num);
+    } else {
+        baseQuery.where((qb) => {
+            qb.where(`${TABLES.variant}.${COLS.VARIANT.DISPLAY_NAME}`, raw)
+                .orWhere(`${TABLES.variant}.${COLS.VARIANT.VARIANT_NAME}`, raw);
+        });
+    }
+
+    const row = await baseQuery.first();
     if (!row) return null;
     return {
         variantId: row.variant_id,

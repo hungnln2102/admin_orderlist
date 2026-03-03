@@ -77,7 +77,21 @@ export function orderBelongsToPackageByProduct(
     return true;
 
   if (!packageCode || !record.productCodeNormalized) return false;
-  return record.productCodeNormalized === packageCode;
+  const belongs = record.productCodeNormalized === packageCode;
+  if (belongs) {
+    // Debug: track product-level match
+    // eslint-disable-next-line no-console
+    console.debug("[PackageMatch] orderBelongsToPackageByProduct", {
+      package: item.package,
+      packageCode,
+      normalizedProductCodes,
+      orderId: record.base.id,
+      orderCode: record.base.id_order,
+      orderProduct: record.base.id_product,
+      productCodeNormalized: record.productCodeNormalized,
+    });
+  }
+  return belongs;
 }
 
 /**
@@ -94,12 +108,47 @@ export function orderMatchesPackageLink(
   const linkValue =
     matchColumn === "slot" ? record.slotMatchKey : record.informationMatchKey;
   if (!linkValue) return false;
-  return packageLinkKeys.some(
+  const matched = packageLinkKeys.some(
     (pkgKey) =>
       pkgKey === linkValue ||
       pkgKey.includes(linkValue) ||
       linkValue.includes(pkgKey)
   );
+  // Debug: log detailed comparison when we have keys but không match
+  if (!matched) {
+    // eslint-disable-next-line no-console
+    console.debug("[PackageMatch] orderMatchesPackageLink: NO MATCH", {
+      packageId: item.id,
+      packageName: item.package,
+      slotLinkMode: slotMode,
+      packageLinkKeys,
+      matchColumn,
+      orderId: record.base.id,
+      orderCode: record.base.id_order,
+      slotDisplay: record.slotDisplay,
+      slotMatchKey: record.slotMatchKey,
+      informationDisplay: record.informationDisplay,
+      informationMatchKey: record.informationMatchKey,
+      customer: record.customerDisplay,
+    });
+  } else {
+    // eslint-disable-next-line no-console
+    console.debug("[PackageMatch] orderMatchesPackageLink: MATCH", {
+      packageId: item.id,
+      packageName: item.package,
+      slotLinkMode: slotMode,
+      packageLinkKeys,
+      matchColumn,
+      orderId: record.base.id,
+      orderCode: record.base.id_order,
+      slotDisplay: record.slotDisplay,
+      slotMatchKey: record.slotMatchKey,
+      informationDisplay: record.informationDisplay,
+      informationMatchKey: record.informationMatchKey,
+      customer: record.customerDisplay,
+    });
+  }
+  return matched;
 }
 
 export type ComputeAugmentationInput = {

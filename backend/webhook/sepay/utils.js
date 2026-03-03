@@ -277,14 +277,27 @@ const deriveOrderCode = (transaction) => {
   return (codes[0] || fromSplit || "").trim();
 };
 
-const fetchProductPricing = async (client, productName) => {
-  const name = String(productName ?? "");
-  if (!name) {
+const fetchProductPricing = async (client, productNameOrVariantId) => {
+  if (productNameOrVariantId == null || productNameOrVariantId === "") {
     return { productId: null, variantId: null, pctCtv: 1, pctKhach: 1, pctPromo: 0 };
   }
 
-  // Resolve pricing from product schema: variant.display_name -> price_config
-  const variantSql = `
+  const byVariantId = Number.isFinite(Number(productNameOrVariantId)) && Number(productNameOrVariantId) > 0;
+  const variantSql = byVariantId
+    ? `
+    SELECT
+      v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctCtv)} AS pct_ctv,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctKhach)} AS pct_khach,
+      pc.${safeIdent(PRICE_CONFIG_COLS.pctPromo)} AS pct_promo
+    FROM ${VARIANT_TABLE} AS v
+    LEFT JOIN ${PRICE_CONFIG_TABLE} AS pc
+      ON pc.${safeIdent(PRICE_CONFIG_COLS.variantId)} = v.${safeIdent(VARIANT_COLS.id)}
+    WHERE v.${safeIdent(VARIANT_COLS.id)} = $1
+    ORDER BY pc.${safeIdent(PRICE_CONFIG_COLS.updatedAt)} DESC NULLS LAST
+    LIMIT 1
+  `
+    : `
     SELECT
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
       pc.${safeIdent(PRICE_CONFIG_COLS.pctCtv)} AS pct_ctv,
@@ -297,11 +310,12 @@ const fetchProductPricing = async (client, productName) => {
     ORDER BY pc.${safeIdent(PRICE_CONFIG_COLS.updatedAt)} DESC NULLS LAST
     LIMIT 1
   `;
-  const variantRes = await client.query(variantSql, [name]);
+  const param = byVariantId ? Number(productNameOrVariantId) : String(productNameOrVariantId).trim();
+  const variantRes = await client.query(variantSql, [param]);
   const variantRow = variantRes.rows[0] || {};
 
   return {
-    productId: variantRow.variant_id ?? null, // supply_price now keyed by variant.id
+    productId: variantRow.variant_id ?? null,
     variantId: variantRow.variant_id ?? null,
     pctCtv: variantRow.pct_ctv ?? 1,
     pctKhach: variantRow.pct_khach ?? 1,

@@ -120,6 +120,7 @@ const attachCrudRoutes = (router) => {
                     todayYMDInVietnam,
                     ensureSupplyRecord,
                     normalizeTextInput,
+                    resolveProductToVariantId,
                 },
             });
 

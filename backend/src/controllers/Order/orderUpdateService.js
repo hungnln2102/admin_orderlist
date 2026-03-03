@@ -15,11 +15,13 @@ const updateOrderWithFinance = async ({
         todayYMDInVietnam,
         ensureSupplyRecord,
         normalizeTextInput,
+        resolveProductToVariantId,
     } = helpers;
     const { addSupplierImportOnProcessing } = require("./orderFinanceHelpers");
     const logger = require("../../utils/logger");
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+    const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
     // Accept supply (name) or id_supply/supply_id: resolve name -> id
     const raw = { ...payload };
     if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
@@ -29,6 +31,21 @@ const updateOrderWithFinance = async ({
             raw[supplyIdCol] = resolvedId;
         }
         delete raw.supply;
+    }
+
+    // Chuẩn hoá id_product theo config DB hiện tại:
+    // - Cho phép truyền tên gói (display_name) hoặc mã số.
+    // - Luôn convert sang variant_id (integer) để khớp kiểu cột id_product.
+    if (raw[productIdCol] != null) {
+        const rawProduct = raw[productIdCol];
+        const variantId = await resolveProductToVariantId(rawProduct);
+        if (variantId != null) {
+            raw[productIdCol] = variantId;
+        } else if (typeof rawProduct === "string") {
+            raw[productIdCol] = rawProduct.trim() || null;
+        } else {
+            raw[productIdCol] = Number(rawProduct) || null;
+        }
     }
 
     const sanitized = sanitizeOrderWritePayload(raw);
@@ -78,7 +95,6 @@ const updateOrderWithFinance = async ({
             .first();
         normalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
     }
-    const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
     const variantIdVal = updatedOrder?.[productIdCol];
     if (variantIdVal != null && Number.isFinite(Number(variantIdVal))) {
         const variant = await db(TABLES.variant)
