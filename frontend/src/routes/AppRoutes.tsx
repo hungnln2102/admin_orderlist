@@ -12,9 +12,10 @@ import Invoices from "@/pages/Personal/Invoices/index";
 import Warehouse from "@/pages/Personal/Storage";
 import CtvList from "@/pages/CustomerCtv/CtvList";
 import PromoCodes from "@/pages/CustomerCtv/PromoCodes";
-import CustomerStatus from "@/pages/CustomerCtv/CustomerStatus";
+import Customers from "@/pages/CustomerCtv/Customers";
 import AddMcoin from "@/pages/CustomerCtv/AddMcoin";
 import ActiveKeys from "@/pages/CustomerCtv/ActiveKeys";
+import RenewAdobeAdmin from "@/pages/CustomerCtv/RenewAdobeAdmin";
 
 export function AppRoutes() {
   return (
@@ -31,11 +32,14 @@ export function AppRoutes() {
       <Route path="/show-price" element={<ShowPrice />} />
       <Route path="/invoices" element={<Invoices />} />
       <Route path="/warehouse" element={<Warehouse />} />
+      {/* Khách hàng & CTV */}
       <Route path="/ctv" element={<CtvList />} />
       <Route path="/promo-codes" element={<PromoCodes />} />
-      <Route path="/customer-status" element={<CustomerStatus />} />
+      {/* Trang khách hàng (danh sách + trạng thái) dùng component Customers */}
+      <Route path="/customer-status" element={<Customers />} />
       <Route path="/add-mcoin" element={<AddMcoin />} />
       <Route path="/active-keys" element={<ActiveKeys />} />
+      <Route path="/renew-adobe-admin" element={<RenewAdobeAdmin />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

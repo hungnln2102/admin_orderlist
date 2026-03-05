@@ -27,18 +27,22 @@ const attachRenewRoutes = (router) => {
         }
     });
 
-    // PATCH /refund
+    // PATCH /refund — đánh dấu đơn đã hoàn tiền (order_list, không còn bảng order_canceled)
     router.patch("/canceled/:id/refund", async(req, res) => {
         const id = Number(req.params.id);
         if (!id) return res.status(400).json({ error: "ID không hợp lệ" });
 
-        try {
-            const [updated] = await db(TABLES.orderCanceled)
-                .where({ id })
-                .update({ status: STATUS.REFUNDED })
-                .returning(["id", "id_order", "status"]);
+        const { ORDERS_SCHEMA } = require("../../config/dbSchema");
+        const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
 
-            if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+        try {
+            const [updated] = await db(TABLES.orderList)
+                .where({ id })
+                .whereIn(statusCol, [STATUS.PENDING_REFUND])
+                .update({ [statusCol]: STATUS.REFUNDED })
+                .returning(["id", "id_order", statusCol]);
+
+            if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng hoặc đã hoàn tiền" });
             res.json({ success: true, ...updated });
         } catch (error) {
             logger.error("Lỗi hoàn tiền", { id, error: error.message, stack: error.stack });

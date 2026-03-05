@@ -36,6 +36,11 @@ const SCHEMA_IDENTITY = pickSchema(
   process.env.SCHEMA_IDENTITY,
   "identity"
 );
+const SCHEMA_COMMON = pickSchema(
+  process.env.DB_SCHEMA_COMMON,
+  process.env.SCHEMA_COMMON,
+  "common"
+);
 const SCHEMA_PROMOTION = pickSchema(
   process.env.DB_SCHEMA_PROMOTION,
   process.env.SCHEMA_PROMOTION,
@@ -189,6 +194,23 @@ const IDENTITY_SCHEMA = {
 };
 
 // -----------------------
+// COMMON SCHEMA (status, enums dùng chung)
+// -----------------------
+const COMMON_SCHEMA = {
+  STATUS: {
+    TABLE: "status",
+    COLS: {
+      CODE: "code",
+      LABEL_VI: "label_vi",
+      LABEL_EN: "label_en",
+      DESCRIPTION: "description",
+      SORT_ORDER: "sort_order",
+      IS_ACTIVE: "is_active",
+    },
+  },
+};
+
+// -----------------------
 // PROMOTION SCHEMA
 // -----------------------
 const PROMOTION_SCHEMA = {
@@ -278,6 +300,8 @@ const ORDERS_SCHEMA = {
       PRICE: "price",
       NOTE: "note",
       STATUS: "status",
+      REFUND: "refund",
+      CANCELED_AT: "canceled_at",
     },
   },
   ORDER_EXPIRED: {
@@ -528,6 +552,7 @@ module.exports = {
   SCHEMA_PRODUCT,
   SCHEMA_ADMIN,
   SCHEMA_IDENTITY,
+  SCHEMA_COMMON,
   SCHEMA_PROMOTION,
   SCHEMA_WALLET,
   SCHEMA_FORM_DESC,
@@ -543,6 +568,7 @@ module.exports = {
   getDefinition,
   ADMIN_SCHEMA,
   FINANCE_SCHEMA,
+  COMMON_SCHEMA,
   IDENTITY_SCHEMA,
   PROMOTION_SCHEMA,
   WALLET_SCHEMA,

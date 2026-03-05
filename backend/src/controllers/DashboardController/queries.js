@@ -13,7 +13,10 @@ const {
 } = require("./constants");
 
 const ORDER_COLS = ORDER_DEF.COLS;
-const ORDER_CANCELED_COLS = ORDERS_SCHEMA.ORDER_CANCELED.COLS;
+const ORDER_LIST_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
+const STATUS_EXPIRED = STATUS.EXPIRED;
+const STATUS_PENDING_REFUND = STATUS.PENDING_REFUND;
+const STATUS_REFUNDED = STATUS.REFUNDED;
 
 const buildStatsBindings = (periods) => ({
   prevStart: periods.previousStart,
@@ -33,7 +36,7 @@ const buildStatsQuery = () => `
   valid_orders AS (
     SELECT
       ${quoteIdent(ORDER_COLS.ID)} AS order_id,
-      'active' as status,
+      CASE WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_EXPIRED}' THEN 'expired' ELSE 'active' END AS status,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
@@ -41,31 +44,20 @@ const buildStatsQuery = () => `
       ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
     FROM ${TABLES.orderList}
     WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
-    
-    UNION ALL
-    
-    SELECT
-      ${quoteIdent(ORDER_COLS.ID)} AS order_id,
-      'expired' as status,
-      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
-      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
-      ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
-      ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
-      ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
-    FROM ${TABLES.orderExpired}
-    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
+      AND ${quoteIdent(ORDER_COLS.STATUS)} NOT IN ('${STATUS_PENDING_REFUND}', '${STATUS_REFUNDED}')
   ),
   canceled_data AS (
       SELECT
-        "id" AS order_id,
+        ${quoteIdent(ORDER_COLS.ID)} AS order_id,
         'canceled' as status,
-        ${createDateNormalization(quoteIdent(ORDER_CANCELED_COLS.CREATED_AT))} AS registration_date,
+        ${createDateNormalization(quoteIdent(ORDER_LIST_COLS.CANCELED_AT))} AS registration_date,
         NULL::date AS expiry_date,
         ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
         ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
         ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
-      FROM ${TABLES.orderCanceled}
-      WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
+      FROM ${TABLES.orderList}
+      WHERE (${quoteIdent(ORDER_COLS.STATUS)} IN ('${STATUS_PENDING_REFUND}', '${STATUS_REFUNDED}') OR ${quoteIdent(ORDER_LIST_COLS.REFUND)} IS NOT NULL)
+        AND TRIM(COALESCE(${quoteIdent(ORDER_LIST_COLS.CANCELED_AT)}::text, '')) <> ''
   ),
   all_data AS (
       SELECT *, FALSE as is_canceled FROM valid_orders
@@ -118,9 +110,8 @@ const buildYearsQuery = () => `
   WITH all_dates AS (
     SELECT order_date::text AS raw_date FROM ${TABLES.orderList}
     UNION ALL
-    SELECT order_date::text AS raw_date FROM ${TABLES.orderExpired}
-    UNION ALL
-    SELECT createdate::text AS raw_date FROM ${TABLES.orderCanceled}
+    SELECT canceled_at::text AS raw_date FROM ${TABLES.orderList}
+    WHERE canceled_at IS NOT NULL
   ),
   normalized AS (
     SELECT DISTINCT ${normalizedYearCase} AS year_value
@@ -149,32 +140,23 @@ const buildChartsQuery = () => `
   ),
   income_stream AS (
     SELECT
-      ${orderIdStringColumn}, 
+      ${orderIdStringColumn},
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
       ${orderPriceColumn} AS amount,
       1 AS order_count
     FROM ${TABLES.orderList}
     WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
-    
-    UNION
-    
-    SELECT
-      ${orderIdStringColumn},
-      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
-      ${orderPriceColumn} AS amount,
-      1 AS order_count
-    FROM ${TABLES.orderExpired}
-    WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
+      AND ${quoteIdent(ORDER_COLS.STATUS)} NOT IN ('${STATUS_PENDING_REFUND}', '${STATUS_REFUNDED}')
   ),
   refund_stream AS (
     SELECT
       NULL AS id_order,
-      ${createDateNormalization(quoteIdent(ORDER_CANCELED_COLS.CREATED_AT))} AS event_date,
+      ${createDateNormalization(quoteIdent(ORDER_LIST_COLS.CANCELED_AT))} AS event_date,
       (${orderPriceColumn} * -1) AS amount,
       0 AS order_count
-    FROM ${TABLES.orderCanceled}
-    WHERE TRIM(${quoteIdent(ORDER_CANCELED_COLS.CREATED_AT)}::text) <> ''
-      AND status = '${STATUS.REFUNDED}'
+    FROM ${TABLES.orderList}
+    WHERE TRIM(COALESCE(${quoteIdent(ORDER_LIST_COLS.CANCELED_AT)}::text, '')) <> ''
+      AND ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_REFUNDED}'
   ),
   all_transactions AS (
       SELECT id_order, event_date, amount, order_count FROM income_stream

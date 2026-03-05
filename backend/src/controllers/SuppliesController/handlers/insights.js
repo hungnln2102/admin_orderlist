@@ -75,6 +75,7 @@ const getSupplyInsights = async (_req, res) => {
       : "NULL AS raw_status";
 
     const idSupplyCol = quoteIdent(orderCols.idSupply);
+    const canceledAtCol = orderCols.canceledAt || "canceled_at";
     const monthlySql = `
       WITH params AS (
         SELECT ?::date AS curr_start, ?::date AS curr_end
@@ -90,26 +91,19 @@ const getSupplyInsights = async (_req, res) => {
           ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
         FROM ${TABLES.orderList}, params
         WHERE ${idSupplyCol} IS NOT NULL
+          AND ${quoteIdent(orderCols.status)} NOT IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}')
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
           AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
         UNION ALL
         SELECT
           ${createSourceKey(idSupplyCol)} AS source_key,
           ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
-          ${createDateNormalization(quoteIdent(orderCols.orderDate))} AS order_date
-        FROM ${TABLES.orderExpired}, params
+          ${createDateNormalization(quoteIdent(canceledAtCol))} AS order_date
+        FROM ${TABLES.orderList}, params
         WHERE ${idSupplyCol} IS NOT NULL
-          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} >= params.curr_start
-          AND ${createDateNormalization(quoteIdent(orderCols.orderDate))} < params.curr_end
-        UNION ALL
-        SELECT
-          ${createSourceKey(idSupplyCol)} AS source_key,
-          ${createNumericExtraction(quoteIdent(orderCols.cost))} AS import_value,
-          ${createDateNormalization("createdate")} AS order_date
-        FROM ${TABLES.orderCanceled}, params
-        WHERE ${idSupplyCol} IS NOT NULL
-          AND ${createDateNormalization("createdate")} >= params.curr_start
-          AND ${createDateNormalization("createdate")} < params.curr_end
+          AND (${quoteIdent(orderCols.status)} IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}') OR ${quoteIdent(orderCols.refund)} IS NOT NULL)
+          AND ${createDateNormalization(quoteIdent(canceledAtCol))} >= params.curr_start
+          AND ${createDateNormalization(quoteIdent(canceledAtCol))} < params.curr_end
       ) m
       WHERE order_date IS NOT NULL
       GROUP BY source_key
@@ -127,22 +121,16 @@ const getSupplyInsights = async (_req, res) => {
           MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
         FROM ${TABLES.orderList}
         WHERE ${idSupplyCol} IS NOT NULL
+          AND ${quoteIdent(orderCols.status)} NOT IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}')
         GROUP BY source_key
         UNION ALL
         SELECT
           ${createSourceKey(idSupplyCol)} AS source_key,
           COUNT(*) AS total_orders,
-          MAX(${createDateNormalization(quoteIdent(orderCols.orderDate))}) AS last_order_date
-        FROM ${TABLES.orderExpired}
+          MAX(${createDateNormalization(quoteIdent(canceledAtCol))}) AS last_order_date
+        FROM ${TABLES.orderList}
         WHERE ${idSupplyCol} IS NOT NULL
-        GROUP BY source_key
-        UNION ALL
-        SELECT
-          ${createSourceKey(idSupplyCol)} AS source_key,
-          COUNT(*) AS total_orders,
-          MAX(${createDateNormalization("createdate")}) AS last_order_date
-        FROM ${TABLES.orderCanceled}
-        WHERE ${idSupplyCol} IS NOT NULL
+          AND (${quoteIdent(orderCols.status)} IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}') OR ${quoteIdent(orderCols.refund)} IS NOT NULL)
         GROUP BY source_key
       ) agg
       WHERE source_key <> ''

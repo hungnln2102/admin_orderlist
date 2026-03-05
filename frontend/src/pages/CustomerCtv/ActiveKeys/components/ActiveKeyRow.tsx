@@ -14,6 +14,9 @@ export function ActiveKeyRow({ item, index, onView, onEdit }: ActiveKeyRowProps)
       <td className="px-2 py-3 sm:px-4 text-center text-sm text-white/80 tabular-nums whitespace-nowrap">
         {index}
       </td>
+      <td className="px-2 py-3 sm:px-4 text-sm text-white/90 whitespace-nowrap">
+        {item.account}
+      </td>
       <td className="px-2 py-3 sm:px-4 text-sm font-medium text-white whitespace-nowrap">
         {item.product}
       </td>

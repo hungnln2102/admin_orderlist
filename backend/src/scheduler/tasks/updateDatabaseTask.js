@@ -29,100 +29,29 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
         `'${STATUS.EXPIRED}'`,
       ].join(", ");
 
-      const transfer = await client.query(`
-      WITH expired AS (
-        SELECT
-          ${COL.idOrder},
-          ${COL.idProduct},
-          ${COL.informationOrder},
-          ${COL.customer},
-          ${COL.contact},
-          ${COL.slot},
-          ${normalizeDateSQL(COL.orderDate)} AS ${COL.orderDate},
-          ${intFromTextSQL(COL.days)} AS ${COL.days},
-          ${expiryDateSQL()} AS ${COL.orderExpired},
-          ${COL.idSupply},
-          ${COL.cost},
-          ${COL.price},
-          ${COL.note},
-          ${COL.status}
-        FROM ${TABLES.orderList}
-        WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
-          AND (${COL.status} IN (${statusExpiredEligible}))
-      )
-      INSERT INTO ${TABLES.orderExpired} (
-        ${[
-          COL.idOrder,
-          COL.idProduct,
-          COL.informationOrder,
-          COL.customer,
-          COL.contact,
-          COL.slot,
-          COL.orderDate,
-          COL.days,
-          COL.orderExpired,
-          COL.idSupply,
-          COL.cost,
-          COL.price,
-          COL.note,
-          COL.status,
-        ].join(", ")}
-      )
-      SELECT
-        ${COL.idOrder},
-        ${COL.idProduct},
-        ${COL.informationOrder},
-        ${COL.customer},
-        ${COL.contact},
-        ${COL.slot},
-        ${COL.orderDate},
-        ${COL.days},
-        ${COL.orderExpired},
-        ${COL.idSupply},
-        ${COL.cost},
-        ${COL.price},
-        ${COL.note},
-        ${COL.status}
-      FROM expired
-      ON CONFLICT DO NOTHING
+      // Gom 1 bảng: chỉ cập nhật status, không chuyển sang bảng order_expired
+      const markExpired = await client.query(`
+      UPDATE ${TABLES.orderList}
+      SET ${COL.status} = '${STATUS.EXPIRED}'
+      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
+        AND (${COL.status} IN (${statusExpiredEligible}))
       RETURNING ${COL.idOrder};
     `);
-
-      logger.info(`Đã chuyển ${transfer.rowCount} đơn hết hạn (< 0 ngày)`);
-      if (transfer.rows.length) {
+      logger.info(`Đã cập nhật ${markExpired.rowCount} đơn hết hạn (< 0 ngày) sang status EXPIRED`);
+      if (markExpired.rows.length) {
         const idKey = ORDER_COLS.idOrder;
-        const orderIds = transfer.rows.map((r) => r[idKey]).filter(Boolean).join(", ");
-        logger.debug(`ID đã lưu: ${orderIds}`);
+        const orderIds = markExpired.rows.map((r) => r[idKey]).filter(Boolean).join(", ");
+        logger.debug(`ID đã cập nhật: ${orderIds}`);
       }
 
+      // 0 <= số ngày còn lại <= 4 → Cần Gia Hạn (RENEWAL); < 0 → đã xử lý ở markExpired (Hết Hạn)
       const paidToRenewal = await client.query(`
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.RENEWAL}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
         AND (${COL.status} = '${STATUS.PAID}');
     `);
-      logger.info(`Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (<= 4 days)`);
-
-      const del = await client.query(`
-      DELETE FROM ${TABLES.orderList}
-      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
-        AND (${COL.status} IN (${statusExpiredEligible}))
-      RETURNING ${COL.idOrder};
-    `);
-      logger.info(`Đã xóa ${del.rowCount} đơn khỏi order_list`);
-      if (del.rows.length) {
-        const idKey = ORDER_COLS.idOrder;
-        const orderIds = del.rows.map((r) => r[idKey]).filter(Boolean).join(", ");
-        logger.debug(`ID đã xóa: ${orderIds}`);
-      }
-
-      const renewalToExpired = await client.query(`
-      UPDATE ${TABLES.orderList}
-      SET ${COL.status} = '${STATUS.EXPIRED}'
-      WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} = '${STATUS.RENEWAL}');
-    `);
-      logger.info(`Updated ${renewalToExpired.rowCount} orders to '${STATUS.EXPIRED}' (0 days)`);
+      logger.info(`Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (0 <= days left <= 4)`);
 
       await client.query("COMMIT");
       logger.info("[CRON] Hoàn thành cập nhật");

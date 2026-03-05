@@ -514,6 +514,8 @@ const updateProductPrice = async (req, res) => {
           [...priceValues, parsedId]
         );
       } else {
+        // DB hiện tại không có unique constraint trên variant_id,
+        // nên không thể dùng ON CONFLICT (variant_id). Chỉ cần insert bản ghi mới.
         const updatesWithPlaceholders = priceUpdates.filter((u) => u.includes("?"));
         const cols = [
           priceConfigCols.variantId,
@@ -524,19 +526,11 @@ const updateProductPrice = async (req, res) => {
           ...Array.from({ length: updatesWithPlaceholders.length + 1 }, () => "?"),
           "NOW()",
         ];
-        const conflictSetParts = updatesWithPlaceholders.map(
-          (u) => {
-            const colName = u.split(" = ")[0].replace(/"/g, "");
-            return `${quoteIdent(colName)} = EXCLUDED.${quoteIdent(colName)}`;
-          }
-        );
-        conflictSetParts.push(`${quoteIdent(priceConfigCols.updatedAt)} = NOW()`);
+
         await db.raw(
           `
           INSERT INTO ${TABLES.priceConfig} (${cols.map(quoteIdent).join(", ")})
-          VALUES (${placeholders.join(", ")})
-          ON CONFLICT (${quoteIdent(priceConfigCols.variantId)})
-          DO UPDATE SET ${conflictSetParts.join(", ")};
+          VALUES (${placeholders.join(", ")});
         `,
           [parsedId, ...priceValues]
         );

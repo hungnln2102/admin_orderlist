@@ -48,6 +48,8 @@ export const menuSections: MenuSection[] = [
         href: "/form-info",
         icon: ClipboardDocumentIcon,
       },
+      { name: "Add Mcoin", href: "/add-mcoin", icon: BanknotesIcon },
+      { name: "Quản lí Key active", href: "/active-keys", icon: KeyIcon },
     ],
   },
   {
@@ -66,12 +68,20 @@ export const menuSections: MenuSection[] = [
       { name: "Danh sách CTV", href: "/ctv", icon: UserGroupIcon },
       { name: "Danh sách mã khuyến mãi", href: "/promo-codes", icon: TicketIcon },
       {
-        name: "Trạng thái khách hàng",
+        name: "Khách hàng",
         href: "/customer-status",
         icon: ClipboardDocumentListIcon,
       },
-      { name: "Add Mcoin", href: "/add-mcoin", icon: BanknotesIcon },
-      { name: "Quản lí Key active", href: "/active-keys", icon: KeyIcon },
+    ],
+  },
+  {
+    title: "Renew adobe",
+    items: [
+      {
+        name: "Danh sách tài khoản admin",
+        href: "/renew-adobe-admin",
+        icon: UserGroupIcon,
+      },
     ],
   },
 ];

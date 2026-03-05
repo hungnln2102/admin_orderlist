@@ -3,10 +3,13 @@ const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { TABLES } = require("./constants");
 const { normalizeOrderRow } = require("./helpers");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
+const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
 
 const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
+const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
+const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
 const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name"; // Cột tên NCC
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
@@ -16,18 +19,26 @@ const attachListRoutes = (router) => {
     // GET /api/orders
     router.get("/", async(req, res) => {
         const scope = (req.query.scope || "").toLowerCase();
-        const table = scope === "expired" ? TABLES.orderExpired :
-            (scope === "canceled" || scope === "cancelled") ? TABLES.orderCanceled :
-            TABLES.orderList;
+        const table = TABLES.orderList;
 
         logger.debug(`[GET] /api/orders`, { scope });
 
         try {
-            // Cả 3 bảng order_list, order_expired, order_canceled đều có supply_id
-            const rows = await db(table)
+            let query = db(table)
                 .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
-                .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`)
-                .select(
+                .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`);
+
+            if (scope === "expired") {
+                query = query.where(statusCol, STATUS.EXPIRED);
+            } else if (scope === "canceled" || scope === "cancelled") {
+                query = query.where((q) =>
+                    q.whereIn(statusCol, [STATUS.PENDING_REFUND, STATUS.REFUNDED]).orWhereNotNull(refundCol)
+                );
+            } else {
+                query = query.whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED]);
+            }
+
+            const rows = await query.select(
                     `${table}.*`,
                     db.raw(`${table}.order_date::text as order_date_raw`),
                     db.raw(`${table}.order_expired::text as order_expired_raw`),

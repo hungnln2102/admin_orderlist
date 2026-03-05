@@ -10,7 +10,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
   return async function notifyZeroDaysRemainingTask(trigger = "cron") {
     const sqlDate = getSqlCurrentDate();
     logger.info(
-      `[CRON] Bắt đầu thông báo các đơn hết hạn (số ngày còn lại = 0, trạng thái = Hết Hạn)`,
+      `[CRON] Bắt đầu thông báo các đơn đúng ngày hết hạn (số ngày còn lại = 0, Cần Gia Hạn)`,
       { trigger, date: process.env.MOCK_DATE || "CURRENT_DATE" }
     );
 
@@ -20,8 +20,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
 
     const client = await pool.connect();
     try {
-      const statusEligible = `'${STATUS.EXPIRED}'`;
-
+      // 0 <= x <= 4 là Cần Gia Hạn; job này thông báo đơn đúng 0 ngày (đúng ngày hết hạn), không lọc status
       const result = await client.query(`
       SELECT
         ${COL.idOrder},
@@ -40,12 +39,12 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         ${COL.status}
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} = ${statusEligible})
+        AND (${COL.status} NOT IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}'))
       ORDER BY ${COL.idOrder}
     `);
 
       logger.info(
-        `Tìm thấy ${result.rowCount} đơn hết hạn (ngày còn lại = 0, trạng thái = Hết Hạn)`
+        `Tìm thấy ${result.rowCount} đơn đúng ngày hết hạn (0 ngày còn lại)`
       );
 
       if (result.rows.length > 0) {
