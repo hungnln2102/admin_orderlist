@@ -21,10 +21,12 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
+      # Dùng biến môi trường trong container (POSTGRES_*), không dùng ${DB_USER} vì không được thay thế trong healthcheck
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # ==========================================
   # 2. BACKEND SERVICE (Node.js)

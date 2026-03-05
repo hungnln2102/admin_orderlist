@@ -15,15 +15,6 @@ const { deleteOrderWithArchive } = require("./orderDeletionService");
 const { updateOrderWithFinance } = require("./orderUpdateService");
 const { sendOrderCreatedNotification } = require("../../services/telegramOrderNotification");
 const logger = require("../../utils/logger");
-const ORDER_EXPIRED_COLS = Object.values(ORDERS_SCHEMA.ORDER_EXPIRED.COLS || {});
-const ORDER_CANCELED_COLS = Object.values(ORDERS_SCHEMA.ORDER_CANCELED.COLS || {});
-const ORDER_CANCELED_ALLOWED_COLS = ORDER_CANCELED_COLS.filter(
-    (col) => col && col !== ORDERS_SCHEMA.ORDER_CANCELED.COLS.NOTE
-);
-const ORDER_EXPIRED_ALLOWED_COLS = ORDER_EXPIRED_COLS.filter(Boolean);
-
-const pruneArchiveData = (data, allowedCols) =>
-    Object.fromEntries(Object.entries(data).filter(([key]) => allowedCols.includes(key)));
 
 const attachCrudRoutes = (router) => {
     // POST /api/orders (Create)
@@ -162,16 +153,13 @@ const attachCrudRoutes = (router) => {
                 order,
                 normalized,
                 reqBody: req.body,
-                    helpers: {
-                        TABLES,
-                        ORDERS_SCHEMA,
-                        STATUS,
-                        nextId,
-                        pruneArchiveData,
-                        adjustSupplierDebtIfNeeded,
-                        calcRemainingRefund,
-                    allowedArchiveColsExpired: ORDER_EXPIRED_ALLOWED_COLS,
-                    allowedArchiveColsCanceled: ORDER_CANCELED_ALLOWED_COLS,
+                helpers: {
+                    TABLES,
+                    ORDERS_SCHEMA,
+                    STATUS,
+                    nextId,
+                    adjustSupplierDebtIfNeeded,
+                    calcRemainingRefund,
                 },
             });
 

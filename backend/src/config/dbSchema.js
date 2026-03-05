@@ -279,7 +279,7 @@ const WALLET_SCHEMA = {
 };
 
 // -----------------------
-// ORDERS SCHEMA (includes payment/refund tables)
+// ORDERS SCHEMA (order_list + payment tables)
 // -----------------------
 const ORDERS_SCHEMA = {
   ORDER_LIST: {
@@ -302,49 +302,6 @@ const ORDERS_SCHEMA = {
       STATUS: "status",
       REFUND: "refund",
       CANCELED_AT: "canceled_at",
-    },
-  },
-  ORDER_EXPIRED: {
-    TABLE: "order_expired",
-    COLS: {
-      ID: "id",
-      ID_ORDER: "id_order",
-      ID_PRODUCT: "id_product",
-      INFORMATION_ORDER: "information_order",
-      CUSTOMER: "customer",
-      CONTACT: "contact",
-      SLOT: "slot",
-      ORDER_DATE: "order_date",
-      DAYS: "days",
-      ORDER_EXPIRED: "order_expired",
-      ID_SUPPLY: "supply_id",
-      COST: "cost",
-      PRICE: "price",
-      NOTE: "note",
-      STATUS: "status",
-      ARCHIVED_AT: "archived_at",
-    },
-  },
-  ORDER_CANCELED: {
-    TABLE: "order_canceled",
-    COLS: {
-      ID: "id",
-      ID_ORDER: "id_order",
-      ID_PRODUCT: "id_product",
-      INFORMATION_ORDER: "information_order",
-      CUSTOMER: "customer",
-      CONTACT: "contact",
-      SLOT: "slot",
-      ORDER_DATE: "order_date",
-      DAYS: "days",
-      ORDER_EXPIRED: "order_expired",
-      ID_SUPPLY: "supply_id",
-      COST: "cost",
-      PRICE: "price",
-      NOTE: "note",
-      STATUS: "status",
-      REFUND: "refund",
-      CREATED_AT: "createdate",
     },
   },
   PAYMENT_RECEIPT: {
