@@ -11,8 +11,8 @@ const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
 
 const TABLES = {
   orderList: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),
-  orderExpired: tableName(ORDERS_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
-  orderCanceled: tableName(ORDERS_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
+  orderExpired: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),
+  orderCanceled: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
 };
 

@@ -24,13 +24,12 @@ const { ORDERS_SCHEMA } = require("./src/config/dbSchema");
 const PAYMENT_SUPPLY_TABLE = tableName(PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE, SCHEMA_PARTNER);
 const PAYMENT_SUPPLY_COLS = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
 
-// Archive columns
-const ORDER_EXPIRED_COLS = Object.values(ORDERS_SCHEMA.ORDER_EXPIRED.COLS || {});
-const ORDER_CANCELED_COLS = Object.values(ORDERS_SCHEMA.ORDER_CANCELED.COLS || {});
-const ORDER_CANCELED_ALLOWED_COLS = ORDER_CANCELED_COLS.filter(
-  (col) => col && col !== ORDERS_SCHEMA.ORDER_CANCELED.COLS.NOTE
+// Archive columns (1 bảng order_list)
+const ORDER_LIST_COLS = Object.values(ORDERS_SCHEMA.ORDER_LIST.COLS || {});
+const ORDER_CANCELED_ALLOWED_COLS = ORDER_LIST_COLS.filter(
+  (col) => col && col !== ORDERS_SCHEMA.ORDER_LIST.COLS.NOTE
 );
-const ORDER_EXPIRED_ALLOWED_COLS = ORDER_EXPIRED_COLS.filter(Boolean);
+const ORDER_EXPIRED_ALLOWED_COLS = ORDER_LIST_COLS.filter(Boolean);
 
 const pruneArchiveData = (data, allowedCols) =>
   Object.fromEntries(Object.entries(data).filter(([key]) => allowedCols.includes(key)));
@@ -503,7 +502,7 @@ const tests = {
     const debtAfterDelete = await getSupplierDebt(supplyId);
     const canceledRow = await db(TABLES.orderCanceled).where({ id_order: order.id_order }).first();
 
-    const daysCol = ORDERS_SCHEMA.ORDER_CANCELED.COLS.DAYS;
+    const daysCol = ORDERS_SCHEMA.ORDER_LIST.COLS.DAYS;
     const orderCanceledDays = canceledRow ? canceledRow[daysCol] : null;
     const expectedProrated = Math.ceil((remainingDaysExpected / totalDays) * cost / 1000) * 1000;
     const expectedDebt = debtAfterProcessing - expectedProrated;

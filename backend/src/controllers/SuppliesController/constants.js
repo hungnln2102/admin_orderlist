@@ -26,8 +26,8 @@ const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
 
 const TABLES = {
   orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
-  orderExpired: tableName(ORDERS_SCHEMA.ORDER_EXPIRED.TABLE, SCHEMA_ORDERS),
-  orderCanceled: tableName(ORDERS_SCHEMA.ORDER_CANCELED.TABLE, SCHEMA_ORDERS),
+  orderExpired: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+  orderCanceled: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
   supply: tableName(SUPPLY_DEF.tableName, SCHEMA_SUPPLIER),
   supplyPrice: tableName(SUPPLY_PRICE_DEF.tableName, SCHEMA_SUPPLIER_COST),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),

@@ -279,7 +279,7 @@ const WALLET_SCHEMA = {
 };
 
 // -----------------------
-// ORDERS SCHEMA (order_list + payment tables)
+// ORDERS SCHEMA (order_list duy nhất + payment tables)
 // -----------------------
 const ORDERS_SCHEMA = {
   ORDER_LIST: {
