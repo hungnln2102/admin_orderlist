@@ -10,22 +10,20 @@ services:
       context: ./database
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+      POSTGRES_DB: ${DB_NAME:-mydtbmav}
     volumes:
-      # Mount thư mục dữ liệu để không bị mất khi restart container
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
       - app-network
     healthcheck:
-      # Dùng biến môi trường trong container (POSTGRES_*), không dùng ${DB_USER} vì không được thay thế trong healthcheck
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" || exit 1"]
-      interval: 5s
+      test: ["CMD", "pg_isready"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
       start_period: 30s
 
   # ==========================================
@@ -34,18 +32,17 @@ services:
   backend:
     container_name: admin_orderlist-backend
     build:
-      context: ./backend # Trỏ vào thư mục code backend
+      context: ./backend
     restart: always
     depends_on:
       postgres:
-        condition: service_healthy # Chỉ chạy khi Database đã khởi động xong
+        condition: service_healthy
     env_file:
-      - ./backend/.env.docker # Load file cấu hình riêng cho môi trường Docker
+      - ./backend/.env.docker
     ports:
       - "3001:3001"   # Main API
       - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
     volumes:
-      # Mount code để sửa code xong server tự reload (Hot Reload)
       - ./backend:/app
       - /app/node_modules
     networks:
@@ -65,7 +62,6 @@ services:
     ports:
       - "8081:80"
     volumes:
-      # Mount code để sửa giao diện xong web tự cập nhật
       - ./frontend:/app
       - /app/node_modules
     networks:
