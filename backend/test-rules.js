@@ -393,13 +393,13 @@ const tests = {
     
     const debtAfterDelete = await getSupplierDebt(supplyId);
     
-    // Mark as refunded
-    const canceledOrder = await db(TABLES.orderCanceled)
+    // Mark as refunded (1 bảng order_list)
+    const canceledOrder = await db(TABLES.orderList)
       .where({ id_order: order.id_order })
       .first();
     
     if (canceledOrder) {
-      await db(TABLES.orderCanceled)
+      await db(TABLES.orderList)
         .where({ id: canceledOrder.id })
         .update({ status: STATUS.REFUNDED });
     }
@@ -500,7 +500,7 @@ const tests = {
     }
 
     const debtAfterDelete = await getSupplierDebt(supplyId);
-    const canceledRow = await db(TABLES.orderCanceled).where({ id_order: order.id_order }).first();
+    const canceledRow = await db(TABLES.orderList).where({ id_order: order.id_order }).first();
 
     const daysCol = ORDERS_SCHEMA.ORDER_LIST.COLS.DAYS;
     const orderCanceledDays = canceledRow ? canceledRow[daysCol] : null;

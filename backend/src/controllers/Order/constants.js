@@ -12,8 +12,6 @@ const { STATUS } = require("../../utils/statuses");
 
 const TABLES = {
     orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
-    orderExpired: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
-    orderCanceled: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
     supplier: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
     packageProduct: tableName(PRODUCT_SCHEMA.PACKAGE_PRODUCT.TABLE, SCHEMA_PRODUCT),
     supplierCost: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_SUPPLIER_COST),
