@@ -235,10 +235,61 @@ FROM orders.order_canceled;
   - Hoặc cập nhật FK sang `orders.orders`
   - Hoặc tạm thời trỏ vào VIEW (tuỳ hỗ trợ của PostgreSQL/phiên bản hiện tại).
 
------------------------------------------------------------------------------------------
 1. Dùng bảng order_list làm bảng chính
 2. vẫn dùng rule như hiện tại nhưng thay vì sẽ xóa dữ liệu bảng order_list note vào 2 bảng kia thì giờ chỉ cần đổi trạng thái thôi là xong.
 3. Đã tạo thêm 2 cột trong order_list đó là:
 refund: note tiền hoàn. Chỉ khi nào hoàn mới note
 canceled_at: note ngày hủy. Chỉ khi nào hủy mới note
 4. Với các dữ liệu trên thì hiện tại có đang còn thiếu cột dữ liệu nào không.
+
+5. Các nơi trong codebase đang sử dụng `order_expired` / `order_canceled` (theo grep ngày 06/03/2026):
+
+- **Biến/column `order_expired`**:
+  - `database/migrations/create_sales_summary_in_product_schema.sql`
+  - `frontend/src/lib/fieldMapper.ts`
+  - `docs/OPTIMIZATION_SUMMARY.md`
+  - `shared/schema.cjs`
+  - `docs/orders_merge_single_table.md` (tài liệu hiện tại)
+  - `frontend/src/lib/tableSql.ts`
+  - `backend/src/scheduler/tasks/notifyZeroDays.js`
+  - `backend/src/scheduler/tasks/updateDatabaseTask.js`
+  - `backend/test-zero-days.js`
+  - `backend/src/controllers/Order/orderUpdateService.js`
+  - `database/migrations/002_add_performance_indexes.sql`
+  - `docs/OPTIMIZATION_PROGRESS.md`
+  - `backend/src/routes/testTelegram.js`
+  - `database/migrations/005_order_supply_to_id_supply.sql`
+  - `backend/src/services/telegramOrderNotification.js`
+  - `docs/BUSINESS_RULES.md`
+  - `backend/src/controllers/Order/calculatePriceRoute.js`
+  - `backend/src/controllers/Order/listRoutes.js`
+  - `backend/test-rules.js`
+  - `frontend/src/constants.ts`
+  - `docs/OPTIMIZATION_PRIORITY.md`
+  - `shared/schema.js`
+  - `frontend/src/components/modals/CreateOrderModal/types.ts`
+  - `docs/WEBHOOK_FLOW_EXPLAINED.md`
+  - `frontend/src/components/modals/CreateOrderModal/hooks/usePriceCalculation.ts`
+  - `backend/src/config/dbSchema.js`
+  - `docs/ORDER_STATUS_FLOW.md`
+  - `docs/db-type-refactor.md`
+  - `backend/src/controllers/Order/helpers.js`
+  - `backend/src/scheduler/tasks/notifyFourDays.js`
+  - `docs/order-tables.md`
+  - `docs/OPTIMIZATION_ROADMAP.md`
+  - `backend/webhook/sepay/renewal.js`
+
+- **Biến/column `order_canceled`**:
+  - `docs/TEST_CASES_SUPPLIER_PAYMENT.md`
+  - `frontend/src/lib/tableSql.ts`
+  - `docs/order-tables.md`
+  - `database/migrations/002_add_performance_indexes.sql`
+  - `database/migrations/005_order_supply_to_id_supply.sql`
+  - `docs/OPTIMIZATION_PROGRESS.md`
+  - `shared/schema.cjs`
+  - `backend/src/controllers/Order/renewRoutes.js`
+  - `shared/schema.js`
+  - `docs/orders_merge_single_table.md` (tài liệu hiện tại)
+  - `docs/BUSINESS_RULES.md`
+  - `backend/test-rules.js`
+  - `docs/db-type-refactor.md`

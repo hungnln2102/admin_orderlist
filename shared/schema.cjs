@@ -12,7 +12,7 @@ const SHARED_COLS = {
     slot: "slot",
     orderDate: "order_date",
     days: "days",
-    orderExpired: "order_expired",
+    expiryDate: "expiry_date",
     supply: "supply",
     cost: "cost",
     price: "price",
@@ -23,10 +23,8 @@ const SHARED_COLS = {
 };
 
 const DB_DEFINITIONS = {
-  // Orders
+  // Orders (đã gom về một bảng order_list)
   orderList: { tableName: "order_list", columns: SHARED_COLS.ORDER },
-  orderExpired: { tableName: "order_expired", columns: SHARED_COLS.ORDER },
-  orderCanceled: { tableName: "order_canceled", columns: SHARED_COLS.ORDER },
 
   // Accounts & warehouse
   accountStorage: {
@@ -96,6 +94,7 @@ const DB_DEFINITIONS = {
       rules: "rules",
       description: "description",
       imageUrl: "image_url",
+      updatedAt: "updated_at",
     },
   },
   formName: {
@@ -186,6 +185,8 @@ const DB_DEFINITIONS = {
       variantId: "variant_id",
       sourceId: "supplier_id",
       price: "price",
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   },
 

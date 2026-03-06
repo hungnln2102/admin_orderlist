@@ -29,7 +29,7 @@ router.post("/", async (req, res) => {
       order_date: new Date(),
       expiry_date_display: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("vi-VN"),
       expiry_date_str: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("vi-VN"),
-      order_expired: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiry_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       days: req.body.days || 30,
       total_days: req.body.days || 30,
       price: req.body.price || 100000,
@@ -85,7 +85,7 @@ router.get("/", async (req, res) => {
       registration_date_display: new Date().toLocaleDateString("vi-VN"),
       order_date: new Date(),
       expiry_date_display: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("vi-VN"),
-      order_expired: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiry_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       days: 30,
       price: 100000,
     };
@@ -136,7 +136,7 @@ router.get("/zero-days", async (req, res) => {
         idProduct: "Sản phẩm Test A",
         expiry_date_display: new Date().toLocaleDateString("vi-VN"),
         expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-        order_expired: new Date(),
+        expiry_date: new Date(),
       },
       {
         id_order: "TEST-002",
@@ -149,7 +149,7 @@ router.get("/zero-days", async (req, res) => {
         idProduct: "Sản phẩm Test B",
         expiry_date_display: new Date().toLocaleDateString("vi-VN"),
         expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-        order_expired: new Date(),
+        expiry_date: new Date(),
       },
       {
         id_order: "TEST-003",
@@ -162,7 +162,7 @@ router.get("/zero-days", async (req, res) => {
         idProduct: "Sản phẩm Test C",
         expiry_date_display: new Date().toLocaleDateString("vi-VN"),
         expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-        order_expired: new Date(),
+        expiry_date: new Date(),
       },
     ];
 
@@ -212,7 +212,7 @@ router.post("/zero-days", async (req, res) => {
         idProduct: req.body.product || `Sản phẩm Test ${String.fromCharCode(64 + i)}`,
         expiry_date_display: new Date().toLocaleDateString("vi-VN"),
         expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-        order_expired: new Date(),
+        expiry_date: new Date(),
       });
     }
 

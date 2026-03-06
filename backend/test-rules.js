@@ -99,7 +99,7 @@ const tests = {
       price: 150000,
       days: 30,
       order_date: formatDate(new Date()),
-      order_expired: formatDate(addDays(new Date(), 30)),
+      expiry_date: formatDate(addDays(new Date(), 30)),
     };
     
     const order = await createOrder(orderData);
@@ -131,7 +131,7 @@ const tests = {
       price: 300000,
       days: 30,
       order_date: formatDate(new Date()),
-      order_expired: formatDate(addDays(new Date(), 30)),
+      expiry_date: formatDate(addDays(new Date(), 30)),
     };
     
     const order = await createOrder(orderData);
@@ -188,7 +188,7 @@ const tests = {
       price: 450000,
       days: 30,
       order_date: formatDate(new Date()),
-      order_expired: formatDate(addDays(new Date(), 30)),
+      expiry_date: formatDate(addDays(new Date(), 30)),
     };
     
     const order = await createOrder(orderData);
@@ -283,7 +283,7 @@ const tests = {
       price: 150000,
       days: 30,
       order_date: formatDate(addDays(new Date(), -28)),
-      order_expired: formatDate(expiryDate),
+      expiry_date: formatDate(expiryDate),
       status: STATUS.RENEWAL, // Eligible for renewal
     };
     
@@ -336,7 +336,7 @@ const tests = {
       price: 200000,
       days: 30,
       order_date: formatDate(new Date()),
-      order_expired: formatDate(addDays(new Date(), 30)),
+      expiry_date: formatDate(addDays(new Date(), 30)),
     };
     
     const order = await createOrder(orderData);
@@ -446,7 +446,7 @@ const tests = {
       price: 450000,
       days: totalDays,
       order_date: formatDate(orderDate),
-      order_expired: formatDate(orderExpiredDate),
+      expiry_date: formatDate(orderExpiredDate),
     };
 
     const order = await createOrder(orderData);
@@ -551,7 +551,7 @@ const tests = {
       price: 450000,
       days: totalDays,
       order_date: formatDate(orderDate),
-      order_expired: formatDate(orderExpiredDate),
+      expiry_date: formatDate(orderExpiredDate),
     };
 
     const order = await createOrder(orderData);

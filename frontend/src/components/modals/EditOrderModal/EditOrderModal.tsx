@@ -78,7 +78,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
     const raw = normalizeDateLike(
       formData.expiry_date_display ||
         formData.expiry_date ||
-        formData[ORDER_FIELDS.ORDER_EXPIRED]
+        formData[ORDER_FIELDS.EXPIRY_DATE]
     );
     return Helpers.formatDateToDMY(raw) || String(raw || "");
   }, [formData]);
@@ -262,7 +262,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
               <label className={labelClass}>Ngày hết hạn</label>
               <input
                 type="text"
-                name={ORDER_FIELDS.ORDER_EXPIRED}
+                name={ORDER_FIELDS.EXPIRY_DATE}
                 value={orderExpiredDisplay}
                 readOnly
                 disabled

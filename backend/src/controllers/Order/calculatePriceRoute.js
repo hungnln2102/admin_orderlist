@@ -172,7 +172,7 @@ const attachCalculatePriceRoute = (router) => {
                 customerPrice,
                 totalPrice,
                 days: 30,
-                order_expired: ""
+                expiry_date: ""
             });
 
         } catch (error) {

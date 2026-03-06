@@ -28,7 +28,7 @@ export interface CalculatedPriceResult {
   cost: number;
   price: number;
   days: number;
-  order_expired: string;
+  expiry_date: string;
 }
 
 export type RawCalculatedPriceResult = Partial<{
@@ -39,7 +39,7 @@ export type RawCalculatedPriceResult = Partial<{
   cost: number;
   price: number;
   days: number;
-  order_expired: string;
+  expiry_date: string;
 }>;
 
 export type CustomerType =

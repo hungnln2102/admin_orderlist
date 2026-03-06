@@ -100,7 +100,7 @@ router.post("/", async (req, res) => {
         const stateRes = await client.query(
           `SELECT
             ${ORDER_COLS.status},
-            ${ORDER_COLS.orderExpired}
+            ${ORDER_COLS.expiryDate}
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
           LIMIT 1`,
@@ -113,7 +113,7 @@ router.post("/", async (req, res) => {
           state
             ? isEligibleForRenewal(
                 state[ORDER_COLS.status],
-                state[ORDER_COLS.orderExpired]
+                state[ORDER_COLS.expiryDate]
               )
             : null
         );
@@ -196,7 +196,7 @@ router.post("/", async (req, res) => {
         if (state) {
           const eligibility = isEligibleForRenewal(
             state[ORDER_COLS.status],
-            state[ORDER_COLS.orderExpired]
+            state[ORDER_COLS.expiryDate]
           );
           if (eligibility.eligible) {
             queueRenewalTask(code, {

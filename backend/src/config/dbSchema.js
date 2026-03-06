@@ -294,7 +294,7 @@ const ORDERS_SCHEMA = {
       SLOT: "slot",
       ORDER_DATE: "order_date",
       DAYS: "days",
-      ORDER_EXPIRED: "order_expired",
+      EXPIRY_DATE: "expiry_date",
       ID_SUPPLY: "supply_id",
       COST: "cost",
       PRICE: "price",
@@ -334,6 +334,8 @@ const SUPPLIER_COST_DEF = {
     VARIANT_ID: "variant_id",
     SUPPLIER_ID: "supplier_id",
     PRICE: "price",
+    CREATED_AT: "created_at",
+    UPDATED_AT: "updated_at",
   },
 };
 
@@ -373,8 +375,11 @@ const PRODUCT_SCHEMA = {
     TABLE: "product",
     COLS: {
       ID: "id",
+      NAME: "name",
       PACKAGE_NAME: "package_name",
       IMAGE_URL: "image_url",
+      UPDATED_AT: "updated_at",
+      IS_ACTIVE: "is_active",
     },
   },
   VARIANT: {
@@ -385,6 +390,7 @@ const PRODUCT_SCHEMA = {
       VARIANT_NAME: "variant_name",
       IS_ACTIVE: "is_active",
       DISPLAY_NAME: "display_name",
+      UPDATED_AT: "updated_at",
     },
   },
   PRODUCT_DESC: {
@@ -396,6 +402,7 @@ const PRODUCT_SCHEMA = {
       DESCRIPTION: "description",
       IMAGE_URL: "image_url",
       SHORT_DESC: "short_desc",
+      UPDATED_AT: "updated_at",
     },
   },
   PRICE_CONFIG: {

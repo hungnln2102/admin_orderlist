@@ -18,7 +18,7 @@ const COL = {
   slot: quoteIdent(ORDER_COLS.slot),
   orderDate: quoteIdent(ORDER_COLS.orderDate),
   days: quoteIdent(ORDER_COLS.days),
-  orderExpired: quoteIdent(ORDER_COLS.orderExpired),
+  expiryDate: quoteIdent(ORDER_COLS.expiryDate),
   idSupply: quoteIdent(ORDER_COLS.idSupply),
   cost: quoteIdent(ORDER_COLS.cost),
   price: quoteIdent(ORDER_COLS.price),
@@ -49,7 +49,7 @@ function intFromTextSQL(column) {
 function expiryDateSQL() {
   return `
   COALESCE(
-    ${normalizeDateSQL(COL.orderExpired)},
+    ${normalizeDateSQL(COL.expiryDate)},
     (${normalizeDateSQL(COL.orderDate)} + (COALESCE(${intFromTextSQL(COL.days)}, 0) - 1))
   )
   `;

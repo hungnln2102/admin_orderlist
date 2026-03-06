@@ -245,7 +245,7 @@ const buildOrderCreatedMessage = (order, paymentNote) => {
     formatDateDMY(order.order_date);
   const expiryDate =
     toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
-    formatDateDMY(order.order_expired);
+    formatDateDMY(order.expiry_date);
   const days = Number(order.days || order.total_days || 0) || 0;
   const priceValue = `${formatCurrency(order.price || 0)} đ`;
 
@@ -472,7 +472,7 @@ const buildDueOrderMessage = (order, index, total) => {
     formatDateDMY(order.order_date);
   const expiryDate =
     toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
-    formatDateDMY(order.order_expired);
+    formatDateDMY(order.expiry_date);
   const days = Number(order.days || order.total_days || 0) || 0;
   const daysLeft = Number(order.days_left) || 4;
   const price = Number(order.price || 0) || 0;

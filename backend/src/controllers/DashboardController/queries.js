@@ -38,7 +38,7 @@ const buildStatsQuery = () => `
       ${quoteIdent(ORDER_COLS.ID)} AS order_id,
       CASE WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_EXPIRED}' THEN 'expired' ELSE 'active' END AS status,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
-      ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_EXPIRED))} AS expiry_date,
+      ${createDateNormalization(quoteIdent(ORDER_COLS.EXPIRY_DATE))} AS expiry_date,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
       ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status

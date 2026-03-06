@@ -86,7 +86,7 @@ export const parseNumeric = (value: unknown): number | null => {
 export const parseExpiryTime = (order: Order): number => {
   const raw =
     sanitizeDateLike(order.expiry_date) ??
-    sanitizeDateLike(order[ORDER_FIELDS.ORDER_EXPIRED]) ??
+    sanitizeDateLike(order[ORDER_FIELDS.EXPIRY_DATE]) ??
     sanitizeDateLike(order.expiry_date_display) ??
     sanitizeDateLike(order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]);
   const formatted = Helpers.formatDateToDMY(raw) || String(raw || "");

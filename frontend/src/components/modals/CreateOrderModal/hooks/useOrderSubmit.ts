@@ -44,9 +44,9 @@ export const useOrderSubmit = ({
 
         const currentExpiryDMY =
           Helpers.formatDateToDMY(
-            formData[ORDER_FIELDS.ORDER_EXPIRED] as string
+            formData[ORDER_FIELDS.EXPIRY_DATE] as string
           ) ||
-          (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) ||
+          (formData[ORDER_FIELDS.EXPIRY_DATE] as string) ||
           "";
 
         const totalDays = Number(formData[ORDER_FIELDS.DAYS] || 0) || 0;
@@ -57,7 +57,7 @@ export const useOrderSubmit = ({
           if (computed && computed !== "N/A") {
             expiryDMY = computed;
             updateForm({
-              [ORDER_FIELDS.ORDER_EXPIRED]: expiryDMY,
+              [ORDER_FIELDS.EXPIRY_DATE]: expiryDMY,
             } as Partial<Order>);
           }
         }
@@ -78,7 +78,7 @@ export const useOrderSubmit = ({
           [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
           [ORDER_FIELDS.PRICE]: Number(formData[ORDER_FIELDS.PRICE]),
           [ORDER_FIELDS.ORDER_DATE]: normalizedRegister,
-          [ORDER_FIELDS.ORDER_EXPIRED]: normalizedExpiry,
+          [ORDER_FIELDS.EXPIRY_DATE]: normalizedExpiry,
           [ORDER_FIELDS.CONTACT]: formData[ORDER_FIELDS.CONTACT] || null,
           [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
           [ORDER_FIELDS.NOTE]: formData[ORDER_FIELDS.NOTE] || null,

@@ -51,7 +51,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     | number
     | undefined;
   const rawExpiryValue = useMemo(
-    () => (formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || "",
+    () => (formData[ORDER_FIELDS.EXPIRY_DATE] as string) || "",
     [formData]
   );
   const registerDateDMY = useMemo(
@@ -104,9 +104,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       };
 
       if (computedExpiry && computedExpiry !== "N/A") {
-        patch[ORDER_FIELDS.ORDER_EXPIRED] = computedExpiry;
+        patch[ORDER_FIELDS.EXPIRY_DATE] = computedExpiry;
       } else if (totalDays <= 0 && nextDMY) {
-        patch[ORDER_FIELDS.ORDER_EXPIRED] = nextDMY;
+        patch[ORDER_FIELDS.EXPIRY_DATE] = nextDMY;
       }
 
       updateForm(patch);
@@ -126,7 +126,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const days = Helpers.inclusiveDaysBetween(registerDate, end);
       updateForm({
         [ORDER_FIELDS.DAYS]: String(days),
-        [ORDER_FIELDS.ORDER_EXPIRED]: end,
+        [ORDER_FIELDS.EXPIRY_DATE]: end,
       } as Partial<Order>);
     }
   }, [
@@ -147,12 +147,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       const computed = calculateExpirationDate(registerDateDMY, totalDays);
       if (computed && computed !== "N/A" && computed !== rawExpiryValue) {
         updateForm({
-          [ORDER_FIELDS.ORDER_EXPIRED]: computed,
+          [ORDER_FIELDS.EXPIRY_DATE]: computed,
         } as Partial<Order>);
       }
     } else if (normalized && normalized !== rawExpiryValue) {
       updateForm({
-        [ORDER_FIELDS.ORDER_EXPIRED]: normalized,
+        [ORDER_FIELDS.EXPIRY_DATE]: normalized,
       } as Partial<Order>);
     }
   }, [rawExpiryValue, registerDateDMY, totalDays, updateForm]);
@@ -374,8 +374,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     <label className={labelClass}>Ngày Hết Hạn</label>
                     <input
                       type="text"
-                      name={ORDER_FIELDS.ORDER_EXPIRED}
-                      value={(formData[ORDER_FIELDS.ORDER_EXPIRED] as string) || ""}
+                      name={ORDER_FIELDS.EXPIRY_DATE}
+                      value={(formData[ORDER_FIELDS.EXPIRY_DATE] as string) || ""}
                       readOnly
                       className={`${inputClass} font-bold text-rose-400 ${readOnlyClass}`}
                     />

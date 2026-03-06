@@ -67,7 +67,7 @@ export const useProductSelection = ({
         [ORDER_FIELDS.COST]: 0,
         [ORDER_FIELDS.PRICE]: 0,
         [ORDER_FIELDS.DAYS]: "0",
-        [ORDER_FIELDS.ORDER_EXPIRED]: resetExpiry,
+        [ORDER_FIELDS.EXPIRY_DATE]: resetExpiry,
       };
     });
   }, [productName, setFormData, setSelectedSupplyId]);
@@ -86,7 +86,7 @@ export const useProductSelection = ({
           [ORDER_FIELDS.COST]: 0,
           [ORDER_FIELDS.PRICE]: 0,
           [ORDER_FIELDS.DAYS]: "0",
-          [ORDER_FIELDS.ORDER_EXPIRED]:
+          [ORDER_FIELDS.EXPIRY_DATE]:
             prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
         }));
         setSupplies(allSupplies);
@@ -102,7 +102,7 @@ export const useProductSelection = ({
         [ORDER_FIELDS.COST]: 0,
         [ORDER_FIELDS.PRICE]: 0,
         [ORDER_FIELDS.DAYS]: "0",
-        [ORDER_FIELDS.ORDER_EXPIRED]: prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
+        [ORDER_FIELDS.EXPIRY_DATE]: prev[ORDER_FIELDS.ORDER_DATE] || todayDate,
       }));
       setSupplies([]);
       setSupplyPrices([]);

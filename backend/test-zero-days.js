@@ -25,7 +25,7 @@ const testOrders = [
     total_days: 31,
     expiry_date_display: new Date().toLocaleDateString("vi-VN"),
     expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-    order_expired: new Date(),
+    expiry_date: new Date(),
     price: 65000,
   },
   {
@@ -47,7 +47,7 @@ const testOrders = [
     total_days: 30,
     expiry_date_display: new Date().toLocaleDateString("vi-VN"),
     expiry_date_str: new Date().toLocaleDateString("vi-VN"),
-    order_expired: new Date(),
+    expiry_date: new Date(),
     price: 100000,
   },
 ];

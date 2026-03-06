@@ -50,7 +50,7 @@ export const useOrderInit = ({
       ...INITIAL_FORM_DATA,
       [ORDER_FIELDS.ID_ORDER]: initialID,
       [ORDER_FIELDS.ORDER_DATE]: initialDate,
-      [ORDER_FIELDS.ORDER_EXPIRED]: initialDate,
+      [ORDER_FIELDS.EXPIRY_DATE]: initialDate,
     });
     setIsDataLoaded(false);
     setSelectedSupplyId(null);

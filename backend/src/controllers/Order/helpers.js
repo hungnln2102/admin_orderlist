@@ -36,12 +36,12 @@ const normalizeOrderRow = (
     options = {}
 ) => {
     const registrationRaw = row.order_date_raw || row.order_date;
-    const expiryRaw = row.order_expired_raw || row.order_expired;
+    const expiryRaw = row.expiry_date_raw || row.expiry_date;
 
     const registrationYmd = normalizeRawToYMD(registrationRaw);
     const expiryYmd = normalizeRawToYMD(expiryRaw);
 
-    // Số ngày còn lại = (order_expired - hôm nay), dùng UTC để tránh lệch timezone
+    // Số ngày còn lại = (expiry_date - hôm nay), dùng UTC để tránh lệch timezone
     let soNgayConLai = null;
     if (expiryYmd && todayYmd) {
         const [ey, em, ed] = expiryYmd.split("-").map(Number);
@@ -77,7 +77,7 @@ const normalizeOrderRow = (
 const ORDER_WRITABLE_COLUMNS = [
     COLS.ORDER.ID_ORDER, COLS.ORDER.ID_PRODUCT, COLS.ORDER.INFORMATION_ORDER,
     COLS.ORDER.CUSTOMER, COLS.ORDER.CONTACT, COLS.ORDER.SLOT,
-    COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.ORDER_EXPIRED,
+    COLS.ORDER.ORDER_DATE, COLS.ORDER.DAYS, COLS.ORDER.EXPIRY_DATE,
     COLS.ORDER.ID_SUPPLY, COLS.ORDER.COST, COLS.ORDER.PRICE,
     COLS.ORDER.NOTE, COLS.ORDER.STATUS
 ];
@@ -88,7 +88,7 @@ const sanitizeOrderWritePayload = (raw = {}) => {
         if (raw[col] === undefined) return;
 
         let val = raw[col];
-        if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.ORDER_EXPIRED) {
+        if (col === COLS.ORDER.ORDER_DATE || col === COLS.ORDER.EXPIRY_DATE) {
             val = normalizeDateInput(val);
         } else if (col === COLS.ORDER.COST || col === COLS.ORDER.PRICE || col === COLS.ORDER.DAYS || col === COLS.ORDER.ID_SUPPLY) {
             val = toNullableNumber(val);

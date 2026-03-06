@@ -65,7 +65,7 @@ const getOrderDaysLeft = async (orderCode) => {
     .where(COLS.ORDER.ID_ORDER, orderCode)
     .first();
   if (!order) return null;
-  return daysUntil(order[COLS.ORDER.ORDER_EXPIRED]);
+  return daysUntil(order[COLS.ORDER.EXPIRY_DATE]);
 };
 
 // Helper: Cleanup test data
@@ -173,7 +173,7 @@ const tests = {
       [COLS.ORDER.ID_PRODUCT]: "Netflix Premium --1m",
       [COLS.ORDER.CUSTOMER]: "Test Customer",
       [COLS.ORDER.ORDER_DATE]: formatDateForDB(new Date()),
-      [COLS.ORDER.ORDER_EXPIRED]: formatDateForDB(expiryDate),
+      [COLS.ORDER.EXPIRY_DATE]: formatDateForDB(expiryDate),
       [COLS.ORDER.DAYS]: 30,
       [COLS.ORDER.STATUS]: STATUS.UNPAID,
       [COLS.ORDER.COST]: 100000,
@@ -184,7 +184,7 @@ const tests = {
     const stateBefore = await fetchOrderState(orderCode);
     const eligibilityBefore = isEligibleForRenewal(
       stateBefore[ORDER_COLS.status],
-      stateBefore[ORDER_COLS.orderExpired]
+      stateBefore[ORDER_COLS.expiryDate]
     );
     
     // Simulate webhook: UNPAID → PROCESSING
@@ -204,7 +204,7 @@ const tests = {
     const stateAfter = await fetchOrderState(orderCode);
     const eligibilityAfter = isEligibleForRenewal(
       stateAfter[ORDER_COLS.status],
-      stateAfter[ORDER_COLS.orderExpired]
+      stateAfter[ORDER_COLS.expiryDate]
     );
     
     console.log(`  - Status before: ${stateBefore[ORDER_COLS.status] || STATUS.UNPAID}`);
@@ -235,7 +235,7 @@ const tests = {
       [COLS.ORDER.ID_PRODUCT]: "Netflix Premium --1m",
       [COLS.ORDER.CUSTOMER]: "Test Customer",
       [COLS.ORDER.ORDER_DATE]: formatDateForDB(addDays(new Date(), -28)),
-      [COLS.ORDER.ORDER_EXPIRED]: formatDateForDB(expiryDate),
+      [COLS.ORDER.EXPIRY_DATE]: formatDateForDB(expiryDate),
       [COLS.ORDER.DAYS]: 30,
       [COLS.ORDER.STATUS]: STATUS.RENEWAL,
       [COLS.ORDER.COST]: 100000,
@@ -246,7 +246,7 @@ const tests = {
     const stateBefore = await fetchOrderState(orderCode);
     const eligibilityBefore = isEligibleForRenewal(
       stateBefore[ORDER_COLS.status],
-      stateBefore[ORDER_COLS.orderExpired]
+      stateBefore[ORDER_COLS.expiryDate]
     );
     
     console.log(`  - Status before: ${stateBefore[ORDER_COLS.status]}`);
@@ -290,7 +290,7 @@ const tests = {
       [COLS.ORDER.ID_PRODUCT]: "Netflix Premium --1m",
       [COLS.ORDER.CUSTOMER]: "Test Customer",
       [COLS.ORDER.ORDER_DATE]: formatDateForDB(addDays(new Date(), -30)),
-      [COLS.ORDER.ORDER_EXPIRED]: formatDateForDB(expiryDate),
+      [COLS.ORDER.EXPIRY_DATE]: formatDateForDB(expiryDate),
       [COLS.ORDER.DAYS]: 30,
       [COLS.ORDER.STATUS]: STATUS.EXPIRED,
       [COLS.ORDER.COST]: 100000,
@@ -301,7 +301,7 @@ const tests = {
     const stateBefore = await fetchOrderState(orderCode);
     const eligibilityBefore = isEligibleForRenewal(
       stateBefore[ORDER_COLS.status],
-      stateBefore[ORDER_COLS.orderExpired]
+      stateBefore[ORDER_COLS.expiryDate]
     );
     
     console.log(`  - Status before: ${stateBefore[ORDER_COLS.status]}`);
@@ -344,7 +344,7 @@ const tests = {
       [COLS.ORDER.ID_PRODUCT]: "Netflix Premium --1m",
       [COLS.ORDER.CUSTOMER]: "Test Customer",
       [COLS.ORDER.ORDER_DATE]: formatDateForDB(addDays(new Date(), -28)),
-      [COLS.ORDER.ORDER_EXPIRED]: formatDateForDB(expiryDate),
+      [COLS.ORDER.EXPIRY_DATE]: formatDateForDB(expiryDate),
       [COLS.ORDER.DAYS]: 30,
       [COLS.ORDER.STATUS]: STATUS.PROCESSING,
       [COLS.ORDER.COST]: 100000,
@@ -355,7 +355,7 @@ const tests = {
     const state = await fetchOrderState(orderCode);
     const eligibility = isEligibleForRenewal(
       state[ORDER_COLS.status],
-      state[ORDER_COLS.orderExpired]
+      state[ORDER_COLS.expiryDate]
     );
     
     console.log(`  - Status: ${state[ORDER_COLS.status]}`);
@@ -381,7 +381,7 @@ const tests = {
       [COLS.ORDER.ID_PRODUCT]: "Netflix Premium --1m",
       [COLS.ORDER.CUSTOMER]: "Test Customer",
       [COLS.ORDER.ORDER_DATE]: formatDateForDB(addDays(new Date(), -31)),
-      [COLS.ORDER.ORDER_EXPIRED]: formatDateForDB(expiryDate),
+      [COLS.ORDER.EXPIRY_DATE]: formatDateForDB(expiryDate),
       [COLS.ORDER.DAYS]: 30,
       [COLS.ORDER.STATUS]: STATUS.PROCESSING, // PROCESSING status
       [COLS.ORDER.COST]: 100000,
@@ -399,7 +399,7 @@ const tests = {
     const shouldMove = statusExpiredEligible.includes(before[COLS.ORDER.STATUS]);
     
     console.log(`  - Status: ${before[COLS.ORDER.STATUS]}`);
-    console.log(`  - DaysLeft: ${calculateDaysLeft(before[COLS.ORDER.ORDER_EXPIRED])}`);
+    console.log(`  - DaysLeft: ${calculateDaysLeft(before[COLS.ORDER.EXPIRY_DATE])}`);
     console.log(`  - Should move to expired: ${shouldMove}`);
     
     const passed = shouldMove === false; // PROCESSING should NOT be moved

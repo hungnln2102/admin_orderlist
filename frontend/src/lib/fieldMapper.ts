@@ -29,18 +29,13 @@ export const ORDER_FIELD_MAP = {
   SLOT: ORDER_COLS.slot,
   ORDER_DATE: ORDER_COLS.orderDate,
   DAYS: ORDER_COLS.days,
-  ORDER_EXPIRED: ORDER_COLS.orderExpired,
+  EXPIRY_DATE: ORDER_COLS.expiryDate,
   SUPPLY: ORDER_COLS.supply,
   COST: ORDER_COLS.cost,
   PRICE: ORDER_COLS.price,
   NOTE: ORDER_COLS.note,
   STATUS: ORDER_COLS.status,
   REFUND: ORDER_COLS.refund,
-} as const;
-
-// ORDER_EXPIRED_FIELDS mapping (mirrors order_list/order_expired columns)
-export const ORDER_EXPIRED_FIELD_MAP = {
-  ...ORDER_FIELD_MAP,
 } as const;
 
 // PURCHASE_ORDER_FIELDS mapping (subset of ORDER fields)
@@ -52,7 +47,7 @@ export const PURCHASE_ORDER_FIELD_MAP = {
   SLOT: ORDER_COLS.slot,
   ORDER_DATE: ORDER_COLS.orderDate,
   DAYS: ORDER_COLS.days,
-  ORDER_EXPIRED: ORDER_COLS.orderExpired,
+  EXPIRY_DATE: ORDER_COLS.expiryDate,
   SUPPLY: ORDER_COLS.supply,
   COST: ORDER_COLS.cost,
   STATUS: ORDER_COLS.status,
@@ -146,6 +141,7 @@ export const PRODUCT_SCHEMA_DESC_FIELD_MAP = {
   RULES: PRODUCT_SCHEMA_DESC_COLS.rules,
   DESCRIPTION: PRODUCT_SCHEMA_DESC_COLS.description,
   IMAGE_URL: PRODUCT_SCHEMA_DESC_COLS.imageUrl,
+  UPDATED_AT: PRODUCT_SCHEMA_DESC_COLS.updatedAt,
 } as const;
 
 export const PRICE_CONFIG_FIELD_MAP = {
@@ -162,10 +158,11 @@ export const SUPPLIER_COST_FIELD_MAP = {
   VARIANT_ID: SUPPLIER_COST_COLS.variantId,
   SOURCE_ID: SUPPLIER_COST_COLS.sourceId,
   PRICE: SUPPLIER_COST_COLS.price,
+  CREATED_AT: SUPPLIER_COST_COLS.createdAt,
+  UPDATED_AT: SUPPLIER_COST_COLS.updatedAt,
 } as const;
 
 export type OrderFieldKey = keyof typeof ORDER_FIELD_MAP;
-export type OrderExpiredFieldKey = keyof typeof ORDER_EXPIRED_FIELD_MAP;
 export type PurchaseOrderFieldKey = keyof typeof PURCHASE_ORDER_FIELD_MAP;
 export type VariantPricingFieldKey = keyof typeof VARIANT_PRICING_FIELD_MAP;
 export type SupplyFieldKey = keyof typeof SUPPLY_FIELD_MAP;

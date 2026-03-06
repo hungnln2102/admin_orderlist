@@ -109,10 +109,10 @@ export const usePriceCalculation = ({
           cost: Math.max(0, Number(raw.gia_nhap ?? raw.cost ?? 0) || 0),
           price: Math.max(0, Number(raw.gia_ban ?? raw.price ?? 0) || 0),
           days: Number(raw.so_ngay_da_dang_ki ?? raw.days ?? 0) || 0,
-          order_expired: "",
+          expiry_date: "",
         };
 
-        const expiryRaw = (raw.order_expired ?? raw.het_han ?? "").trim();
+        const expiryRaw = (raw.expiry_date ?? raw.order_expired ?? raw.het_han ?? "").trim();
         const expiryDMY =
           Helpers.formatDateToDMY(expiryRaw) ||
           expiryRaw ||
@@ -120,7 +120,7 @@ export const usePriceCalculation = ({
             ? calculateExpirationDate(normalizedRegisterDMY, mapped.days)
             : "");
 
-        mapped.order_expired = expiryDMY;
+        mapped.expiry_date = expiryDMY;
 
         return mapped;
       } catch (error) {
@@ -161,7 +161,7 @@ export const usePriceCalculation = ({
         Helpers.getTodayDMY();
       let days = Number(result.days || 0) || 0;
       let expiry =
-        result.order_expired ||
+        result.expiry_date ||
         (days > 0 ? calculateExpirationDate(safeRegister, days) : "");
 
       const monthsFromInfo =
@@ -212,8 +212,8 @@ export const usePriceCalculation = ({
             days > 0
               ? String(days)
               : String(prev[ORDER_FIELDS.DAYS] || "0"),
-          [ORDER_FIELDS.ORDER_EXPIRED]:
-            expiry || (prev[ORDER_FIELDS.ORDER_EXPIRED] as string) || "",
+          [ORDER_FIELDS.EXPIRY_DATE]:
+            expiry || (prev[ORDER_FIELDS.EXPIRY_DATE] as string) || "",
         };
       });
 

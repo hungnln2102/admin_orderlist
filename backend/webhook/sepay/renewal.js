@@ -40,7 +40,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const orderRes = await client.query(
       `SELECT
         ${ORDER_COLS.idProduct},
-        ${ORDER_COLS.orderExpired},
+        ${ORDER_COLS.expiryDate},
         ${ORDER_COLS.idSupply},
         ${ORDER_COLS.cost},
         ${ORDER_COLS.price},
@@ -64,7 +64,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     const order = orderRes.rows[0];
     const sanPham = order[ORDER_COLS.idProduct];
-    const hetHan = parseFlexibleDate(order[ORDER_COLS.orderExpired]);
+    const hetHan = parseFlexibleDate(order[ORDER_COLS.expiryDate]);
     const idSupplyRaw = order[ORDER_COLS.idSupply];
     const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
       ? Number(idSupplyRaw) : null;
@@ -205,7 +205,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       SET
         ${ORDER_COLS.orderDate} = $1,
         ${ORDER_COLS.days} = $2,
-        ${ORDER_COLS.orderExpired} = $3,
+        ${ORDER_COLS.expiryDate} = $3,
         ${ORDER_COLS.cost} = $4,
         ${ORDER_COLS.price} = $5,
         ${ORDER_COLS.status} = $6
@@ -258,7 +258,7 @@ const fetchOrderState = async (orderCode) => {
     const res = await client.query(
       `SELECT
         ${ORDER_COLS.status},
-        ${ORDER_COLS.orderExpired}
+        ${ORDER_COLS.expiryDate}
       FROM ${ORDER_TABLE}
       WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
       LIMIT 1`,
@@ -270,9 +270,9 @@ const fetchOrderState = async (orderCode) => {
   }
 };
 
-const isEligibleForRenewal = (statusValue, orderExpired) => {
+const isEligibleForRenewal = (statusValue, expiryDate) => {
   const statusText = String(statusValue || "");
-  const daysLeft = daysUntil(orderExpired);
+  const daysLeft = daysUntil(expiryDate);
 
   // Chỉ RENEWAL và EXPIRED mới eligible cho renewal
   // PROCESSING là trạng thái SAU KHI renewal, không phải điều kiện để renewal
@@ -320,7 +320,7 @@ const processRenewalTask = async (orderCode) => {
 
   const { eligible, forceRenewal } = isEligibleForRenewal(
     state[ORDER_COLS.status],
-    state[ORDER_COLS.orderExpired]
+    state[ORDER_COLS.expiryDate]
   );
 
   if (!eligible) {
@@ -396,7 +396,7 @@ const fetchRenewalCandidates = async () => {
       `SELECT
         ${ORDER_COLS.idOrder} AS order_code,
         ${ORDER_COLS.status} AS status_value,
-        ${ORDER_COLS.orderExpired} AS order_expired_value
+        ${ORDER_COLS.expiryDate} AS expiry_date_value
       FROM ${ORDER_TABLE}
       WHERE TRIM(${ORDER_COLS.idOrder}::text) <> ''`
     );
@@ -407,7 +407,7 @@ const fetchRenewalCandidates = async () => {
       if (!orderCode) continue;
       const eligibility = isEligibleForRenewal(
         row.status_value,
-        row.order_expired_value
+        row.expiry_date_value
       );
 
       if (eligibility.eligible) {

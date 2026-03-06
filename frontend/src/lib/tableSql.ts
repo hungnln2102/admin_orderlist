@@ -1,6 +1,6 @@
 // tableSql.ts - Định nghĩa mapping cột DB cho frontend (cập nhật thủ công khi DB đổi).
 
-// 1. ORDER_LIST (Backend: ORDER_LIST)
+// 1. ORDER_LIST (Backend: ORDER_LIST - bảng duy nhất cho mọi đơn hàng)
 export const ORDER_COLS = {
   id: "id",
   idOrder: "id_order",
@@ -11,7 +11,7 @@ export const ORDER_COLS = {
   slot: "slot",
   orderDate: "order_date",
   days: "days",
-  orderExpired: "order_expired", // Khớp với ORDER_EXPIRED trong dbSchema
+  expiryDate: "expiry_date", // ngày hết hạn trong order_list
   idSupply: "supply_id", // DB column - API trả về supply (tên NCC) qua JOIN supplier
   supply: "supply", // Tên NCC (từ API response - backend JOIN supplier trả về)
   cost: "cost",
@@ -20,13 +20,7 @@ export const ORDER_COLS = {
   status: "status",
 };
 
-// 2. ORDER_EXPIRED (Backend: ORDER_EXPIRED - thêm archived_at)
-export const ORDER_EXPIRED_COLS = {
-  ...ORDER_COLS,
-  archivedAt: "archived_at",
-};
-
-// 3. REFUND (Backend: REFUND)
+// 2. REFUND (Backend: REFUND)
 export const REFUND_COLS = {
   id: "id",
   orderCode: "ma_don_hang", // Backend: ORDER_CODE -> ma_don_hang
@@ -158,7 +152,10 @@ export const CATEGORY_COLS = {
 
 export const PRODUCT_COLS = {
   id: "id",
+  name: "name",
   packageName: "package_name",
+  isActive: "is_active",
+  updatedAt: "updated_at",
 };
 
 export const VARIANT_COLS = {
@@ -175,6 +172,7 @@ export const PRODUCT_SCHEMA_DESC_COLS = {
   rules: "rules",
   description: "description",
   imageUrl: "image_url",
+  updatedAt: "updated_at",
 };
 
 export const PRICE_CONFIG_COLS = {
@@ -191,15 +189,18 @@ export const SUPPLIER_COST_COLS = {
   variantId: "variant_id",
   sourceId: "supplier_id",
   price: "price",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
 };
 
 // --- XUẤT KHẨU (EXPORTS) ---
 
 // Danh sách định nghĩa DB (dành cho logic validation nếu cần)
+// Lưu ý: Đơn hàng đã gom về 1 bảng duy nhất `order_list`.
+// Các tab Hết hạn / Hoàn tiền chỉ là scope/filter trên `order_list`,
+// không còn bảng vật lý `order_expired` / `order_canceled`.
 export const DB_DEFINITIONS = {
   ORDER_LIST: "order_list",
-  ORDER_EXPIRED: "order_expired",
-  ORDER_CANCELED: "order_canceled",
   REFUND: "refund",
   PAYMENT_RECEIPT: "payment_receipt",
   SUPPLY: "supplier",
@@ -225,7 +226,6 @@ export const PRODUCT_DB_DEFINITIONS = {
 // Gom nhóm tất cả columns để fieldMapper sử dụng
 export const SCHEMA_TABLES = {
   ORDER_COLS,
-  ORDER_EXPIRED_COLS,
   ACCOUNT_STORAGE_COLS,
   BANK_LIST_COLS,
   PACKAGE_PRODUCT_COLS,

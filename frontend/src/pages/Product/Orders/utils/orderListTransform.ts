@@ -27,7 +27,7 @@ export function enrichOrdersWithVirtualFields(
       order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE]
     );
     const expirySource = sanitizeDateLike(
-      order.expiry_date ?? order[ORDER_FIELDS.ORDER_EXPIRED]
+      order.expiry_date ?? order[ORDER_FIELDS.EXPIRY_DATE]
     );
 
     const formattedOrderDate = resolveDateDisplay(

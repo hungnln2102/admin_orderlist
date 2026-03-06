@@ -84,7 +84,7 @@ const updateOrderWithFinance = async ({
 
     const toISO = (d) => (d ? d.toISOString().split("T")[0] : null);
     updatedOrder.order_date_raw = toISO(updatedOrder.order_date);
-    updatedOrder.order_expired_raw = toISO(updatedOrder.order_expired);
+    updatedOrder.expiry_date_raw = toISO(updatedOrder.expiry_date);
 
     const normalized = normalizeOrderRow(updatedOrder, todayYMDInVietnam());
     const supplyIdVal = updatedOrder?.[supplyIdCol];

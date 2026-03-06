@@ -31,7 +31,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         ${COL.slot},
         ${normalizeDateSQL(COL.orderDate)} AS ${COL.orderDate},
         ${intFromTextSQL(COL.days)} AS ${COL.days},
-        ${expiryDateSQL()} AS ${COL.orderExpired},
+        ${expiryDateSQL()} AS ${COL.expiryDate},
         ${COL.idSupply},
         ${COL.cost},
         ${COL.price},
@@ -77,7 +77,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
             total_days: normalized.days || normalized.total_days,
             expiry_date_display: normalized.expiry_date_display,
             expiry_date_str: normalized.expiry_date_display,
-            order_expired: normalized.order_expired || normalized.expiry_date,
+            expiry_date: normalized.expiry_date,
             price: normalized.price,
           };
         });

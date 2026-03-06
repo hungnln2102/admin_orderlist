@@ -1,6 +1,5 @@
 import {
   ORDER_FIELD_MAP,
-  ORDER_EXPIRED_FIELD_MAP,
   VARIANT_PRICING_FIELD_MAP,
   SUPPLY_FIELD_MAP,
   SUPPLY_PRICE_FIELD_MAP,
@@ -59,10 +58,9 @@ export const API_ENDPOINTS = {
   WAREHOUSE: "/api/warehouse",
 };
 
-// Keep UI aliases stable; values now sourced from tableSql via fieldMapper.
+// Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.
+// Chỉ còn một mapping duy nhất cho đơn hàng: ORDER_FIELDS (order_list).
 export const ORDER_FIELDS = ORDER_FIELD_MAP;
-// Typo kept for backward compatibility with existing imports.
-export const ORDER_EXPRIED_FIELDS = ORDER_EXPIRED_FIELD_MAP;
 export const VARIANT_PRICING_FIELDS = VARIANT_PRICING_FIELD_MAP;
 export const SUPPLY_FIELDS = SUPPLY_FIELD_MAP;
 export const SUPPLY_PRICE_FIELDS = SUPPLY_PRICE_FIELD_MAP;
@@ -90,7 +88,7 @@ export const CALCULATED_FIELDS = {
   COST: "cost",
   PRICE: "price",
   DAYS: "days",
-  ORDER_EXPIRED: "order_expired",
+  EXPIRY_DATE: "expiry_date",
 };
 
 export const ORDER_CODE_PREFIXES = {
@@ -166,7 +164,7 @@ export interface Order {
   slot: string;
   order_date: string;
   days: string;
-  order_expired: string;
+  expiry_date: string;
   registration_date?: string;
   expiry_date?: string;
   registration_date_display?: string;

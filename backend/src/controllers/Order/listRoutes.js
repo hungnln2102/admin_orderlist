@@ -41,7 +41,7 @@ const attachListRoutes = (router) => {
             const rows = await query.select(
                     `${table}.*`,
                     db.raw(`${table}.order_date::text as order_date_raw`),
-                    db.raw(`${table}.order_expired::text as order_expired_raw`),
+                    db.raw(`${table}.expiry_date::text as expiry_date_raw`),
                     // id_product trong response luôn là display_name của variant nếu có,
                     // fallback sang giá trị gốc trong bảng orders.* (thường là variant_id).
                     db.raw(`COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`),

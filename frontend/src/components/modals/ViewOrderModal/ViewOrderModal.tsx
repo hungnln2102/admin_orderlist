@@ -72,7 +72,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     order.expiry_date ||
       order.expiry_date_display ||
       order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
-      (order[ORDER_FIELDS.ORDER_EXPIRED] as string | null)
+      (order[ORDER_FIELDS.EXPIRY_DATE] as string | null)
   );
 
   const fallbackRemaining =
@@ -100,7 +100,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     order.expiry_date_display ||
     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
     Helpers.formatDateToDMY(expirySource) ||
-    String((order[ORDER_FIELDS.ORDER_EXPIRED] as string) || "");
+    String((order[ORDER_FIELDS.EXPIRY_DATE] as string) || "");
 
   const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
   const safeQrAmount = Helpers.roundGiaBanValue(qrAmountFromOrder);
