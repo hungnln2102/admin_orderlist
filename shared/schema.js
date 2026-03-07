@@ -11,7 +11,7 @@ const SHARED_COLS = {
     slot: "slot",
     orderDate: "order_date",
     days: "days",
-    expiryDate: "expiry_date",
+    expiryDate: "expired_at",
     idSupply: "id_supply",
     cost: "cost",
     price: "price",

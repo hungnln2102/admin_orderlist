@@ -30,6 +30,24 @@ const normalizeRawToYMD = (value) => {
     return null;
 };
 
+// Tính ngày hết hạn từ order_date + days khi DB không có cột expiry (order_expired/expiry_date).
+const computeExpiryFromOrderDateAndDays = (row) => {
+    const orderDateCol = COLS.ORDER.ORDER_DATE;
+    const daysCol = COLS.ORDER.DAYS;
+    const regRaw = row.order_date_raw || row.order_date || row[orderDateCol];
+    const regYmd = normalizeRawToYMD(regRaw);
+    if (!regYmd) return null;
+    const days = Number(row.days ?? row[daysCol] ?? 0);
+    if (!Number.isFinite(days) || days <= 0) return regYmd;
+    const [y, m, d] = regYmd.split("-").map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    date.setUTCDate(date.getUTCDate() + days - 1);
+    const ey = date.getUTCFullYear();
+    const em = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const ed = String(date.getUTCDate()).padStart(2, "0");
+    return Number.isFinite(ey) ? `${ey}-${em}-${ed}` : null;
+};
+
 const normalizeOrderRow = (
     row,
     todayYmd = todayYMDInVietnam(),
@@ -39,7 +57,8 @@ const normalizeOrderRow = (
     const expiryRaw = row.expiry_date_raw || row.expiry_date;
 
     const registrationYmd = normalizeRawToYMD(registrationRaw);
-    const expiryYmd = normalizeRawToYMD(expiryRaw);
+    let expiryYmd = normalizeRawToYMD(expiryRaw);
+    if (!expiryYmd) expiryYmd = computeExpiryFromOrderDateAndDays(row);
 
     // Số ngày còn lại = (expiry_date - hôm nay), dùng UTC để tránh lệch timezone
     let soNgayConLai = null;

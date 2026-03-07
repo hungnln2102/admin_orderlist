@@ -56,6 +56,10 @@ export const API_ENDPOINTS = {
   REFUNDS: "/api/refunds",
   BANK_LIST: "/api/banks",
   WAREHOUSE: "/api/warehouse",
+
+  RENEW_ADOBE_ACCOUNTS: "/api/renew-adobe/accounts",
+  RENEW_ADOBE_ACCOUNT_CHECK: (id: number) =>
+    `/api/renew-adobe/accounts/${id}/check`,
 };
 
 // Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.

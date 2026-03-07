@@ -10,6 +10,7 @@ const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
 const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
+const expiryCol = ORDERS_SCHEMA.ORDER_LIST.COLS.EXPIRY_DATE;
 const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name"; // Cột tên NCC
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
@@ -41,7 +42,7 @@ const attachListRoutes = (router) => {
             const rows = await query.select(
                     `${table}.*`,
                     db.raw(`${table}.order_date::text as order_date_raw`),
-                    db.raw(`${table}.expiry_date::text as expiry_date_raw`),
+                    db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
                     // id_product trong response luôn là display_name của variant nếu có,
                     // fallback sang giá trị gốc trong bảng orders.* (thường là variant_id).
                     db.raw(`COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`),

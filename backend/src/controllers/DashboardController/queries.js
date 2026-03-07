@@ -15,6 +15,7 @@ const {
 const ORDER_COLS = ORDER_DEF.COLS;
 const ORDER_LIST_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const STATUS_EXPIRED = STATUS.EXPIRED;
+const STATUS_RENEWAL = STATUS.RENEWAL;
 const STATUS_PENDING_REFUND = STATUS.PENDING_REFUND;
 const STATUS_REFUNDED = STATUS.REFUNDED;
 
@@ -36,9 +37,13 @@ const buildStatsQuery = () => `
   valid_orders AS (
     SELECT
       ${quoteIdent(ORDER_COLS.ID)} AS order_id,
-      CASE WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_EXPIRED}' THEN 'expired' ELSE 'active' END AS status,
+      CASE
+        WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_EXPIRED}' THEN 'expired'
+        WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_RENEWAL}' THEN 'renewal_needed'
+        ELSE 'active'
+      END AS status,
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS registration_date,
-      ${createDateNormalization(quoteIdent(ORDER_COLS.EXPIRY_DATE))} AS expiry_date,
+      NULL::date AS expiry_date,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.COST))} AS cost_value,
       ${createNumericExtraction(quoteIdent(ORDER_COLS.PRICE))} AS price_value,
       ${quoteIdent(ORDER_COLS.STATUS)} AS payment_status
@@ -100,8 +105,7 @@ const buildStatsQuery = () => `
     (
       SELECT COUNT(*)
       FROM valid_orders sub
-      WHERE sub.expiry_date IS NOT NULL
-        AND (sub.expiry_date - ${CURRENT_DATE_SQL}) BETWEEN 1 AND 4
+      WHERE sub.status = 'renewal_needed'
     ) AS overdue_orders_count
   FROM all_data, params;
 `;

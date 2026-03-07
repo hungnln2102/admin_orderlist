@@ -56,6 +56,11 @@ const SCHEMA_FORM_DESC = pickSchema(
   process.env.SCHEMA_FORM_DESC,
   "form_desc"
 );
+const SCHEMA_RENEW_ADOBE = pickSchema(
+  process.env.DB_SCHEMA_RENEW_ADOBE,
+  process.env.SCHEMA_RENEW_ADOBE,
+  "system_renew_adobe"
+);
 // Bảng inputs có thể ở schema khác (vd: public) - dùng DB_SCHEMA_INPUTS nếu cần
 const SCHEMA_INPUTS = pickSchema(
   process.env.DB_SCHEMA_INPUTS,
@@ -294,7 +299,7 @@ const ORDERS_SCHEMA = {
       SLOT: "slot",
       ORDER_DATE: "order_date",
       DAYS: "days",
-      EXPIRY_DATE: "expiry_date",
+      EXPIRY_DATE: "expired_at",
       ID_SUPPLY: "supply_id",
       COST: "cost",
       PRICE: "price",
@@ -336,6 +341,33 @@ const SUPPLIER_COST_DEF = {
     PRICE: "price",
     CREATED_AT: "created_at",
     UPDATED_AT: "updated_at",
+  },
+};
+
+// -----------------------
+// RENEW ADOBE (system_renew_adobe.accounts)
+// -----------------------
+const RENEW_ADOBE_SCHEMA = {
+  ACCOUNT: {
+    TABLE: "accounts",
+    COLS: {
+      ID: "id",
+      EMAIL: "email",
+      PASSWORD_ENC: "password_enc",
+      ACCESS_TOKEN: "access_token",
+      TOKEN_EXPIRES: "token_expires",
+      ADOBE_ORG_ID: "adobe_org_id",
+      ORG_NAME: "org_name",
+      ORG_TYPE: "org_type",
+      LICENSE_STATUS: "license_status",
+      LICENSE_DETAIL: "license_detail",
+      USER_COUNT: "user_count",
+      USERS_SNAPSHOT: "users_snapshot",
+      ALERT_TARGET: "alert_target",
+      LAST_CHECKED: "last_checked",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+    },
   },
 };
 
@@ -524,6 +556,7 @@ module.exports = {
   SCHEMA_FINANCE,
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
+  SCHEMA_RENEW_ADOBE,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
   tableName,
@@ -544,4 +577,6 @@ module.exports = {
   // Partner schema
   SCHEMA_PARTNER,
   PARTNER_SCHEMA,
+  // Renew Adobe
+  RENEW_ADOBE_SCHEMA,
 };

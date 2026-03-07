@@ -11,7 +11,7 @@ export const ORDER_COLS = {
   slot: "slot",
   orderDate: "order_date",
   days: "days",
-  expiryDate: "expiry_date", // ngày hết hạn trong order_list
+  expiryDate: "expired_at", // ngày hết hạn trong order_list
   idSupply: "supply_id", // DB column - API trả về supply (tên NCC) qua JOIN supplier
   supply: "supply", // Tên NCC (từ API response - backend JOIN supplier trả về)
   cost: "cost",

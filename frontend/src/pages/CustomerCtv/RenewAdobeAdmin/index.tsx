@@ -1,59 +1,115 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
+import { API_BASE_URL } from "@/lib/api";
+import { API_ENDPOINTS } from "@/constants";
 
-type AdminStatus = "active" | "expired" | "pending";
+/**
+ * Khớp cấu trúc bảng `accounts` trong docs/Adobe_Auto_Login (2).md.
+ * Cột form: email, password_enc, org_name, user_count, license_status.
+ */
+export type LicenseStatus = "active" | "expired" | "unknown";
 
-type AdminAccount = {
-  id: string;
-  account: string;
+export type AdobeAdminAccount = {
+  id: number;
   email: string;
-  status: AdminStatus;
+  password_enc: string;
+  org_name: string | null;
+  user_count: number;
+  license_status: LicenseStatus;
 };
 
-const MOCK_ADMIN_ACCOUNTS: AdminAccount[] = [
-  {
-    id: "1",
-    account: "admin-main-01",
-    email: "admin-main-01@example.com",
-    status: "active",
-  },
-  {
-    id: "2",
-    account: "admin-team-02",
-    email: "admin-team-02@example.com",
-    status: "expired",
-  },
-  {
-    id: "3",
-    account: "admin-backup-03",
-    email: "admin-backup-03@example.com",
-    status: "pending",
-  },
-];
+/** Hiển thị password dạng che (bảo mật) */
+function maskPassword(_raw: string): string {
+  return "••••••••";
+}
 
-const STATUS_LABELS: Record<AdminStatus, string> = {
+const STATUS_LABELS: Record<LicenseStatus, string> = {
   active: "Đang hoạt động",
   expired: "Hết hạn",
-  pending: "Chờ gia hạn",
+  unknown: "Chờ gia hạn",
 };
 
 const PAGE_SIZE = 10;
 
+/** Chuẩn hóa 1 row từ API (system_renew_adobe.account) sang AdobeAdminAccount */
+function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
+  const status = String(row.license_status ?? "unknown").toLowerCase();
+  const licenseStatus: LicenseStatus =
+    status === "active" || status === "expired" ? status : "unknown";
+  return {
+    id: Number(row.id) || 0,
+    email: String(row.email ?? ""),
+    password_enc: String(row.password_enc ?? ""),
+    org_name: row.org_name != null ? String(row.org_name) : null,
+    user_count: Number(row.user_count) ?? 0,
+    license_status: licenseStatus,
+  };
+}
+
+const fetchAccounts = () =>
+  fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`)
+    .then((res) => {
+      if (!res.ok) throw new Error(res.statusText || "Lỗi tải danh sách");
+      return res.json();
+    })
+    .then((rows: Record<string, unknown>[]) => rows.map(normalizeAccount));
+
 export default function RenewAdobeAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [accounts, setAccounts] = useState<AdobeAdminAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<number | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+
+  const loadAccounts = useMemo(
+    () => () => {
+      setLoading(true);
+      setError(null);
+      fetchAccounts()
+        .then(setAccounts)
+        .catch((err) => setError(err?.message ?? "Không thể tải danh sách tài khoản."))
+        .finally(() => setLoading(false));
+    },
+    []
+  );
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  const handleCheck = (acc: AdobeAdminAccount) => {
+    setCheckError(null);
+    setCheckingId(acc.id);
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_CHECK(acc.id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText || "Check thất bại");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.success) loadAccounts();
+        else throw new Error(data.error || "Check thất bại");
+      })
+      .catch((err) => setCheckError(err?.message ?? "Lỗi khi chạy check."))
+      .finally(() => setCheckingId(null));
+  };
 
   const filtered = useMemo(() => {
-    if (!searchTerm.trim()) return MOCK_ADMIN_ACCOUNTS;
+    if (!searchTerm.trim()) return accounts;
     const q = searchTerm.trim().toLowerCase();
-    return MOCK_ADMIN_ACCOUNTS.filter(
+    return accounts.filter(
       (item) =>
-        item.account.toLowerCase().includes(q) ||
-        item.email.toLowerCase().includes(q)
+        item.email.toLowerCase().includes(q) ||
+        (item.org_name ?? "").toLowerCase().includes(q)
     );
-  }, [searchTerm]);
+  }, [accounts, searchTerm]);
 
   const totalItems = filtered.length;
   const start = (currentPage - 1) * PAGE_SIZE;
@@ -77,7 +133,7 @@ export default function RenewAdobeAdmin() {
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300/70 pointer-events-none" />
           <input
             type="text"
-            placeholder="Tìm theo tài khoản, email..."
+            placeholder="Tìm theo email, org_name..."
             className="w-full pl-11 pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
             value={searchTerm}
             onChange={(e) => {
@@ -89,39 +145,66 @@ export default function RenewAdobeAdmin() {
       </div>
 
       <div className="rounded-[18px] bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 border border-white/12 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
+        {error && (
+          <div className="p-4 bg-rose-500/10 border-b border-rose-400/20 text-rose-300 text-sm">
+            {error}
+          </div>
+        )}
+        {checkError && (
+          <div className="p-4 bg-amber-500/10 border-b border-amber-400/20 text-amber-300 text-sm">
+            {checkError}
+          </div>
+        )}
+        {loading ? (
+          <div className="p-12 text-center text-white/70">
+            Đang tải danh sách...
+          </div>
+        ) : (
         <ResponsiveTable
           showCardOnMobile
           cardView={
             currentRows.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-white/70 text-lg mb-2">
-                  Không tìm thấy tài khoản nào
+                  {accounts.length === 0
+                    ? "Chưa có tài khoản nào"
+                    : "Không tìm thấy tài khoản nào"}
                 </p>
                 <p className="text-white/60 text-sm">
-                  Thử thay đổi từ khóa tìm kiếm
+                  {accounts.length === 0
+                    ? "Thêm tài khoản vào bảng system_renew_adobe.account"
+                    : "Thử thay đổi từ khóa tìm kiếm"}
                 </p>
               </div>
             ) : (
               <TableCard
                 data={currentRows}
                 renderCard={(item, idx) => {
-                  const acc = item as AdminAccount;
+                  const acc = item as AdobeAdminAccount;
                   return (
                     <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold text-white/50">
-                            #{start + idx + 1}
-                          </p>
-                          <p className="text-sm font-semibold text-white">
-                            {acc.account}
-                          </p>
-                        </div>
-                        <StatusBadge status={acc.status} />
-                      </div>
-                      <p className="text-xs text-white/70 break-all">
+                      <p className="text-xs text-white/50">#{start + idx + 1}</p>
+                      <p className="text-sm font-medium text-white break-all">
                         {acc.email}
                       </p>
+                      <p className="text-xs text-white/60">
+                        Mật khẩu: {maskPassword(acc.password_enc)}
+                      </p>
+                      <p className="text-xs text-white/70">
+                        Org: {acc.org_name ?? "—"}
+                      </p>
+                      <p className="text-xs text-white/70">
+                        Số user: {acc.user_count}
+                      </p>
+                      <StatusBadge status={acc.license_status} />
+                      <button
+                        type="button"
+                        onClick={() => handleCheck(acc)}
+                        disabled={checkingId !== null}
+                        className="mt-2 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold"
+                      >
+                        {checkingId === acc.id ? "Đang check..." : "Check"}
+                      </button>
                     </div>
                   );
                 }}
@@ -133,43 +216,62 @@ export default function RenewAdobeAdmin() {
           <table className="min-w-full divide-y divide-white/5 text-white">
             <thead>
               <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
-                <th className="w-12 text-center">STT</th>
-                <th className="min-w-[160px]">TÀI KHOẢN ADMIN</th>
-                <th className="min-w-[200px]">EMAIL</th>
-                <th className="w-32">TRẠNG THÁI</th>
+                <th className="min-w-[180px]">EMAIL</th>
+                <th className="min-w-[100px]">PASSWORD_ENC</th>
+                <th className="min-w-[140px]">ORG_NAME</th>
+                <th className="w-24 text-center">USER_COUNT</th>
+                <th className="w-36">LICENSE_STATUS</th>
+                <th className="w-28 text-center">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {currentRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-white/70"
                   >
                     <p className="text-lg mb-2">
-                      Không tìm thấy tài khoản nào
+                      {accounts.length === 0
+                        ? "Chưa có tài khoản nào"
+                        : "Không tìm thấy tài khoản nào"}
                     </p>
                     <p className="text-sm text-white/60">
-                      Thử thay đổi từ khóa tìm kiếm
+                      {accounts.length === 0
+                        ? "Thêm tài khoản vào bảng system_renew_adobe.account"
+                        : "Thử thay đổi từ khóa tìm kiếm"}
                     </p>
                   </td>
                 </tr>
               ) : (
-                currentRows.map((item, i) => {
-                  const acc = item as AdminAccount;
+                currentRows.map((item) => {
+                  const acc = item as AdobeAdminAccount;
                   return (
                     <tr key={acc.id}>
-                      <td className="px-2 sm:px-4 py-3 text-center text-xs text-white/70">
-                        {start + i + 1}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 text-sm font-medium">
-                        {acc.account}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 text-sm text-white/80 break-all">
+                      <td className="px-2 sm:px-4 py-3 text-sm text-white/90 break-all">
                         {acc.email}
                       </td>
+                      <td className="px-2 sm:px-4 py-3 text-sm text-white/60 font-mono">
+                        {maskPassword(acc.password_enc)}
+                      </td>
+                      <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
+                        {acc.org_name ?? "—"}
+                      </td>
+                      <td className="px-2 sm:px-4 py-3 text-sm text-white/80 text-center tabular-nums">
+                        {acc.user_count}
+                      </td>
                       <td className="px-2 sm:px-4 py-3">
-                        <StatusBadge status={acc.status} />
+                        <StatusBadge status={acc.license_status} />
+                      </td>
+                      <td className="px-2 sm:px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleCheck(acc)}
+                          disabled={checkingId !== null}
+                          className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {checkingId === acc.id ? "Đang check..." : "Check"}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -178,8 +280,9 @@ export default function RenewAdobeAdmin() {
             </tbody>
           </table>
         </ResponsiveTable>
+        )}
 
-        {totalItems > 0 && (
+        {!loading && totalItems > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 bg-slate-900/85 px-4 py-3 sm:px-6">
             <Pagination
               currentPage={currentPage}
@@ -195,7 +298,7 @@ export default function RenewAdobeAdmin() {
 }
 
 type StatusBadgeProps = {
-  status: AdminStatus;
+  status: LicenseStatus;
 };
 
 function StatusBadge({ status }: StatusBadgeProps) {

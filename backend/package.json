@@ -3,9 +3,9 @@
     "version": "1.0.0",
     "description": "",
     "main": "server.js",
-"scripts": {
-    "test": "jest",
-    "test:form-info": "node scripts/test-form-info-supertest.js",
+    "scripts": {
+        "test": "jest",
+        "test:form-info": "node scripts/test-form-info-supertest.js",
         "start": "node index.js",
         "start:api": "node index.js",
         "start:scheduler": "node scheduler.js",
@@ -37,6 +37,7 @@
         "multer": "^1.4.5-lts.1",
         "node-cron": "^4.2.1",
         "pg": "^8.16.3",
+        "puppeteer": "^23.11.1",
         "winston": "^3.19.0",
         "winston-daily-rotate-file": "^5.0.0"
     },
