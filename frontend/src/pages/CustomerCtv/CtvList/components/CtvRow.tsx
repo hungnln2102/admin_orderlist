@@ -8,6 +8,8 @@ type CtvRowProps = {
   index: number;
   onView: (item: CtvItem) => void;
   onEdit: (item: CtvItem) => void;
+  /** true = form Khách hàng (cột HỌ, TÊN riêng); false = form CTV (một cột TÊN) */
+  variant?: "ctv" | "customer";
 };
 
 const statusClass: Record<CtvItem["status"], string> = {
@@ -16,9 +18,10 @@ const statusClass: Record<CtvItem["status"], string> = {
   suspended: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
-export function CtvRow({ item, index, onView, onEdit }: CtvRowProps) {
+export function CtvRow({ item, index, onView, onEdit, variant = "ctv" }: CtvRowProps) {
   const statusLabel = CTV_STATUS_LABELS[item.status];
   const statusStyle = statusClass[item.status];
+  const isCustomerForm = variant === "customer";
 
   return (
     <tr className="group border-b border-white/5 hover:bg-white/[0.03] transition-colors">
@@ -28,18 +31,34 @@ export function CtvRow({ item, index, onView, onEdit }: CtvRowProps) {
       <td className="px-2 py-3 sm:px-4 text-sm text-white/90 whitespace-nowrap">
         {item.account}
       </td>
-      <td className="px-2 py-3 sm:px-4 text-sm font-medium text-white whitespace-nowrap">
-        {item.name}
-      </td>
-      <td className="px-2 py-3 sm:px-4 text-center text-sm text-white/90 tabular-nums whitespace-nowrap">
-        {item.totalOrders.toLocaleString("vi-VN")}
+      {isCustomerForm ? (
+        <>
+          <td className="px-2 py-3 sm:px-4 text-sm text-white/90 whitespace-nowrap">
+            {item.lastName ?? ""}
+          </td>
+          <td className="px-2 py-3 sm:px-4 text-sm font-medium text-white whitespace-nowrap">
+            {item.firstName ?? ""}
+          </td>
+        </>
+      ) : (
+        <td className="px-2 py-3 sm:px-4 text-sm font-medium text-white whitespace-nowrap">
+          {item.name}
+        </td>
+      )}
+      <td className="px-2 py-3 sm:px-4 text-sm text-white/80 max-w-[180px] truncate" title={item.email}>
+        {item.email}
       </td>
       <td className="px-2 py-3 sm:px-4 text-right text-sm text-white/90 tabular-nums whitespace-nowrap">
-        {formatCtvCurrency(item.totalAmount)}
+        {formatCtvCurrency(item.balance)}
       </td>
-      <td className="px-2 py-3 sm:px-4 text-center text-sm text-white/90 font-medium whitespace-nowrap">
-        {item.discount}
+      <td className="px-2 py-3 sm:px-4 text-right text-sm text-white/90 tabular-nums whitespace-nowrap">
+        {formatCtvCurrency(item.totalSpent)}
       </td>
+      {isCustomerForm && (
+        <td className="px-2 py-3 sm:px-4 text-center text-sm text-white/90 font-medium whitespace-nowrap">
+          {item.rank}
+        </td>
+      )}
       <td className="px-2 py-3 sm:px-4 whitespace-nowrap">
         <span
           className={`inline-flex items-center rounded-lg border px-2.5 py-0.5 text-xs font-medium ${statusStyle}`}

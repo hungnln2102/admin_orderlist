@@ -8,6 +8,8 @@ type CtvCardProps = {
   index: number;
   onView: (item: CtvItem) => void;
   onEdit: (item: CtvItem) => void;
+  /** "customer" = hiển thị Hạng; "ctv" = ẩn Hạng */
+  variant?: "ctv" | "customer";
 };
 
 const statusClass: Record<CtvItem["status"], string> = {
@@ -16,7 +18,7 @@ const statusClass: Record<CtvItem["status"], string> = {
   suspended: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
-export function CtvCard({ item, index, onView, onEdit }: CtvCardProps) {
+export function CtvCard({ item, index, onView, onEdit, variant = "ctv" }: CtvCardProps) {
   const statusLabel = CTV_STATUS_LABELS[item.status];
   const statusStyle = statusClass[item.status];
 
@@ -42,16 +44,24 @@ export function CtvCard({ item, index, onView, onEdit }: CtvCardProps) {
             <div className="text-white font-medium text-right truncate">
               {item.account}
             </div>
-            <div className="text-white/60">Tổng đơn</div>
-            <div className="text-white font-medium tabular-nums text-right">
-              {item.totalOrders.toLocaleString("vi-VN")}
+            <div className="text-white/60">Email</div>
+            <div className="text-white font-medium text-right truncate">
+              {item.email || "—"}
             </div>
-            <div className="text-white/60">Tổng tiền</div>
+            <div className="text-white/60">Số dư</div>
             <div className="text-white font-medium tabular-nums text-right">
-              {formatCtvCurrency(item.totalAmount)}
+              {formatCtvCurrency(item.balance)}
             </div>
-            <div className="text-white/60">Chiết khấu</div>
-            <div className="text-white font-medium text-right">{item.discount}</div>
+            <div className="text-white/60">Tổng tiêu</div>
+            <div className="text-white font-medium tabular-nums text-right">
+              {formatCtvCurrency(item.totalSpent)}
+            </div>
+            {variant === "customer" && (
+              <>
+                <div className="text-white/60">Hạng</div>
+                <div className="text-white font-medium text-right">{item.rank}</div>
+              </>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1.5 shrink-0">

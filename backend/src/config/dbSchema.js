@@ -36,6 +36,11 @@ const SCHEMA_IDENTITY = pickSchema(
   process.env.SCHEMA_IDENTITY,
   "identity"
 );
+/** Schema chứa bảng customer_profiles (mặc định = identity; nếu bảng nằm ở public thì set DB_SCHEMA_CUSTOMER_PROFILES=public) */
+const SCHEMA_CUSTOMER_PROFILES = pickSchema(
+  process.env.DB_SCHEMA_CUSTOMER_PROFILES,
+  SCHEMA_IDENTITY
+);
 /** Schema chứa bảng mail_backup (mặc định = system_renew_adobe, cùng schema với renew-adobe accounts; override bằng DB_SCHEMA_MAIL_BACKUP nếu cần) */
 const SCHEMA_MAIL_BACKUP = pickSchema(
   process.env.DB_SCHEMA_MAIL_BACKUP,
@@ -216,6 +221,19 @@ const IDENTITY_SCHEMA = {
       ID: "id",
       CODE: "code",
       NAME: "name",
+    },
+  },
+  CUSTOMER_PROFILES: {
+    TABLE: "customer_profiles",
+    COLS: {
+      ID: "id",
+      ACCOUNT_ID: "account_id",
+      FIRST_NAME: "first_name",
+      LAST_NAME: "last_name",
+      DATE_OF_BIRTH: "date_of_birth",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+      TIER_ID: "tier_id",
     },
   },
 };
@@ -531,7 +549,9 @@ const PARTNER_SCHEMA = {
   SUPPLIER_COST: SUPPLIER_COST_DEF,
 };
 
-const tableName = (name, schema) => (schema ? `${schema}.${name}` : name);
+// PostgreSQL: unquoted identifiers fold to lowercase; chuẩn hóa schema để tránh "Identity" vs "identity"
+const tableName = (name, schema) =>
+  schema ? `${String(schema).toLowerCase()}.${name}` : name;
 
 const EMPTY_SCHEMA = {};
 const getTable = (key, schemaMap = EMPTY_SCHEMA) => schemaMap[key] || null;
@@ -570,6 +590,7 @@ module.exports = {
   SCHEMA_PRODUCT,
   SCHEMA_ADMIN,
   SCHEMA_IDENTITY,
+  SCHEMA_CUSTOMER_PROFILES,
   SCHEMA_MAIL_BACKUP,
   SCHEMA_COMMON,
   SCHEMA_PROMOTION,

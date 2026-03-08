@@ -10,13 +10,18 @@ export interface RoleItem {
 export interface CtvItem {
   id: string;
   account: string; // tài khoản (username/email)
-  name: string;
-  totalOrders: number;
-  totalAmount: number;
+  name: string; // họ tên (lastName + firstName hoặc account)
+  lastName?: string; // Họ (dùng cho form tab Khách)
+  firstName?: string; // Tên (dùng cho form tab Khách)
+  email: string;
+  balance: number; // số dư
+  totalSpent: number; // tổng tiêu
+  totalOrders: number; // giữ để tương thích, có thể = 0
+  totalAmount: number; // giữ để tương thích, có thể = totalSpent
   rank: string;
-  discount: string; // e.g. "10%", "15%"
+  discount: string; // e.g. "10%", "—"
   status: CtvStatus;
-  roleId: number; // FK → roles.id (để lọc theo tab)
+  roleId: number | null; // FK → roles.id (để lọc theo tab)
 }
 
 export const CTV_STATUS_LABELS: Record<CtvStatus, string> = {

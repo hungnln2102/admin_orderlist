@@ -2,56 +2,81 @@ import { useEffect, useMemo, useState } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
+import { API_BASE_URL } from "@/lib/api";
+import { API_ENDPOINTS } from "@/constants";
 import type { CtvItem, CtvStatus } from "./types";
 import { CTV_STATUS_OPTIONS } from "./types";
-import { ROLES, sortCtvList } from "./constants";
+import { ROLES, ROLE_ID_CUSTOMER, sortCtvList } from "./constants";
 import { CtvRow } from "./components/CtvRow";
 import { CtvCard } from "./components/CtvCard";
-import { fetchAccounts } from "@/lib/accountsApi";
 
 const PAGE_SIZE = 10;
+
+function mapCustomerStatusToCtvItem(raw: {
+  id: string;
+  account: string;
+  lastName?: string;
+  firstName?: string;
+  email?: string;
+  balance?: number;
+  totalSpent?: number;
+  rank?: string;
+  status: CtvStatus;
+  roleId?: number | null;
+}): CtvItem {
+  const name = [raw.lastName, raw.firstName].filter(Boolean).join(" ") || raw.account;
+  return {
+    id: raw.id,
+    account: raw.account,
+    name,
+    lastName: raw.lastName ?? "",
+    firstName: raw.firstName ?? "",
+    email: raw.email || "",
+    balance: Number(raw.balance) ?? 0,
+    totalSpent: Number(raw.totalSpent) ?? 0,
+    totalOrders: 0,
+    totalAmount: Number(raw.totalSpent) ?? 0,
+    rank: raw.rank || "Mới",
+    discount: "—",
+    status: raw.status,
+    roleId: raw.roleId ?? null,
+  };
+}
 
 export default function CtvList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<CtvStatus | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [roleTab, setRoleTab] = useState<number | "all">("all");
+  const [roleTab, setRoleTab] = useState<number>(ROLES[0]?.id ?? 2);
   const [items, setItems] = useState<CtvItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const url = `${API_BASE_URL}${API_ENDPOINTS.CUSTOMER_STATUS}`;
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const accounts = await fetchAccounts();
+        const res = await fetch(url, { credentials: "include" });
+        const data = await res.json();
         if (cancelled) return;
-        const mapped: CtvItem[] = sortCtvList(
-          accounts.map((acc) => ({
-            id: String(acc.id),
-            account: acc.username || acc.email || "",
-            name: acc.username || acc.email || "",
-            totalOrders: 0,
-            totalAmount: 0,
-            rank: "Mới",
-            discount: "0%",
-            status: acc.isActive ? "active" : "inactive",
-            roleId: Number(acc.roleId) || 0,
-          }))
-        );
+        if (!res.ok) {
+          setError(data?.error || "Không thể tải danh sách");
+          setItems([]);
+          return;
+        }
+        const list = Array.isArray(data.items) ? data.items : [];
+        const mapped: CtvItem[] = sortCtvList(list.map(mapCustomerStatusToCtvItem));
         setItems(mapped);
       } catch (err) {
-        console.error(err);
         if (!cancelled) {
-          setError("Không thể tải danh sách tài khoản");
+          setError("Không thể tải danh sách CTV / khách hàng");
           setItems([]);
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
     load();
@@ -63,24 +88,26 @@ export default function CtvList() {
   const roleStats = useMemo(() => {
     return ROLES.map((role) => ({
       role,
-      count: items.filter((item) => Number(item.roleId) === role.id).length,
+      count: items.filter((item) => item.roleId != null && item.roleId === role.id).length,
     }));
   }, [items]);
 
   const filtered = useMemo(() => {
-    let list = items;
-    if (roleTab !== "all") {
-      list = list.filter((item) => Number(item.roleId) === roleTab);
-    }
+    let list = items.filter((item) => item.roleId != null && Number(item.roleId) === roleTab);
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
-      list = list.filter((item) => item.name.toLowerCase().includes(q));
+      list = list.filter(
+        (item) =>
+          (item.name || "").toLowerCase().includes(q) ||
+          (item.account || "").toLowerCase().includes(q) ||
+          (item.email || "").toLowerCase().includes(q)
+      );
     }
     if (statusFilter !== "all") {
       list = list.filter((item) => item.status === statusFilter);
     }
     return list;
-  }, [searchTerm, statusFilter, roleTab]);
+  }, [items, searchTerm, statusFilter, roleTab]);
 
   const totalItems = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -105,29 +132,12 @@ export default function CtvList() {
             Danh sách <span className="text-indigo-400">CTV</span>
           </h1>
           <p className="text-sm font-medium text-white/50 tracking-wide">
-            Quản lý Cộng tác viên, hạng, chiết khấu và trạng thái
+            Quản lý CTV & khách hàng — số dư, tổng tiêu, hạng và trạng thái
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setRoleTab("all");
-            setCurrentPage(1);
-          }}
-          className={`px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-medium transition-colors ${
-            roleTab === "all"
-              ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/40"
-              : "bg-slate-900/70 text-indigo-200/80 hover:bg-slate-800"
-          }`}
-        >
-          Tất cả{" "}
-          <span className="ml-1 rounded-xl bg-black/20 px-2 py-0.5 text-[10px] font-semibold">
-            {items.length}
-          </span>
-        </button>
         {roleStats.map(({ role, count }) => (
           <button
             key={role.id}
@@ -156,7 +166,7 @@ export default function CtvList() {
             <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300/70 pointer-events-none" />
             <input
               type="text"
-              placeholder="Tìm theo tên hoặc tài khoản CTV..."
+              placeholder="Tìm theo tài khoản, họ tên, email..."
               className="w-full pl-11 pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
               value={searchTerm}
               onChange={(e) => {
@@ -195,6 +205,17 @@ export default function CtvList() {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
+      {loading && (
+        <div className="rounded-xl bg-slate-800/60 border border-white/10 px-4 py-6 text-center text-white/70">
+          Đang tải danh sách...
+        </div>
+      )}
+      {!loading && (
       <div className="rounded-[18px] bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 border border-white/12 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
         <ResponsiveTable
           showCardOnMobile
@@ -202,7 +223,7 @@ export default function CtvList() {
             currentRows.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-white/70 text-lg mb-2">
-                  Không tìm thấy CTV nào
+                  Không tìm thấy CTV / khách hàng nào
                 </p>
                 <p className="text-white/60 text-sm">
                   Thử thay đổi từ khóa hoặc bộ lọc
@@ -217,6 +238,7 @@ export default function CtvList() {
                     index={start + idx + 1}
                     onView={handleView}
                     onEdit={handleEdit}
+                    variant={roleTab === ROLE_ID_CUSTOMER ? "customer" : "ctv"}
                   />
                 )}
                 className="p-4"
@@ -228,11 +250,21 @@ export default function CtvList() {
             <thead>
               <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
                 <th className="w-12 text-center">STT</th>
-                <th className="min-w-[120px]">TÀI KHOẢN</th>
-                <th className="min-w-[140px]">TÊN CTV</th>
-                <th className="w-24 text-center">TỔNG ĐƠN</th>
-                <th className="w-32 text-right">TỔNG TIỀN</th>
-                <th className="w-24 text-center">CHIẾT KHẤU</th>
+                <th className="min-w-[100px]">TÀI KHOẢN</th>
+                {roleTab === ROLE_ID_CUSTOMER ? (
+                  <>
+                    <th className="min-w-[100px]">HỌ</th>
+                    <th className="min-w-[80px]">TÊN</th>
+                  </>
+                ) : (
+                  <th className="min-w-[120px]">TÊN</th>
+                )}
+                <th className="min-w-[160px]">EMAIL</th>
+                <th className="w-28 text-right">SỐ DƯ</th>
+                <th className="w-28 text-right">TỔNG TIÊU</th>
+                {roleTab === ROLE_ID_CUSTOMER && (
+                  <th className="w-24 text-center">HẠNG</th>
+                )}
                 <th className="w-28">TRẠNG THÁI</th>
                 <th className="w-28 text-right pr-4">THAO TÁC</th>
               </tr>
@@ -241,10 +273,10 @@ export default function CtvList() {
               {currentRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={roleTab === ROLE_ID_CUSTOMER ? 10 : 8}
                     className="px-4 py-12 text-center text-white/70"
                   >
-                    <p className="text-lg mb-2">Không tìm thấy CTV nào</p>
+                    <p className="text-lg mb-2">Không tìm thấy CTV / khách hàng nào</p>
                     <p className="text-sm text-white/60">
                       Thử thay đổi từ khóa hoặc bộ lọc
                     </p>
@@ -258,6 +290,7 @@ export default function CtvList() {
                     index={start + i + 1}
                     onView={handleView}
                     onEdit={handleEdit}
+                    variant={roleTab === ROLE_ID_CUSTOMER ? "customer" : "ctv"}
                   />
                 ))
               )}
@@ -276,6 +309,7 @@ export default function CtvList() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

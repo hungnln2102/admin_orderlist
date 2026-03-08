@@ -10,7 +10,6 @@ import {
   ArchiveBoxIcon,
   UserGroupIcon,
   TicketIcon,
-  ClipboardDocumentListIcon,
   BanknotesIcon,
   KeyIcon,
   ClipboardDocumentIcon,
@@ -65,13 +64,8 @@ export const menuSections: MenuSection[] = [
   {
     title: "Khách hàng & CTV",
     items: [
-      { name: "Danh sách CTV", href: "/ctv", icon: UserGroupIcon },
+      { name: "Danh sách Khách Hàng", href: "/customer-list", icon: UserGroupIcon },
       { name: "Danh sách mã khuyến mãi", href: "/promo-codes", icon: TicketIcon },
-      {
-        name: "Khách hàng",
-        href: "/customer-status",
-        icon: ClipboardDocumentListIcon,
-      },
     ],
   },
   {

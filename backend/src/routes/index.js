@@ -24,6 +24,7 @@ const accountsRoutes = require("./accountsRoutes");
 const promotionCodesRoutes = require("./promotionCodesRoutes");
 const formInfoRoutes = require("./formInfoRoutes");
 const renewAdobeRoutes = require("./renewAdobeRoutes");
+const customerStatusRoutes = require("./customerStatusRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -35,6 +36,7 @@ router.use(authGuard);
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
 router.use("/renew-adobe", renewAdobeRoutes);
+router.use("/", customerStatusRoutes);
 router.use("/", accountsRoutes);
 router.use("/", promotionCodesRoutes);
 router.use("/orders", ordersRoutes);
