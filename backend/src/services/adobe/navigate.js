@@ -9,6 +9,7 @@ const {
   ADMIN_CONSOLE_OVERVIEW_URL,
   ADMIN_CONSOLE_PRODUCTS_URL,
   ADMIN_CONSOLE_USERS_URL,
+  ADMIN_CONSOLE_USERS_ADMINISTRATORS_URL,
   ADMIN_CONSOLE_AUTO_ASSIGN_URL,
 } = require("./constants");
 
@@ -94,6 +95,30 @@ async function navigateToAdminConsoleUsers(page) {
 }
 
 /**
+ * Vào trang Users > Administrators (adminconsole.adobe.com/users/administrators) — dùng cho flow xóa product.
+ * Chờ đến khi nút "Xem chi tiết" xuất hiện mới trả về, tránh chuyển sang bước sau khi trang chưa sẵn sàng.
+ * @param {import('puppeteer').Page} page - Đã đăng nhập
+ */
+async function navigateToAdminConsoleUsersAdministrators(page) {
+  logger.info("[adobe] Điều hướng: Admin Console (Users / Administrators)");
+  await page.goto(ADMIN_CONSOLE_USERS_ADMINISTRATORS_URL, {
+    waitUntil: "domcontentloaded",
+    timeout: 55000,
+  }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 5000));
+  try {
+    await page.waitForSelector(
+      'button[aria-label^="Xem chi tiết"], button[aria-label^="View details"]',
+      { visible: true, timeout: 30000 }
+    );
+    await new Promise((r) => setTimeout(r, 2000));
+    logger.info("[adobe] Trang Administrators đã sẵn sàng (có nút Xem chi tiết)");
+  } catch (e) {
+    logger.warn("[adobe] Chờ nút Xem chi tiết trên Administrators timeout: %s", e.message);
+  }
+}
+
+/**
  * Vào trang Auto-assign products (adminconsole.adobe.com/products/auto-assign) — dùng khi cần lấy URL truy cập sản phẩm.
  * Chờ trang load xong (có nút Add product) rồi mới trả về để tránh flow chạy khi DOM chưa sẵn sàng.
  * @param {import('puppeteer').Page} page - Đã đăng nhập
@@ -118,5 +143,6 @@ module.exports = {
   navigateToAdminConsoleOverview,
   navigateToAdminConsoleProducts,
   navigateToAdminConsoleUsers,
+  navigateToAdminConsoleUsersAdministrators,
   navigateToAdminConsoleAutoAssign,
 };

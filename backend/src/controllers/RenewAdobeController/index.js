@@ -20,6 +20,9 @@ const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = TABLE_DEF.COLS;
 
+/** Giới hạn user mỗi tài khoản Admin Console (10 slot + 1 chủ = 11). */
+const MAX_USERS_PER_ACCOUNT = 11;
+
 /** Các cột cần kiểm tra trống (khớp bảng accounts hiện tại), trừ id */
 const CHECK_EMPTY_COLS = [
   COLS.EMAIL,
@@ -221,6 +224,64 @@ const runCheckWithCookies = async (req, res) => {
 };
 
 /**
+ * Chạy check một account và cập nhật DB (dùng cho scheduler job). Không dùng req/res.
+ * @param {number} id - account id
+ * @param {{ cookiesFile?: string }} [options]
+ * @throws {Error} khi account không tồn tại, thiếu email/password, queue đầy, hoặc login lỗi không có scrapedData
+ */
+async function runCheckForAccountId(id, options = {}) {
+  const cookiesFile = options.cookiesFile?.trim();
+  const useCookies = !!cookiesFile;
+
+  const account = await db(TABLE).where(COLS.ID, id).first();
+  if (!account) {
+    throw new Error("Không tìm thấy tài khoản.");
+  }
+
+  const email = account[COLS.EMAIL];
+  const password = account[COLS.PASSWORD_ENC] || "";
+  if (!useCookies && (!email || !password)) {
+    throw new Error("Thiếu email hoặc password_enc.");
+  }
+
+  const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
+  const urlAccessEmpty = COLS.URL_ACCESS && (account[COLS.URL_ACCESS] == null || String(account[COLS.URL_ACCESS]).trim() === "");
+  const opts = { mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null, needUrlAccess: urlAccessEmpty };
+  if (useCookies) opts.cookiesFile = cookiesFile;
+  if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
+  const cookiesPath = getCookiesPathForAccount(id);
+  if (cookiesPath) opts.saveCookiesTo = cookiesPath;
+
+  try {
+    await runWithQueue(() => getAdobeUserToken(email, password, opts));
+  } catch (loginErr) {
+    if (loginErr.scrapedData) {
+      const sd = loginErr.scrapedData;
+      const isSignInPage = /^(Sign\s*in|Log\s*in|Sign\s*out|Đăng\s*nhập)$/i.test(String(sd.orgName || "").trim());
+      const orgName = isSignInPage ? null : (sd.orgName ?? null);
+      const updatePayload = {
+        [COLS.ORG_NAME]: orgName,
+        [COLS.USER_COUNT]: sd.userCount ?? 0,
+        [COLS.LICENSE_STATUS]: sd.licenseStatus ?? "unknown",
+        [COLS.LAST_CHECKED]: new Date(),
+      };
+      if (sd.usersSnapshot != null) updatePayload[COLS.USERS_SNAPSHOT] = sd.usersSnapshot;
+      if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
+        updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
+      }
+      if (COLS.ALERT_CONFIG && loginErr.savedCookies) updatePayload[COLS.ALERT_CONFIG] = loginErr.savedCookies;
+      if (COLS.URL_ACCESS && sd.url_access != null && String(sd.url_access).trim() !== "") {
+        updatePayload[COLS.URL_ACCESS] = String(sd.url_access).trim();
+      }
+      await db(TABLE).where(COLS.ID, id).update(updatePayload);
+      logger.info("[renew-adobe] runCheckForAccountId — đã cập nhật DB", { id, license_status: sd.licenseStatus });
+      return;
+    }
+    throw loginErr;
+  }
+}
+
+/**
  * POST /api/renew-adobe/accounts/:id/check
  * Login Admin Console → chờ trang overview → success (scrape + cập nhật DB) hoặc fail.
  * Body tùy chọn: { cookiesFile: "path" } — dùng cookies thay vì tk/mk trong DB.
@@ -232,71 +293,20 @@ const runCheck = async (req, res) => {
   }
 
   const cookiesFile = req.body?.cookiesFile?.trim();
-  const useCookies = !!cookiesFile;
 
   try {
+    await runCheckForAccountId(id, { cookiesFile });
     const account = await db(TABLE).where(COLS.ID, id).first();
-    if (!account) {
-      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-    }
-
-    const email = account[COLS.EMAIL];
-    const password = account[COLS.PASSWORD_ENC] || "";
-    if (!useCookies && (!email || !password)) {
-      return res.status(400).json({ error: "Thiếu email hoặc password_enc." });
-    }
-
-    const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-    logger.info("[renew-adobe] Check bắt đầu", { id, email: useCookies ? "(cookies)" : email, mailBackupId });
-
-    const urlAccessEmpty = COLS.URL_ACCESS && (account[COLS.URL_ACCESS] == null || String(account[COLS.URL_ACCESS]).trim() === "");
-    try {
-      const opts = { mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null, needUrlAccess: urlAccessEmpty };
-      if (useCookies) opts.cookiesFile = cookiesFile;
-      if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
-      const cookiesPath = getCookiesPathForAccount(id);
-      if (cookiesPath) opts.saveCookiesTo = cookiesPath;
-      await runWithQueue(() => getAdobeUserToken(email, password, opts));
-    } catch (loginErr) {
-      if (loginErr.scrapedData) {
-        const sd = loginErr.scrapedData;
-        const isSignInPage = /^(Sign\s*in|Log\s*in|Sign\s*out|Đăng\s*nhập)$/i.test(String(sd.orgName || "").trim());
-        const orgName = isSignInPage ? null : (sd.orgName ?? null);
-        const updatePayload = {
-          [COLS.ORG_NAME]: orgName,
-          [COLS.USER_COUNT]: sd.userCount ?? 0,
-          [COLS.LICENSE_STATUS]: sd.licenseStatus ?? "unknown",
-          [COLS.LAST_CHECKED]: new Date(),
-        };
-        if (sd.usersSnapshot != null) updatePayload[COLS.USERS_SNAPSHOT] = sd.usersSnapshot;
-        if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
-          updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
-        }
-        if (COLS.ALERT_CONFIG && loginErr.savedCookies) updatePayload[COLS.ALERT_CONFIG] = loginErr.savedCookies;
-        if (COLS.URL_ACCESS && sd.url_access != null && String(sd.url_access).trim() !== "") {
-          updatePayload[COLS.URL_ACCESS] = String(sd.url_access).trim();
-        }
-        await db(TABLE).where(COLS.ID, id).update(updatePayload);
-        logger.info("[renew-adobe] Success — đã vào overview, đã cập nhật DB", { id });
-        const response = {
-          success: true,
-          message: "Đăng nhập thành công, đã vào trang overview.",
-          org_name: orgName,
-          user_count: sd.userCount ?? 0,
-          license_status: sd.licenseStatus ?? "unknown",
-        };
-        if (sd.profileName) response.profile_name = sd.profileName;
-        if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) response.manage_team_members = sd.manageTeamMembers;
-        if (sd.adminConsoleUsers && Array.isArray(sd.adminConsoleUsers)) response.admin_console_users = sd.adminConsoleUsers;
-        if (sd.url_access) response.url_access = sd.url_access;
-        return res.json(response);
-      }
-      logger.warn("[renew-adobe] Fail — %s", loginErr.message);
-      return res.status(400).json({
-        success: false,
-        message: loginErr.message || "Login thất bại.",
-      });
-    }
+    const orgName = account?.[COLS.ORG_NAME] ?? null;
+    const userCount = account?.[COLS.USER_COUNT] ?? 0;
+    const licenseStatus = account?.[COLS.LICENSE_STATUS] ?? "unknown";
+    return res.json({
+      success: true,
+      message: "Đăng nhập thành công, đã vào trang overview.",
+      org_name: orgName,
+      user_count: userCount,
+      license_status: licenseStatus,
+    });
   } catch (err) {
     if (err.code === "QUEUE_FULL") {
       return res.status(err.statusCode || 429).json({
@@ -304,11 +314,16 @@ const runCheck = async (req, res) => {
         error: err.message || "Hàng đợi check Adobe đã đầy, vui lòng thử lại sau.",
       });
     }
-    console.error("[renew-adobe] runCheck lỗi:", err);
+    if (err.message === "Không tìm thấy tài khoản.") {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message === "Thiếu email hoặc password_enc.") {
+      return res.status(400).json({ error: err.message });
+    }
     logger.error("[renew-adobe] Run check failed", { id, error: err.message, stack: err.stack });
-    res.status(500).json({
+    return res.status(400).json({
       success: false,
-      error: err.message || "Lỗi khi chạy check (Puppeteer/Adobe API).",
+      message: err.message || "Login thất bại.",
     });
   }
 };
@@ -496,6 +511,144 @@ const runAddUser = async (req, res) => {
 };
 
 /**
+ * POST /api/renew-adobe/accounts/add-users-batch (Hướng 2: tự chia nhiều tài khoản)
+ * Body: { accountIds: number[], userEmails: string[] }.
+ * Phân bổ email theo slot còn trống (11 - user_count) lần lượt theo thứ tự accountIds, rồi gọi add-user từng tài khoản.
+ */
+const runAddUsersBatch = async (req, res) => {
+  const accountIdsRaw = req.body?.accountIds;
+  const userEmailsRaw = req.body?.userEmails;
+  const accountIds = Array.isArray(accountIdsRaw)
+    ? accountIdsRaw.map((id) => parseInt(id, 10)).filter(Number.isFinite)
+    : [];
+  const userEmails = Array.isArray(userEmailsRaw)
+    ? userEmailsRaw.map((e) => String(e).trim()).filter(Boolean)
+    : [];
+
+  if (accountIds.length === 0) {
+    return res.status(400).json({ error: "Thiếu accountIds (mảng ID tài khoản, thứ tự = ưu tiên fill)." });
+  }
+  if (userEmails.length === 0) {
+    return res.status(400).json({ error: "Thiếu userEmails (mảng email cần thêm)." });
+  }
+
+  try {
+    const accounts = await db(TABLE)
+      .whereIn(COLS.ID, accountIds)
+      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USERS_SNAPSHOT, COLS.USER_COUNT, COLS.MAIL_BACKUP_ID, COLS.ALERT_CONFIG);
+    const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
+    const ordered = [...accounts].sort((a, b) => (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0));
+
+    const distribution = [];
+    let remaining = [...userEmails];
+
+    for (const account of ordered) {
+      const currentCount = Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0);
+      const slotLeft = Math.max(0, MAX_USERS_PER_ACCOUNT - currentCount);
+      const take = Math.min(slotLeft, remaining.length);
+      const chunk = take > 0 ? remaining.splice(0, take) : [];
+      distribution.push({
+        accountId: account[COLS.ID],
+        accountEmail: account[COLS.EMAIL],
+        slotLeft,
+        added: chunk,
+        user_count_before: currentCount,
+      });
+    }
+
+    const exceeded_emails = remaining.length > 0 ? remaining : undefined;
+    const totalToAdd = userEmails.length - (exceeded_emails?.length ?? 0);
+    if (totalToAdd === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn 11 user. Hoặc chọn thêm tài khoản.",
+        distribution: distribution.map((d) => ({ accountId: d.accountId, accountEmail: d.accountEmail, added: d.added })),
+        exceeded_emails,
+      });
+    }
+
+    const results = [];
+    for (const item of distribution) {
+      if (item.added.length === 0) continue;
+      const id = item.accountId;
+      const account = ordered.find((a) => a[COLS.ID] === id);
+      if (!account || !account[COLS.EMAIL] || !account[COLS.PASSWORD_ENC]) {
+        results.push({ accountId: id, accountEmail: item.accountEmail, added: item.added, error: "Thiếu email/password." });
+        continue;
+      }
+      const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
+      const cookiesPath = getCookiesPathForAccount(id);
+      const opts = {
+        email: account[COLS.EMAIL],
+        password: account[COLS.PASSWORD_ENC],
+        mailBackupId,
+        saveCookiesTo: cookiesPath || undefined,
+      };
+      if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
+
+      try {
+        await runWithQueue(() => addUserFlow.runAddUser(opts, item.added));
+        let list = [];
+        try {
+          const snap = account[COLS.USERS_SNAPSHOT];
+          if (snap && String(snap).trim()) list = JSON.parse(snap);
+        } catch (_) {
+          list = [];
+        }
+        if (!Array.isArray(list)) list = [];
+        for (const em of item.added) {
+          const exists = list.some((u) => (u && (u.email || u.Email || "")).toString().toLowerCase() === em.toLowerCase());
+          if (!exists) list.push({ name: null, email: em, product: false });
+        }
+        const newCount = list.length;
+        await db(TABLE).where(COLS.ID, id).update({
+          [COLS.USERS_SNAPSHOT]: JSON.stringify(list),
+          [COLS.USER_COUNT]: newCount,
+          [COLS.LAST_CHECKED]: new Date(),
+        });
+        results.push({
+          accountId: id,
+          accountEmail: item.accountEmail,
+          added: item.added,
+          user_count_after: newCount,
+        });
+        logger.info("[renew-adobe] Batch: đã thêm %s user vào account %s", item.added.length, id);
+      } catch (err) {
+        if (err.code === "QUEUE_FULL") {
+          return res.status(err.statusCode || 429).json({
+            success: false,
+            error: err.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
+            results,
+          });
+        }
+        logger.error("[renew-adobe] Batch add user failed", { id, error: err.message });
+        results.push({ accountId: id, accountEmail: item.accountEmail, added: item.added, error: err.message });
+      }
+    }
+
+    const totalAdded = results.reduce((sum, r) => sum + (r.added?.length ?? 0), 0);
+    const message =
+      exceeded_emails && exceeded_emails.length > 0
+        ? `Đã thêm ${totalAdded} user vào ${results.length} tài khoản. Còn ${exceeded_emails.length} email chưa thêm (hết slot).`
+        : `Đã thêm ${totalAdded} user vào ${results.length} tài khoản.`;
+
+    return res.json({
+      success: true,
+      message,
+      total_added: totalAdded,
+      distribution: results,
+      exceeded_emails: exceeded_emails || undefined,
+    });
+  } catch (err) {
+    logger.error("[renew-adobe] Add users batch failed", { error: err.message });
+    return res.status(500).json({
+      success: false,
+      error: err.message || "Lỗi khi chạy thêm user batch.",
+    });
+  }
+};
+
+/**
  * POST /api/renew-adobe/accounts/:id/auto-delete-users
  * Body: { userEmails: string[] } — danh sách email user cần xóa.
  * Luồng: Login Adobe → truy cập trang Users (../users) → xóa lần lượt từng user.
@@ -563,9 +716,11 @@ module.exports = {
   listAccounts,
   lookupAccountByEmail,
   runCheck,
+  runCheckForAccountId,
   runCheckWithCookies,
   runDeleteUser,
   runAddUser,
+  runAddUsersBatch,
   runAutoDeleteUsers,
   adobeQueueStatus,
 };

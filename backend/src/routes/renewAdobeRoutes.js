@@ -1,5 +1,5 @@
 const express = require("express");
-const { listAccounts, lookupAccountByEmail, runCheck, runCheckWithCookies, runDeleteUser, runAddUser, runAutoDeleteUsers, adobeQueueStatus } = require("../controllers/RenewAdobeController");
+const { listAccounts, lookupAccountByEmail, runCheck, runCheckWithCookies, runDeleteUser, runAddUser, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus } = require("../controllers/RenewAdobeController");
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ router.post("/check-with-cookies", runCheckWithCookies);
 router.post("/accounts/:id/check", runCheck);
 router.post("/accounts/:id/delete-user", runDeleteUser);
 router.post("/accounts/:id/add-user", runAddUser);
+router.post("/accounts/add-users-batch", runAddUsersBatch);
 router.post("/accounts/:id/auto-delete-users", runAutoDeleteUsers);
 
 module.exports = router;

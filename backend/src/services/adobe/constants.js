@@ -15,6 +15,9 @@ const ADMIN_CONSOLE_PRODUCTS_URL = "https://adminconsole.adobe.com/products";
 /** URL trang Users trên Admin Console */
 const ADMIN_CONSOLE_USERS_URL = "https://adminconsole.adobe.com/users";
 
+/** URL trang Users > Administrators (dùng cho flow xóa product khỏi user) */
+const ADMIN_CONSOLE_USERS_ADMINISTRATORS_URL = "https://adminconsole.adobe.com/users/administrators";
+
 /** URL trang Auto-assign products (lấy URL truy cập sản phẩm) */
 const ADMIN_CONSOLE_AUTO_ASSIGN_URL = "https://adminconsole.adobe.com/products/auto-assign";
 
@@ -26,6 +29,7 @@ module.exports = {
   ADMIN_CONSOLE_OVERVIEW_URL,
   ADMIN_CONSOLE_PRODUCTS_URL,
   ADMIN_CONSOLE_USERS_URL,
+  ADMIN_CONSOLE_USERS_ADMINISTRATORS_URL,
   ADMIN_CONSOLE_AUTO_ASSIGN_URL,
   ACCOUNT_ADOBE_URL,
 };

@@ -34,6 +34,7 @@ const {
   navigateToAdminConsoleAutoAssign,
 } = require("./navigate");
 const { getProductAccessUrl } = require("./getProductAccessUrlFlow");
+const { runDeleteProduct } = require("./deleteProductFlow");
 
 /**
  * Chạy một phiên Puppeteer: tạo browser + page, login, gọi fn(page), đóng browser.
@@ -231,7 +232,22 @@ async function runAdminConsoleFlow(page, opts = {}) {
     product: !!u.product,
   }));
 
-  // Lấy url_access sau khi đã lấy xong thông tin người dùng (chỉ chạy 1 lần khi url_access trống và có gói)
+  // Xóa product: từ trang /users bấm "Quản trị viên" → vào administrators → B0–B4 (chạy trước url_access)
+  if (productInfo.hasPlan) {
+    try {
+      const deleteResult = await runDeleteProduct(page);
+      if (deleteResult.skipped) {
+        logger.info("[adobe] deleteProduct đã bỏ qua");
+      } else {
+        logger.info("[adobe] Đã chạy flow delete product xong");
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    } catch (e) {
+      logger.warn("[adobe] deleteProduct lỗi (bỏ qua): %s", e.message);
+    }
+  }
+
+  // Lấy url_access sau khi đã lấy xong thông tin người dùng (chỉ chạy khi url_access trống và có gói)
   let urlAccess = null;
   if (needUrlAccess && productInfo.hasPlan) {
     try {

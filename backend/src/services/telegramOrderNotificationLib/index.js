@@ -7,6 +7,7 @@ const { buildOrderCreatedMessage } = require("./messageBuilders");
 const { sendOrderCreatedNotification } = require("./sendOrderCreated");
 const { sendZeroDaysRemainingNotification } = require("./sendZeroDays");
 const { sendFourDaysRemainingNotification } = require("./sendFourDays");
+const { sendAdobeZeroDaysNotification } = require("./sendAdobeZeroDays");
 
 module.exports = {
   buildSepayQrUrl,
@@ -14,4 +15,5 @@ module.exports = {
   sendOrderCreatedNotification,
   sendZeroDaysRemainingNotification,
   sendFourDaysRemainingNotification,
+  sendAdobeZeroDaysNotification,
 };
