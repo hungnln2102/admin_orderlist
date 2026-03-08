@@ -36,6 +36,13 @@ const SCHEMA_IDENTITY = pickSchema(
   process.env.SCHEMA_IDENTITY,
   "identity"
 );
+/** Schema chứa bảng mail_backup (mặc định = system_renew_adobe, cùng schema với renew-adobe accounts; override bằng DB_SCHEMA_MAIL_BACKUP nếu cần) */
+const SCHEMA_MAIL_BACKUP = pickSchema(
+  process.env.DB_SCHEMA_MAIL_BACKUP,
+  process.env.DB_SCHEMA_RENEW_ADOBE,
+  process.env.SCHEMA_RENEW_ADOBE,
+  "system_renew_adobe"
+);
 const SCHEMA_COMMON = pickSchema(
   process.env.DB_SCHEMA_COMMON,
   process.env.SCHEMA_COMMON,
@@ -186,6 +193,21 @@ const IDENTITY_SCHEMA = {
       BAN_REASON: "ban_reason",
       UPDATED_AT: "updated_at",
       ROLE_ID: "role_id",
+      MAIL_BACKUP_ID: "mail_backup_id",
+    },
+  },
+  MAIL_BACKUP: {
+    TABLE: "mail_backup",
+    COLS: {
+      ID: "id",
+      EMAIL: "email",
+      APP_PASSWORD: "app_password",
+      NOTE: "note",
+      PROVIDER: "provider",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+      ALIAS_PREFIX: "alias_prefix",
     },
   },
   ROLES: {
@@ -347,6 +369,8 @@ const SUPPLIER_COST_DEF = {
 // -----------------------
 // RENEW ADOBE (system_renew_adobe.accounts)
 // -----------------------
+// Bảng accounts (renew-adobe): id, email, password_enc, org_name, license_status, license_detail,
+// user_count, users_snapshot, alert_config (jsonb), last_checked, is_active, created_at, mail_backup_id
 const RENEW_ADOBE_SCHEMA = {
   ACCOUNT: {
     TABLE: "accounts",
@@ -354,19 +378,16 @@ const RENEW_ADOBE_SCHEMA = {
       ID: "id",
       EMAIL: "email",
       PASSWORD_ENC: "password_enc",
-      ACCESS_TOKEN: "access_token",
-      TOKEN_EXPIRES: "token_expires",
-      ADOBE_ORG_ID: "adobe_org_id",
       ORG_NAME: "org_name",
-      ORG_TYPE: "org_type",
       LICENSE_STATUS: "license_status",
       LICENSE_DETAIL: "license_detail",
       USER_COUNT: "user_count",
       USERS_SNAPSHOT: "users_snapshot",
-      ALERT_TARGET: "alert_target",
+      ALERT_CONFIG: "alert_config",
       LAST_CHECKED: "last_checked",
       IS_ACTIVE: "is_active",
       CREATED_AT: "created_at",
+      MAIL_BACKUP_ID: "mail_backup_id",
     },
   },
 };
@@ -548,6 +569,7 @@ module.exports = {
   SCHEMA_PRODUCT,
   SCHEMA_ADMIN,
   SCHEMA_IDENTITY,
+  SCHEMA_MAIL_BACKUP,
   SCHEMA_COMMON,
   SCHEMA_PROMOTION,
   SCHEMA_WALLET,

@@ -44,17 +44,16 @@ PROCESSING → PAID (Đã Thanh Toán)
 ```
 PAID (daysLeft <= 4) → RENEWAL (Cần Gia Hạn)
 ```
-- Scheduler chạy hàng ngày (cron)
+- Scheduler chạy hàng ngày (cron, mặc định 00:01)
 - Kiểm tra các đơn PAID với `daysLeft <= 4`
 - Tự động chuyển sang RENEWAL
 
 ### 5. Scheduler: RENEWAL → EXPIRED
 ```
-RENEWAL (daysLeft = 0) → EXPIRED (Hết Hạn)
+RENEWAL (daysLeft < 0) → EXPIRED (Hết Hạn)
 ```
 - Scheduler chạy hàng ngày
-- Kiểm tra các đơn RENEWAL với `daysLeft = 0`
-- Tự động chuyển sang EXPIRED
+- Kiểm tra các đơn có `daysLeft < 0` (đã quá hạn), status in (PAID, RENEWAL, EXPIRED) → set EXPIRED
 
 ### 6. Webhook nhận thanh toán cho đơn RENEWAL/EXPIRED → Renewal
 ```

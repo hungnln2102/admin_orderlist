@@ -1,0 +1,26 @@
+---
+description: Tính năng mới hoặc thêm tính năng phải tách thành các component/file nhỏ, không gom vào một file
+alwaysApply: true
+---
+
+# Chia nhỏ module — không gom vào một file
+
+Từ giờ, **mọi tính năng mới hoặc khi thêm tính năng** đều **không được gom vào một file duy nhất**. Bắt buộc phải **chia thành các component (module) nhỏ**.
+
+## Nguyên tắc
+
+1. **Một file một trách nhiệm**: Mỗi file chỉ xử lý một nhóm logic rõ ràng (constants, cookies, scrapers, otp, helpers, entry point).
+2. **Thư mục theo domain**: Nhóm code theo domain/tính năng (ví dụ: `services/adobe/`, `services/adobe/cookies.js`, `scrapers.js`, `otpFlow.js`).
+3. **Entry point mỏng**: File chính (index.js hoặc service chính) chỉ điều phối, gọi các module con; không chứa toàn bộ logic.
+4. **Re-export khi cần tương thích**: Nếu có file cũ đang được require() từ nhiều nơi, giữ file đó như re-export từ module mới để không phá API.
+
+## Ví dụ (backend)
+
+- **Đúng**: `services/adobe/` với `constants.js`, `cookies.js`, `scrapers.js`, `otpFlow.js`, `loginHelpers.js`, `index.js`; `adobeCheckService.js` chỉ re-export từ `./adobe`.
+- **Sai**: Một file `adobeCheckService.js` 800+ dòng chứa cookies, scrape, OTP, login, delete user.
+
+## Khi thêm tính năng mới
+
+- Tạo file mới cho logic mới (ví dụ: `adobe/newFeature.js`) hoặc thêm vào module con phù hợp.
+- Cập nhật entry point (index) để gọi module mới.
+- Không bổ sung hàng trăm dòng vào một file hiện có.

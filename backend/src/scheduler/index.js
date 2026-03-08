@@ -61,7 +61,10 @@ if (require.main === module && process.argv.includes("--run-once")) {
 
 cron.schedule(
   cronExpression,
-  () => runCronSafe("cron"),
+  () => {
+    logger.info("[Scheduler] Cron 00:01 triggered", { cronExpression, timezone: schedulerTimezone });
+    runCronSafe("cron");
+  },
   { scheduled: true, timezone: schedulerTimezone }
 );
 

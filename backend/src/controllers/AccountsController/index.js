@@ -46,6 +46,7 @@ const listAccounts = async (_req, res) => {
         banReason: `${ACCOUNTS_TABLE}.${aCols.banReason}`,
         updatedAt: `${ACCOUNTS_TABLE}.${aCols.updatedAt}`,
         roleId: `${ACCOUNTS_TABLE}.${aCols.roleId}`,
+        mailBackupId: `${ACCOUNTS_TABLE}.${aCols.mailBackupId}`,
         roleCode: `${ROLES_TABLE}.${rCols.code}`,
         roleName: `${ROLES_TABLE}.${rCols.name}`,
       })

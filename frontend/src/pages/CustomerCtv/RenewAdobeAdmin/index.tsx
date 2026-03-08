@@ -4,12 +4,14 @@ import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import { API_BASE_URL } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
+import { ManageTeamTable } from "./ManageTeamTable";
+import { DeleteUserByEmail } from "./DeleteUserByEmail";
 
 /**
- * Khớp cấu trúc bảng `accounts` trong docs/Adobe_Auto_Login (2).md.
+ * Khớp cấu trúc bảng `accounts` trong docs/Renew_Adobe_Overview.md.
  * Cột form: email, password_enc, org_name, user_count, license_status.
  */
-export type LicenseStatus = "active" | "expired" | "unknown";
+export type LicenseStatus = "paid" | "active" | "expired" | "unknown";
 
 export type AdobeAdminAccount = {
   id: number;
@@ -18,6 +20,15 @@ export type AdobeAdminAccount = {
   org_name: string | null;
   user_count: number;
   license_status: LicenseStatus;
+  users_snapshot?: string | null;
+};
+
+/** Một user trong users_snapshot (parse từ JSON) */
+export type SnapshotUser = {
+  name: string | null;
+  email: string;
+  role: string;
+  access: string;
 };
 
 /** Hiển thị password dạng che (bảo mật) */
@@ -26,6 +37,7 @@ function maskPassword(_raw: string): string {
 }
 
 const STATUS_LABELS: Record<LicenseStatus, string> = {
+  paid: "Còn gói",
   active: "Đang hoạt động",
   expired: "Hết hạn",
   unknown: "Chờ gia hạn",
@@ -37,7 +49,13 @@ const PAGE_SIZE = 10;
 function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
   const status = String(row.license_status ?? "unknown").toLowerCase();
   const licenseStatus: LicenseStatus =
-    status === "active" || status === "expired" ? status : "unknown";
+    status === "paid"
+      ? "paid"
+      : status === "active"
+        ? "active"
+        : status === "expired"
+          ? "expired"
+          : "unknown";
   return {
     id: Number(row.id) || 0,
     email: String(row.email ?? ""),
@@ -45,11 +63,14 @@ function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
     org_name: row.org_name != null ? String(row.org_name) : null,
     user_count: Number(row.user_count) ?? 0,
     license_status: licenseStatus,
+    users_snapshot: row.users_snapshot != null ? String(row.users_snapshot) : null,
   };
 }
 
 const fetchAccounts = () =>
-  fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`)
+  fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`, {
+    credentials: "include",
+  })
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText || "Lỗi tải danh sách");
       return res.json();
@@ -64,6 +85,10 @@ export default function RenewAdobeAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<number | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [testResult, setTestResult] = useState<AdobeAdminAccount | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
 
   const loadAccounts = useMemo(
     () => () => {
@@ -114,6 +139,47 @@ export default function RenewAdobeAdmin() {
   const totalItems = filtered.length;
   const start = (currentPage - 1) * PAGE_SIZE;
   const currentRows = filtered.slice(start, start + PAGE_SIZE);
+
+  const handleTestLookup = () => {
+    const q = testEmail.trim();
+    if (!q) {
+      setTestResult(null);
+      setTestError(null);
+      return;
+    }
+    setTestError(null);
+    setTestLoading(true);
+    const params = new URLSearchParams({ email: q });
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_LOOKUP}?${params}`, {
+      credentials: "include",
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data.account) {
+          const acc = normalizeAccount(data.account);
+          setTestResult(acc);
+          setTestError(null);
+        } else {
+          setTestResult(null);
+          setTestError(data?.error ?? "Không tìm thấy tài khoản với email tương ứng.");
+        }
+      })
+      .catch((err) => {
+        setTestResult(null);
+        setTestError(err?.message ?? "Lỗi khi tra cứu.");
+      })
+      .finally(() => setTestLoading(false));
+  };
+
+  const parsedSnapshot = useMemo((): SnapshotUser[] => {
+    if (!testResult?.users_snapshot) return [];
+    try {
+      const arr = JSON.parse(testResult.users_snapshot as string) as unknown;
+      return Array.isArray(arr) ? arr as SnapshotUser[] : [];
+    } catch {
+      return [];
+    }
+  }, [testResult?.users_snapshot]);
 
   return (
     <div className="space-y-6">
@@ -293,6 +359,77 @@ export default function RenewAdobeAdmin() {
           </div>
         )}
       </div>
+
+      {/* Form test tra cứu theo email */}
+      <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
+        <h2 className="text-lg font-semibold text-white mb-4">Tra cứu test theo email</h2>
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-white/60 mb-1.5">Email tài khoản</label>
+            <input
+              type="text"
+              placeholder="Nhập email"
+              className="w-full px-4 py-2.5 border border-white/10 rounded-xl bg-slate-950/40 text-sm text-white placeholder:text-slate-400/70 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleTestLookup}
+            disabled={testLoading}
+            className="rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-medium px-5 py-2.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {testLoading ? "Đang tra cứu..." : "Tra cứu"}
+          </button>
+        </div>
+        {testError && (
+          <p className="text-amber-400/90 text-sm mt-2">{testError}</p>
+        )}
+
+        {testResult && (
+          <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/60 p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+              <div>
+                <span className="text-white/50 block">Email</span>
+                <span className="text-white font-medium break-all">{testResult.email}</span>
+              </div>
+              <div>
+                <span className="text-white/50 block">Org name</span>
+                <span className="text-white">{testResult.org_name ?? "—"}</span>
+              </div>
+              <div>
+                <span className="text-white/50 block">Số user</span>
+                <span className="text-white tabular-nums">{testResult.user_count}</span>
+              </div>
+              <div>
+                <span className="text-white/50 block">Trạng thái</span>
+                <StatusBadge status={testResult.license_status} />
+              </div>
+            </div>
+
+            {parsedSnapshot.length > 0 && (
+              <div className="mt-4">
+                <ManageTeamTable
+                  members={parsedSnapshot}
+                  title="Quản lý nhóm"
+                  showAddUserButton
+                  teamCount={parsedSnapshot.length}
+                />
+              </div>
+            )}
+            {testResult.users_snapshot && parsedSnapshot.length === 0 && (
+              <p className="text-white/50 text-sm">users_snapshot có dữ liệu nhưng không parse được hoặc rỗng.</p>
+            )}
+          </div>
+        )}
+
+        {testEmail.trim() && !testResult && !testLoading && !testError && (
+          <p className="mt-4 text-white/50 text-sm">Nhấn &quot;Tra cứu&quot; để xem thông tin từ users_snapshot.</p>
+        )}
+      </div>
+
+      <DeleteUserByEmail onDeleted={loadAccounts} />
     </div>
   );
 }
@@ -305,11 +442,11 @@ function StatusBadge({ status }: StatusBadgeProps) {
   const label = STATUS_LABELS[status];
 
   const colorClasses =
-    status === "active"
+    status === "paid" || status === "active"
       ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/40"
       : status === "expired"
-      ? "bg-rose-500/15 text-rose-300 border-rose-400/40"
-      : "bg-amber-500/15 text-amber-300 border-amber-400/40";
+        ? "bg-rose-500/15 text-rose-300 border-rose-400/40"
+        : "bg-amber-500/15 text-amber-300 border-amber-400/40";
 
   return (
     <span

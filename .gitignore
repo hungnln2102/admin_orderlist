@@ -9,5 +9,10 @@ backend/.env.*
 backend/creds/
 backend/creds/**
 backend/creds/*.json
+backend/cookies/
+backend/cookies/*.json
+backend/manage-team-scraped.json
+backend/manage-team-debug.txt
+backend/admin-console-users.json
 clean_repo/
 *.log
