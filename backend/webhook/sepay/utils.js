@@ -254,6 +254,10 @@ const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallba
   }
 };
 
+/**
+ * Lấy danh sách mã đơn từ payload webhook.
+ * Nhiều mã đơn có thể phân cách bằng "-" (vd: MAV001-MAV002-MAV003).
+ */
 const extractOrderCodes = (transaction) => {
   const fields = [
     transaction?.transaction_content,
@@ -261,11 +265,24 @@ const extractOrderCodes = (transaction) => {
     transaction?.description,
   ];
   const codes = new Set();
+  const orderCodePattern = /MAV\w{3,}/gi;
   for (const text of fields) {
     if (!text) continue;
-    const matches = String(text).match(/MAV\w{3,}/gi);
-    if (matches) {
-      matches.forEach((m) => codes.add(m.toUpperCase()));
+    const str = String(text).trim();
+    // Tách theo "-" để lấy từng mã đơn
+    const parts = str.split("-").map((p) => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      const matches = part.match(orderCodePattern);
+      if (matches) {
+        matches.forEach((m) => codes.add(m.toUpperCase()));
+      } else if (/^MAV\w{3,}$/i.test(part)) {
+        codes.add(part.toUpperCase());
+      }
+    }
+    // Fallback: tìm tất cả MAVxxx trong cả chuỗi
+    const globalMatches = str.match(orderCodePattern);
+    if (globalMatches) {
+      globalMatches.forEach((m) => codes.add(m.toUpperCase()));
     }
   }
   return Array.from(codes);

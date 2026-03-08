@@ -62,27 +62,22 @@ router.post("/", async (req, res) => {
   }
 
   const orderCode = deriveOrderCode(transaction);
-  logger.debug("Derived order code", { orderCode });
   const extractedOrderCodes = extractOrderCodes(transaction);
   const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
   const normalizedExtracted = extractedOrderCodes
     .map((code) => String(code || "").trim().toUpperCase())
     .filter(Boolean);
+  // Nhiều mã đơn phân cách bằng "-": dùng đủ danh sách đã tách, không chỉ primary
   const orderCodes = Array.from(
     new Set(
-      normalizedPrimary
-        ? [normalizedPrimary]
-        : normalizedExtracted
+      normalizedExtracted.length > 0
+        ? normalizedExtracted
+        : normalizedPrimary
+          ? [normalizedPrimary]
+          : []
     )
   );
-  if (normalizedExtracted.length > 1 && normalizedPrimary) {
-    logger.warn(
-      "Multiple order codes detected; using primary only",
-      { primary: normalizedPrimary, extracted: normalizedExtracted }
-    );
-  } else if (orderCodes.length > 1) {
-    logger.debug("Extracted order codes", { orderCodes });
-  }
+  logger.debug("Order codes from webhook", { orderCodes, count: orderCodes.length });
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
   );
@@ -160,21 +155,28 @@ router.post("/", async (req, res) => {
         }
       }
 
+      // Từng đơn theo trạng thái: Chưa Thanh Toán hoặc Cần Gia Hạn → Đang Xử Lý
       if (receiptResult?.inserted || receiptResult?.duplicate) {
-        for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
+        for (const code of codesToUpdate) {
           const state = stateByOrderCode.get(code);
-          const eligibility = eligibilityByOrderCode.get(code);
-          if (!state || eligibility?.eligible) continue;
+          if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
-          if (statusValue === ORDER_STATUS.UNPAID) {
+          const moveToProcessing =
+            statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL;
+          if (moveToProcessing) {
             await client.query(
               `UPDATE ${ORDER_TABLE}
                SET ${ORDER_COLS.status} = $2
                WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-                 AND ${ORDER_COLS.status} = $3`,
-              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID]
+                 AND (${ORDER_COLS.status} = $3 OR ${ORDER_COLS.status} = $4)`,
+              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID, ORDER_STATUS.RENEWAL]
             );
+            logger.debug("[Webhook] Order status → Đang Xử Lý", {
+              orderCode: code,
+              previousStatus: statusValue,
+            });
           }
         }
       }
