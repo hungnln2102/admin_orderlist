@@ -23,18 +23,17 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
     try {
       await client.query("BEGIN");
 
-      const statusExpiredEligible = [
+      // Chỉ chuyển đơn từ PAID/RENEWAL → EXPIRED khi đã hết hạn; bỏ qua đơn đã là EXPIRED (tránh update thừa)
+      const statusToExpired = [
         `'${STATUS.PAID}'`,
         `'${STATUS.RENEWAL}'`,
-        `'${STATUS.EXPIRED}'`,
       ].join(", ");
 
-      // Gom 1 bảng: chỉ cập nhật status, không chuyển sang bảng order_expired
       const markExpired = await client.query(`
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.EXPIRED}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) < 0
-        AND (${COL.status} IN (${statusExpiredEligible}))
+        AND (${COL.status} IN (${statusToExpired}))
       RETURNING ${COL.idOrder};
     `);
       logger.info(`Đã cập nhật ${markExpired.rowCount} đơn hết hạn (< 0 ngày) sang status EXPIRED`);
