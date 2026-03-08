@@ -29,8 +29,11 @@ const { performLogin } = require("./performLogin");
 const {
   navigateToAccountPage,
   navigateToAdminConsoleOverview,
+  navigateToAdminConsoleProducts,
   navigateToAdminConsoleUsers,
+  navigateToAdminConsoleAutoAssign,
 } = require("./navigate");
+const { getProductAccessUrl } = require("./getProductAccessUrlFlow");
 
 /**
  * Chạy một phiên Puppeteer: tạo browser + page, login, gọi fn(page), đóng browser.
@@ -40,15 +43,30 @@ const {
  * @param {(page: import('puppeteer').Page) => Promise<any>} fn - Nhận page đã login, trả về kết quả tùy ý
  * @returns {Promise<any>} Kết quả của fn(page)
  */
+function getPuppeteerLaunchOptions() {
+  const headless = process.env.PUPPETEER_HEADLESS === "true";
+  const opts = {
+    headless,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-http2", // Tránh net::ERR_HTTP2_PROTOCOL_ERROR khi load adobe.com
+    ],
+    defaultViewport: null,
+    slowMo: headless ? 50 : 120, // Chậm hơn khi mở browser để dễ xem từng bước
+  };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    opts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  logger.info("[adobe] Launch browser: headless=%s (set PUPPETEER_HEADLESS=false để mở cửa sổ khi test)", headless);
+  return opts;
+}
+
 async function runWithSession(opts, fn) {
   const puppeteer = require("puppeteer");
-  const headless = process.env.PUPPETEER_HEADLESS === "true";
-  const browser = await puppeteer.launch({
-    headless,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    defaultViewport: null,
-    slowMo: 50,
-  });
+  const browser = await puppeteer.launch(getPuppeteerLaunchOptions());
   const page = await browser.newPage();
   try {
     const cookiesFile = opts.cookiesFile && opts.cookiesFile.trim();
@@ -94,15 +112,10 @@ async function getAdobeUserToken(email, password, options = {}) {
   const saveCookiesTo = options.saveCookiesTo && options.saveCookiesTo.trim();
   const needAccountProfile = options.needAccountProfile !== false;
   const deleteUserEmail = options.deleteUserEmail && String(options.deleteUserEmail).trim();
+  const needUrlAccess = !!options.needUrlAccess;
 
   const puppeteer = require("puppeteer");
-  const headless = process.env.PUPPETEER_HEADLESS === "true";
-  const browser = await puppeteer.launch({
-    headless,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    defaultViewport: null,
-    slowMo: 50,
-  });
+  const browser = await puppeteer.launch(getPuppeteerLaunchOptions());
   let scrapedData = null;
   const page = await browser.newPage();
 
@@ -140,6 +153,7 @@ async function getAdobeUserToken(email, password, options = {}) {
       scrapedData = await runAdminConsoleFlow(page, {
         needAccountProfile,
         deleteUserEmail,
+        needUrlAccess,
       });
     } else {
       throw new Error("Sau login không ở adobe.com hay @AdobeOrg.");
@@ -180,11 +194,11 @@ async function getAdobeUserToken(email, password, options = {}) {
 }
 
 /**
- * Luồng chỉ trên Admin Console: (tùy chọn account) → overview → users → scrape / xóa.
- * Page đã đăng nhập (adobe.com).
+ * Luồng chỉ trên Admin Console: (tùy chọn account) → products (check gói) → users → scrape / xóa.
+ * Page đã đăng nhập (adobe.com). Kiểm tra có sản phẩm trên trang /products (tiện hơn Overview).
  */
 async function runAdminConsoleFlow(page, opts = {}) {
-  const { needAccountProfile, deleteUserEmail } = opts;
+  const { needAccountProfile, deleteUserEmail, needUrlAccess } = opts;
   let profileName = null;
 
   if (needAccountProfile) {
@@ -195,10 +209,10 @@ async function runAdminConsoleFlow(page, opts = {}) {
     }
   }
 
-  await navigateToAdminConsoleOverview(page);
+  await navigateToAdminConsoleProducts(page);
   const productInfo = await getAdobeProductInfo(page);
   const licenseStatus = productInfo.hasPlan ? "Paid" : "Expired";
-  logger.info("[adobe] Check gói (Admin Console): hasPlan=%s → license_status=%s", productInfo.hasPlan, licenseStatus);
+  logger.info("[adobe] Check gói (Admin Console /products): hasPlan=%s → license_status=%s", productInfo.hasPlan, licenseStatus);
 
   await navigateToAdminConsoleUsers(page);
   if (deleteUserEmail) {
@@ -206,15 +220,30 @@ async function runAdminConsoleFlow(page, opts = {}) {
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  const adminConsoleUsers = await scrapeAdminConsoleUsersPage(page).catch(() => []);
+  let adminConsoleUsers = await scrapeAdminConsoleUsersPage(page).catch(() => []);
+  if (adminConsoleUsers.length === 0) {
+    await new Promise((r) => setTimeout(r, 4000));
+    adminConsoleUsers = await scrapeAdminConsoleUsersPage(page).catch(() => []);
+  }
   const manageTeamMembers = adminConsoleUsers.map((u) => ({
     name: u.name,
     email: u.email || "",
-    role: "",
-    access: u.sanPhamText && u.sanPhamText[0] ? u.sanPhamText[0] : "",
+    product: !!u.product,
   }));
 
-  return {
+  // Lấy url_access sau khi đã lấy xong thông tin người dùng (chỉ chạy 1 lần khi url_access trống và có gói)
+  let urlAccess = null;
+  if (needUrlAccess && productInfo.hasPlan) {
+    try {
+      await navigateToAdminConsoleAutoAssign(page);
+      urlAccess = await getProductAccessUrl(page);
+      if (urlAccess) logger.info("[adobe] Đã lấy url_access từ auto-assign");
+    } catch (e) {
+      logger.warn("[adobe] getProductAccessUrl lỗi (bỏ qua): %s", e.message);
+    }
+  }
+
+  const result = {
     orgName: profileName ?? null,
     userCount: manageTeamMembers.length,
     licenseStatus,
@@ -223,7 +252,12 @@ async function runAdminConsoleFlow(page, opts = {}) {
     manageTeamMembers,
     adminConsoleUsers,
   };
+  if (urlAccess) result.url_access = urlAccess;
+  return result;
 }
+
+const autoDeleteFlow = require("./autoDeleteFlow");
+const addUserFlow = require("./addUserFlow");
 
 module.exports = {
   getAdobeUserToken,
@@ -231,4 +265,6 @@ module.exports = {
   performLogin,
   navigate: require("./navigate"),
   scrapers: require("./scrapers"),
+  autoDeleteFlow,
+  addUserFlow,
 };

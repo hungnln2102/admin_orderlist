@@ -6,8 +6,10 @@
 export type ManageTeamMember = {
   name: string | null;
   email: string;
-  role: string;
-  access: string;
+  role?: string;
+  access?: string;
+  /** Có icon ở cột Sản phẩm (đã gán gói) = true */
+  product?: boolean;
 };
 
 type ManageTeamTableProps = {
@@ -84,6 +86,7 @@ export function ManageTeamTable({
           <thead>
             <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-left [&>th]:text-xs [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-white/60 [&>th]:bg-white/[0.03]">
               <th className="min-w-[220px]">Người</th>
+              <th className="min-w-[100px]">Sản phẩm</th>
               <th className="min-w-[140px]">Vai trò</th>
               <th className="min-w-[180px]">Truy cập</th>
               <th className="w-20 text-center">Hành động</th>
@@ -92,7 +95,7 @@ export function ManageTeamTable({
           <tbody className="divide-y divide-white/5">
             {members.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-white/50 text-sm">
+                <td colSpan={5} className="px-4 py-8 text-center text-white/50 text-sm">
                   Chưa có thành viên nào trong nhóm.
                 </td>
               </tr>
@@ -111,6 +114,11 @@ export function ManageTeamTable({
                     </div>
                   </td>
                   <td className="px-4 py-3">
+                    <span className={`text-sm font-medium ${member.product ? "text-emerald-400" : "text-white/50"}`}>
+                      {member.product === true ? "Có" : member.product === false ? "Không" : "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1 text-sm text-white/80">
                       {member.role || "—"}
                       <svg className="h-3.5 w-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,7 +128,7 @@ export function ManageTeamTable({
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-2 text-sm text-white/80">
-                      {member.access ? (
+                      {member.access !== undefined && member.access !== "" ? (
                         <>
                           <span className="flex h-5 w-5 rounded overflow-hidden bg-gradient-to-br from-orange-400 via-pink-500 to-violet-500" aria-hidden />
                           {member.access}

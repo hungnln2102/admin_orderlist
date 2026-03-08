@@ -63,6 +63,8 @@ export const API_ENDPOINTS = {
     `/api/renew-adobe/accounts/${id}/check`,
   RENEW_ADOBE_ACCOUNT_DELETE_USER: (id: number) =>
     `/api/renew-adobe/accounts/${id}/delete-user`,
+  RENEW_ADOBE_ACCOUNT_ADD_USER: (id: number) =>
+    `/api/renew-adobe/accounts/${id}/add-user`,
 };
 
 // Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.

@@ -6,9 +6,10 @@ const logger = require("../../utils/logger");
 
 /**
  * Scrape trang Admin Console users (adminconsole.adobe.com/users): div[role="row"] + div[role="gridcell"].
- * Format: [{ index, name, email, loaiId, sanPhamText }].
+ * Format: [{ index, name, email, loaiId, sanPhamText, product }].
+ * product: true nếu cột Sản phẩm có icon (img/svg), false nếu không.
  * @param {import('puppeteer').Page} page
- * @returns {Promise<Array<{ index: number, name: string|null, email: string|null, loaiId: string|null, sanPhamText: string[] }>>}
+ * @returns {Promise<Array<{ index: number, name: string|null, email: string|null, loaiId: string|null, sanPhamText: string[], product: boolean }>>}
  */
 async function scrapeAdminConsoleUsersPage(page) {
   return page
@@ -32,7 +33,9 @@ async function scrapeAdminConsoleUsersPage(page) {
             !/Adobe ID|Enterprise ID|Federated ID/i.test(t) &&
             t !== name
         );
-        return { index: index + 1, name, email, loaiId, sanPhamText };
+        const lastCell = cells.length > 0 ? cells[cells.length - 1] : null;
+        const product = !!(lastCell && lastCell.querySelector("img, svg, [role='img']"));
+        return { index: index + 1, name, email, loaiId, sanPhamText, product };
       });
     })
     .catch(() => []);
@@ -162,19 +165,30 @@ async function getAdobeProductInfo(page) {
         .map((el) => (el.innerText || "").trim())
         .filter(Boolean);
 
-      const productName =
+      let productName =
         productRows.find((t) =>
           /Creative Cloud|Acrobat|Photoshop|Illustrator|Express|Premiere|Lightroom/i.test(t)
         ) || null;
 
-      const licenseUsage =
+      let licenseUsage =
         productRows.find((t) => /\d+\s*trên\s*\d+/i.test(t) || /\d+\s*\/\s*\d+/i.test(t)) || null;
 
+      if (!productName && /Creative Cloud|Acrobat|Photoshop|Illustrator|Express|Premiere|Lightroom/i.test(text)) {
+        const m = text.match(/(Creative Cloud\s*(?:Pro|Teams)?|Acrobat|Photoshop|Illustrator|Express|Premiere|Lightroom)[^\n]*/i);
+        productName = m ? m[0].trim().split(/\n/)[0] : "Creative Cloud";
+      }
+      if (!licenseUsage && /\d+\s*trên\s*\d+/i.test(text)) {
+        const m = text.match(/\d+\s*trên\s*\d+\s*(?:Giấy phép|licenses?)?/i);
+        licenseUsage = m ? m[0].trim() : null;
+      }
+      const hasLicenseUsage = /\d+\s*trên\s*\d+/i.test(text) && (/Giấy phép|licenses?/i.test(text) || /Creative Cloud/i.test(text));
+      const hasPlan = !!productName || hasLicenseUsage;
+
       return {
-        hasPlan: !!productName,
-        status: productName ? "has_plan" : "unknown",
-        message: productName ? "Có gói" : "Không xác định",
-        productName,
+        hasPlan,
+        status: hasPlan ? "has_plan" : "unknown",
+        message: hasPlan ? "Có gói" : "Không xác định",
+        productName: productName || (hasLicenseUsage ? "Creative Cloud" : null),
         licenseUsage,
       };
     })

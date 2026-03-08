@@ -14,8 +14,10 @@
 async function performLogin(page, opts = {}) {
   const logger = require("../../utils/logger");
   const { ADOBE_LOGIN_URL } = require("./constants");
-  const { maybeSkipSecurityPrompt, waitForPassword, fillWithKeyboard, tryClickContinue } = require("./loginHelpers");
+  const { maybeSkipSecurityPrompt, waitForPassword, fillWithKeyboard, tryClickContinue, clickButtonByText } =
+    require("./loginHelpers");
   const { isOnVerifyScreen, waitForOtpAndFill } = require("./otpFlow");
+  const { isOnAddBackupEmailScreen, isOnVerifyPhoneScreen, skipVerifyPhone } = require("./backupEmailFlow");
 
   const { email, password, useCookies, cookiesToUse = [], mailBackupId } = opts;
 
@@ -23,13 +25,13 @@ async function performLogin(page, opts = {}) {
     logger.info("[adobe] Đăng nhập bằng cookies: %s cookie", cookiesToUse.length);
     await page.goto("https://www.adobe.com", {
       waitUntil: "domcontentloaded",
-      timeout: 20000,
+      timeout: 50000,
     });
     await page.setCookie(...cookiesToUse);
     logger.info("[adobe] Đã set cookies, chuyển sang adobe.com...");
     await page.goto("https://www.adobe.com", {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
+      timeout: 50000,
     });
     await new Promise((r) => setTimeout(r, 3000));
     await maybeSkipSecurityPrompt(page);
@@ -91,13 +93,13 @@ async function performLogin(page, opts = {}) {
     });
     const emailInput = await page.waitForSelector(
       'input[name="username"], input[type="email"], input[name="email"]',
-      { timeout: 20000 }
+      { timeout: 45000 }
     );
     await fillWithKeyboard(page, emailInput, email, 25);
     await new Promise((r) => setTimeout(r, 150));
     await page.keyboard.press("Enter");
     await Promise.race([
-      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 25000 }),
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45000 }),
       new Promise((r) => setTimeout(r, 5000)),
     ]).catch(() => {});
     await new Promise((r) => setTimeout(r, 2000));
@@ -115,6 +117,47 @@ async function performLogin(page, opts = {}) {
 
     await maybeSkipSecurityPrompt(page);
   }
+
+  // Xử lý màn Add backup email (bỏ qua — bấm Not now), OTP verify, bỏ qua verify phone
+  const handleProgressiveProfileSteps = async () => {
+    const maxRound = 6;
+    for (let round = 0; round < maxRound; round++) {
+      const url = page.url() || "";
+      if (url.indexOf("@AdobeOrg") !== -1 || (url.includes("adobe.com") && !url.includes("auth.services"))) {
+        return;
+      }
+      if (await isOnAddBackupEmailScreen(page)) {
+        logger.info("[adobe] Gặp màn Add backup email — bấm Not now để bỏ qua.");
+        const notNow = await page.evaluate(() => {
+          const labels = ["Not now", "Bỏ qua", "Skip", "Later"];
+          const norm = (s) => (s || "").trim();
+          for (const btn of document.querySelectorAll("button, [role='button']")) {
+            const t = norm(btn.innerText || btn.textContent);
+            if (labels.some((l) => t === l || t.includes(l))) {
+              btn.click();
+              return true;
+            }
+          }
+          return false;
+        });
+        if (notNow) await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      if (await isOnVerifyScreen(page)) {
+        await waitForOtpAndFill(page, { mailBackupId });
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      if (await isOnVerifyPhoneScreen(page)) {
+        await skipVerifyPhone(page, clickButtonByText);
+        await new Promise((r) => setTimeout(r, 2500));
+        continue;
+      }
+      break;
+    }
+  };
+
+  await handleProgressiveProfileSteps();
 
   logger.info("[adobe] Chờ trang đã đăng nhập (adobe.com hoặc @AdobeOrg), tối đa 60s...");
   try {

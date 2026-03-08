@@ -94,7 +94,9 @@ Base path: **`/api/renew-adobe`** (xem `backend/src/routes/renewAdobeRoutes.js`)
 | Env | Ý nghĩa |
 |-----|--------|
 | `ADOBE_SAVE_COOKIES` | `false` / `0` = không lưu cookie ra file (vẫn lưu vào `alert_config` nếu có). Mặc định bật. |
-| `PUPPETEER_HEADLESS` | `true` = chạy browser ẩn. |
+| `PUPPETEER_HEADLESS` | `true` = chạy Chrome **ngầm** (không mở cửa sổ). Nên bật trên server; khi đó có thể tăng đa luồng (ADOBE_CHECK_MAX_CONCURRENT). |
+| `ADOBE_CHECK_MAX_CONCURRENT` | Số job check/delete chạy **đồng thời** (mặc định 2). Chạy headless có thể tăng 4–6 nếu server đủ RAM (~300MB/Chrome). |
+| `ADOBE_CHECK_MAX_QUEUE` | Số job tối đa chờ trong hàng đợi (mặc định 50). Vượt thì API trả 429. |
 | OTP/2FA (mail) | `mail_backup_id` trong account, hoặc `ADOBE_OTP_IMAP_*` / `MAILTEST` + `APPPASSWORD` — xem `mailOtpService.js` và `docs/Setup_OTP_Mail.md` nếu cần. |
 
 ---
