@@ -220,8 +220,20 @@ const createProductPrice = async (req, res) => {
             productId = existing?.id ?? existing?.ID ?? null;
           }
           if (!productId) {
+            // Cột "name" NOT NULL trên product.product: dùng tên hiển thị
+            const productName =
+              rawPackageName ||
+              normalizeTextInput(packageProduct) ||
+              productCode ||
+              normalizedPackageName;
+            const productPayload = {
+              [productSchemaCols.packageName]: normalizedPackageName,
+            };
+            if (productSchemaCols.name) {
+              productPayload[productSchemaCols.name] = productName;
+            }
             const productInsert = await trx(TABLES.product)
-              .insert({ [productSchemaCols.packageName]: normalizedPackageName })
+              .insert(productPayload)
               .returning("id");
             productId = productInsert?.[0]?.id ?? productInsert?.[0]?.ID ?? null;
           }
