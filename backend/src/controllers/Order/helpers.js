@@ -9,6 +9,7 @@ const { getNextSupplyId } = require("../../services/idService");
 const { db } = require("../../db");
 const { TABLES, COLS, STATUS } = require("./constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
+const { findProductIdByName } = require("../ProductsController/finders");
 
 const normalizeRawToYMD = (value) => {
     if (value === undefined || value === null) return null;
@@ -120,7 +121,7 @@ const sanitizeOrderWritePayload = (raw = {}) => {
 };
 
 /**
- * Resolve product name (display_name) to variant id.
+ * Resolve product name (display_name, variant_name, package_name) to variant id.
  * Returns null if not found.
  */
 const resolveProductToVariantId = async(productNameOrId) => {
@@ -136,7 +137,12 @@ const resolveProductToVariantId = async(productNameOrId) => {
         .orWhere(variantNameCol, name)
         .select(PRODUCT_SCHEMA.VARIANT.COLS.ID)
         .first();
-    return row ? Number(row[PRODUCT_SCHEMA.VARIANT.COLS.ID]) || null : null;
+    if (row && Number.isFinite(Number(row[PRODUCT_SCHEMA.VARIANT.COLS.ID]))) {
+        return Number(row[PRODUCT_SCHEMA.VARIANT.COLS.ID]);
+    }
+    // Fallback: tìm theo package_name và fuzzy match (findProductIdByName)
+    const { variantId } = await findProductIdByName(name);
+    return variantId;
 };
 
 const ensureSupplyRecord = async(sourceName) => {

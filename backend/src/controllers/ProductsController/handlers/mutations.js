@@ -209,24 +209,21 @@ const createProductPrice = async (req, res) => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         inserted = await db.transaction(async (trx) => {
-          // Rule (theo repo admin_orderlist): Gói (package_name) có thể trùng — reuse product khi cùng package_name.
-          // Chỉ Mã Sản Phẩm (display_name) là unique. Insert product, nếu trùng package_name thì merge (reuse).
-          const productInsertQuery = trx(TABLES.product).insert({
-            [productSchemaCols.packageName]: normalizedPackageName,
-          });
+          // Rule: Gói (package_name) có thể trùng. Không còn unique constraint (migration 003).
+          // Reuse product khi cùng package_name: tìm trước, nếu có thì dùng, không thì insert mới.
+          let productId = null;
           if (rawPackageName && rawPackageName.length > 0) {
-            productInsertQuery.onConflict(productSchemaCols.packageName).merge({
-              [productSchemaCols.packageName]: normalizedPackageName,
-            });
-          }
-          const productInsert = await productInsertQuery.returning("id");
-          let productId = productInsert?.[0]?.id ?? productInsert?.[0]?.ID ?? null;
-          if (!productId && rawPackageName && rawPackageName.length > 0) {
             const existing = await trx(TABLES.product)
               .select("id")
               .where(productSchemaCols.packageName, normalizedPackageName)
               .first();
             productId = existing?.id ?? existing?.ID ?? null;
+          }
+          if (!productId) {
+            const productInsert = await trx(TABLES.product)
+              .insert({ [productSchemaCols.packageName]: normalizedPackageName })
+              .returning("id");
+            productId = productInsert?.[0]?.id ?? productInsert?.[0]?.ID ?? null;
           }
           if (!productId) {
             throw new Error("Unable to resolve product id.");

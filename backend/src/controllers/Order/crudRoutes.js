@@ -48,7 +48,13 @@ const attachCrudRoutes = (router) => {
             if (variantId != null) {
                 payload[productIdCol] = variantId;
             } else if (typeof rawProduct === "string") {
-                payload[productIdCol] = rawProduct.trim() || null;
+                const trimmed = rawProduct.trim();
+                if (trimmed) {
+                    return res.status(400).json({
+                        error: "Sản phẩm không tồn tại trong hệ thống. Vui lòng chọn sản phẩm từ danh sách hoặc thêm sản phẩm mới trước khi tạo đơn.",
+                    });
+                }
+                payload[productIdCol] = null;
             } else {
                 payload[productIdCol] = Number(rawProduct) || null;
             }
