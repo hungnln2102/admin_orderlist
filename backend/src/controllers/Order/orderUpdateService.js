@@ -34,8 +34,15 @@ const updateOrderWithFinance = async ({
     }
 
     // Chuẩn hoá id_product theo config DB hiện tại:
+    // - Hỗ trợ field mới variant_id (ưu tiên nếu có).
     // - Cho phép truyền tên gói (display_name) hoặc mã số.
     // - Luôn convert sang variant_id (integer) để khớp kiểu cột id_product.
+    if (raw[productIdCol] == null && payload?.variant_id != null) {
+        const numericVariant = Number(payload.variant_id);
+        if (Number.isFinite(numericVariant) && numericVariant > 0) {
+            raw[productIdCol] = numericVariant;
+        }
+    }
     if (raw[productIdCol] != null) {
         const rawProduct = raw[productIdCol];
         const variantId = await resolveProductToVariantId(rawProduct);
@@ -103,7 +110,12 @@ const updateOrderWithFinance = async ({
             .first();
         const displayName = variant?.[PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME]
             ?? variant?.[PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME];
-        if (displayName != null) normalized.id_product = displayName;
+        // variant_id luôn là ID variant (numeric)
+        normalized.variant_id = Number(variantIdVal);
+        if (displayName != null) {
+            normalized.product_display_name = displayName;
+            normalized.id_product = displayName;
+        }
     }
     return { updated: normalized };
 };

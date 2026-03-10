@@ -40,14 +40,21 @@ const attachListRoutes = (router) => {
             }
 
             const rows = await query.select(
-                    `${table}.*`,
-                    db.raw(`${table}.order_date::text as order_date_raw`),
-                    db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
-                    // id_product trong response luôn là display_name của variant nếu có,
-                    // fallback sang giá trị gốc trong bảng orders.* (thường là variant_id).
-                    db.raw(`COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`),
-                    db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
-                );
+                `${table}.*`,
+                db.raw(`${table}.order_date::text as order_date_raw`),
+                db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
+                // variant_id: luôn là ID của variant (order_list.id_product)
+                db.raw(`${table}.${idProductCol}::text as variant_id`),
+                // product_display_name: ưu tiên display_name của variant, fallback về variant_id (text)
+                db.raw(
+                    `COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as product_display_name`
+                ),
+                // id_product (alias legacy): trỏ về product_display_name để không vỡ FE cũ
+                db.raw(
+                    `COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`
+                ),
+                db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
+            );
             const today = todayYMDInVietnam();
             const normalized = rows.map((row) =>
                 normalizeOrderRow(row, today, {

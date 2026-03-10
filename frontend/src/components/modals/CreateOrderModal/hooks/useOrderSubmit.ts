@@ -88,6 +88,8 @@ export const useOrderSubmit = ({
           (dataToSave as Record<string, unknown>).supply_id = selectedSupplyId;
         }
         if (variantId != null && Number.isFinite(variantId)) {
+          // Gửi cả variant_id (rõ nghĩa) và id_product (tương thích backend cũ)
+          (dataToSave as Record<string, unknown>).variant_id = variantId;
           (dataToSave as Record<string, unknown>).id_product = variantId;
         }
 

@@ -29,6 +29,15 @@ const attachCrudRoutes = (router) => {
         const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
         const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 
+        // Hỗ trợ variant_id mới: nếu client gửi variant_id mà payload chưa có id_product,
+        // map variant_id sang cột id_product (variant_id).
+        if (payload[productIdCol] == null && req.body?.variant_id != null) {
+            const numericVariant = Number(req.body.variant_id);
+            if (Number.isFinite(numericVariant) && numericVariant > 0) {
+                payload[productIdCol] = numericVariant;
+            }
+        }
+
         // Accept supply (name) or id_supply/supply_id (int): resolve name -> id
         if (payload.supply != null && payload.supply !== "") {
             const name = normalizeTextInput(String(payload.supply));
@@ -85,7 +94,14 @@ const attachCrudRoutes = (router) => {
                     .first();
                 const displayName = variant?.[PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME]
                     ?? variant?.[PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME];
-                if (displayName != null) normalized.id_product = displayName;
+                // variant_id luôn là ID variant (numeric)
+                normalized.variant_id = Number(variantIdVal);
+                if (displayName != null) {
+                    // product_display_name là nhãn hiển thị mới
+                    normalized.product_display_name = displayName;
+                    // id_product giữ alias legacy để FE cũ không vỡ
+                    normalized.id_product = displayName;
+                }
             }
             res.status(201).json(normalized);
             sendOrderCreatedNotification(normalized).catch((err) => {

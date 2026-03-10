@@ -169,7 +169,10 @@ export type OrderDatasetKey = "active" | "expired" | "canceled";
 export interface Order {
   id: number;
   id_order: string;
+  // id_product: alias hiển thị (display_name); backend đã trả thêm variant_id & product_display_name
   id_product: string;
+  variant_id?: number | string | null;
+  product_display_name?: string | null;
   information_order: string;
   customer: string;
   contact: string;

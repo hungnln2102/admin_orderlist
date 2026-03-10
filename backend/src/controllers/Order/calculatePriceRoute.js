@@ -52,23 +52,28 @@ const fetchVariantPricing = async (productNameOrId) => {
 const attachCalculatePriceRoute = (router) => {
     router.post("/calculate-price", async(req, res) => {
         logger.debug("[POST] /api/calculate-price");
-        const { supply_id, san_pham_name, id_product, id_order, customer_type } = req.body || {};
+        const { supply_id, san_pham_name, id_product, id_order, customer_type, variant_id } = req.body || {};
 
-        const productName = String(san_pham_name || id_product || "").trim();
         const orderId = String(id_order || "").trim();
 
-        if (!productName) {
-            return res.status(400).json({ error: "Tên sản phẩm bắt buộc." });
+        // Ưu tiên variant_id (ID variant) nếu được truyền vào; fallback về tên hiển thị (san_pham_name/id_product)
+        const hasVariantId = variant_id != null && Number.isFinite(Number(variant_id)) && Number(variant_id) > 0;
+        const productKey = hasVariantId
+            ? String(Number(variant_id))
+            : String(san_pham_name || id_product || "").trim();
+
+        if (!productKey) {
+            return res.status(400).json({ error: "Tên sản phẩm hoặc variant_id bắt buộc." });
         }
 
         try {
             const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-            const orderRow = orderId ?
-                await db(TABLES.orderList)
-                .select("id_product", "price", "cost", supplyIdCol)
-                .where({ id_order: orderId })
-                .first() :
-                null;
+            const orderRow = orderId
+                ? await db(TABLES.orderList)
+                      .select("id_product", "price", "cost", supplyIdCol)
+                      .where({ id_order: orderId })
+                      .first()
+                : null;
 
             let effectiveSupplyId = Number(supply_id);
             if (!effectiveSupplyId && orderRow?.[supplyIdCol] != null) {
@@ -79,7 +84,7 @@ const attachCalculatePriceRoute = (router) => {
                 if (s) effectiveSupplyId = s.id;
             }
 
-            const variantPricing = await fetchVariantPricing(productName);
+            const variantPricing = await fetchVariantPricing(productKey);
 
             if (!variantPricing?.variantId) {
                 return res.status(400).json({ error: "Không tìm thấy gói cho sản phẩm." });
