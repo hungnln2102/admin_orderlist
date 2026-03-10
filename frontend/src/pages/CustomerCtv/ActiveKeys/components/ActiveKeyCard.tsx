@@ -23,7 +23,7 @@ export function ActiveKeyCard({ item, index, onView, onEdit }: ActiveKeyCardProp
           </div>
           <div className="mt-3 space-y-1.5 text-sm">
             <div className="flex justify-between gap-2">
-              <span className="text-white/60 shrink-0">Tài khoản</span>
+              <span className="text-white/60 shrink-0">Mã đơn hàng</span>
               <span className="text-white/90 truncate text-right">{item.account}</span>
             </div>
             <div className="flex justify-between gap-2">

@@ -73,6 +73,11 @@ const SCHEMA_RENEW_ADOBE = pickSchema(
   process.env.SCHEMA_RENEW_ADOBE,
   "system_renew_adobe"
 );
+const SCHEMA_KEY_ACTIVE = pickSchema(
+  process.env.DB_SCHEMA_KEY_ACTIVE,
+  process.env.SCHEMA_KEY_ACTIVE,
+  "key_active"
+);
 // Bảng inputs có thể ở schema khác (vd: public) - dùng DB_SCHEMA_INPUTS nếu cần
 const SCHEMA_INPUTS = pickSchema(
   process.env.DB_SCHEMA_INPUTS,
@@ -412,6 +417,29 @@ const RENEW_ADOBE_SCHEMA = {
 };
 
 // -----------------------
+// KEY_ACTIVE SCHEMA
+// -----------------------
+const KEY_ACTIVE_SCHEMA = {
+  ORDER_AUTO_KEYS: {
+    TABLE: "order_auto_keys",
+    COLS: {
+      ORDER_CODE: "order_code",
+      AUTO_KEY: "auto_key",
+      CREATED_AT: "created_at",
+      SYSTEM_CODE: "system_code",
+    },
+  },
+  SYSTEMS: {
+    TABLE: "systems",
+    COLS: {
+      SYSTEM_CODE: "system_code",
+      SYSTEM_NAME: "system_name",
+      CREATED_AT: "created_at",
+    },
+  },
+};
+
+// -----------------------
 // PRODUCT SCHEMA
 // -----------------------
 const PRODUCT_SCHEMA = {
@@ -462,14 +490,24 @@ const PRODUCT_SCHEMA = {
       VARIANT_NAME: "variant_name",
       IS_ACTIVE: "is_active",
       DISPLAY_NAME: "display_name",
+      CREATED_AT: "created_at",
+      FORM_ID: "form_id",
       UPDATED_AT: "updated_at",
+      SHORT_DESC: "short_desc",
+      DESCRIPTION: "description",
+      RULES: "rules",
+      IMAGE_URL: "image_url",
     },
   },
+  // Alias logic cũ cho product_desc: hiện tại tất cả dữ liệu mô tả
+  // (rules, description, short_desc, image_url) đã được gộp vào bảng variant.
+  // Để tránh phải sửa quá nhiều code, cấu hình PRODUCT_DESC được trỏ sang
+  // chính bảng variant, với VARIANT_ID ánh xạ về ID.
   PRODUCT_DESC: {
-    TABLE: "product_desc",
+    TABLE: "variant",
     COLS: {
       ID: "id",
-      VARIANT_ID: "variant_id",
+      VARIANT_ID: "id", // alias: trước đây product_desc.variant_id, giờ dùng variant.id
       RULES: "rules",
       DESCRIPTION: "description",
       IMAGE_URL: "image_url",
@@ -601,6 +639,7 @@ module.exports = {
   SCHEMA_SUPPLIER,
   SCHEMA_SUPPLIER_COST,
   SCHEMA_RENEW_ADOBE,
+  SCHEMA_KEY_ACTIVE,
   NOTIFICATION_GROUP_ID,
   RENEWAL_TOPIC_ID,
   tableName,
@@ -623,4 +662,6 @@ module.exports = {
   PARTNER_SCHEMA,
   // Renew Adobe
   RENEW_ADOBE_SCHEMA,
+  // Key Active
+  KEY_ACTIVE_SCHEMA,
 };

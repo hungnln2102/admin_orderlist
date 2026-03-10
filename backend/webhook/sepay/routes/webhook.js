@@ -191,21 +191,16 @@ router.post("/", async (req, res) => {
 
     // Rule renewal: sau khi đổi trạng thái (và insert receipt), chạy gia hạn cho đơn eligible.
     // Eligible = RENEWAL / EXPIRED (khi daysLeft <= 4).
+    // Lưu ý: eligibility được tính trước khi đổi trạng thái sang PROCESSING để không bị mất điều kiện.
     // Sau khi renewal, đơn sẽ chuyển về PROCESSING (Đang Xử Lý).
     try {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
-        const state = await fetchOrderState(code);
-        if (state) {
-          const eligibility = isEligibleForRenewal(
-            state[ORDER_COLS.status],
-            state[ORDER_COLS.expiryDate]
-          );
-          if (eligibility.eligible) {
-            queueRenewalTask(code, {
-              forceRenewal: eligibility.forceRenewal,
-            });
-            await processRenewalTask(code);
-          }
+        const precomputedEligibility = eligibilityByOrderCode.get(code);
+        if (precomputedEligibility?.eligible) {
+          queueRenewalTask(code, {
+            forceRenewal: precomputedEligibility.forceRenewal,
+          });
+          await processRenewalTask(code);
         }
       }
     } catch (renewErr) {

@@ -73,7 +73,9 @@ export const VARIANT_PRICING_COLS = {
 // 8. PRODUCT_DESC (Backend: PRODUCT_DESC)
 export const PRODUCT_DESC_COLS = {
   id: "id",
-  productId: "product_id",
+  // Sau khi gộp bảng product_desc vào variant, productId
+  // trên giao diện sẽ dùng display_name của variant.
+  productId: "display_name",
   rules: "rules",
   description: "description",
   imageUrl: "image_url",
@@ -168,7 +170,8 @@ export const VARIANT_COLS = {
 
 export const PRODUCT_SCHEMA_DESC_COLS = {
   id: "id",
-  productId: "product_id",
+  // Alias mô tả sản phẩm trong schema product: sử dụng display_name của variant.
+  productId: "display_name",
   rules: "rules",
   description: "description",
   imageUrl: "image_url",
@@ -205,7 +208,8 @@ export const DB_DEFINITIONS = {
   PAYMENT_RECEIPT: "payment_receipt",
   SUPPLY: "supplier",
   SUPPLY_PRICE: "supplier_cost",
-  PRODUCT_DESC: "product_desc",
+  // Mô tả sản phẩm hiện lưu trực tiếp trên bảng variant
+  PRODUCT_DESC: "variant",
   BANK_LIST: "bank_list",
   WAREHOUSE: "product_stock",
   ACCOUNT_STORAGE: "account_storage",
@@ -218,7 +222,8 @@ export const PRODUCT_DB_DEFINITIONS = {
   CATEGORY: "category",
   PRODUCT: "product",
   VARIANT: "variant",
-  PRODUCT_DESC: "product_desc",
+  // Trước đây là bảng product_desc, hiện đã gộp vào variant
+  PRODUCT_DESC: "variant",
   PRICE_CONFIG: "price_config",
   SUPPLIER_COST: "supplier_cost",
 };

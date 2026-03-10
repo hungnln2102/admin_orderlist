@@ -4,6 +4,7 @@ import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import { API_BASE_URL } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
+import { UserOrdersTable } from "./components/UserOrdersTable";
 import { AddUserByEmail } from "./AddUserByEmail";
 
 /**
@@ -20,15 +21,18 @@ export type AdobeAdminAccount = {
   user_count: number;
   license_status: LicenseStatus;
   users_snapshot?: string | null;
+  order_code?: string | null;
+  last_checked?: string | null;
+  license_detail?: string | null;
 };
 
-/** Một user trong users_snapshot (parse từ JSON): name, email, product (có icon sản phẩm = true) */
+/** Một user trong users_snapshot (parse từ JSON): name, email, product (false = hết quyền) */
 export type SnapshotUser = {
   name: string | null;
   email: string;
   role?: string;
-  access?: string;
-  product?: boolean;
+  access?: string | boolean;
+  product?: boolean | string;
 };
 
 /** Hiển thị password dạng che (bảo mật) */
@@ -64,6 +68,9 @@ function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
     user_count: Number(row.user_count) ?? 0,
     license_status: licenseStatus,
     users_snapshot: row.users_snapshot != null ? String(row.users_snapshot) : null,
+    order_code: row.order_code != null ? String(row.order_code) : null,
+    last_checked: row.last_checked != null ? String(row.last_checked) : null,
+    license_detail: row.license_detail != null ? String(row.license_detail) : null,
   };
 }
 
@@ -85,6 +92,7 @@ export default function RenewAdobeAdmin() {
   const [error, setError] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<number | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadAccounts = useMemo(
     () => () => {
@@ -101,6 +109,25 @@ export default function RenewAdobeAdmin() {
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
+
+  const handleDeleteUser = (accountId: number, userEmail: string) => {
+    setCheckError(null);
+    const key = `acc-${accountId}-${userEmail}`;
+    setDeletingId(key);
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE_USER(accountId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userEmail }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success !== false) loadAccounts();
+        else throw new Error(data?.error ?? "Xóa thất bại");
+      })
+      .catch((err) => setCheckError(err?.message ?? "Lỗi khi xóa user."))
+      .finally(() => setDeletingId(null));
+  };
 
   const handleCheck = (acc: AdobeAdminAccount) => {
     setCheckError(null);
@@ -315,7 +342,12 @@ export default function RenewAdobeAdmin() {
         )}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        <UserOrdersTable
+          accounts={accounts}
+          onDeleteUser={handleDeleteUser}
+          deletingId={deletingId}
+        />
         <AddUserByEmail accounts={accounts} onAdded={loadAccounts} />
       </div>
     </div>
