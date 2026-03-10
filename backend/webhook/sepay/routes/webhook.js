@@ -190,7 +190,7 @@ router.post("/", async (req, res) => {
     }
 
     // Rule renewal: sau khi đổi trạng thái (và insert receipt), chạy gia hạn cho đơn eligible.
-    // Eligible = RENEWAL / EXPIRED (khi daysLeft <= 4).
+    // Eligible = RENEWAL (khi daysLeft <= 4).
     // Lưu ý: eligibility được tính trước khi đổi trạng thái sang PROCESSING để không bị mất điều kiện.
     // Sau khi renewal, đơn sẽ chuyển về PROCESSING (Đang Xử Lý).
     try {

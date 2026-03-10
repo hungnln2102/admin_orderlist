@@ -3,6 +3,8 @@ const {
   pool,
   ORDER_TABLE,
   ORDER_COLS,
+  VARIANT_TABLE,
+  VARIANT_COLS,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   SEND_RENEWAL_TO_TOPIC,
@@ -108,7 +110,38 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       };
     }
 
-    const productNormalized = normalizeProductDuration(sanPham || "");
+    // Xác định nhãn sản phẩm để đọc thời hạn:
+    // - Nếu id_product là số (ID variant), ưu tiên dùng variant.display_name (vd: NETFLIX_SLOT--1M).
+    // - Nếu không, dùng trực tiếp giá trị id_product như trước đây.
+    let productLabel = sanPham || "";
+    const numericId = Number(sanPham);
+    const isNumericId =
+      Number.isFinite(numericId) &&
+      String(numericId) === String(sanPham || "").trim();
+
+    if (isNumericId) {
+      try {
+        const variantSql = `
+          SELECT ${VARIANT_COLS.displayName} AS display_name
+          FROM ${VARIANT_TABLE}
+          WHERE ${VARIANT_COLS.id} = $1
+          LIMIT 1
+        `;
+        const variantRes = await client.query(variantSql, [numericId]);
+        const displayName = variantRes.rows[0]?.display_name;
+        if (displayName) {
+          productLabel = String(displayName);
+        }
+      } catch (lookupErr) {
+        logger.warn("[Renewal] Không thể lấy display_name từ variant, fallback id_product", {
+          orderCode,
+          idProduct: sanPham,
+          error: lookupErr.message,
+        });
+      }
+    }
+
+    const productNormalized = normalizeProductDuration(productLabel || "");
     const months = monthsFromString(productNormalized);
     if (!months) {
       return {
@@ -274,12 +307,10 @@ const isEligibleForRenewal = (statusValue, expiryDate) => {
   const statusText = String(statusValue || "");
   const daysLeft = daysUntil(expiryDate);
 
-  // Chỉ RENEWAL và EXPIRED mới eligible cho renewal
-  // PROCESSING là trạng thái SAU KHI renewal, không phải điều kiện để renewal
-  const readyForRenew =
-    daysLeft <= 4 &&
-    (statusText === ORDER_STATUS.RENEWAL ||
-      statusText === ORDER_STATUS.EXPIRED);
+  // Chỉ trạng thái Cần Gia Hạn (RENEWAL) mới được phép gia hạn tự động.
+  // PROCESSING là trạng thái SAU KHI renewal, không phải điều kiện để renewal.
+  // Hết Hạn (EXPIRED) không còn eligible trong rule mới.
+  const readyForRenew = daysLeft <= 4 && statusText === ORDER_STATUS.RENEWAL;
 
   return {
     eligible: readyForRenew,
