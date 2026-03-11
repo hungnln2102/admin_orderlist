@@ -1,0 +1,32 @@
+// backend/test-adobe.js
+const puppeteer = require("puppeteer");
+
+(async () => {
+  try {
+    console.log("[test-adobe] Launching browser...");
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-http2",
+      ],
+    });
+
+    const page = await browser.newPage();
+    console.log("[test-adobe] goto https://www.adobe.com ...");
+    await page.goto("https://www.adobe.com", {
+      waitUntil: "domcontentloaded",
+      timeout: 90000,
+    });
+
+    console.log("[test-adobe] Loaded OK. Current URL:", page.url());
+    await browser.close();
+    process.exit(0);
+  } catch (err) {
+    console.error("[test-adobe] Puppeteer test failed:", err);
+    process.exit(1);
+  }
+})();
