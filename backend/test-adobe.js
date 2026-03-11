@@ -17,8 +17,8 @@ const puppeteer = require("puppeteer");
     });
 
     const page = await browser.newPage();
-    console.log("[test-adobe] goto https://www.adobe.com ...");
-    await page.goto("https://www.adobe.com", {
+    console.log("[test-adobe] goto https://example.com ...");
+    await page.goto("https://example.com", {
       waitUntil: "domcontentloaded",
       timeout: 90000,
     });
