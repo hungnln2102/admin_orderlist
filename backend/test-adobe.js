@@ -3,9 +3,10 @@ const puppeteer = require("puppeteer");
 
 (async () => {
   try {
-    console.log("[test-adobe] Launching browser...");
+    console.log("[test-adobe] Launching browser (system Chromium)...");
     const browser = await puppeteer.launch({
       headless: true,
+      executablePath: "/usr/bin/chromium-browser",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
