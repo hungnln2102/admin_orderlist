@@ -1,145 +1,137 @@
 /**
  * Entry point cho Adobe HTTP service.
- * Interface tương thích với code cũ (RenewAdobeController).
  *
  * Luồng:
- * 1. loginViaHttp → lấy access token + cookies
+ * 1. loginViaHttp → lấy access token + cookies (Playwright nếu cần)
  * 2. getOrgId → lấy organization ID
- * 3. getProducts → check license status
- * 4. getUsers → lấy danh sách user
- * 5. addUsers / removeUser → quản lý user
+ * 3. getProducts / getUsers / addUsers / removeUser → HTTP operations
+ *
+ * Nếu saved cookies + token hợp lệ → KHÔNG mở browser.
+ * Nếu hết hạn → Playwright headless login ~15-30s → save session mới.
  */
 
 const logger = require("../../utils/logger");
 const { loginViaHttp } = require("./login");
+const { loginWithPlaywright } = require("./loginBrowser");
 const { getOrgId, getProducts, getUsers, addUsers, removeUser } = require("./adminConsole");
-const { exportCookies } = require("./httpClient");
+const { exportCookies, createHttpClient, importCookies } = require("./httpClient");
 
 /**
- * Check tài khoản Adobe: login → lấy thông tin org, products, users.
- * Trả về dữ liệu giống scrapedData cũ để RenewAdobeController không cần đổi nhiều.
- *
- * @param {string} email
- * @param {string} password
- * @param {{ savedCookies?: Array, savedCookiesFromDb?: object }} [options]
- * @returns {Promise<{ success: boolean, scrapedData: object|null, savedCookies: object|null, error?: string }>}
+ * Login + lấy org ID. Nếu fast path (saved cookies) thất bại → fallback Playwright.
+ * @returns {{ client, jar, accessToken, orgId }}
  */
-async function checkAccount(email, password, options = {}) {
+async function loginAndGetOrg(email, password, options = {}) {
   const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
+  const savedAccessToken = options.savedCookiesFromDb?.accessToken || null;
   const mailBackupId = options.mailBackupId || null;
 
-  logger.info("[adobe-http] checkAccount bắt đầu: %s", email);
-
-  const loginResult = await loginViaHttp(email, password, { savedCookies, mailBackupId });
+  const loginResult = await loginViaHttp(email, password, {
+    savedCookies,
+    savedAccessToken,
+    mailBackupId,
+  });
 
   if (!loginResult.success) {
-    logger.warn("[adobe-http] Login thất bại: %s", loginResult.error);
-    return {
-      success: false,
-      scrapedData: null,
-      savedCookies: null,
-      error: loginResult.error,
-      loginResults: loginResult.results,
-    };
+    throw new Error(loginResult.error || "Login thất bại");
   }
 
-  const { client, jar, accessToken } = loginResult;
+  let { client, jar, accessToken } = loginResult;
 
-  const orgId = await getOrgId(client);
-  const productInfo = await getProducts(client, orgId, accessToken);
-  const users = await getUsers(client, orgId, accessToken);
+  // Thử lấy org ID
+  let orgId = await getOrgId(client, accessToken);
 
-  const manageTeamMembers = users.map((u) => ({
-    name: u.name,
-    email: u.email || "",
-    product: !!u.product,
-  }));
+  // Nếu không có org ID hoặc không có token → cookies hết hạn thực tế → Playwright login
+  if (!orgId || !accessToken) {
+    logger.info("[adobe-http] Org=%s, token=%s → cần Playwright login để lấy session mới",
+      orgId || "null", accessToken ? "có" : "null");
 
-  const scrapedData = {
-    orgName: null,
-    userCount: users.length,
-    licenseStatus: productInfo.licenseStatus,
-    adobe_org_id: orgId,
-    profileName: null,
-    manageTeamMembers,
-    adminConsoleUsers: users,
-  };
+    const browserResult = await loginWithPlaywright(email, password, { savedCookies, mailBackupId });
+    if (!browserResult.success) {
+      throw new Error(browserResult.error || "Playwright login thất bại");
+    }
 
-  const cookies = exportCookies(jar);
+    // Tạo HTTP client mới với cookies từ browser
+    const fresh = createHttpClient();
+    client = fresh.client;
+    jar = fresh.jar;
+    await importCookies(jar, browserResult.cookies);
+    accessToken = browserResult.accessToken;
 
-  logger.info("[adobe-http] checkAccount xong: org=%s, users=%s, license=%s",
-    orgId, users.length, productInfo.licenseStatus);
+    // Thử lại lấy org ID
+    orgId = await getOrgId(client, accessToken);
+    if (!orgId) {
+      throw new Error("Không lấy được org ID ngay cả sau Playwright login");
+    }
+  }
 
-  return { success: true, scrapedData, savedCookies: cookies };
+  return { client, jar, accessToken, orgId };
+}
+
+/**
+ * Check tài khoản Adobe: login → org → products → users.
+ */
+async function checkAccount(email, password, options = {}) {
+  logger.info("[adobe-http] checkAccount bắt đầu: %s", email);
+
+  try {
+    const { client, jar, accessToken, orgId } = await loginAndGetOrg(email, password, options);
+
+    const productInfo = await getProducts(client, orgId, accessToken);
+    const users = await getUsers(client, orgId, accessToken);
+
+    const manageTeamMembers = users.map((u) => ({
+      name: u.name,
+      email: u.email || "",
+      product: !!u.product,
+    }));
+
+    const scrapedData = {
+      orgName: null,
+      userCount: users.length,
+      licenseStatus: productInfo.licenseStatus,
+      adobe_org_id: orgId,
+      profileName: null,
+      manageTeamMembers,
+      adminConsoleUsers: users,
+    };
+
+    // Save cookies + access token cùng nhau
+    const savedCookies = exportCookies(jar);
+    savedCookies.accessToken = accessToken;
+
+    logger.info("[adobe-http] checkAccount xong: org=%s, users=%s, license=%s",
+      orgId, users.length, productInfo.licenseStatus);
+
+    return { success: true, scrapedData, savedCookies };
+  } catch (err) {
+    logger.warn("[adobe-http] checkAccount lỗi: %s", err.message);
+    return { success: false, scrapedData: null, savedCookies: null, error: err.message };
+  }
 }
 
 /**
  * Thêm user vào tài khoản Adobe.
- * @param {string} email - Email tài khoản admin
- * @param {string} password
- * @param {string[]} userEmails - Danh sách email user cần thêm
- * @param {{ savedCookies?: Array, savedCookiesFromDb?: object }} [options]
  */
 async function addUserToAccount(email, password, userEmails, options = {}) {
-  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
-  const mailBackupId = options.mailBackupId || null;
-  const loginResult = await loginViaHttp(email, password, { savedCookies, mailBackupId });
-
-  if (!loginResult.success) {
-    throw new Error(`Login thất bại: ${loginResult.error}`);
-  }
-
-  const { client, accessToken } = loginResult;
-  const orgId = await getOrgId(client);
-  if (!orgId) throw new Error("Không lấy được org ID");
+  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
   if (!accessToken) throw new Error("Không có access token để gọi API add user");
-
   return addUsers(client, orgId, accessToken, userEmails);
 }
 
 /**
  * Xóa user khỏi tài khoản Adobe.
- * @param {string} email - Email tài khoản admin
- * @param {string} password
- * @param {string} userEmail - Email user cần xóa
- * @param {{ savedCookies?: Array, savedCookiesFromDb?: object }} [options]
  */
 async function removeUserFromAccount(email, password, userEmail, options = {}) {
-  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
-  const mailBackupId = options.mailBackupId || null;
-  const loginResult = await loginViaHttp(email, password, { savedCookies, mailBackupId });
-
-  if (!loginResult.success) {
-    throw new Error(`Login thất bại: ${loginResult.error}`);
-  }
-
-  const { client, accessToken } = loginResult;
-  const orgId = await getOrgId(client);
-  if (!orgId) throw new Error("Không lấy được org ID");
+  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
   if (!accessToken) throw new Error("Không có access token để gọi API remove user");
-
   return removeUser(client, orgId, accessToken, userEmail);
 }
 
 /**
  * Xóa nhiều user (auto-delete flow).
- * @param {string} email
- * @param {string} password
- * @param {string[]} userEmails
- * @param {{ savedCookies?: Array, savedCookiesFromDb?: object }} [options]
  */
 async function autoDeleteUsers(email, password, userEmails, options = {}) {
-  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
-  const mailBackupId = options.mailBackupId || null;
-  const loginResult = await loginViaHttp(email, password, { savedCookies, mailBackupId });
-
-  if (!loginResult.success) {
-    throw new Error(`Login thất bại: ${loginResult.error}`);
-  }
-
-  const { client, accessToken } = loginResult;
-  const orgId = await getOrgId(client);
-  if (!orgId) throw new Error("Không lấy được org ID");
+  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
   if (!accessToken) throw new Error("Không có access token");
 
   const deleted = [];
@@ -148,11 +140,8 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
   for (const ue of userEmails) {
     try {
       const result = await removeUser(client, orgId, accessToken, ue);
-      if (result.success) {
-        deleted.push(ue);
-      } else {
-        failed.push(ue);
-      }
+      if (result.success) { deleted.push(ue); }
+      else { failed.push(ue); }
     } catch (e) {
       logger.warn("[adobe-http] Delete user %s failed: %s", ue, e.message);
       failed.push(ue);

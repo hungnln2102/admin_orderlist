@@ -1,10 +1,7 @@
 /**
  * Login Adobe — strategy:
- * 1. Fast path: nếu có saved cookies → import vào HTTP client → test session
- * 2. Slow path: nếu cookies hết hạn → Playwright headless login → lấy cookies mới
- *
- * Browser chỉ mở khi cần login (~15-30s), sau đó đóng ngay.
- * Tất cả operations sau login đều dùng HTTP (axios + tough-cookie).
+ * 1. Fast path: có saved cookies + token → import HTTP client → test session
+ * 2. Slow path: cookies hết hạn → Playwright headless login → lấy cookies mới
  */
 
 const logger = require("../../utils/logger");
@@ -13,9 +10,8 @@ const { loginWithPlaywright } = require("./loginBrowser");
 const { ADMIN_CONSOLE_BASE } = require("./constants");
 
 /**
- * Test session cookies bằng cách gọi Admin Console.
+ * Test saved cookies bằng cách gọi Admin Console.
  * Nếu redirect về login → session hết hạn.
- * @returns {{ valid: boolean, accessToken?: string }}
  */
 async function testSessionValid(client) {
   try {
@@ -31,7 +27,7 @@ async function testSessionValid(client) {
       return { valid: false };
     }
 
-    if (finalUrl.includes("@AdobeOrg") || finalUrl.includes("adminconsole.adobe.com")) {
+    if (finalUrl.includes("adminconsole.adobe.com")) {
       return { valid: true };
     }
 
@@ -46,13 +42,12 @@ async function testSessionValid(client) {
  *
  * @param {string} email
  * @param {string} password
- * @param {{ savedCookies?: Array, mailBackupId?: number|null }} [options]
- * @returns {Promise<{ success: boolean, client?, jar?, accessToken?, error? }>}
+ * @param {{ savedCookies?: Array, savedAccessToken?: string, mailBackupId?: number|null }} [options]
  */
 async function loginViaHttp(email, password, options = {}) {
-  const { savedCookies = [], mailBackupId = null } = options;
+  const { savedCookies = [], savedAccessToken = null, mailBackupId = null } = options;
 
-  // ── Fast path: thử saved cookies ──
+  // ── Fast path: thử saved cookies + token ──
   if (savedCookies.length > 0) {
     logger.info("[adobe-http] Thử session từ %d saved cookies...", savedCookies.length);
     const { client, jar } = createHttpClient();
@@ -60,8 +55,8 @@ async function loginViaHttp(email, password, options = {}) {
 
     const test = await testSessionValid(client);
     if (test.valid) {
-      logger.info("[adobe-http] Session cookies hợp lệ — bỏ qua browser");
-      return { success: true, client, jar, accessToken: test.accessToken || null };
+      logger.info("[adobe-http] Session cookies hợp lệ — bỏ qua browser (savedToken=%s)", savedAccessToken ? "có" : "null");
+      return { success: true, client, jar, accessToken: savedAccessToken };
     }
     logger.info("[adobe-http] Session hết hạn, cần Playwright login...");
   }
@@ -76,11 +71,10 @@ async function loginViaHttp(email, password, options = {}) {
     return { success: false, error: browserResult.error, client: null, jar: null };
   }
 
-  // Import cookies từ browser vào HTTP client mới
   const { client, jar } = createHttpClient();
   await importCookies(jar, browserResult.cookies);
 
-  logger.info("[adobe-http] Playwright login xong — HTTP client đã có session (%d cookies, hasToken=%s)",
+  logger.info("[adobe-http] Playwright login xong — %d cookies, hasToken=%s",
     browserResult.cookies.length, !!browserResult.accessToken);
 
   return {

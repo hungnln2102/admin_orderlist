@@ -10,48 +10,102 @@
  */
 
 const logger = require("../../utils/logger");
-const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API } = require("./constants");
+const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE } = require("./constants");
 
 /**
- * Lấy org ID từ Admin Console homepage (redirect chứa @AdobeOrg).
- * @param {import('axios').AxiosInstance} client - Client đã có cookies login
- * @returns {Promise<string|null>} orgId
+ * Lấy org ID bằng nhiều chiến lược:
+ * 1. Parse từ Admin Console redirect URL
+ * 2. Parse từ HTML response
+ * 3. Gọi JIL API /organizations
+ * 4. Gọi IMS profile
  */
-async function getOrgId(client) {
-  logger.info("[adobe-http] Lấy org ID từ Admin Console...");
-  const res = await client.get(`${ADMIN_CONSOLE_BASE}/`, {
-    maxRedirects: 5,
-    headers: { Accept: "text/html" },
-  });
+async function getOrgId(client, accessToken) {
+  logger.info("[adobe-http] Lấy org ID...");
 
-  const finalUrl = res.request?.res?.responseUrl || res.config?.url || "";
-  const orgMatch = finalUrl.match(/\/([A-Fa-f0-9]+)@AdobeOrg/);
-  if (orgMatch) {
-    logger.info("[adobe-http] Org ID: %s", orgMatch[1]);
-    return orgMatch[1];
+  // Strategy 1: Admin Console redirect URL
+  try {
+    const res = await client.get(`${ADMIN_CONSOLE_BASE}/`, {
+      maxRedirects: 5,
+      timeout: 15000,
+      headers: { Accept: "text/html" },
+    });
+    const finalUrl = res.request?.res?.responseUrl || res.config?.url || "";
+    const orgMatch = finalUrl.match(/\/([A-Fa-f0-9]+)@AdobeOrg/);
+    if (orgMatch) {
+      logger.info("[adobe-http] Org ID (redirect URL): %s", orgMatch[1]);
+      return orgMatch[1];
+    }
+
+    const html = typeof res.data === "string" ? res.data : "";
+    const htmlMatch = html.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
+    if (htmlMatch) {
+      logger.info("[adobe-http] Org ID (HTML): %s", htmlMatch[1]);
+      return htmlMatch[1];
+    }
+  } catch (e) {
+    logger.debug("[adobe-http] getOrgId strategy 1 error: %s", e.message);
   }
 
-  const html = typeof res.data === "string" ? res.data : "";
-  const htmlMatch = html.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
-  if (htmlMatch) {
-    logger.info("[adobe-http] Org ID (from HTML): %s", htmlMatch[1]);
-    return htmlMatch[1];
+  // Strategy 2: JIL API organizations list (cần Bearer token)
+  if (accessToken) {
+    try {
+      const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
+        timeout: 15000,
+        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.status === 200 && res.data) {
+        const orgs = Array.isArray(res.data) ? res.data : [res.data];
+        for (const org of orgs) {
+          const id = org.orgId || org.id || org.orgRef;
+          if (id) {
+            const clean = String(id).replace(/@AdobeOrg$/, "");
+            logger.info("[adobe-http] Org ID (JIL API): %s", clean);
+            return clean;
+          }
+        }
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] getOrgId JIL API error: %s", e.message);
+    }
   }
 
-  logger.warn("[adobe-http] Không tìm được org ID. Final URL: %s", finalUrl.slice(0, 100));
+  // Strategy 3: IMS profile (cần Bearer token)
+  if (accessToken) {
+    try {
+      const res = await client.get(`${ADOBE_IMS_BASE}/ims/profile/v1`, {
+        timeout: 10000,
+        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.status === 200 && res.data) {
+        const body = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+        const m = body.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
+        if (m) {
+          logger.info("[adobe-http] Org ID (IMS profile): %s", m[1]);
+          return m[1];
+        }
+        const projOrg = res.data.projectedProductContext?.[0]?.prodCtx?.ownedBy;
+        if (projOrg) {
+          const clean = String(projOrg).replace(/@AdobeOrg$/, "");
+          logger.info("[adobe-http] Org ID (IMS projectedProductContext): %s", clean);
+          return clean;
+        }
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] getOrgId IMS profile error: %s", e.message);
+    }
+  }
+
+  logger.warn("[adobe-http] Không tìm được org ID qua bất kỳ strategy nào");
   return null;
 }
 
 /**
- * Lấy danh sách products qua JIL API (internal Admin Console API).
- * @param {import('axios').AxiosInstance} client
- * @param {string} orgId
- * @param {string} [accessToken]
- * @returns {Promise<{ hasPlan: boolean, licenseStatus: string, products: Array }>}
+ * Lấy danh sách products.
  */
 async function getProducts(client, orgId, accessToken) {
-  logger.info("[adobe-http] Lấy products cho org %s...", orgId);
+  if (!orgId) return { hasPlan: false, licenseStatus: "unknown", products: [] };
 
+  logger.info("[adobe-http] Lấy products cho org %s...", orgId);
   const headers = { Accept: "application/json" };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
@@ -73,13 +127,8 @@ async function getProducts(client, orgId, accessToken) {
           licenseQuota: p.licenseQuota || p.adminQuantity || 0,
           userCount: p.userCount || p.provisionedQuantity || 0,
         }));
-
         const hasPlan = products.length > 0 && products.some((p) => (p.licenseQuota || 0) > 0);
-        return {
-          hasPlan,
-          licenseStatus: hasPlan ? "Paid" : "Expired",
-          products,
-        };
+        return { hasPlan, licenseStatus: hasPlan ? "Paid" : "Expired", products };
       }
     } catch (e) {
       logger.debug("[adobe-http] Products endpoint %s error: %s", url, e.message);
@@ -91,14 +140,11 @@ async function getProducts(client, orgId, accessToken) {
 
 /**
  * Lấy danh sách users.
- * @param {import('axios').AxiosInstance} client
- * @param {string} orgId
- * @param {string} [accessToken]
- * @returns {Promise<Array<{ name: string|null, email: string, product: boolean }>>}
  */
 async function getUsers(client, orgId, accessToken) {
-  logger.info("[adobe-http] Lấy users cho org %s...", orgId);
+  if (!orgId) return [];
 
+  logger.info("[adobe-http] Lấy users cho org %s...", orgId);
   const headers = { Accept: "application/json" };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
@@ -117,7 +163,7 @@ async function getUsers(client, orgId, accessToken) {
           ? res.data
           : res.data.users || res.data.items || res.data.resources || [];
         return data.map((u) => ({
-          name: u.name || u.firstName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : null,
+          name: u.name || (u.firstName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : null),
           email: u.email || u.username || "",
           product: !!(u.products?.length || u.groups?.length || u.adminRoles?.length),
         }));
@@ -132,11 +178,6 @@ async function getUsers(client, orgId, accessToken) {
 
 /**
  * Thêm user vào org (qua User Management Action API).
- * @param {import('axios').AxiosInstance} client
- * @param {string} orgId
- * @param {string} accessToken
- * @param {string[]} emails
- * @returns {Promise<{ success: boolean, added: string[], failed: string[] }>}
  */
 async function addUsers(client, orgId, accessToken, emails) {
   logger.info("[adobe-http] Thêm %s users vào org %s...", emails.length, orgId);
@@ -182,11 +223,6 @@ async function addUsers(client, orgId, accessToken, emails) {
 
 /**
  * Xóa user khỏi org.
- * @param {import('axios').AxiosInstance} client
- * @param {string} orgId
- * @param {string} accessToken
- * @param {string} email
- * @returns {Promise<{ success: boolean }>}
  */
 async function removeUser(client, orgId, accessToken, email) {
   logger.info("[adobe-http] Xóa user %s khỏi org %s...", email, orgId);
