@@ -1,19 +1,11 @@
-FROM node:20-alpine AS base
+FROM ghcr.io/puppeteer/puppeteer:latest
 
-# Cài đặt postgresql-client (pg_dump) và Chromium cho Puppeteer (Renew Adobe)
-RUN apk add --no-cache \
-    postgresql-client \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    fontconfig \
-    ttf-freefont
-
-# Dùng Chromium của hệ thống thay vì tải qua Puppeteer (tránh ENOENT trong container)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Cài đặt postgresql-client (pg_dump) cho backup DB
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
+USER pptruser
 
 WORKDIR /app
 
