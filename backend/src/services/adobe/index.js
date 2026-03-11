@@ -145,7 +145,9 @@ async function getAdobeUserToken(email, password, options = {}) {
 
     const currentUrl = page.url() || "";
     const isOnAdobeOrg = currentUrl.indexOf("@AdobeOrg") !== -1;
-    const isOnAdobeCom = /^https?:\/\/(www\.)?adobe\.com(\/|$)/i.test(currentUrl);
+    const isOnAdobeCom =
+      /^https?:\/\/([a-z0-9-]+\.)*adobe\.com/i.test(currentUrl) &&
+      currentUrl.indexOf("auth.services") === -1;
 
     if (isOnAdobeOrg) {
       await new Promise((r) => setTimeout(r, 2500));
