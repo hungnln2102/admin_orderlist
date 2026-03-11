@@ -35,33 +35,31 @@ async function loginAndGetOrg(email, password, options = {}) {
     throw new Error(loginResult.error || "Login thất bại");
   }
 
-  let { client, jar, accessToken } = loginResult;
+  let { client, jar, accessToken, usedBrowser } = loginResult;
 
-  // Thử lấy org ID
   let orgId = await getOrgId(client, accessToken);
 
-  // Nếu không có org ID hoặc không có token → cookies hết hạn thực tế → Playwright login
-  if (!orgId || !accessToken) {
-    logger.info("[adobe-http] Org=%s, token=%s → cần Playwright login để lấy session mới",
-      orgId || "null", accessToken ? "có" : "null");
+  // Chỉ retry Playwright nếu chưa dùng browser (fast path thất bại lấy org)
+  if (!orgId && !usedBrowser) {
+    logger.info("[adobe-http] Org=%s → fast path không lấy được org, chuyển Playwright...",
+      orgId || "null");
 
     const browserResult = await loginWithPlaywright(email, password, { savedCookies, mailBackupId });
     if (!browserResult.success) {
       throw new Error(browserResult.error || "Playwright login thất bại");
     }
 
-    // Tạo HTTP client mới với cookies từ browser
     const fresh = createHttpClient();
     client = fresh.client;
     jar = fresh.jar;
     await importCookies(jar, browserResult.cookies);
     accessToken = browserResult.accessToken;
 
-    // Thử lại lấy org ID
     orgId = await getOrgId(client, accessToken);
-    if (!orgId) {
-      throw new Error("Không lấy được org ID ngay cả sau Playwright login");
-    }
+  }
+
+  if (!orgId) {
+    throw new Error("Không lấy được org ID sau tất cả strategies");
   }
 
   return { client, jar, accessToken, orgId };

@@ -1,67 +1,67 @@
 /**
  * Login Adobe — strategy:
- * 1. Fast path: có saved cookies + token → import HTTP client → test session
- * 2. Slow path: cookies hết hạn → Playwright headless login → lấy cookies mới
+ * 1. Fast path: có saved cookies + token → thử API call thực
+ * 2. Slow path: cookies/token hết hạn → Playwright headless login
  */
 
 const logger = require("../../utils/logger");
 const { createHttpClient, importCookies } = require("./httpClient");
 const { loginWithPlaywright } = require("./loginBrowser");
-const { ADMIN_CONSOLE_BASE } = require("./constants");
+const { ADMIN_CONSOLE_API_BASE } = require("./constants");
 
 /**
- * Test saved cookies bằng cách gọi Admin Console.
- * Nếu redirect về login → session hết hạn.
+ * Test session bằng API call thực (không phải URL check).
+ * SPA Admin Console luôn trả 200 (shell HTML) nên URL check không đáng tin.
  */
-async function testSessionValid(client) {
+async function testSessionValid(client, savedAccessToken) {
+  if (!savedAccessToken) {
+    logger.info("[adobe-http] Không có saved token → cần login");
+    return { valid: false };
+  }
+
   try {
-    const res = await client.get(`${ADMIN_CONSOLE_BASE}/`, {
-      maxRedirects: 5,
-      timeout: 15000,
-      headers: { Accept: "text/html" },
+    const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
+      timeout: 10000,
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${savedAccessToken}`,
+      },
     });
 
-    const finalUrl = res.request?.res?.responseUrl || res.config?.url || "";
-
-    if (finalUrl.includes("auth.services.adobe.com") || finalUrl.includes("adobelogin.com")) {
-      return { valid: false };
-    }
-
-    if (finalUrl.includes("adminconsole.adobe.com")) {
+    if (res.status === 200 && res.data) {
+      logger.info("[adobe-http] Token vẫn hợp lệ (JIL API 200)");
       return { valid: true };
     }
 
+    logger.info("[adobe-http] Token hết hạn (JIL API status=%s)", res.status);
     return { valid: false };
-  } catch (_) {
+  } catch (e) {
+    logger.info("[adobe-http] Token hết hạn (error: %s)", e.message);
     return { valid: false };
   }
 }
 
 /**
  * Login Adobe — trả về HTTP client đã có session.
- *
- * @param {string} email
- * @param {string} password
- * @param {{ savedCookies?: Array, savedAccessToken?: string, mailBackupId?: number|null }} [options]
  */
 async function loginViaHttp(email, password, options = {}) {
   const { savedCookies = [], savedAccessToken = null, mailBackupId = null } = options;
 
-  // ── Fast path: thử saved cookies + token ──
-  if (savedCookies.length > 0) {
-    logger.info("[adobe-http] Thử session từ %d saved cookies...", savedCookies.length);
+  // ── Fast path: thử saved token với API call thực ──
+  if (savedCookies.length > 0 && savedAccessToken) {
+    logger.info("[adobe-http] Thử saved token + %d cookies...", savedCookies.length);
     const { client, jar } = createHttpClient();
     await importCookies(jar, savedCookies);
 
-    const test = await testSessionValid(client);
+    const test = await testSessionValid(client, savedAccessToken);
     if (test.valid) {
-      logger.info("[adobe-http] Session cookies hợp lệ — bỏ qua browser (savedToken=%s)", savedAccessToken ? "có" : "null");
-      return { success: true, client, jar, accessToken: savedAccessToken };
+      logger.info("[adobe-http] Session hợp lệ — bỏ qua browser hoàn toàn");
+      return { success: true, client, jar, accessToken: savedAccessToken, usedBrowser: false };
     }
-    logger.info("[adobe-http] Session hết hạn, cần Playwright login...");
   }
 
-  // ── Slow path: Playwright login ──
+  // ── Slow path: Playwright login (truyền cookies để thử cookie-login trước form) ──
+  logger.info("[adobe-http] Cần Playwright login...");
   const browserResult = await loginWithPlaywright(email, password, {
     savedCookies,
     mailBackupId,
@@ -74,7 +74,7 @@ async function loginViaHttp(email, password, options = {}) {
   const { client, jar } = createHttpClient();
   await importCookies(jar, browserResult.cookies);
 
-  logger.info("[adobe-http] Playwright login xong — %d cookies, hasToken=%s",
+  logger.info("[adobe-http] Playwright xong — %d cookies, hasToken=%s",
     browserResult.cookies.length, !!browserResult.accessToken);
 
   return {
@@ -82,6 +82,7 @@ async function loginViaHttp(email, password, options = {}) {
     client,
     jar,
     accessToken: browserResult.accessToken,
+    usedBrowser: true,
   };
 }
 

@@ -60,17 +60,36 @@ async function loginWithPlaywright(email, password, options = {}) {
       const pwCookies = toPwCookies(savedCookies);
       if (pwCookies.length > 0) {
         await context.addCookies(pwCookies);
-        logger.info("[adobe-login] Import %d cookies, test session...", pwCookies.length);
-        await page.goto("https://adminconsole.adobe.com/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-        await page.waitForTimeout(4000);
-        const url = page.url();
-        if (url.includes("@AdobeOrg") || (url.includes("adminconsole.adobe.com") && !url.includes("auth.services"))) {
-          logger.info("[adobe-login] Session cookies hợp lệ, bỏ qua form login");
+        logger.info("[adobe-login] Import %d cookies, cookie-login...", pwCookies.length);
+
+        await page.goto("https://adminconsole.adobe.com/", {
+          waitUntil: "networkidle",
+          timeout: 45000,
+        }).catch(() => {});
+
+        await page.waitForTimeout(3000);
+        const url1 = page.url();
+
+        if (url1.includes("auth.services") || url1.includes("adobelogin.com")) {
+          logger.info("[adobe-login] Cookies hết hạn (redirect → login page)");
+        } else {
+          // Vẫn ở Admin Console → cookies hợp lệ, đợi SPA route xong
+          try {
+            await page.waitForFunction(
+              () => window.location.href.includes("@AdobeOrg"),
+              { timeout: 15000 }
+            );
+          } catch (_) {
+            logger.info("[adobe-login] SPA chưa route tới @AdobeOrg, vẫn thử extract token...");
+          }
+
           if (!accessToken) accessToken = await extractTokenFromPage(page);
+          const finalUrl = page.url();
+          logger.info("[adobe-login] Cookie-login OK — url=%s, hasToken=%s", finalUrl, !!accessToken);
+
           const cookies = await context.cookies();
           return { success: true, cookies: fromPwCookies(cookies), accessToken };
         }
-        logger.info("[adobe-login] Cookies hết hạn, login form...");
       }
     }
 
@@ -423,8 +442,10 @@ async function extractTokenFromPage(page) {
 // ────────────────── Cookie format conversion ──────────────────
 
 function toPwCookies(cookies) {
+  const now = Math.floor(Date.now() / 1000);
   return cookies
     .filter((c) => c.name && c.domain)
+    .filter((c) => !c.expirationDate || c.expirationDate > now)
     .map((c) => ({
       name: c.name,
       value: c.value || "",
