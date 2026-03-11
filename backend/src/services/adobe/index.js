@@ -53,10 +53,19 @@ function getPuppeteerLaunchOptions() {
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--disable-http2", // Tránh net::ERR_HTTP2_PROTOCOL_ERROR khi load adobe.com
+      "--disable-http2",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--disable-translate",
+      "--metrics-recording-only",
+      "--no-first-run",
+      "--safebrowsing-disable-auto-update",
     ],
-    defaultViewport: null,
-    slowMo: headless ? 50 : 120, // Chậm hơn khi mở browser để dễ xem từng bước
+    defaultViewport: { width: 1280, height: 720 },
+    slowMo: headless ? 30 : 120,
+    protocolTimeout: 180000,
   };
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     opts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
@@ -157,6 +166,7 @@ async function getAdobeUserToken(email, password, options = {}) {
         needAccountProfile,
         deleteUserEmail,
         needUrlAccess,
+        hasExistingCookies: savedCookiesFromDb.length > 0,
       });
     } else {
       throw new Error("Sau login không ở adobe.com hay @AdobeOrg.");
@@ -201,7 +211,7 @@ async function getAdobeUserToken(email, password, options = {}) {
  * Page đã đăng nhập (adobe.com). Kiểm tra có sản phẩm trên trang /products (tiện hơn Overview).
  */
 async function runAdminConsoleFlow(page, opts = {}) {
-  const { needAccountProfile, deleteUserEmail, needUrlAccess } = opts;
+  const { needAccountProfile, deleteUserEmail, needUrlAccess, hasExistingCookies } = opts;
   let profileName = null;
 
   if (needAccountProfile) {
@@ -234,12 +244,14 @@ async function runAdminConsoleFlow(page, opts = {}) {
     product: !!u.product,
   }));
 
-  // Xóa product: từ trang /users bấm "Quản trị viên" → vào administrators → B0–B4 (chạy trước url_access)
-  if (productInfo.hasPlan) {
+  // Xóa product: chỉ chạy lần đầu (alert_config chưa có giá trị)
+  if (hasExistingCookies) {
+    logger.info("[adobe] Bỏ qua deleteProduct: đã chạy trước đó (alert_config có giá trị)");
+  } else {
     try {
       const deleteResult = await runDeleteProduct(page);
       if (deleteResult.skipped) {
-        logger.info("[adobe] deleteProduct đã bỏ qua");
+        logger.info("[adobe] deleteProduct đã bỏ qua (không có product để xóa)");
       } else {
         logger.info("[adobe] Đã chạy flow delete product xong");
       }

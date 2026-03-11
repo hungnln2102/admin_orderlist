@@ -1,10 +1,8 @@
 /**
- * Re-export Adobe check service từ module adobe (đã tách thành các component nhỏ).
- * Giữ tên file để không phá require() từ RenewAdobeController và scripts.
+ * Re-export Adobe check service (HTTP-only, không dùng Puppeteer).
  */
-
-const { getAdobeUserToken } = require("./adobe");
+const adobeHttp = require("./adobe-http");
 
 module.exports = {
-  getAdobeUserToken,
+  adobeHttp,
 };

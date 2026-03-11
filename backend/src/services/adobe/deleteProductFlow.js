@@ -226,7 +226,14 @@ async function runDeleteProduct(page, opts = {}) {
   await clickOpenUserDetail(page, userEmail);
   await clickMoreActions(page);
   await clickEditProducts(page);
+
+  // B3: nếu không có product nào để xóa → bỏ qua Save
   const removed = await clickRemoveProduct(page);
+  if (!removed) {
+    logger.info("[adobe] deleteProduct: không có product gán cho user → bỏ qua");
+    return { removed: false, skipped: true };
+  }
+
   await clickSave(page);
   return { removed };
 }

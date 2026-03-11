@@ -1,4 +1,3 @@
-const path = require("path");
 const { db } = require("../../db");
 const {
   SCHEMA_RENEW_ADOBE,
@@ -6,24 +5,14 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
-const { getAdobeUserToken } = require("../../services/adobeCheckService");
-const { runWithQueue, getQueueStatus } = require("../../services/adobe/adobeCheckQueue");
-const { autoDeleteFlow, addUserFlow } = require("../../services/adobe");
-
-/** Đường dẫn file cookie theo account (lưu sau login lần đầu, dùng lại lần sau). Có thể tắt bằng env ADOBE_SAVE_COOKIES=false. */
-function getCookiesPathForAccount(accountId) {
-  if (process.env.ADOBE_SAVE_COOKIES === "false" || process.env.ADOBE_SAVE_COOKIES === "0") return null;
-  return path.join(process.cwd(), "cookies", `adobe_account_${accountId}.json`);
-}
+const adobeHttp = require("../../services/adobe-http");
 
 const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = TABLE_DEF.COLS;
 
-/** Giới hạn user mỗi tài khoản Admin Console (10 slot + 1 chủ = 11). */
 const MAX_USERS_PER_ACCOUNT = 11;
 
-/** Các cột cần kiểm tra trống (khớp bảng accounts hiện tại), trừ id */
 const CHECK_EMPTY_COLS = [
   COLS.EMAIL,
   COLS.PASSWORD_ENC,
@@ -37,37 +26,24 @@ const CHECK_EMPTY_COLS = [
   COLS.CREATED_AT,
 ];
 
-/**
- * Kiểm tra giá trị có được coi là trống không (theo doc).
- * - text: null, undefined, hoặc chuỗi rỗng/whitespace
- * - number: null, undefined (0 coi là có giá trị)
- * - boolean: null, undefined (false coi là có giá trị)
- * - date: null, undefined
- */
-function isValueEmpty(value, colName) {
+function isValueEmpty(value) {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return String(value).trim() === "";
-  if (typeof value === "number") return false; // 0 vẫn coi là có giá trị
-  if (typeof value === "boolean") return false; // false vẫn coi là có giá trị
+  if (typeof value === "number") return false;
+  if (typeof value === "boolean") return false;
   if (value instanceof Date) return false;
   return true;
 }
 
-/** Trả về mảng tên cột đang trống của một row */
 function getEmptyFields(row) {
   const empty = [];
   for (const col of CHECK_EMPTY_COLS) {
-    const val = row[col];
-    if (isValueEmpty(val, col)) empty.push(col);
+    if (isValueEmpty(row[col])) empty.push(col);
   }
   return empty;
 }
 
-/**
- * GET /api/renew-adobe/accounts
- * Danh sách account từ system_renew_adobe.accounts, kèm kiểm tra cột trống (theo docs/Renew_Adobe_Overview.md).
- * Mỗi item có thêm empty_fields: string[] (các cột đang trống).
- */
+/** GET /api/renew-adobe/accounts */
 const listAccounts = async (_req, res) => {
   try {
     const rows = await db(TABLE)
@@ -88,55 +64,32 @@ const listAccounts = async (_req, res) => {
       )
       .orderBy(COLS.ID, "asc");
 
-    const withEmptyCheck = rows.map((row) => {
-      const empty_fields = getEmptyFields(row);
-      return { ...row, empty_fields };
-    });
+    const withEmptyCheck = rows.map((row) => ({
+      ...row,
+      empty_fields: getEmptyFields(row),
+    }));
 
-    console.log("[renew-adobe] listAccounts – số bản ghi:", rows.length);
-    console.log("[renew-adobe] listAccounts – dữ liệu trả về (có empty_fields):", JSON.stringify(withEmptyCheck, null, 2));
-    logger.info("[renew-adobe] List accounts + check empty", {
-      total: withEmptyCheck.length,
-      sample: withEmptyCheck.slice(0, 2).map((r) => ({ id: r.id, email: r.email, empty_fields: r.empty_fields })),
-    });
-
+    logger.info("[renew-adobe] List accounts", { total: withEmptyCheck.length });
     res.json(withEmptyCheck);
   } catch (error) {
-    logger.error("[renew-adobe] List accounts failed", {
-      error: error.message,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      error: "Không thể tải danh sách tài khoản Renew Adobe.",
-    });
+    logger.error("[renew-adobe] List accounts failed", { error: error.message });
+    res.status(500).json({ error: "Không thể tải danh sách tài khoản Renew Adobe." });
   }
 };
 
-/**
- * GET /api/renew-adobe/accounts/lookup?email=...
- * Tra cứu 1 tài khoản theo email:
- * 1) Tìm theo email đăng nhập (cột email);
- * 2) Nếu không có, tìm tài khoản có email này trong users_snapshot (thành viên).
- */
+/** GET /api/renew-adobe/accounts/lookup?email= */
 const lookupAccountByEmail = async (req, res) => {
   const email = (req.query.email || "").toString().trim();
-  if (!email) {
-    return res.status(400).json({ error: "Thiếu tham số email." });
-  }
+  if (!email) return res.status(400).json({ error: "Thiếu tham số email." });
+
   const emailLower = email.toLowerCase();
   try {
     let row = await db(TABLE)
       .select(
-        `${TABLE}.${COLS.ID}`,
-        `${TABLE}.${COLS.EMAIL}`,
-        `${TABLE}.${COLS.ORG_NAME}`,
-        `${TABLE}.${COLS.LICENSE_STATUS}`,
-        `${TABLE}.${COLS.LICENSE_DETAIL}`,
-        `${TABLE}.${COLS.USER_COUNT}`,
-        `${TABLE}.${COLS.USERS_SNAPSHOT}`,
-        `${TABLE}.${COLS.LAST_CHECKED}`,
-        `${TABLE}.${COLS.IS_ACTIVE}`,
-        `${TABLE}.${COLS.CREATED_AT}`
+        `${TABLE}.${COLS.ID}`, `${TABLE}.${COLS.EMAIL}`, `${TABLE}.${COLS.ORG_NAME}`,
+        `${TABLE}.${COLS.LICENSE_STATUS}`, `${TABLE}.${COLS.LICENSE_DETAIL}`,
+        `${TABLE}.${COLS.USER_COUNT}`, `${TABLE}.${COLS.USERS_SNAPSHOT}`,
+        `${TABLE}.${COLS.LAST_CHECKED}`, `${TABLE}.${COLS.IS_ACTIVE}`, `${TABLE}.${COLS.CREATED_AT}`
       )
       .where(COLS.EMAIL, email)
       .first();
@@ -144,23 +97,17 @@ const lookupAccountByEmail = async (req, res) => {
     if (!row) {
       const rows = await db(TABLE)
         .select(
-          `${TABLE}.${COLS.ID}`,
-          `${TABLE}.${COLS.EMAIL}`,
-          `${TABLE}.${COLS.ORG_NAME}`,
-          `${TABLE}.${COLS.LICENSE_STATUS}`,
-          `${TABLE}.${COLS.LICENSE_DETAIL}`,
-          `${TABLE}.${COLS.USER_COUNT}`,
-          `${TABLE}.${COLS.USERS_SNAPSHOT}`,
-          `${TABLE}.${COLS.LAST_CHECKED}`,
-          `${TABLE}.${COLS.IS_ACTIVE}`,
-          `${TABLE}.${COLS.CREATED_AT}`
+          `${TABLE}.${COLS.ID}`, `${TABLE}.${COLS.EMAIL}`, `${TABLE}.${COLS.ORG_NAME}`,
+          `${TABLE}.${COLS.LICENSE_STATUS}`, `${TABLE}.${COLS.LICENSE_DETAIL}`,
+          `${TABLE}.${COLS.USER_COUNT}`, `${TABLE}.${COLS.USERS_SNAPSHOT}`,
+          `${TABLE}.${COLS.LAST_CHECKED}`, `${TABLE}.${COLS.IS_ACTIVE}`, `${TABLE}.${COLS.CREATED_AT}`
         )
         .whereNotNull(COLS.USERS_SNAPSHOT)
         .where(COLS.USERS_SNAPSHOT, "!=", "");
       for (const r of rows) {
         try {
           const arr = JSON.parse(r[COLS.USERS_SNAPSHOT] || "[]");
-          if (Array.isArray(arr) && arr.some((u) => String(u && u.email || "").toLowerCase() === emailLower)) {
+          if (Array.isArray(arr) && arr.some((u) => String(u?.email || "").toLowerCase() === emailLower)) {
             row = r;
             break;
           }
@@ -168,353 +115,183 @@ const lookupAccountByEmail = async (req, res) => {
       }
     }
 
-    if (!row) {
-      return res.status(404).json({ error: "Không tìm thấy tài khoản với email tương ứng.", account: null });
-    }
-
+    if (!row) return res.status(404).json({ error: "Không tìm thấy tài khoản với email tương ứng.", account: null });
     res.json({ account: row });
   } catch (error) {
     logger.error("[renew-adobe] Lookup account failed", { email, error: error.message });
-    res.status(500).json({
-      error: "Lỗi tra cứu tài khoản.",
-      account: null,
-    });
+    res.status(500).json({ error: "Lỗi tra cứu tài khoản.", account: null });
   }
 };
 
 /**
- * POST /api/renew-adobe/check-with-cookies
- * Đăng nhập bằng file cookies (bỏ qua tk/mk). Body: { cookiesFile: "path/to/file.json" }
+ * Check một account qua HTTP và cập nhật DB.
+ * @param {number} id
  */
-const runCheckWithCookies = async (req, res) => {
-  const cookiesFile = req.body?.cookiesFile?.trim();
-  if (!cookiesFile) {
-    return res.status(400).json({ error: "Thiếu cookiesFile trong body." });
-  }
-
-  logger.info("[renew-adobe] Check với cookies file: %s", cookiesFile);
-
-  try {
-    await runWithQueue(() => getAdobeUserToken("", "", { cookiesFile }));
-  } catch (loginErr) {
-    if (loginErr.code === "QUEUE_FULL") {
-      return res.status(loginErr.statusCode || 429).json({
-        success: false,
-        error: loginErr.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
-      });
-    }
-    if (loginErr.scrapedData) {
-      const sd = loginErr.scrapedData;
-      return res.json({
-        success: true,
-        message: "Đăng nhập bằng cookies thành công.",
-        adobe_org_id: sd.adobe_org_id ?? null,
-        org_name: sd.orgName ?? null,
-        user_count: sd.userCount ?? 0,
-        license_status: sd.licenseStatus ?? "unknown",
-        users_snapshot: sd.usersSnapshot ?? null,
-      });
-    }
-    logger.warn("[renew-adobe] Check với cookies fail — %s", loginErr.message);
-    return res.status(400).json({
-      success: false,
-      message: loginErr.message || "Cookies không hợp lệ hoặc đã hết hạn.",
-    });
-  }
-};
-
-/**
- * Chạy check một account và cập nhật DB (dùng cho scheduler job). Không dùng req/res.
- * @param {number} id - account id
- * @param {{ cookiesFile?: string }} [options]
- * @throws {Error} khi account không tồn tại, thiếu email/password, queue đầy, hoặc login lỗi không có scrapedData
- */
-async function runCheckForAccountId(id, options = {}) {
-  const cookiesFile = options.cookiesFile?.trim();
-  const useCookies = !!cookiesFile;
-
+async function runCheckForAccountId(id) {
   const account = await db(TABLE).where(COLS.ID, id).first();
-  if (!account) {
-    throw new Error("Không tìm thấy tài khoản.");
-  }
+  if (!account) throw new Error("Không tìm thấy tài khoản.");
 
   const email = account[COLS.EMAIL];
   const password = account[COLS.PASSWORD_ENC] || "";
-  if (!useCookies && (!email || !password)) {
-    throw new Error("Thiếu email hoặc password_enc.");
-  }
+  if (!email || !password) throw new Error("Thiếu email hoặc password_enc.");
 
   const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-  const urlAccessEmpty = COLS.URL_ACCESS && (account[COLS.URL_ACCESS] == null || String(account[COLS.URL_ACCESS]).trim() === "");
-  const opts = { mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null, needUrlAccess: urlAccessEmpty };
-  if (useCookies) opts.cookiesFile = cookiesFile;
-  if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
-  const cookiesPath = getCookiesPathForAccount(id);
-  if (cookiesPath) opts.saveCookiesTo = cookiesPath;
+  logger.info("[renew-adobe] Check account", { id, email });
 
-  try {
-    await runWithQueue(() => getAdobeUserToken(email, password, opts));
-  } catch (loginErr) {
-    if (loginErr.scrapedData) {
-      const sd = loginErr.scrapedData;
-      const isSignInPage = /^(Sign\s*in|Log\s*in|Sign\s*out|Đăng\s*nhập)$/i.test(String(sd.orgName || "").trim());
-      const orgName = isSignInPage ? null : (sd.orgName ?? null);
-      const updatePayload = {
-        [COLS.ORG_NAME]: orgName,
-        [COLS.USER_COUNT]: sd.userCount ?? 0,
-        [COLS.LICENSE_STATUS]: sd.licenseStatus ?? "unknown",
-        [COLS.LAST_CHECKED]: new Date(),
-      };
-      if (sd.usersSnapshot != null) updatePayload[COLS.USERS_SNAPSHOT] = sd.usersSnapshot;
-      if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
-        updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
-      }
-      if (COLS.ALERT_CONFIG && loginErr.savedCookies) updatePayload[COLS.ALERT_CONFIG] = loginErr.savedCookies;
-      if (COLS.URL_ACCESS && sd.url_access != null && String(sd.url_access).trim() !== "") {
-        updatePayload[COLS.URL_ACCESS] = String(sd.url_access).trim();
-      }
-      await db(TABLE).where(COLS.ID, id).update(updatePayload);
-      logger.info("[renew-adobe] runCheckForAccountId — đã cập nhật DB", { id, license_status: sd.licenseStatus });
-      return;
-    }
-    throw loginErr;
+  const result = await adobeHttp.checkAccount(email, password, {
+    savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
+    mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || "Check thất bại.");
   }
+
+  const sd = result.scrapedData;
+  const updatePayload = {
+    [COLS.ORG_NAME]: sd.orgName ?? null,
+    [COLS.USER_COUNT]: sd.userCount ?? 0,
+    [COLS.LICENSE_STATUS]: sd.licenseStatus ?? "unknown",
+    [COLS.LAST_CHECKED]: new Date(),
+  };
+  if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
+    updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
+  }
+  if (COLS.ALERT_CONFIG && result.savedCookies) {
+    updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
+  }
+  await db(TABLE).where(COLS.ID, id).update(updatePayload);
+  logger.info("[renew-adobe] Check xong — đã cập nhật DB", { id, license_status: sd.licenseStatus });
 }
 
-/**
- * POST /api/renew-adobe/accounts/:id/check
- * Login Admin Console → chờ trang overview → success (scrape + cập nhật DB) hoặc fail.
- * Body tùy chọn: { cookiesFile: "path" } — dùng cookies thay vì tk/mk trong DB.
- */
+/** POST /api/renew-adobe/accounts/:id/check */
 const runCheck = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "ID không hợp lệ." });
-  }
-
-  const cookiesFile = req.body?.cookiesFile?.trim();
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
 
   try {
-    await runCheckForAccountId(id, { cookiesFile });
+    await runCheckForAccountId(id);
     const account = await db(TABLE).where(COLS.ID, id).first();
-    const orgName = account?.[COLS.ORG_NAME] ?? null;
-    const userCount = account?.[COLS.USER_COUNT] ?? 0;
-    const licenseStatus = account?.[COLS.LICENSE_STATUS] ?? "unknown";
     return res.json({
       success: true,
-      message: "Đăng nhập thành công, đã vào trang overview.",
-      org_name: orgName,
-      user_count: userCount,
-      license_status: licenseStatus,
+      message: "Check thành công.",
+      org_name: account?.[COLS.ORG_NAME] ?? null,
+      user_count: account?.[COLS.USER_COUNT] ?? 0,
+      license_status: account?.[COLS.LICENSE_STATUS] ?? "unknown",
     });
   } catch (err) {
-    if (err.code === "QUEUE_FULL") {
-      return res.status(err.statusCode || 429).json({
-        success: false,
-        error: err.message || "Hàng đợi check Adobe đã đầy, vui lòng thử lại sau.",
-      });
-    }
-    if (err.message === "Không tìm thấy tài khoản.") {
-      return res.status(404).json({ error: err.message });
-    }
-    if (err.message === "Thiếu email hoặc password_enc.") {
-      return res.status(400).json({ error: err.message });
-    }
-    logger.error("[renew-adobe] Run check failed", { id, error: err.message, stack: err.stack });
-    return res.status(400).json({
-      success: false,
-      message: err.message || "Login thất bại.",
-    });
+    if (err.message === "Không tìm thấy tài khoản.") return res.status(404).json({ error: err.message });
+    if (err.message === "Thiếu email hoặc password_enc.") return res.status(400).json({ error: err.message });
+    logger.error("[renew-adobe] Run check failed", { id, error: err.message });
+    return res.status(400).json({ success: false, message: err.message || "Check thất bại." });
   }
 };
 
-/**
- * POST /api/renew-adobe/accounts/:id/delete-user
- * Body: { userEmail: "email@example.com" } (bắt buộc). Tùy chọn: { cookiesFile: "path" }.
- * Đăng nhập → Admin Console Users → chọn user theo email → Xóa người dùng → xác nhận.
- */
+/** POST /api/renew-adobe/check-with-cookies — không dùng nữa (HTTP không cần cookies file) */
+const runCheckWithCookies = async (_req, res) => {
+  return res.status(400).json({
+    error: "Endpoint check-with-cookies không còn hỗ trợ (đã chuyển sang HTTP). Dùng POST /accounts/:id/check.",
+  });
+};
+
+/** POST /api/renew-adobe/accounts/:id/delete-user */
 const runDeleteUser = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "ID không hợp lệ." });
-  }
-  const userEmail = (req.body?.userEmail || "").toString().trim();
-  if (!userEmail) {
-    return res.status(400).json({ error: "Thiếu userEmail trong body (email user cần xóa)." });
-  }
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
 
-  const cookiesFile = req.body?.cookiesFile?.trim();
-  const useCookies = !!cookiesFile;
+  const userEmail = (req.body?.userEmail || "").toString().trim();
+  if (!userEmail) return res.status(400).json({ error: "Thiếu userEmail trong body." });
 
   try {
     const account = await db(TABLE).where(COLS.ID, id).first();
-    if (!account) {
-      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-    }
+    if (!account) return res.status(404).json({ error: "Không tìm thấy tài khoản." });
 
     const email = account[COLS.EMAIL];
     const password = account[COLS.PASSWORD_ENC] || "";
-    if (!useCookies && (!email || !password)) {
-      return res.status(400).json({ error: "Thiếu email hoặc password_enc." });
-    }
+    if (!email || !password) return res.status(400).json({ error: "Thiếu email hoặc password_enc." });
 
     const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-    logger.info("[renew-adobe] Delete user bắt đầu", { id, userEmail, email: useCookies ? "(cookies)" : email });
-
-    const opts = {
+    logger.info("[renew-adobe] Delete user bắt đầu", { id, userEmail });
+    const result = await adobeHttp.removeUserFromAccount(email, password, userEmail, {
+      savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-      deleteUserEmail: userEmail,
-      needAccountProfile: false,
-    };
-    if (useCookies) opts.cookiesFile = cookiesFile;
-    if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
-    const cookiesPath = getCookiesPathForAccount(id);
-    if (cookiesPath) opts.saveCookiesTo = cookiesPath;
-
-    try {
-      await runWithQueue(() => getAdobeUserToken(email, password, opts));
-    } catch (loginErr) {
-      if (loginErr.scrapedData) {
-        const sd = loginErr.scrapedData;
-        const updatePayload = {
-          [COLS.USER_COUNT]: sd.userCount ?? 0,
-          [COLS.LAST_CHECKED]: new Date(),
-        };
-        if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
-          updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
-        }
-        if (COLS.ALERT_CONFIG && loginErr.savedCookies) updatePayload[COLS.ALERT_CONFIG] = loginErr.savedCookies;
-        await db(TABLE).where(COLS.ID, id).update(updatePayload);
-        logger.info("[renew-adobe] Delete user xong — đã cập nhật DB", { id });
-        return res.json({
-          success: true,
-          message: "Đã xóa user và cập nhật danh sách.",
-          user_count: sd.userCount ?? 0,
-          manage_team_members: sd.manageTeamMembers || [],
-        });
-      }
-      logger.warn("[renew-adobe] Delete user fail — %s", loginErr.message);
-      return res.status(400).json({
-        success: false,
-        message: loginErr.message || "Đăng nhập hoặc xóa user thất bại.",
-      });
-    }
-  } catch (err) {
-    if (err.code === "QUEUE_FULL") {
-      return res.status(err.statusCode || 429).json({
-        success: false,
-        error: err.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
-      });
-    }
-    console.error("[renew-adobe] runDeleteUser lỗi:", err);
-    logger.error("[renew-adobe] Run delete user failed", { id, error: err.message });
-    res.status(500).json({
-      success: false,
-      error: err.message || "Lỗi khi chạy xóa user.",
     });
+
+    if (result.success) {
+      // Sau khi xóa, check lại để lấy danh sách user mới
+      try {
+        await runCheckForAccountId(id);
+      } catch (_) {}
+
+      const updated = await db(TABLE).where(COLS.ID, id).first();
+      return res.json({
+        success: true,
+        message: "Đã xóa user.",
+        user_count: updated?.[COLS.USER_COUNT] ?? 0,
+      });
+    }
+
+    return res.status(400).json({ success: false, message: result.error || "Xóa user thất bại." });
+  } catch (err) {
+    logger.error("[renew-adobe] Run delete user failed", { id, error: err.message });
+    res.status(500).json({ success: false, error: err.message || "Lỗi khi xóa user." });
   }
 };
 
-/**
- * POST /api/renew-adobe/accounts/:id/add-user
- * Body: { userEmail: "email@example.com" } hoặc { userEmails: ["a@x.com", "b@x.com"] }.
- * Đăng nhập 1 lần → mở modal Add user → điền tất cả email (2 ô mặc định, thêm nếu cần) → Lưu 1 lần.
- */
+/** POST /api/renew-adobe/accounts/:id/add-user */
 const runAddUser = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "ID không hợp lệ." });
-  }
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
+
   const userEmailsRaw = req.body?.userEmails;
   const userEmailSingle = (req.body?.userEmail || "").toString().trim();
   const userEmails = Array.isArray(userEmailsRaw)
     ? userEmailsRaw.map((e) => String(e).trim()).filter(Boolean)
-    : userEmailSingle
-      ? [userEmailSingle]
-      : [];
-  if (userEmails.length === 0) {
-    return res.status(400).json({ error: "Thiếu userEmail hoặc userEmails (mảng email cần thêm)." });
-  }
+    : userEmailSingle ? [userEmailSingle] : [];
+  if (userEmails.length === 0) return res.status(400).json({ error: "Thiếu userEmail hoặc userEmails." });
 
   try {
     const account = await db(TABLE).where(COLS.ID, id).first();
-    if (!account) {
-      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-    }
+    if (!account) return res.status(404).json({ error: "Không tìm thấy tài khoản." });
 
     const email = account[COLS.EMAIL];
     const password = account[COLS.PASSWORD_ENC] || "";
-    if (!email || !password) {
-      return res.status(400).json({ error: "Tài khoản thiếu email hoặc password." });
-    }
+    if (!email || !password) return res.status(400).json({ error: "Tài khoản thiếu email hoặc password." });
 
     const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-    const cookiesPath = getCookiesPathForAccount(id);
-
-    const opts = {
-      email,
-      password,
-      mailBackupId,
-      saveCookiesTo: cookiesPath || undefined,
-    };
-    if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
-
     logger.info("[renew-adobe] Add users bắt đầu", { id, count: userEmails.length });
-    await runWithQueue(() => addUserFlow.runAddUser(opts, userEmails));
-
-    const currentSnapshot = account[COLS.USERS_SNAPSHOT];
-    let list = [];
-    try {
-      if (currentSnapshot && String(currentSnapshot).trim()) {
-        list = JSON.parse(currentSnapshot);
-      }
-    } catch (_) {
-      list = [];
-    }
-    if (!Array.isArray(list)) list = [];
-    for (const em of userEmails) {
-      const exists = list.some((u) => (u && (u.email || u.Email || "")).toString().toLowerCase() === em.toLowerCase());
-      if (!exists) {
-        list.push({ name: null, email: em, product: false });
-      }
-    }
-    const newCount = list.length;
-    await db(TABLE).where(COLS.ID, id).update({
-      [COLS.USERS_SNAPSHOT]: JSON.stringify(list),
-      [COLS.USER_COUNT]: newCount,
-      [COLS.LAST_CHECKED]: new Date(),
+    const result = await adobeHttp.addUserToAccount(email, password, userEmails, {
+      savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
+      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
     });
-    logger.info("[renew-adobe] Đã cập nhật users_snapshot và user_count", { id, user_count: newCount });
+
+    // Sau khi add, check lại để lấy danh sách user mới nhất
+    try {
+      await runCheckForAccountId(id);
+    } catch (_) {}
+
+    const updated = await db(TABLE).where(COLS.ID, id).first();
+    const newCount = updated?.[COLS.USER_COUNT] ?? 0;
+    let usersSnapshot = [];
+    try { usersSnapshot = JSON.parse(updated?.[COLS.USERS_SNAPSHOT] || "[]"); } catch (_) {}
 
     return res.json({
       success: true,
       message: userEmails.length > 1
-        ? `Đã thêm ${userEmails.length} người dùng trong một bước.`
-        : "Đã thêm người dùng và gửi lời mời (hoặc thêm vào nhóm).",
+        ? `Đã thêm ${userEmails.length} người dùng.`
+        : "Đã thêm người dùng.",
       user_emails: userEmails,
       user_count: newCount,
-      users_snapshot: list,
+      users_snapshot: usersSnapshot,
+      add_result: result,
     });
   } catch (err) {
-    if (err.code === "QUEUE_FULL") {
-      return res.status(err.statusCode || 429).json({
-        success: false,
-        error: err.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
-      });
-    }
     logger.error("[renew-adobe] Run add user failed", { id, error: err.message });
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Lỗi khi chạy thêm người dùng.",
-    });
+    return res.status(500).json({ success: false, error: err.message || "Lỗi khi thêm người dùng." });
   }
 };
 
-/**
- * POST /api/renew-adobe/accounts/add-users-batch (Hướng 2: tự chia nhiều tài khoản)
- * Body: { accountIds: number[], userEmails: string[] }.
- * Phân bổ email theo slot còn trống (11 - user_count) lần lượt theo thứ tự accountIds, rồi gọi add-user từng tài khoản.
- */
+/** POST /api/renew-adobe/accounts/add-users-batch */
 const runAddUsersBatch = async (req, res) => {
   const accountIdsRaw = req.body?.accountIds;
   const userEmailsRaw = req.body?.userEmails;
@@ -525,17 +302,13 @@ const runAddUsersBatch = async (req, res) => {
     ? userEmailsRaw.map((e) => String(e).trim()).filter(Boolean)
     : [];
 
-  if (accountIds.length === 0) {
-    return res.status(400).json({ error: "Thiếu accountIds (mảng ID tài khoản, thứ tự = ưu tiên fill)." });
-  }
-  if (userEmails.length === 0) {
-    return res.status(400).json({ error: "Thiếu userEmails (mảng email cần thêm)." });
-  }
+  if (accountIds.length === 0) return res.status(400).json({ error: "Thiếu accountIds." });
+  if (userEmails.length === 0) return res.status(400).json({ error: "Thiếu userEmails." });
 
   try {
     const accounts = await db(TABLE)
       .whereIn(COLS.ID, accountIds)
-      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USERS_SNAPSHOT, COLS.USER_COUNT, COLS.MAIL_BACKUP_ID, COLS.ALERT_CONFIG);
+      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG);
     const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
     const ordered = [...accounts].sort((a, b) => (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0));
 
@@ -556,136 +329,92 @@ const runAddUsersBatch = async (req, res) => {
       });
     }
 
-    const exceeded_emails = remaining.length > 0 ? remaining : undefined;
-    const totalToAdd = userEmails.length - (exceeded_emails?.length ?? 0);
+    const exceededEmails = remaining.length > 0 ? remaining : undefined;
+    const totalToAdd = userEmails.length - (exceededEmails?.length ?? 0);
     if (totalToAdd === 0) {
       return res.status(400).json({
         success: false,
-        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn 11 user. Hoặc chọn thêm tài khoản.",
+        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn 11 user.",
         distribution: distribution.map((d) => ({ accountId: d.accountId, accountEmail: d.accountEmail, added: d.added })),
-        exceeded_emails,
+        exceeded_emails: exceededEmails,
       });
     }
 
     const results = [];
     for (const item of distribution) {
       if (item.added.length === 0) continue;
-      const id = item.accountId;
-      const account = ordered.find((a) => a[COLS.ID] === id);
+      const acId = item.accountId;
+      const account = ordered.find((a) => a[COLS.ID] === acId);
       if (!account || !account[COLS.EMAIL] || !account[COLS.PASSWORD_ENC]) {
-        results.push({ accountId: id, accountEmail: item.accountEmail, added: item.added, error: "Thiếu email/password." });
+        results.push({ accountId: acId, accountEmail: item.accountEmail, added: item.added, error: "Thiếu email/password." });
         continue;
       }
-      const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-      const cookiesPath = getCookiesPathForAccount(id);
-      const opts = {
-        email: account[COLS.EMAIL],
-        password: account[COLS.PASSWORD_ENC],
-        mailBackupId,
-        saveCookiesTo: cookiesPath || undefined,
-      };
-      if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
 
       try {
-        await runWithQueue(() => addUserFlow.runAddUser(opts, item.added));
-        let list = [];
-        try {
-          const snap = account[COLS.USERS_SNAPSHOT];
-          if (snap && String(snap).trim()) list = JSON.parse(snap);
-        } catch (_) {
-          list = [];
-        }
-        if (!Array.isArray(list)) list = [];
-        for (const em of item.added) {
-          const exists = list.some((u) => (u && (u.email || u.Email || "")).toString().toLowerCase() === em.toLowerCase());
-          if (!exists) list.push({ name: null, email: em, product: false });
-        }
-        const newCount = list.length;
-        await db(TABLE).where(COLS.ID, id).update({
-          [COLS.USERS_SNAPSHOT]: JSON.stringify(list),
-          [COLS.USER_COUNT]: newCount,
-          [COLS.LAST_CHECKED]: new Date(),
-        });
+        const batchMailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
+        await adobeHttp.addUserToAccount(
+          account[COLS.EMAIL], account[COLS.PASSWORD_ENC], item.added,
+          { savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null, mailBackupId: Number.isFinite(batchMailBackupId) ? batchMailBackupId : null }
+        );
+        // Check lại sau khi add
+        try { await runCheckForAccountId(acId); } catch (_) {}
+        const updated = await db(TABLE).where(COLS.ID, acId).first();
         results.push({
-          accountId: id,
+          accountId: acId,
           accountEmail: item.accountEmail,
           added: item.added,
-          user_count_after: newCount,
+          user_count_after: updated?.[COLS.USER_COUNT] ?? 0,
         });
-        logger.info("[renew-adobe] Batch: đã thêm %s user vào account %s", item.added.length, id);
+        logger.info("[renew-adobe] Batch: đã thêm %s user vào account %s", item.added.length, acId);
       } catch (err) {
-        if (err.code === "QUEUE_FULL") {
-          return res.status(err.statusCode || 429).json({
-            success: false,
-            error: err.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
-            results,
-          });
-        }
-        logger.error("[renew-adobe] Batch add user failed", { id, error: err.message });
-        results.push({ accountId: id, accountEmail: item.accountEmail, added: item.added, error: err.message });
+        logger.error("[renew-adobe] Batch add user failed", { id: acId, error: err.message });
+        results.push({ accountId: acId, accountEmail: item.accountEmail, added: item.added, error: err.message });
       }
     }
 
-    const totalAdded = results.reduce((sum, r) => sum + (r.added?.length ?? 0), 0);
-    const message =
-      exceeded_emails && exceeded_emails.length > 0
-        ? `Đã thêm ${totalAdded} user vào ${results.length} tài khoản. Còn ${exceeded_emails.length} email chưa thêm (hết slot).`
-        : `Đã thêm ${totalAdded} user vào ${results.length} tài khoản.`;
-
+    const totalAdded = results.reduce((sum, r) => sum + (r.error ? 0 : r.added?.length ?? 0), 0);
     return res.json({
       success: true,
-      message,
+      message: exceededEmails?.length
+        ? `Đã thêm ${totalAdded} user vào ${results.length} tài khoản. Còn ${exceededEmails.length} email chưa thêm (hết slot).`
+        : `Đã thêm ${totalAdded} user vào ${results.length} tài khoản.`,
       total_added: totalAdded,
       distribution: results,
-      exceeded_emails: exceeded_emails || undefined,
+      exceeded_emails: exceededEmails,
     });
   } catch (err) {
     logger.error("[renew-adobe] Add users batch failed", { error: err.message });
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Lỗi khi chạy thêm user batch.",
-    });
+    return res.status(500).json({ success: false, error: err.message || "Lỗi batch." });
   }
 };
 
-/**
- * POST /api/renew-adobe/accounts/:id/auto-delete-users
- * Body: { userEmails: string[] } — danh sách email user cần xóa.
- * Luồng: Login Adobe → truy cập trang Users (../users) → xóa lần lượt từng user.
- */
+/** POST /api/renew-adobe/accounts/:id/auto-delete-users */
 const runAutoDeleteUsers = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) {
-    return res.status(400).json({ error: "ID không hợp lệ." });
-  }
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
+
   const userEmails = req.body?.userEmails;
   const list = Array.isArray(userEmails) ? userEmails : userEmails ? [userEmails] : [];
   const normalized = list.map((e) => String(e).trim()).filter(Boolean);
-  if (normalized.length === 0) {
-    return res.status(400).json({ error: "Thiếu hoặc rỗng userEmails (mảng email cần xóa)." });
-  }
+  if (normalized.length === 0) return res.status(400).json({ error: "Thiếu userEmails." });
 
   try {
     const account = await db(TABLE).where(COLS.ID, id).first();
-    if (!account) {
-      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-    }
+    if (!account) return res.status(404).json({ error: "Không tìm thấy tài khoản." });
 
     const email = account[COLS.EMAIL];
     const password = account[COLS.PASSWORD_ENC] || "";
+
     const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-    const cookiesPath = getCookiesPathForAccount(id);
-
-    const opts = {
-      email,
-      password,
-      mailBackupId,
-      saveCookiesTo: cookiesPath || undefined,
-    };
-    if (COLS.ALERT_CONFIG) opts.savedCookiesFromDb = account[COLS.ALERT_CONFIG] ?? null;
-
     logger.info("[renew-adobe] Auto-delete users bắt đầu", { id, count: normalized.length });
-    const result = await runWithQueue(() => autoDeleteFlow.runAutoDeleteUsers(opts, normalized));
+    const result = await adobeHttp.autoDeleteUsers(email, password, normalized, {
+      savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
+      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+    });
+
+    // Check lại sau khi xóa
+    try { await runCheckForAccountId(id); } catch (_) {}
+
     return res.json({
       success: true,
       message: `Đã xử lý: ${result.deleted.length} xóa thành công, ${result.failed.length} lỗi.`,
@@ -693,23 +422,14 @@ const runAutoDeleteUsers = async (req, res) => {
       failed: result.failed,
     });
   } catch (err) {
-    if (err.code === "QUEUE_FULL") {
-      return res.status(err.statusCode || 429).json({
-        success: false,
-        error: err.message || "Hàng đợi đã đầy, vui lòng thử lại sau.",
-      });
-    }
     logger.error("[renew-adobe] Auto-delete users failed", { id, error: err.message });
-    return res.status(500).json({
-      success: false,
-      error: err.message || "Lỗi khi chạy auto xóa user.",
-    });
+    return res.status(500).json({ success: false, error: err.message || "Lỗi khi xóa user." });
   }
 };
 
-/** GET /api/renew-adobe/queue-status — trạng thái hàng đợi check/delete (để frontend hiển thị hoặc disable nút khi đầy) */
+/** GET /api/renew-adobe/queue-status — giữ lại cho FE nhưng trả static (không còn queue) */
 const adobeQueueStatus = (_req, res) => {
-  res.json(getQueueStatus());
+  res.json({ running: 0, queued: 0, maxConcurrent: 10, maxQueueSize: 100 });
 };
 
 module.exports = {
