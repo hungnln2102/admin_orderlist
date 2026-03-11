@@ -25,13 +25,13 @@ async function performLogin(page, opts = {}) {
     logger.info("[adobe] Đăng nhập bằng cookies: %s cookie", cookiesToUse.length);
     await page.goto("https://www.adobe.com", {
       waitUntil: "domcontentloaded",
-      timeout: 50000,
+      timeout: 90000,
     });
     await page.setCookie(...cookiesToUse);
     logger.info("[adobe] Đã set cookies, chuyển sang adobe.com...");
     await page.goto("https://www.adobe.com", {
       waitUntil: "domcontentloaded",
-      timeout: 50000,
+      timeout: 90000,
     });
     await new Promise((r) => setTimeout(r, 3000));
     await maybeSkipSecurityPrompt(page);
@@ -89,7 +89,7 @@ async function performLogin(page, opts = {}) {
     logger.info("[adobe] Login adobe.com — form: Tài khoản => 2FA => Mật khẩu => 2FA(nếu có) => Skip SĐT");
     await page.goto(ADOBE_LOGIN_URL, {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
+      timeout: 90000,
     });
     const emailInput = await page.waitForSelector(
       'input[name="username"], input[type="email"], input[name="email"]',
@@ -99,7 +99,7 @@ async function performLogin(page, opts = {}) {
     await new Promise((r) => setTimeout(r, 150));
     await page.keyboard.press("Enter");
     await Promise.race([
-      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45000 }),
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 90000 }),
       new Promise((r) => setTimeout(r, 5000)),
     ]).catch(() => {});
     await new Promise((r) => setTimeout(r, 2000));
@@ -110,7 +110,7 @@ async function performLogin(page, opts = {}) {
     await fillWithKeyboard(page, passwordEl, password, 25);
     await new Promise((r) => setTimeout(r, 150));
     await page.keyboard.press("Enter");
-    await page.waitForNavigation({ waitUntil: "networkidle0", timeout: 45000 }).catch(() => {});
+    await page.waitForNavigation({ waitUntil: "networkidle0", timeout: 90000 }).catch(() => {});
     await new Promise((r) => setTimeout(r, 5000));
 
     await handle2FAStep("sau mật khẩu");
@@ -159,7 +159,7 @@ async function performLogin(page, opts = {}) {
 
   await handleProgressiveProfileSteps();
 
-  logger.info("[adobe] Chờ trang đã đăng nhập (adobe.com hoặc @AdobeOrg), tối đa 60s...");
+  logger.info("[adobe] Chờ trang đã đăng nhập (adobe.com hoặc @AdobeOrg), tối đa 90s...");
   try {
     await page.waitForFunction(
       () => {
@@ -169,7 +169,7 @@ async function performLogin(page, opts = {}) {
           (/^https?:\/\/(www\.)?adobe\.com(\/|$)/i.test(h) && h.indexOf("auth.services") === -1)
         );
       },
-      { timeout: 60000 }
+      { timeout: 90000 }
     );
   } catch (e) {
     const stillVerifyIdentity = await page

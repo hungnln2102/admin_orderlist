@@ -23,7 +23,7 @@ const Dashboard: React.FC = () => {
 
   const { goldLoading, goldError, selectedGoldRows, fetchGoldPrices } = useGoldPrices();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
-  const { goals: savingGoals, totalTarget: savingGoalsTotalTarget, loading: savingGoalsLoading, refetch: refetchGoals } = useSavingGoals();
+  const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
   const [activeSection, setActiveSection] = useState<"overview" | "finance">("overview");
 
   const latestGoldBid = selectedGoldRows.length ? Number(selectedGoldRows[0]?.bid || 0) || null : null;

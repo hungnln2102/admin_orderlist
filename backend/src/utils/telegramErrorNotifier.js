@@ -5,7 +5,6 @@
  */
 
 const https = require("https");
-const dns = require("dns");
 const os = require("os");
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
@@ -24,19 +23,6 @@ let queue = [];
 let sending = false;
 let lastSentAt = 0;
 
-const preferIpv4Lookup = (hostname, options, cb) =>
-  dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
-    if (err || !address) {
-      return dns.lookup(hostname, options, (err2, addr2, fam2) => {
-        if (err2 || !addr2) {
-          return cb(err2 || new Error(`Cannot resolve ${hostname}`));
-        }
-        cb(null, addr2, fam2);
-      });
-    }
-    cb(null, address, family);
-  });
-
 const postToTelegram = (payload) =>
   new Promise((resolve, reject) => {
     const body = JSON.stringify(payload);
@@ -50,7 +36,7 @@ const postToTelegram = (payload) =>
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
         },
-        agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
+        agent: new https.Agent({ keepAlive: true }),
       },
       (res) => {
         let data = "";

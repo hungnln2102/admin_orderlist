@@ -6,7 +6,6 @@ import {
 import {
   ORDER_DATASET_CONFIG,
   ORDER_DATASET_SEQUENCE,
-  ORDER_FIELDS,
   ORDER_STATUSES,
   Order,
   OrderDatasetKey,
