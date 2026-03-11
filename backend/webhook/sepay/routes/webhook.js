@@ -155,7 +155,8 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Từng đơn theo trạng thái: Chưa Thanh Toán hoặc Cần Gia Hạn → Đang Xử Lý
+      // Chỉ đổi trạng thái Chưa Thanh Toán → Đang Xử Lý tại webhook.
+      // Đơn Cần Gia Hạn để renewal tự cập nhật status khi chạy gia hạn.
       if (receiptResult?.inserted || receiptResult?.duplicate) {
         const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
         for (const code of codesToUpdate) {
@@ -163,15 +164,13 @@ router.post("/", async (req, res) => {
           if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
-          const moveToProcessing =
-            statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL;
-          if (moveToProcessing) {
+          if (statusValue === ORDER_STATUS.UNPAID) {
             await client.query(
               `UPDATE ${ORDER_TABLE}
                SET ${ORDER_COLS.status} = $2
                WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-                 AND (${ORDER_COLS.status} = $3 OR ${ORDER_COLS.status} = $4)`,
-              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID, ORDER_STATUS.RENEWAL]
+                 AND ${ORDER_COLS.status} = $3`,
+              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID]
             );
             logger.debug("[Webhook] Order status → Đang Xử Lý", {
               orderCode: code,
@@ -189,10 +188,7 @@ router.post("/", async (req, res) => {
       client.release();
     }
 
-    // Rule renewal: sau khi đổi trạng thái (và insert receipt), chạy gia hạn cho đơn eligible.
-    // Eligible = RENEWAL (khi daysLeft <= 4).
-    // Lưu ý: eligibility được tính trước khi đổi trạng thái sang PROCESSING để không bị mất điều kiện.
-    // Sau khi renewal, đơn sẽ chuyển về PROCESSING (Đang Xử Lý).
+    // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). Renewal tự cập nhật status → Đang Xử Lý.
     try {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
         const precomputedEligibility = eligibilityByOrderCode.get(code);
