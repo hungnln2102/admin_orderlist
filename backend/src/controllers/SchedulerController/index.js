@@ -1,4 +1,4 @@
-const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask } = require("../../../scheduler");
+const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask } = require("../../../scheduler");
 const logger = require("../../utils/logger");
 
 const runSchedulerNow = async (_req, res) => {
@@ -29,8 +29,19 @@ const schedulerStatus = (_req, res) => {
   });
 };
 
+const runCleanupExpiredAdobeUsersNow = async (_req, res) => {
+  try {
+    await cleanupExpiredAdobeUsersTask("manual");
+    res.json({ success: true });
+  } catch (error) {
+    logger.error("[scheduler] Cleanup expired Adobe users failed", { error: error.message, stack: error.stack });
+    res.status(500).json({ error: "Không thể chạy cleanup expired Adobe users." });
+  }
+};
+
 module.exports = {
   runSchedulerNow,
   schedulerStatus,
   runFourDaysNotificationNow,
+  runCleanupExpiredAdobeUsersNow,
 };

@@ -13,12 +13,12 @@
 const logger = require("../../utils/logger");
 const { loginViaHttp } = require("./login");
 const { loginWithPlaywright } = require("./loginBrowser");
-const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser } = require("./adminConsole");
+const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers } = require("./adminConsole");
 const { exportCookies, createHttpClient, importCookies } = require("./httpClient");
 
 /**
- * Login + lấy org ID. Nếu fast path (saved cookies) thất bại → fallback Playwright.
- * @returns {{ client, jar, accessToken, orgId }}
+ * Login + lấy org ID + org name. Nếu fast path (saved cookies) thất bại → fallback Playwright.
+ * @returns {{ client, jar, accessToken, orgId, orgName }}
  */
 async function loginAndGetOrg(email, password, options = {}) {
   const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
@@ -37,12 +37,11 @@ async function loginAndGetOrg(email, password, options = {}) {
 
   let { client, jar, accessToken, usedBrowser } = loginResult;
 
-  let orgId = await getOrgId(client, accessToken);
+  let orgResult = await getOrgId(client, accessToken);
 
   // Chỉ retry Playwright nếu chưa dùng browser (fast path thất bại lấy org)
-  if (!orgId && !usedBrowser) {
-    logger.info("[adobe-http] Org=%s → fast path không lấy được org, chuyển Playwright...",
-      orgId || "null");
+  if (!orgResult && !usedBrowser) {
+    logger.info("[adobe-http] Org=null → fast path không lấy được org, chuyển Playwright...");
 
     const browserResult = await loginWithPlaywright(email, password, { savedCookies, mailBackupId });
     if (!browserResult.success) {
@@ -55,14 +54,14 @@ async function loginAndGetOrg(email, password, options = {}) {
     await importCookies(jar, browserResult.cookies);
     accessToken = browserResult.accessToken;
 
-    orgId = await getOrgId(client, accessToken);
+    orgResult = await getOrgId(client, accessToken);
   }
 
-  if (!orgId) {
+  if (!orgResult) {
     throw new Error("Không lấy được org ID sau tất cả strategies");
   }
 
-  return { client, jar, accessToken, orgId };
+  return { client, jar, accessToken, orgId: orgResult.orgId, orgName: orgResult.orgName };
 }
 
 /**
@@ -72,7 +71,7 @@ async function checkAccount(email, password, options = {}) {
   logger.info("[adobe-http] checkAccount bắt đầu: %s", email);
 
   try {
-    const { client, jar, accessToken, orgId } = await loginAndGetOrg(email, password, options);
+    const { client, jar, accessToken, orgId, orgName } = await loginAndGetOrg(email, password, options);
 
     const productInfo = await getProducts(client, orgId, accessToken);
     const users = await getUsers(client, orgId, accessToken);
@@ -94,7 +93,7 @@ async function checkAccount(email, password, options = {}) {
       }));
 
     const scrapedData = {
-      orgName: null,
+      orgName: orgName || null,
       userCount: manageTeamMembers.length,
       licenseStatus: productInfo.licenseStatus,
       adobe_org_id: orgId,
@@ -159,9 +158,62 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
   return { deleted, failed };
 }
 
+/**
+ * Add users + gắn product + trả về snapshot mới.
+ * Dùng cho auto-assign flow (không cần caller re-check riêng).
+ */
+async function addUsersWithProduct(email, password, userEmails, options = {}) {
+  const { client, jar, accessToken, orgId } = await loginAndGetOrg(email, password, options);
+  if (!accessToken) throw new Error("Không có access token");
+
+  // 1. Get paid products
+  const productInfo = await getProducts(client, orgId, accessToken);
+  const paidProducts = productInfo.products.filter((p) => !p.isFree && p.id);
+
+  // 2. Add users to org
+  const addResult = await addUsers(client, orgId, accessToken, userEmails);
+
+  // 3. Assign product to added users
+  let assignResult = null;
+  if (paidProducts.length > 0) {
+    assignResult = await assignProductToUsers(client, orgId, accessToken, userEmails, paidProducts);
+  }
+
+  // 4. Re-fetch users → build snapshot mới
+  const users = await getUsers(client, orgId, accessToken);
+  const paidProductIds = paidProducts.map((p) => p.id);
+  const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
+
+  const adminEmail = email.toLowerCase().trim();
+  const manageTeamMembers = users
+    .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
+    .map((u) => ({
+      name: u.name,
+      email: u.email || "",
+      product: productEmails.has((u.email || "").toLowerCase().trim()),
+    }));
+
+  const savedCookies = exportCookies(jar);
+  savedCookies.accessToken = accessToken;
+
+  logger.info("[adobe-http] addUsersWithProduct done: added=%s, assign=%s, snapshot=%s",
+    addResult.added?.length ?? 0, assignResult?.success ?? false, manageTeamMembers.length);
+
+  return {
+    addResult,
+    assignResult,
+    manageTeamMembers,
+    userCount: manageTeamMembers.length,
+    licenseStatus: productInfo.licenseStatus,
+    orgName: options._orgName || null,
+    savedCookies,
+  };
+}
+
 module.exports = {
   checkAccount,
   addUserToAccount,
+  addUsersWithProduct,
   removeUserFromAccount,
   autoDeleteUsers,
 };

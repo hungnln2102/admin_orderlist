@@ -390,13 +390,13 @@ const SUPPLIER_COST_DEF = {
 };
 
 // -----------------------
-// RENEW ADOBE (system_renew_adobe.accounts)
+// RENEW ADOBE (system_renew_adobe.accounts_admin)
 // -----------------------
-// Bảng accounts (renew-adobe): id, email, password_enc, org_name, license_status, license_detail,
+// Bảng accounts_admin (renew-adobe): id, email, password_enc, org_name, license_status, license_detail,
 // user_count, users_snapshot, alert_config (jsonb), last_checked, is_active, created_at, mail_backup_id, url_access (text)
 const RENEW_ADOBE_SCHEMA = {
   ACCOUNT: {
-    TABLE: "accounts",
+    TABLE: "accounts_admin",
     COLS: {
       ID: "id",
       EMAIL: "email",

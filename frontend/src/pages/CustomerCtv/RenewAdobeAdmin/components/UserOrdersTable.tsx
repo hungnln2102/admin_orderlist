@@ -1,12 +1,18 @@
 /**
- * Form mới: Bảng hiển thị Mã đơn hàng, Tên Khách Hàng, Email, Tình trạng Gói, Hạn Sử Dụng, Thao Tác.
- * Đặt trong khu vực dưới bảng tài khoản admin (vùng khoanh đỏ).
+ * Bảng hiển thị Mã đơn hàng, Tên Khách Hàng, Email, Tình trạng Gói, Hạn Sử Dụng, Thao Tác.
+ *
+ * Luồng dữ liệu:
+ * 1. key_active.order_auto_keys → lấy toàn bộ mã đơn
+ * 2. JOIN orders.order_list → lấy email (information_order), customer, expiry_date
+ * 3. Match email ↔ users_snapshot JSON → điền mã đơn, tên KH, hạn sử dụng
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import * as Helpers from "@/lib/helpers";
+import { API_BASE_URL } from "@/lib/api";
+import { API_ENDPOINTS } from "@/constants";
 import type { AdobeAdminAccount, LicenseStatus, SnapshotUser } from "../index";
 
 const STATUS_LABELS: Record<LicenseStatus, string> = {
@@ -29,9 +35,19 @@ export type UserOrderRow = {
   order_code: string;
   customer_name: string;
   email: string;
+  profile: string;
   display_status: DisplayStatus;
   expiry: string;
   accountId: number;
+};
+
+type OrderInfo = {
+  order_code: string;
+  information_order: string;
+  customer: string;
+  contact: string;
+  expiry_date: string | null;
+  status: string;
 };
 
 /** Ưu tiên product của user: product === false hoặc falsy → "Hết quyền", còn lại dùng license_status của account */
@@ -45,30 +61,28 @@ function resolveDisplayStatus(
 
 const PAGE_SIZE = 10;
 
-function getExpiryFromAccount(acc: AdobeAdminAccount): string {
-  if (acc.license_detail) {
-    try {
-      const detail = JSON.parse(acc.license_detail) as Record<string, unknown>;
-      const endDate =
-        (detail.endDate as string) ??
-        (detail.end_date as string) ??
-        (detail.expiryDate as string) ??
-        (detail.expiry_date as string);
-      if (endDate) return Helpers.formatDateToDMY(endDate);
-    } catch {
-      // ignore
+/**
+ * Build Map<email_lowercase, OrderInfo> từ dữ liệu key_active + order_list.
+ * Nếu 1 email có nhiều đơn → lấy đơn đầu tiên (đã sort theo order_code ASC).
+ */
+function buildEmailOrderMap(orders: OrderInfo[]): Map<string, OrderInfo> {
+  const map = new Map<string, OrderInfo>();
+  for (const o of orders) {
+    const email = (o.information_order || "").trim().toLowerCase();
+    if (email && !map.has(email)) {
+      map.set(email, o);
     }
   }
-  return acc.last_checked ? Helpers.formatDateToDMY(acc.last_checked) : "—";
+  return map;
 }
 
-/** Flatten users từ users_snapshot của tất cả accounts → UserOrderRow */
-function flattenToUserRows(accounts: AdobeAdminAccount[]): UserOrderRow[] {
+/** Flatten users từ users_snapshot + match với order data → UserOrderRow */
+function flattenToUserRows(
+  accounts: AdobeAdminAccount[],
+  emailOrderMap: Map<string, OrderInfo>
+): UserOrderRow[] {
   const rows: UserOrderRow[] = [];
-  const accExtended = accounts as (AdobeAdminAccount & { order_code?: string; last_checked?: string; license_detail?: string })[];
-  for (const acc of accExtended) {
-    const expiry = getExpiryFromAccount(acc);
-    const orderCode = acc.order_code ?? "—";
+  for (const acc of accounts) {
     let users: SnapshotUser[] = [];
     if (acc.users_snapshot) {
       try {
@@ -80,13 +94,17 @@ function flattenToUserRows(accounts: AdobeAdminAccount[]): UserOrderRow[] {
     if (users.length > 0) {
       for (const u of users) {
         if (u.email) {
+          const matched = emailOrderMap.get(u.email.toLowerCase().trim());
           rows.push({
             id: `acc-${acc.id}-${u.email}`,
-            order_code: orderCode,
-            customer_name: u.name ?? "—",
+            order_code: matched?.order_code ?? "—",
+            customer_name: matched?.customer || u.name || "—",
             email: u.email,
+            profile: acc.org_name ?? "—",
             display_status: resolveDisplayStatus(u.product, acc.license_status),
-            expiry,
+            expiry: matched?.expiry_date
+              ? Helpers.formatDateToDMY(matched.expiry_date)
+              : "—",
             accountId: acc.id,
           });
         }
@@ -94,11 +112,12 @@ function flattenToUserRows(accounts: AdobeAdminAccount[]): UserOrderRow[] {
     } else {
       rows.push({
         id: `acc-${acc.id}-admin`,
-        order_code: orderCode,
+        order_code: "—",
         customer_name: acc.org_name ?? "—",
         email: acc.email,
+        profile: acc.org_name ?? "—",
         display_status: acc.license_status,
-        expiry,
+        expiry: "—",
         accountId: acc.id,
       });
     }
@@ -136,8 +155,22 @@ export function UserOrdersTable({
 }: UserOrdersTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
+  const [orderData, setOrderData] = useState<OrderInfo[]>([]);
 
-  const allRows = useMemo(() => flattenToUserRows(accounts), [accounts]);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS}`, {
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Lỗi tải user-orders");
+        return res.json();
+      })
+      .then((data: OrderInfo[]) => setOrderData(data))
+      .catch(() => setOrderData([]));
+  }, [accounts]);
+
+  const emailOrderMap = useMemo(() => buildEmailOrderMap(orderData), [orderData]);
+  const allRows = useMemo(() => flattenToUserRows(accounts, emailOrderMap), [accounts, emailOrderMap]);
 
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return allRows;
@@ -160,7 +193,7 @@ export function UserOrdersTable({
         Danh sách user & đơn hàng
       </h3>
       <p className="text-xs text-white/50 mb-4">
-        Mã đơn hàng, Tên Khách Hàng, Email, Tình trạng Gói, Hạn Sử Dụng
+        Mã đơn hàng, Tên Khách Hàng, Email, Profile, Tình trạng Gói, Hạn Sử Dụng
       </p>
 
       <div className="mb-4">
@@ -194,6 +227,7 @@ export function UserOrdersTable({
                       <p className="text-xs text-white/60">Mã đơn: {row.order_code}</p>
                       <p className="text-sm font-medium text-white">{row.customer_name}</p>
                       <p className="text-xs text-white/80 break-all">{row.email}</p>
+                      <p className="text-xs text-white/60">Profile: {row.profile}</p>
                       <StatusBadge status={row.display_status} />
                       <p className="text-xs text-white/70">Hạn: {row.expiry}</p>
                       {onDeleteUser && (
@@ -220,6 +254,7 @@ export function UserOrdersTable({
                 <th className="min-w-[120px]">MÃ ĐƠN HÀNG</th>
                 <th className="min-w-[160px]">TÊN KHÁCH HÀNG</th>
                 <th className="min-w-[200px]">EMAIL</th>
+                <th className="min-w-[140px]">PROFILE</th>
                 <th className="w-36">TÌNH TRẠNG GÓI</th>
                 <th className="min-w-[110px]">HẠN SỬ DỤNG</th>
                 <th className="w-24 text-center">THAO TÁC</th>
@@ -228,7 +263,7 @@ export function UserOrdersTable({
             <tbody className="divide-y divide-white/5">
               {currentRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-white/70">
+                  <td colSpan={7} className="px-4 py-12 text-center text-white/70">
                     Chưa có dữ liệu. Chạy Check để đồng bộ users từ Adobe.
                   </td>
                 </tr>
@@ -243,6 +278,9 @@ export function UserOrdersTable({
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-sm text-white/90 break-all">
                       {row.email}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
+                      {row.profile}
                     </td>
                     <td className="px-2 sm:px-4 py-3">
                       <StatusBadge status={row.display_status} />

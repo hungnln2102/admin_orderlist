@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
@@ -84,6 +84,13 @@ const fetchAccounts = () =>
     })
     .then((rows: Record<string, unknown>[]) => rows.map(normalizeAccount));
 
+type CheckAllProgress = {
+  total: number;
+  completed: number;
+  failed: number;
+  checkingIds: Set<number>;
+};
+
 export default function RenewAdobeAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,6 +100,12 @@ export default function RenewAdobeAdmin() {
   const [checkingId, setCheckingId] = useState<number | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [checkAllProgress, setCheckAllProgress] = useState<CheckAllProgress | null>(null);
+  const [autoAssignPhase, setAutoAssignPhase] = useState<"idle" | "running" | "done">("idle");
+  const [autoAssignResult, setAutoAssignResult] = useState<{ assigned: number; skipped: number } | null>(null);
+  const checkAllAbortRef = useRef<AbortController | null>(null);
+  const isCheckingAll = checkAllProgress !== null && checkAllProgress.completed < checkAllProgress.total;
 
   const loadAccounts = useMemo(
     () => () => {
@@ -109,6 +122,151 @@ export default function RenewAdobeAdmin() {
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
+
+  const handleCheckAll = useCallback(() => {
+    if (isCheckingAll) return;
+    setCheckError(null);
+
+    const abort = new AbortController();
+    checkAllAbortRef.current = abort;
+
+    setCheckAllProgress({ total: 0, completed: 0, failed: 0, checkingIds: new Set() });
+
+    const url = `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_CHECK_ALL}`;
+    fetch(url, { credentials: "include", signal: abort.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(res.statusText || "Check All thất bại");
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("Không hỗ trợ streaming");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+              handleSSEEvent(evt);
+            } catch {}
+          }
+        }
+
+        if (buffer.startsWith("data: ")) {
+          try { handleSSEEvent(JSON.parse(buffer.slice(6))); } catch {}
+        }
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setCheckError(err?.message ?? "Lỗi khi chạy Check All.");
+      })
+      .finally(() => {
+        checkAllAbortRef.current = null;
+        setCheckAllProgress((prev) =>
+          prev ? { ...prev, checkingIds: new Set() } : null
+        );
+      });
+
+    function handleSSEEvent(evt: Record<string, unknown>) {
+      switch (evt.type) {
+        case "start":
+          setCheckAllProgress({
+            total: evt.total as number,
+            completed: 0,
+            failed: 0,
+            checkingIds: new Set(),
+          });
+          setAutoAssignPhase("idle");
+          setAutoAssignResult(null);
+          break;
+        case "checking":
+          setCheckAllProgress((prev) => {
+            if (!prev) return prev;
+            const ids = new Set(prev.checkingIds);
+            ids.add(evt.id as number);
+            return { ...prev, checkingIds: ids };
+          });
+          break;
+        case "done":
+          setAccounts((prev) =>
+            prev.map((acc) =>
+              acc.id === evt.id
+                ? {
+                    ...acc,
+                    org_name: (evt.org_name as string) ?? null,
+                    user_count: (evt.user_count as number) ?? acc.user_count,
+                    license_status: (evt.license_status as LicenseStatus) ?? acc.license_status,
+                  }
+                : acc
+            )
+          );
+          setCheckAllProgress((prev) => {
+            if (!prev) return prev;
+            const ids = new Set(prev.checkingIds);
+            ids.delete(evt.id as number);
+            return {
+              ...prev,
+              completed: evt.completed as number,
+              failed: evt.failed as number,
+              checkingIds: ids,
+            };
+          });
+          break;
+        case "error":
+          setCheckAllProgress((prev) => {
+            if (!prev) return prev;
+            const ids = new Set(prev.checkingIds);
+            ids.delete(evt.id as number);
+            return {
+              ...prev,
+              completed: evt.completed as number,
+              failed: evt.failed as number,
+              checkingIds: ids,
+            };
+          });
+          break;
+        case "complete":
+          setCheckAllProgress((prev) =>
+            prev
+              ? { ...prev, completed: evt.completed as number, failed: evt.failed as number, checkingIds: new Set() }
+              : null
+          );
+          break;
+        case "auto_assign_start":
+          setAutoAssignPhase("running");
+          break;
+        case "auto_assign_done":
+          setAutoAssignPhase("done");
+          setAutoAssignResult({
+            assigned: (evt.assigned as number) ?? 0,
+            skipped: (evt.skipped as number) ?? 0,
+          });
+          loadAccounts();
+          break;
+        case "auto_assign_error":
+          setAutoAssignPhase("done");
+          setCheckError(`Auto-assign: ${evt.error as string}`);
+          break;
+        case "auto_assign_progress":
+          break;
+        case "fatal":
+          setCheckError(evt.error as string);
+          break;
+      }
+    }
+  }, [isCheckingAll]);
+
+  const handleCancelCheckAll = useCallback(() => {
+    checkAllAbortRef.current?.abort();
+    setCheckAllProgress(null);
+  }, []);
 
   const handleDeleteUser = (accountId: number, userEmail: string) => {
     setCheckError(null);
@@ -174,7 +332,83 @@ export default function RenewAdobeAdmin() {
             Danh sách tài khoản admin dùng cho Renew Adobe
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          {isCheckingAll ? (
+            <button
+              type="button"
+              onClick={handleCancelCheckAll}
+              className="rounded-xl bg-rose-500/20 text-rose-300 border border-rose-400/40 px-4 py-2 text-sm font-semibold hover:bg-rose-500/30 transition-colors"
+            >
+              Hủy Check All
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCheckAll}
+              disabled={loading || accounts.length === 0 || checkingId !== null}
+              className="rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-4 py-2 text-sm font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Check All
+            </button>
+          )}
+        </div>
       </div>
+
+      {checkAllProgress && checkAllProgress.total > 0 && (
+        <div className="rounded-2xl bg-gradient-to-r from-slate-800/70 to-slate-900/70 border border-white/10 p-4 space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/80 font-medium">
+              {isCheckingAll
+                ? "Đang check..."
+                : autoAssignPhase === "running"
+                  ? "Đang phân bổ user..."
+                  : "Hoàn tất"}
+              {" "}
+              <span className="text-indigo-300 tabular-nums">
+                {checkAllProgress.completed}/{checkAllProgress.total}
+              </span>
+              {checkAllProgress.failed > 0 && (
+                <span className="text-rose-400 ml-2">
+                  ({checkAllProgress.failed} lỗi)
+                </span>
+              )}
+              {autoAssignPhase === "done" && autoAssignResult && (
+                <span className="text-emerald-400 ml-2">
+                  — Đã gán {autoAssignResult.assigned} user
+                  {autoAssignResult.skipped > 0 && `, ${autoAssignResult.skipped} bỏ qua (hết slot)`}
+                </span>
+              )}
+            </span>
+            {!isCheckingAll && autoAssignPhase !== "running" && (
+              <button
+                type="button"
+                onClick={() => { setCheckAllProgress(null); setAutoAssignPhase("idle"); setAutoAssignResult(null); }}
+                className="text-white/40 hover:text-white/70 text-xs transition-colors"
+              >
+                Đóng
+              </button>
+            )}
+          </div>
+          <div className="h-2 rounded-full bg-slate-700/80 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                autoAssignPhase === "running"
+                  ? "bg-gradient-to-r from-violet-500 to-fuchsia-400 animate-pulse"
+                  : checkAllProgress.failed > 0 && !isCheckingAll
+                    ? "bg-gradient-to-r from-indigo-500 to-amber-500"
+                    : isCheckingAll
+                      ? "bg-gradient-to-r from-indigo-500 to-cyan-400"
+                      : "bg-gradient-to-r from-emerald-500 to-cyan-400"
+              }`}
+              style={{
+                width: autoAssignPhase === "running"
+                  ? "100%"
+                  : `${Math.round((checkAllProgress.completed / checkAllProgress.total) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="relative w-full max-w-md">
@@ -294,8 +528,12 @@ export default function RenewAdobeAdmin() {
               ) : (
                 currentRows.map((item) => {
                   const acc = item as AdobeAdminAccount;
+                  const isBeingChecked = checkAllProgress?.checkingIds.has(acc.id);
                   return (
-                    <tr key={acc.id}>
+                    <tr
+                      key={acc.id}
+                      className={isBeingChecked ? "bg-indigo-500/10 animate-pulse" : ""}
+                    >
                       <td className="px-2 sm:px-4 py-3 text-sm text-white/90 break-all">
                         {acc.email}
                       </td>
@@ -315,10 +553,14 @@ export default function RenewAdobeAdmin() {
                         <button
                           type="button"
                           onClick={() => handleCheck(acc)}
-                          disabled={checkingId !== null}
+                          disabled={checkingId !== null || isCheckingAll}
                           className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {checkingId === acc.id ? "Đang check..." : "Check"}
+                          {checkingId === acc.id
+                            ? "Đang check..."
+                            : isBeingChecked
+                              ? "Checking..."
+                              : "Check"}
                         </button>
                       </td>
                     </tr>

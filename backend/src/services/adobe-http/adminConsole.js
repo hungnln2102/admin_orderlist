@@ -13,14 +13,19 @@ const logger = require("../../utils/logger");
 const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE, ADMIN_CONSOLE_CLIENT_ID } = require("./constants");
 
 /**
- * Lấy org ID bằng nhiều chiến lược:
+ * Lấy org ID + org name bằng nhiều chiến lược:
  * 1. Parse từ Admin Console redirect URL
  * 2. Parse từ HTML response
  * 3. Gọi JIL API /organizations
  * 4. Gọi IMS profile
+ *
+ * @returns {{ orgId: string, orgName: string|null }} hoặc null nếu không tìm được
  */
 async function getOrgId(client, accessToken) {
   logger.info("[adobe-http] Lấy org ID...");
+
+  let foundOrgId = null;
+  let foundOrgName = null;
 
   // Strategy 1: Admin Console redirect URL
   try {
@@ -33,20 +38,22 @@ async function getOrgId(client, accessToken) {
     const orgMatch = finalUrl.match(/\/([A-Fa-f0-9]+)@AdobeOrg/);
     if (orgMatch) {
       logger.info("[adobe-http] Org ID (redirect URL): %s", orgMatch[1]);
-      return orgMatch[1];
+      foundOrgId = orgMatch[1];
     }
 
-    const html = typeof res.data === "string" ? res.data : "";
-    const htmlMatch = html.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
-    if (htmlMatch) {
-      logger.info("[adobe-http] Org ID (HTML): %s", htmlMatch[1]);
-      return htmlMatch[1];
+    if (!foundOrgId) {
+      const html = typeof res.data === "string" ? res.data : "";
+      const htmlMatch = html.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
+      if (htmlMatch) {
+        logger.info("[adobe-http] Org ID (HTML): %s", htmlMatch[1]);
+        foundOrgId = htmlMatch[1];
+      }
     }
   } catch (e) {
     logger.debug("[adobe-http] getOrgId strategy 1 error: %s", e.message);
   }
 
-  // Strategy 2: JIL API organizations list (cần Bearer token)
+  // Strategy 2: JIL API organizations list (cần Bearer token) — also extracts org name
   if (accessToken) {
     try {
       const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
@@ -58,9 +65,15 @@ async function getOrgId(client, accessToken) {
         for (const org of orgs) {
           const id = org.orgId || org.id || org.orgRef;
           if (id) {
-            const clean = String(id).replace(/@AdobeOrg$/, "");
-            logger.info("[adobe-http] Org ID (JIL API): %s", clean);
-            return clean;
+            if (!foundOrgId) {
+              foundOrgId = String(id).replace(/@AdobeOrg$/, "");
+              logger.info("[adobe-http] Org ID (JIL API): %s", foundOrgId);
+            }
+            if (!foundOrgName) {
+              foundOrgName = org.name || org.orgName || org.displayName || null;
+              if (foundOrgName) logger.info("[adobe-http] Org Name (JIL API): %s", foundOrgName);
+            }
+            break;
           }
         }
       }
@@ -70,7 +83,7 @@ async function getOrgId(client, accessToken) {
   }
 
   // Strategy 3: IMS profile (cần Bearer token)
-  if (accessToken) {
+  if (!foundOrgId && accessToken) {
     try {
       const res = await client.get(`${ADOBE_IMS_BASE}/ims/profile/v1`, {
         timeout: 10000,
@@ -81,13 +94,17 @@ async function getOrgId(client, accessToken) {
         const m = body.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
         if (m) {
           logger.info("[adobe-http] Org ID (IMS profile): %s", m[1]);
-          return m[1];
+          foundOrgId = m[1];
         }
-        const projOrg = res.data.projectedProductContext?.[0]?.prodCtx?.ownedBy;
-        if (projOrg) {
-          const clean = String(projOrg).replace(/@AdobeOrg$/, "");
-          logger.info("[adobe-http] Org ID (IMS projectedProductContext): %s", clean);
-          return clean;
+        if (!foundOrgId) {
+          const projOrg = res.data.projectedProductContext?.[0]?.prodCtx?.ownedBy;
+          if (projOrg) {
+            foundOrgId = String(projOrg).replace(/@AdobeOrg$/, "");
+            logger.info("[adobe-http] Org ID (IMS projectedProductContext): %s", foundOrgId);
+          }
+        }
+        if (!foundOrgName && res.data.displayName) {
+          foundOrgName = res.data.displayName;
         }
       }
     } catch (e) {
@@ -95,8 +112,29 @@ async function getOrgId(client, accessToken) {
     }
   }
 
-  logger.warn("[adobe-http] Không tìm được org ID qua bất kỳ strategy nào");
-  return null;
+  // Strategy 4: nếu có orgId nhưng chưa có orgName → gọi JIL org detail
+  if (foundOrgId && !foundOrgName && accessToken) {
+    try {
+      const res = await client.get(
+        `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${foundOrgId}@AdobeOrg`,
+        { timeout: 10000, headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": ADMIN_CONSOLE_CLIENT_ID } }
+      );
+      if (res.status === 200 && res.data) {
+        foundOrgName = res.data.name || res.data.orgName || res.data.displayName || null;
+        if (foundOrgName) logger.info("[adobe-http] Org Name (JIL detail): %s", foundOrgName);
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] getOrgId JIL detail error: %s", e.message);
+    }
+  }
+
+  if (!foundOrgId) {
+    logger.warn("[adobe-http] Không tìm được org ID qua bất kỳ strategy nào");
+    return null;
+  }
+
+  logger.info("[adobe-http] Org result: id=%s, name=%s", foundOrgId, foundOrgName || "(null)");
+  return { orgId: foundOrgId, orgName: foundOrgName };
 }
 
 /**
@@ -352,4 +390,60 @@ async function removeUser(client, orgId, accessToken, email) {
   }
 }
 
-module.exports = { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser };
+/**
+ * Gắn product cho user đã có trong org.
+ * Thử 2 cách:
+ *   1) JIL API: POST .../products/{productId}/users
+ *   2) UMAPI action: add { product: [name] }
+ */
+async function assignProductToUsers(client, orgId, accessToken, emails, products) {
+  if (!products?.length || !emails?.length) return { success: false, error: "Thiếu product hoặc emails" };
+
+  const hdrs = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
+  };
+
+  // --- Cách 1: JIL API POST products/{pid}/users ---
+  for (const p of products) {
+    if (!p.id) continue;
+    const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products/${p.id}/users`;
+    try {
+      const body = emails.map((e) => ({ email: e }));
+      const res = await client.post(url, body, { headers: hdrs, timeout: 20000 });
+      if (res.status >= 200 && res.status < 300) {
+        logger.info("[adobe-http] assignProduct JIL OK: product=%s, users=%s", p.id, emails.length);
+        return { success: true, method: "jil", productId: p.id };
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] assignProduct JIL %s error: %s", p.id, e.message);
+    }
+  }
+
+  // --- Cách 2: UMAPI action add product ---
+  const productNames = products.map((p) => p.name).filter(Boolean);
+  if (productNames.length > 0) {
+    const commands = emails.map((email) => ({
+      user: email,
+      requestID: `assign_${email}_${Date.now()}`,
+      do: [{ add: { product: productNames } }],
+    }));
+    const url = `${USER_MANAGEMENT_API}/v2/usermanagement/action/${orgId}@AdobeOrg`;
+    try {
+      const res = await client.post(url, commands, { headers: hdrs, timeout: 20000 });
+      if (res.status === 200) {
+        logger.info("[adobe-http] assignProduct UMAPI OK: products=%s, users=%s", productNames.join(","), emails.length);
+        return { success: true, method: "umapi", productNames };
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] assignProduct UMAPI error: %s", e.message);
+    }
+  }
+
+  logger.warn("[adobe-http] assignProduct: tất cả phương thức thất bại cho %s users", emails.length);
+  return { success: false, error: "Không gắn được product" };
+}
+
+module.exports = { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers };

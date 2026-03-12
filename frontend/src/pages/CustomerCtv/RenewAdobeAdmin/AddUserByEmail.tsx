@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 
-const MAX_USERS_PER_ACCOUNT = 11;
+const MAX_USERS_PER_ACCOUNT = 10;
 
 export type AccountForAdd = {
   id: number;
@@ -107,6 +107,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
           setEmailInput("");
         }
         onAdded?.();
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         setError(data?.error ?? data?.message ?? "Thêm người dùng thất bại.");
         if (data?.distribution) setLastDistribution(data.distribution);
@@ -122,7 +123,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
     <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
       <h3 className="text-sm font-semibold text-white/90 mb-1">Thêm người dùng (chia nhiều tài khoản)</h3>
       <p className="text-xs text-white/50 mb-3">
-        Chọn một hoặc nhiều tài khoản còn gói, nhập email cần thêm. Hệ thống tự phân bổ theo slot còn trống (tối đa 11
+        Chọn một hoặc nhiều tài khoản còn gói, nhập email cần thêm. Hệ thống tự phân bổ theo slot còn trống (tối đa 10
         user/tài khoản).
       </p>
 
@@ -144,7 +145,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
                     className="rounded border-white/20 bg-slate-900/50 text-emerald-500 focus:ring-emerald-500"
                   />
                   <label htmlFor={`acc-${a.id}`} className="text-xs text-white/80 cursor-pointer flex-1">
-                    {a.email} — {a.user_count ?? 0}/11 (còn {slotLeft} slot)
+                    {a.email} — {a.user_count ?? 0}/10 (còn {slotLeft} slot)
                   </label>
                 </li>
               );
@@ -202,7 +203,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
             ) : (
               <p key={d.accountId} className="text-emerald-400/90">
                 {d.accountEmail}: đã thêm {d.added?.length ?? 0} user
-                {d.user_count_after != null ? ` (sau: ${d.user_count_after}/11)` : ""}.
+                {d.user_count_after != null ? ` (sau: ${d.user_count_after}/10)` : ""}.
               </p>
             )
           )}
