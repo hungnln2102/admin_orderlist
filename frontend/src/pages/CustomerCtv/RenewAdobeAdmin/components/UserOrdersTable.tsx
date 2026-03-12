@@ -76,12 +76,18 @@ function buildEmailOrderMap(orders: OrderInfo[]): Map<string, OrderInfo> {
   return map;
 }
 
-/** Flatten users từ users_snapshot + match với order data → UserOrderRow */
+/**
+ * Nguồn chính = đơn hàng (emailOrderMap từ key_active + order_list).
+ * Match ngược vào users_snapshot để lấy Profile (org_name) & trạng thái product.
+ */
 function flattenToUserRows(
   accounts: AdobeAdminAccount[],
   emailOrderMap: Map<string, OrderInfo>
 ): UserOrderRow[] {
-  const rows: UserOrderRow[] = [];
+  // Build lookup: email → snapshot info (account nào chứa user này)
+  type SnapInfo = { accountId: number; orgName: string; product: boolean | string | undefined; licenseStatus: LicenseStatus };
+  const snapLookup = new Map<string, SnapInfo>();
+
   for (const acc of accounts) {
     let users: SnapshotUser[] = [];
     if (acc.users_snapshot) {
@@ -91,37 +97,39 @@ function flattenToUserRows(
         users = [];
       }
     }
-    if (users.length > 0) {
-      for (const u of users) {
-        if (u.email) {
-          const matched = emailOrderMap.get(u.email.toLowerCase().trim());
-          rows.push({
-            id: `acc-${acc.id}-${u.email}`,
-            order_code: matched?.order_code ?? "—",
-            customer_name: matched?.customer || u.name || "—",
-            email: u.email,
-            profile: acc.org_name ?? "—",
-            display_status: resolveDisplayStatus(u.product, acc.license_status),
-            expiry: matched?.expiry_date
-              ? Helpers.formatDateToDMY(matched.expiry_date)
-              : "—",
-            accountId: acc.id,
-          });
-        }
+    for (const u of users) {
+      const key = (u.email || "").toLowerCase().trim();
+      if (key && !snapLookup.has(key)) {
+        snapLookup.set(key, {
+          accountId: acc.id,
+          orgName: acc.org_name ?? "—",
+          product: u.product,
+          licenseStatus: acc.license_status,
+        });
       }
-    } else {
-      rows.push({
-        id: `acc-${acc.id}-admin`,
-        order_code: "—",
-        customer_name: acc.org_name ?? "—",
-        email: acc.email,
-        profile: acc.org_name ?? "—",
-        display_status: acc.license_status,
-        expiry: "—",
-        accountId: acc.id,
-      });
     }
   }
+
+  // Duyệt từ đơn hàng → tạo row
+  const rows: UserOrderRow[] = [];
+  for (const [email, order] of emailOrderMap) {
+    const snap = snapLookup.get(email);
+    rows.push({
+      id: snap ? `acc-${snap.accountId}-${email}` : `order-${email}`,
+      order_code: order.order_code ?? "—",
+      customer_name: order.customer || "—",
+      email,
+      profile: snap?.orgName ?? "—",
+      display_status: snap
+        ? resolveDisplayStatus(snap.product, snap.licenseStatus)
+        : "unknown",
+      expiry: order.expiry_date
+        ? Helpers.formatDateToDMY(order.expiry_date)
+        : "—",
+      accountId: snap?.accountId ?? 0,
+    });
+  }
+
   return rows;
 }
 
@@ -146,12 +154,16 @@ export type UserOrdersTableProps = {
   accounts: AdobeAdminAccount[];
   onDeleteUser?: (accountId: number, userEmail: string) => void;
   deletingId?: string | null;
+  onFixUser?: (userEmail: string) => void;
+  fixingId?: string | null;
 };
 
 export function UserOrdersTable({
   accounts,
   onDeleteUser,
   deletingId,
+  onFixUser,
+  fixingId,
 }: UserOrdersTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
@@ -230,14 +242,24 @@ export function UserOrdersTable({
                       <p className="text-xs text-white/60">Profile: {row.profile}</p>
                       <StatusBadge status={row.display_status} />
                       <p className="text-xs text-white/70">Hạn: {row.expiry}</p>
-                      {onDeleteUser && (
+                      {row.accountId > 0 && onDeleteUser && (
                         <button
                           type="button"
                           onClick={() => onDeleteUser(row.accountId, row.email)}
-                          disabled={!!deletingId}
+                          disabled={!!deletingId || !!fixingId}
                           className="mt-2 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold"
                         >
                           Xóa
+                        </button>
+                      )}
+                      {row.accountId === 0 && onFixUser && (
+                        <button
+                          type="button"
+                          onClick={() => onFixUser(row.email)}
+                          disabled={!!fixingId || !!deletingId}
+                          className="mt-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold"
+                        >
+                          {fixingId === row.email ? "Đang fix..." : "Fix"}
                         </button>
                       )}
                     </div>
@@ -289,14 +311,24 @@ export function UserOrdersTable({
                       {row.expiry}
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-center">
-                      {onDeleteUser && (
+                      {row.accountId > 0 && onDeleteUser && (
                         <button
                           type="button"
                           onClick={() => onDeleteUser(row.accountId, row.email)}
-                          disabled={!!deletingId}
+                          disabled={!!deletingId || !!fixingId}
                           className="rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Xóa
+                        </button>
+                      )}
+                      {row.accountId === 0 && onFixUser && (
+                        <button
+                          type="button"
+                          onClick={() => onFixUser(row.email)}
+                          disabled={!!fixingId || !!deletingId}
+                          className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {fixingId === row.email ? "Đang fix..." : "Fix"}
                         </button>
                       )}
                     </td>

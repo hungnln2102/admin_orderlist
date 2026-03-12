@@ -756,6 +756,82 @@ const runAutoAssign = async (_req, res) => {
   }
 };
 
+/**
+ * POST /api/renew-adobe/fix-user
+ * Fix thủ công 1 email: add vào tài khoản còn gói & còn slot + gắn product.
+ */
+const fixSingleUser = async (req, res) => {
+  const userEmail = (req.body?.email || "").toString().trim().toLowerCase();
+  if (!userEmail) return res.status(400).json({ error: "Thiếu email." });
+
+  try {
+    // Tìm tài khoản còn gói & còn slot (ít slot trống nhất trước)
+    const accounts = await db(TABLE)
+      .select(
+        COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.ORG_NAME,
+        COLS.LICENSE_STATUS, COLS.USER_COUNT,
+        COLS.ALERT_CONFIG, COLS.MAIL_BACKUP_ID
+      )
+      .where(COLS.IS_ACTIVE, true)
+      .orderBy(COLS.ID, "asc");
+
+    const available = accounts
+      .filter((a) => {
+        const ls = (a[COLS.LICENSE_STATUS] || "").toLowerCase();
+        return ls !== "expired" && ls !== "unknown";
+      })
+      .map((a) => ({
+        ...a,
+        currentCount: Math.max(0, parseInt(a[COLS.USER_COUNT], 10) || 0),
+      }))
+      .filter((a) => a.currentCount < MAX_USERS_PER_ACCOUNT)
+      .sort((a, b) => {
+        const slotsA = MAX_USERS_PER_ACCOUNT - a.currentCount;
+        const slotsB = MAX_USERS_PER_ACCOUNT - b.currentCount;
+        return slotsA - slotsB;
+      });
+
+    if (available.length === 0) {
+      return res.status(400).json({ success: false, error: "Không có tài khoản nào còn slot." });
+    }
+
+    const target = available[0];
+    const accId = target[COLS.ID];
+    const accEmail = target[COLS.EMAIL];
+    const accPwd = target[COLS.PASSWORD_ENC] || "";
+    const mailBackupId = target[COLS.MAIL_BACKUP_ID] != null ? Number(target[COLS.MAIL_BACKUP_ID]) : null;
+
+    logger.info("[renew-adobe] fixSingleUser: email=%s → account=%s", userEmail, accId);
+
+    const result = await adobeHttp.addUsersWithProduct(accEmail, accPwd, [userEmail], {
+      savedCookiesFromDb: target[COLS.ALERT_CONFIG] || null,
+      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+      _orgName: target[COLS.ORG_NAME],
+    });
+
+    const updatePayload = {
+      [COLS.USER_COUNT]: Number.isFinite(result.userCount) ? result.userCount : 0,
+      [COLS.USERS_SNAPSHOT]: JSON.stringify(result.manageTeamMembers || []),
+      [COLS.LICENSE_STATUS]: result.licenseStatus ?? target[COLS.LICENSE_STATUS],
+    };
+    if (result.savedCookies) {
+      updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
+    }
+    await db(TABLE).where(COLS.ID, accId).update(updatePayload);
+
+    return res.json({
+      success: true,
+      message: `Đã gán ${userEmail} vào ${accEmail}.`,
+      accountId: accId,
+      accountEmail: accEmail,
+      profile: target[COLS.ORG_NAME] ?? "—",
+    });
+  } catch (err) {
+    logger.error("[renew-adobe] fixSingleUser failed", { email: userEmail, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   listAccounts,
   lookupAccountByEmail,
@@ -771,4 +847,5 @@ module.exports = {
   listUserOrders,
   autoAssignUsers,
   runAutoAssign,
+  fixSingleUser,
 };

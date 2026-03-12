@@ -268,6 +268,8 @@ export default function RenewAdobeAdmin() {
     setCheckAllProgress(null);
   }, []);
 
+  const [fixingId, setFixingId] = useState<string | null>(null);
+
   const handleDeleteUser = (accountId: number, userEmail: string) => {
     setCheckError(null);
     const key = `acc-${accountId}-${userEmail}`;
@@ -285,6 +287,24 @@ export default function RenewAdobeAdmin() {
       })
       .catch((err) => setCheckError(err?.message ?? "Lỗi khi xóa user."))
       .finally(() => setDeletingId(null));
+  };
+
+  const handleFixUser = (userEmail: string) => {
+    setCheckError(null);
+    setFixingId(userEmail);
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USER}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email: userEmail }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success) loadAccounts();
+        else throw new Error(data?.error ?? "Fix thất bại");
+      })
+      .catch((err) => setCheckError(err?.message ?? "Lỗi khi fix user."))
+      .finally(() => setFixingId(null));
   };
 
   const handleCheck = (acc: AdobeAdminAccount) => {
@@ -589,6 +609,8 @@ export default function RenewAdobeAdmin() {
           accounts={accounts}
           onDeleteUser={handleDeleteUser}
           deletingId={deletingId}
+          onFixUser={handleFixUser}
+          fixingId={fixingId}
         />
         <AddUserByEmail accounts={accounts} onAdded={loadAccounts} />
       </div>
