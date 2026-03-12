@@ -147,9 +147,12 @@ async function runCheckForAccountId(id) {
   const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
   logger.info("[renew-adobe] Check account", { id, email });
 
+  const existingUrlAccess = (COLS.URL_ACCESS && account[COLS.URL_ACCESS]) || null;
+
   const result = await adobeHttp.checkAccount(email, password, {
     savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
     mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+    existingUrlAccess,
   });
 
   if (!result.success) {
@@ -165,6 +168,9 @@ async function runCheckForAccountId(id) {
   };
   if (sd.manageTeamMembers && Array.isArray(sd.manageTeamMembers)) {
     updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(sd.manageTeamMembers);
+  }
+  if (sd.urlAccess && COLS.URL_ACCESS) {
+    updatePayload[COLS.URL_ACCESS] = sd.urlAccess;
   }
   if (COLS.ALERT_CONFIG && result.savedCookies) {
     updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
@@ -832,6 +838,22 @@ const fixSingleUser = async (req, res) => {
   }
 };
 
+/** PATCH /api/renew-adobe/accounts/:id/url-access */
+const updateUrlAccess = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
+
+  const urlAccess = (req.body?.url_access ?? "").toString().trim();
+
+  try {
+    await db(TABLE).where(COLS.ID, id).update({ [COLS.URL_ACCESS]: urlAccess || null });
+    return res.json({ success: true, url_access: urlAccess || null });
+  } catch (err) {
+    logger.error("[renew-adobe] updateUrlAccess failed", { id, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   listAccounts,
   lookupAccountByEmail,
@@ -848,4 +870,5 @@ module.exports = {
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,
+  updateUrlAccess,
 };

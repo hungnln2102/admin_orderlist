@@ -69,6 +69,8 @@ export const API_ENDPOINTS = {
   RENEW_ADOBE_CHECK_ALL: "/api/renew-adobe/accounts/check-all",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
+  RENEW_ADOBE_URL_ACCESS: (id: number) =>
+    `/api/renew-adobe/accounts/${id}/url-access`,
 
   CUSTOMER_STATUS: "/api/customer-status",
 };

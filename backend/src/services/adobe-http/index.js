@@ -13,7 +13,8 @@
 const logger = require("../../utils/logger");
 const { loginViaHttp } = require("./login");
 const { loginWithPlaywright } = require("./loginBrowser");
-const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers } = require("./adminConsole");
+const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers, removeProductFromUser } = require("./adminConsole");
+const autoAssignBrowser = require("./autoAssignBrowser");
 const { exportCookies, createHttpClient, importCookies } = require("./httpClient");
 
 /**
@@ -84,6 +85,18 @@ async function checkAccount(email, password, options = {}) {
     const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
 
     const adminEmail = email.toLowerCase().trim();
+
+    // Admin KHÔNG ĐƯỢC giữ product → chỉ remove khi user data xác nhận admin thực sự có product
+    const paidProducts = productInfo.products.filter((p) => !p.isFree);
+    const adminUser = users.find((u) => (u.email || "").toLowerCase().trim() === adminEmail);
+    const adminHasPaidProduct = adminUser?.products?.some((p) => paidProductIds.includes(p.id));
+    if (adminHasPaidProduct && paidProducts.length > 0) {
+      logger.info("[adobe-http] Admin %s đang giữ paid product (xác nhận từ user data) → removing...", adminEmail);
+      await removeProductFromUser(client, orgId, accessToken, adminEmail, paidProducts);
+    } else {
+      logger.info("[adobe-http] Admin %s không giữ paid product → bỏ qua remove", adminEmail);
+    }
+
     const manageTeamMembers = users
       .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
       .map((u) => ({
@@ -91,6 +104,26 @@ async function checkAccount(email, password, options = {}) {
         email: u.email || "",
         product: productEmails.has((u.email || "").toLowerCase().trim()),
       }));
+
+    // Auto-assign URL: chỉ chạy khi DB chưa có url_access
+    let urlAccess = options.existingUrlAccess || null;
+    let browserCookies = null;
+    if (!urlAccess && paidProducts.length > 0) {
+      try {
+        const dbCookies = options.savedCookiesFromDb?.cookies || [];
+        const mailBackupId = options.mailBackupId || null;
+        const pwResult = await autoAssignBrowser.getOrCreateAutoAssignUrl(orgId, email, password, {
+          savedCookies: dbCookies,
+          mailBackupId,
+        });
+        urlAccess = pwResult.url;
+        browserCookies = pwResult.savedCookies;
+      } catch (e) {
+        logger.warn("[adobe-http] autoAssignBrowser error: %s", e.message);
+      }
+    } else if (urlAccess) {
+      logger.info("[adobe-http] url_access đã có trong DB, bỏ qua: %s", urlAccess);
+    }
 
     const scrapedData = {
       orgName: orgName || null,
@@ -100,14 +133,19 @@ async function checkAccount(email, password, options = {}) {
       profileName: null,
       manageTeamMembers,
       adminConsoleUsers: users,
+      urlAccess,
     };
 
-    // Save cookies + access token cùng nhau
+    // Merge cookies: ưu tiên browser cookies từ Playwright (fresh session)
     const savedCookies = exportCookies(jar);
     savedCookies.accessToken = accessToken;
+    if (browserCookies && browserCookies.length > 0) {
+      savedCookies.cookies = browserCookies;
+      logger.info("[adobe-http] Cập nhật cookies từ Playwright browser (%d cookies)", browserCookies.length);
+    }
 
-    logger.info("[adobe-http] checkAccount xong: org=%s, users=%s, license=%s",
-      orgId, users.length, productInfo.licenseStatus);
+    logger.info("[adobe-http] checkAccount xong: org=%s, users=%s, license=%s, urlAccess=%s",
+      orgId, users.length, productInfo.licenseStatus, urlAccess || "(none)");
 
     return { success: true, scrapedData, savedCookies };
   } catch (err) {
@@ -179,12 +217,22 @@ async function addUsersWithProduct(email, password, userEmails, options = {}) {
     assignResult = await assignProductToUsers(client, orgId, accessToken, userEmails, paidProducts);
   }
 
-  // 4. Re-fetch users → build snapshot mới
+  // 4. Admin KHÔNG ĐƯỢC giữ product → remove nếu có
+  const adminEmail = email.toLowerCase().trim();
+  if (paidProducts.length > 0) {
+    const paidProductIds = paidProducts.map((p) => p.id);
+    const checkAdminProduct = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
+    if (checkAdminProduct.has(adminEmail)) {
+      logger.info("[adobe-http] Admin %s đang giữ product sau add → removing...", adminEmail);
+      await removeProductFromUser(client, orgId, accessToken, adminEmail, paidProducts);
+    }
+  }
+
+  // 5. Re-fetch users → build snapshot mới
   const users = await getUsers(client, orgId, accessToken);
   const paidProductIds = paidProducts.map((p) => p.id);
   const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
 
-  const adminEmail = email.toLowerCase().trim();
   const manageTeamMembers = users
     .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
     .map((u) => ({

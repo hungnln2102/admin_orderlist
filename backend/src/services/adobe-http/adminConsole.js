@@ -446,4 +446,57 @@ async function assignProductToUsers(client, orgId, accessToken, emails, products
   return { success: false, error: "Không gắn được product" };
 }
 
-module.exports = { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers };
+/**
+ * Remove product khỏi 1 user (dùng để đảm bảo admin không giữ product slot).
+ * Thử UMAPI action remove → fallback JIL DELETE.
+ */
+async function removeProductFromUser(client, orgId, accessToken, email, products) {
+  if (!products?.length || !email) return { success: false };
+
+  const hdrs = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
+  };
+
+  // UMAPI action: remove product
+  const productNames = products.map((p) => p.name).filter(Boolean);
+  if (productNames.length > 0) {
+    const commands = [{
+      user: email,
+      requestID: `rmprod_${email}_${Date.now()}`,
+      do: [{ remove: { product: productNames } }],
+    }];
+    const url = `${USER_MANAGEMENT_API}/v2/usermanagement/action/${orgId}@AdobeOrg`;
+    try {
+      const res = await client.post(url, commands, { headers: hdrs, timeout: 20000 });
+      if (res.status === 200) {
+        logger.info("[adobe-http] removeProductFromUser UMAPI OK: %s", email);
+        return { success: true, method: "umapi" };
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] removeProductFromUser UMAPI error: %s", e.message);
+    }
+  }
+
+  // Fallback: JIL DELETE products/{pid}/users/{email}
+  for (const p of products) {
+    if (!p.id) continue;
+    const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products/${p.id}/users/${encodeURIComponent(email)}`;
+    try {
+      const res = await client.delete(url, { headers: hdrs, timeout: 20000 });
+      if (res.status >= 200 && res.status < 300) {
+        logger.info("[adobe-http] removeProductFromUser JIL OK: product=%s, %s", p.id, email);
+        return { success: true, method: "jil" };
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] removeProductFromUser JIL %s error: %s", p.id, e.message);
+    }
+  }
+
+  logger.warn("[adobe-http] removeProductFromUser failed for %s", email);
+  return { success: false };
+}
+
+module.exports = { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers, removeProductFromUser };

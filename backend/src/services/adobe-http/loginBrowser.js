@@ -721,4 +721,14 @@ function normalizeSameSite(s) {
   return "Lax";
 }
 
-module.exports = { loginWithPlaywright };
+module.exports = {
+  loginWithPlaywright,
+  toPwCookies,
+  fromPwCookies,
+  detectScreen,
+  enterPassword,
+  handle2FA,
+  maybeSkipSecurityPrompt,
+  handleProgressiveProfile,
+  extractTokenFromPage,
+};
