@@ -11,6 +11,7 @@ const LOGIN_PAGE_URL =
   "https://auth.services.adobe.com/en_US/index.html?client_id=homepage_milo&scope=AdobeID%2Copenid%2Cgnav%2Cpps.read%2Cfirefly_api%2Cadditional_info.roles%2Cread_organizations%2Caccount_cluster.read&response_type=token&redirect_uri=https%3A%2F%2Fwww.adobe.com%2Fhome&flow_type=token&idp_flow_type=login&locale=en_US";
 
 const CLIENT_ID = "homepage_milo";
+const ADMIN_CONSOLE_CLIENT_ID = "ONESIE1";
 
 const DEFAULT_HEADERS = {
   "User-Agent":
@@ -31,6 +32,7 @@ module.exports = {
   ADOBE_WWW,
   LOGIN_PAGE_URL,
   CLIENT_ID,
+  ADMIN_CONSOLE_CLIENT_ID,
   DEFAULT_HEADERS,
   ADMIN_CONSOLE_API_BASE,
   USER_MANAGEMENT_API,

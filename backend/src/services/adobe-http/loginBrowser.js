@@ -8,8 +8,9 @@ const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const mailOtpService = require("../mailOtpService");
 
-const ADOBE_LOGIN_URL =
-  "https://auth.services.adobe.com/en_US/index.html?callback=https%3A%2F%2Fims-na1.adobelogin.com%2Fims%2Fadobeid%2Faac_manage_teams%2FAdobeID%2Ftoken%3Fredirect_uri%3Dhttps%253A%252F%252Fadminconsole.adobe.com%252F&client_id=aac_manage_teams&scope=AdobeID%2Copenid%2Cgnav%2Cread_organizations%2Cadditional_info.roles&denied_callback=https%3A%2F%2Fims-na1.adobelogin.com%2Fims%2Fdenied%2Faac_manage_teams%3Fredirect_uri%3Dhttps%253A%252F%252Fadminconsole.adobe.com%252F%26response_type%3Dtoken&locale=en_US&flow_type=token&idp_flow_type=login&response_type=token&relay=9e0af1a0-36dc-4ac4-8932-9f0eec3fbb00";
+// Navigate tới Admin Console → Adobe tự redirect đến login page với params hợp lệ.
+// Không hardcode relay/session token — tránh "Something went wrong".
+const ADOBE_ENTRY_URL = "https://adminconsole.adobe.com/";
 
 const PASSWORD_SELECTORS = [
   'input[name="password"]',
@@ -27,9 +28,11 @@ const SKIP_RE = /^\s*(not now|skip|bỏ qua|later|skip for now)\s*$/i;
 async function loginWithPlaywright(email, password, options = {}) {
   const { savedCookies = [], mailBackupId = null } = options;
 
-  logger.info("[adobe-login] Khởi động Playwright Chromium headless...");
+  const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
+  logger.info("[adobe-login] Khởi động Playwright Chromium (headless=%s)...", headless);
   const browser = await chromium.launch({
-    headless: true,
+    headless,
+    slowMo: headless ? 0 : 80,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
   });
 
@@ -43,14 +46,36 @@ async function loginWithPlaywright(email, password, options = {}) {
     });
     const page = await context.newPage();
 
+    // Bắt access_token từ URL redirect (token xuất hiện rất ngắn trong URL fragment)
     page.on("framenavigated", async (frame) => {
       if (frame !== page.mainFrame()) return;
       try {
-        const hash = await frame.evaluate(() => window.location.hash).catch(() => "");
-        const m = hash.match(/access_token=([^&]+)/);
+        const url = frame.url() || "";
+        const m = url.match(/access_token=([^&#]+)/);
         if (m && !accessToken) {
           accessToken = decodeURIComponent(m[1]);
-          logger.info("[adobe-login] Captured access_token từ redirect");
+          logger.info("[adobe-login] Captured token từ frame URL");
+        }
+        if (!accessToken) {
+          const hash = await frame.evaluate(() => window.location.hash).catch(() => "");
+          const h = hash.match(/access_token=([^&]+)/);
+          if (h) {
+            accessToken = decodeURIComponent(h[1]);
+            logger.info("[adobe-login] Captured token từ URL hash");
+          }
+        }
+      } catch (_) {}
+    });
+
+    // Bắt token từ response URL (backup — IMS redirect chain)
+    page.on("response", (response) => {
+      if (accessToken) return;
+      try {
+        const url = response.url() || "";
+        const m = url.match(/access_token=([^&#]+)/);
+        if (m) {
+          accessToken = decodeURIComponent(m[1]);
+          logger.info("[adobe-login] Captured token từ response URL");
         }
       } catch (_) {}
     });
@@ -69,6 +94,7 @@ async function loginWithPlaywright(email, password, options = {}) {
 
         await page.waitForTimeout(3000);
         const url1 = page.url();
+        logger.info("[adobe-login] [URL] Sau cookie-login navigate: %s", url1.slice(0, 120));
 
         if (url1.includes("auth.services") || url1.includes("adobelogin.com")) {
           logger.info("[adobe-login] Cookies hết hạn (redirect → login page)");
@@ -95,69 +121,92 @@ async function loginWithPlaywright(email, password, options = {}) {
 
     // --- Form login ---
     logger.info("[adobe-login] Form login: %s", email);
-    await page.goto(ADOBE_LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 90000 }).catch((e) => {
+    await page.goto(ADOBE_ENTRY_URL, { waitUntil: "domcontentloaded", timeout: 90000 }).catch((e) => {
       logger.warn("[adobe-login] Goto login timeout: %s", e.message);
     });
+    // Đợi redirect tới trang login (auth.services.adobe.com)
+    await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, { timeout: 30000 }).catch(() => {});
+    logger.info("[adobe-login] [URL] Đã redirect tới login: %s", page.url().slice(0, 120));
 
     // B1: Nhập email
+    logger.info("[adobe-login] [URL] Trang login: %s", page.url().slice(0, 120));
     const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
     await emailInput.waitFor({ state: "visible", timeout: 45000 });
     await emailInput.click();
     await page.keyboard.type(email, { delay: 25 });
     await page.waitForTimeout(150);
     await page.keyboard.press("Enter");
-    await Promise.race([
-      page.waitForLoadState("domcontentloaded", { timeout: 30000 }),
-      page.waitForTimeout(5000),
-    ]).catch(() => {});
-    await page.waitForTimeout(2000);
 
-    // B2: 2FA sau email
-    await handle2FA(page, mailBackupId);
+    // B2: Đợi xem trang nào xuất hiện (2FA / password / redirect)
+    logger.info("[adobe-login] Đợi phản hồi sau email...");
+    const afterEmail = await detectScreen(page, 15000);
+    logger.info("[adobe-login] Sau email → screen: %s", afterEmail);
 
-    // B3: Nhập password
-    const passwordInput = await waitForPasswordField(page);
-    await passwordInput.click();
-    await page.keyboard.type(password, { delay: 25 });
-    await page.waitForTimeout(150);
-    await page.keyboard.press("Enter");
-    await page.waitForLoadState("networkidle", { timeout: 90000 }).catch(() => {});
-    await page.waitForTimeout(5000);
+    // B3: Xử lý theo screen
+    if (afterEmail === "2fa") {
+      logger.info("[adobe-login] [URL] Trước 2FA: %s", page.url().slice(0, 120));
+      await handle2FA(page, mailBackupId);
+      logger.info("[adobe-login] [URL] Sau 2FA: %s", page.url().slice(0, 120));
+      const after2fa = await detectScreen(page, 10000);
+      logger.info("[adobe-login] Sau 2FA → screen: %s", after2fa);
+      if (after2fa === "password") {
+        await enterPassword(page, password);
+        logger.info("[adobe-login] [URL] Sau password: %s", page.url().slice(0, 120));
+      }
+    } else if (afterEmail === "password") {
+      await enterPassword(page, password);
+      logger.info("[adobe-login] [URL] Sau password: %s", page.url().slice(0, 120));
+      const afterPw = await detectScreen(page, 10000);
+      logger.info("[adobe-login] Sau password → screen: %s", afterPw);
+      if (afterPw === "2fa") {
+        logger.info("[adobe-login] [URL] Trước 2FA: %s", page.url().slice(0, 120));
+        await handle2FA(page, mailBackupId);
+        logger.info("[adobe-login] [URL] Sau 2FA: %s", page.url().slice(0, 120));
+      }
+    } else if (afterEmail === "unknown") {
+      logger.warn("[adobe-login] [URL] Unknown screen: %s", page.url().slice(0, 120));
+    }
 
-    // B4: 2FA sau password
-    await handle2FA(page, mailBackupId);
-
-    // B5: Skip security prompt
+    // B4: Skip security prompt + progressive profile
     await maybeSkipSecurityPrompt(page);
-
-    // B6: Progressive profile (backup email, verify phone, etc.)
     await handleProgressiveProfile(page, mailBackupId);
 
-    // B7: Chờ login thành công
-    logger.info("[adobe-login] Chờ redirect thành công (tối đa 90s)...");
-    await page.waitForFunction(
-      () => {
-        const h = window.location.href;
-        return (
-          h.includes("@AdobeOrg") ||
-          (/^https?:\/\/([a-z0-9-]+\.)*adobe\.com/i.test(h) && !h.includes("auth.services"))
-        );
-      },
-      { timeout: 90000 }
-    );
-    await page.waitForTimeout(2500);
+    // B5: Chờ login thành công
+    if (!isOnAdobeSite(page.url())) {
+      logger.info("[adobe-login] Chờ redirect thành công (tối đa 90s)...");
+      await page.waitForFunction(
+        () => {
+          const h = window.location.href;
+          return (
+            h.includes("@AdobeOrg") ||
+            (/^https?:\/\/([a-z0-9-]+\.)*adobe\.com/i.test(h) && !h.includes("auth.services"))
+          );
+        },
+        { timeout: 90000 }
+      );
+      await page.waitForTimeout(2500);
+    }
 
-    // B8: Thử lấy token nếu chưa có
+    // B6: Lấy token — thử nhiều lần (SPA cần thời gian initialize)
     if (!accessToken) accessToken = await extractTokenFromPage(page);
 
-    // B9: Nếu chưa ở Admin Console, navigate tới đó để lấy thêm cookies
+    // B7: Nếu chưa ở Admin Console, navigate tới đó
     const currentUrl = page.url();
     if (!currentUrl.includes("adminconsole.adobe.com")) {
       logger.info("[adobe-login] Navigate tới Admin Console để lấy cookies...");
-      await page.goto("https://adminconsole.adobe.com/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(3000);
-      if (!accessToken) accessToken = await extractTokenFromPage(page);
+      await page.goto("https://adminconsole.adobe.com/", { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(5000);
     }
+
+    // B8: Retry token extraction — đợi SPA set localStorage
+    if (!accessToken) {
+      for (let i = 0; i < 5; i++) {
+        accessToken = await extractTokenFromPage(page);
+        if (accessToken) break;
+        await page.waitForTimeout(2000);
+      }
+    }
+    logger.info("[adobe-login] Token sau tất cả extraction: %s", accessToken ? "CÓ" : "NULL");
 
     const cookies = await context.cookies();
     logger.info("[adobe-login] Login thành công! URL: %s, hasToken: %s, cookies: %d",
@@ -178,55 +227,225 @@ async function loginWithPlaywright(email, password, options = {}) {
 async function isOnVerifyScreen(page) {
   try {
     const url = page.url();
-    if (/challenge\/verify\/email/i.test(url)) return true;
-    return page.evaluate(() => (document.body?.innerText || "").includes("Verify your identity")).catch(() => false);
+    // Chỉ check URL path (trước dấu ?), không check query string
+    const urlPath = url.split("?")[0];
+    if (/challenge|verify|2fa|mfa|otp/i.test(urlPath)) return true;
+
+    return page
+      .evaluate(() => {
+        const t = (document.body?.innerText || "").toLowerCase();
+        return (
+          t.includes("verify your identity") ||
+          t.includes("verify it's you") ||
+          t.includes("verification code") ||
+          t.includes("security verification") ||
+          t.includes("enter the code") ||
+          t.includes("we sent a code") ||
+          t.includes("we've sent") ||
+          t.includes("we'll send") ||
+          t.includes("send a code") ||
+          t.includes("email verification") ||
+          t.includes("two-step verification") ||
+          t.includes("xác minh") ||
+          t.includes("mã xác nhận") ||
+          /check your .*(email|inbox)/i.test(t) ||
+          /enter.*\d.*digit/i.test(t)
+        );
+      })
+      .catch(() => false);
   } catch (_) {
     return false;
   }
 }
 
-async function handle2FA(page, mailBackupId) {
-  if (!(await isOnVerifyScreen(page))) return;
-  logger.info("[adobe-login] Gặp 2FA Verify screen, bấm Continue...");
-  await page.waitForTimeout(2000);
-  await tryClickContinue(page);
+/**
+ * Detect screen hiện tại dựa vào HEADING hiển thị (đáng tin nhất).
+ * SPA Adobe ẩn/hiện elements bằng CSS, nên check DOM input không tin được.
+ */
+async function detectScreen(page, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const url = page.url();
+    if (isOnAdobeSite(url)) return "done";
+
+    // Check heading text hiển thị — nguồn chính xác nhất
+    const screen = await page.evaluate(() => {
+      for (const el of document.querySelectorAll("h1, h2, h3, [class*='Heading']")) {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        const t = el.textContent.trim().toLowerCase();
+        if (/verify|identity|verification|xác minh/.test(t)) return "2fa";
+        if (/password|mật khẩu/.test(t)) return "password";
+        if (/enter your email|sign in|đăng nhập/.test(t)) return "email";
+      }
+      return null;
+    }).catch(() => null);
+
+    if (screen === "2fa" || screen === "password") return screen;
+
+    // Fallback: Playwright isVisible (đáng tin hơn DOM check)
+    const pwVisible = await page.locator('input[type="password"]:visible').first().isVisible().catch(() => false);
+    if (pwVisible) return "password";
+
+    await page.waitForTimeout(1000);
+  }
+
+  const bodyText = await page.evaluate(() =>
+    (document.body?.innerText || "").slice(0, 300)
+  ).catch(() => "");
+  logger.warn("[adobe-login] detectScreen timeout, url=%s, body=%s", page.url(), bodyText);
+  return "unknown";
+}
+
+function isOnAdobeSite(url) {
+  return (
+    url.includes("@AdobeOrg") ||
+    (url.includes("adminconsole.adobe.com") && !url.includes("auth.services")) ||
+    (url.includes("adobe.com/home") && !url.includes("auth.services"))
+  );
+}
+
+async function enterPassword(page, password) {
+  logger.info("[adobe-login] Nhập password...");
+  const passwordInput = await waitForPasswordField(page);
+  await passwordInput.click();
+  await page.keyboard.type(password, { delay: 25 });
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Enter");
+  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(3000);
+}
+
+async function handle2FA(page, mailBackupId) {
+  logger.info("[adobe-login] Xử lý 2FA screen — url: %s", page.url().slice(0, 120));
+
+  // B1: Bấm Continue → Adobe gửi OTP qua email
+  await page.waitForTimeout(1500);
+  let clicked = await tryClickContinue(page);
+  if (!clicked) {
+    // Retry: đợi thêm rồi thử lại
+    await page.waitForTimeout(3000);
+    clicked = await tryClickContinue(page);
+  }
+  logger.info("[adobe-login] Bấm Continue: %s", clicked ? "OK" : "THẤT BẠI");
+
+  if (!clicked) {
+    logger.warn("[adobe-login] Không bấm được Continue — thử bấm bất kỳ button nào visible");
+    await page.evaluate(() => {
+      const btns = document.querySelectorAll("button, [role='button']");
+      for (const b of btns) {
+        const r = b.getBoundingClientRect();
+        if (r.width > 30 && r.height > 20) { b.click(); break; }
+      }
+    }).catch(() => {});
+  }
+
+  // B2: Đợi trang chuyển sang ô nhập OTP (xác nhận Adobe đã gửi mail)
+  logger.info("[adobe-login] Đợi trang OTP input xuất hiện...");
+  const otpInputAppeared = await waitForOtpInput(page, 15000);
+  logger.info("[adobe-login] OTP input: %s — url: %s",
+    otpInputAppeared ? "có" : "chưa thấy", page.url().slice(0, 120));
+
+  // B3: Bây giờ mới vào IMAP lấy OTP (Adobe đã gửi mail sau khi bấm Continue)
+  logger.info("[adobe-login] Adobe đã gửi OTP → chờ email từ IMAP...");
   await waitForOtpAndFill(page, mailBackupId);
+  logger.info("[adobe-login] Sau OTP — url: %s", page.url().slice(0, 120));
+}
+
+async function waitForOtpInput(page, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const found = await page.evaluate(() => {
+      const selectors = [
+        'input[autocomplete="one-time-code"]',
+        'input[name*="code"]',
+        'input[name*="otp"]',
+        'input[placeholder*="ode"]',
+        'input[type="text"][inputmode="numeric"]',
+        'input[data-testid*="code"]',
+      ];
+      for (const s of selectors) {
+        if (document.querySelector(s)) return true;
+      }
+      // Check for 6 separate digit inputs
+      const numInputs = document.querySelectorAll('input[maxlength="1"]');
+      if (numInputs.length >= 4) return true;
+      return false;
+    }).catch(() => false);
+
+    if (found) return true;
+
+    // Nếu đã chuyển sang trang khác (password, admin console) → không cần OTP
+    const url = page.url();
+    if (url.includes("@AdobeOrg") || !url.includes("auth.services")) return false;
+
+    await page.waitForTimeout(1000);
+  }
+  return false;
 }
 
 async function tryClickContinue(page) {
+  // Strategy 1: Playwright click trực tiếp (giả lập mouse thật)
   try {
-    const btn = page.locator('[data-id="Page-PrimaryButton"]');
-    if (await btn.isVisible({ timeout: 6000 })) {
-      await btn.scrollIntoViewIfNeeded();
-      await btn.click();
-      return true;
-    }
-  } catch (_) {}
+    await page.click('[data-id="Page-PrimaryButton"]', { timeout: 8000 });
+    logger.info("[adobe-login] Click Continue: strategy 1 (data-id selector) OK");
+    return true;
+  } catch (e) {
+    logger.debug("[adobe-login] Strategy 1 fail: %s", e.message);
+  }
 
+  // Strategy 2: getByRole (semantic — tìm button "Continue")
+  try {
+    await page.getByRole("button", { name: /continue/i }).click({ timeout: 5000 });
+    logger.info("[adobe-login] Click Continue: strategy 2 (getByRole) OK");
+    return true;
+  } catch (e) {
+    logger.debug("[adobe-login] Strategy 2 fail: %s", e.message);
+  }
+
+  // Strategy 3: getByText
+  try {
+    await page.getByText("Continue", { exact: true }).click({ timeout: 3000 });
+    logger.info("[adobe-login] Click Continue: strategy 3 (getByText) OK");
+    return true;
+  } catch (e) {
+    logger.debug("[adobe-login] Strategy 3 fail: %s", e.message);
+  }
+
+  // Strategy 4: JavaScript DOM click (bypass mọi overlay/interceptor)
   const clicked = await page.evaluate(() => {
-    const re = /\b(continue|tiếp\s*tục)\b/i;
-    for (const el of document.querySelectorAll("button, [role='button'], a, input[type='submit']")) {
-      const text = (el.textContent || el.getAttribute("aria-label") || "").trim();
-      if (re.test(text)) {
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 2 && rect.height > 2) { el.click(); return true; }
+    const btn = document.querySelector('[data-id="Page-PrimaryButton"]');
+    if (btn) {
+      btn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      return "data-id";
+    }
+    for (const el of document.querySelectorAll("button, [role='button']")) {
+      if (/\bcontinue\b/i.test(el.textContent || "")) {
+        el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        return "text-match";
       }
     }
-    return false;
-  }).catch(() => false);
-  return clicked;
+    return null;
+  }).catch(() => null);
+
+  if (clicked) {
+    logger.info("[adobe-login] Click Continue: strategy 4 (JS dispatch) OK via %s", clicked);
+    return true;
+  }
+
+  logger.warn("[adobe-login] Tất cả click strategies đều thất bại");
+  return false;
 }
 
 async function waitForPasswordField(page) {
   for (const sel of PASSWORD_SELECTORS) {
     try {
       const loc = page.locator(sel).first();
-      await loc.waitFor({ state: "visible", timeout: 8000 });
+      await loc.waitFor({ state: "visible", timeout: 10000 });
       return loc;
     } catch (_) {}
   }
-  throw new Error("Không tìm thấy ô mật khẩu (có thể UI đổi hoặc cần 2FA).");
+  throw new Error("Không tìm thấy ô mật khẩu.");
 }
 
 async function maybeSkipSecurityPrompt(page) {
@@ -283,6 +502,21 @@ async function handleProgressiveProfile(page, mailBackupId) {
 }
 
 async function clickButtonByLabel(page, re, timeoutMs = 15000) {
+  // Strategy 1: Playwright getByRole button
+  try {
+    await page.getByRole("button", { name: re }).click({ timeout: Math.min(timeoutMs, 8000) });
+    logger.info("[adobe-login] clickButtonByLabel(%s): getByRole OK", re.source);
+    return true;
+  } catch (_) {}
+
+  // Strategy 2: Playwright getByText
+  try {
+    await page.getByText(re).first().click({ timeout: 5000 });
+    logger.info("[adobe-login] clickButtonByLabel(%s): getByText OK", re.source);
+    return true;
+  } catch (_) {}
+
+  // Strategy 3: DOM dispatchEvent (fallback)
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const clicked = await page.evaluate(
@@ -292,16 +526,23 @@ async function clickButtonByLabel(page, re, timeoutMs = 15000) {
           const text = (el.textContent || el.getAttribute("aria-label") || "").trim();
           if (re.test(text)) {
             const rect = el.getBoundingClientRect();
-            if (rect.width > 2 && rect.height > 2) { el.click(); return true; }
+            if (rect.width > 2 && rect.height > 2) {
+              el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+              return true;
+            }
           }
         }
         return false;
       },
       re.source, re.flags
     ).catch(() => false);
-    if (clicked) return true;
+    if (clicked) {
+      logger.info("[adobe-login] clickButtonByLabel(%s): DOM dispatch OK", re.source);
+      return true;
+    }
     await page.waitForTimeout(500);
   }
+  logger.warn("[adobe-login] clickButtonByLabel(%s): thất bại", re.source);
   return false;
 }
 

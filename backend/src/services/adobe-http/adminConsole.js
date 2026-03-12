@@ -10,7 +10,7 @@
  */
 
 const logger = require("../../utils/logger");
-const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE } = require("./constants");
+const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE, ADMIN_CONSOLE_CLIENT_ID } = require("./constants");
 
 /**
  * Lấy org ID bằng nhiều chiến lược:
@@ -51,7 +51,7 @@ async function getOrgId(client, accessToken) {
     try {
       const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
         timeout: 15000,
-        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": ADMIN_CONSOLE_CLIENT_ID },
       });
       if (res.status === 200 && res.data) {
         const orgs = Array.isArray(res.data) ? res.data : [res.data];
@@ -106,7 +106,10 @@ async function getProducts(client, orgId, accessToken) {
   if (!orgId) return { hasPlan: false, licenseStatus: "unknown", products: [] };
 
   logger.info("[adobe-http] Lấy products cho org %s...", orgId);
-  const headers = { Accept: "application/json" };
+  const headers = {
+    Accept: "application/json",
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
+  };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const urls = [
@@ -121,13 +124,50 @@ async function getProducts(client, orgId, accessToken) {
 
       if (res.status === 200 && res.data) {
         const data = Array.isArray(res.data) ? res.data : res.data.products || res.data.items || [];
-        const products = data.map((p) => ({
-          id: p.id || p.code || p.productId,
-          name: p.name || p.productName || p.code,
-          licenseQuota: p.licenseQuota || p.adminQuantity || 0,
-          userCount: p.userCount || p.provisionedQuantity || 0,
-        }));
-        const hasPlan = products.length > 0 && products.some((p) => (p.licenseQuota || 0) > 0);
+
+        if (data.length > 0) {
+          logger.info("[adobe-http] Product raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
+          logger.info("[adobe-http] Product[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
+        }
+
+        const products = data.map((p) => {
+          // JIL API: assignedQuantity = total licenses, provisionedQuantity = used
+          let quota =
+            p.assignedQuantity || p.licenseQuota || p.adminQuantity || p.licensedQuantity ||
+            p.totalQuantity || p.seats || p.totalCount || p.quantity || 0;
+          let used =
+            p.provisionedQuantity || p.userCount || p.assignedCount ||
+            p.usedCount || p.consumedQuantity || 0;
+
+          if (quota === 0 && Array.isArray(p.licenseGroupSummaries)) {
+            for (const lg of p.licenseGroupSummaries) {
+              const lgQuota = lg.assignedQuantity || lg.totalQuantity || lg.licensedQuantity || lg.quantity || 0;
+              const lgUsed = lg.provisionedQuantity || lg.usedQuantity || 0;
+              if (lgQuota > quota) quota = lgQuota;
+              if (lgUsed > used) used = lgUsed;
+            }
+          }
+
+          const code = p.code || "";
+          const shortName = p.shortName || p.name || p.productName || p.longName || code;
+          const isFree = /complimentary|free\s+membership/i.test(shortName) || code === "CCFM";
+
+          return {
+            id: p.id || p.code || p.productId,
+            code,
+            name: shortName,
+            licenseQuota: quota,
+            userCount: used,
+            isFree,
+          };
+        });
+
+        const paidProducts = products.filter((p) => !p.isFree);
+        const hasPlan = paidProducts.length > 0 && paidProducts.some((p) => (p.licenseQuota || 0) > 0);
+
+        logger.info("[adobe-http] Products result: count=%s (paid=%s), hasPlan=%s, quotas=%s",
+          products.length, paidProducts.length, hasPlan,
+          products.map(p => `${p.code}:${p.licenseQuota}${p.isFree ? "(free)" : ""}`).join(","));
         return { hasPlan, licenseStatus: hasPlan ? "Paid" : "Expired", products };
       }
     } catch (e) {
@@ -139,18 +179,60 @@ async function getProducts(client, orgId, accessToken) {
 }
 
 /**
- * Lấy danh sách users.
+ * Lấy Set<email> thực sự được gán product (qua JIL /products/{id}/users).
+ * Đây là nguồn chính xác nhất — cùng endpoint Admin Console UI dùng.
+ */
+async function getProductUserEmails(client, orgId, accessToken, productIds) {
+  const emails = new Set();
+  if (!orgId || !accessToken || !productIds?.length) return emails;
+
+  const headers = {
+    Accept: "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
+  };
+
+  for (const pid of productIds) {
+    if (!pid) continue;
+    const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products/${pid}/users`;
+    try {
+      const res = await client.get(url, { headers, timeout: 15000 });
+      logger.info("[adobe-http] Product users %s → status=%s", pid, res.status);
+      if (res.status === 200 && res.data) {
+        const data = Array.isArray(res.data) ? res.data : res.data.users || res.data.items || [];
+        if (data.length > 0) {
+          logger.info("[adobe-http] ProductUser[0] sample: %s", JSON.stringify(data[0]).slice(0, 300));
+        }
+        for (const u of data) {
+          const email = (u.email || u.username || "").toLowerCase().trim();
+          if (email) emails.add(email);
+        }
+      }
+    } catch (e) {
+      logger.debug("[adobe-http] Product users %s error: %s", pid, e.message);
+    }
+  }
+
+  logger.info("[adobe-http] Product user emails: %s users across %s products", emails.size, productIds.length);
+  return emails;
+}
+
+/**
+ * Lấy danh sách users (tên + email). Không xác định product ở đây.
  */
 async function getUsers(client, orgId, accessToken) {
   if (!orgId) return [];
 
   logger.info("[adobe-http] Lấy users cho org %s...", orgId);
-  const headers = { Accept: "application/json" };
+  const headers = {
+    Accept: "application/json",
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
+  };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const urls = [
-    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/users`,
     `${USER_MANAGEMENT_API}/v2/usermanagement/users/${orgId}@AdobeOrg/0`,
+    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/users`,
   ];
 
   for (const url of urls) {
@@ -162,11 +244,26 @@ async function getUsers(client, orgId, accessToken) {
         const data = Array.isArray(res.data)
           ? res.data
           : res.data.users || res.data.items || res.data.resources || [];
-        return data.map((u) => ({
-          name: u.name || (u.firstName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : null),
-          email: u.email || u.username || "",
-          product: !!(u.products?.length || u.groups?.length || u.adminRoles?.length),
-        }));
+
+        if (data.length > 0) {
+          logger.info("[adobe-http] User raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
+          logger.info("[adobe-http] User[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
+        }
+
+        const users = data.map((u) => {
+          const name =
+            u.name ||
+            (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : null) ||
+            (u.firstname ? `${u.firstname} ${u.lastname || ""}`.trim() : null);
+
+          return {
+            name,
+            email: u.email || u.username || "",
+          };
+        });
+
+        logger.info("[adobe-http] Users result: count=%s", users.length);
+        return users;
       }
     } catch (e) {
       logger.debug("[adobe-http] Users endpoint %s error: %s", url, e.message);
@@ -186,6 +283,7 @@ async function addUsers(client, orgId, accessToken, emails) {
     Accept: "application/json",
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
   };
 
   const commands = emails.map((email) => ({
@@ -231,6 +329,7 @@ async function removeUser(client, orgId, accessToken, email) {
     Accept: "application/json",
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
+    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
   };
 
   const commands = [
@@ -253,4 +352,4 @@ async function removeUser(client, orgId, accessToken, email) {
   }
 }
 
-module.exports = { getOrgId, getProducts, getUsers, addUsers, removeUser };
+module.exports = { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser };

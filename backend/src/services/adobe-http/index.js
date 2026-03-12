@@ -13,7 +13,7 @@
 const logger = require("../../utils/logger");
 const { loginViaHttp } = require("./login");
 const { loginWithPlaywright } = require("./loginBrowser");
-const { getOrgId, getProducts, getUsers, addUsers, removeUser } = require("./adminConsole");
+const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser } = require("./adminConsole");
 const { exportCookies, createHttpClient, importCookies } = require("./httpClient");
 
 /**
@@ -77,15 +77,25 @@ async function checkAccount(email, password, options = {}) {
     const productInfo = await getProducts(client, orgId, accessToken);
     const users = await getUsers(client, orgId, accessToken);
 
-    const manageTeamMembers = users.map((u) => ({
-      name: u.name,
-      email: u.email || "",
-      product: !!u.product,
-    }));
+    // Chỉ check user assignment từ paid products (loại bỏ Complimentary/CCFM)
+    const paidProductIds = productInfo.products
+      .filter((p) => !p.isFree && p.id)
+      .map((p) => p.id);
+    logger.info("[adobe-http] Paid product IDs cho user check: %s", paidProductIds.join(",") || "(none)");
+    const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
+
+    const adminEmail = email.toLowerCase().trim();
+    const manageTeamMembers = users
+      .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
+      .map((u) => ({
+        name: u.name,
+        email: u.email || "",
+        product: productEmails.has((u.email || "").toLowerCase().trim()),
+      }));
 
     const scrapedData = {
       orgName: null,
-      userCount: users.length,
+      userCount: manageTeamMembers.length,
       licenseStatus: productInfo.licenseStatus,
       adobe_org_id: orgId,
       profileName: null,

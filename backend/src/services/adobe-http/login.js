@@ -1,16 +1,18 @@
 /**
- * Login Adobe — strategy:
- * 1. Fast path: có saved cookies + token → thử API call thực
- * 2. Slow path: cookies/token hết hạn → Playwright headless login
+ * Login Adobe — strategy (theo thứ tự ưu tiên):
+ * 1. Fast path: saved cookies + token → thử API call thực
+ * 2. SUSI HTTP: TLS Chrome fingerprint → login qua HTTP (không cần browser)
+ * 3. Playwright: headless browser login (fallback cuối)
  */
 
 const logger = require("../../utils/logger");
 const { createHttpClient, importCookies } = require("./httpClient");
 const { loginWithPlaywright } = require("./loginBrowser");
-const { ADMIN_CONSOLE_API_BASE } = require("./constants");
+const { loginViaSusi } = require("./loginSusi");
+const { ADMIN_CONSOLE_API_BASE, ADMIN_CONSOLE_CLIENT_ID } = require("./constants");
 
 /**
- * Test session bằng API call thực (không phải URL check).
+ * Test session bằng API call thực.
  * SPA Admin Console luôn trả 200 (shell HTML) nên URL check không đáng tin.
  */
 async function testSessionValid(client, savedAccessToken) {
@@ -25,6 +27,7 @@ async function testSessionValid(client, savedAccessToken) {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${savedAccessToken}`,
+        "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
       },
     });
 
@@ -47,7 +50,7 @@ async function testSessionValid(client, savedAccessToken) {
 async function loginViaHttp(email, password, options = {}) {
   const { savedCookies = [], savedAccessToken = null, mailBackupId = null } = options;
 
-  // ── Fast path: thử saved token với API call thực ──
+  // ── 1. Fast path: thử saved token với API call thực ──
   if (savedCookies.length > 0 && savedAccessToken) {
     logger.info("[adobe-http] Thử saved token + %d cookies...", savedCookies.length);
     const { client, jar } = createHttpClient();
@@ -55,13 +58,41 @@ async function loginViaHttp(email, password, options = {}) {
 
     const test = await testSessionValid(client, savedAccessToken);
     if (test.valid) {
-      logger.info("[adobe-http] Session hợp lệ — bỏ qua browser hoàn toàn");
+      logger.info("[adobe-http] Session hợp lệ — bỏ qua login hoàn toàn");
       return { success: true, client, jar, accessToken: savedAccessToken, usedBrowser: false };
     }
   }
 
-  // ── Slow path: Playwright login (truyền cookies để thử cookie-login trước form) ──
-  logger.info("[adobe-http] Cần Playwright login...");
+  // ── 2. SUSI HTTP: TLS Chrome fingerprint (không browser, nhẹ) ──
+  logger.info("[adobe-http] Thử SUSI HTTP login (TLS Chrome)...");
+  try {
+    const susiResult = await loginViaSusi(email, password, { mailBackupId });
+
+    if (susiResult.success && susiResult.accessToken) {
+      logger.info("[adobe-http] SUSI HTTP login thành công! cookies=%d",
+        susiResult.cookies?.length || 0);
+
+      const { client, jar } = createHttpClient();
+      if (susiResult.cookies?.length) {
+        await importCookies(jar, susiResult.cookies);
+      }
+
+      return {
+        success: true,
+        client,
+        jar,
+        accessToken: susiResult.accessToken,
+        usedBrowser: false,
+      };
+    }
+
+    logger.info("[adobe-http] SUSI HTTP thất bại: %s → fallback Playwright", susiResult.error);
+  } catch (e) {
+    logger.warn("[adobe-http] SUSI HTTP error: %s → fallback Playwright", e.message);
+  }
+
+  // ── 3. Playwright fallback (browser headless) ──
+  logger.info("[adobe-http] Fallback Playwright login...");
   const browserResult = await loginWithPlaywright(email, password, {
     savedCookies,
     mailBackupId,
