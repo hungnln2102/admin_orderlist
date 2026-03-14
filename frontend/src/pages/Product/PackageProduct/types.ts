@@ -1,4 +1,5 @@
 export type {
+  AccountInfo,
   PackageField,
   SlotLinkMode,
   PackageRow,

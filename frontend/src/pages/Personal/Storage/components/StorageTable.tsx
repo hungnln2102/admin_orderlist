@@ -4,8 +4,11 @@ import {
   PencilSquareIcon,
   TrashIcon,
   XMarkIcon,
+  CheckCircleIcon,
+  XCircleIcon,
 } from "@heroicons/react/24/outline";
-import { WarehouseItem, inputClass } from "../types";
+import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
+import { WarehouseItem } from "../types";
 
 type StorageTableProps = {
   items: WarehouseItem[];
@@ -20,6 +23,17 @@ type StorageTableProps = {
   onStartCreate: () => void;
 };
 
+const inputCls =
+  "w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-indigo-500/30 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.08] transition-all";
+
+const statusColor = (s?: string | null) => {
+  const v = (s || "").toLowerCase();
+  if (v.includes("tồn")) return "bg-emerald-500/15 text-emerald-400 border-emerald-500/20";
+  if (v.includes("dùng") || v.includes("dung")) return "bg-sky-500/15 text-sky-400 border-sky-500/20";
+  if (v.includes("hết") || v.includes("het")) return "bg-rose-500/15 text-rose-400 border-rose-500/20";
+  return "bg-white/5 text-white/60 border-white/10";
+};
+
 export const StorageTable: React.FC<StorageTableProps> = ({
   items,
   draft,
@@ -31,197 +45,286 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   onCancel,
   onStartEdit,
 }) => {
-  const renderInput = (field: keyof WarehouseItem, value: string | null | undefined) => (
+  const renderInput = (
+    field: keyof WarehouseItem,
+    value: string | null | undefined,
+    placeholder?: string
+  ) => (
     <input
-      className={`${inputClass} bg-white/5 border-white/5 focus:bg-white/10 text-white placeholder:text-white/20`}
+      className={inputCls}
       value={value || ""}
+      placeholder={placeholder}
       onChange={(e) => onDraftChange(field, e.target.value)}
     />
   );
 
+  const EditActions: React.FC<{ isNew?: boolean; itemId?: number }> = ({
+    isNew,
+    itemId,
+  }) => (
+    <div className="flex items-center gap-1">
+      <button
+        className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+        onClick={() => onSave(isNew ? undefined : itemId)}
+        disabled={loading}
+        title="Lưu"
+      >
+        <CheckIcon className="w-4 h-4" />
+      </button>
+      {!isNew && (
+        <button
+          className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
+          onClick={() => onDelete(itemId)}
+          disabled={loading}
+          title="Xoá"
+        >
+          <TrashIcon className="w-4 h-4" />
+        </button>
+      )}
+      <button
+        className="p-1.5 rounded-lg text-white/40 hover:bg-white/10 transition-colors"
+        onClick={onCancel}
+        disabled={loading}
+        title="Hủy"
+      >
+        <XMarkIcon className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
+  const thCls = "px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/30 text-left whitespace-nowrap";
+
   return (
-    <div className="storage-table bg-transparent overflow-visible">
-      <table className="storage-table__table min-w-full border-separate border-spacing-y-4 text-white">
-        <thead className="storage-table__head">
-          <tr className="storage-table__head-row [&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
-            <th className="storage-table__th w-[120px]">LOẠI</th>
-            <th className="w-[180px]">TÀI KHOẢN</th>
-            <th className="w-[140px]">MẬT KHẨU</th>
-            <th className="w-[180px]">MAIL DỰ PHÒNG</th>
-            <th className="w-[120px]">2FA</th>
-            <th className="w-[120px]">TRẠNG THÁI</th>
-            <th>GHI CHÚ</th>
-            <th className="w-[140px] text-right pr-6">THAO TÁC</th>
-          </tr>
-        </thead>
-        <tbody className="">
-          {editingId === "new" && draft && (
-            <tr className="group/row animate-in fade-in slide-in-from-top-2 duration-300 relative z-20">
-              <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("category", draft.category)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("account", draft.account)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("password", draft.password)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("backup_email", draft.backup_email)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("two_fa", draft.two_fa)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("status", draft.status)}
-              </td>
-              <td className="px-5 py-5 glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500">
-                {renderInput("note", draft.note)}
-              </td>
-              <td className="px-5 py-5 last:rounded-r-[24px] glass-panel border-y border-indigo-500/30 bg-indigo-500/10 transition-all duration-500 text-right pr-6">
-                <div className="inline-flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/40 transition-all"
-                    onClick={() => onSave(undefined)}
-                    disabled={loading}
-                    title="Lưu"
-                  >
-                    <CheckIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                    onClick={onCancel}
-                    disabled={loading}
-                    title="Hủy"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-white" style={{ minWidth: 1080 }}>
+          <thead>
+            <tr className="border-b border-white/[0.06]">
+              <th className={thCls} style={{ width: 100 }}>Loại</th>
+              <th className={thCls} style={{ width: 190 }}>Tài khoản</th>
+              <th className={thCls} style={{ width: 110 }}>Mật khẩu</th>
+              <th className={thCls} style={{ width: 190 }}>Mail dự phòng</th>
+              <th className={thCls} style={{ width: 90 }}>2FA</th>
+              <th className={thCls} style={{ width: 100 }}>Trạng thái</th>
+              <th className={thCls} style={{ width: 90 }}>Hạn SD</th>
+              <th className={`${thCls} !text-center`} style={{ width: 50 }}>V</th>
+              <th className={thCls}>Ghi chú</th>
+              <th className={`${thCls} !text-right !pr-4`} style={{ width: 90 }}></th>
             </tr>
-          )}
-          {items.length === 0 && editingId !== "new" ? (
-            <tr>
-              <td colSpan={8} className="px-5 py-12 text-center">
-                <div className="text-white/40 text-sm font-medium tracking-wide">
-                  HỆ THỐNG TRỐNG: KHÔNG CÓ HÀNG TỒN KHO
-                </div>
-              </td>
-            </tr>
-          ) : (
-            items.map((item) => {
+          </thead>
+          <tbody className="divide-y divide-white/[0.04]">
+            {/* --- New row --- */}
+            {editingId === "new" && draft && (
+              <tr className="bg-indigo-500/[0.06]">
+                <td className="px-3 py-2.5">{renderInput("category", draft.category, "VD: ADOBE EDU")}</td>
+                <td className="px-3 py-2.5">{renderInput("account", draft.account, "Email / Username")}</td>
+                <td className="px-3 py-2.5">{renderInput("password", draft.password, "••••••")}</td>
+                <td className="px-3 py-2.5">{renderInput("backup_email", draft.backup_email, "Backup mail")}</td>
+                <td className="px-3 py-2.5">{renderInput("two_fa", draft.two_fa, "2FA code")}</td>
+                <td className="px-3 py-2.5">{renderInput("status", draft.status, "Trạng thái")}</td>
+                <td className="px-3 py-2.5">
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={draft.expires_at?.slice(0, 10) || ""}
+                    onChange={(e) => onDraftChange("expires_at", e.target.value)}
+                  />
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
+                    checked={!!draft.is_verified}
+                    onChange={(e) => onDraftChange("is_verified", e.target.checked ? "true" : "")}
+                  />
+                </td>
+                <td className="px-3 py-2.5">{renderInput("note", draft.note, "Ghi chú...")}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <EditActions isNew />
+                </td>
+              </tr>
+            )}
+
+            {/* --- Empty --- */}
+            {items.length === 0 && editingId !== "new" && (
+              <tr>
+                <td colSpan={10} className="py-16 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                      <ArchiveIcon className="w-6 h-6 text-white/20" />
+                    </div>
+                    <p className="text-sm text-white/30">Chưa có dữ liệu tồn kho</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {/* --- Data rows --- */}
+            {items.map((item) => {
               const isEditing = editingId === item.id;
-              const current = isEditing ? draft || item : item;
+              const cur = isEditing ? draft || item : item;
+
               return (
                 <tr
-                  key={item.id ?? `${item.category ?? ""}-${item.account ?? ""}`}
-                  className={`group/row cursor-pointer transition-all duration-500 relative ${isEditing ? 'z-20' : 'z-10'}`}
+                  key={item.id ?? `${item.category}-${item.account}`}
+                  className={`group transition-colors duration-200 ${
+                    isEditing
+                      ? "bg-indigo-500/[0.06]"
+                      : "hover:bg-white/[0.02]"
+                  }`}
                 >
-                  <td className={`px-5 py-5 first:rounded-l-[24px] glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
+                  {/* Loại */}
+                  <td className="px-3 py-2.5">
                     {isEditing ? (
-                      renderInput("category", current.category)
+                      renderInput("category", cur.category)
                     ) : (
-                      <span className="text-sm font-bold text-white tracking-wider uppercase whitespace-nowrap">
+                      <span className="text-[11px] font-bold text-white/90 uppercase tracking-wide">
                         {item.category || "—"}
                       </span>
                     )}
                   </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    <div className="text-sm font-bold text-white tracking-tight">
-                      {isEditing ? renderInput("account", current.account) : item.account || "—"}
-                    </div>
-                  </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    <div className="text-[13px] font-medium text-white/80">
-                      {isEditing ? renderInput("password", current.password) : item.password || "—"}
-                    </div>
-                  </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    <div className="text-[13px] font-medium text-white/60 italic">
-                      {isEditing ? renderInput("backup_email", current.backup_email) : item.backup_email || "—"}
-                    </div>
-                  </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    {isEditing ? renderInput("two_fa", current.two_fa) : <span className="text-xs font-black text-indigo-400/80">{item.two_fa || "—"}</span>}
-                  </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
+
+                  {/* Tài khoản */}
+                  <td className="px-3 py-2.5">
                     {isEditing ? (
-                      renderInput("status", current.status)
+                      renderInput("account", cur.account)
                     ) : (
-                      <span className="inline-flex px-2.5 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] font-bold uppercase tracking-wider text-indigo-200 whitespace-nowrap">
+                      <span className="text-xs text-white/80 break-all leading-relaxed">
+                        {item.account || "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Mật khẩu */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      renderInput("password", cur.password)
+                    ) : (
+                      <span className="text-xs text-white/50 font-mono">
+                        {item.password || "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Mail dự phòng */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      renderInput("backup_email", cur.backup_email)
+                    ) : (
+                      <span className="text-xs text-white/40 break-all leading-relaxed">
+                        {item.backup_email || "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* 2FA */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      renderInput("two_fa", cur.two_fa)
+                    ) : (
+                      <span className="text-xs text-white/50">
+                        {item.two_fa || "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Trạng thái */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      renderInput("status", cur.status)
+                    ) : (
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-md border text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${statusColor(item.status)}`}
+                      >
                         {item.status || "—"}
                       </span>
                     )}
                   </td>
-                  <td className={`px-5 py-5 glass-panel border-y transition-all duration-500 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    <div className="text-[12px] font-medium text-white/60 max-w-xs truncate">
-                      {isEditing ? renderInput("note", current.note) : item.note || "—"}
-                    </div>
+
+                  {/* Hạn SD */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        className={inputCls}
+                        value={cur.expires_at?.slice(0, 10) || ""}
+                        onChange={(e) => onDraftChange("expires_at", e.target.value)}
+                      />
+                    ) : (
+                      <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
+                        {item.expires_at
+                          ? new Date(item.expires_at).toLocaleDateString("vi-VN")
+                          : "—"}
+                      </span>
+                    )}
                   </td>
-                  <td className={`px-5 py-5 last:rounded-r-[24px] glass-panel border-y transition-all duration-500 text-right pr-6 ${isEditing ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5'}`}>
-                    <div className="inline-flex items-center gap-2">
-                      {isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/40 transition-all"
-                            onClick={() => onSave(item.id)}
-                            disabled={loading}
-                            title="Lưu"
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 hover:bg-rose-500/40 transition-all"
-                            onClick={() => onDelete(item.id)}
-                            disabled={loading}
-                            title="Xoá"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                            onClick={onCancel}
-                            disabled={loading}
-                            title="Hủy"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-indigo-300/60 hover:text-white hover:bg-indigo-500/20 transition-all"
-                            onClick={() => onStartEdit(item)}
-                            disabled={loading}
-                            title="Sửa"
-                          >
-                            <PencilSquareIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all"
-                            onClick={() => onDelete(item.id)}
-                            disabled={loading}
-                            title="Xoá"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
+
+                  {/* Verified */}
+                  <td className="px-3 py-2.5 text-center">
+                    {isEditing ? (
+                      <input
+                        type="checkbox"
+                        className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
+                        checked={!!cur.is_verified}
+                        onChange={(e) =>
+                          onDraftChange("is_verified", e.target.checked ? "true" : "")
+                        }
+                      />
+                    ) : item.is_verified ? (
+                      <CheckCircleSolid className="w-4 h-4 text-emerald-400 mx-auto" />
+                    ) : (
+                      <XCircleIcon className="w-4 h-4 text-white/15 mx-auto" />
+                    )}
+                  </td>
+
+                  {/* Ghi chú */}
+                  <td className="px-3 py-2.5">
+                    {isEditing ? (
+                      renderInput("note", cur.note)
+                    ) : (
+                      <span className="text-[11px] text-white/35 line-clamp-2 leading-relaxed">
+                        {item.note || "—"}
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="px-3 py-2.5 text-right">
+                    {isEditing ? (
+                      <EditActions itemId={item.id} />
+                    ) : (
+                      <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button
+                          className="p-1.5 rounded-lg text-white/30 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                          onClick={() => onStartEdit(item)}
+                          disabled={loading}
+                          title="Sửa"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="p-1.5 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          onClick={() => onDelete(item.id)}
+                          disabled={loading}
+                          title="Xoá"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
-            })
-          )}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
+
+const ArchiveIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+  </svg>
+);

@@ -18,7 +18,6 @@ import {
   normalizeProductCodeValue,
   normalizeSlotKey,
   toCleanString,
-  stripCapacityFields,
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
 } from "../utils/packageHelpers";
@@ -234,25 +233,17 @@ export const usePackageData = (): UsePackageDataResult => {
         );
         const existing = map.get(name);
         if (!existing) {
-          const inferredFields = hasCapacityConfigured
-            ? defaultTemplateFields
-            : stripCapacityFields(defaultTemplateFields);
           map.set(name, {
             name,
             productId,
-            fields: inferredFields,
+            fields: defaultTemplateFields,
             isCustom: false,
           });
           changed = true;
           return;
         }
-        if (
-          existing.isCustom !== true &&
-          !hasCapacityConfigured &&
-          existing.fields.includes("capacity")
-        ) {
-          const strippedFields = stripCapacityFields(existing.fields);
-          map.set(name, { ...existing, productId: existing.productId ?? productId, fields: strippedFields });
+        if (existing.isCustom !== true && existing.productId == null && productId != null) {
+          map.set(name, { ...existing, productId });
           changed = true;
         }
       });

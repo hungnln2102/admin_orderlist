@@ -24,9 +24,9 @@ import { PackageViewModal } from "./components/Modals/PackageViewModal";
 import { usePackageData } from "./hooks/usePackageData";
 import { showAppNotification } from "@/lib/notifications";
 import {
-  DEFAULT_CAPACITY_LIMIT,
   DEFAULT_SLOT_LIMIT,
   PACKAGE_FIELD_OPTIONS,
+  ManualWarehouseEntry,
   PackageField,
   PackageFormValues,
   AugmentedRow,
@@ -35,11 +35,11 @@ import {
   StatusFilter,
   STATUS_FILTERS,
   buildFormValuesFromRow,
-  buildInformationSummary,
   parseNumericValue,
-  stripCapacityFields,
   toMatchColumnValue,
 } from "./utils/packageHelpers";
+import { API_ENDPOINTS } from "../../../constants";
+import { WarehouseItem } from "../../Personal/Storage/types";
 
 const SUMMARY_CARD_ACCENTS = [
   {
@@ -223,13 +223,8 @@ const PackageProduct: React.FC = () => {
             packageId,
             slotLimit: 0,
             matchMode: null,
-            informationUser: null,
-            informationPass: null,
-            informationMail: null,
-            note: null,
             supplier: null,
             importPrice: null,
-            expired: null,
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -340,16 +335,19 @@ const PackageProduct: React.FC = () => {
     (row: AugmentedRow) => {
       const template = templates.find((tpl) => tpl.name === row.package) ?? {
         name: row.package,
-        fields: row.hasCapacityField
-          ? defaultTemplateFields
-          : stripCapacityFields(defaultTemplateFields),
+        fields: defaultTemplateFields,
         isCustom: false,
       };
       setEditContext({
         rowId: row.id,
         template,
         initialValues: buildFormValuesFromRow(row),
-        accountStorageId: row.accountStorageId ?? null,
+        stockInfo: row.stockId
+          ? { account: row.informationUser, password: row.informationPass, backup_email: row.informationMail, two_fa: row.informationTwoFa, note: row.informationNote }
+          : null,
+        storageInfo: row.storageId
+          ? { account: row.accountUser, password: row.accountPass, backup_email: row.accountMail, two_fa: row.accountTwoFa, note: row.accountNote }
+          : null,
       });
       setEditModalOpen(true);
     },
@@ -452,55 +450,66 @@ const PackageProduct: React.FC = () => {
     setDeleteRowError,
   ]);
 
+  const createWarehouseItem = useCallback(
+    async (entry: ManualWarehouseEntry, fallbackCategory?: string): Promise<number | null> => {
+      if (!entry.account.trim()) return null;
+      try {
+        const res = await apiFetch(API_ENDPOINTS.WAREHOUSE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: entry.product_type?.trim() || fallbackCategory || "Khác",
+            account: entry.account || null,
+            password: entry.password || null,
+            backup_email: entry.backup_email || null,
+            two_fa: entry.two_fa || null,
+            note: entry.note || null,
+            status: "Tồn",
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const created = (await res.json()) as WarehouseItem;
+        return created.id ?? null;
+      } catch (error) {
+        console.error("Lỗi khi tạo kho hàng:", error);
+        return null;
+      }
+    },
+    []
+  );
+
   const handleAddSubmit = useCallback(
     async (values: PackageFormValues) => {
       if (!selectedTemplate) return;
-      const includeAccountStorage = selectedTemplate.fields.includes("capacity");
-      const includePackageInfo = selectedTemplate.fields.includes("information");
-      const includeNote = selectedTemplate.fields.includes("note");
       const includeSupplier = selectedTemplate.fields.includes("supplier");
       const includeImport = selectedTemplate.fields.includes("import");
-      const includeExpired = true;
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
           ? Math.floor(parsedSlotLimit)
           : DEFAULT_SLOT_LIMIT;
-      const parsedCapacityLimit = parseNumericValue(values.capacity);
-      const capacityLimit =
-        parsedCapacityLimit !== null && parsedCapacityLimit > 0
-          ? Math.floor(parsedCapacityLimit)
-          : DEFAULT_CAPACITY_LIMIT;
-      const packageInfoSummary = includePackageInfo
-        ? buildInformationSummary(
-            values.informationUser || null,
-            values.informationPass || null,
-            values.informationMail || null
-          )
-        : "";
+
+      let resolvedStockId = values.stockId;
+      let resolvedStorageId = values.storageId;
+      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
+
+      if (!resolvedStockId && values.manualStock.account.trim()) {
+        resolvedStockId = await createWarehouseItem(values.manualStock, selectedTemplate.name);
+        resolvedSupplier = values.manualStock.account || null;
+      }
+      if (!resolvedStorageId && values.manualStorage.account.trim()) {
+        resolvedStorageId = await createWarehouseItem(values.manualStorage, selectedTemplate.name);
+      }
+
       const payload = {
         packageId: selectedTemplate.productId ?? undefined,
-        informationUser: includePackageInfo
-          ? values.informationUser || null
-          : null,
-        informationPass: includePackageInfo
-          ? values.informationPass || null
-          : null,
-        informationMail: includePackageInfo
-          ? values.informationMail || null
-          : null,
-        note: includeNote ? values.note || null : null,
-        supplier: includeSupplier ? values.supplier || null : null,
+        supplier: resolvedSupplier,
         importPrice: includeImport ? parseNumericValue(values.import) ?? 0 : null,
-        accountUser: includeAccountStorage ? values.accountUser || null : null,
-        accountPass: includeAccountStorage ? values.accountPass || null : null,
-        accountMail: includeAccountStorage ? values.accountMail || null : null,
-        accountNote: includeAccountStorage ? values.accountNote || null : null,
-        capacity: includeAccountStorage ? capacityLimit : null,
-        hasCapacityField: includeAccountStorage,
-        expired: includeExpired ? values.expired || null : null,
         slotLimit,
         matchMode: toMatchColumnValue(values.slotLinkMode),
+        stockId: resolvedStockId ?? null,
+        storageId: resolvedStorageId ?? null,
+        storageTotal: parseNumericValue(values.storageTotal),
       };
       try {
         const res = await apiFetch(`/api/package-products`, {
@@ -514,12 +523,7 @@ const PackageProduct: React.FC = () => {
           ...created,
           slot: slotLimit,
           slotUsed: 0,
-          capacity: includeAccountStorage ? capacityLimit : created.capacity,
-          information: includePackageInfo
-            ? packageInfoSummary || null
-            : created.information,
           match: created.match ?? toMatchColumnValue(values.slotLinkMode),
-          hasCapacityField: includeAccountStorage,
         });
         setRows((prev) => [...prev, mergedRow]);
         if (created.id !== undefined && created.id !== null) {
@@ -532,6 +536,7 @@ const PackageProduct: React.FC = () => {
     },
     [
       selectedTemplate,
+      createWarehouseItem,
       applySlotLinkPrefs,
       setRows,
       persistSlotLinkPreference,
@@ -541,53 +546,35 @@ const PackageProduct: React.FC = () => {
   const handleEditSubmit = useCallback(
     async (values: PackageFormValues) => {
       if (!editContext) return;
-      const { template, rowId, accountStorageId } = editContext;
-      const includeAccountStorage = template.fields.includes("capacity");
-      const includePackageInfo = template.fields.includes("information");
-      const includeNote = template.fields.includes("note");
+      const { template, rowId } = editContext;
       const includeSupplier = template.fields.includes("supplier");
       const includeImport = template.fields.includes("import");
-      const includeExpired = true;
       const parsedSlotLimit = parseNumericValue(values.slot);
       const slotLimit =
         parsedSlotLimit !== null && parsedSlotLimit > 0
           ? Math.floor(parsedSlotLimit)
           : DEFAULT_SLOT_LIMIT;
-      const parsedCapacityLimit = parseNumericValue(values.capacity);
-      const capacityLimit =
-        parsedCapacityLimit !== null && parsedCapacityLimit > 0
-          ? Math.floor(parsedCapacityLimit)
-          : DEFAULT_CAPACITY_LIMIT;
-      const packageInfoSummary = includePackageInfo
-        ? buildInformationSummary(
-            values.informationUser || null,
-            values.informationPass || null,
-            values.informationMail || null
-          )
-        : "";
+
+      let resolvedStockId = values.stockId;
+      let resolvedStorageId = values.storageId;
+      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
+
+      if (!resolvedStockId && values.manualStock.account.trim()) {
+        resolvedStockId = await createWarehouseItem(values.manualStock, template.name);
+        resolvedSupplier = values.manualStock.account || null;
+      }
+      if (!resolvedStorageId && values.manualStorage.account.trim()) {
+        resolvedStorageId = await createWarehouseItem(values.manualStorage, template.name);
+      }
+
       const payload = {
-        informationUser: includePackageInfo
-          ? values.informationUser || null
-          : null,
-        informationPass: includePackageInfo
-          ? values.informationPass || null
-          : null,
-        informationMail: includePackageInfo
-          ? values.informationMail || null
-          : null,
-        note: includeNote ? values.note || null : null,
-        supplier: includeSupplier ? values.supplier || null : null,
+        supplier: resolvedSupplier,
         importPrice: includeImport ? parseNumericValue(values.import) ?? 0 : null,
-        expired: includeExpired ? values.expired || null : null,
         slotLimit,
-        accountStorageId: accountStorageId ?? null,
-        accountUser: includeAccountStorage ? values.accountUser || null : null,
-        accountPass: includeAccountStorage ? values.accountPass || null : null,
-        accountMail: includeAccountStorage ? values.accountMail || null : null,
-        accountNote: includeAccountStorage ? values.accountNote || null : null,
-        capacity: includeAccountStorage ? capacityLimit : null,
-        hasCapacityField: includeAccountStorage,
         matchMode: toMatchColumnValue(values.slotLinkMode),
+        stockId: resolvedStockId ?? null,
+        storageId: resolvedStorageId ?? null,
+        storageTotal: parseNumericValue(values.storageTotal),
       };
       try {
         const res = await apiFetch(`/api/package-products/${rowId}`, {
@@ -600,12 +587,7 @@ const PackageProduct: React.FC = () => {
         const mergedRow = applySlotLinkPrefs({
           ...updated,
           slot: slotLimit,
-          capacity: includeAccountStorage ? capacityLimit : updated.capacity,
-          information: includePackageInfo
-            ? packageInfoSummary || null
-            : updated.information,
           match: updated.match ?? toMatchColumnValue(values.slotLinkMode),
-          hasCapacityField: includeAccountStorage,
         });
         setRows((prev) =>
           prev.map((row) => (row.id === rowId ? mergedRow : row))
@@ -616,8 +598,21 @@ const PackageProduct: React.FC = () => {
         console.error(`Cập nhật Gói Sản Phẩm ${rowId} Lỗi:`, error);
       }
     },
-    [editContext, closeEditModal, applySlotLinkPrefs, setRows, persistSlotLinkPreference]
+    [editContext, createWarehouseItem, closeEditModal, applySlotLinkPrefs, setRows, persistSlotLinkPreference]
   );
+
+  const usedProductIds = useMemo(
+    () => new Set(templates.map((t) => t.productId).filter((id): id is number => id != null)),
+    [templates]
+  );
+
+  const productHasStorage = useMemo(() => {
+    if (!selectedTemplate?.productId) return false;
+    const productId = selectedTemplate.productId;
+    return rows
+      .filter((r) => r.productId === productId)
+      .some((r) => r.storageTotal != null);
+  }, [rows, selectedTemplate]);
 
   const slotCards = useMemo(
     () => [
@@ -930,6 +925,7 @@ const PackageProduct: React.FC = () => {
         initialName={createInitialName}
         initialFields={createInitialFields}
         mode={createModalMode}
+        usedProductIds={usedProductIds}
         onClose={() => setCreateModalOpen(false)}
         onSubmit={handleCreateTemplate}
       />
@@ -938,6 +934,7 @@ const PackageProduct: React.FC = () => {
           mode="add"
           open={addModalOpen}
           template={selectedTemplate}
+          hasStorage={productHasStorage}
           onClose={() => setAddModalOpen(false)}
           onSubmit={handleAddSubmit}
         />
@@ -948,6 +945,9 @@ const PackageProduct: React.FC = () => {
           open={editModalOpen}
           template={editContext.template}
           initialValues={editContext.initialValues}
+          hasStorage={productHasStorage}
+          stockInfo={editContext.stockInfo}
+          storageInfo={editContext.storageInfo}
           onClose={closeEditModal}
           onSubmit={handleEditSubmit}
         />

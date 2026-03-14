@@ -222,6 +222,47 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
     await decreaseSupplierDebt(trx, supplyId, roundedProrated);
 };
 
+const recordSupplierPaymentOnCompletion = async (trx, beforeRow, afterRow) => {
+    const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
+    const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
+
+    if (prevStatus === nextStatus || prevStatus !== STATUS.PROCESSING || nextStatus !== STATUS.PAID) return;
+
+    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+    const supplyId =
+        (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
+        (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
+        (await findSupplyIdByName(trx, afterRow?.supply)) ||
+        (await findSupplyIdByName(trx, beforeRow?.supply));
+    if (!supplyId) return;
+
+    const costValue = toNullableNumber(afterRow?.cost ?? beforeRow?.cost);
+    if (!costValue || costValue <= 0) return;
+
+    const colId = paymentSupplyCols.ID;
+    const colImport = paymentSupplyCols.IMPORT_VALUE;
+    const colPaid = paymentSupplyCols.PAID;
+    const colStatus = paymentSupplyCols.STATUS;
+    const colSourceId = paymentSupplyCols.SOURCE_ID;
+
+    const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
+        .where(colSourceId, supplyId)
+        .andWhere(colStatus, STATUS.UNPAID)
+        .orderBy(colId, "desc")
+        .first();
+
+    if (latestCycle) {
+        const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
+        const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
+        await trx(PAYMENT_SUPPLY_TABLE)
+            .where(colId, latestCycle[colId])
+            .update({
+                [colImport]: currentImport - costValue,
+                [colPaid]: currentPaid + costValue,
+            });
+    }
+};
+
 const addSupplierImportOnProcessing = async (trx, beforeRow, afterRow) => {
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
@@ -250,4 +291,5 @@ module.exports = {
     decreaseSupplierDebt,
     adjustSupplierDebtIfNeeded,
     addSupplierImportOnProcessing,
+    recordSupplierPaymentOnCompletion,
 };

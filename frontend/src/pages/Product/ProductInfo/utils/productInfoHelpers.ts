@@ -197,8 +197,8 @@ export const mergeProducts = (
       packageName: priceRow ? (priceRow.package || priceRow.san_pham || "") : null,
       category: priceRow?.category ?? null,
       categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
-      imageUrl: item.imageUrl ?? null,
-      packageImageUrl: item.imageUrl ?? null,
+      imageUrl: item.imageUrl || null,
+      packageImageUrl: priceRow?.image_url || null,
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
         item.descriptionHtml || toHtmlFromPlain(item.description || ""),
@@ -227,7 +227,7 @@ export const mergeProducts = (
       description: "",
       descriptionHtml: "",
       imageUrl: null,
-      packageImageUrl: null,
+      packageImageUrl: priceItem.image_url || null,
     });
   }
 

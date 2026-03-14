@@ -276,7 +276,7 @@ export function computeAugmentationForPackage(input: ComputeAugmentationInput): 
   let capacityUsed = 0;
   let remainingCapacity = 0;
   if (includeCapacity) {
-    const capacityLimitRaw = parseNumericValue(item.capacity);
+    const capacityLimitRaw = parseNumericValue(item.storageTotal);
     capacityLimit =
       capacityLimitRaw && capacityLimitRaw > 0
         ? Math.floor(capacityLimitRaw)

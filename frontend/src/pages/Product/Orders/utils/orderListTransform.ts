@@ -166,9 +166,27 @@ export function filterAndSortOrders(
     const orderStatusText = String(
       order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || ""
     ).trim();
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilterValue && orderStatusText === statusFilterValue);
+
+    let matchesStatus: boolean;
+    if (statusFilter === "all") {
+      matchesStatus = true;
+    } else if (statusFilter === "today") {
+      const regSrc = sanitizeDateLike(
+        order.registration_date ||
+          order.registration_date_display ||
+          order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
+          order[ORDER_FIELDS.ORDER_DATE]
+      );
+      matchesStatus = Helpers.isRegisteredToday(regSrc);
+    } else if (statusFilter === ORDER_STATUSES.CAN_GIA_HAN) {
+      const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
+      matchesStatus = Number.isFinite(remaining) && remaining > 0 && remaining <= 4;
+    } else if (statusFilter === ORDER_STATUSES.ORDER_EXPIRED) {
+      const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
+      matchesStatus = Number.isFinite(remaining) && remaining <= 0;
+    } else {
+      matchesStatus = !!(statusFilterValue && orderStatusText === statusFilterValue);
+    }
 
     return (
       (matchesSearch || orderCodeFallbackMatch || productFallbackMatch) &&

@@ -1,6 +1,5 @@
 import React from "react";
-import { ExclamationTriangleIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import GradientButton from "../../../../components/ui/GradientButton";
+import { ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline";
 
 type SearchBarProps = {
   search: string;
@@ -18,47 +17,37 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   error,
 }) => {
   return (
-    <div className="space-y-4">
-      <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.25)] backdrop-blur-sm relative z-10">
-        <div className="flex flex-col lg:flex-row gap-4 items-center">
-          {/* Search Group */}
-          <div className="relative w-full lg:flex-1 group">
-            <MagnifyingGlassIcon className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 transition-opacity duration-300 ${loading ? 'opacity-30' : 'opacity-70 group-focus-within:opacity-100'}`} />
-            <input
-              type="text"
-              placeholder="Tìm kiếm tài khoản, danh mục, mật khẩu..."
-              className="w-full pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
-              style={{ paddingLeft: '3.25rem' }}
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-            {loading && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-              </div>
-            )}
-          </div>
-
-          {/* Action Group */}
-          <div className="flex items-center gap-3 w-full lg:w-auto mt-2 lg:mt-0">
-            <div className="hidden lg:block w-px h-8 bg-white/10 mx-1"></div>
-            
-            <GradientButton
-              onClick={onCreate}
-              disabled={loading}
-              className="!py-2.5 !px-6 text-sm whitespace-nowrap"
-            >
-              Tạo mới
-            </GradientButton>
-          </div>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm tài khoản, loại sản phẩm..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-indigo-500/40 focus:bg-white/[0.06] transition-all"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+          {loading && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+            </div>
+          )}
         </div>
+
+        <button
+          onClick={onCreate}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-sm font-medium transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 whitespace-nowrap"
+        >
+          <PlusIcon className="w-4 h-4" />
+          <span className="hidden sm:inline">Thêm mới</span>
+        </button>
       </div>
-      
+
       {error && (
-        <div className="mx-2 text-sm text-rose-300 flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-4 py-2 rounded-xl">
-          <ExclamationTriangleIcon className="h-5 w-5" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+          <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}

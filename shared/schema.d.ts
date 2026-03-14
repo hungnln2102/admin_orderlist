@@ -8,7 +8,6 @@ export interface DbDefinition {
 export const DB_DEFINITIONS: Record<string, DbDefinition>;
 
 export const ORDER_COLS: ColumnDict;
-export const ACCOUNT_STORAGE_COLS: ColumnDict;
 export const BANK_LIST_COLS: ColumnDict;
 export const PACKAGE_PRODUCT_COLS: ColumnDict;
 export const PAYMENT_RECEIPT_COLS: ColumnDict;

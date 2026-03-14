@@ -2,12 +2,8 @@ import { ORDER_COLS } from "../../../../lib/tableSql";
 import * as Helpers from "../../../../lib/helpers";
 
 export type PackageField =
-  | "information"
-  | "note"
   | "supplier"
-  | "import"
-  | "expired"
-  | "capacity";
+  | "import";
 export type SlotLinkMode = "information" | "slot";
 export type PackageRow = {
   id: number;
@@ -17,16 +13,19 @@ export type PackageRow = {
   informationUser?: string | null;
   informationPass?: string | null;
   informationMail?: string | null;
+  informationTwoFa?: string | null;
+  informationNote?: string | null;
   note: string | null;
-  accountStorageId?: number | null;
+  storageId?: number | null;
+  storageTotal?: number | null;
   accountUser?: string | null;
   accountPass?: string | null;
   accountMail?: string | null;
+  accountTwoFa?: string | null;
   accountNote?: string | null;
   supplier: string | null;
   import: number | string | null;
   expired: string | null;
-  capacity?: string | number | null;
   capacityUsed?: string | number | null;
   slot?: string | number | null;
   slotUsed?: string | number | null;
@@ -36,6 +35,7 @@ export type PackageRow = {
   productCodes?: string[] | null;
   normalizedProductCodes?: string[];
   matchModeValue?: string | null;
+  stockId?: number | null;
 };
 export type OrderListItem = {
   id?: number | string | null;
@@ -91,62 +91,70 @@ export type PackageTemplate = {
   fields: PackageField[];
   isCustom?: boolean;
 };
-export type PackageFormValues = {
-  informationUser: string;
-  informationPass: string;
-  informationMail: string;
+export type ManualWarehouseEntry = {
+  product_type: string;
+  account: string;
+  password: string;
+  backup_email: string;
+  two_fa: string;
   note: string;
-  accountUser: string;
-  accountPass: string;
-  accountMail: string;
-  accountNote: string;
+};
+
+export const EMPTY_MANUAL_ENTRY: ManualWarehouseEntry = {
+  product_type: "",
+  account: "",
+  password: "",
+  backup_email: "",
+  two_fa: "",
+  note: "",
+};
+
+export type PackageFormValues = {
   supplier: string;
   import: string;
-  expired: string;
-  capacity: string;
   slot: string;
   slotLinkMode: SlotLinkMode;
-  hasCapacity: boolean;
+  stockId: number | null;
+  storageId: number | null;
+  storageTotal: string;
+  manualStock: ManualWarehouseEntry;
+  manualStorage: ManualWarehouseEntry;
 };
+export type AccountInfo = {
+  account?: string | null;
+  password?: string | null;
+  backup_email?: string | null;
+  two_fa?: string | null;
+  note?: string | null;
+};
+
 export type EditContext = {
   rowId: number;
   template: PackageTemplate;
   initialValues: PackageFormValues;
-  accountStorageId: number | null;
+  stockInfo?: AccountInfo | null;
+  storageInfo?: AccountInfo | null;
 };
 export type AvailabilityState = "ok" | "low" | "out";
 export type SlotLinkPreferenceMap = Record<string, SlotLinkMode>;
 
 export const EMPTY_FORM_VALUES: PackageFormValues = {
-  informationUser: "",
-  informationPass: "",
-  informationMail: "",
-  note: "",
-  accountUser: "",
-  accountPass: "",
-  accountMail: "",
-  accountNote: "",
   supplier: "",
   import: "",
-  expired: "",
-  capacity: "",
   slot: "",
   slotLinkMode: "information",
-  hasCapacity: false,
+  stockId: null,
+  storageId: null,
+  storageTotal: "",
+  manualStock: { ...EMPTY_MANUAL_ENTRY },
+  manualStorage: { ...EMPTY_MANUAL_ENTRY },
 };
 
 export const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }> =
   [
-    { value: "information", label: "Thông tin gói" },
-    { value: "note", label: "Ghi chú" },
     { value: "supplier", label: "Nhà cung cấp" },
     { value: "import", label: "Giá nhập (VND)" },
-    { value: "expired", label: "Ngày hết hạn" },
-    { value: "capacity", label: "Tổng dung lượng (GB)" },
   ];
-
-export const stripCapacityFields = (fields: PackageField[]): PackageField[] =>
-  fields.filter((field) => field !== "capacity");
 
 export const DEFAULT_SLOT_LIMIT = 5;
 export const DEFAULT_CAPACITY_LIMIT = 2000;
@@ -383,26 +391,16 @@ export const buildFormValuesFromRow = (
     "slotLimit" in row && typeof row.slotLimit === "number"
       ? String(row.slotLimit)
       : toInputString(row.slot);
-  const capacityValue =
-    "capacityLimit" in row && typeof row.capacityLimit === "number"
-      ? String(row.capacityLimit)
-      : toInputString(row.capacity);
   return {
-    informationUser: row.informationUser ?? "",
-    informationPass: row.informationPass ?? "",
-    informationMail: row.informationMail ?? "",
-    note: row.note ?? "",
-    accountUser: row.accountUser ?? "",
-    accountPass: row.accountPass ?? "",
-    accountMail: row.accountMail ?? "",
-    accountNote: row.accountNote ?? "",
     supplier: row.supplier ?? "",
     import: toInputString(row.import),
-    expired: row.expired ?? "",
-    capacity: capacityValue,
     slot: slotValue,
     slotLinkMode: row.slotLinkMode ?? "information",
-    hasCapacity: row.hasCapacityField ?? false,
+    stockId: row.stockId ?? null,
+    storageId: row.storageId ?? null,
+    storageTotal: row.storageTotal != null ? String(row.storageTotal) : "",
+    manualStock: { ...EMPTY_MANUAL_ENTRY },
+    manualStorage: { ...EMPTY_MANUAL_ENTRY },
   };
 };
 
@@ -432,11 +430,9 @@ export const enhancePackageRow = (
   row: PackageRow,
   slotLinkPrefs: SlotLinkPreferenceMap
 ) => {
-  const normalizedCapacity =
-    row.capacity === undefined || row.capacity === null ? null : row.capacity;
   const normalizedHasCapacity =
     row.hasCapacityField === undefined
-      ? Boolean((row as any).hasCapacity) || normalizedCapacity !== null
+      ? row.storageId != null || row.storageTotal != null
       : Boolean(row.hasCapacityField);
   const matchValue = row.match ?? row.matchModeValue ?? null;
   const prefKey =
@@ -461,7 +457,6 @@ export const enhancePackageRow = (
     ...row,
     slot: row.slot ?? DEFAULT_SLOT_LIMIT,
     slotUsed: row.slotUsed ?? 0,
-    capacity: normalizedCapacity,
     hasCapacityField: normalizedHasCapacity,
     slotLinkMode,
     matchModeValue: matchValue,

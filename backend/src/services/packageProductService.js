@@ -12,47 +12,50 @@ const { QUOTED_COLS } = require("../utils/columns");
 const PACKAGE_DEF = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
 const PRODUCT_DEF = getDefinition("PRODUCT", PRODUCT_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
+const STOCK_DEF = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 
 const TABLES = {
   packageProduct: tableName(PACKAGE_DEF.tableName, SCHEMA_PRODUCT),
-  accountStorage: tableName(
-    PRODUCT_SCHEMA.ACCOUNT_STORAGE.TABLE,
-    SCHEMA_PRODUCT
-  ),
   product: tableName(PRODUCT_DEF.tableName, SCHEMA_PRODUCT),
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
+  productStock: tableName(STOCK_DEF.tableName, SCHEMA_PRODUCT),
 };
 
 const PRODUCT_SCHEMA_COLS = PRODUCT_DEF.columns;
 const VARIANT_COLS = VARIANT_DEF.columns;
+const STOCK_COLS = STOCK_DEF.columns;
 
 const PACKAGE_PRODUCTS_SELECT = `
   SELECT
     pp.${QUOTED_COLS.packageProduct.id} AS package_id,
     pp.${QUOTED_COLS.packageProduct.packageId} AS product_id,
     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
-    pp.${QUOTED_COLS.packageProduct.username} AS package_username,
-    pp.${QUOTED_COLS.packageProduct.password} AS package_password,
-    pp.${QUOTED_COLS.packageProduct.mail2nd} AS package_mail_2nd,
-    pp.${QUOTED_COLS.packageProduct.note} AS package_note,
+    stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
+    stk.${quoteIdent(STOCK_COLS.passwordEncrypted)} AS package_password,
+    stk.${quoteIdent(STOCK_COLS.backupEmail)} AS package_mail_2nd,
+    stk.${quoteIdent(STOCK_COLS.note)} AS package_note,
+    stk.${quoteIdent(STOCK_COLS.twoFaEncrypted)} AS package_two_fa,
     pp.${QUOTED_COLS.packageProduct.supplier} AS package_supplier,
     pp.${QUOTED_COLS.packageProduct.cost} AS package_import,
     pp.${QUOTED_COLS.packageProduct.slot} AS package_slot,
-    pp.${QUOTED_COLS.packageProduct.expired} AS package_expired,
-    pp.${QUOTED_COLS.packageProduct.expired}::text AS package_expired_raw,
+    stk.${quoteIdent(STOCK_COLS.expiresAt)} AS package_expired,
+    stk.${quoteIdent(STOCK_COLS.expiresAt)}::text AS package_expired_raw,
     pp.${QUOTED_COLS.packageProduct.match} AS package_match,
-    acc.${QUOTED_COLS.accountStorage.id} AS account_id,
-    acc.${QUOTED_COLS.accountStorage.username} AS account_username,
-    acc.${QUOTED_COLS.accountStorage.password} AS account_password,
-    acc.${QUOTED_COLS.accountStorage.mail2nd} AS account_mail_2nd,
-    acc.${QUOTED_COLS.accountStorage.note} AS account_note,
-    acc.${QUOTED_COLS.accountStorage.storage} AS account_storage,
-    acc.${QUOTED_COLS.accountStorage.mailFamily} AS account_mail_family,
+    pp.${QUOTED_COLS.packageProduct.stockId} AS stock_id,
+    pp.${QUOTED_COLS.packageProduct.storageId} AS storage_id,
+    pp.${QUOTED_COLS.packageProduct.storageTotal} AS storage_total,
+    stk2.${quoteIdent(STOCK_COLS.accountUsername)} AS storage_username,
+    stk2.${quoteIdent(STOCK_COLS.passwordEncrypted)} AS storage_password,
+    stk2.${quoteIdent(STOCK_COLS.backupEmail)} AS storage_mail,
+    stk2.${quoteIdent(STOCK_COLS.note)} AS storage_note,
+    stk2.${quoteIdent(STOCK_COLS.twoFaEncrypted)} AS storage_two_fa,
     COALESCE(product_codes.product_codes, ARRAY[]::text[]) AS package_products
   FROM ${TABLES.packageProduct} pp
   LEFT JOIN ${TABLES.product} p ON p.${quoteIdent(PRODUCT_SCHEMA_COLS.id)} = pp.${QUOTED_COLS.packageProduct.packageId}
-  LEFT JOIN ${TABLES.accountStorage} acc
-    ON acc.${QUOTED_COLS.accountStorage.mailFamily} = pp.${QUOTED_COLS.packageProduct.username}
+  LEFT JOIN ${TABLES.productStock} stk
+    ON stk.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.stockId}
+  LEFT JOIN ${TABLES.productStock} stk2
+    ON stk2.${quoteIdent(STOCK_COLS.id)} = pp.${QUOTED_COLS.packageProduct.storageId}
   LEFT JOIN (
     SELECT
       v.${quoteIdent(VARIANT_COLS.productId)} AS product_id,
@@ -84,7 +87,6 @@ const mapPackageProductRow = (row) => {
     informationPass,
     informationMail
   );
-  const accountStorageId = getRowId(row, "account_id", "account_storage_id");
   const productCodes = Array.isArray(row.package_products)
     ? row.package_products
         .map((code) => (typeof code === "string" ? code.trim() : ""))
@@ -99,23 +101,26 @@ const mapPackageProductRow = (row) => {
     informationUser,
     informationPass,
     informationMail,
+    informationTwoFa: row.package_two_fa ?? null,
+    informationNote: row.package_note ?? null,
     note: row.package_note ?? null,
     supplier: row.package_supplier ?? null,
     import: fromDbNumber(row.package_import),
-    accountStorageId,
-    accountUser: row.account_username ?? null,
-    accountPass: row.account_password ?? null,
-    accountMail: row.account_mail_2nd ?? null,
-    accountNote: row.account_note ?? null,
-    capacity: fromDbNumber(row.account_storage),
+    storageId: row.storage_id != null ? Number(row.storage_id) : null,
+    storageTotal: row.storage_total != null ? Number(row.storage_total) : null,
+    accountUser: row.storage_username ?? null,
+    accountPass: row.storage_password ?? null,
+    accountMail: row.storage_mail ?? null,
+    accountTwoFa: row.storage_two_fa ?? null,
+    accountNote: row.storage_note ?? null,
     expired: formatDateOutput(row.package_expired_raw ?? row.package_expired),
     slot: fromDbNumber(row.package_slot),
     slotUsed: null,
     capacityUsed: null,
     match: row.package_match ?? null,
     productCodes,
-    hasCapacityField:
-      row.account_storage !== null && row.account_storage !== undefined,
+    hasCapacityField: row.storage_id != null || row.storage_total != null,
+    stockId: row.stock_id != null ? Number(row.stock_id) : null,
   };
 };
 

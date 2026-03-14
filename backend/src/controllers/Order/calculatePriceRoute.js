@@ -15,18 +15,12 @@ const fetchVariantPricing = async (productNameOrId) => {
     // - Truyền variant_name
     const num = Number(raw);
     const baseQuery = db(TABLES.variant)
-        .leftJoin(
-            TABLES.priceConfig,
-            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.VARIANT_ID}`,
-            `${TABLES.variant}.${COLS.VARIANT.ID}`
-        )
         .select(
             `${TABLES.variant}.${COLS.VARIANT.ID} as variant_id`,
-            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_CTV} as pct_ctv`,
-            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_KHACH} as pct_khach`,
-            `${TABLES.priceConfig}.${COLS.PRICE_CONFIG.PCT_PROMO} as pct_promo`
+            `${TABLES.variant}.${COLS.VARIANT.PCT_CTV} as pct_ctv`,
+            `${TABLES.variant}.${COLS.VARIANT.PCT_KHACH} as pct_khach`,
+            `${TABLES.variant}.${COLS.VARIANT.PCT_PROMO} as pct_promo`
         )
-        .orderBy(`${TABLES.priceConfig}.${COLS.PRICE_CONFIG.UPDATED_AT}`, "desc")
         .orderBy(`${TABLES.variant}.${COLS.VARIANT.ID}`, "asc")
         .limit(1);
 

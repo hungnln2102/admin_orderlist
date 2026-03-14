@@ -48,7 +48,7 @@ export const useCreateOrderLogic = (
   } = useSuppliesData(API_BASE);
 
   const productName = formData[ORDER_FIELDS.ID_PRODUCT] as string;
-  const orderId = formData[ORDER_FIELDS.ID_ORDER] as string;
+  const orderPrefix = formData[ORDER_FIELDS.ID_ORDER] as string;
   const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
   const infoValue =
     (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
@@ -85,7 +85,7 @@ export const useCreateOrderLogic = (
     infoValue,
     infoRef,
     productName,
-    orderId,
+    orderId: orderPrefix,
     registerDate,
     selectedSupplyId,
     customMode,
@@ -95,7 +95,7 @@ export const useCreateOrderLogic = (
 
   const { handleProductSelect } = useProductSelection({
     productName,
-    orderId,
+    orderId: orderPrefix,
     registerDate,
     allSupplies,
     selectedSupplyId,
@@ -118,7 +118,7 @@ export const useCreateOrderLogic = (
     formData,
     customerType,
     productName,
-    orderId,
+    orderId: orderPrefix,
     registerDate,
     setSelectedSupplyId,
     setFormData,

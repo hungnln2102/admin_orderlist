@@ -7,7 +7,10 @@ export type WarehouseItem = {
   two_fa?: string | null;
   note?: string | null;
   status?: string | null;
+  expires_at?: string | null;
+  is_verified?: boolean | null;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export const inputClass =

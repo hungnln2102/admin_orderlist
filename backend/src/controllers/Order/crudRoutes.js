@@ -11,6 +11,7 @@ const { adjustSupplierDebtIfNeeded, calcRemainingRefund } = require("./orderFina
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
 const { nextId } = require("../../services/idService");
+const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../services/orderCodeService");
 const { deleteOrderWithArchive } = require("./orderDeletionService");
 const { updateOrderWithFinance } = require("./orderUpdateService");
 const { sendOrderCreatedNotification } = require("../../services/telegramOrderNotification");
@@ -73,6 +74,12 @@ const attachCrudRoutes = (router) => {
         try {
             // Ensure we always have a numeric PK because orders.order_list.id has no default/sequence
             payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, trx);
+
+            // Server-side order code: detect prefix from client id_order, then generate unique code
+            const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+            const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+            const detectedPrefix = VALID_PREFIXES.find((p) => clientIdOrder.startsWith(p)) || "MAVC";
+            payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 

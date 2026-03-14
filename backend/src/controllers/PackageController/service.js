@@ -1,16 +1,13 @@
 const { db, withTransaction } = require("../../db");
 const {
-  normalizeDateInput,
   toNullableNumber,
-  hasAccountStoragePayload,
 } = require("../../utils/normalizers");
 const {
   PACKAGE_PRODUCTS_SELECT,
   mapPackageProductRow,
   fetchPackageProductById,
 } = require("../../services/packageProductService");
-const { getNextAccountStorageId } = require("../../services/idService");
-const { pkgCols, accCols, TABLES } = require("./constants");
+const { pkgCols, TABLES } = require("./constants");
 
 const normalizeMatchMode = (matchMode) =>
   matchMode === "slot" ? "slot" : "information_order";
@@ -24,21 +21,13 @@ const listPackageProducts = async () => {
 const createPackageProduct = async (payload) => {
   const {
     packageId,
-    informationUser,
-    informationPass,
-    informationMail,
-    note,
     supplier,
     importPrice,
     slotLimit,
-    accountUser,
-    accountPass,
-    accountMail,
-    accountNote,
-    capacity,
-    expired,
-    hasCapacityField,
     matchMode,
+    stockId,
+    storageId,
+    storageTotal,
   } = payload || {};
 
   const productIdNum = packageId != null ? Number(packageId) : null;
@@ -46,7 +35,6 @@ const createPackageProduct = async (payload) => {
     throw new Error("packageId (product id) là bắt buộc.");
   }
 
-  const normalizedExpired = normalizeDateInput(expired);
   const normalizedSlotLimit = toNullableNumber(slotLimit);
   const normalizedMatchMode = normalizeMatchMode(matchMode);
 
@@ -54,70 +42,33 @@ const createPackageProduct = async (payload) => {
     const [pkgRow] = await trx(TABLES.packageProduct)
       .insert({
         [pkgCols.packageId]: productIdNum,
-        [pkgCols.username]: informationUser || null,
-        [pkgCols.password]: informationPass || null,
-        [pkgCols.mail2nd]: informationMail || null,
-        [pkgCols.note]: note || null,
         [pkgCols.supplier]: supplier || null,
         [pkgCols.cost]: toNullableNumber(importPrice),
-        [pkgCols.expired]: normalizedExpired,
         [pkgCols.slot]: normalizedSlotLimit,
         [pkgCols.match]: normalizedMatchMode,
+        [pkgCols.stockId]: toNullableNumber(stockId),
+        [pkgCols.storageId]: toNullableNumber(storageId),
+        [pkgCols.storageTotal]: toNullableNumber(storageTotal),
       })
       .returning("id");
 
     const packageId =
       pkgRow?.id ?? pkgRow?.ID ?? pkgRow?.packageProductId ?? pkgRow?.package_id;
 
-    let createdAccountStorageId = null;
-    const mailFamily = informationUser || null;
-    if (
-      hasAccountStoragePayload({
-        accountUser,
-        accountPass,
-        accountMail,
-        accountNote,
-        capacity,
-      })
-    ) {
-      const nextStorageId = await getNextAccountStorageId(trx);
-      await trx(TABLES.accountStorage).insert({
-        [accCols.id]: nextStorageId,
-        [accCols.username]: accountUser || null,
-        [accCols.password]: accountPass || null,
-        [accCols.mail2nd]: accountMail || null,
-        [accCols.note]: accountNote || null,
-        [accCols.storage]: toNullableNumber(capacity),
-        [accCols.mailFamily]: mailFamily,
-      });
-      createdAccountStorageId = nextStorageId;
-    }
-
     const fetched = await fetchPackageProductById(trx, packageId);
-    if (fetched) return { ...fetched, hasCapacityField: Boolean(hasCapacityField) };
+    if (fetched) return fetched;
 
-    // Fallback mapping if fetch fails
     return mapPackageProductRow({
       package_id: packageId,
       product_id: productIdNum,
       package_name: null,
-      package_username: informationUser || null,
-      package_password: informationPass || null,
-      package_mail_2nd: informationMail || null,
-      package_note: note || null,
       package_supplier: supplier || null,
       package_import: toNullableNumber(importPrice),
-      package_expired: normalizedExpired,
       package_slot: normalizedSlotLimit,
       package_match: normalizedMatchMode,
-      account_id: createdAccountStorageId,
-      account_username: accountUser || null,
-      account_password: accountPass || null,
-      account_mail_2nd: accountMail || null,
-      account_note: accountNote || null,
-      account_storage: toNullableNumber(capacity),
-      account_mail_family: mailFamily,
-      has_capacity_field: Boolean(hasCapacityField),
+      stock_id: toNullableNumber(stockId),
+      storage_id: toNullableNumber(storageId),
+      storage_total: toNullableNumber(storageTotal),
       package_products: [],
     });
   });
@@ -127,31 +78,15 @@ const createPackageProduct = async (payload) => {
 
 const updatePackageProduct = async (id, payload) => {
   const {
-    informationUser,
-    informationPass,
-    informationMail,
-    note,
     supplier,
     importPrice,
     slotLimit,
-    accountStorageId,
-    accountUser,
-    accountPass,
-    accountMail,
-    accountNote,
-    capacity,
-    expired,
-    hasCapacityField,
     matchMode,
+    stockId,
+    storageId,
+    storageTotal,
   } = payload || {};
 
-  let storageIdNumber = null;
-  if (accountStorageId !== undefined && accountStorageId !== null && accountStorageId !== "") {
-    const parsed = Number(accountStorageId);
-    storageIdNumber = Number.isFinite(parsed) ? parsed : null;
-  }
-
-  const normalizedExpired = normalizeDateInput(expired);
   const normalizedSlotLimit = toNullableNumber(slotLimit);
   const normalizedMatchMode = normalizeMatchMode(matchMode);
 
@@ -159,15 +94,13 @@ const updatePackageProduct = async (id, payload) => {
     const [updatedPkg] = await trx(TABLES.packageProduct)
       .where(pkgCols.id, id)
       .update({
-        [pkgCols.username]: informationUser || null,
-        [pkgCols.password]: informationPass || null,
-        [pkgCols.mail2nd]: informationMail || null,
-        [pkgCols.note]: note || null,
         [pkgCols.supplier]: supplier || null,
         [pkgCols.cost]: toNullableNumber(importPrice),
-        [pkgCols.expired]: normalizedExpired,
         [pkgCols.slot]: normalizedSlotLimit,
         [pkgCols.match]: normalizedMatchMode,
+        [pkgCols.stockId]: toNullableNumber(stockId),
+        [pkgCols.storageId]: toNullableNumber(storageId),
+        [pkgCols.storageTotal]: toNullableNumber(storageTotal),
       })
       .returning("id");
 
@@ -181,63 +114,19 @@ const updatePackageProduct = async (id, payload) => {
       updatedPkg?.packageProductId ??
       updatedPkg?.package_id;
 
-    const shouldUpsertAccountStorage = hasAccountStoragePayload({
-      accountUser,
-      accountPass,
-      accountMail,
-      accountNote,
-      capacity,
-    });
-    const mailFamily = informationUser || null;
-
-    if (storageIdNumber && shouldUpsertAccountStorage) {
-      await trx(TABLES.accountStorage)
-        .where(accCols.id, storageIdNumber)
-        .update({
-          [accCols.username]: accountUser || null,
-          [accCols.password]: accountPass || null,
-          [accCols.mail2nd]: accountMail || null,
-          [accCols.note]: accountNote || null,
-          [accCols.storage]: toNullableNumber(capacity),
-          [accCols.mailFamily]: mailFamily,
-        });
-    } else if (!storageIdNumber && shouldUpsertAccountStorage) {
-      const nextStorageId = await getNextAccountStorageId(trx);
-      storageIdNumber = nextStorageId;
-      await trx(TABLES.accountStorage).insert({
-        [accCols.id]: nextStorageId,
-        [accCols.username]: accountUser || null,
-        [accCols.password]: accountPass || null,
-        [accCols.mail2nd]: accountMail || null,
-        [accCols.note]: accountNote || null,
-        [accCols.storage]: toNullableNumber(capacity),
-        [accCols.mailFamily]: mailFamily,
-      });
-    }
-
     const fetched = await fetchPackageProductById(trx, packageId ?? id);
-    if (fetched) return { ...fetched, hasCapacityField: Boolean(hasCapacityField) };
+    if (fetched) return fetched;
 
     return mapPackageProductRow({
       package_id: packageId ?? id,
       product_id: null,
       package_name: null,
-      package_username: informationUser || null,
-      package_password: informationPass || null,
-      package_mail_2nd: informationMail || null,
-      package_note: note || null,
       package_supplier: supplier || null,
       package_import: toNullableNumber(importPrice),
-      package_expired: normalizedExpired,
-      account_id: storageIdNumber,
-      account_username: accountUser || null,
-      account_password: accountPass || null,
-      account_mail_2nd: accountMail || null,
-      account_note: accountNote || null,
-      account_storage: toNullableNumber(capacity),
-      account_mail_family: mailFamily,
-      has_capacity_field: Boolean(hasCapacityField),
       package_match: normalizedMatchMode,
+      stock_id: toNullableNumber(stockId),
+      storage_id: toNullableNumber(storageId),
+      storage_total: toNullableNumber(storageTotal),
       package_products: [],
     });
   });

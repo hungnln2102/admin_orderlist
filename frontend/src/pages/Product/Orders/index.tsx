@@ -6,11 +6,10 @@ import {
 import {
   ORDER_DATASET_CONFIG,
   ORDER_DATASET_SEQUENCE,
-  ORDER_STATUSES,
   Order,
   OrderDatasetKey,
 } from "../../../constants";
-import { SEARCH_FIELD_OPTIONS } from "./constants";
+import { SEARCH_FIELD_OPTIONS, STAT_FILTER_MAP, type StatFilterKey } from "./constants";
 import GradientButton from "../../../components/ui/GradientButton";
 import StatCard from "../../../components/ui/StatCard";
 import ConfirmModal from "../../../components/modals/ConfirmModal/ConfirmModal";
@@ -140,7 +139,7 @@ export default function Orders() {
               <button
                 key={key}
                 type="button"
-                onClick={() => setDatasetKey(datasetKeyValue)}
+                onClick={() => { setDatasetKey(datasetKeyValue); setStatusFilter("all"); }}
                 className={`flex items-center justify-between rounded-2xl px-6 py-4 text-left transition-all duration-300 border ${
                   isActive
                     ? "bg-gradient-to-br from-indigo-500/80 to-purple-600/80 text-white border-white/20 shadow-[0_12px_40px_-12px_rgba(99,102,241,0.5)] scale-[1.02]"
@@ -168,15 +167,27 @@ export default function Orders() {
 
       <div className="rounded-[24px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {updatedStats.map((stat) => (
-            <StatCard
-              key={stat.name}
-              title={stat.name}
-              value={stat.value}
-              icon={stat.icon}
-              accent={stat.accent}
-            />
-          ))}
+          {updatedStats.map((stat) => {
+            const fk = stat.filterKey as StatFilterKey;
+            const filterValue = STAT_FILTER_MAP[fk] ?? "all";
+            const isActive = statusFilter === filterValue;
+            return (
+              <button
+                key={stat.name}
+                type="button"
+                onClick={() => setStatusFilter(isActive ? "all" : filterValue)}
+                className="text-left transition-all duration-200"
+              >
+                <StatCard
+                  title={stat.name}
+                  value={stat.value}
+                  icon={stat.icon}
+                  accent={stat.accent}
+                  isActive={isActive}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -218,28 +229,6 @@ export default function Orders() {
                     {opt.label}
                   </option>
                 ))}
-              </select>
-            </div>
-
-            <div className="relative w-full sm:w-auto sm:min-w-[160px] lg:w-[220px]">
-              <select
-                className="w-full px-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
-                style={{ 
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")', 
-                  backgroundPosition: 'right 1rem center', 
-                  backgroundRepeat: 'no-repeat', 
-                  backgroundSize: '1.1rem', 
-                  paddingRight: '2.5rem' 
-                }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all" className="bg-slate-900 text-white">Tất cả trạng thái</option>
-                <option value={ORDER_STATUSES.DA_THANH_TOAN} className="bg-slate-900 text-white">Đã thanh toán</option>
-                <option value={ORDER_STATUSES.CHUA_THANH_TOAN} className="bg-slate-900 text-white">Chưa thanh toán</option>
-                <option value={ORDER_STATUSES.DANG_XU_LY} className="bg-slate-900 text-white">Đang xử lý</option>
-                <option value={ORDER_STATUSES.CAN_GIA_HAN} className="bg-slate-900 text-white">Cần gia hạn</option>
-                <option value={ORDER_STATUSES.ORDER_EXPIRED} className="bg-slate-900 text-white">Hết hạn</option>
               </select>
             </div>
 

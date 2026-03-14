@@ -212,17 +212,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Mã Đơn Hàng</label>
-                  <input
-                    type="text"
-                    name={ORDER_FIELDS.ID_ORDER}
-                    value={(formData[ORDER_FIELDS.ID_ORDER] as string) || ""}
-                    readOnly
-                    className={`${inputClass} font-semibold ${readOnlyClass}`}
-                  />
-                </div>
-
-                <div>
                   <label className={labelClass}>
                     Tên Khách Hàng <span className="text-red-500">*</span>
                   </label>

@@ -95,13 +95,13 @@ const updateSupplyPriceForProduct = async (req, res) => {
         price
       );
       
-      // Include update info in response (optional)
       res.json({
         productId: result.productId,
         sourceId: result.supplierId,
         supplierId: result.supplierId,
         price: result.price,
         ordersUpdated: updateResult.updatedCount,
+        debtAdjustment: updateResult.debtAdjustment || 0,
       });
     } catch (updateError) {
       // Log error but don't fail the price update

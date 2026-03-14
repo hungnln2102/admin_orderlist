@@ -175,8 +175,8 @@ export const usePriceCalculation = ({
         );
 
       if (monthsFromInfo > 0) {
-        const derivedDays = Helpers.daysFromMonths(monthsFromInfo);
         const end = Helpers.addMonthsMinusOneDay(safeRegister, monthsFromInfo);
+        const derivedDays = Helpers.inclusiveDaysBetween(safeRegister, end);
         if (derivedDays > 0) {
           days = derivedDays;
           expiry = end;

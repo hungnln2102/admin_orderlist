@@ -13,6 +13,7 @@ const {
   normalizeTextInput,
 } = require("../controllers/Order/helpers");
 const { nextId } = require("./idService");
+const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
 const { todayYMDInVietnam } = require("../utils/normalizers");
 
 /**
@@ -46,6 +47,12 @@ const createOrder = async (orderData, trx = null) => {
 
     // Ensure we have a numeric PK
     payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, transaction);
+
+    // Server-side order code: detect prefix from client id_order, then generate unique code
+    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+    const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+    const detectedPrefix = VALID_PREFIXES.find((p) => clientIdOrder.startsWith(p)) || "MAVC";
+    payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, transaction);
 
     // Insert order
     const [newOrder] = await transaction(TABLES.orderList).insert(payload).returning("*");

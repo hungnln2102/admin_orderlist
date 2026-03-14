@@ -21,9 +21,9 @@ const listHandler = async (_req, res) => {
 const validateMatchRequiresAccount = (body) => {
   const matchMode = body?.matchMode ?? body?.match;
   if (matchMode !== "slot" && matchMode !== "information_order") return null;
-  const informationUser = (body?.informationUser ?? body?.account_user ?? "").trim();
-  if (!informationUser) {
-    return "Khi chọn Match theo Slot hoặc Information, Thông tin gói (tài khoản/email) là bắt buộc.";
+  const hasStock = body?.stockId != null && body?.stockId !== "";
+  if (!hasStock) {
+    return "Khi chọn Match theo Slot hoặc Information, cần liên kết với kho hàng (stock_id).";
   }
   return null;
 };

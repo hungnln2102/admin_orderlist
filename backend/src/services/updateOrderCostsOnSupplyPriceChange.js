@@ -1,70 +1,132 @@
 const { db } = require("../db");
-const { TABLES, COLS, STATUS } = require("../controllers/Order/constants");
-const { ORDERS_SCHEMA } = require("../config/dbSchema");
-const { quoteIdent } = require("../utils/sql");
+const { TABLES, STATUS } = require("../controllers/Order/constants");
+const {
+    PARTNER_SCHEMA,
+    SCHEMA_PARTNER,
+    tableName,
+} = require("../config/dbSchema");
+const { toNullableNumber } = require("../utils/normalizers");
+const logger = require("../utils/logger");
+
+const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
+const PAYMENT_SUPPLY_TABLE = tableName(
+    PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
+    SCHEMA_PARTNER
+);
 
 /**
- * Updates order costs for all PROCESSING and UNPAID orders when a supply price changes.
- * 
- * @param {number} productId - The variant/product ID
- * @param {number} supplierId - The supplier ID
- * @param {number} newPrice - The new price to set
- * @returns {Promise<{updatedCount: number, orders: Array}>} - Result with count and affected order IDs
+ * When a supplier cost changes in supplier_cost, propagate to affected orders:
+ *
+ * - UNPAID orders: simply overwrite cost with the new price.
+ * - PROCESSING orders: cost was already added to supplier debt (total_amount).
+ *   Overwrite cost AND adjust total_amount by the difference (newPrice − oldCost).
  */
-const updateOrderCostsOnSupplyPriceChange = async (productId, supplierId, newPrice) => {
+const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPrice) => {
+    const newCost = toNullableNumber(newPrice);
+    if (!Number.isFinite(variantId) || !Number.isFinite(supplierId) || newCost == null) {
+        return { updatedCount: 0, orders: [] };
+    }
+
+    const trx = await db.transaction();
     try {
-        console.log('\n========== AUTO-UPDATE ORDER COSTS ==========');
-        console.log('Input parameters:', { productId, supplierId, newPrice });
+        const unpaidResult = await trx.raw(
+            `UPDATE ${TABLES.orderList}
+             SET "cost" = ?
+             WHERE "id_product" = ?
+               AND "supply_id" = ?
+               AND "status" = ?
+             RETURNING "id", "id_order", "status", "cost"`,
+            [newCost, variantId, supplierId, STATUS.UNPAID]
+        );
+        const unpaidOrders = unpaidResult.rows || [];
 
-        // order_list.id_product = variant id (int), order_list.supply_id = supplier id (int)
-        const updateQuery = `
-            UPDATE ${TABLES.orderList}
-            SET "cost" = ?
-            WHERE "id_product" = ?
-              AND "supply_id" = ?
-              AND "status" IN (?, ?)
-            RETURNING "id", "id_order", "id_product", "supply_id", "status", "cost";
-        `;
+        const processingSnapshot = await trx.raw(
+            `SELECT "id", "id_order", "cost"
+             FROM ${TABLES.orderList}
+             WHERE "id_product" = ?
+               AND "supply_id" = ?
+               AND "status" = ?`,
+            [variantId, supplierId, STATUS.PROCESSING]
+        );
+        const processingRows = processingSnapshot.rows || [];
 
-        const updateResult = await db.raw(updateQuery, [
-            newPrice,
-            productId,
-            supplierId,
-            STATUS.PROCESSING,
-            STATUS.UNPAID
-        ]);
+        let totalDelta = 0;
+        if (processingRows.length > 0) {
+            for (const row of processingRows) {
+                const oldCost = toNullableNumber(row.cost) || 0;
+                totalDelta += (newCost - oldCost);
+            }
 
-        const updatedOrders = updateResult.rows || [];
-        const updatedCount = updatedOrders.length;
+            await trx.raw(
+                `UPDATE ${TABLES.orderList}
+                 SET "cost" = ?
+                 WHERE "id_product" = ?
+                   AND "supply_id" = ?
+                   AND "status" = ?`,
+                [newCost, variantId, supplierId, STATUS.PROCESSING]
+            );
 
-        if (updatedCount > 0) {
-            console.log(`✓ Updated ${updatedCount} order(s) (variant ${productId}, supplier ${supplierId})`);
-            updatedOrders.forEach((order, i) => {
-                console.log(`  ${i + 1}. ${order.id_order} - cost: ${order.cost}`);
-            });
-        } else {
-            console.log('⚠ No orders updated (no matching variant/supplier/status)');
+            if (totalDelta !== 0) {
+                const colId = paymentSupplyCols.ID;
+                const colImport = paymentSupplyCols.IMPORT_VALUE;
+                const colStatus = paymentSupplyCols.STATUS;
+                const colSourceId = paymentSupplyCols.SOURCE_ID;
+
+                const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
+                    .where(colSourceId, supplierId)
+                    .andWhere(colStatus, STATUS.UNPAID)
+                    .orderBy(colId, "desc")
+                    .first();
+
+                if (latestCycle) {
+                    const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
+                    await trx(PAYMENT_SUPPLY_TABLE)
+                        .where(colId, latestCycle[colId])
+                        .update({ [colImport]: currentImport + totalDelta });
+                }
+            }
         }
-        console.log('==============================================\n');
+
+        await trx.commit();
+
+        const allUpdated = [
+            ...unpaidOrders.map(o => ({ ...o, type: "UNPAID" })),
+            ...processingRows.map(o => ({ ...o, cost: newCost, type: "PROCESSING" })),
+        ];
+
+        logger.info("[SupplyPriceChange] Orders updated", {
+            variantId,
+            supplierId,
+            newCost,
+            unpaid: unpaidOrders.length,
+            processing: processingRows.length,
+            totalDelta,
+        });
 
         return {
-            updatedCount,
-            orders: updatedOrders.map(o => ({
+            updatedCount: allUpdated.length,
+            orders: allUpdated.map(o => ({
                 id: o.id,
                 orderId: o.id_order,
-                variantId: o.id_product,
-                newCost: o.cost
-            }))
+                variantId,
+                newCost,
+                type: o.type,
+            })),
+            debtAdjustment: totalDelta,
         };
-
     } catch (error) {
-        console.error('❌ ERROR in updateOrderCostsOnSupplyPriceChange:', error);
-        console.error('Stack trace:', error.stack);
-        console.log('==============================================\n');
+        await trx.rollback();
+        logger.error("[SupplyPriceChange] Failed", {
+            variantId,
+            supplierId,
+            newCost,
+            error: error?.message,
+            stack: error?.stack,
+        });
         throw error;
     }
 };
 
 module.exports = {
-    updateOrderCostsOnSupplyPriceChange
+    updateOrderCostsOnSupplyPriceChange,
 };

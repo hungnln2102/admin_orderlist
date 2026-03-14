@@ -13,7 +13,7 @@ export const buildCategoryRows = (
       groups.set(key, {
         key,
         packageName: packageLabel,
-        imageUrl: item.imageUrl ?? null,
+        imageUrl: item.packageImageUrl ?? null,
         categories: [],
         items: [],
       });

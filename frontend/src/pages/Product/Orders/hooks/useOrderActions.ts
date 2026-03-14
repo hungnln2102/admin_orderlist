@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   API_ENDPOINTS,
   ORDER_FIELDS,
@@ -39,10 +39,16 @@ export function useOrderActions(deps: OrderActionsDeps) {
 
   const [renewingOrderCode, setRenewingOrderCode] = useState<string | null>(null);
 
+  /** Chống double-submit: nếu đã gọi tạo đơn thì bỏ qua lần gọi tiếp theo (tránh 2 đơn trùng mã) */
+  const isCreatingOrderRef = useRef(false);
+
   type CreateOrderPayload = Partial<EditableOrder> | EditableOrder;
 
   const handleSaveNewOrder = useCallback(
     async (newOrderData: CreateOrderPayload) => {
+      if (isCreatingOrderRef.current) return;
+      isCreatingOrderRef.current = true;
+
       closeCreateModal();
 
       try {
@@ -71,6 +77,8 @@ export function useOrderActions(deps: OrderActionsDeps) {
             error instanceof Error ? error.message : String(error)
           }`,
         });
+      } finally {
+        isCreatingOrderRef.current = false;
       }
     },
     [closeCreateModal, fetchOrders, handleViewOrder]

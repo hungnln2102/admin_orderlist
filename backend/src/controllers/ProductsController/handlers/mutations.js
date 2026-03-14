@@ -8,7 +8,6 @@ const {
   variantCols,
   productSchemaCols,
   productDescCols,
-  priceConfigCols,
   supplyPriceCols,
   categoryCols,
   productCategoryCols,
@@ -35,11 +34,11 @@ const fetchVariantView = async (variantId) => {
         ) FILTER (WHERE c.${quoteIdent(categoryCols.id)} IS NOT NULL),
         '[]'::json
       ) AS categories,
-      pc.${quoteIdent(priceConfigCols.pctCtv)} AS pct_ctv,
-      pc.${quoteIdent(priceConfigCols.pctKhach)} AS pct_khach,
-      pc.${quoteIdent(priceConfigCols.pctPromo)} AS pct_promo,
+      v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
+      v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
+      v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
       v.${quoteIdent(variantCols.isActive)} AS is_active,
-      pc.${quoteIdent(priceConfigCols.updatedAt)} AS update,
+      v.${quoteIdent(variantCols.updatedAt)} AS update,
       spagg.max_supply_price AS max_supply_price
     FROM ${TABLES.variant} v
     LEFT JOIN ${TABLES.product} p
@@ -56,17 +55,6 @@ const fetchVariantView = async (variantId) => {
     LEFT JOIN ${TABLES.category} c
       ON c.${quoteIdent(categoryCols.id)} = pcj.${quoteIdent(productCategoryCols.categoryId)}
     LEFT JOIN LATERAL (
-      SELECT
-        pc.${quoteIdent(priceConfigCols.pctCtv)},
-        pc.${quoteIdent(priceConfigCols.pctKhach)},
-        pc.${quoteIdent(priceConfigCols.pctPromo)},
-        pc.${quoteIdent(priceConfigCols.updatedAt)}
-      FROM ${TABLES.priceConfig} pc
-      WHERE pc.${quoteIdent(priceConfigCols.variantId)} = v.id
-      ORDER BY pc.${quoteIdent(priceConfigCols.updatedAt)} DESC NULLS LAST
-      LIMIT 1
-    ) pc ON TRUE
-    LEFT JOIN LATERAL (
       SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
       FROM ${TABLES.supplyPrice} sp
       WHERE sp.${quoteIdent(supplyPriceCols.variantId)} = v.id
@@ -79,11 +67,11 @@ const fetchVariantView = async (variantId) => {
       p.${quoteIdent(productSchemaCols.packageName)},
       p.${quoteIdent(productSchemaCols.imageUrl)},
       pd.desc_image_url,
-      pc.${quoteIdent(priceConfigCols.pctCtv)},
-      pc.${quoteIdent(priceConfigCols.pctKhach)},
-      pc.${quoteIdent(priceConfigCols.pctPromo)},
+      v.${quoteIdent(variantCols.pctCtv)},
+      v.${quoteIdent(variantCols.pctKhach)},
+      v.${quoteIdent(variantCols.pctPromo)},
       v.${quoteIdent(variantCols.isActive)},
-      pc.${quoteIdent(priceConfigCols.updatedAt)},
+      v.${quoteIdent(variantCols.updatedAt)},
       spagg.max_supply_price
     LIMIT 1;
   `;
@@ -189,7 +177,6 @@ const createProductPrice = async (req, res) => {
     return res.status(400).json({ error: "sanPham là bắt buộc." });
   }
 
-  // Use unique placeholder when package name is empty so product insert always returns an id
   const rawPackageName = normalizeTextInput(packageName);
   const normalizedPackageName =
     rawPackageName && rawPackageName.length > 0
@@ -209,8 +196,6 @@ const createProductPrice = async (req, res) => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         inserted = await db.transaction(async (trx) => {
-          // Rule: Gói (package_name) có thể trùng. Không còn unique constraint (migration 003).
-          // Reuse product khi cùng package_name: tìm trước, nếu có thì dùng, không thì insert mới.
           let productId = null;
           if (rawPackageName && rawPackageName.length > 0) {
             const existing = await trx(TABLES.product)
@@ -220,7 +205,6 @@ const createProductPrice = async (req, res) => {
             productId = existing?.id ?? existing?.ID ?? null;
           }
           if (!productId) {
-            // Cột "name" NOT NULL trên product.product: dùng tên hiển thị
             const productName =
               rawPackageName ||
               normalizeTextInput(packageProduct) ||
@@ -229,9 +213,6 @@ const createProductPrice = async (req, res) => {
             const productPayload = {
               [productSchemaCols.packageName]: normalizedPackageName,
             };
-            if (productSchemaCols.name) {
-              productPayload[productSchemaCols.name] = productName;
-            }
             const productInsert = await trx(TABLES.product)
               .insert(productPayload)
               .returning("id");
@@ -270,17 +251,12 @@ const createProductPrice = async (req, res) => {
               [variantCols.displayName]: productCode,
               [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
               [variantCols.isActive]: isActive,
+              [variantCols.pctCtv]: pctCtvVal,
+              [variantCols.pctKhach]: pctKhachVal,
+              [variantCols.pctPromo]: pctPromoVal,
             })
             .returning("id");
           const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;
-
-          await trx(TABLES.priceConfig).insert({
-            [priceConfigCols.variantId]: variantId,
-            [priceConfigCols.pctCtv]: pctCtvVal,
-            [priceConfigCols.pctKhach]: pctKhachVal,
-            [priceConfigCols.pctPromo]: pctPromoVal,
-            [priceConfigCols.updatedAt]: new Date(),
-          });
 
           if (Array.isArray(suppliers) && suppliers.length) {
             for (const supplier of suppliers) {
@@ -397,8 +373,21 @@ const updateProductPrice = async (req, res) => {
           : !(String(is_active || "").trim().toLowerCase() === "false");
       addVariantUpdate(variantCols.isActive, isActive);
     }
+    if (pctCtv !== undefined) addVariantUpdate(variantCols.pctCtv, toNullableNumber(pctCtv));
+    if (pctKhach !== undefined) addVariantUpdate(variantCols.pctKhach, toNullableNumber(pctKhach));
+    if (pctPromo !== undefined) addVariantUpdate(variantCols.pctPromo, toNullableNumber(pctPromo));
+
+    if (
+      !variantUpdates.length &&
+      packageName === undefined &&
+      imageUrl === undefined &&
+      !Array.isArray(normalizedCategoryIds)
+    ) {
+      return res.status(400).json({ error: "Không có trường nào để cập nhật." });
+    }
 
     if (variantUpdates.length) {
+      variantUpdates.push(`${quoteIdent(variantCols.updatedAt)} = NOW()`);
       await db.raw(
         `
         UPDATE ${TABLES.variant}
@@ -431,7 +420,6 @@ const updateProductPrice = async (req, res) => {
         );
       }
     }
-
 
     if (productSchemaId && Array.isArray(normalizedCategoryIds)) {
       let existingColors = null;
@@ -479,70 +467,6 @@ const updateProductPrice = async (req, res) => {
           return row;
         });
         await db(TABLES.productCategory).insert(rows);
-      }
-    }
-
-    const priceUpdates = [];
-    const priceValues = [];
-    const addPriceUpdate = (column, value) => {
-      priceUpdates.push(`${quoteIdent(column)} = ?`);
-      priceValues.push(value);
-    };
-
-    if (pctCtv !== undefined) addPriceUpdate(priceConfigCols.pctCtv, toNullableNumber(pctCtv));
-    if (pctKhach !== undefined) addPriceUpdate(priceConfigCols.pctKhach, toNullableNumber(pctKhach));
-    if (pctPromo !== undefined) addPriceUpdate(priceConfigCols.pctPromo, toNullableNumber(pctPromo));
-
-    if (
-      !variantUpdates.length &&
-      priceUpdates.length === 0 &&
-      packageName === undefined &&
-      imageUrl === undefined &&
-      !Array.isArray(normalizedCategoryIds)
-    ) {
-      return res.status(400).json({ error: "Không có trường nào để cập nhật." });
-    }
-
-    if (priceUpdates.length) {
-      priceUpdates.push(`${quoteIdent(priceConfigCols.updatedAt)} = NOW()`);
-      const existingPrice = await db.raw(
-        `
-        SELECT id FROM ${TABLES.priceConfig}
-        WHERE ${quoteIdent(priceConfigCols.variantId)} = ?
-        LIMIT 1;
-      `,
-        [parsedId]
-      );
-      if (existingPrice.rows && existingPrice.rows.length) {
-        await db.raw(
-          `
-          UPDATE ${TABLES.priceConfig}
-          SET ${priceUpdates.join(", ")}
-          WHERE ${quoteIdent(priceConfigCols.variantId)} = ?;
-        `,
-          [...priceValues, parsedId]
-        );
-      } else {
-        // DB hiện tại không có unique constraint trên variant_id,
-        // nên không thể dùng ON CONFLICT (variant_id). Chỉ cần insert bản ghi mới.
-        const updatesWithPlaceholders = priceUpdates.filter((u) => u.includes("?"));
-        const cols = [
-          priceConfigCols.variantId,
-          ...updatesWithPlaceholders.map((u) => u.split(" = ")[0].replace(/"/g, "")),
-          priceConfigCols.updatedAt,
-        ];
-        const placeholders = [
-          ...Array.from({ length: updatesWithPlaceholders.length + 1 }, () => "?"),
-          "NOW()",
-        ];
-
-        await db.raw(
-          `
-          INSERT INTO ${TABLES.priceConfig} (${cols.map(quoteIdent).join(", ")})
-          VALUES (${placeholders.join(", ")});
-        `,
-          [parsedId, ...priceValues]
-        );
       }
     }
 
@@ -624,11 +548,6 @@ const deleteProductPrice = async (req, res) => {
       DELETE FROM ${TABLES.supplyPrice}
       WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?;
     `,
-      [parsedId]
-    );
-    await db.raw(
-      `DELETE FROM ${TABLES.priceConfig}
-       WHERE ${quoteIdent(priceConfigCols.variantId)} = ?;`,
       [parsedId]
     );
     const result = await db.raw(

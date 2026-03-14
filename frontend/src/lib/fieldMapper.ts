@@ -14,7 +14,6 @@ import {
   PRODUCT_COLS,
   VARIANT_COLS,
   PRODUCT_SCHEMA_DESC_COLS,
-  PRICE_CONFIG_COLS,
   SUPPLIER_COST_COLS,
 } from "./tableSql";
 
@@ -112,7 +111,10 @@ export const WAREHOUSE_FIELD_MAP = {
   TWO_FA: WAREHOUSE_COLS.twoFa,
   NOTE: WAREHOUSE_COLS.note,
   STATUS: WAREHOUSE_COLS.status,
+  EXPIRES_AT: WAREHOUSE_COLS.expiresAt,
+  IS_VERIFIED: WAREHOUSE_COLS.isVerified,
   CREATED_AT: WAREHOUSE_COLS.createdAt,
+  UPDATED_AT: WAREHOUSE_COLS.updatedAt,
 } as const;
 
 // PRODUCT schema mappings
@@ -144,15 +146,6 @@ export const PRODUCT_SCHEMA_DESC_FIELD_MAP = {
   UPDATED_AT: PRODUCT_SCHEMA_DESC_COLS.updatedAt,
 } as const;
 
-export const PRICE_CONFIG_FIELD_MAP = {
-  ID: PRICE_CONFIG_COLS.id,
-  VARIANT_ID: PRICE_CONFIG_COLS.variantId,
-  PCT_CTV: PRICE_CONFIG_COLS.pctCtv,
-  PCT_KHACH: PRICE_CONFIG_COLS.pctKhach,
-  PCT_PROMO: PRICE_CONFIG_COLS.pctPromo,
-  UPDATED_AT: PRICE_CONFIG_COLS.updatedAt,
-} as const;
-
 export const SUPPLIER_COST_FIELD_MAP = {
   ID: SUPPLIER_COST_COLS.id,
   VARIANT_ID: SUPPLIER_COST_COLS.variantId,
@@ -175,5 +168,4 @@ export type CategoryFieldKey = keyof typeof CATEGORY_FIELD_MAP;
 export type ProductFieldKey = keyof typeof PRODUCT_FIELD_MAP;
 export type VariantFieldKey = keyof typeof VARIANT_FIELD_MAP;
 export type ProductSchemaDescFieldKey = keyof typeof PRODUCT_SCHEMA_DESC_FIELD_MAP;
-export type PriceConfigFieldKey = keyof typeof PRICE_CONFIG_FIELD_MAP;
 export type SupplierCostFieldKey = keyof typeof SUPPLIER_COST_FIELD_MAP;

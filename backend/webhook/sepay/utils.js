@@ -5,11 +5,9 @@ const {
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
   VARIANT_COLS,
-  PRICE_CONFIG_COLS,
   SUPPLIER_COLS,
   SUPPLIER_COST_COLS,
   VARIANT_TABLE,
-  PRICE_CONFIG_TABLE,
   SUPPLIER_TABLE,
   SUPPLIER_COST_TABLE,
 } = require("./config");
@@ -304,27 +302,21 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
     ? `
     SELECT
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctCtv)} AS pct_ctv,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctKhach)} AS pct_khach,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctPromo)} AS pct_promo
+      v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
+      v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
+      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo
     FROM ${VARIANT_TABLE} AS v
-    LEFT JOIN ${PRICE_CONFIG_TABLE} AS pc
-      ON pc.${safeIdent(PRICE_CONFIG_COLS.variantId)} = v.${safeIdent(VARIANT_COLS.id)}
     WHERE v.${safeIdent(VARIANT_COLS.id)} = $1
-    ORDER BY pc.${safeIdent(PRICE_CONFIG_COLS.updatedAt)} DESC NULLS LAST
     LIMIT 1
   `
     : `
     SELECT
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctCtv)} AS pct_ctv,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctKhach)} AS pct_khach,
-      pc.${safeIdent(PRICE_CONFIG_COLS.pctPromo)} AS pct_promo
+      v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
+      v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
+      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo
     FROM ${VARIANT_TABLE} AS v
-    LEFT JOIN ${PRICE_CONFIG_TABLE} AS pc
-      ON pc.${safeIdent(PRICE_CONFIG_COLS.variantId)} = v.${safeIdent(VARIANT_COLS.id)}
     WHERE v.${safeIdent(VARIANT_COLS.displayName)} = $1
-    ORDER BY pc.${safeIdent(PRICE_CONFIG_COLS.updatedAt)} DESC NULLS LAST
     LIMIT 1
   `;
   const param = byVariantId ? Number(productNameOrVariantId) : String(productNameOrVariantId).trim();

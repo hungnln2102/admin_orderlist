@@ -1,7 +1,6 @@
 const { toNullableNumber } = require("../../utils/normalizers");
 const {
   variantCols,
-  priceConfigCols,
   productSchemaCols,
   supplyPriceCols,
   supplyCols,
@@ -35,11 +34,11 @@ const mapProductPriceRow = (row = {}) => {
     row.id_product ||
     row.product ||
     "";
-  const pctCtv = toNullableNumber(row.pct_ctv ?? row[priceConfigCols.pctCtv]);
+  const pctCtv = toNullableNumber(row.pct_ctv ?? row[variantCols.pctCtv]);
   const pctKhach = toNullableNumber(
-    row.pct_khach ?? row[priceConfigCols.pctKhach]
+    row.pct_khach ?? row[variantCols.pctKhach]
   );
-  const pctPromo = toNullableNumber(row.pct_promo ?? row[priceConfigCols.pctPromo]);
+  const pctPromo = toNullableNumber(row.pct_promo ?? row[variantCols.pctPromo]);
   const isActiveRaw = row.is_active ?? row[variantCols.isActive];
   const isActive =
     typeof isActiveRaw === "boolean"
@@ -68,7 +67,7 @@ const mapProductPriceRow = (row = {}) => {
     pct_khach: pctKhach,
     pct_promo: pctPromo,
     is_active: isActive,
-    update: row.update ?? row[priceConfigCols.updatedAt] ?? null,
+    update: row.update ?? row[variantCols.updatedAt] ?? null,
     max_supply_price: toNullableNumber(row.max_supply_price),
   };
 };

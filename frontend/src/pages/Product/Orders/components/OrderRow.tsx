@@ -245,10 +245,10 @@ export const OrderRow = React.memo(function OrderRow({
                     )}
                     {canMarkPaid && (
                       <button
-                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-md shadow-amber-900/40"
                         onClick={stopPropagation(onMarkPaid)}
                       >
-                        Thanh Toán
+                        Hoàn Thành
                       </button>
                     )}
                     {canRenew && (

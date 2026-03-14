@@ -57,6 +57,7 @@ export interface StatCardProps {
   subtitle?: React.ReactNode;
   children?: React.ReactNode;
   iconClassName?: string;
+  isActive?: boolean;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -66,10 +67,15 @@ const StatCard: React.FC<StatCardProps> = ({
   accent,
   subtitle,
   children,
+  isActive,
 }) => {
   return (
     <div
-      className={`stat-card group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-500 holographic-hover z-10 ${accent.border}`}
+      className={`stat-card group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-300 holographic-hover z-10 ${accent.border} ${
+        isActive
+          ? "ring-2 ring-indigo-400/60 scale-[1.03] shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
+          : "hover:scale-[1.02] cursor-pointer"
+      }`}
     >
       <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
       

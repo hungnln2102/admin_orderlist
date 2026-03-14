@@ -110,12 +110,20 @@ export const OrderCard: React.FC<OrderCardProps> = ({
             </span>
             {showActionButtons && (canStartProcessing || canMarkPaid || canRenew) && (
               <div className="flex items-center gap-2">
-                {(canStartProcessing || canMarkPaid) && onMarkPaid && (
+                {canStartProcessing && onMarkPaid && (
                   <button
                     className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase tracking-wide transition-all hover:bg-emerald-500/30 active:scale-95 shadow-lg"
                     onClick={(e) => { e.stopPropagation(); onMarkPaid(order); }}
                   >
                     Thanh Toán
+                  </button>
+                )}
+                {canMarkPaid && onMarkPaid && (
+                  <button
+                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold text-amber-300 uppercase tracking-wide transition-all hover:bg-amber-500/30 active:scale-95 shadow-lg"
+                    onClick={(e) => { e.stopPropagation(); onMarkPaid(order); }}
+                  >
+                    Hoàn Thành
                   </button>
                 )}
                 {canRenew && onRenew && (

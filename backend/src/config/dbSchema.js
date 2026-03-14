@@ -443,18 +443,6 @@ const KEY_ACTIVE_SCHEMA = {
 // PRODUCT SCHEMA
 // -----------------------
 const PRODUCT_SCHEMA = {
-  ACCOUNT_STORAGE: {
-    TABLE: "account_storage",
-    COLS: {
-      ID: "id",
-      USERNAME: "username",
-      PASSWORD: "password",
-      MAIL_2ND: "mail_2nd",
-      MAIL_FAMILY: "mail_family",
-      STORAGE: "storage",
-      NOTE: "note",
-    },
-  },
   CATEGORY: {
     TABLE: "category",
     COLS: {
@@ -475,7 +463,6 @@ const PRODUCT_SCHEMA = {
     TABLE: "product",
     COLS: {
       ID: "id",
-      NAME: "name",
       PACKAGE_NAME: "package_name",
       IMAGE_URL: "image_url",
       UPDATED_AT: "updated_at",
@@ -497,6 +484,9 @@ const PRODUCT_SCHEMA = {
       DESCRIPTION: "description",
       RULES: "rules",
       IMAGE_URL: "image_url",
+      PCT_CTV: "pct_ctv",
+      PCT_KHACH: "pct_khach",
+      PCT_PROMO: "pct_promo",
     },
   },
   // Alias logic cũ cho product_desc: hiện tại tất cả dữ liệu mô tả
@@ -515,29 +505,21 @@ const PRODUCT_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
-  PRICE_CONFIG: {
-    TABLE: "price_config",
-    COLS: {
-      ID: "id",
-      VARIANT_ID: "variant_id",
-      PCT_CTV: "pct_ctv",
-      PCT_KHACH: "pct_khach",
-      PCT_PROMO: "pct_promo",
-      UPDATED_AT: "updated_at",
-    },
-  },
   PRODUCT_STOCK: {
-    TABLE: "product_stock",
+    TABLE: "product_stocks",
     COLS: {
       ID: "id",
       PRODUCT_TYPE: "product_type",
       ACCOUNT_USERNAME: "account_username",
-      ACCOUNT_PASSWORD: "account_password",
       BACKUP_EMAIL: "backup_email",
-      TWO_FA_CODE: "two_fa_code",
+      PASSWORD_ENCRYPTED: "password_encrypted",
+      TWO_FA_ENCRYPTED: "two_fa_encrypted",
+      STATUS: "status",
+      EXPIRES_AT: "expires_at",
+      IS_VERIFIED: "is_verified",
       NOTE: "note",
-      STOCK_STATUS: "stock_status",
       CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
     },
   },
   PACKAGE_PRODUCT: {
@@ -545,15 +527,13 @@ const PRODUCT_SCHEMA = {
     COLS: {
       ID: "id",
       PACKAGE_ID: "package_id",
-      USERNAME: "account_user",
-      PASSWORD: "account_pass",
-      MAIL_2ND: "recovery_mail",
-      NOTE: "note",
-      EXPIRED: "expiry_date",
       SUPPLIER: "supplier",
       COST: "cost",
       SLOT: "slot",
       MATCH: "match",
+      STOCK_ID: "stock_id",
+      STORAGE_ID: "storage_id",
+      STORAGE_TOTAL: "storage_total",
     },
   },
   SUPPLIER_COST: SUPPLIER_COST_DEF,

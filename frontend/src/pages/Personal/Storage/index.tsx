@@ -63,7 +63,8 @@ export default function Storage() {
   };
 
   const updateDraft = (key: keyof WarehouseItem, value: string) => {
-    setDraft((prev) => ({ ...(prev || {}), [key]: value }));
+    const parsed = key === "is_verified" ? value === "true" : value;
+    setDraft((prev) => ({ ...(prev || {}), [key]: parsed }));
   };
 
   const saveEdit = async (id?: number) => {
@@ -134,11 +135,13 @@ export default function Storage() {
       two_fa: "",
       note: "",
       status: "Tồn",
+      expires_at: "",
+      is_verified: false,
     });
   };
 
-  const derived = useMemo(() => {
-    const filtered = items
+  const filtered = useMemo(() => {
+    return items
       .filter((item) => {
         if (!search.trim()) return true;
         const q = normalizeText(search);
@@ -157,13 +160,11 @@ export default function Storage() {
         const nameB = normalizeText(b.category);
         return nameA.localeCompare(nameB, "vi");
       });
-
-    return { filtered };
   }, [items, search]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-4">
-      <StorageHeader />
+    <div className="p-4 lg:p-6 space-y-5 max-w-[1400px]">
+      <StorageHeader totalItems={items.length} />
 
       <SearchBar
         search={search}
@@ -174,7 +175,7 @@ export default function Storage() {
       />
 
       <StorageTable
-        items={derived.filtered}
+        items={filtered}
         draft={draft}
         editingId={editingId}
         loading={loading}

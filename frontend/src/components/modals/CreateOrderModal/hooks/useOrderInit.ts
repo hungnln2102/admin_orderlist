@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
   ORDER_FIELDS,
@@ -34,21 +34,15 @@ export const useOrderInit = ({
   fetchProducts,
   fetchAllSupplies,
 }: UseOrderInitParams) => {
-  const currentOrderId = useMemo(
-    () => customerType + Helpers.generateRandomId(5),
-    [customerType]
-  );
-
   useEffect(() => {
     if (!isOpen) return;
     const initialType: CustomerType = DEFAULT_ORDER_CODE_PREFIX;
-    const initialID = initialType + Helpers.generateRandomId(5);
     const initialDate = Helpers.getTodayDMY();
 
     setCustomerType(initialType);
     setFormData({
       ...INITIAL_FORM_DATA,
-      [ORDER_FIELDS.ID_ORDER]: initialID,
+      [ORDER_FIELDS.ID_ORDER]: initialType,
       [ORDER_FIELDS.ORDER_DATE]: initialDate,
       [ORDER_FIELDS.EXPIRY_DATE]: initialDate,
     });
@@ -76,7 +70,7 @@ export const useOrderInit = ({
     if (!isOpen) return;
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.ID_ORDER]: currentOrderId,
+      [ORDER_FIELDS.ID_ORDER]: customerType,
     }));
-  }, [currentOrderId, isOpen, setFormData]);
+  }, [customerType, isOpen, setFormData]);
 };

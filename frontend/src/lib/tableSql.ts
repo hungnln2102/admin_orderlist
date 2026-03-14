@@ -56,7 +56,7 @@ export const SUPPLY_PRICE_COLS = {
   price: "price",
 };
 
-// 7. VARIANT_PRICING VIEW (Backend: /api/product-prices -> variant + price_config)
+// 7. VARIANT_PRICING VIEW (Backend: /api/product-prices -> variant)
 export const VARIANT_PRICING_COLS = {
   id: "id",
   code: "id_product", // alias cho variant.display_name
@@ -92,38 +92,28 @@ export const WAREHOUSE_COLS = {
   id: "id",
   category: "product_type",
   account: "account_username",
-  password: "account_password",
+  password: "password_encrypted",
   backupEmail: "backup_email",
-  twoFa: "two_fa_code",
-  status: "stock_status",
+  twoFa: "two_fa_encrypted",
+  status: "status",
+  expiresAt: "expires_at",
+  isVerified: "is_verified",
   note: "note",
   createdAt: "created_at",
-};
-
-// 11. ACCOUNT_STORAGE (Backend: ACCOUNT_STORAGE)
-export const ACCOUNT_STORAGE_COLS = {
-  id: "id",
-  username: "username",
-  password: "password",
-  mail2nd: "mail_2nd",
-  mailFamily: "mail_family",
-  storage: "storage",
-  note: "note",
+  updatedAt: "updated_at",
 };
 
 // 12. PACKAGE_PRODUCT (Backend: PACKAGE_PRODUCT)
 export const PACKAGE_PRODUCT_COLS = {
   id: "id",
   package: "package_name",
-  username: "account_user",
-  password: "account_pass",
-  mail2nd: "recovery_mail",
-  note: "note",
-  expired: "expiry_date",
   supplier: "supplier",
   cost: "cost",
   slot: "slot",
   match: "match",
+  stockId: "stock_id",
+  storageId: "storage_id",
+  storageTotal: "storage_total",
 };
 
 // 13. PAYMENT_SUPPLY (Backend: PAYMENT_SUPPLY)
@@ -178,15 +168,6 @@ export const PRODUCT_SCHEMA_DESC_COLS = {
   updatedAt: "updated_at",
 };
 
-export const PRICE_CONFIG_COLS = {
-  id: "id",
-  variantId: "variant_id",
-  pctCtv: "pct_ctv",
-  pctKhach: "pct_khach",
-  pctPromo: "pct_promo",
-  updatedAt: "updated_at",
-};
-
 export const SUPPLIER_COST_COLS = {
   id: "id",
   variantId: "variant_id",
@@ -211,8 +192,7 @@ export const DB_DEFINITIONS = {
   // Mô tả sản phẩm hiện lưu trực tiếp trên bảng variant
   PRODUCT_DESC: "variant",
   BANK_LIST: "bank_list",
-  WAREHOUSE: "product_stock",
-  ACCOUNT_STORAGE: "account_storage",
+  WAREHOUSE: "product_stocks",
   PACKAGE_PRODUCT: "package_product",
   PAYMENT_SUPPLY: "supplier_payments",
   USERS: "users",
@@ -224,14 +204,12 @@ export const PRODUCT_DB_DEFINITIONS = {
   VARIANT: "variant",
   // Trước đây là bảng product_desc, hiện đã gộp vào variant
   PRODUCT_DESC: "variant",
-  PRICE_CONFIG: "price_config",
   SUPPLIER_COST: "supplier_cost",
 };
 
 // Gom nhóm tất cả columns để fieldMapper sử dụng
 export const SCHEMA_TABLES = {
   ORDER_COLS,
-  ACCOUNT_STORAGE_COLS,
   BANK_LIST_COLS,
   PACKAGE_PRODUCT_COLS,
   PAYMENT_RECEIPT_COLS,
@@ -250,7 +228,6 @@ export const PRODUCT_SCHEMA_TABLES = {
   PRODUCT_COLS,
   VARIANT_COLS,
   PRODUCT_SCHEMA_DESC_COLS,
-  PRICE_CONFIG_COLS,
   SUPPLIER_COST_COLS,
 };
 

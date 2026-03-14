@@ -7,21 +7,46 @@ const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
 const cols = warehouseDef.columns;
 const warehouseTable = tableName(warehouseDef.tableName, SCHEMA_PRODUCT);
 
+const pkgDef = getDefinition("PACKAGE_PRODUCT", PRODUCT_SCHEMA);
+const pkgCols = pkgDef.columns;
+const pkgTable = tableName(pkgDef.tableName, SCHEMA_PRODUCT);
+
+const SELECT_MAP = {
+  id: cols.id,
+  category: cols.productType,
+  account: cols.accountUsername,
+  password: cols.passwordEncrypted,
+  backup_email: cols.backupEmail,
+  two_fa: cols.twoFaEncrypted,
+  note: cols.note,
+  status: cols.status,
+  expires_at: cols.expiresAt,
+  is_verified: cols.isVerified,
+  created_at: cols.createdAt,
+  updated_at: cols.updatedAt,
+};
+
 const listWarehouse = async (_req, res) => {
   try {
-    const rows = await db(warehouseTable)
+    const alias = "ps";
+    const rows = await db(`${warehouseTable} as ${alias}`)
       .select({
-        id: cols.id,
-        category: cols.productType,
-        account: cols.accountUsername,
-        password: cols.accountPassword,
-        backup_email: cols.backupEmail,
-        two_fa: cols.twoFaCode,
-        note: cols.note,
-        status: cols.stockStatus,
-        created_at: cols.createdAt,
+        id: `${alias}.${cols.id}`,
+        category: `${alias}.${cols.productType}`,
+        account: `${alias}.${cols.accountUsername}`,
+        password: `${alias}.${cols.passwordEncrypted}`,
+        backup_email: `${alias}.${cols.backupEmail}`,
+        two_fa: `${alias}.${cols.twoFaEncrypted}`,
+        note: `${alias}.${cols.note}`,
+        status: db.raw(
+          `CASE WHEN EXISTS (SELECT 1 FROM ${pkgTable} WHERE ${pkgCols.stockId} = ${alias}.${cols.id} OR ${pkgCols.storageId} = ${alias}.${cols.id}) THEN 'Đang Sử Dụng' ELSE 'Tồn' END`
+        ),
+        expires_at: `${alias}.${cols.expiresAt}`,
+        is_verified: `${alias}.${cols.isVerified}`,
+        created_at: `${alias}.${cols.createdAt}`,
+        updated_at: `${alias}.${cols.updatedAt}`,
       })
-      .orderBy(cols.id, "asc");
+      .orderBy(`${alias}.${cols.id}`, "asc");
     res.json(rows || []);
   } catch (error) {
     logger.error("[warehouse] Query failed", { error: error.message, stack: error.stack });
@@ -38,32 +63,27 @@ const createWarehouse = async (req, res) => {
     two_fa,
     note,
     status,
-    created_at,
+    expires_at,
+    is_verified,
   } = req.body || {};
 
   try {
+    const now = new Date().toISOString();
     const [row] = await db(warehouseTable)
       .insert({
         [cols.productType]: category ?? null,
         [cols.accountUsername]: account ?? null,
-        [cols.accountPassword]: password ?? null,
+        [cols.passwordEncrypted]: password ?? null,
         [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFaCode]: two_fa ?? null,
+        [cols.twoFaEncrypted]: two_fa ?? null,
         [cols.note]: note ?? null,
-        [cols.stockStatus]: status ?? null,
-        [cols.createdAt]: normalizeDateInput(created_at) || new Date().toISOString(),
+        [cols.status]: status ?? "Tồn",
+        [cols.expiresAt]: normalizeDateInput(expires_at) || null,
+        [cols.isVerified]: is_verified ?? false,
+        [cols.createdAt]: now,
+        [cols.updatedAt]: now,
       })
-      .returning({
-        id: cols.id,
-        category: cols.productType,
-        account: cols.accountUsername,
-        password: cols.accountPassword,
-        backup_email: cols.backupEmail,
-        two_fa: cols.twoFaCode,
-        note: cols.note,
-        status: cols.stockStatus,
-        created_at: cols.createdAt,
-      });
+      .returning(SELECT_MAP);
 
     res.status(201).json(row);
   } catch (error) {
@@ -82,7 +102,8 @@ const updateWarehouse = async (req, res) => {
     two_fa,
     note,
     status,
-    created_at,
+    expires_at,
+    is_verified,
   } = req.body || {};
 
   if (!id) return res.status(400).json({ error: "Missing id" });
@@ -93,24 +114,16 @@ const updateWarehouse = async (req, res) => {
       .update({
         [cols.productType]: category ?? null,
         [cols.accountUsername]: account ?? null,
-        [cols.accountPassword]: password ?? null,
+        [cols.passwordEncrypted]: password ?? null,
         [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFaCode]: two_fa ?? null,
+        [cols.twoFaEncrypted]: two_fa ?? null,
         [cols.note]: note ?? null,
-        [cols.stockStatus]: status ?? null,
-        [cols.createdAt]: normalizeDateInput(created_at) || null,
+        [cols.status]: status ?? null,
+        [cols.expiresAt]: normalizeDateInput(expires_at) || null,
+        [cols.isVerified]: is_verified ?? false,
+        [cols.updatedAt]: new Date().toISOString(),
       })
-      .returning({
-        id: cols.id,
-        category: cols.productType,
-        account: cols.accountUsername,
-        password: cols.accountPassword,
-        backup_email: cols.backupEmail,
-        two_fa: cols.twoFaCode,
-        note: cols.note,
-        status: cols.stockStatus,
-        created_at: cols.createdAt,
-      });
+      .returning(SELECT_MAP);
 
     if (!row) {
       return res.status(404).json({ error: "Không tìm thấy" });

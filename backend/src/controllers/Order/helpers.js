@@ -54,8 +54,8 @@ const normalizeOrderRow = (
     todayYmd = todayYMDInVietnam(),
     options = {}
 ) => {
-    const registrationRaw = row.order_date_raw || row.order_date;
-    const expiryRaw = row.expiry_date_raw || row.expiry_date;
+    const registrationRaw = row.order_date_raw || row.order_date || row[COLS.ORDER.ORDER_DATE];
+    const expiryRaw = row.expiry_date_raw || row.expiry_date || row[COLS.ORDER.EXPIRY_DATE];
 
     const registrationYmd = normalizeRawToYMD(registrationRaw);
     let expiryYmd = normalizeRawToYMD(expiryRaw);

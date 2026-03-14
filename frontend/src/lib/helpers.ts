@@ -268,10 +268,6 @@ export const getImportPriceBySupplyName = (
 };
 
 // Misc helpers
-export const generateRandomId = (length: number): string => {
-  return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
-};
-
 export const getStatusColor = (status: string): string => {
   return getStatusMeta(status).color;
 };

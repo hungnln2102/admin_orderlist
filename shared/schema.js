@@ -25,31 +25,22 @@ export const DB_DEFINITIONS = {
   // Orders (đã gom về một bảng order_list)
   orderList: { tableName: "order_list", columns: SHARED_COLS.ORDER },
 
-  // Accounts & warehouse
-  accountStorage: {
-    tableName: "account_storage",
-    columns: {
-      id: "id",
-      username: "username",
-      password: "password",
-      mail2nd: "mail_2nd",
-      note: "note",
-      storage: "storage",
-      mailFamily: "mail_family",
-    },
-  },
+  // Warehouse
   warehouse: {
-    tableName: "product_stock",
+    tableName: "product_stocks",
     columns: {
       id: "id",
       category: "product_type",
       account: "account_username",
-      password: "account_password",
       backupEmail: "backup_email",
-      twoFa: "two_fa_code",
+      passwordEncrypted: "password_encrypted",
+      twoFaEncrypted: "two_fa_encrypted",
+      status: "status",
+      expiresAt: "expires_at",
+      isVerified: "is_verified",
       note: "note",
-      status: "stock_status",
       createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   },
   packageProduct: {
@@ -57,15 +48,13 @@ export const DB_DEFINITIONS = {
     columns: {
       id: "id",
       package: "package_name",
-      username: "account_user",
-      password: "account_pass",
-      mail2nd: "recovery_mail",
-      note: "note",
-      expired: "expiry_date",
       supplier: "supplier",
       importPrice: "Import",
       slot: "slot",
       match: "match",
+      stockId: "stock_id",
+      storageId: "storage_id",
+      storageTotal: "storage_total",
     },
   },
 
@@ -211,7 +200,6 @@ export const DB_DEFINITIONS = {
 };
 
 export const ORDER_COLS = DB_DEFINITIONS.orderList.columns;
-export const ACCOUNT_STORAGE_COLS = DB_DEFINITIONS.accountStorage.columns;
 export const BANK_LIST_COLS = DB_DEFINITIONS.bankList.columns;
 export const PACKAGE_PRODUCT_COLS = DB_DEFINITIONS.packageProduct.columns;
 export const PAYMENT_RECEIPT_COLS = DB_DEFINITIONS.paymentReceipt.columns;
@@ -227,7 +215,6 @@ export const WAREHOUSE_COLS = DB_DEFINITIONS.warehouse.columns;
 export default {
   DB_DEFINITIONS,
   ORDER_COLS,
-  ACCOUNT_STORAGE_COLS,
   BANK_LIST_COLS,
   PACKAGE_PRODUCT_COLS,
   PAYMENT_RECEIPT_COLS,
