@@ -38,7 +38,9 @@ const deleteOrderWithArchive = async ({
         order?.status ||
         ""
     ).trim();
-    const isHardDelete = normalizedStatus === STATUS.UNPAID;
+    const isHardDelete =
+        normalizedStatus === STATUS.UNPAID ||
+        normalizedStatus === STATUS.EXPIRED;
 
     if (isHardDelete) {
         await trx(TABLES.orderList).where({ id: orderId }).del();

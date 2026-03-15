@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS identity.mail_backup (
   alias_prefix  VARCHAR(255)
 );
 
--- Nếu bảng đã tồn tại nhưng chưa có alias_prefix (chạy đúng schema của bạn, vd. system_renew_adobe):
--- ALTER TABLE system_renew_adobe.mail_backup ADD COLUMN IF NOT EXISTS alias_prefix VARCHAR(255);
+-- Nếu bảng đã tồn tại nhưng chưa có alias_prefix (chạy đúng schema của bạn, vd. system_automation):
+-- ALTER TABLE system_automation.mail_backup ADD COLUMN IF NOT EXISTS alias_prefix VARCHAR(255);
 
 -- Gợi ý: thêm bản ghi (email = đăng nhập IMAP, alias_prefix = chuỗi filter thư, vd. +acc1 hoặc acc1)
 -- INSERT INTO identity.mail_backup (email, app_password, provider, note, alias_prefix)

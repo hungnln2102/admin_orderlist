@@ -9,6 +9,7 @@
         "test:org-name": "node scripts/test-org-name.js",
         "test:manage-team": "node scripts/test-manage-team.js",
         "test:form-info": "node scripts/test-form-info-supertest.js",
+        "proxy:local": "node scripts/local-proxy.js",
         "start": "node index.js",
         "start:api": "node index.js",
         "start:scheduler": "node scheduler.js",

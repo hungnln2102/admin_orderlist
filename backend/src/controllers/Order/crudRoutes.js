@@ -4,6 +4,8 @@ const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
     ensureSupplyRecord,
+    ensureSupplierCost,
+    ensureVariantRecord,
     resolveProductToVariantId,
     normalizeTextInput,
 } = require("./helpers");
@@ -60,11 +62,11 @@ const attachCrudRoutes = (router) => {
             } else if (typeof rawProduct === "string") {
                 const trimmed = rawProduct.trim();
                 if (trimmed) {
-                    return res.status(400).json({
-                        error: "Sản phẩm không tồn tại trong hệ thống. Vui lòng chọn sản phẩm từ danh sách hoặc thêm sản phẩm mới trước khi tạo đơn.",
-                    });
+                    const newVariantId = await ensureVariantRecord(trimmed);
+                    payload[productIdCol] = newVariantId;
+                } else {
+                    payload[productIdCol] = null;
                 }
-                payload[productIdCol] = null;
             } else {
                 payload[productIdCol] = Number(rawProduct) || null;
             }
@@ -84,6 +86,16 @@ const attachCrudRoutes = (router) => {
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
             await trx.commit();
+
+            const resolvedVariantId = newOrder?.[productIdCol];
+            const resolvedSupplyId = newOrder?.[supplyIdCol];
+            const orderCost = Number(newOrder?.cost ?? payload.cost ?? 0);
+            if (resolvedVariantId && resolvedSupplyId && orderCost > 0) {
+                ensureSupplierCost(resolvedVariantId, resolvedSupplyId, orderCost).catch((err) => {
+                    logger.error("[Order] Tạo supplier_cost thất bại", { error: err.message });
+                });
+            }
+
             const normalized = normalizeOrderRow(newOrder, todayYMDInVietnam());
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {

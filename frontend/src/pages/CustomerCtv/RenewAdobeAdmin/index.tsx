@@ -48,9 +48,15 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
   unknown: "Chờ gia hạn",
 };
 
+/** Tài khoản chưa có thông tin (chưa check / chưa điền org_name): hiển thị "Chờ check" thay vì "Chờ gia hạn" */
+function hasNoAccountInfo(acc: AdobeAdminAccount): boolean {
+  const o = (acc.org_name ?? "").toString().trim();
+  return o === "" || o === "—" || o === "-";
+}
+
 const PAGE_SIZE = 10;
 
-/** Chuẩn hóa 1 row từ API (system_renew_adobe.account) sang AdobeAdminAccount */
+/** Chuẩn hóa 1 row từ API (system_automation.accounts_admin) sang AdobeAdminAccount */
 function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
   const status = String(row.license_status ?? "unknown").toLowerCase();
   const licenseStatus: LicenseStatus =
@@ -494,7 +500,7 @@ export default function RenewAdobeAdmin() {
                 </p>
                 <p className="text-white/60 text-sm">
                   {accounts.length === 0
-                    ? "Thêm tài khoản vào bảng system_renew_adobe.account"
+                    ? "Thêm tài khoản vào bảng system_automation.accounts_admin"
                     : "Thử thay đổi từ khóa tìm kiếm"}
                 </p>
               </div>
@@ -518,7 +524,7 @@ export default function RenewAdobeAdmin() {
                       <p className="text-xs text-white/70">
                         Số user: {acc.user_count}
                       </p>
-                      <StatusBadge status={acc.license_status} />
+                      <StatusBadge status={acc.license_status} account={acc} />
                       <button
                         type="button"
                         onClick={() => handleCheck(acc)}
@@ -561,7 +567,7 @@ export default function RenewAdobeAdmin() {
                     </p>
                     <p className="text-sm text-white/60">
                       {accounts.length === 0
-                        ? "Thêm tài khoản vào bảng system_renew_adobe.account"
+                        ? "Thêm tài khoản vào bảng system_automation.accounts_admin"
                         : "Thử thay đổi từ khóa tìm kiếm"}
                     </p>
                   </td>
@@ -588,7 +594,7 @@ export default function RenewAdobeAdmin() {
                         {acc.user_count}
                       </td>
                       <td className="px-2 sm:px-4 py-3">
-                        <StatusBadge status={acc.license_status} />
+                        <StatusBadge status={acc.license_status} account={acc} />
                       </td>
                       <td className="px-2 sm:px-4 py-3 text-center">
                         <UrlAccessCell
@@ -647,10 +653,14 @@ export default function RenewAdobeAdmin() {
 
 type StatusBadgeProps = {
   status: LicenseStatus;
+  account?: AdobeAdminAccount | null;
 };
 
-function StatusBadge({ status }: StatusBadgeProps) {
-  const label = STATUS_LABELS[status];
+function StatusBadge({ status, account }: StatusBadgeProps) {
+  const label =
+    account && status === "unknown" && hasNoAccountInfo(account)
+      ? "Chờ check"
+      : STATUS_LABELS[status];
 
   const colorClasses =
     status === "paid" || status === "active"

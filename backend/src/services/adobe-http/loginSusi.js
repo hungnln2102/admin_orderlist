@@ -82,7 +82,13 @@ async function tryDirectToken(impit, email, password) {
       res.status, !!data?.access_token, data?.error || "none");
 
     if (res.status === 200 && data?.access_token) {
-      return { success: true, accessToken: data.access_token, cookies: [] };
+      logger.info("[susi] IMS token thành công, có refresh_token=%s", !!data.refresh_token);
+      return {
+        success: true,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token || null,
+        cookies: [],
+      };
     }
 
     return { success: false, error: `IMS ${res.status}: ${data?.error || "no token"}` };
@@ -451,4 +457,53 @@ class CookieStore {
   }
 }
 
-module.exports = { loginViaSusi };
+// ────────────────── Token Refresh (IMS grant_type=refresh_token) ──────────────────
+
+/**
+ * Lấy access_token mới từ refresh_token (sống ~2 tuần) mà không cần browser.
+ * @param {string} refreshToken
+ * @returns {{ success, accessToken, refreshToken } | { success: false, error }}
+ */
+async function tryRefreshToken(refreshToken) {
+  if (!refreshToken) return { success: false, error: "Không có refresh_token" };
+
+  const impit = new Impit({ browser: "chrome" });
+  try {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+    });
+
+    const res = await impit.fetch(`${IMS_BASE}/ims/token/v3`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": CHROME_UA,
+      },
+      body: body.toString(),
+    });
+
+    const data = await safeJson(res);
+    logger.info("[susi] Refresh token → status=%d, hasToken=%s", res.status, !!data?.access_token);
+
+    if (res.status === 200 && data?.access_token) {
+      return {
+        success: true,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token || refreshToken, // Adobe đôi khi trả refresh_token mới
+      };
+    }
+
+    return { success: false, error: `Refresh failed: ${res.status} ${data?.error || ""}` };
+  } catch (e) {
+    logger.warn("[susi] Refresh token error: %s", e.message);
+    return { success: false, error: e.message };
+  } finally {
+    try { impit.close(); } catch (_) {}
+  }
+}
+
+module.exports = { loginViaSusi, tryRefreshToken };

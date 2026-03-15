@@ -5,7 +5,7 @@ const {
     todayYMDInVietnam,
     formatYMDToDMY,
 } = require("../../utils/normalizers");
-const { getNextSupplyId } = require("../../services/idService");
+const { getNextSupplyId, nextId } = require("../../services/idService");
 const { db } = require("../../db");
 const { TABLES, COLS, STATUS } = require("./constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../config/dbSchema");
@@ -172,12 +172,94 @@ const ensureSupplyRecord = async(sourceName) => {
     return nextId;
 };
 
+/**
+ * Đảm bảo tồn tại bản ghi supplier_cost cho cặp variant + supplier.
+ * Tạo mới nếu chưa có; cập nhật giá nếu thay đổi.
+ */
+const ensureSupplierCost = async (variantId, supplierId, cost) => {
+    if (!variantId || !supplierId) return;
+    const price = Number(cost);
+    if (!Number.isFinite(price) || price <= 0) return;
+
+    const scCols = COLS.SUPPLIER_COST;
+    const existing = await db(TABLES.supplierCost)
+        .where(scCols.VARIANT_ID, variantId)
+        .andWhere(scCols.SUPPLIER_ID, supplierId)
+        .first();
+
+    if (existing) {
+        if (Number(existing[scCols.PRICE]) !== price) {
+            await db(TABLES.supplierCost)
+                .where(scCols.ID, existing[scCols.ID])
+                .update({ [scCols.PRICE]: price });
+        }
+        return;
+    }
+
+    const newId = await nextId(TABLES.supplierCost, scCols.ID);
+    await db(TABLES.supplierCost).insert({
+        [scCols.ID]: newId,
+        [scCols.VARIANT_ID]: variantId,
+        [scCols.SUPPLIER_ID]: supplierId,
+        [scCols.PRICE]: price,
+    });
+};
+
+/**
+ * Tìm hoặc tạo mới product + variant theo tên hiển thị.
+ * Tương tự ensureSupplyRecord nhưng cho phía sản phẩm.
+ */
+const ensureVariantRecord = async (productName) => {
+    if (!productName) return null;
+    const name = String(productName).trim();
+    if (!name) return null;
+
+    const displayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
+    const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME;
+    const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
+
+    const existing = await db(TABLES.variant)
+        .where(displayNameCol, name)
+        .orWhere(variantNameCol, name)
+        .select(variantIdCol)
+        .first();
+    if (existing && Number.isFinite(Number(existing[variantIdCol]))) {
+        return Number(existing[variantIdCol]);
+    }
+
+    return db.transaction(async (trx) => {
+        const productIdCol = PRODUCT_SCHEMA.PRODUCT.COLS.ID;
+        const packageNameCol = PRODUCT_SCHEMA.PRODUCT.COLS.PACKAGE_NAME;
+        const isActiveCol = PRODUCT_SCHEMA.PRODUCT.COLS.IS_ACTIVE;
+
+        const productId = await nextId(TABLES.product, productIdCol, trx);
+        await trx(TABLES.product).insert({
+            [productIdCol]: productId,
+            [packageNameCol]: name,
+            [isActiveCol]: true,
+        });
+
+        const variantId = await nextId(TABLES.variant, variantIdCol, trx);
+        await trx(TABLES.variant).insert({
+            [variantIdCol]: variantId,
+            [PRODUCT_SCHEMA.VARIANT.COLS.PRODUCT_ID]: productId,
+            [variantNameCol]: name,
+            [displayNameCol]: name,
+            [PRODUCT_SCHEMA.VARIANT.COLS.IS_ACTIVE]: true,
+        });
+
+        return variantId;
+    });
+};
+
 module.exports = {
     normalizeRawToYMD,
     normalizeOrderRow,
     ORDER_WRITABLE_COLUMNS,
     sanitizeOrderWritePayload,
     ensureSupplyRecord,
+    ensureSupplierCost,
+    ensureVariantRecord,
     resolveProductToVariantId,
     normalizeTextInput,
 };

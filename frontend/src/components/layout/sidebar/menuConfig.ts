@@ -81,6 +81,11 @@ export const menuSections: MenuSection[] = [
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
       },
+      {
+        name: "Sản phẩm hệ thống",
+        href: "/product-system",
+        icon: CubeIcon,
+      },
     ],
   },
 ];

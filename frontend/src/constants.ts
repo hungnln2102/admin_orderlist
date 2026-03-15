@@ -70,6 +70,10 @@ export const API_ENDPOINTS = {
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
+  RENEW_ADOBE_VARIANTS: "/api/renew-adobe/variants",
+  RENEW_ADOBE_PRODUCT_SYSTEM: "/api/renew-adobe/product-system",
+  RENEW_ADOBE_PRODUCT_SYSTEM_DELETE: (id: number) =>
+    `/api/renew-adobe/product-system/${id}`,
 
   CUSTOMER_STATUS: "/api/customer-status",
 };

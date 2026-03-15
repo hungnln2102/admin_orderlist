@@ -7,10 +7,12 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const mailOtpService = require("../mailOtpService");
+const { getPlaywrightProxyOptions } = require("./proxyConfig");
+const { fetchOrgDataInBrowser } = require("./fetchOrgDataBrowser");
 
-// Navigate tới Admin Console → Adobe tự redirect đến login page với params hợp lệ.
-// Không hardcode relay/session token — tránh "Something went wrong".
-const ADOBE_ENTRY_URL = "https://adminconsole.adobe.com/";
+// Trang chủ Adobe — vào đây, click Sign in rồi mới đăng nhập.
+const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
+const ADOBE_HOME_URL = "https://www.adobe.com/";
 
 const PASSWORD_SELECTORS = [
   'input[name="password"]',
@@ -29,12 +31,16 @@ async function loginWithPlaywright(email, password, options = {}) {
   const { savedCookies = [], mailBackupId = null } = options;
 
   const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
+  const proxyOptions = getPlaywrightProxyOptions();
+  if (proxyOptions) logger.info("[adobe-login] Dùng proxy: %s", proxyOptions.server);
   logger.info("[adobe-login] Khởi động Playwright Chromium (headless=%s)...", headless);
-  const browser = await chromium.launch({
+  const launchOptions = {
     headless,
     slowMo: headless ? 0 : 80,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-  });
+  };
+  if (proxyOptions) launchOptions.proxy = proxyOptions;
+  const browser = await chromium.launch(launchOptions);
 
   let accessToken = null;
 
@@ -80,6 +86,19 @@ async function loginWithPlaywright(email, password, options = {}) {
       } catch (_) {}
     });
 
+    // Bắt token từ request header khi Admin Console gọi API (jil-api, usermanagement)
+    page.on("request", (request) => {
+      if (accessToken) return;
+      try {
+        const headers = request.headers();
+        const auth = headers["authorization"] || headers["Authorization"] || "";
+        if (auth.startsWith("Bearer ") && auth.length > 50) {
+          accessToken = auth.slice(7).trim();
+          logger.info("[adobe-login] Captured token từ API request header");
+        }
+      } catch (_) {}
+    });
+
     // --- Cookie login (fast path) ---
     if (savedCookies.length > 0) {
       const pwCookies = toPwCookies(savedCookies);
@@ -108,27 +127,81 @@ async function loginWithPlaywright(email, password, options = {}) {
           } catch (_) {
             logger.info("[adobe-login] SPA chưa route tới @AdobeOrg, vẫn thử extract token...");
           }
-
+          // Đợi SPA gọi API để bắt token từ request header
+          await page.waitForTimeout(5000);
           if (!accessToken) accessToken = await extractTokenFromPage(page);
           const finalUrl = page.url();
+          const orgId = extractOrgIdFromUrl(finalUrl);
+          if (orgId) logger.info("[adobe-login] Cookie-login OK — orgId=%s (từ URL)", orgId);
           logger.info("[adobe-login] Cookie-login OK — url=%s, hasToken=%s", finalUrl, !!accessToken);
 
           const cookies = await context.cookies();
-          return { success: true, cookies: fromPwCookies(cookies), accessToken };
+          return { success: true, cookies: fromPwCookies(cookies), accessToken, orgId };
         }
       }
     }
 
     // --- Form login ---
+    // Vào www.adobe.com → đóng popup → click Sign in → đăng nhập
     logger.info("[adobe-login] Form login: %s", email);
-    await page.goto(ADOBE_ENTRY_URL, { waitUntil: "domcontentloaded", timeout: 90000 }).catch((e) => {
-      logger.warn("[adobe-login] Goto login timeout: %s", e.message);
+    await page.goto(ADOBE_HOME_URL, { waitUntil: "domcontentloaded", timeout: 30000 }).catch((e) => {
+      logger.warn("[adobe-login] Goto adobe.com timeout: %s", e.message);
     });
-    // Đợi redirect tới trang login (auth.services.adobe.com)
-    await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, { timeout: 30000 }).catch(() => {});
-    logger.info("[adobe-login] [URL] Đã redirect tới login: %s", page.url().slice(0, 120));
+    logger.info("[adobe-login] [URL] adobe.com: %s", page.url().slice(0, 80));
 
-    // B1: Nhập email
+    // Đóng popup region / cookie banner nếu xuất hiện
+    await page.waitForTimeout(2000);
+    const popupClose = page.locator([
+      'button[aria-label="Close"]',
+      'button[aria-label="close"]',
+      'button[data-dismiss="modal"]',
+      '.dialog-close',
+      '.modal-close',
+      '.close-button',
+      '[class*="close"]',
+    ].join(", ")).first();
+    const popupClosed = await popupClose.click({ timeout: 3000 }).then(() => true).catch(() => false);
+    if (popupClosed) {
+      logger.info("[adobe-login] Đã đóng popup");
+      await page.waitForTimeout(800);
+    }
+
+    // Click nút Sign in — dùng đúng class từ inspect element
+    logger.info("[adobe-login] Click nút Sign in...");
+    const clicked = await page.locator("button.profile-comp.secondary-button").first()
+      .click({ timeout: 8000 }).then(() => true).catch(async () => {
+        logger.info("[adobe-login] Fallback selectors cho Sign in...");
+        // Thử các selector khác theo thứ tự
+        const fallbacks = [
+          'a[href*="signin"]',
+          '[class*="feds-signIn"]',
+          'button[class*="profile-comp"]',
+          'a:text-is("Sign in")',
+          'button:text-is("Sign in")',
+        ];
+        for (const sel of fallbacks) {
+          const ok = await page.locator(sel).first()
+            .click({ timeout: 3000 }).then(() => true).catch(() => false);
+          if (ok) return true;
+        }
+        // Last resort: getByRole
+        return page.getByRole("link", { name: /sign\s*in/i }).first()
+          .click({ timeout: 3000 }).then(() => true).catch(() => false);
+      });
+    logger.info("[adobe-login] Click Sign in: %s", clicked ? "OK" : "không tìm thấy nút");
+
+    // Đợi redirect sang trang login
+    await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, { timeout: 20000 }).catch(() => {});
+    logger.info("[adobe-login] [URL] Sau Sign in click: %s", page.url().slice(0, 120));
+
+    // Nếu không redirect được, navigate thẳng Admin Console
+    if (!page.url().includes("auth.services") && !page.url().includes("adobelogin")) {
+      logger.warn("[adobe-login] Không redirect được từ adobe.com, thử navigate Admin Console...");
+      await page.goto(ADMIN_CONSOLE_URL, { waitUntil: "domcontentloaded", timeout: 20000 }).catch(() => {});
+      await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, { timeout: 15000 }).catch(() => {});
+      logger.info("[adobe-login] [URL] Sau Admin Console fallback: %s", page.url().slice(0, 120));
+    }
+
     logger.info("[adobe-login] [URL] Trang login: %s", page.url().slice(0, 120));
     const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
     await emailInput.waitFor({ state: "visible", timeout: 45000 });
@@ -194,8 +267,19 @@ async function loginWithPlaywright(email, password, options = {}) {
     const currentUrl = page.url();
     if (!currentUrl.includes("adminconsole.adobe.com")) {
       logger.info("[adobe-login] Navigate tới Admin Console để lấy cookies...");
-      await page.goto("https://adminconsole.adobe.com/", { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(5000);
+      await page.goto("https://adminconsole.adobe.com/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(3000);
+    }
+
+    // B7b: Chờ SPA chuyển URL có @AdobeOrg (để lấy orgId chắc chắn — tránh 401 token vẫn có orgId)
+    try {
+      await page.waitForFunction(
+        () => window.location.href.includes("@AdobeOrg"),
+        { timeout: 15000 }
+      );
+      await page.waitForTimeout(1500);
+    } catch (_) {
+      logger.warn("[adobe-login] URL chưa có @AdobeOrg sau 15s, tiếp tục...");
     }
 
     // B8: Retry token extraction — đợi SPA set localStorage
@@ -208,11 +292,31 @@ async function loginWithPlaywright(email, password, options = {}) {
     }
     logger.info("[adobe-login] Token sau tất cả extraction: %s", accessToken ? "CÓ" : "NULL");
 
-    const cookies = await context.cookies();
-    logger.info("[adobe-login] Login thành công! URL: %s, hasToken: %s, cookies: %d",
-      page.url().slice(0, 80), !!accessToken, cookies.length);
+    const finalUrl = page.url();
+    let orgId = extractOrgIdFromUrl(finalUrl);
+    if (!orgId && (finalUrl.includes("adminconsole.adobe.com") || finalUrl.includes("adobe.com"))) {
+      orgId = extractOrgIdFromUrl(await page.evaluate(() => window.location.href).catch(() => ""));
+    }
 
-    return { success: true, cookies: fromPwCookies(cookies), accessToken };
+    // B9: Fetch dữ liệu org/products/users NGAY TRONG Playwright session (trước khi đóng browser)
+    // Playwright context có session hợp lệ → page.request tự dùng cookies browser
+    let browserData = null;
+    if (orgId && accessToken) {
+      logger.info("[adobe-login] Fetching org data bên trong browser session (orgId=%s)...", orgId);
+      browserData = await fetchOrgDataInBrowser(page, orgId, accessToken);
+      if (browserData) {
+        logger.info("[adobe-login] browserData: orgName=%s, products=%d, users=%d",
+          browserData.orgName || "(null)", browserData.products?.length ?? 0, browserData.users?.length ?? 0);
+      }
+    } else {
+      logger.warn("[adobe-login] Bỏ qua fetchOrgDataInBrowser (orgId=%s, hasToken=%s)", orgId || "null", !!accessToken);
+    }
+
+    const cookies = await context.cookies();
+    logger.info("[adobe-login] Login thành công! URL: %s, hasToken: %s, orgId: %s, cookies: %d",
+      finalUrl.slice(0, 80), !!accessToken, orgId || "(null)", cookies.length);
+
+    return { success: true, cookies: fromPwCookies(cookies), accessToken, orgId, browserData };
   } catch (error) {
     logger.error("[adobe-login] Login thất bại: %s", error.message);
     return { success: false, error: error.message };
@@ -222,7 +326,11 @@ async function loginWithPlaywright(email, password, options = {}) {
   }
 }
 
+
+
+
 // ────────────────── Helpers ──────────────────
+
 
 async function isOnVerifyScreen(page) {
   try {
@@ -312,8 +420,17 @@ async function enterPassword(page, password) {
   await page.keyboard.type(password, { delay: 25 });
   await page.waitForTimeout(150);
   await page.keyboard.press("Enter");
-  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
+  // Đừng chờ networkidle — trang Overview có banner/analytics nên có thể không bao giờ idle → treo 60s.
+  // Chờ redirect tới Admin Console (URL có @AdobeOrg) tối đa 45s.
+  try {
+    await page.waitForURL(
+      (url) => url.includes("@AdobeOrg") || (url.includes("adminconsole.adobe.com") && !url.includes("auth.services")),
+      { timeout: 45000 }
+    );
+  } catch (_) {
+    logger.warn("[adobe-login] Chờ URL Admin Console timeout, tiếp tục...");
+  }
+  await page.waitForTimeout(2500);
 }
 
 async function handle2FA(page, mailBackupId) {
@@ -650,9 +767,20 @@ async function waitForOtpAndFill(page, mailBackupId) {
   }
 }
 
+// ────────────────── Helpers ──────────────────
+
+function extractOrgIdFromUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const m = url.match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/);
+  return m ? m[1] : null;
+}
+
 // ────────────────── Token extraction ──────────────────
 
 async function extractTokenFromPage(page) {
+  // Đợi SPA load xong trước khi extract
+  await page.waitForTimeout(2000).catch(() => {});
+
   try {
     const hash = await page.evaluate(() => window.location.hash).catch(() => "");
     const m = hash.match(/access_token=([^&]+)/);
@@ -661,14 +789,30 @@ async function extractTokenFromPage(page) {
 
   try {
     return await page.evaluate(() => {
-      const keys = ["adobeid_ims_access_token", "feds_access_token", "ims_token"];
+      const keys = [
+        "adobeid_ims_access_token",
+        "AdobeID_ims_access_token",
+        "feds_access_token",
+        "ims_token",
+        "adobe_com_adobe_redux", // Redux persist
+      ];
       for (const k of keys) {
         const v = window.localStorage.getItem(k) || window.sessionStorage.getItem(k);
-        if (v && v.length > 20) return v;
+        if (v && v.length > 20) {
+          if (k === "adobe_com_adobe_redux") {
+            try {
+              const parsed = JSON.parse(v);
+              const token = parsed?.session?.token?.access_token || parsed?.ims?.token?.access_token;
+              if (token && token.length > 20) return token;
+            } catch (_) {}
+          } else {
+            return v;
+          }
+        }
       }
       for (let i = 0; i < window.localStorage.length; i++) {
         const k = window.localStorage.key(i);
-        if (/access.?token/i.test(k)) {
+        if (/access.?token|ims.*token/i.test(k)) {
           const v = window.localStorage.getItem(k);
           if (v && v.length > 20) return v;
         }

@@ -1,6 +1,21 @@
 /**
  * URL và cấu hình cho Adobe HTTP login + Admin Console API.
+ * TIMEOUTS: chỉnh tại đây để tối ưu toàn bộ luồng (tránh treo lâu / fail sớm).
  */
+
+/** Timeout (ms) dùng chung — có thể override bằng env ADOBE_* */
+const TIMEOUTS = {
+  /** Login page / redirect */
+  LOGIN_PAGE: Number(process.env.ADOBE_TIMEOUT_LOGIN_PAGE) || 45000,
+  /** Chờ URL có @AdobeOrg sau khi login */
+  URL_ADOBE_ORG: Number(process.env.ADOBE_TIMEOUT_URL_ORG) || 15000,
+  /** Gọi JIL/IMS API (getOrgId, getProducts, getUsers) */
+  API: Number(process.env.ADOBE_TIMEOUT_API) || 15000,
+  /** Test token (fast path) */
+  TEST_TOKEN: Number(process.env.ADOBE_TIMEOUT_TEST_TOKEN) || 10000,
+  /** Navigate Admin Console (domcontentloaded) */
+  NAVIGATE: Number(process.env.ADOBE_TIMEOUT_NAVIGATE) || 20000,
+};
 
 const ADOBE_IMS_BASE = "https://ims-na1.adobelogin.com";
 const AUTH_SERVICES_BASE = "https://auth.services.adobe.com";
@@ -26,6 +41,7 @@ const ADMIN_CONSOLE_API_BASE = "https://bps-il.adobe.io";
 const USER_MANAGEMENT_API = "https://usermanagement.adobe.io";
 
 module.exports = {
+  TIMEOUTS,
   ADOBE_IMS_BASE,
   AUTH_SERVICES_BASE,
   ADMIN_CONSOLE_BASE,

@@ -41,12 +41,12 @@ const SCHEMA_CUSTOMER_PROFILES = pickSchema(
   process.env.DB_SCHEMA_CUSTOMER_PROFILES,
   SCHEMA_IDENTITY
 );
-/** Schema chứa bảng mail_backup (mặc định = system_renew_adobe, cùng schema với renew-adobe accounts; override bằng DB_SCHEMA_MAIL_BACKUP nếu cần) */
+/** Schema chứa bảng mail_backup (mặc định = system_automation, cùng schema với renew-adobe accounts; override bằng DB_SCHEMA_MAIL_BACKUP nếu cần) */
 const SCHEMA_MAIL_BACKUP = pickSchema(
   process.env.DB_SCHEMA_MAIL_BACKUP,
   process.env.DB_SCHEMA_RENEW_ADOBE,
   process.env.SCHEMA_RENEW_ADOBE,
-  "system_renew_adobe"
+  "system_automation"
 );
 const SCHEMA_COMMON = pickSchema(
   process.env.DB_SCHEMA_COMMON,
@@ -71,7 +71,7 @@ const SCHEMA_FORM_DESC = pickSchema(
 const SCHEMA_RENEW_ADOBE = pickSchema(
   process.env.DB_SCHEMA_RENEW_ADOBE,
   process.env.SCHEMA_RENEW_ADOBE,
-  "system_renew_adobe"
+  "system_automation"
 );
 const SCHEMA_KEY_ACTIVE = pickSchema(
   process.env.DB_SCHEMA_KEY_ACTIVE,
@@ -390,10 +390,11 @@ const SUPPLIER_COST_DEF = {
 };
 
 // -----------------------
-// RENEW ADOBE (system_renew_adobe.accounts_admin)
+// SYSTEM AUTOMATION (schema system_automation: accounts_admin, product_system)
 // -----------------------
 // Bảng accounts_admin (renew-adobe): id, email, password_enc, org_name, license_status, license_detail,
 // user_count, users_snapshot, alert_config (jsonb), last_checked, is_active, created_at, mail_backup_id, url_access (text)
+// Bảng product_system: ánh xạ variant_id → system_code (fix_adobe_edu, renew_adobe, renew_zoom, otp_netflix...) cho job hàng loạt
 const RENEW_ADOBE_SCHEMA = {
   ACCOUNT: {
     TABLE: "accounts_admin",
@@ -412,6 +413,15 @@ const RENEW_ADOBE_SCHEMA = {
       CREATED_AT: "created_at",
       MAIL_BACKUP_ID: "mail_backup_id",
       URL_ACCESS: "url_access",
+    },
+  },
+  PRODUCT_SYSTEM: {
+    TABLE: "product_system",
+    COLS: {
+      ID: "id",
+      VARIANT_ID: "variant_id",
+      SYSTEM_CODE: "system_code",
+      CREATED_AT: "created_at",
     },
   },
 };

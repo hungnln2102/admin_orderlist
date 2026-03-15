@@ -2,12 +2,12 @@
  * Job: Xóa user khỏi tài khoản Adobe khi đơn hàng đã hết hạn.
  *
  * Luồng:
- * 1. Lấy tất cả email có đơn đang hoạt động từ key_active → order_list
- * 2. Với mỗi Adobe account, parse users_snapshot
- * 3. User nào KHÔNG có email khớp với đơn active → cần xóa
- * 4. Gọi autoDeleteUsers để xóa khỏi Adobe
+ * 1. Từ users_snapshot lấy danh sách email, check vào order_list (variant_id trong product_system renew_adobe)
+ * 2. Giữ lại user có đơn: status in [Đã Thanh Toán, Cần Gia Hạn, Đang Xử Lý] VÀ expiry_date > hôm nay (số ngày còn lại > 0)
+ * 3. User có đơn status "Hết Hạn" hoặc expiry_date <= hôm nay → xóa khỏi tài khoản
+ * 4. Check 1 lượt xong, xóa từng tài khoản (autoDeleteUsers nhận array emails, xóa tuần tự)
  *
- * Chạy kèm job 00:01 (sau khi updateDatabaseTask đã mark expired).
+ * Chạy kèm job 00:01 (hoặc 23:30 tùy cấu hình).
  */
 
 const logger = require("../../utils/logger");
@@ -15,41 +15,51 @@ const { db } = require("../../db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
-  SCHEMA_KEY_ACTIVE,
-  KEY_ACTIVE_SCHEMA,
   SCHEMA_ORDERS,
   ORDERS_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
 const { autoDeleteUsers } = require("../../services/adobe-http");
-const { STATUS } = require("../../utils/statuses");
 
 const ACCT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCT = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
-const TBL_KEY = tableName(KEY_ACTIVE_SCHEMA.ORDER_AUTO_KEYS.TABLE, SCHEMA_KEY_ACTIVE);
-const KEY_COLS = KEY_ACTIVE_SCHEMA.ORDER_AUTO_KEYS.COLS;
+const PS_TABLE = tableName(RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE, SCHEMA_RENEW_ADOBE);
+const PS_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
+
 const TBL_ORDER = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const ORD_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 
+const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
+
+/** Trạng thái đơn được coi là active (số ngày còn lại > 0) */
+const ALLOWED_ORDER_STATUSES = ["Đã Thanh Toán", "Cần Gia Hạn", "Đang Xử Lý"];
+
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 
-const INACTIVE_STATUSES = [STATUS.EXPIRED, STATUS.CANCELED, STATUS.REFUNDED];
-
 /**
- * Lấy Set<email_lowercase> có đơn active trong key_active → order_list.
- * "Active" = order tồn tại trong key_active và status KHÔNG phải Hết Hạn/Hủy/Đã Hoàn.
+ * Lấy Set<email_lowercase> có đơn active: variant renew_adobe, status allowed, expiry_date > hôm nay.
+ * User KHÔNG trong set này (đơn Hết Hạn hoặc expiry <= today) → xóa khỏi tài khoản.
  */
 async function getActiveOrderEmails() {
-  const rows = await db(TBL_KEY)
-    .leftJoin(TBL_ORDER, `${TBL_KEY}.${KEY_COLS.ORDER_CODE}`, `${TBL_ORDER}.${ORD_COLS.ID_ORDER}`)
-    .select(`${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER} as email`)
-    .whereNotNull(`${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER}`)
-    .whereNotIn(`${TBL_ORDER}.${ORD_COLS.STATUS}`, INACTIVE_STATUSES);
+  const variantRows = await db(PS_TABLE)
+    .where(PS_COLS.SYSTEM_CODE, RENEW_ADOBE_SYSTEM_CODE)
+    .select(PS_COLS.VARIANT_ID);
+  const variantIds = variantRows.map((r) => r[PS_COLS.VARIANT_ID]).filter((id) => id != null);
+  if (variantIds.length === 0) return new Set();
+
+  const rows = await db(TBL_ORDER)
+    .select(ORD_COLS.INFORMATION_ORDER)
+    .whereIn(ORD_COLS.ID_PRODUCT, variantIds)
+    .whereIn(ORD_COLS.STATUS, ALLOWED_ORDER_STATUSES)
+    .whereNotNull(ORD_COLS.INFORMATION_ORDER)
+    .whereRaw(
+      `(${TBL_ORDER}.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh' > (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
+    );
 
   const emails = new Set();
   for (const r of rows) {
-    const email = (r.email || "").trim().toLowerCase();
+    const email = (r[ORD_COLS.INFORMATION_ORDER] || "").trim().toLowerCase();
     if (email) emails.add(email);
   }
   return emails;
@@ -113,10 +123,27 @@ function createCleanupExpiredAdobeUsersTask() {
           logger.info("[CRON] Account %s: deleted=%d, failed=%d",
             acc[ACCT.ID], result.deleted.length, result.failed.length);
 
-          // Re-check account to refresh users_snapshot
-          try {
-            await runCheckForAccountId(acc[ACCT.ID]);
-          } catch (_) {}
+          if (result.savedCookies) {
+            try {
+              await db(ACCT_TABLE).where(ACCT.ID, acc[ACCT.ID]).update({
+                [ACCT.ALERT_CONFIG]: result.savedCookies,
+              });
+            } catch (_) {}
+          }
+          if (result.snapshot && Array.isArray(result.snapshot.manageTeamMembers)) {
+            try {
+              await db(ACCT_TABLE).where(ACCT.ID, acc[ACCT.ID]).update({
+                [ACCT.USERS_SNAPSHOT]: JSON.stringify(result.snapshot.manageTeamMembers),
+                ...(result.snapshot.orgName != null && { [ACCT.ORG_NAME]: result.snapshot.orgName }),
+                ...(result.snapshot.licenseStatus != null && { [ACCT.LICENSE_STATUS]: result.snapshot.licenseStatus }),
+                [ACCT.USER_COUNT]: result.snapshot.manageTeamMembers.length,
+              });
+            } catch (_) {}
+          } else {
+            try {
+              await runCheckForAccountId(acc[ACCT.ID]);
+            } catch (_) {}
+          }
 
           // Delay giữa các account để tránh rate limit
           await new Promise((r) => setTimeout(r, 3000));

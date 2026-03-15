@@ -19,6 +19,7 @@ const {
   SCHEMA_WALLET,
   SCHEMA_FORM_DESC,
   SCHEMA_INPUTS,
+  SCHEMA_RENEW_ADOBE,
 } = require("../config/dbSchema");
 
 const DATABASE_URL =
@@ -57,6 +58,7 @@ const searchPath = Array.from(
       SCHEMA_WALLET,
       SCHEMA_FORM_DESC,
       SCHEMA_INPUTS,
+      SCHEMA_RENEW_ADOBE, // system_automation (accounts_admin, product_system)
     ].filter(Boolean)
   )
 );

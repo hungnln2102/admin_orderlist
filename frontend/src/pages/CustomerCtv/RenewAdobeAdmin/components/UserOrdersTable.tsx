@@ -2,9 +2,9 @@
  * Bảng hiển thị Mã đơn hàng, Tên Khách Hàng, Email, Tình trạng Gói, Hạn Sử Dụng, Thao Tác.
  *
  * Luồng dữ liệu:
- * 1. key_active.order_auto_keys → lấy toàn bộ mã đơn
- * 2. JOIN orders.order_list → lấy email (information_order), customer, expiry_date
- * 3. Match email ↔ users_snapshot JSON → điền mã đơn, tên KH, hạn sử dụng
+ * 1. order_list lọc theo variant_id thuộc hệ thống renew_adobe (product_system)
+ * 2. API trả về order_code, information_order, customer, expiry_date, status
+ * 3. Match email ↔ users_snapshot JSON → điền profile, tình trạng gói
  */
 
 import { useMemo, useState, useEffect } from "react";
@@ -62,7 +62,7 @@ function resolveDisplayStatus(
 const PAGE_SIZE = 10;
 
 /**
- * Build Map<email_lowercase, OrderInfo> từ dữ liệu key_active + order_list.
+ * Build Map<email_lowercase, OrderInfo> từ đơn hàng (order_list theo variant renew_adobe).
  * Nếu 1 email có nhiều đơn → lấy đơn đầu tiên (đã sort theo order_code ASC).
  */
 function buildEmailOrderMap(orders: OrderInfo[]): Map<string, OrderInfo> {
@@ -77,7 +77,7 @@ function buildEmailOrderMap(orders: OrderInfo[]): Map<string, OrderInfo> {
 }
 
 /**
- * Nguồn chính = đơn hàng (emailOrderMap từ key_active + order_list).
+ * Nguồn chính = đơn hàng (emailOrderMap từ order_list theo variant renew_adobe).
  * Match ngược vào users_snapshot để lấy Profile (org_name) & trạng thái product.
  */
 function flattenToUserRows(

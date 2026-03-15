@@ -10,7 +10,10 @@
  */
 
 const logger = require("../../utils/logger");
-const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE, ADMIN_CONSOLE_CLIENT_ID } = require("./constants");
+const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_IMS_BASE, ADMIN_CONSOLE_CLIENT_ID, TIMEOUTS } = require("./constants");
+
+// Multiple client IDs to try for JIL API (fallback order)
+const JIL_CLIENT_IDS = [ADMIN_CONSOLE_CLIENT_ID, "aac_manage_teams", "AdobeAnalyticsUI"];
 
 /**
  * Lấy org ID + org name bằng nhiều chiến lược:
@@ -22,7 +25,7 @@ const { ADMIN_CONSOLE_BASE, ADMIN_CONSOLE_API_BASE, USER_MANAGEMENT_API, ADOBE_I
  * @returns {{ orgId: string, orgName: string|null }} hoặc null nếu không tìm được
  */
 async function getOrgId(client, accessToken) {
-  logger.info("[adobe-http] Lấy org ID...");
+  logger.info("[adobe-http] Lấy org ID (hasToken=%s)...", !!accessToken);
 
   let foundOrgId = null;
   let foundOrgName = null;
@@ -31,10 +34,11 @@ async function getOrgId(client, accessToken) {
   try {
     const res = await client.get(`${ADMIN_CONSOLE_BASE}/`, {
       maxRedirects: 5,
-      timeout: 15000,
+      timeout: TIMEOUTS.API,
       headers: { Accept: "text/html" },
     });
     const finalUrl = res.request?.res?.responseUrl || res.config?.url || "";
+    logger.info("[adobe-http] getOrgId strategy 1: redirect URL (trimmed): %s", (finalUrl || "").slice(0, 180));
     const orgMatch = finalUrl.match(/\/([A-Fa-f0-9]+)@AdobeOrg/);
     if (orgMatch) {
       logger.info("[adobe-http] Org ID (redirect URL): %s", orgMatch[1]);
@@ -47,48 +51,61 @@ async function getOrgId(client, accessToken) {
       if (htmlMatch) {
         logger.info("[adobe-http] Org ID (HTML): %s", htmlMatch[1]);
         foundOrgId = htmlMatch[1];
+      } else {
+        logger.info("[adobe-http] getOrgId strategy 1: không thấy @AdobeOrg trong URL và HTML");
       }
     }
   } catch (e) {
-    logger.debug("[adobe-http] getOrgId strategy 1 error: %s", e.message);
+    logger.warn("[adobe-http] getOrgId strategy 1 error: %s", e.message);
   }
 
-  // Strategy 2: JIL API organizations list (cần Bearer token) — also extracts org name
+  // Strategy 2: JIL API organizations list (cần Bearer token) — thử nhiều x-api-key
   if (accessToken) {
-    try {
-      const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
-        timeout: 15000,
-        headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": ADMIN_CONSOLE_CLIENT_ID },
-      });
-      if (res.status === 200 && res.data) {
-        const orgs = Array.isArray(res.data) ? res.data : [res.data];
-        for (const org of orgs) {
-          const id = org.orgId || org.id || org.orgRef;
-          if (id) {
-            if (!foundOrgId) {
-              foundOrgId = String(id).replace(/@AdobeOrg$/, "");
-              logger.info("[adobe-http] Org ID (JIL API): %s", foundOrgId);
+    for (const clientId of JIL_CLIENT_IDS) {
+      if (foundOrgId) break;
+      try {
+        const res = await client.get(`${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations`, {
+          timeout: TIMEOUTS.API,
+          headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": clientId },
+        });
+        logger.info("[adobe-http] getOrgId strategy 2 (JIL organizations, x-api-key=%s): status=%s", clientId, res.status);
+        if (res.status === 200 && res.data) {
+          const orgs = Array.isArray(res.data) ? res.data : [res.data];
+          for (const org of orgs) {
+            const id = org.orgId || org.id || org.orgRef;
+            if (id) {
+              if (!foundOrgId) {
+                foundOrgId = String(id).replace(/@AdobeOrg$/, "");
+                logger.info("[adobe-http] Org ID (JIL API, x-api-key=%s): %s", clientId, foundOrgId);
+              }
+              if (!foundOrgName) {
+                foundOrgName = org.name || org.orgName || org.displayName || null;
+                if (foundOrgName) logger.info("[adobe-http] Org Name (JIL API): %s", foundOrgName);
+              }
+              break;
             }
-            if (!foundOrgName) {
-              foundOrgName = org.name || org.orgName || org.displayName || null;
-              if (foundOrgName) logger.info("[adobe-http] Org Name (JIL API): %s", foundOrgName);
-            }
-            break;
           }
+          if (foundOrgId) break;
+          logger.info("[adobe-http] getOrgId strategy 2 (x-api-key=%s): JIL trả data nhưng không có orgId", clientId);
+        } else {
+          logger.info("[adobe-http] getOrgId strategy 2 (x-api-key=%s): status=%s → thử client_id tiếp", clientId, res.status);
         }
+      } catch (e) {
+        logger.warn("[adobe-http] getOrgId strategy 2 (x-api-key=%s) error: %s", clientId, e.message);
       }
-    } catch (e) {
-      logger.debug("[adobe-http] getOrgId JIL API error: %s", e.message);
     }
+  } else {
+    logger.info("[adobe-http] getOrgId strategy 2: bỏ qua (không có token)");
   }
 
   // Strategy 3: IMS profile (cần Bearer token)
   if (!foundOrgId && accessToken) {
     try {
       const res = await client.get(`${ADOBE_IMS_BASE}/ims/profile/v1`, {
-        timeout: 10000,
+        timeout: TIMEOUTS.API,
         headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
       });
+      logger.info("[adobe-http] getOrgId strategy 3 (IMS profile): status=%s", res.status);
       if (res.status === 200 && res.data) {
         const body = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
         const m = body.match(/([A-Fa-f0-9]{20,})@AdobeOrg/);
@@ -106,10 +123,18 @@ async function getOrgId(client, accessToken) {
         if (!foundOrgName && res.data.displayName) {
           foundOrgName = res.data.displayName;
         }
+        if (!foundOrgId) {
+          logger.info("[adobe-http] getOrgId strategy 3: IMS 200 nhưng không parse được org từ body");
+        }
+      } else {
+        const bodyStr = res.data ? (typeof res.data === "string" ? res.data : JSON.stringify(res.data)).slice(0, 300) : "";
+        logger.warn("[adobe-http] getOrgId strategy 3: IMS non-200, body=%s", bodyStr);
       }
     } catch (e) {
-      logger.debug("[adobe-http] getOrgId IMS profile error: %s", e.message);
+      logger.warn("[adobe-http] getOrgId strategy 3 (IMS) error: %s", e.message);
     }
+  } else if (!foundOrgId) {
+    logger.info("[adobe-http] getOrgId strategy 3: bỏ qua (không có token)");
   }
 
   // Strategy 4: nếu có orgId nhưng chưa có orgName → gọi JIL org detail
@@ -117,7 +142,7 @@ async function getOrgId(client, accessToken) {
     try {
       const res = await client.get(
         `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${foundOrgId}@AdobeOrg`,
-        { timeout: 10000, headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": ADMIN_CONSOLE_CLIENT_ID } }
+        { timeout: TIMEOUTS.API, headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}`, "x-api-key": ADMIN_CONSOLE_CLIENT_ID } }
       );
       if (res.status === 200 && res.data) {
         foundOrgName = res.data.name || res.data.orgName || res.data.displayName || null;
@@ -144,74 +169,76 @@ async function getProducts(client, orgId, accessToken) {
   if (!orgId) return { hasPlan: false, licenseStatus: "unknown", products: [] };
 
   logger.info("[adobe-http] Lấy products cho org %s...", orgId);
-  const headers = {
-    Accept: "application/json",
-    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
-  };
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const urls = [
     `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products`,
     `${USER_MANAGEMENT_API}/v2/usermanagement/${orgId}@AdobeOrg/products/`,
   ];
 
+  // Thử nhiều x-api-key vì token có thể được issued cho client_id khác nhau
+  const clientIdsToTry = accessToken ? JIL_CLIENT_IDS : [ADMIN_CONSOLE_CLIENT_ID];
+
   for (const url of urls) {
-    try {
-      const res = await client.get(url, { headers });
-      logger.info("[adobe-http] Products %s → status=%s", url, res.status);
+    for (const clientId of clientIdsToTry) {
+      try {
+        const headers = { Accept: "application/json", "x-api-key": clientId };
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const res = await client.get(url, { headers });
+        logger.info("[adobe-http] Products %s (x-api-key=%s) → status=%s", url, clientId, res.status);
 
-      if (res.status === 200 && res.data) {
-        const data = Array.isArray(res.data) ? res.data : res.data.products || res.data.items || [];
+        if (res.status === 200 && res.data) {
+          const data = Array.isArray(res.data) ? res.data : res.data.products || res.data.items || [];
 
-        if (data.length > 0) {
-          logger.info("[adobe-http] Product raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
-          logger.info("[adobe-http] Product[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
-        }
-
-        const products = data.map((p) => {
-          // JIL API: assignedQuantity = total licenses, provisionedQuantity = used
-          let quota =
-            p.assignedQuantity || p.licenseQuota || p.adminQuantity || p.licensedQuantity ||
-            p.totalQuantity || p.seats || p.totalCount || p.quantity || 0;
-          let used =
-            p.provisionedQuantity || p.userCount || p.assignedCount ||
-            p.usedCount || p.consumedQuantity || 0;
-
-          if (quota === 0 && Array.isArray(p.licenseGroupSummaries)) {
-            for (const lg of p.licenseGroupSummaries) {
-              const lgQuota = lg.assignedQuantity || lg.totalQuantity || lg.licensedQuantity || lg.quantity || 0;
-              const lgUsed = lg.provisionedQuantity || lg.usedQuantity || 0;
-              if (lgQuota > quota) quota = lgQuota;
-              if (lgUsed > used) used = lgUsed;
-            }
+          if (data.length > 0) {
+            logger.info("[adobe-http] Product raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
+            logger.info("[adobe-http] Product[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
           }
 
-          const code = p.code || "";
-          const shortName = p.shortName || p.name || p.productName || p.longName || code;
-          const isFree = /complimentary|free\s+membership/i.test(shortName) || code === "CCFM";
+          const products = data.map((p) => {
+            // JIL API: assignedQuantity = total licenses, provisionedQuantity = used
+            let quota =
+              p.assignedQuantity || p.licenseQuota || p.adminQuantity || p.licensedQuantity ||
+              p.totalQuantity || p.seats || p.totalCount || p.quantity || 0;
+            let used =
+              p.provisionedQuantity || p.userCount || p.assignedCount ||
+              p.usedCount || p.consumedQuantity || 0;
 
-          return {
-            id: p.id || p.code || p.productId,
-            code,
-            name: shortName,
-            licenseQuota: quota,
-            userCount: used,
-            isFree,
-          };
-        });
+            if (quota === 0 && Array.isArray(p.licenseGroupSummaries)) {
+              for (const lg of p.licenseGroupSummaries) {
+                const lgQuota = lg.assignedQuantity || lg.totalQuantity || lg.licensedQuantity || lg.quantity || 0;
+                const lgUsed = lg.provisionedQuantity || lg.usedQuantity || 0;
+                if (lgQuota > quota) quota = lgQuota;
+                if (lgUsed > used) used = lgUsed;
+              }
+            }
 
-        const paidProducts = products.filter((p) => !p.isFree);
-        const hasPlan = paidProducts.length > 0 && paidProducts.some((p) => (p.licenseQuota || 0) > 0);
+            const code = p.code || "";
+            const shortName = p.shortName || p.name || p.productName || p.longName || code;
+            const isFree = /complimentary|free\s+membership/i.test(shortName) || code === "CCFM";
 
-        logger.info("[adobe-http] Products result: count=%s (paid=%s), hasPlan=%s, quotas=%s",
-          products.length, paidProducts.length, hasPlan,
-          products.map(p => `${p.code}:${p.licenseQuota}${p.isFree ? "(free)" : ""}`).join(","));
-        return { hasPlan, licenseStatus: hasPlan ? "Paid" : "Expired", products };
+            return {
+              id: p.id || p.code || p.productId,
+              code,
+              name: shortName,
+              licenseQuota: quota,
+              userCount: used,
+              isFree,
+            };
+          });
+
+          const paidProducts = products.filter((p) => !p.isFree);
+          const hasPlan = paidProducts.length > 0 && paidProducts.some((p) => (p.licenseQuota || 0) > 0);
+
+          logger.info("[adobe-http] Products result: count=%s (paid=%s), hasPlan=%s, quotas=%s",
+            products.length, paidProducts.length, hasPlan,
+            products.map(p => `${p.code}:${p.licenseQuota}${p.isFree ? "(free)" : ""}`).join(","));
+          return { hasPlan, licenseStatus: hasPlan ? "Paid" : "Expired", products };
+        } // end if 200
+      } catch (e) {
+        logger.debug("[adobe-http] Products endpoint %s (x-api-key=%s) error: %s", url, clientId, e.message);
       }
-    } catch (e) {
-      logger.debug("[adobe-http] Products endpoint %s error: %s", url, e.message);
-    }
-  }
+    } // end clientId loop
+  } // end url loop
 
   return { hasPlan: false, licenseStatus: "unknown", products: [] };
 }
@@ -224,30 +251,34 @@ async function getProductUserEmails(client, orgId, accessToken, productIds) {
   const emails = new Set();
   if (!orgId || !accessToken || !productIds?.length) return emails;
 
-  const headers = {
-    Accept: "application/json",
-    Authorization: `Bearer ${accessToken}`,
-    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
-  };
-
   for (const pid of productIds) {
     if (!pid) continue;
     const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products/${pid}/users`;
-    try {
-      const res = await client.get(url, { headers, timeout: 15000 });
-      logger.info("[adobe-http] Product users %s → status=%s", pid, res.status);
-      if (res.status === 200 && res.data) {
-        const data = Array.isArray(res.data) ? res.data : res.data.users || res.data.items || [];
-        if (data.length > 0) {
-          logger.info("[adobe-http] ProductUser[0] sample: %s", JSON.stringify(data[0]).slice(0, 300));
+    let fetched = false;
+    for (const clientId of JIL_CLIENT_IDS) {
+      if (fetched) break;
+      try {
+        const headers = {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          "x-api-key": clientId,
+        };
+        const res = await client.get(url, { headers, timeout: 15000 });
+        logger.info("[adobe-http] Product users %s (x-api-key=%s) → status=%s", pid, clientId, res.status);
+        if (res.status === 200 && res.data) {
+          const data = Array.isArray(res.data) ? res.data : res.data.users || res.data.items || [];
+          if (data.length > 0) {
+            logger.info("[adobe-http] ProductUser[0] sample: %s", JSON.stringify(data[0]).slice(0, 300));
+          }
+          for (const u of data) {
+            const email = (u.email || u.username || "").toLowerCase().trim();
+            if (email) emails.add(email);
+          }
+          fetched = true;
         }
-        for (const u of data) {
-          const email = (u.email || u.username || "").toLowerCase().trim();
-          if (email) emails.add(email);
-        }
+      } catch (e) {
+        logger.debug("[adobe-http] Product users %s (x-api-key=%s) error: %s", pid, clientId, e.message);
       }
-    } catch (e) {
-      logger.debug("[adobe-http] Product users %s error: %s", pid, e.message);
     }
   }
 
@@ -262,49 +293,50 @@ async function getUsers(client, orgId, accessToken) {
   if (!orgId) return [];
 
   logger.info("[adobe-http] Lấy users cho org %s...", orgId);
-  const headers = {
-    Accept: "application/json",
-    "x-api-key": ADMIN_CONSOLE_CLIENT_ID,
-  };
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const urls = [
     `${USER_MANAGEMENT_API}/v2/usermanagement/users/${orgId}@AdobeOrg/0`,
     `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/users`,
   ];
 
+  const clientIdsToTry = accessToken ? JIL_CLIENT_IDS : [ADMIN_CONSOLE_CLIENT_ID];
+
   for (const url of urls) {
-    try {
-      const res = await client.get(url, { headers });
-      logger.info("[adobe-http] Users %s → status=%s", url, res.status);
+    for (const clientId of clientIdsToTry) {
+      try {
+        const headers = { Accept: "application/json", "x-api-key": clientId };
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+        const res = await client.get(url, { headers });
+        logger.info("[adobe-http] Users %s (x-api-key=%s) → status=%s", url, clientId, res.status);
 
-      if (res.status === 200 && res.data) {
-        const data = Array.isArray(res.data)
-          ? res.data
-          : res.data.users || res.data.items || res.data.resources || [];
+        if (res.status === 200 && res.data) {
+          const data = Array.isArray(res.data)
+            ? res.data
+            : res.data.users || res.data.items || res.data.resources || [];
 
-        if (data.length > 0) {
-          logger.info("[adobe-http] User raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
-          logger.info("[adobe-http] User[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
+          if (data.length > 0) {
+            logger.info("[adobe-http] User raw fields: %s", JSON.stringify(Object.keys(data[0])).slice(0, 300));
+            logger.info("[adobe-http] User[0] sample: %s", JSON.stringify(data[0]).slice(0, 500));
+          }
+
+          const users = data.map((u) => {
+            const name =
+              u.name ||
+              (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : null) ||
+              (u.firstname ? `${u.firstname} ${u.lastname || ""}`.trim() : null);
+
+            return {
+              name,
+              email: u.email || u.username || "",
+            };
+          });
+
+          logger.info("[adobe-http] Users result: count=%s", users.length);
+          return users;
         }
-
-        const users = data.map((u) => {
-          const name =
-            u.name ||
-            (u.firstName ? `${u.firstName} ${u.lastName || ""}`.trim() : null) ||
-            (u.firstname ? `${u.firstname} ${u.lastname || ""}`.trim() : null);
-
-          return {
-            name,
-            email: u.email || u.username || "",
-          };
-        });
-
-        logger.info("[adobe-http] Users result: count=%s", users.length);
-        return users;
+      } catch (e) {
+        logger.debug("[adobe-http] Users endpoint %s (x-api-key=%s) error: %s", url, clientId, e.message);
       }
-    } catch (e) {
-      logger.debug("[adobe-http] Users endpoint %s error: %s", url, e.message);
     }
   }
 
@@ -381,9 +413,41 @@ async function removeUser(client, orgId, accessToken, email) {
   const url = `${USER_MANAGEMENT_API}/v2/usermanagement/action/${orgId}@AdobeOrg`;
 
   try {
-    const res = await client.post(url, commands, { headers });
+    const res = await client.post(url, commands, { headers, validateStatus: () => true });
     logger.info("[adobe-http] Remove user → status=%s", res.status);
-    return { success: res.status === 200 };
+    if (res.status !== 200) {
+      const body = res.data ? (typeof res.data === "string" ? res.data : JSON.stringify(res.data)) : res.statusText;
+      logger.warn("[adobe-http] Remove user UMAPI non-200: status=%s, body=%s", res.status, body?.slice(0, 500));
+    }
+    if (res.status === 200) return { success: true };
+
+    const bodyStr = res.data ? (typeof res.data === "string" ? res.data : JSON.stringify(res.data)) : "";
+    const apiKeyInvalid = res.status === 403 && (/403003|Api Key is invalid/i.test(bodyStr));
+    if (apiKeyInvalid) {
+      logger.warn("[adobe-http] Remove user: Api Key invalid (403003) → bỏ qua JIL, dùng browser xóa");
+      return { success: false, error: "Api Key is invalid", apiKeyInvalid: true };
+    }
+
+    // Fallback: 403 khác (không phải invalid key) — thử thu hồi product qua JIL (hiếm khi thành công).
+    logger.info("[adobe-http] Remove user fallback: thu hồi product qua JIL API...");
+    const productInfo = await getProducts(client, orgId, accessToken);
+    const paidProducts = (productInfo.products || []).filter((p) => !p.isFree && p.id);
+    let removedAny = false;
+    for (const p of paidProducts) {
+      const delUrl = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/products/${p.id}/users/${encodeURIComponent(email)}`;
+      try {
+        const delRes = await client.delete(delUrl, { headers, timeout: 15000, validateStatus: () => true });
+        if (delRes.status >= 200 && delRes.status < 300) {
+          logger.info("[adobe-http] Remove user JIL OK: product=%s, %s", p.id, email);
+          removedAny = true;
+        } else {
+          logger.debug("[adobe-http] Remove user JIL product=%s → status=%s", p.id, delRes.status);
+        }
+      } catch (e) {
+        logger.debug("[adobe-http] Remove user JIL product=%s error: %s", p.id, e.message);
+      }
+    }
+    return { success: removedAny, error: removedAny ? null : `UMAPI ${res.status}, JIL fallback không xóa được` };
   } catch (e) {
     logger.error("[adobe-http] Remove user error: %s", e.message);
     return { success: false, error: e.message };

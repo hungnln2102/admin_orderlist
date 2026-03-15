@@ -84,8 +84,6 @@ cron.schedule(
   async () => {
     logger.info("[Scheduler] Cron 00:01 triggered", { cronExpression, timezone: schedulerTimezone });
     await runCronSafe("cron");
-    logger.info("[Scheduler] Cron 00:01 — bắt đầu cleanup expired Adobe users");
-    await runCleanupExpiredAdobeUsersSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }
 );
@@ -93,6 +91,15 @@ cron.schedule(
 if (runOnStart) {
   runCronSafe("startup");
 }
+
+cron.schedule(
+  "30 23 * * *",
+  async () => {
+    logger.info("[Scheduler] Cron 23:30 — cleanup expired Adobe users (số ngày còn lại <= 0)");
+    await runCleanupExpiredAdobeUsersSafe("cron");
+  },
+  { scheduled: true, timezone: schedulerTimezone }
+);
 
 cron.schedule(
   "0 18 * * *",

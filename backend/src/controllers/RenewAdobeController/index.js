@@ -1,9 +1,9 @@
 const { db } = require("../../db");
 const {
   SCHEMA_RENEW_ADOBE,
+  SCHEMA_PRODUCT,
   RENEW_ADOBE_SCHEMA,
-  SCHEMA_KEY_ACTIVE,
-  KEY_ACTIVE_SCHEMA,
+  PRODUCT_SCHEMA,
   SCHEMA_ORDERS,
   ORDERS_SCHEMA,
   tableName,
@@ -15,10 +15,27 @@ const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = TABLE_DEF.COLS;
 
-const TBL_KEY = tableName(KEY_ACTIVE_SCHEMA.ORDER_AUTO_KEYS.TABLE, SCHEMA_KEY_ACTIVE);
-const KEY_COLS = KEY_ACTIVE_SCHEMA.ORDER_AUTO_KEYS.COLS;
+const PS_TABLE = tableName(RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE, SCHEMA_RENEW_ADOBE);
+const PS_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
+
+const VARIANT_TABLE = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT);
+const VARIANT_COLS = PRODUCT_SCHEMA.VARIANT.COLS;
+
 const TBL_ORDER = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const ORD_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
+
+const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
+
+/** Trạng thái đơn được hiển thị trong Danh sách user & đơn hàng */
+const ALLOWED_ORDER_STATUSES = ["Đã Thanh Toán", "Cần Gia Hạn", "Đang Xử Lý"];
+
+/** Lấy danh sách variant_id thuộc hệ thống renew_adobe (từ product_system) */
+async function getRenewAdobeVariantIds() {
+  const rows = await db(PS_TABLE)
+    .where(PS_COLS.SYSTEM_CODE, RENEW_ADOBE_SYSTEM_CODE)
+    .select(PS_COLS.VARIANT_ID);
+  return rows.map((r) => r[PS_COLS.VARIANT_ID]).filter((id) => id != null);
+}
 
 const MAX_USERS_PER_ACCOUNT = 10;
 
@@ -147,12 +164,15 @@ async function runCheckForAccountId(id) {
   const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
   logger.info("[renew-adobe] Check account", { id, email });
 
-  const existingUrlAccess = (COLS.URL_ACCESS && account[COLS.URL_ACCESS]) || null;
+  const existingUrlAccess = (COLS.URL_ACCESS && account[COLS.URL_ACCESS] && String(account[COLS.URL_ACCESS]).trim()) || null;
+  const rawOrgName = (COLS.ORG_NAME && account[COLS.ORG_NAME]) ? String(account[COLS.ORG_NAME]).trim() : "";
+  const existingOrgName = rawOrgName && rawOrgName !== "-" ? rawOrgName : undefined;
 
   const result = await adobeHttp.checkAccount(email, password, {
     savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
     mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
     existingUrlAccess,
+    existingOrgName,
   });
 
   if (!result.success) {
@@ -348,7 +368,7 @@ const runAddUsersBatch = async (req, res) => {
   try {
     const accounts = await db(TABLE)
       .whereIn(COLS.ID, accountIds)
-      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG);
+      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG, COLS.MAIL_BACKUP_ID);
     const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
     const ordered = [...accounts].sort((a, b) => (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0));
 
@@ -452,7 +472,9 @@ const runAutoDeleteUsers = async (req, res) => {
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
     });
 
-    // Check lại sau khi xóa
+    if (result.savedCookies && COLS.ALERT_CONFIG) {
+      await db(TABLE).where(COLS.ID, id).update({ [COLS.ALERT_CONFIG]: result.savedCookies });
+    }
     try { await runCheckForAccountId(id); } catch (_) {}
 
     return res.json({
@@ -578,25 +600,31 @@ const checkAllAccounts = async (req, res) => {
 
 /**
  * GET /api/renew-adobe/user-orders
- * Join key_active.order_auto_keys → orders.order_list
- * để lấy mã đơn, email (information_order), tên KH, hạn sử dụng.
+ * Lấy đơn hàng từ order_list có id_product thuộc hệ thống renew_adobe (product_system).
  */
 const listUserOrders = async (_req, res) => {
   try {
-    const rows = await db(TBL_KEY)
-      .leftJoin(TBL_ORDER, `${TBL_KEY}.${KEY_COLS.ORDER_CODE}`, `${TBL_ORDER}.${ORD_COLS.ID_ORDER}`)
+    const variantIds = await getRenewAdobeVariantIds();
+    if (variantIds.length === 0) {
+      logger.info("[renew-adobe] user-orders: 0 rows (chưa có variant nào thuộc renew_adobe)");
+      return res.json([]);
+    }
+
+    const rows = await db(TBL_ORDER)
       .select(
-        `${TBL_KEY}.${KEY_COLS.ORDER_CODE} as order_code`,
+        `${TBL_ORDER}.${ORD_COLS.ID_ORDER} as order_code`,
         `${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER} as information_order`,
         `${TBL_ORDER}.${ORD_COLS.CUSTOMER} as customer`,
         `${TBL_ORDER}.${ORD_COLS.CONTACT} as contact`,
         db.raw(`TO_CHAR((${TBL_ORDER}.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as expiry_date`),
         `${TBL_ORDER}.${ORD_COLS.STATUS} as status`
       )
-      .whereNotNull(`${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER}`)
-      .orderBy(`${TBL_KEY}.${KEY_COLS.ORDER_CODE}`, "asc");
+      .whereIn(ORD_COLS.ID_PRODUCT, variantIds)
+      .whereIn(ORD_COLS.STATUS, ALLOWED_ORDER_STATUSES)
+      .whereNotNull(ORD_COLS.INFORMATION_ORDER)
+      .orderBy(ORD_COLS.ID_ORDER, "asc");
 
-    logger.info("[renew-adobe] user-orders: %d rows", rows.length);
+    logger.info("[renew-adobe] user-orders: %d rows (variant_ids: %s)", rows.length, variantIds.join(", "));
     res.json(rows);
   } catch (error) {
     logger.error("[renew-adobe] user-orders failed", { error: error.message });
@@ -617,18 +645,20 @@ async function autoAssignUsers(onProgress = null) {
     logger.info("[renew-adobe] autoAssign: %s", JSON.stringify(data));
   };
 
-  const INACTIVE_STATUSES = ["Hết Hạn", "Đã Hủy", "Đã Hoàn", "Hủy"];
-
-  // 1. Lấy email từ đơn hàng còn hiệu lực
-  const activeOrders = await db(TBL_KEY)
-    .leftJoin(TBL_ORDER, `${TBL_KEY}.${KEY_COLS.ORDER_CODE}`, `${TBL_ORDER}.${ORD_COLS.ID_ORDER}`)
-    .select(
-      `${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER} as email`,
-      `${TBL_ORDER}.${ORD_COLS.STATUS} as status`,
-      `${TBL_ORDER}.${ORD_COLS.EXPIRY_DATE} as expiry_date`
-    )
-    .whereNotNull(`${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER}`)
-    .whereNotIn(`${TBL_ORDER}.${ORD_COLS.STATUS}`, INACTIVE_STATUSES);
+  // 1. Lấy email từ đơn hàng còn hiệu lực (order_list, variant thuộc renew_adobe, status: Đã Thanh Toán / Cần Gia Hạn / Đang Xử Lý)
+  const variantIds = await getRenewAdobeVariantIds();
+  let activeOrders = [];
+  if (variantIds.length > 0) {
+    activeOrders = await db(TBL_ORDER)
+      .select(
+        `${TBL_ORDER}.${ORD_COLS.INFORMATION_ORDER} as email`,
+        `${TBL_ORDER}.${ORD_COLS.STATUS} as status`,
+        `${TBL_ORDER}.${ORD_COLS.EXPIRY_DATE} as expiry_date`
+      )
+      .whereIn(ORD_COLS.ID_PRODUCT, variantIds)
+      .whereIn(ORD_COLS.STATUS, ALLOWED_ORDER_STATUSES)
+      .whereNotNull(ORD_COLS.INFORMATION_ORDER);
+  }
 
   const now = new Date();
   const activeEmails = new Set();
@@ -854,6 +884,75 @@ const updateUrlAccess = async (req, res) => {
   }
 };
 
+/** GET /api/renew-adobe/variants — id + display_name từ product.variant (cho dropdown) */
+const listVariants = async (_req, res) => {
+  try {
+    const rows = await db(VARIANT_TABLE)
+      .select(VARIANT_COLS.ID, VARIANT_COLS.DISPLAY_NAME)
+      .where(VARIANT_COLS.IS_ACTIVE, true)
+      .orderBy(VARIANT_COLS.DISPLAY_NAME, "asc");
+    return res.json(rows.map((r) => ({ id: r[VARIANT_COLS.ID], display_name: r[VARIANT_COLS.DISPLAY_NAME] ?? "" })));
+  } catch (err) {
+    logger.error("[renew-adobe] listVariants failed", { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/** GET /api/renew-adobe/product-system — danh sách bảng product_system */
+const listProductSystem = async (_req, res) => {
+  try {
+    const rows = await db(PS_TABLE)
+      .select(PS_COLS.ID, PS_COLS.VARIANT_ID, PS_COLS.SYSTEM_CODE, PS_COLS.CREATED_AT)
+      .orderBy(PS_COLS.ID, "asc");
+    return res.json(rows);
+  } catch (err) {
+    logger.error("[renew-adobe] listProductSystem failed", { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/** POST /api/renew-adobe/product-system — thêm 1 dòng (variant_id, system_code) */
+const createProductSystem = async (req, res) => {
+  const variantId = req.body?.variant_id != null ? Number(req.body.variant_id) : null;
+  const systemCode = (req.body?.system_code && String(req.body.system_code).trim()) || null;
+  if (variantId == null || variantId <= 0 || !systemCode) {
+    return res.status(400).json({ error: "Cần variant_id (số nguyên > 0) và system_code (chuỗi không rỗng)" });
+  }
+  try {
+    const [row] = await db(PS_TABLE)
+      .insert({
+        [PS_COLS.VARIANT_ID]: variantId,
+        [PS_COLS.SYSTEM_CODE]: systemCode,
+      })
+      .returning([PS_COLS.ID, PS_COLS.VARIANT_ID, PS_COLS.SYSTEM_CODE, PS_COLS.CREATED_AT]);
+    return res.status(201).json(row || { id: null, variant_id: variantId, system_code: systemCode, created_at: new Date().toISOString() });
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Cặp variant_id + system_code đã tồn tại" });
+    }
+    logger.error("[renew-adobe] createProductSystem failed", { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/** DELETE /api/renew-adobe/product-system/:id */
+const deleteProductSystem = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || id <= 0) {
+    return res.status(400).json({ error: "id không hợp lệ" });
+  }
+  try {
+    const deleted = await db(PS_TABLE).where(PS_COLS.ID, id).del();
+    if (deleted === 0) {
+      return res.status(404).json({ error: "Không tìm thấy bản ghi" });
+    }
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error("[renew-adobe] deleteProductSystem failed", { error: err.message });
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   listAccounts,
   lookupAccountByEmail,
@@ -871,4 +970,8 @@ module.exports = {
   runAutoAssign,
   fixSingleUser,
   updateUrlAccess,
+  listVariants,
+  listProductSystem,
+  createProductSystem,
+  deleteProductSystem,
 };

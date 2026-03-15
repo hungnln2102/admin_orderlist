@@ -15,6 +15,7 @@ Chạy theo thứ tự số (001 → 008). Sales summary và form_desc chạy kh
 | `007_product_and_supplier_cost_audit_columns.sql` | Product: name, updated_at, is_active; variant/product_desc: updated_at; supplier_cost: created_at, updated_at. |
 | `008_rename_order_expired_to_expiry_date.sql` | Đổi cột `order_expired` → `expiry_date` trong `order_list`. |
 | `009_create_system_renew_adobe_schema.sql` | Tạo schema `system_renew_adobe` và bảng `account` (Renew Adobe). |
+| `013_rename_schema_to_system_automation_and_create_product_system.sql` | Đổi tên schema `system_renew_adobe` → `system_automation`, tạo bảng `product_system` (variant_id, system_code). |
 | `create_sales_summary_table.sql` | Tạo bảng sales summary (schema tùy file). |
 | `create_sales_summary_in_product_schema.sql` | Sales summary trong schema product. |
 | `run_sales_summary_migration.sql` | Script chạy migration sales summary. |

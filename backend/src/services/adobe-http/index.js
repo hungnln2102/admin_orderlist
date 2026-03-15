@@ -1,34 +1,165 @@
 /**
- * Entry point cho Adobe HTTP service.
+ * Entry point Adobe HTTP service (Renew Adobe).
  *
- * Luồng:
- * 1. loginViaHttp → lấy access token + cookies (Playwright nếu cần)
- * 2. getOrgId → lấy organization ID
- * 3. getProducts / getUsers / addUsers / removeUser → HTTP operations
+ * Luồng: loginViaHttp (fast path / refresh / SUSI / Playwright) → getOrgId hoặc orgId từ URL
+ * → getProducts + getUsers (hoặc browserData nếu Playwright đã fetch) → checkAccount / addUser / deleteUser.
  *
- * Nếu saved cookies + token hợp lệ → KHÔNG mở browser.
- * Nếu hết hạn → Playwright headless login ~15-30s → save session mới.
+ * Env: ADOBE_PROXY (proxy đổi IP), ADOBE_TIMEOUT_* (timeout ms), PLAYWRIGHT_HEADLESS.
+ * Cookie/token lưu DB (alert_config): { cookies, accessToken, refreshToken?, savedAt }.
  */
 
+const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { loginViaHttp } = require("./login");
 const { loginWithPlaywright } = require("./loginBrowser");
 const { getOrgId, getProducts, getProductUserEmails, getUsers, addUsers, removeUser, assignProductToUsers, removeProductFromUser } = require("./adminConsole");
-const autoAssignBrowser = require("./autoAssignBrowser");
+const adobeRenewV2 = require("../adobe-renew-v2");
 const { exportCookies, createHttpClient, importCookies } = require("./httpClient");
+const { getPlaywrightProxyOptions } = require("./proxyConfig");
+
+/**
+ * Check account bằng luồng V2 (B1–B13) + B14 (auto-assign URL) trên cùng 1 browser — không bật/tắt browser hai lần.
+ */
+async function checkAccountV2(email, password, options = {}) {
+  const adobeRenewV2 = require("../adobe-renew-v2");
+  const savedCookiesFromDb = normalizeSavedCookiesFromDb(options.savedCookiesFromDb);
+  const cookiesToUse = savedCookiesFromDb?.cookies || [];
+  const mailBackupId = options.mailBackupId || null;
+  const existingOrgName = options.existingOrgName && String(options.existingOrgName).trim() ? String(options.existingOrgName).trim() : null;
+
+  const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
+  const proxyOptions = getPlaywrightProxyOptions();
+  const launchOptions = {
+    headless,
+    slowMo: headless ? 0 : 80,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+  };
+  if (proxyOptions) launchOptions.proxy = proxyOptions;
+
+  const browser = await chromium.launch(launchOptions);
+  let result;
+  try {
+    const context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+    });
+    const page = await context.newPage();
+
+    logger.info("[adobe-http] checkAccount V2 (B1–B13 + B14 cùng browser)...");
+    result = await adobeRenewV2.runCheckFlow(email, password, {
+      savedCookies: cookiesToUse,
+      mailBackupId,
+      sharedSession: { context, page },
+      existingOrgName,
+    });
+
+    if (!result.success) {
+      return { success: false, scrapedData: null, savedCookies: null, error: result.error };
+    }
+
+    const adminEmail = email.toLowerCase().trim();
+    const users = (result.users || []).map((u) => ({
+      name: u.name || "",
+      email: (u.email || "").trim(),
+      product: u.hasProduct === true,
+    }));
+    const hasProducts = (result.products || []).length > 0;
+    if (!hasProducts) {
+      logger.info("[adobe-http] B12 không có product → chỉ dùng kết quả tới B13, bỏ qua B14/B15");
+    }
+    const adminHasProduct = hasProducts && users.some((u) => (u.email || "").toLowerCase() === adminEmail && u.product === true);
+    const manageTeamMembers = users.filter((u) => (u.email || "").toLowerCase() !== adminEmail);
+    const productInfo = {
+      hasPlan: result.license_status === "Paid",
+      licenseStatus: result.license_status || "unknown",
+      products: (result.products || []).map((p) => ({ id: p.name, name: p.name, licenseQuota: p.total || 0, isFree: false })),
+    };
+
+    if (adminHasProduct) {
+      try {
+        await adobeRenewV2.runB15RemoveProductFromAdmin(page, email, { orgId: result.orgId });
+      } catch (e) {
+        logger.warn("[adobe-http] B15 remove admin product error: %s", e.message);
+      }
+    }
+    let urlAccess = (options.existingUrlAccess && String(options.existingUrlAccess).trim()) || null;
+    if (urlAccess) {
+      logger.info("[adobe-http] Đã có url_access trong DB → bỏ qua B14 (không vào mục tạo URL)");
+    }
+    if (hasProducts && !urlAccess && result.orgId) {
+      try {
+        const pwResult = await adobeRenewV2.getOrCreateAutoAssignUrlWithPage(page, result.orgId, email, password, { mailBackupId });
+        urlAccess = pwResult.url;
+        if (pwResult.savedCookies && pwResult.savedCookies.length) result.cookies = pwResult.savedCookies;
+      } catch (e) {
+        logger.warn("[adobe-http] B14 auto-assign error: %s", e.message);
+      }
+    }
+
+    const scrapedData = {
+      orgName: result.org_name || null,
+      userCount: manageTeamMembers.length,
+      licenseStatus: result.license_status || "unknown",
+      adobe_org_id: result.orgId || null,
+      profileName: result.org_name || null,
+      manageTeamMembers,
+      adminConsoleUsers: users,
+      urlAccess,
+    };
+
+    const savedCookies = {
+      cookies: result.cookies || [],
+      savedAt: new Date().toISOString(),
+    };
+
+    logger.info("[adobe-http] checkAccount V2 xong: org=%s, users=%s, license=%s, saved session cookies=%d",
+      result.org_name, users.length, result.license_status, (result.cookies || []).length);
+    return { success: true, scrapedData, savedCookies };
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
 
 /**
  * Login + lấy org ID + org name. Nếu fast path (saved cookies) thất bại → fallback Playwright.
  * @returns {{ client, jar, accessToken, orgId, orgName }}
  */
+/**
+ * Chuẩn hóa savedCookiesFromDb từ DB: nếu cột là TEXT thì trả về string, cần parse thành object.
+ * Coi [] hoặc {} hoặc { cookies: [] } là "không có config còn hiệu lực" → trả về null.
+ * @param {object|string|null} raw
+ * @returns {{ cookies: Array, accessToken?: string }|null}
+ */
+function normalizeSavedCookiesFromDb(raw) {
+  if (raw == null) return null;
+  let obj = raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      obj = parsed && typeof parsed === "object" ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  if (obj == null) return null;
+  if (Array.isArray(obj)) return null;
+  if (typeof obj !== "object") return null;
+  const cookies = obj.cookies;
+  if (!Array.isArray(cookies) || cookies.length === 0) return null;
+  return obj;
+}
+
 async function loginAndGetOrg(email, password, options = {}) {
-  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
-  const savedAccessToken = options.savedCookiesFromDb?.accessToken || null;
+  const savedCookiesFromDb = normalizeSavedCookiesFromDb(options.savedCookiesFromDb);
+  const savedCookies = savedCookiesFromDb?.cookies || options.savedCookies || [];
+  const savedAccessToken = savedCookiesFromDb?.accessToken ?? options.savedAccessToken ?? null;
+  const savedRefreshToken = savedCookiesFromDb?.refreshToken ?? options.savedRefreshToken ?? null;
   const mailBackupId = options.mailBackupId || null;
 
   const loginResult = await loginViaHttp(email, password, {
     savedCookies,
     savedAccessToken,
+    savedRefreshToken,
     mailBackupId,
   });
 
@@ -36,9 +167,24 @@ async function loginAndGetOrg(email, password, options = {}) {
     throw new Error(loginResult.error || "Login thất bại");
   }
 
-  let { client, jar, accessToken, usedBrowser } = loginResult;
+  let { client, jar, accessToken, refreshToken = null, usedBrowser, orgId: loginOrgId, browserData = null } = loginResult;
 
-  let orgResult = await getOrgId(client, accessToken);
+  let orgResult = null;
+  // Khi vừa login bằng Playwright, token có thể bị Adobe coi là invalid ngay sau khi đóng browser (401).
+  // Ưu tiên dùng orgId lấy từ URL trong browser — tránh gọi getOrgId với token lỗi.
+  if (usedBrowser && loginOrgId) {
+    logger.info("[adobe-http] Dùng org ID từ Playwright URL (tránh 401 token): %s", loginOrgId);
+    // Nếu có browserData, lấy orgName từ đó
+    const orgNameFromData = browserData?.orgName || null;
+    orgResult = { orgId: loginOrgId, orgName: orgNameFromData };
+  }
+  if (!orgResult) {
+    orgResult = await getOrgId(client, accessToken);
+  }
+  if (!orgResult && loginOrgId) {
+    logger.info("[adobe-http] getOrgId không có kết quả, dùng org ID từ Playwright URL: %s", loginOrgId);
+    orgResult = { orgId: loginOrgId, orgName: browserData?.orgName || null };
+  }
 
   // Chỉ retry Playwright nếu chưa dùng browser (fast path thất bại lấy org)
   if (!orgResult && !usedBrowser) {
@@ -54,104 +200,29 @@ async function loginAndGetOrg(email, password, options = {}) {
     jar = fresh.jar;
     await importCookies(jar, browserResult.cookies);
     accessToken = browserResult.accessToken;
+    browserData = browserResult.browserData || null;
+    refreshToken = browserResult.refreshToken || null;
 
     orgResult = await getOrgId(client, accessToken);
+    if (!orgResult && browserResult.orgId) {
+      logger.info("[adobe-http] Dùng org ID từ Playwright URL: %s", browserResult.orgId);
+      orgResult = { orgId: browserResult.orgId, orgName: browserData?.orgName || null };
+    }
   }
 
   if (!orgResult) {
     throw new Error("Không lấy được org ID sau tất cả strategies");
   }
 
-  return { client, jar, accessToken, orgId: orgResult.orgId, orgName: orgResult.orgName };
+  return { client, jar, accessToken, refreshToken, orgId: orgResult.orgId, orgName: orgResult.orgName, browserData };
 }
 
 /**
- * Check tài khoản Adobe: login → org → products → users.
+ * Check tài khoản Adobe: luồng V2 (adobe-renew-v2, B1–B13). V1 đã loại bỏ.
  */
 async function checkAccount(email, password, options = {}) {
-  logger.info("[adobe-http] checkAccount bắt đầu: %s", email);
-
-  try {
-    const { client, jar, accessToken, orgId, orgName } = await loginAndGetOrg(email, password, options);
-
-    const productInfo = await getProducts(client, orgId, accessToken);
-    const users = await getUsers(client, orgId, accessToken);
-
-    // Chỉ check user assignment từ paid products (loại bỏ Complimentary/CCFM)
-    const paidProductIds = productInfo.products
-      .filter((p) => !p.isFree && p.id)
-      .map((p) => p.id);
-    logger.info("[adobe-http] Paid product IDs cho user check: %s", paidProductIds.join(",") || "(none)");
-    const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
-
-    const adminEmail = email.toLowerCase().trim();
-
-    // Admin KHÔNG ĐƯỢC giữ product → chỉ remove khi user data xác nhận admin thực sự có product
-    const paidProducts = productInfo.products.filter((p) => !p.isFree);
-    const adminUser = users.find((u) => (u.email || "").toLowerCase().trim() === adminEmail);
-    const adminHasPaidProduct = adminUser?.products?.some((p) => paidProductIds.includes(p.id));
-    if (adminHasPaidProduct && paidProducts.length > 0) {
-      logger.info("[adobe-http] Admin %s đang giữ paid product (xác nhận từ user data) → removing...", adminEmail);
-      await removeProductFromUser(client, orgId, accessToken, adminEmail, paidProducts);
-    } else {
-      logger.info("[adobe-http] Admin %s không giữ paid product → bỏ qua remove", adminEmail);
-    }
-
-    const manageTeamMembers = users
-      .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
-      .map((u) => ({
-        name: u.name,
-        email: u.email || "",
-        product: productEmails.has((u.email || "").toLowerCase().trim()),
-      }));
-
-    // Auto-assign URL: chỉ chạy khi DB chưa có url_access
-    let urlAccess = options.existingUrlAccess || null;
-    let browserCookies = null;
-    if (!urlAccess && paidProducts.length > 0) {
-      try {
-        const dbCookies = options.savedCookiesFromDb?.cookies || [];
-        const mailBackupId = options.mailBackupId || null;
-        const pwResult = await autoAssignBrowser.getOrCreateAutoAssignUrl(orgId, email, password, {
-          savedCookies: dbCookies,
-          mailBackupId,
-        });
-        urlAccess = pwResult.url;
-        browserCookies = pwResult.savedCookies;
-      } catch (e) {
-        logger.warn("[adobe-http] autoAssignBrowser error: %s", e.message);
-      }
-    } else if (urlAccess) {
-      logger.info("[adobe-http] url_access đã có trong DB, bỏ qua: %s", urlAccess);
-    }
-
-    const scrapedData = {
-      orgName: orgName || null,
-      userCount: manageTeamMembers.length,
-      licenseStatus: productInfo.licenseStatus,
-      adobe_org_id: orgId,
-      profileName: null,
-      manageTeamMembers,
-      adminConsoleUsers: users,
-      urlAccess,
-    };
-
-    // Merge cookies: ưu tiên browser cookies từ Playwright (fresh session)
-    const savedCookies = exportCookies(jar);
-    savedCookies.accessToken = accessToken;
-    if (browserCookies && browserCookies.length > 0) {
-      savedCookies.cookies = browserCookies;
-      logger.info("[adobe-http] Cập nhật cookies từ Playwright browser (%d cookies)", browserCookies.length);
-    }
-
-    logger.info("[adobe-http] checkAccount xong: org=%s, users=%s, license=%s, urlAccess=%s",
-      orgId, users.length, productInfo.licenseStatus, urlAccess || "(none)");
-
-    return { success: true, scrapedData, savedCookies };
-  } catch (err) {
-    logger.warn("[adobe-http] checkAccount lỗi: %s", err.message);
-    return { success: false, scrapedData: null, savedCookies: null, error: err.message };
-  }
+  logger.info("[adobe-http] checkAccount (V2): %s", email);
+  return await checkAccountV2(email, password, options);
 }
 
 /**
@@ -173,27 +244,27 @@ async function removeUserFromAccount(email, password, userEmail, options = {}) {
 }
 
 /**
- * Xóa nhiều user (auto-delete flow).
+ * Xóa nhiều user (auto-delete flow). Luồng V2: 1 browser, login (B1–B9) → /users → xóa → snapshot.
  */
 async function autoDeleteUsers(email, password, userEmails, options = {}) {
-  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
-  if (!accessToken) throw new Error("Không có access token");
-
-  const deleted = [];
-  const failed = [];
-
-  for (const ue of userEmails) {
-    try {
-      const result = await removeUser(client, orgId, accessToken, ue);
-      if (result.success) { deleted.push(ue); }
-      else { failed.push(ue); }
-    } catch (e) {
-      logger.warn("[adobe-http] Delete user %s failed: %s", ue, e.message);
-      failed.push(ue);
-    }
+  if (!userEmails || userEmails.length === 0) {
+    return { deleted: [], failed: [], snapshot: null };
   }
-
-  return { deleted, failed };
+  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
+  logger.info("[adobe-http] Xóa %d user qua V2 (1 browser: login → xóa → snapshot)...", userEmails.length);
+  const v2Result = await adobeRenewV2.deleteUsersV2(email, password, userEmails, {
+    savedCookies,
+    mailBackupId: options.mailBackupId || null,
+  });
+  const result = {
+    deleted: v2Result.deleted || [],
+    failed: v2Result.failed || [],
+    snapshot: v2Result.snapshot || null,
+  };
+  if (v2Result.savedCookies && v2Result.savedCookies.cookies && v2Result.savedCookies.cookies.length) {
+    result.savedCookies = v2Result.savedCookies;
+  }
+  return result;
 }
 
 /**

@@ -1,5 +1,7 @@
 # Renew Adobe — Tài liệu toàn bộ Flow
 
+**Lưu ý:** Luồng V1 (Puppeteer, `services/adobe/`) đã được dọn; toàn bộ check/login/auto-assign dùng V2 (`adobe-http` + `adobe-renew-v2`, Playwright B1–B15).
+
 ## Tổng quan
 
 Hệ thống Renew Adobe quản lý tài khoản Adobe Creative Cloud Admin Console:
@@ -230,7 +232,7 @@ services/adobe-http/
 
 ## 10. DB Schema
 
-**Table:** `system_renew_adobe.accounts`
+**Table:** `system_automation.accounts_admin` (schema đổi từ system_renew_adobe → system_automation)
 
 | Cột | Kiểu | Mô tả |
 |-----|------|-------|
