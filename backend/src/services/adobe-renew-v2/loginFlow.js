@@ -5,6 +5,7 @@
 
 const logger = require("../../utils/logger");
 const mailOtpService = require("../mailOtpService");
+const { LOGIN_PAGE_URL } = require("../adobe-http/constants");
 
 const PASSWORD_SELECTORS = ['input[name="password"]', 'input[type="password"]', 'input#password'];
 const SKIP_RE = /^\s*(not now|skip|bỏ qua|later|skip for now)\s*$/i;
@@ -160,9 +161,18 @@ async function doFormLoginOnAuthPage(page, email, password, mailBackupId) {
       { timeout: 90000 }
     ).catch(() => {});
     await page.waitForTimeout(2500);
-    return isOnAdobeSite(page.url());
+    const ok = isOnAdobeSite(page.url());
+    if (!ok) {
+      const u = page.url() || "";
+      const body = await page.evaluate(() => (document.body && document.body.innerText) ? document.body.innerText.slice(0, 800) : "").catch(() => "");
+      logger.warn("[adobe-v2] doFormLoginOnAuthPage chưa tới trang đích. url=%s body=%s", u.slice(0, 160), body.replace(/\s+/g, " ").slice(0, 260));
+    }
+    return ok;
   } catch (e) {
-    logger.error("[adobe-v2] doFormLoginOnAuthPage error: %s", e.message);
+    const u = page.url ? (page.url() || "") : "";
+    const body = await page.evaluate(() => (document.body && document.body.innerText) ? document.body.innerText.slice(0, 800) : "").catch(() => "");
+    logger.error("[adobe-v2] doFormLoginOnAuthPage error: %s url=%s body=%s",
+      e.message, u.slice(0, 160), body.replace(/\s+/g, " ").slice(0, 260));
     return false;
   }
 }
@@ -178,10 +188,40 @@ async function runLoginFlow(page, opts) {
 
   // Nếu đã ở trang auth (fallback từ B1 khi adobe.com lỗi HTTP2), login trực tiếp không cần click Sign in.
   const currentUrl = page.url() || "";
-  if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(currentUrl)) {
-    logger.info("[adobe-v2] B2: Đang ở auth page (%s) → login trực tiếp", currentUrl.slice(0, 90));
+  logger.info("[adobe-v2] runLoginFlow start url=%s", currentUrl.slice(0, 140));
+
+  // Nếu rơi vào chrome error page (thường do network/proxy), retry điều hướng về auth page.
+  if (/^chrome-error:\/\//i.test(currentUrl)) {
+    logger.warn("[adobe-v2] Đang ở chrome-error page → retry goto LOGIN_PAGE_URL");
+    await page.goto(LOGIN_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch((e) => {
+      logger.warn("[adobe-v2] retry goto LOGIN_PAGE_URL failed: %s", e.message);
+    });
+    await page.waitForTimeout(1500);
+  }
+
+  const urlAfterRetry = page.url() || "";
+  if (/^chrome-error:\/\//i.test(urlAfterRetry)) {
+    throw new Error("Không mở được trang login (chrome-error). Kiểm tra mạng/proxy/DNS trên VPS.");
+  }
+
+  if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(urlAfterRetry)) {
+    logger.info("[adobe-v2] B2: Đang ở auth page (%s) → login trực tiếp", urlAfterRetry.slice(0, 90));
     const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
     if (!ok) throw new Error("Login thất bại trên trang auth (fallback).");
+    return;
+  }
+
+  // Fallback: một số môi trường headless redirect ra trang có form login nhưng URL chưa match auth.* (hoặc bị custom domain).
+  // Nếu thấy input email thì login trực tiếp, không cần click Sign in.
+  const emailInputVisible = await page
+    .locator('input[name="username"], input[type="email"], input[name="email"]')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (emailInputVisible) {
+    logger.info("[adobe-v2] B2: Thấy form login (email input) → login trực tiếp, url=%s", (page.url() || "").slice(0, 90));
+    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    if (!ok) throw new Error("Login thất bại trên trang form login (fallback).");
     return;
   }
 
@@ -190,7 +230,7 @@ async function runLoginFlow(page, opts) {
   const signInClicked = await page.locator("button.profile-comp.secondary-button").first().click({ timeout: 6000 }).then(() => true).catch(async () => {
     return page.getByRole("link", { name: /sign\s*in/i }).first().click({ timeout: 4000 }).then(() => true).catch(() => false);
   });
-  if (!signInClicked) throw new Error("Không tìm thấy nút Sign in");
+  if (!signInClicked) throw new Error(`Không tìm thấy nút Sign in. URL hiện tại: ${(page.url() || "").slice(0, 140)}`);
   await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com|account\.adobe\.com|adminconsole\.adobe\.com/, { timeout: 20000 }).catch(() => {});
 
   const urlAfterSignIn = page.url();

@@ -6,11 +6,13 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
-const { LOGIN_PAGE_URL } = require("../adobe-http/constants");
+const { LOGIN_PAGE_URL, ADMIN_CONSOLE_BASE } = require("../adobe-http/constants");
 const { runLoginFlow, isOnAdobeSite } = require("./loginFlow");
 const { ensureAccountAdobePage, runB10ToB13 } = require("./checkInfoFlow");
 
-const ADOBE_HOME = "https://www.adobe.com/";
+// Tránh hit www.adobe.com (hay lỗi ERR_HTTP2_PROTOCOL_ERROR trên VPS/headless).
+// Admin Console entry ổn định hơn và vẫn dẫn về auth.services khi cần login.
+const ADOBE_ENTRY = ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
 
 /** Cookie session khi export được gán expiry mặc định để tái sử dụng 2–3 ngày (tránh chết sau 1h). */
 const DEFAULT_COOKIE_EXPIRY_DAYS = 3;
@@ -93,7 +95,6 @@ async function runCheckFlow(email, password, options = {}) {
         "--disable-dev-shm-usage",
         "--disable-gpu",
         // Giảm lỗi mạng kiểu ERR_HTTP2_PROTOCOL_ERROR/QUIC trên một số môi trường/proxy
-        "--disable-http2",
         "--disable-quic",
       ],
     };
@@ -113,16 +114,19 @@ async function runCheckFlow(email, password, options = {}) {
       if (pwCookies.length > 0) await context.addCookies(pwCookies);
     }
 
-    // ─── B1: Luôn vào adobe.com trước ───
-    logger.info("[adobe-v2] B1: goto adobe.com");
+    // ─── B1: Đi thẳng vào Admin Console entry (ổn định hơn www.adobe.com) ───
+    // NOTE: headless đi thẳng auth.services dễ bị Adobe chặn/serve flow khác.
+    // Vì vậy luôn vào Admin Console entry trước; nếu fail mới fallback auth.services.
+    const b1Url = ADOBE_ENTRY;
+    logger.info("[adobe-v2] B1: goto ADMIN_CONSOLE entry");
     const b1Ok = await page
-      .goto(ADOBE_HOME, { waitUntil: "domcontentloaded", timeout: 30000 })
+      .goto(b1Url, { waitUntil: "domcontentloaded", timeout: 45000 })
       .then(() => true)
       .catch((e) => {
-        logger.warn("[adobe-v2] goto adobe.com: %s", e.message);
+        logger.warn("[adobe-v2] B1 goto error: %s", e.message);
         return false;
       });
-    // Fallback: nếu adobe.com fail (thường do HTTP2), đi thẳng vào trang login auth.services
+    // Fallback: nếu entry fail, luôn fallback qua auth.services
     if (!b1Ok) {
       logger.info("[adobe-v2] B1 fallback: goto LOGIN_PAGE_URL (auth.services)");
       await page.goto(LOGIN_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch((e) => {
