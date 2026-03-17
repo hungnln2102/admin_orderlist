@@ -176,6 +176,15 @@ async function doFormLoginOnAuthPage(page, email, password, mailBackupId) {
 async function runLoginFlow(page, opts) {
   const { email, password, mailBackupId = null } = opts;
 
+  // Nếu đã ở trang auth (fallback từ B1 khi adobe.com lỗi HTTP2), login trực tiếp không cần click Sign in.
+  const currentUrl = page.url() || "";
+  if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(currentUrl)) {
+    logger.info("[adobe-v2] B2: Đang ở auth page (%s) → login trực tiếp", currentUrl.slice(0, 90));
+    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    if (!ok) throw new Error("Login thất bại trên trang auth (fallback).");
+    return;
+  }
+
   // ─── B2: Sign in ───
   logger.info("[adobe-v2] B2: Click Sign in");
   const signInClicked = await page.locator("button.profile-comp.secondary-button").first().click({ timeout: 6000 }).then(() => true).catch(async () => {

@@ -6,6 +6,7 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
+const { LOGIN_PAGE_URL } = require("../adobe-http/constants");
 const { runLoginFlow, isOnAdobeSite } = require("./loginFlow");
 const { ensureAccountAdobePage, runB10ToB13 } = require("./checkInfoFlow");
 
@@ -86,7 +87,15 @@ async function runCheckFlow(email, password, options = {}) {
     const launchOptions = {
       headless,
       slowMo: headless ? 0 : 80,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        // Giảm lỗi mạng kiểu ERR_HTTP2_PROTOCOL_ERROR/QUIC trên một số môi trường/proxy
+        "--disable-http2",
+        "--disable-quic",
+      ],
     };
     if (proxyOptions) launchOptions.proxy = proxyOptions;
     browser = await chromium.launch(launchOptions);
@@ -106,7 +115,20 @@ async function runCheckFlow(email, password, options = {}) {
 
     // ─── B1: Luôn vào adobe.com trước ───
     logger.info("[adobe-v2] B1: goto adobe.com");
-    await page.goto(ADOBE_HOME, { waitUntil: "domcontentloaded", timeout: 30000 }).catch((e) => logger.warn("[adobe-v2] goto adobe.com: %s", e.message));
+    const b1Ok = await page
+      .goto(ADOBE_HOME, { waitUntil: "domcontentloaded", timeout: 30000 })
+      .then(() => true)
+      .catch((e) => {
+        logger.warn("[adobe-v2] goto adobe.com: %s", e.message);
+        return false;
+      });
+    // Fallback: nếu adobe.com fail (thường do HTTP2), đi thẳng vào trang login auth.services
+    if (!b1Ok) {
+      logger.info("[adobe-v2] B1 fallback: goto LOGIN_PAGE_URL (auth.services)");
+      await page.goto(LOGIN_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch((e) => {
+        logger.warn("[adobe-v2] goto LOGIN_PAGE_URL: %s", e.message);
+      });
+    }
     await page.waitForTimeout(2000);
     await page.locator('button[aria-label="Close"], button[aria-label="close"], .dialog-close').first().click({ timeout: 3000 }).then(() => true).catch(() => false);
 

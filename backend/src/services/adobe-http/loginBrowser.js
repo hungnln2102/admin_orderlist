@@ -37,7 +37,15 @@ async function loginWithPlaywright(email, password, options = {}) {
   const launchOptions = {
     headless,
     slowMo: headless ? 0 : 80,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      // Giảm lỗi mạng kiểu ERR_HTTP2_PROTOCOL_ERROR/QUIC trên một số môi trường/proxy
+      "--disable-http2",
+      "--disable-quic",
+    ],
   };
   if (proxyOptions) launchOptions.proxy = proxyOptions;
   const browser = await chromium.launch(launchOptions);
