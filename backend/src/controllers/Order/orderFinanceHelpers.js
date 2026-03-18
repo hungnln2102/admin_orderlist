@@ -267,20 +267,41 @@ const addSupplierImportOnProcessing = async (trx, beforeRow, afterRow) => {
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 
-    if (prevStatus === nextStatus || nextStatus !== STATUS.PROCESSING) return;
-
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-    const supplyId =
-        (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
-        (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
-        (await findSupplyIdByName(trx, afterRow?.supply)) ||
-        (await findSupplyIdByName(trx, beforeRow?.supply));
-    if (!supplyId) return;
 
-    const costValue = toNullableNumber(afterRow?.cost ?? beforeRow?.cost);
-    if (!costValue || costValue <= 0) return;
+    // Case 1: Đơn chuyển sang Đang Xử Lý → cộng cost vào NCC mới
+    if (prevStatus !== nextStatus && nextStatus === STATUS.PROCESSING) {
+        const supplyId =
+            (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
+            (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
+            (await findSupplyIdByName(trx, afterRow?.supply)) ||
+            (await findSupplyIdByName(trx, beforeRow?.supply));
+        if (!supplyId) return;
 
-    await increaseSupplierDebt(trx, supplyId, costValue, afterRow?.order_date);
+        const costValue = toNullableNumber(afterRow?.cost ?? beforeRow?.cost);
+        if (!costValue || costValue <= 0) return;
+
+        await increaseSupplierDebt(trx, supplyId, costValue, afterRow?.order_date);
+        return;
+    }
+
+    // Case 2: Đơn vẫn Đang Xử Lý nhưng NCC thay đổi → trừ NCC cũ, cộng NCC mới
+    if (prevStatus === STATUS.PROCESSING && nextStatus === STATUS.PROCESSING) {
+        const oldSupplyId = beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null;
+        const newSupplyId = afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null;
+
+        if (!oldSupplyId || !newSupplyId || oldSupplyId === newSupplyId) return;
+
+        const oldCost = toNullableNumber(beforeRow?.cost);
+        const newCost = toNullableNumber(afterRow?.cost);
+
+        if (oldCost && oldCost > 0) {
+            await decreaseSupplierDebt(trx, oldSupplyId, oldCost);
+        }
+        if (newCost && newCost > 0) {
+            await increaseSupplierDebt(trx, newSupplyId, newCost, afterRow?.order_date);
+        }
+    }
 };
 
 module.exports = {

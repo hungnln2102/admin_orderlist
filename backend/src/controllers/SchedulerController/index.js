@@ -1,4 +1,4 @@
-const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask } = require("../../../scheduler");
+const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask, renewAdobeCheckAndNotifyTask } = require("../../../scheduler");
 const logger = require("../../utils/logger");
 
 const runSchedulerNow = async (_req, res) => {
@@ -39,9 +39,20 @@ const runCleanupExpiredAdobeUsersNow = async (_req, res) => {
   }
 };
 
+const runRenewAdobeCheckNow = async (_req, res) => {
+  try {
+    await renewAdobeCheckAndNotifyTask("manual");
+    res.json({ success: true });
+  } catch (error) {
+    logger.error("[scheduler] Renew Adobe check & notify failed", { error: error.message, stack: error.stack });
+    res.status(500).json({ error: "Không thể chạy job check tài khoản Adobe." });
+  }
+};
+
 module.exports = {
   runSchedulerNow,
   schedulerStatus,
   runFourDaysNotificationNow,
   runCleanupExpiredAdobeUsersNow,
+  runRenewAdobeCheckNow,
 };

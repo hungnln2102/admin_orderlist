@@ -4,6 +4,7 @@ const { backupDatabaseToDrive } = require("../../utils/backupService");
 const { normalizeOrderRow } = require("../../controllers/Order/helpers");
 const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { COL, TABLES, ORDER_COLS, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
+const { removeMappingsByOrders } = require("../../services/userAccountMappingService");
 
 let lastRunAt = null;
 
@@ -39,8 +40,20 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
       logger.info(`Đã cập nhật ${markExpired.rowCount} đơn hết hạn (< 0 ngày) sang status EXPIRED`);
       if (markExpired.rows.length) {
         const idKey = ORDER_COLS.idOrder;
-        const orderIds = markExpired.rows.map((r) => r[idKey]).filter(Boolean).join(", ");
+        const expiredOrderIds = markExpired.rows.map((r) => r[idKey]).filter(Boolean);
+        const orderIds = expiredOrderIds.join(", ");
         logger.debug(`ID đã cập nhật: ${orderIds}`);
+
+        // Xóa mapping trong user_account_mapping cho đơn vừa hết hạn
+        if (expiredOrderIds.length > 0) {
+          await client.query("COMMIT"); // Commit trước để tránh deadlock
+          try {
+            await removeMappingsByOrders(expiredOrderIds);
+          } catch (mappingErr) {
+            logger.warn("[CRON] Xóa mapping thất bại (bỏ qua)", { error: mappingErr.message });
+          }
+          await client.query("BEGIN"); // Mở lại transaction cho paidToRenewal
+        }
       }
 
       // 0 <= số ngày còn lại <= 4 → Cần Gia Hạn (RENEWAL); < 0 → đã xử lý ở markExpired (Hết Hạn)

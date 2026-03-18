@@ -424,6 +424,17 @@ const RENEW_ADOBE_SCHEMA = {
       CREATED_AT: "created_at",
     },
   },
+  USER_ACCOUNT_MAPPING: {
+    TABLE: "user_account_mapping",
+    COLS: {
+      ID: "id",
+      USER_EMAIL: "user_email",
+      ORDER_ID: "id_order",          // order code từ orders.order_list.id_order
+      ADOBE_ACCOUNT_ID: "adobe_account_id", // nullable: ID accounts_admin đang dùng
+      ASSIGNED_AT: "assigned_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
 };
 
 // -----------------------

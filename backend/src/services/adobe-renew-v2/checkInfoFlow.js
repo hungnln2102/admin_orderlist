@@ -1,11 +1,10 @@
 /**
  * Adobe Renew V2 — Luồng lấy thông tin B10→B13.
- * account.adobe.com (Profile Name) → adminconsole products → users.
+ * Admin Console (Profile/Org switcher) → products → users.
  */
 
 const logger = require("../../utils/logger");
 
-const ACCOUNT_ADOBE = "https://account.adobe.com/";
 const ADMIN_PRODUCTS = "https://adminconsole.adobe.com/products";
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
@@ -25,7 +24,18 @@ async function waitForProductsPageReady(page, timeoutMs = 20000) {
       await page.waitForTimeout(1500);
       continue;
     }
-    const ready = await page.locator('[data-testid="table"], [data-testid="product-name"], [data-testid="product-name-cell"]').first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+    const ready = await page.locator([
+      '[data-testid="table"]',
+      '[data-testid="product-name"]',
+      '[data-testid="product-name-cell"]',
+      // Spectrum/ARIA based tables (UI hay đổi data-testid)
+      '[role="grid"]',
+      '[role="table"]',
+      '[role="rowgroup"] [role="row"]',
+      'table tbody tr',
+      'button:has-text("Xuất sang CSV")',
+      'button:has-text("Export")',
+    ].join(", ")).first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
     if (ready) {
       await page.waitForTimeout(1500);
       logger.info("[adobe-v2] B12: Trang products đã load xong");
@@ -56,114 +66,107 @@ async function waitForUsersPageReady(page, timeoutMs = 20000) {
   logger.warn("[adobe-v2] B13: Timeout chờ trang users (vẫn scrape thử)");
 }
 
-/** Đảm bảo đang ở account.adobe.com và trang đã load (cho B10–B11). */
-async function ensureAccountAdobePage(page) {
-  const url = page.url();
-  if (!url.includes("account.adobe.com") || url.includes("auth.")) {
-    logger.info("[adobe-v2] Navigate tới account.adobe.com...");
-    await page.goto(ACCOUNT_ADOBE, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-  }
-  await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-}
+/** B10–B11: Lấy Profile/Org name ngay trên Admin Console theo docs/Renew_Adobe_Check_Flow.md */
+async function runB10B11ProfileNameFromAdminConsole(page) {
+  logger.info("[adobe-v2] B10: Lấy Profile từ adminconsole (org-switch-button)");
 
-/** B10: Bấm mở menu profile. B11: Lấy Profile Name từ panel. */
-async function runB10B11ProfileName(page) {
-  let org_name = null;
-
-  logger.info("[adobe-v2] B10: Bấm menu profile (account.adobe.com)");
-  const triggerSelectors = [
-    '#unav-profile',
-    '[data-test-id="unav-profile"]',
-    'account-menu-trigger',
-    'div.unav-comp-external-profile',
-    '[class*="unav-profile"]',
-  ];
-  let clicked = false;
-  for (const sel of triggerSelectors) {
-    try {
-      const el = page.locator(sel).first();
-      await el.waitFor({ state: "visible", timeout: 5000 });
-      await el.click({ timeout: 3000 });
-      clicked = true;
-      logger.info("[adobe-v2] B10: Đã click trigger: %s", sel);
-      break;
-    } catch (_) {}
-  }
-  if (!clicked) {
-    try {
-      await page.getByRole("button", { name: /profile|account|hồ sơ/i }).first().click({ timeout: 5000 });
-      clicked = true;
-    } catch (_) {}
+  // Đảm bảo đang ở adminconsole (products/users đều ok)
+  if (!page.url().includes("adminconsole.adobe.com")) {
+    await page.goto(ADMIN_PRODUCTS, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
+    await page.waitForTimeout(1500);
   }
 
-  if (clicked) {
-    await page.waitForTimeout(2000);
-    logger.info("[adobe-v2] B11: Lấy Profile Name từ panel...");
-    const nameSelectors = [
-      'h3.app__switchProfileName___qL7wd',
-      '.app__switchProfileName___qL7wd',
-      '[class*="switchProfileName"]',
-      '[class*="switchProfileContainer"] h3',
-      '[data-testid="mini-app-profile-switcher-open-button"]',
-    ];
-    for (const sel of nameSelectors) {
-      try {
-        const el = page.locator(sel).first();
-        if (await el.isVisible().catch(() => false)) {
-          const text = await el.textContent().then((t) => t?.trim() || null).catch(() => null);
-          if (text && text.length > 0 && !/chuyển hồ sơ|switch profile/i.test(text)) {
-            org_name = text;
-            logger.info("[adobe-v2] B11: Profile Name = %s (selector: %s)", org_name, sel);
-            break;
-          }
-          if (sel.includes("mini-app-profile-switcher")) {
-            const container = el.locator("..");
-            const h3 = container.locator("h3").first();
-            if (await h3.isVisible().catch(() => false)) {
-              org_name = await h3.textContent().then((t) => t?.trim() || null).catch(() => null);
-              if (org_name) { logger.info("[adobe-v2] B11: Profile Name = %s (từ h3 cạnh nút)", org_name); break; }
-            }
-          }
-        }
-      } catch (_) {}
+  const btn = page.locator('button[data-testid="org-switch-button"]').first();
+  const visible = await btn.isVisible().catch(() => false);
+  if (!visible) {
+    logger.warn("[adobe-v2] B10–B11: Không thấy org-switch-button trên adminconsole");
+    return null;
+  }
+
+  // Click để mở menu listbox
+  await btn.scrollIntoViewIfNeeded().catch(() => {});
+  await btn.click({ timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(800);
+
+  // Menu có role=listbox, item role=option; trong option có tag Business ID
+  const name = await page.evaluate(() => {
+    const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+    const list =
+      document.querySelector('[role="listbox"][aria-label]') ||
+      document.querySelector('[role="listbox"]') ||
+      document.querySelector('[class*="Menu" i][role="listbox"]');
+    if (!list) return null;
+
+    const options = Array.from(list.querySelectorAll('[role="option"]'));
+    const getLabel = (opt) => {
+      const labelId = opt.getAttribute("aria-labelledby");
+      if (labelId) {
+        const el = document.getElementById(labelId);
+        if (el) return norm(el.textContent);
+      }
+      return norm(opt.textContent);
+    };
+
+    // Ưu tiên dòng có tag Business ID (không phụ thuộc ngôn ngữ chính)
+    for (const opt of options) {
+      const txt = norm(opt.textContent);
+      if (/Business\s*ID/i.test(txt)) {
+        // lấy phần trước "Business ID"
+        return getLabel(opt).replace(/Business\s*ID.*$/i, "").trim() || getLabel(opt);
+      }
     }
-    if (!org_name) {
-      org_name = await page.evaluate(() => {
-        const h3 = document.querySelector('h3[class*="switchProfileName"], .app__switchProfileName___qL7wd, [class*="switchProfileName"]');
-        if (h3) return (h3.textContent || "").trim() || null;
-        for (const el of document.querySelectorAll("[class*='switchProfile'], [class*='ProfileName']")) {
-          const t = (el.textContent || "").trim();
-          if (t && t.length < 100 && !/chuyển|switch/i.test(t)) return t;
-        }
-        return null;
-      }).catch(() => null);
-      if (org_name) logger.info("[adobe-v2] B11: Profile Name (evaluate) = %s", org_name);
-    }
+    // Fallback: chọn option đang selected
+    const selected = options.find((o) => o.getAttribute("aria-selected") === "true") || options[0];
+    if (!selected) return null;
+    return getLabel(selected);
+  }).catch(() => null);
+
+  if (name) {
+    logger.info("[adobe-v2] B11: Profile Name (adminconsole org switch) = %s", name);
+    return name;
   }
 
-  if (!org_name) logger.warn("[adobe-v2] B10–B11: Không lấy được Profile Name (panel có thể chưa mở hoặc selector đổi)");
-  return org_name;
+  logger.warn("[adobe-v2] B10–B11: Không lấy được Profile Name từ org switch menu");
+  return null;
 }
 
 function scrapeProductsPage(page) {
   return page.evaluate(() => {
-    const rows = document.querySelectorAll('[data-testid="table"] [role="row"][data-key]');
     const out = [];
-    for (const row of rows) {
+    const parseUsage = (text) => {
+      const t = (text || "").replace(/\s+/g, " ").trim();
+      const m = t.match(/(\d+)\s*(?:trên|of|\/)\s*(\d+)/i) || t.match(/(\d+)\s*\/\s*(\d+)/);
+      if (!m) return { used: 0, total: 0 };
+      return { used: parseInt(m[1], 10) || 0, total: parseInt(m[2], 10) || 0 };
+    };
+
+    // Strategy A: data-testid (old UI)
+    const rowsA = document.querySelectorAll('[data-testid="table"] [role="row"][data-key]');
+    for (const row of rowsA) {
       const nameEl = row.querySelector('[data-testid="product-name"]');
       const name = nameEl ? nameEl.textContent?.trim() : null;
       const usageEl = row.querySelector('[data-testid="quantity-usage"]');
       const unitEl = row.querySelector('[data-testid="unit-name"]');
-      let used = 0, total = 0;
-      if (usageEl) {
-        const text = usageEl.textContent || "";
-        const m = text.match(/(\d+)\s*(?:trên|of|\/)\s*(\d+)/i) || text.match(/(\d+)\s*\/\s*(\d+)/);
-        if (m) { used = parseInt(m[1], 10); total = parseInt(m[2], 10); }
-      }
+      const { used, total } = parseUsage(usageEl ? usageEl.textContent : "");
       const unit = unitEl ? unitEl.textContent?.trim() : "";
       if (name) out.push({ name, used, total, unit });
+    }
+    if (out.length > 0) return out;
+
+    // Strategy B: ARIA grid/table (new UI)
+    const gridRows = Array.from(document.querySelectorAll('[role="rowgroup"] [role="row"], [role="grid"] [role="row"], [role="table"] [role="row"]'))
+      .filter((r) => r && r.textContent && r.textContent.trim().length > 0);
+    for (const row of gridRows) {
+      const txt = (row.textContent || "").replace(/\s+/g, " ").trim();
+      // Bỏ qua header row (thường chứa "Tên", "Số lượng"...)
+      if (/^\s*(tên|name)\b/i.test(txt) && /(số lượng|quantity|thẻ|status)/i.test(txt)) continue;
+      const usageMatch = txt.match(/(\d+)\s*(?:trên|of|\/)\s*(\d+)/i) || txt.match(/(\d+)\s*\/\s*(\d+)/);
+      const { used, total } = parseUsage(usageMatch ? usageMatch[0] : "");
+      if (!usageMatch) continue;
+      // Name: lấy phần trước usage
+      const idx = txt.toLowerCase().indexOf(usageMatch[0].toLowerCase());
+      const name = (idx > 0 ? txt.slice(0, idx) : txt).trim();
+      if (name) out.push({ name, used, total, unit: "" });
     }
     return out;
   }).catch(() => []);
@@ -207,7 +210,7 @@ async function runB10ToB13(page, options = {}) {
     logger.info("[adobe-v2] B10–B11: Bỏ qua (đã có org_name=%s)", existingOrgName);
   } else {
     try {
-      org_name = await runB10B11ProfileName(page);
+      org_name = await runB10B11ProfileNameFromAdminConsole(page);
     } catch (e) {
       logger.warn("[adobe-v2] B10–B11: %s", e.message);
     }
@@ -223,8 +226,21 @@ async function runB10ToB13(page, options = {}) {
   }
   orgId = extractOrgIdFromUrl(productsUrl);
   products = await scrapeProductsPage(page);
-  license_status = products.length === 0 ? "Expired" : (products.some((p) => (p.used || 0) < (p.total || 0)) ? "Paid" : "Expired");
-  logger.info("[adobe-v2] products: %d, license_status: %s, orgId: %s", products.length, license_status, orgId || "(null)");
+
+  // Xác định license_status:
+  // - Có ít nhất 1 product quota > 0 → "Paid" (còn gói)
+  // - Có products nhưng tất cả quota = 0 → "Expired" (hết gói rõ ràng)
+  // - Không có products (scrape ra rỗng):
+  //    + Nếu vẫn ở đúng URL adminconsole/products → tài khoản hết hạn, Adobe không hiển thị products → "Expired"
+  //    + Nếu bị redirect ra ngoài (login page, trang khác) → scrape thật sự thất bại → "unknown"
+  const onProductsPage = productsUrl.includes("adminconsole.adobe.com") && productsUrl.includes("/products");
+  if (products.length === 0) {
+    license_status = onProductsPage ? "Expired" : "unknown";
+  } else {
+    license_status = products.some((p) => (p.total || 0) > 0) ? "Paid" : "Expired";
+  }
+  logger.info("[adobe-v2] products: %d, license_status: %s, orgId: %s, onProductsPage: %s",
+    products.length, license_status, orgId || "(null)", onProductsPage);
 
   logger.info("[adobe-v2] B13: adminconsole/users");
   await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
@@ -242,6 +258,5 @@ async function runB10ToB13(page, options = {}) {
 }
 
 module.exports = {
-  ensureAccountAdobePage,
   runB10ToB13,
 };

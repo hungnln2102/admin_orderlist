@@ -229,18 +229,29 @@ async function checkAccount(email, password, options = {}) {
  * Thêm user vào tài khoản Adobe.
  */
 async function addUserToAccount(email, password, userEmails, options = {}) {
-  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
-  if (!accessToken) throw new Error("Không có access token để gọi API add user");
-  return addUsers(client, orgId, accessToken, userEmails);
+  // Cách A: dùng V2 UI (add + assign product). Trả success theo addResult.
+  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
+  const v2 = await adobeRenewV2.addUsersWithProductV2(email, password, userEmails, {
+    savedCookies,
+    mailBackupId: options.mailBackupId || null,
+    orgId: options.orgId || null,
+  });
+  if (!v2.success) throw new Error(v2.error || "V2 add user fail");
+  return { success: true, added: v2.addResult?.added || [], failed: v2.addResult?.failed || [] };
 }
 
 /**
  * Xóa user khỏi tài khoản Adobe.
  */
 async function removeUserFromAccount(email, password, userEmail, options = {}) {
-  const { client, accessToken, orgId } = await loginAndGetOrg(email, password, options);
-  if (!accessToken) throw new Error("Không có access token để gọi API remove user");
-  return removeUser(client, orgId, accessToken, userEmail);
+  if (!userEmail) throw new Error("Thiếu userEmail");
+  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
+  logger.info("[adobe-http] removeUserFromAccount → dùng V2 deleteUsersV2 (1 user)...");
+  const v2 = await adobeRenewV2.deleteUsersV2(email, password, [userEmail], {
+    savedCookies,
+    mailBackupId: options.mailBackupId || null,
+  });
+  return { success: (v2.deleted || []).includes(userEmail) };
 }
 
 /**
@@ -272,60 +283,21 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
  * Dùng cho auto-assign flow (không cần caller re-check riêng).
  */
 async function addUsersWithProduct(email, password, userEmails, options = {}) {
-  const { client, jar, accessToken, orgId } = await loginAndGetOrg(email, password, options);
-  if (!accessToken) throw new Error("Không có access token");
-
-  // 1. Get paid products
-  const productInfo = await getProducts(client, orgId, accessToken);
-  const paidProducts = productInfo.products.filter((p) => !p.isFree && p.id);
-
-  // 2. Add users to org
-  const addResult = await addUsers(client, orgId, accessToken, userEmails);
-
-  // 3. Assign product to added users
-  let assignResult = null;
-  if (paidProducts.length > 0) {
-    assignResult = await assignProductToUsers(client, orgId, accessToken, userEmails, paidProducts);
-  }
-
-  // 4. Admin KHÔNG ĐƯỢC giữ product → remove nếu có
-  const adminEmail = email.toLowerCase().trim();
-  if (paidProducts.length > 0) {
-    const paidProductIds = paidProducts.map((p) => p.id);
-    const checkAdminProduct = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
-    if (checkAdminProduct.has(adminEmail)) {
-      logger.info("[adobe-http] Admin %s đang giữ product sau add → removing...", adminEmail);
-      await removeProductFromUser(client, orgId, accessToken, adminEmail, paidProducts);
-    }
-  }
-
-  // 5. Re-fetch users → build snapshot mới
-  const users = await getUsers(client, orgId, accessToken);
-  const paidProductIds = paidProducts.map((p) => p.id);
-  const productEmails = await getProductUserEmails(client, orgId, accessToken, paidProductIds);
-
-  const manageTeamMembers = users
-    .filter((u) => (u.email || "").toLowerCase().trim() !== adminEmail)
-    .map((u) => ({
-      name: u.name,
-      email: u.email || "",
-      product: productEmails.has((u.email || "").toLowerCase().trim()),
-    }));
-
-  const savedCookies = exportCookies(jar);
-  savedCookies.accessToken = accessToken;
-
-  logger.info("[adobe-http] addUsersWithProduct done: added=%s, assign=%s, snapshot=%s",
-    addResult.added?.length ?? 0, assignResult?.success ?? false, manageTeamMembers.length);
-
-  return {
-    addResult,
-    assignResult,
-    manageTeamMembers,
-    userCount: manageTeamMembers.length,
-    licenseStatus: productInfo.licenseStatus,
-    orgName: options._orgName || null,
+  const savedCookies = options.savedCookiesFromDb?.cookies || options.savedCookies || [];
+  const v2 = await adobeRenewV2.addUsersWithProductV2(email, password, userEmails, {
     savedCookies,
+    mailBackupId: options.mailBackupId || null,
+    orgId: options.orgId || null,
+  });
+  if (!v2.success) throw new Error(v2.error || "V2 addUsersWithProduct fail");
+  return {
+    addResult: v2.addResult,
+    assignResult: v2.assignResult,
+    manageTeamMembers: v2.manageTeamMembers || [],
+    userCount: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+    licenseStatus: v2.licenseStatus || "unknown",
+    orgName: options._orgName || null,
+    savedCookies: v2.savedCookies,
   };
 }
 

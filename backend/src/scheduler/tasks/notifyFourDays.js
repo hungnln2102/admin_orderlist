@@ -5,6 +5,7 @@ const { todayYMDInVietnam } = require("../../utils/normalizers");
 const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
+const { STATUS } = require("../../utils/statuses");
 
 function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
   return async function notifyFourDaysRemainingTask(trigger = "cron") {
@@ -20,8 +21,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
 
     const client = await pool.connect();
     try {
-      // Chỉ check đúng điều kiện: số ngày còn lại = 4.
-      // Không ràng buộc thêm theo trạng thái; trạng thái dùng chỉ để hiển thị.
+      // Chỉ check đúng điều kiện: số ngày còn lại = 4 VÀ status = Cần Gia Hạn.
       const result = await client.query(`
       SELECT
         ${COL.idOrder},
@@ -41,6 +41,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         ( ${expiryDateSQL()} - ${sqlDate} ) AS days_left
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 4
+        AND ${COL.status} = '${STATUS.RENEWAL}'
       ORDER BY ${COL.idOrder}
     `);
 

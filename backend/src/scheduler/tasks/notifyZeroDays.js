@@ -39,7 +39,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         ${COL.status}
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND (${COL.status} NOT IN ('${STATUS.PENDING_REFUND}', '${STATUS.REFUNDED}'))
+        AND ${COL.status} = '${STATUS.EXPIRED}'
       ORDER BY ${COL.idOrder}
     `);
 

@@ -10,6 +10,7 @@ const {
 } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
 const adobeHttp = require("../../services/adobe-http");
+const { lookupAndRecordIfNeeded } = require("../../services/userAccountMappingService");
 
 const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
@@ -329,6 +330,16 @@ const runAddUser = async (req, res) => {
     try {
       await runCheckForAccountId(id);
     } catch (_) {}
+
+    // Khi add user: tra order_list theo email, nếu có đơn và chưa note thì ghi vào mapping
+    const addedEmails = result.added?.length > 0 ? result.added : userEmails;
+    const mappingResult = await lookupAndRecordIfNeeded(addedEmails, id).catch((e) => {
+      logger.warn("[renew-adobe] lookupAndRecordIfNeeded failed", { error: e.message });
+      return null;
+    });
+    if (mappingResult) {
+      logger.info("[renew-adobe] Mapping result", mappingResult);
+    }
 
     const updated = await db(TABLE).where(COLS.ID, id).first();
     const newCount = updated?.[COLS.USER_COUNT] ?? 0;

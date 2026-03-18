@@ -8,7 +8,7 @@ const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
 const { LOGIN_PAGE_URL, ADMIN_CONSOLE_BASE } = require("../adobe-http/constants");
 const { runLoginFlow, isOnAdobeSite } = require("./loginFlow");
-const { ensureAccountAdobePage, runB10ToB13 } = require("./checkInfoFlow");
+const { runB10ToB13 } = require("./checkInfoFlow");
 
 // Tránh hit www.adobe.com (hay lỗi ERR_HTTP2_PROTOCOL_ERROR trên VPS/headless).
 // Admin Console entry ổn định hơn và vẫn dẫn về auth.services khi cần login.
@@ -150,7 +150,6 @@ async function runCheckFlow(email, password, options = {}) {
         logger.info("[adobe-v2] onlyLogin: dừng sau B1 (đã login), không chạy B10–B13");
         return { success: true, cookies };
       }
-      if (!existingOrgName) await ensureAccountAdobePage(page);
       const result = await runB10ToB13(page, { existingOrgName });
       const rawCookies = await context.cookies();
       const cookies = fromPwCookies(rawCookies);
@@ -169,7 +168,6 @@ async function runCheckFlow(email, password, options = {}) {
       logger.info("[adobe-v2] onlyLogin: dừng sau B9 (login xong), không chạy B10–B13");
       return { success: true, cookies };
     }
-    if (!existingOrgName) await ensureAccountAdobePage(page);
     const result = await runB10ToB13(page, { existingOrgName });
     const rawCookies = await context.cookies();
     const cookies = fromPwCookies(rawCookies);
