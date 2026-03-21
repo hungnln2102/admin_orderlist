@@ -53,8 +53,6 @@ export default function ViewSupplierModal({
     }
   };
 
-  if (!isOpen) return null;
-
   const supply = data?.supply;
   const stats = data?.stats;
   const unpaidPayments = data?.unpaidPayments || [];
@@ -87,6 +85,8 @@ export default function ViewSupplierModal({
       accountName: supply.nameBank || "",
     });
   }, [supply, selectedPayment]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 px-4 py-6" onClick={onClose}>
