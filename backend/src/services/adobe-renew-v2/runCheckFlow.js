@@ -114,40 +114,85 @@ async function runCheckFlow(email, password, options = {}) {
       if (pwCookies.length > 0) await context.addCookies(pwCookies);
     }
 
-    // ─── B1: Đi thẳng vào Admin Console entry (ổn định hơn www.adobe.com) ───
-    // NOTE: headless đi thẳng auth.services dễ bị Adobe chặn/serve flow khác.
-    // Vì vậy luôn vào Admin Console entry trước; nếu fail mới fallback auth.services.
-    const b1Url = ADOBE_ENTRY;
+    // ─── B1: Đi thẳng vào Admin Console entry ───
+    // Adobe tự redirect adminconsole.adobe.com → auth.services.adobe.com khi chưa login.
+    // Không cần fallback thủ công — Adobe handle redirect natively.
     logger.info("[adobe-v2] B1: goto ADMIN_CONSOLE entry");
-    const b1Ok = await page
-      .goto(b1Url, { waitUntil: "domcontentloaded", timeout: 45000 })
-      .then(() => true)
-      .catch((e) => {
-        logger.warn("[adobe-v2] B1 goto error: %s", e.message);
-        return false;
-      });
-    // Fallback: nếu entry fail, luôn fallback qua auth.services
-    if (!b1Ok) {
-      logger.info("[adobe-v2] B1 fallback: goto LOGIN_PAGE_URL (auth.services)");
-      await page.goto(LOGIN_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 45000 }).catch((e) => {
-        logger.warn("[adobe-v2] goto LOGIN_PAGE_URL: %s", e.message);
-      });
-    }
-    await page.waitForTimeout(2000);
+    await page
+      .goto(ADOBE_ENTRY, { waitUntil: "domcontentloaded", timeout: 45000 })
+      .catch((e) => logger.warn("[adobe-v2] B1 goto error: %s", e.message));
+    // Sau khi goto, Adobe có thể redirect sang auth mất vài giây.
+    // Đợi tối đa ~5s để lấy đúng "trang hiện tại" trước khi quyết định bỏ qua login.
+    await page.waitForTimeout(5000);
     await page.locator('button[aria-label="Close"], button[aria-label="close"], .dialog-close').first().click({ timeout: 3000 }).then(() => true).catch(() => false);
 
-    // Chỉ bỏ qua B2 khi không thấy Sign in (trang thực sự đã login). Không dựa mỗi URL www.adobe.com vì trang chủ vẫn hiển thị khi chưa login.
+    // ─── B2: Session check — tránh false positive ───
+    // Adobe có thể show adminconsole shell trước rồi mới redirect sang auth.
+    // Vì vậy không chỉ dựa vào URL; cần dựa thêm vào việc thấy màn login hay thấy org-switch.
     const urlAfterB1 = page.url();
-    const signInVisible = await page.locator("button.profile-comp.secondary-button").first().isVisible().catch(() => false)
-      || await page.getByRole("link", { name: /sign\s*in/i }).first().isVisible().catch(() => false)
-      || await page.locator('input[type="email"][name="username"], input[placeholder*="mail"], a:has-text("Sign in")').first().isVisible().catch(() => false);
-    if (!signInVisible && isOnAdobeSite(urlAfterB1)) {
-      logger.info("[adobe-v2] Sau B1 không thấy Sign in (session còn hiệu lực), bỏ qua B2. url=%s", urlAfterB1.slice(0, 90));
-      await page.waitForTimeout(2000);
+
+    const isLoginUiVisible = async () => {
+      const emailInputVisible = await page
+        .locator('input[name="username"], input[type="email"], input[name="email"]')
+        .first()
+        .isVisible()
+        .catch(() => false);
+
+      const passwordInputVisible = await page
+        .locator('input[type="password"], input#password')
+        .first()
+        .isVisible()
+        .catch(() => false);
+
+      return emailInputVisible || passwordInputVisible;
+    };
+
+    const isOrgSwitchVisible = async () => {
+      return await page
+        .locator('button[data-testid="org-switch-button"]')
+        .first()
+        .isVisible()
+        .catch(() => false);
+    };
+
+    // Không dùng URL làm tiêu chí duy nhất.
+    // Adobe có thể show shell adminconsole trước, rồi mới chuyển sang auth,
+    // nên nếu check quá sớm sẽ bị false positive.
+    const deadline = Date.now() + 5000;
+    let sessionValid = false;
+
+    while (Date.now() < deadline) {
+      const urlNow = page.url() || "";
+      const onAuthUrl =
+        urlNow.includes("auth.services") ||
+        urlNow.includes("adobelogin.com") ||
+        urlNow.includes("auth.");
+
+      if (onAuthUrl) break;
+
+      // Nếu đang thấy form login thì chắc chắn chưa login thật.
+      if (await isLoginUiVisible()) break;
+
+      // Nếu thấy org switch thì coi như đã vào admin console (logged-in).
+      if (await isOrgSwitchVisible()) {
+        sessionValid = true;
+        break;
+      }
+
+      await page.waitForTimeout(250);
+    }
+
+    logger.info(
+      "[adobe-v2] B2: url=%s → session %s",
+      urlAfterB1.slice(0, 90),
+      sessionValid ? "VALID (bỏ qua login)" : "EXPIRED (cần login)"
+    );
+
+    if (sessionValid) {
       if (onlyLogin) {
         const rawCookies = await context.cookies();
         const cookies = fromPwCookies(rawCookies);
-        logger.info("[adobe-v2] onlyLogin: dừng sau B1 (đã login), không chạy B10–B13");
+        logger.info("[adobe-v2] onlyLogin: session còn hiệu lực, dừng trước B10–B13");
         return { success: true, cookies };
       }
       const result = await runB10ToB13(page, { existingOrgName });
@@ -156,11 +201,8 @@ async function runCheckFlow(email, password, options = {}) {
       logger.info("[adobe-v2] Lưu cookies: %d (expiry %d ngày)", cookies.length, DEFAULT_COOKIE_EXPIRY_DAYS);
       return { success: true, ...result, cookies };
     }
-    if (signInVisible) {
-      logger.info("[adobe-v2] Sau B1 thấy Sign in / form login → chạy B2–B9. url=%s", urlAfterB1.slice(0, 90));
-    }
 
-    // Chưa đăng nhập: B2–B9 (loginFlow) rồi B10–B13 (checkInfoFlow) trừ khi onlyLogin
+    // Session hết hạn → B3–B9 (loginFlow) rồi B10–B13
     await runLoginFlow(page, { email, password, mailBackupId });
     if (onlyLogin) {
       const rawCookies = await context.cookies();
@@ -172,8 +214,9 @@ async function runCheckFlow(email, password, options = {}) {
     const rawCookies = await context.cookies();
     const cookies = fromPwCookies(rawCookies);
     const withExpiry = cookies.filter((c) => c.expirationDate && c.expirationDate > Math.floor(Date.now() / 1000)).length;
-    logger.info("[adobe-v2] Lưu cookies: %d (expiry %d ngày cho session, %d có expirationDate)", cookies.length, DEFAULT_COOKIE_EXPIRY_DAYS, withExpiry);
+    logger.info("[adobe-v2] Lưu cookies: %d (expiry %d ngày, %d có expirationDate)", cookies.length, DEFAULT_COOKIE_EXPIRY_DAYS, withExpiry);
     return { success: true, ...result, cookies };
+
   } catch (err) {
     logger.error("[adobe-v2] runCheckFlow error: %s", err.message);
     return { success: false, error: err.message };

@@ -1,23 +1,13 @@
 /**
- * Component: Thêm user trên Adobe Admin Console (Hướng 2 — tự chia nhiều tài khoản).
- * Chọn nhiều tài khoản còn gói → nhập danh sách email → hệ thống phân bổ theo slot (11 - user_count) và gọi add-users-batch.
+ * Component: Thêm user trên Adobe Admin Console.
+ * Chỉ cần nhập email → hệ thống tự phân bổ vào tài khoản còn gói & còn slot.
  */
 
 import { useMemo, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 
-const MAX_USERS_PER_ACCOUNT = 10;
-
-export type AccountForAdd = {
-  id: number;
-  email: string;
-  user_count: number;
-  license_status: string;
-};
-
 export type AddUserByEmailProps = {
-  accounts?: AccountForAdd[];
   onAdded?: () => void;
 };
 
@@ -32,19 +22,8 @@ function parseEmails(raw: string): string[] {
   return uniq.filter((e) => EMAIL_RE.test(e));
 }
 
-/** Tài khoản còn gói, sort theo user_count giảm dần (gần đầy trước để ưu tiên fill). */
-function getEligibleAccounts(accounts: AccountForAdd[]): AccountForAdd[] {
-  const paid = accounts.filter(
-    (a) =>
-      String(a.license_status).toLowerCase() === "paid" ||
-      String(a.license_status).toLowerCase() === "active"
-  );
-  return [...paid].sort((a, b) => (b.user_count ?? 0) - (a.user_count ?? 0));
-}
-
-export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) {
+export function AddUserByEmail({ onAdded }: AddUserByEmailProps) {
   const [emailInput, setEmailInput] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -53,36 +32,13 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
   >([]);
   const [lastExceeded, setLastExceeded] = useState<string[] | null>(null);
 
-  const eligible = useMemo(() => getEligibleAccounts(accounts), [accounts]);
   const emails = useMemo(() => parseEmails(emailInput), [emailInput]);
-
-  const toggleAccount = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setError(null);
-    setSuccess(null);
-  };
-
-  const totalSlotLeft = useMemo(() => {
-    return eligible
-      .filter((a) => selectedIds.has(a.id))
-      .reduce((sum, a) => sum + Math.max(0, MAX_USERS_PER_ACCOUNT - (a.user_count ?? 0)), 0);
-  }, [eligible, selectedIds]);
 
   const handleAdd = async () => {
     if (emails.length === 0) {
       setError("Nhập ít nhất một email hợp lệ (mỗi dòng một email hoặc cách nhau bằng dấu phẩy).");
       return;
     }
-    if (selectedIds.size === 0) {
-      setError("Chọn ít nhất một tài khoản (còn gói) để thêm user.");
-      return;
-    }
-    const accountIds = eligible.filter((a) => selectedIds.has(a.id)).map((a) => a.id);
     setError(null);
     setSuccess(null);
     setLastDistribution([]);
@@ -95,7 +51,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ accountIds, userEmails: emails }),
+        body: JSON.stringify({ userEmails: emails }),
       });
       const data = await res.json();
       setLoading(false);
@@ -121,53 +77,17 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
 
   return (
     <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
-      <h3 className="text-sm font-semibold text-white/90 mb-1">Thêm người dùng (chia nhiều tài khoản)</h3>
+      <h3 className="text-sm font-semibold text-white/90 mb-1">Thêm người dùng</h3>
       <p className="text-xs text-white/50 mb-3">
-        Chọn một hoặc nhiều tài khoản còn gói, nhập email cần thêm. Hệ thống tự phân bổ theo slot còn trống (tối đa 10
-        user/tài khoản).
+        Nhập email cần thêm. Hệ thống tự phân bổ vào tài khoản còn gói & còn slot (tối đa 10 user/tài khoản).
       </p>
-
-      {eligible.length > 0 ? (
-        <div className="mb-3">
-          <p className="text-xs font-medium text-white/70 mb-2">Chọn tài khoản (thứ tự = ưu tiên fill):</p>
-          <ul className="space-y-1.5 max-h-40 overflow-y-auto">
-            {eligible.map((a) => {
-              const slotLeft = Math.max(0, MAX_USERS_PER_ACCOUNT - (a.user_count ?? 0));
-              const checked = selectedIds.has(a.id);
-              return (
-                <li key={a.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`acc-${a.id}`}
-                    checked={checked}
-                    onChange={() => toggleAccount(a.id)}
-                    disabled={loading}
-                    className="rounded border-white/20 bg-slate-900/50 text-emerald-500 focus:ring-emerald-500"
-                  />
-                  <label htmlFor={`acc-${a.id}`} className="text-xs text-white/80 cursor-pointer flex-1">
-                    {a.email} — {a.user_count ?? 0}/10 (còn {slotLeft} slot)
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          {selectedIds.size > 0 && (
-            <p className="text-xs text-emerald-400/90 mt-1">
-              Đã chọn {selectedIds.size} tài khoản, tổng slot còn: {totalSlotLeft}. Sẽ thêm tối đa {totalSlotLeft} email
-              trong đợt này.
-            </p>
-          )}
-        </div>
-      ) : (
-        <p className="text-xs text-amber-400/90 mb-3">Không có tài khoản còn gói (paid/active).</p>
-      )}
 
       <div className="flex flex-col gap-3">
         <div className="flex-1 min-w-0">
           <label className="block text-xs font-medium text-white/60 mb-1.5">Email user cần thêm</label>
           <textarea
             rows={4}
-            placeholder="user1@example.com&#10;user2@example.com&#10;hoặc user1@x.com, user2@x.com"
+            placeholder={"user1@example.com\nuser2@example.com\nhoặc user1@x.com, user2@x.com"}
             className="w-full px-4 py-2.5 border border-white/10 rounded-xl bg-slate-950/40 text-sm text-white placeholder:text-slate-400/70 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-400 outline-none resize-y min-h-[100px]"
             value={emailInput}
             onChange={(e) => {
@@ -182,7 +102,7 @@ export function AddUserByEmail({ accounts = [], onAdded }: AddUserByEmailProps) 
           <button
             type="button"
             onClick={handleAdd}
-            disabled={loading || selectedIds.size === 0 || emails.length === 0}
+            disabled={loading || emails.length === 0}
             className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium px-5 py-2.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Đang xử lý..." : `Thêm ${emails.length} người dùng`}

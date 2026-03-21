@@ -392,7 +392,7 @@ const SUPPLIER_COST_DEF = {
 // -----------------------
 // SYSTEM AUTOMATION (schema system_automation: accounts_admin, product_system)
 // -----------------------
-// Bảng accounts_admin (renew-adobe): id, email, password_enc, org_name, license_status, license_detail,
+// Bảng accounts_admin (renew-adobe): id, email, password_enc, org_name, license_status,
 // user_count, users_snapshot, alert_config (jsonb), last_checked, is_active, created_at, mail_backup_id, url_access (text)
 // Bảng product_system: ánh xạ variant_id → system_code (fix_adobe_edu, renew_adobe, renew_zoom, otp_netflix...) cho job hàng loạt
 const RENEW_ADOBE_SCHEMA = {
@@ -404,7 +404,6 @@ const RENEW_ADOBE_SCHEMA = {
       PASSWORD_ENC: "password_enc",
       ORG_NAME: "org_name",
       LICENSE_STATUS: "license_status",
-      LICENSE_DETAIL: "license_detail",
       USER_COUNT: "user_count",
       USERS_SNAPSHOT: "users_snapshot",
       ALERT_CONFIG: "alert_config",
@@ -429,10 +428,12 @@ const RENEW_ADOBE_SCHEMA = {
     COLS: {
       ID: "id",
       USER_EMAIL: "user_email",
-      ORDER_ID: "id_order",          // order code từ orders.order_list.id_order
+      ORDER_ID: "id_order",               // order code từ orders.order_list.id_order
       ADOBE_ACCOUNT_ID: "adobe_account_id", // nullable: ID accounts_admin đang dùng
       ASSIGNED_AT: "assigned_at",
       UPDATED_AT: "updated_at",
+      PRODUCT: "product",                 // boolean: user đã được assign product hay chưa
+      URL_ACTIVE: "url_active",           // text nullable: URL auto-assign khi product=false
     },
   },
 };

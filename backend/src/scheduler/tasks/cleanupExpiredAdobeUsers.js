@@ -20,6 +20,8 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const { autoDeleteUsers } = require("../../services/adobe-http");
+const { STATUS } = require("../../utils/statuses");
+
 
 const ACCT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCT = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
@@ -33,7 +35,8 @@ const ORD_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
 
 /** Trạng thái đơn được coi là active (số ngày còn lại > 0) */
-const ALLOWED_ORDER_STATUSES = ["Đã Thanh Toán", "Cần Gia Hạn", "Đang Xử Lý"];
+const ALLOWED_ORDER_STATUSES = [STATUS.PAID, STATUS.RENEWAL, STATUS.PROCESSING];
+
 
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 
@@ -122,6 +125,23 @@ function createCleanupExpiredAdobeUsersTask() {
 
           logger.info("[CRON] Account %s: deleted=%d, failed=%d",
             acc[ACCT.ID], result.deleted.length, result.failed.length);
+
+          // Sync user_account_mapping: đánh dấu product=false cho user đã xóa
+          if (result.deleted.length > 0) {
+            const MAP = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
+            const MAP_TABLE = tableName(MAP.TABLE, SCHEMA_RENEW_ADOBE);
+            const MAP_COLS = MAP.COLS;
+            const deletedLower = result.deleted.map((e) => e.toLowerCase());
+            try {
+              const updated = await db(MAP_TABLE)
+                .whereIn(db.raw(`LOWER(${MAP_COLS.USER_EMAIL})`), deletedLower)
+                .andWhere(MAP_COLS.ADOBE_ACCOUNT_ID, acc[ACCT.ID])
+                .update({ [MAP_COLS.PRODUCT]: false, [MAP_COLS.UPDATED_AT]: new Date() });
+              logger.info("[CRON] Account %s: user_account_mapping updated=%d rows (product→false)", acc[ACCT.ID], updated);
+            } catch (mapErr) {
+              logger.error("[CRON] Account %s: sync mapping failed: %s", acc[ACCT.ID], mapErr.message);
+            }
+          }
 
           if (result.savedCookies) {
             try {

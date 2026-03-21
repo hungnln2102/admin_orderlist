@@ -1,4 +1,4 @@
-const { monthsFromString } = require("../../helpers");
+const { monthsFromString, ORDER_PREFIXES } = require("../../helpers");
 const {
   pool,
   ORDER_TABLE,
@@ -177,6 +177,10 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
 
+    // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
+    const isPromoOrder =
+      Boolean(ORDER_PREFIXES?.khuyen) &&
+      orderCode.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase());
     const finalGiaBanRaw = calcGiaBan({
       orderId: orderCode,
       giaNhap: latestGiaNhap,
@@ -184,6 +188,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       pctCtv,
       pctKhach,
       giaBanFallback: giaBanCu,
+      forceKhachLe: isPromoOrder,
     });
 
     const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);
@@ -549,13 +554,19 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
     );
     const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
 
+    // Gói khuyến mãi (MAVK) hết hạn → thông báo theo giá khách lẻ
+    const idOrderForPrice = String(orderRow?.[ORDER_COLS.idOrder] || "");
+    const isPromoOrderForPrice =
+      Boolean(ORDER_PREFIXES?.khuyen) &&
+      idOrderForPrice.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase());
     const finalGiaBanRaw = calcGiaBan({
-      orderId: orderRow?.[ORDER_COLS.idOrder] || "",
+      orderId: idOrderForPrice,
       giaNhap: latestGiaNhap,
       priceMax: effectivePriceMax,
       pctCtv,
       pctKhach,
       giaBanFallback: giaBanCu,
+      forceKhachLe: isPromoOrderForPrice,
     });
 
     const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);

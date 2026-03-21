@@ -17,12 +17,14 @@ const {
 } = require("../../config/dbSchema");
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 const { sendAdobeZeroDaysNotification } = require("../../services/telegramOrderNotification");
-const adobeHttp = require("../../services/adobe-http");
+const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const {
   removeMappingsForAccount,
   recordUsersAssigned,
   syncOrdersToMapping,
 } = require("../../services/userAccountMappingService");
+const { STATUS } = require("../../utils/statuses");
+
 
 const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
@@ -96,6 +98,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign) {
     .where(COLS.IS_ACTIVE, true)
     .where(COLS.LICENSE_STATUS, "Paid");
 
+
   const available = allAccounts
     .map((a) => ({
       ...a,
@@ -128,22 +131,20 @@ async function reassignUsersToAvailableAccounts(emailsToReassign) {
     logger.info("[CRON] Reassign %d user vào account %s (%s)", chunk.length, accId, accEmail);
     try {
       const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-      await adobeHttp.addUsersWithProduct(accEmail, accPwd, chunk, {
-        savedCookiesFromDb: account[COLS.ALERT_CONFIG] || null,
+      const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+      const v2 = await adobeRenewV2.addUsersWithProductV2(accEmail, accPwd, chunk, {
+        savedCookies,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-        _orgName: account[COLS.ORG_NAME],
       });
+      if (!v2.success) throw new Error(v2.error || "addUsersWithProductV2 thất bại");
 
-      // Cập nhật DB account
-      const updated = await db(TABLE).where(COLS.ID, accId).first();
-      const newCount = (parseInt(updated?.[COLS.USER_COUNT], 10) || 0) + chunk.length;
-      let newSnapshot = [];
-      try { newSnapshot = JSON.parse(updated?.[COLS.USERS_SNAPSHOT] || "[]"); } catch (_) {}
-      chunk.forEach((e) => { if (!newSnapshot.find((u) => u.email === e)) newSnapshot.push({ email: e }); });
-      await db(TABLE).where(COLS.ID, accId).update({
-        [COLS.USER_COUNT]: newCount,
-        [COLS.USERS_SNAPSHOT]: JSON.stringify(newSnapshot),
-      });
+      // Cập nhật DB với snapshot thực từ V2
+      const updatePayload = {
+        [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+        [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+      };
+      if (v2.savedCookies) updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+      await db(TABLE).where(COLS.ID, accId).update(updatePayload);
 
       // Ghi mapping mới vào bảng user_account_mapping (với id_order)
       const emailOrderMap = await buildEmailToOrderMap(chunk);
@@ -186,7 +187,8 @@ async function buildEmailToOrderMap(emails) {
 
   const rows = await db(O_TABLE)
     .whereIn(db.raw(`LOWER(${O_COLS.INFORMATION_ORDER})`), emails.map((e) => e.toLowerCase()))
-    .whereNotIn(O_COLS.STATUS, ["Hết Hạn", "Đã Hủy", "Đã Hoàn", "Chờ Hoàn"])
+    .whereNotIn(O_COLS.STATUS, [STATUS.EXPIRED, STATUS.CANCELED, STATUS.REFUNDED, STATUS.PENDING_REFUND])
+
     .orderBy(O_COLS.ORDER_DATE, "desc")
     .select(O_COLS.INFORMATION_ORDER, O_COLS.ID_ORDER);
 

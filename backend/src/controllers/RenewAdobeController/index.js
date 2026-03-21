@@ -9,7 +9,7 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
-const adobeHttp = require("../../services/adobe-http");
+const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { lookupAndRecordIfNeeded } = require("../../services/userAccountMappingService");
 
 const TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
@@ -45,7 +45,6 @@ const CHECK_EMPTY_COLS = [
   COLS.PASSWORD_ENC,
   COLS.ORG_NAME,
   COLS.LICENSE_STATUS,
-  COLS.LICENSE_DETAIL,
   COLS.USER_COUNT,
   COLS.USERS_SNAPSHOT,
   COLS.LAST_CHECKED,
@@ -80,7 +79,6 @@ const listAccounts = async (_req, res) => {
         `${TABLE}.${COLS.PASSWORD_ENC}`,
         `${TABLE}.${COLS.ORG_NAME}`,
         `${TABLE}.${COLS.LICENSE_STATUS}`,
-        `${TABLE}.${COLS.LICENSE_DETAIL}`,
         `${TABLE}.${COLS.USER_COUNT}`,
         `${TABLE}.${COLS.USERS_SNAPSHOT}`,
         `${TABLE}.${COLS.LAST_CHECKED}`,
@@ -114,7 +112,7 @@ const lookupAccountByEmail = async (req, res) => {
     let row = await db(TABLE)
       .select(
         `${TABLE}.${COLS.ID}`, `${TABLE}.${COLS.EMAIL}`, `${TABLE}.${COLS.ORG_NAME}`,
-        `${TABLE}.${COLS.LICENSE_STATUS}`, `${TABLE}.${COLS.LICENSE_DETAIL}`,
+        `${TABLE}.${COLS.LICENSE_STATUS}`,
         `${TABLE}.${COLS.USER_COUNT}`, `${TABLE}.${COLS.USERS_SNAPSHOT}`,
         `${TABLE}.${COLS.LAST_CHECKED}`, `${TABLE}.${COLS.IS_ACTIVE}`, `${TABLE}.${COLS.CREATED_AT}`
       )
@@ -125,7 +123,7 @@ const lookupAccountByEmail = async (req, res) => {
       const rows = await db(TABLE)
         .select(
           `${TABLE}.${COLS.ID}`, `${TABLE}.${COLS.EMAIL}`, `${TABLE}.${COLS.ORG_NAME}`,
-          `${TABLE}.${COLS.LICENSE_STATUS}`, `${TABLE}.${COLS.LICENSE_DETAIL}`,
+          `${TABLE}.${COLS.LICENSE_STATUS}`,
           `${TABLE}.${COLS.USER_COUNT}`, `${TABLE}.${COLS.USERS_SNAPSHOT}`,
           `${TABLE}.${COLS.LAST_CHECKED}`, `${TABLE}.${COLS.IS_ACTIVE}`, `${TABLE}.${COLS.CREATED_AT}`
         )
@@ -217,6 +215,22 @@ async function runCheckForAccountId(id) {
           [COLS.USERS_SNAPSHOT]: JSON.stringify([]),
           [COLS.USER_COUNT]: 0,
         });
+
+        // Sync user_account_mapping: đánh dấu product=false cho user đã xóa
+        const MAP = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
+        const MAP_TABLE = tableName(MAP.TABLE, SCHEMA_RENEW_ADOBE);
+        const MAP_COLS = MAP.COLS;
+        const deletedLower = userEmails.map((e) => e.toLowerCase());
+        try {
+          const updated = await db(MAP_TABLE)
+            .whereIn(db.raw(`LOWER(${MAP_COLS.USER_EMAIL})`), deletedLower)
+            .andWhere(MAP_COLS.ADOBE_ACCOUNT_ID, id)
+            .update({ [MAP_COLS.PRODUCT]: false, [MAP_COLS.UPDATED_AT]: new Date() });
+          logger.info("[renew-adobe] Account %s: user_account_mapping updated=%d rows (product→false)", id, updated);
+        } catch (mapErr) {
+          logger.error("[renew-adobe] Account %s: sync mapping failed: %s", id, mapErr.message);
+        }
+
         logger.info("[renew-adobe] Auto-delete xong cho account %s", id);
       } catch (delErr) {
         logger.error("[renew-adobe] Auto-delete failed cho account %s: %s", id, delErr.message);
@@ -299,69 +313,6 @@ const runDeleteUser = async (req, res) => {
   }
 };
 
-/** POST /api/renew-adobe/accounts/:id/add-user */
-const runAddUser = async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: "ID không hợp lệ." });
-
-  const userEmailsRaw = req.body?.userEmails;
-  const userEmailSingle = (req.body?.userEmail || "").toString().trim();
-  const userEmails = Array.isArray(userEmailsRaw)
-    ? userEmailsRaw.map((e) => String(e).trim()).filter(Boolean)
-    : userEmailSingle ? [userEmailSingle] : [];
-  if (userEmails.length === 0) return res.status(400).json({ error: "Thiếu userEmail hoặc userEmails." });
-
-  try {
-    const account = await db(TABLE).where(COLS.ID, id).first();
-    if (!account) return res.status(404).json({ error: "Không tìm thấy tài khoản." });
-
-    const email = account[COLS.EMAIL];
-    const password = account[COLS.PASSWORD_ENC] || "";
-    if (!email || !password) return res.status(400).json({ error: "Tài khoản thiếu email hoặc password." });
-
-    const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-    logger.info("[renew-adobe] Add users bắt đầu", { id, count: userEmails.length });
-    const result = await adobeHttp.addUserToAccount(email, password, userEmails, {
-      savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
-      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-    });
-
-    // Sau khi add, check lại để lấy danh sách user mới nhất
-    try {
-      await runCheckForAccountId(id);
-    } catch (_) {}
-
-    // Khi add user: tra order_list theo email, nếu có đơn và chưa note thì ghi vào mapping
-    const addedEmails = result.added?.length > 0 ? result.added : userEmails;
-    const mappingResult = await lookupAndRecordIfNeeded(addedEmails, id).catch((e) => {
-      logger.warn("[renew-adobe] lookupAndRecordIfNeeded failed", { error: e.message });
-      return null;
-    });
-    if (mappingResult) {
-      logger.info("[renew-adobe] Mapping result", mappingResult);
-    }
-
-    const updated = await db(TABLE).where(COLS.ID, id).first();
-    const newCount = updated?.[COLS.USER_COUNT] ?? 0;
-    let usersSnapshot = [];
-    try { usersSnapshot = JSON.parse(updated?.[COLS.USERS_SNAPSHOT] || "[]"); } catch (_) {}
-
-    return res.json({
-      success: true,
-      message: userEmails.length > 1
-        ? `Đã thêm ${userEmails.length} người dùng.`
-        : "Đã thêm người dùng.",
-      user_emails: userEmails,
-      user_count: newCount,
-      users_snapshot: usersSnapshot,
-      add_result: result,
-    });
-  } catch (err) {
-    logger.error("[renew-adobe] Run add user failed", { id, error: err.message });
-    return res.status(500).json({ success: false, error: err.message || "Lỗi khi thêm người dùng." });
-  }
-};
-
 /** POST /api/renew-adobe/accounts/add-users-batch */
 const runAddUsersBatch = async (req, res) => {
   const accountIdsRaw = req.body?.accountIds;
@@ -373,15 +324,42 @@ const runAddUsersBatch = async (req, res) => {
     ? userEmailsRaw.map((e) => String(e).trim()).filter(Boolean)
     : [];
 
-  if (accountIds.length === 0) return res.status(400).json({ error: "Thiếu accountIds." });
   if (userEmails.length === 0) return res.status(400).json({ error: "Thiếu userEmails." });
 
   try {
-    const accounts = await db(TABLE)
-      .whereIn(COLS.ID, accountIds)
-      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG, COLS.MAIL_BACKUP_ID);
-    const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
-    const ordered = [...accounts].sort((a, b) => (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0));
+    let ordered;
+    if (accountIds.length > 0) {
+      // Chọn thủ công: lấy đúng các account user chọn, giữ thứ tự
+      const accounts = await db(TABLE)
+        .whereIn(COLS.ID, accountIds)
+        .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG, COLS.MAIL_BACKUP_ID, COLS.LICENSE_STATUS);
+      const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
+      ordered = [...accounts].sort((a, b) => (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0));
+    } else {
+      // Tự động: lấy tất cả account còn gói & còn slot, ưu tiên ít slot trống nhất
+      const allAccounts = await db(TABLE)
+        .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT, COLS.ALERT_CONFIG, COLS.MAIL_BACKUP_ID, COLS.LICENSE_STATUS)
+        .where(COLS.IS_ACTIVE, true)
+        .orderBy(COLS.ID, "asc");
+      ordered = allAccounts
+        .filter((a) => {
+          const ls = (a[COLS.LICENSE_STATUS] || "").toLowerCase();
+          return ls !== "expired" && ls !== "unknown";
+        })
+        .map((a) => ({
+          ...a,
+          _currentCount: Math.max(0, parseInt(a[COLS.USER_COUNT], 10) || 0),
+        }))
+        .filter((a) => a._currentCount < MAX_USERS_PER_ACCOUNT)
+        .sort((a, b) => {
+          const slotsA = MAX_USERS_PER_ACCOUNT - a._currentCount;
+          const slotsB = MAX_USERS_PER_ACCOUNT - b._currentCount;
+          return slotsA - slotsB; // ít slot trống nhất trước (fill fullest first)
+        });
+      if (ordered.length === 0) {
+        return res.status(400).json({ success: false, error: "Không có tài khoản nào còn gói & còn slot." });
+      }
+    }
 
     const distribution = [];
     let remaining = [...userEmails];
@@ -423,20 +401,40 @@ const runAddUsersBatch = async (req, res) => {
 
       try {
         const batchMailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-        await adobeHttp.addUserToAccount(
+        const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+        const v2 = await adobeRenewV2.addUsersWithProductV2(
           account[COLS.EMAIL], account[COLS.PASSWORD_ENC], item.added,
-          { savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null, mailBackupId: Number.isFinite(batchMailBackupId) ? batchMailBackupId : null }
+          {
+            savedCookies,
+            mailBackupId: Number.isFinite(batchMailBackupId) ? batchMailBackupId : null,
+            orgId: account[COLS.ORG_ID] || null,
+          }
         );
-        // Check lại sau khi add
-        try { await runCheckForAccountId(acId); } catch (_) {}
-        const updated = await db(TABLE).where(COLS.ID, acId).first();
+        if (!v2.success) throw new Error(v2.error || "addUsersWithProductV2 thất bại");
+
+        // Cập nhật DB với snapshot thực từ V2 (không cần gọi runCheckForAccountId)
+        // Không ghi đè license_status vì addUsersWithProductV2 luôn trả "unknown"
+        const updatePayload = {
+          [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+          [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+        };
+        if (v2.savedCookies) updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+        await db(TABLE).where(COLS.ID, acId).update(updatePayload);
+
+        // Ghi mapping user_account_mapping
+        const addedEmails = v2.addResult?.added?.length > 0 ? v2.addResult.added : item.added;
+        await lookupAndRecordIfNeeded(addedEmails, acId).catch((e) => {
+          logger.warn("[renew-adobe] Batch lookupAndRecordIfNeeded failed", { error: e.message });
+        });
+
+        const addedCount = v2.addResult?.added?.length ?? item.added.length;
         results.push({
           accountId: acId,
           accountEmail: item.accountEmail,
           added: item.added,
-          user_count_after: updated?.[COLS.USER_COUNT] ?? 0,
+          user_count_after: updatePayload[COLS.USER_COUNT],
         });
-        logger.info("[renew-adobe] Batch: đã thêm %s user vào account %s", item.added.length, acId);
+        logger.info("[renew-adobe] Batch: đã thêm %s user vào account %s (V2)", addedCount, acId);
       } catch (err) {
         logger.error("[renew-adobe] Batch add user failed", { id: acId, error: err.message });
         results.push({ accountId: acId, accountEmail: item.accountEmail, added: item.added, error: err.message });
@@ -760,27 +758,27 @@ async function autoAssignUsers(onProgress = null) {
 
     try {
       const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-      const result = await adobeHttp.addUsersWithProduct(accEmail, accPwd, emails, {
-        savedCookiesFromDb: account[COLS.ALERT_CONFIG] || null,
+      const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+      const v2 = await adobeRenewV2.addUsersWithProductV2(accEmail, accPwd, emails, {
+        savedCookies,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-        _orgName: account[COLS.ORG_NAME],
+        orgId: account[COLS.ORG_ID] || null,
       });
+      if (!v2.success) throw new Error(v2.error || "addUsersWithProductV2 thất bại");
 
-      // Cập nhật DB với snapshot mới
+      // Cập nhật DB với snapshot thực từ V2
+      // Không ghi đè license_status vì addUsersWithProductV2 luôn trả "unknown"
       const updatePayload = {
-        [COLS.USER_COUNT]: result.userCount ?? 0,
-        [COLS.USERS_SNAPSHOT]: JSON.stringify(result.manageTeamMembers || []),
-        [COLS.LICENSE_STATUS]: result.licenseStatus ?? account[COLS.LICENSE_STATUS],
+        [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+        [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
       };
-      if (result.savedCookies) {
-        updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
-      }
+      if (v2.savedCookies) updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
       await db(TABLE).where(COLS.ID, accId).update(updatePayload);
 
-      const addedCount = result.addResult?.added?.length ?? emails.length;
+      const addedCount = v2.addResult?.added?.length ?? emails.length;
       totalAssigned += addedCount;
 
-      log({ step: "done", accountId: accId, added: addedCount, assignProduct: result.assignResult?.success ?? false });
+      log({ step: "done", accountId: accId, added: addedCount, assignProduct: v2.assignResult?.success ?? false });
     } catch (err) {
       logger.error("[renew-adobe] autoAssign add failed: account=%s, error=%s", accId, err.message);
       errors.push(`Account ${accId}: ${err.message}`);
@@ -850,20 +848,19 @@ const fixSingleUser = async (req, res) => {
 
     logger.info("[renew-adobe] fixSingleUser: email=%s → account=%s", userEmail, accId);
 
-    const result = await adobeHttp.addUsersWithProduct(accEmail, accPwd, [userEmail], {
-      savedCookiesFromDb: target[COLS.ALERT_CONFIG] || null,
+    const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+    const v2 = await adobeRenewV2.addUsersWithProductV2(accEmail, accPwd, [userEmail], {
+      savedCookies,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-      _orgName: target[COLS.ORG_NAME],
     });
+    if (!v2.success) throw new Error(v2.error || "addUsersWithProductV2 thất bại");
 
+    // Không ghi đè license_status vì addUsersWithProductV2 luôn trả "unknown"
     const updatePayload = {
-      [COLS.USER_COUNT]: Number.isFinite(result.userCount) ? result.userCount : 0,
-      [COLS.USERS_SNAPSHOT]: JSON.stringify(result.manageTeamMembers || []),
-      [COLS.LICENSE_STATUS]: result.licenseStatus ?? target[COLS.LICENSE_STATUS],
+      [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+      [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
     };
-    if (result.savedCookies) {
-      updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
-    }
+    if (v2.savedCookies) updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
     await db(TABLE).where(COLS.ID, accId).update(updatePayload);
 
     return res.json({
@@ -971,7 +968,6 @@ module.exports = {
   runCheckForAccountId,
   runCheckWithCookies,
   runDeleteUser,
-  runAddUser,
   runAddUsersBatch,
   runAutoDeleteUsers,
   adobeQueueStatus,

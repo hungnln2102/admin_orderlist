@@ -103,12 +103,6 @@ async function maybeSkipSecurityPrompt(page) {
 async function handleProgressiveProfile(page, mailBackupId) {
   for (let r = 0; r < 6; r++) {
     if (isOnAdobeSite(page.url())) return;
-    const isBackup = await page.evaluate(() => /Add a backup email|Thêm địa chỉ email dự phòng/i.test(document.body?.innerText || "")).catch(() => false);
-    if (isBackup) {
-      await page.getByRole("button", { name: SKIP_RE }).click({ timeout: 6000 }).catch(() => {});
-      await page.waitForTimeout(2000);
-      continue;
-    }
     const isVerify = await page.evaluate(() => /verify|identity|verification|xác minh/i.test(document.body?.innerText || "")).catch(() => false);
     if (isVerify) {
       await handle2FA(page, mailBackupId);
@@ -265,40 +259,16 @@ async function runLoginFlow(page, opts) {
   await maybeSkipSecurityPrompt(page);
   await handleProgressiveProfile(page, mailBackupId);
 
-  // ─── B9: Chờ login xong ───
-  const B9_TIMEOUT_MS = 90000;
-  const B9_POLL_MS = 3000;
-  logger.info("[adobe-v2] B9: Chờ login thành công (tối đa %ds)...", B9_TIMEOUT_MS / 1000);
-  page.setDefaultTimeout(B9_TIMEOUT_MS);
-  const b9Start = Date.now();
-  while (Date.now() - b9Start < B9_TIMEOUT_MS) {
-    const url = page.url();
-    if (isOnAdobeSite(url)) {
-      logger.info("[adobe-v2] B9: Đã tới trang đích → chuyển B10. url=%s", url.slice(0, 100));
-      break;
-    }
-    const bodyText = await page.evaluate(() => (document.body && document.body.innerText) ? document.body.innerText.slice(0, 500) : "").catch(() => "");
-    if (/backup email|thêm địa chỉ email dự phòng|add a backup/i.test(bodyText)) {
-      logger.info("[adobe-v2] B9: Gặp màn backup email, bấm Skip...");
-      await page.getByRole("button", { name: /not now|skip|bỏ qua|later/i }).first().click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(2000);
-      continue;
-    }
-    if (/phone|số điện thoại|mobile|verify.*phone/i.test(bodyText) && /add|verify|thêm|xác minh/i.test(bodyText)) {
-      logger.info("[adobe-v2] B9: Gặp màn phone, bấm Skip...");
-      await page.getByRole("button", { name: /not now|skip|bỏ qua|later/i }).first().click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(2000);
-      continue;
-    }
-    const elapsed = Math.round((Date.now() - b9Start) / 1000);
-    logger.info("[adobe-v2] B9: Chờ redirect (%ds) url=%s", elapsed, url.slice(0, 100));
-    await page.waitForTimeout(B9_POLL_MS);
-  }
+  // ─── B9: Xác nhận đã tới adminconsole ───
+  // Adobe tự redirect sau login — enterPassword() đã waitForURL(adminconsole) rồi.
+  // handleProgressiveProfile() đã xử lý các prompt phụ (backup email, phone, 2FA).
+  // Chỉ cần kiểm tra URL cuối để đảm bảo login thành công.
   const finalUrl = page.url();
+  logger.info("[adobe-v2] B9: url sau login = %s", finalUrl.slice(0, 100));
   if (!isOnAdobeSite(finalUrl)) {
-    throw new Error(`B9 timeout: sau ${B9_TIMEOUT_MS / 1000}s vẫn chưa tới account/adminconsole. URL hiện tại: ${finalUrl.slice(0, 120)}`);
+    throw new Error(`Login chưa hoàn tất sau B9. URL hiện tại: ${finalUrl.slice(0, 120)}`);
   }
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1000);
 }
 
 module.exports = {

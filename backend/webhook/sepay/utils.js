@@ -193,7 +193,7 @@ const formatCurrency = (value) => {
   }
 };
 
-const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallback, pctPromo }) => {
+const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallback, pctPromo, forceKhachLe = false }) => {
   const code = String(orderId || "").toUpperCase();
   const normalizePct = (val) => {
     const num = Number(val);
@@ -231,6 +231,10 @@ const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallba
       return basePrice * pctC * pctK;
     }
     if (ORDER_PREFIXES?.khuyen && code.startsWith(ORDER_PREFIXES.khuyen)) {
+      // Gói khuyến mãi hết hạn → báo giá khách lẻ (không áp chiết khấu promo)
+      if (forceKhachLe) {
+        return basePrice * pctC * pctK;
+      }
       if (promoNorm > 0) {
         const factor = Math.max(0, 1 - promoNorm);
         return basePrice * pctC * pctK * factor;

@@ -77,16 +77,28 @@ async function runB10B11ProfileNameFromAdminConsole(page) {
   }
 
   const btn = page.locator('button[data-testid="org-switch-button"]').first();
-  const visible = await btn.isVisible().catch(() => false);
-  if (!visible) {
-    logger.warn("[adobe-v2] B10–B11: Không thấy org-switch-button trên adminconsole");
-    return null;
+  // Tránh case "chuyển bước quá nhanh": adminconsole shell có thể render chậm,
+  // nên cần wait cho button thật sự xuất hiện.
+  try {
+    await btn.waitFor({ state: "visible", timeout: 15000 });
+  } catch {
+    const visible = await btn.isVisible().catch(() => false);
+    if (!visible) {
+      logger.warn("[adobe-v2] B10–B11: Không thấy org-switch-button trên adminconsole (timeout)");
+      return null;
+    }
   }
 
   // Click để mở menu listbox
   await btn.scrollIntoViewIfNeeded().catch(() => {});
   await btn.click({ timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(800);
+  // Chờ menu listbox render xong trước khi scrape text.
+  await page
+    .locator('[role="listbox"], [role="menu"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 8000 })
+    .catch(() => {});
+  await page.waitForTimeout(300);
 
   // Menu có role=listbox, item role=option; trong option có tag Business ID
   const name = await page.evaluate(() => {

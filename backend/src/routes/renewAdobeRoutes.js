@@ -1,5 +1,5 @@
 const express = require("express");
-const { listAccounts, lookupAccountByEmail, runCheck, runCheckWithCookies, runDeleteUser, runAddUser, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, updateUrlAccess, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
+const { listAccounts, lookupAccountByEmail, runCheck, runCheckWithCookies, runDeleteUser, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, updateUrlAccess, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
 
 const router = express.Router();
 
@@ -11,7 +11,6 @@ router.get("/user-orders", listUserOrders);
 router.post("/check-with-cookies", runCheckWithCookies);
 router.post("/accounts/:id/check", runCheck);
 router.post("/accounts/:id/delete-user", runDeleteUser);
-router.post("/accounts/:id/add-user", runAddUser);
 router.post("/accounts/add-users-batch", runAddUsersBatch);
 router.post("/accounts/:id/auto-delete-users", runAutoDeleteUsers);
 router.post("/auto-assign", runAutoAssign);

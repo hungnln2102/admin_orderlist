@@ -1,5 +1,6 @@
 const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask, renewAdobeCheckAndNotifyTask } = require("../../../scheduler");
 const logger = require("../../utils/logger");
+const { syncOrdersToMapping } = require("../../services/userAccountMappingService");
 
 const runSchedulerNow = async (_req, res) => {
   try {
@@ -49,10 +50,21 @@ const runRenewAdobeCheckNow = async (_req, res) => {
   }
 };
 
+const runSyncMappingNow = async (_req, res) => {
+  try {
+    const result = await syncOrdersToMapping();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error("[scheduler] Sync mapping failed", { error: error.message, stack: error.stack });
+    res.status(500).json({ error: "Không thể chạy sync mapping." });
+  }
+};
+
 module.exports = {
   runSchedulerNow,
   schedulerStatus,
   runFourDaysNotificationNow,
   runCleanupExpiredAdobeUsersNow,
   runRenewAdobeCheckNow,
+  runSyncMappingNow,
 };

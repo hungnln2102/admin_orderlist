@@ -23,7 +23,6 @@ export type AdobeAdminAccount = {
   users_snapshot?: string | null;
   order_code?: string | null;
   last_checked?: string | null;
-  license_detail?: string | null;
   url_access?: string | null;
 };
 
@@ -77,7 +76,6 @@ function normalizeAccount(row: Record<string, unknown>): AdobeAdminAccount {
     users_snapshot: row.users_snapshot != null ? String(row.users_snapshot) : null,
     order_code: row.order_code != null ? String(row.order_code) : null,
     last_checked: row.last_checked != null ? String(row.last_checked) : null,
-    license_detail: row.license_detail != null ? String(row.license_detail) : null,
     url_access: row.url_access != null ? String(row.url_access) : null,
   };
 }
@@ -645,7 +643,7 @@ export default function RenewAdobeAdmin() {
           onFixUser={handleFixUser}
           fixingId={fixingId}
         />
-        <AddUserByEmail accounts={accounts} onAdded={loadAccounts} />
+        <AddUserByEmail onAdded={loadAccounts} />
       </div>
     </div>
   );

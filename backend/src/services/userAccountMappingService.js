@@ -14,12 +14,15 @@ const {
   ORDERS_SCHEMA,
   tableName,
 } = require("../config/dbSchema");
+const { STATUS } = require("../utils/statuses");
+
 
 const TABLE = tableName(RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 
 // Statuses coi là đơn còn hiệu lực → cần có trong mapping
-const ACTIVE_STATUSES = ["Đang Xử Lý", "Đã Thanh Toán", "Cần Gia Hạn"];
+const ACTIVE_STATUSES = [STATUS.PROCESSING, STATUS.PAID, STATUS.RENEWAL];
+
 // system_code của Adobe
 const ADOBE_SYSTEM_CODE = "renew_adobe";
 
@@ -228,7 +231,8 @@ async function lookupAndRecordIfNeeded(userEmails, adobeAccountId) {
     // Tìm đơn hàng renew_adobe của email này (lấy mới nhất, trừ đơn đã Hết Hạn)
     const order = await db(O_TABLE)
       .whereIn(O_COLS.ID_PRODUCT, variantIds)
-      .whereNot(O_COLS.STATUS, "Hết Hạn")
+      .whereNot(O_COLS.STATUS, STATUS.EXPIRED)
+
       .whereRaw(`LOWER(${O_COLS.INFORMATION_ORDER}) = ?`, [email])
       .orderBy(O_COLS.ORDER_DATE, "desc")
       .first();
