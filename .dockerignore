@@ -7,3 +7,4 @@ docker-compose.yml
 my-backend/node_modules
 npm-debug.log*
 *.log
+.agents
