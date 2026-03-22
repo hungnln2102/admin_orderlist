@@ -60,8 +60,8 @@ export const API_ENDPOINTS = {
   RENEW_ADOBE_ACCOUNT_LOOKUP: "/api/renew-adobe/accounts/lookup",
   RENEW_ADOBE_ACCOUNT_CHECK: (id: number) =>
     `/api/renew-adobe/accounts/${id}/check`,
-  RENEW_ADOBE_ACCOUNT_DELETE_USER: (id: number) =>
-    `/api/renew-adobe/accounts/${id}/delete-user`,
+  RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS: (id: number) =>
+    `/api/renew-adobe/accounts/${id}/auto-delete-users`,
   RENEW_ADOBE_ACCOUNTS_ADD_USERS_BATCH: "/api/renew-adobe/accounts/add-users-batch",
   RENEW_ADOBE_CHECK_ALL: "/api/renew-adobe/accounts/check-all",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
@@ -203,4 +203,3 @@ export interface Order {
   [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
   [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;
 }
-

@@ -64,6 +64,8 @@ export default defineConfig(({ mode }) => {
     esbuild,
     define,
     server: {
+      port: 5173,
+      strictPort: true,
       watch: {
         usePolling: true,
         interval: 300,

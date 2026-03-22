@@ -9,6 +9,7 @@ const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
 const { gotoUsersPageWithCurrentSession, deleteUsersWithExistingPage, scrapeUsersSnapshot } = require("./userDeleteActions");
 const { deleteUsersV2 } = require("./deleteUsersV2");
 const { addUsersWithProductV2 } = require("./addUsersWithProductV2");
+const facade = require("./facade");
 
 module.exports = {
   runCheckFlow,
@@ -22,4 +23,8 @@ module.exports = {
   scrapeUsersSnapshot,
   deleteUsersV2,
   addUsersWithProductV2,
+  checkAccount: facade.checkAccount,
+  addUsersWithProduct: facade.addUsersWithProduct,
+  removeUserFromAccount: facade.removeUserFromAccount,
+  autoDeleteUsers: facade.autoDeleteUsers,
 };

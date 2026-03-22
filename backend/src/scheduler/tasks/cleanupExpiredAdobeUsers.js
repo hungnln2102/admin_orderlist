@@ -19,7 +19,7 @@ const {
   ORDERS_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
-const { autoDeleteUsers } = require("../../services/adobe-http");
+const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { STATUS } = require("../../utils/statuses");
 
 
@@ -115,7 +115,7 @@ function createCleanupExpiredAdobeUsersTask() {
           }
 
           const mailBackupId = acc[ACCT.MAIL_BACKUP_ID] != null ? Number(acc[ACCT.MAIL_BACKUP_ID]) : null;
-          const result = await autoDeleteUsers(acc[ACCT.EMAIL], password, toDelete, {
+          const result = await adobeRenewV2.autoDeleteUsers(acc[ACCT.EMAIL], password, toDelete, {
             savedCookiesFromDb: acc[ACCT.ALERT_CONFIG] ? acc[ACCT.ALERT_CONFIG] : null,
             mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           });

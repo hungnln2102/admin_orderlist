@@ -7,7 +7,7 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { runCheckFlow, fromPwCookies } = require("./runCheckFlow");
-const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
+const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { gotoUsersPageWithCurrentSession, scrapeUsersSnapshot } = require("./userDeleteActions");
 const { addUsersToOrgViaUI } = require("./userAddActions");
 const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");

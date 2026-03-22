@@ -280,16 +280,22 @@ export default function RenewAdobeAdmin() {
     setCheckError(null);
     const key = `acc-${accountId}-${userEmail}`;
     setDeletingId(key);
-    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE_USER(accountId)}`, {
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ userEmail }),
+      body: JSON.stringify({ userEmails: [userEmail] }),
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data?.success !== false) loadAccounts();
-        else throw new Error(data?.error ?? "Xóa thất bại");
+        if (data?.success === false) {
+          throw new Error(data?.error ?? data?.message ?? "Xóa thất bại");
+        }
+        if (Array.isArray(data?.failed) && data.failed.length > 0) {
+          const firstError = data.failed[0]?.error;
+          throw new Error(firstError ?? "Xóa thất bại");
+        }
+        loadAccounts();
       })
       .catch((err) => setCheckError(err?.message ?? "Lỗi khi xóa user."))
       .finally(() => setDeletingId(null));

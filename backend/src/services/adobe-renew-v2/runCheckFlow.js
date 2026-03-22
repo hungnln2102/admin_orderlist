@@ -5,8 +5,8 @@
 
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
-const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
-const { LOGIN_PAGE_URL, ADMIN_CONSOLE_BASE } = require("../adobe-http/constants");
+const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
+const { LOGIN_PAGE_URL, ADMIN_CONSOLE_BASE } = require("./shared/constants");
 const { runLoginFlow, isOnAdobeSite } = require("./loginFlow");
 const { runB10ToB13 } = require("./checkInfoFlow");
 

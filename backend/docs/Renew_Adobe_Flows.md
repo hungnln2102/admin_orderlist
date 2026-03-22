@@ -30,14 +30,13 @@ Playwright headless login (~15-30s, chỉ khi cần)
 1. [API Endpoints](#1-api-endpoints)
 2. [Flow: Check tài khoản](#2-flow-check-tài-khoản)
 3. [Flow: Login (Playwright → Session)](#3-flow-login-playwright--session)
-4. [Flow: Delete User](#4-flow-delete-user)
-5. [Flow: Add User](#5-flow-add-user)
-6. [Flow: Add Users Batch](#6-flow-add-users-batch)
-7. [Flow: Auto Delete Users](#7-flow-auto-delete-users)
-8. [Flow: Scheduler (CRON)](#8-flow-scheduler-cron)
-9. [Module Structure](#9-module-structure)
-10. [DB Schema](#10-db-schema)
-11. [Environment Variables](#11-environment-variables)
+4. [Flow: Add User](#4-flow-add-user)
+5. [Flow: Add Users Batch](#5-flow-add-users-batch)
+6. [Flow: Auto Delete Users](#6-flow-auto-delete-users)
+7. [Flow: Scheduler (CRON)](#7-flow-scheduler-cron)
+8. [Module Structure](#8-module-structure)
+9. [DB Schema](#9-db-schema)
+10. [Environment Variables](#10-environment-variables)
 
 ---
 
@@ -49,10 +48,9 @@ Playwright headless login (~15-30s, chỉ khi cần)
 | GET | `/api/renew-adobe/accounts` | Danh sách tài khoản |
 | GET | `/api/renew-adobe/accounts/lookup?email=` | Tra cứu theo email |
 | POST | `/api/renew-adobe/accounts/:id/check` | Check tài khoản |
-| POST | `/api/renew-adobe/accounts/:id/delete-user` | Xóa 1 user |
 | POST | `/api/renew-adobe/accounts/:id/add-user` | Thêm user(s) |
 | POST | `/api/renew-adobe/accounts/add-users-batch` | Thêm user vào nhiều tài khoản |
-| POST | `/api/renew-adobe/accounts/:id/auto-delete-users` | Xóa nhiều user |
+| POST | `/api/renew-adobe/accounts/:id/auto-delete-users` | Xóa 1 hoặc nhiều user |
 
 **Files:** `routes/renewAdobeRoutes.js` → `controllers/RenewAdobeController/index.js` → `services/adobe-http/`
 
@@ -141,21 +139,7 @@ waitForOtpAndFill:
 
 ---
 
-## 4. Flow: Delete User
-
-**Endpoint:** `POST /api/renew-adobe/accounts/:id/delete-user`
-**Body:** `{ userEmail: "email@example.com" }`
-
-```
-1. Login (Playwright nếu cần, HTTP nếu có cookies)
-2. adobeHttp.removeUserFromAccount → gọi User Management API
-3. runCheckForAccountId → check lại, lấy danh sách user mới
-4. Return: { success, user_count }
-```
-
----
-
-## 5. Flow: Add User
+## 4. Flow: Add User
 
 **Endpoint:** `POST /api/renew-adobe/accounts/:id/add-user`
 **Body:** `{ userEmail: "..." }` hoặc `{ userEmails: ["a@x.com"] }`
@@ -169,7 +153,7 @@ waitForOtpAndFill:
 
 ---
 
-## 6. Flow: Add Users Batch
+## 5. Flow: Add Users Batch
 
 **Endpoint:** `POST /api/renew-adobe/accounts/add-users-batch`
 **Body:** `{ accountIds: [1, 2, 3], userEmails: [...] }`
@@ -182,7 +166,7 @@ waitForOtpAndFill:
 
 ---
 
-## 7. Flow: Auto Delete Users
+## 6. Flow: Auto Delete Users
 
 **Endpoint:** `POST /api/renew-adobe/accounts/:id/auto-delete-users`
 **Body:** `{ userEmails: ["a@x.com", "b@x.com"] }`
@@ -196,7 +180,7 @@ waitForOtpAndFill:
 
 ---
 
-## 8. Flow: Scheduler (CRON)
+## 7. Flow: Scheduler (CRON)
 
 **File:** `scheduler/tasks/renewAdobeCheckAndNotify.js`
 **Lịch:** 05:00 và 12:00 hàng ngày
@@ -210,7 +194,7 @@ waitForOtpAndFill:
 
 ---
 
-## 9. Module Structure
+## 8. Module Structure
 
 ```
 services/adobe-http/
@@ -230,7 +214,7 @@ services/adobe-http/
 
 ---
 
-## 10. DB Schema
+## 9. DB Schema
 
 **Table:** `system_automation.accounts_admin` (schema đổi từ system_renew_adobe → system_automation)
 
@@ -253,7 +237,7 @@ services/adobe-http/
 
 ---
 
-## 11. Environment Variables
+## 10. Environment Variables
 
 | Biến | Mô tả |
 |------|-------|

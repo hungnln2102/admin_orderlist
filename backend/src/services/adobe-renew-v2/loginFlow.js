@@ -5,7 +5,7 @@
 
 const logger = require("../../utils/logger");
 const mailOtpService = require("../mailOtpService");
-const { LOGIN_PAGE_URL } = require("../adobe-http/constants");
+const { LOGIN_PAGE_URL } = require("./shared/constants");
 
 const PASSWORD_SELECTORS = ['input[name="password"]', 'input[type="password"]', 'input#password'];
 const SKIP_RE = /^\s*(not now|skip|bỏ qua|later|skip for now)\s*$/i;

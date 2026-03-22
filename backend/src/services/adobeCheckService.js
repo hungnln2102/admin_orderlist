@@ -1,8 +1,8 @@
 /**
- * Re-export Adobe check service (HTTP-only, không dùng Puppeteer).
+ * Re-export Adobe check service (Playwright V2).
  */
-const adobeHttp = require("./adobe-http");
+const adobeRenewV2 = require("./adobe-renew-v2");
 
 module.exports = {
-  adobeHttp,
+  adobeRenewV2,
 };

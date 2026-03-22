@@ -6,7 +6,7 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { runCheckFlow, fromPwCookies } = require("./runCheckFlow");
-const { getPlaywrightProxyOptions } = require("../adobe-http/proxyConfig");
+const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { gotoUsersPageWithCurrentSession, deleteUsersWithExistingPage, scrapeUsersSnapshot } = require("./userDeleteActions");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";

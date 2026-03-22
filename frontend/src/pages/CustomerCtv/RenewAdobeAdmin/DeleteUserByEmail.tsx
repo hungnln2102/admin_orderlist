@@ -46,22 +46,23 @@ export function DeleteUserByEmail({ onDeleted }: DeleteUserByEmailProps) {
           return;
         }
         return fetch(
-          `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE_USER(accountId)}`,
+          `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId)}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ userEmail: trimmed }),
+            body: JSON.stringify({ userEmails: [trimmed] }),
           }
         )
           .then((res) => res.json().then((payload) => ({ ok: res.ok, data: payload })))
           .then(({ ok: deleteOk, data }) => {
-            if (deleteOk && data.success) {
+            const hasFailed = Array.isArray(data?.failed) && data.failed.length > 0;
+            if (deleteOk && data.success && !hasFailed) {
               setSuccess(data.message ?? "Đã xóa user và cập nhật danh sách.");
               setEmail("");
               onDeleted?.();
             } else {
-              setError(data?.message ?? data?.error ?? "Xóa user thất bại.");
+              setError(data?.failed?.[0]?.error ?? data?.message ?? data?.error ?? "Xóa user thất bại.");
             }
           });
       })

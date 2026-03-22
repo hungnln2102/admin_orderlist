@@ -318,7 +318,7 @@ Khi **check tài khoản admin**, **thêm user**, **xóa user** và **thêm prod
 
 1. Mở DevTools (F12) → tab **Network**.
 2. Thực hiện một thao tác (ví dụ: Check tài khoản, Thêm user, Xóa user, hoặc Thêm product trong Product System).
-3. Chọn request tương ứng (ví dụ `check`, `add-user`, `delete-user`, `product-system`).
+3. Chọn request tương ứng (ví dụ `check`, `add-user`, `auto-delete-users`, `product-system`).
 4. Xem **Status**: nếu là **401** → lỗi do **chưa đăng nhập** hoặc **hết phiên**.
 
 **Cách xử lý:** Đăng nhập lại vào trang admin (auth), sau đó thử lại Renew Adobe.
@@ -344,7 +344,7 @@ Khi **check tài khoản admin**, **thêm user**, **xóa user** và **thêm prod
 |-----------|----------|-------------------|------------------------|
 | Check tài khoản admin | `POST /api/renew-adobe/accounts/:id/check` | Có | Có (login + getOrg + getProducts + getUsers) |
 | Thêm user | `POST /api/renew-adobe/accounts/:id/add-user` | Có | Có (login + addUsers) |
-| Xóa user | `POST /api/renew-adobe/accounts/:id/delete-user` | Có | Có (login + removeUser) |
+| Xóa user | `POST /api/renew-adobe/accounts/:id/auto-delete-users` | Có | Có (login + removeUser) |
 | Thêm product (variant vào Renew Adobe) | `POST /api/renew-adobe/product-system` | Có | Không (chỉ insert DB) |
 
 - **Nếu cả bốn đều lỗi giống nhau (401):** gần như chắc chắn là **chưa đăng nhập**.

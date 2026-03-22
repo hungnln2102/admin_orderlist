@@ -63,7 +63,7 @@ async function deleteUsersFromExpiredAccount(account) {
 
   logger.info("[CRON] Bắt đầu xóa %d user khỏi account %s (%s) vì hết hạn", userEmails.length, id, email);
   try {
-    await adobeHttp.autoDeleteUsers(email, password, userEmails, {
+    await adobeRenewV2.autoDeleteUsers(email, password, userEmails, {
       savedCookiesFromDb: savedCookiesRaw,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
     });
