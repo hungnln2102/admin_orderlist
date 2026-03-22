@@ -100,8 +100,8 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   );
 
   return (
-    <div className="space-y-6 rounded-[32px] bg-white/5 border border-white/10 p-6 shadow-[0_24px_60px_-34px_rgba(0,0,0,0.7)] backdrop-blur">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="space-y-5 sm:space-y-6 rounded-3xl bg-gradient-to-br from-indigo-950/20 via-slate-900/30 to-slate-950/20 border border-indigo-400/10 p-4 sm:p-5 lg:p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
         {financeSummary.map((item) => (
           <FinanceSummaryCard key={item.title} {...item} />
         ))}

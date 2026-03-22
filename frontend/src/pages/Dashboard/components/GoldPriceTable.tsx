@@ -19,16 +19,16 @@ interface Props {
 }
 
 const GoldPriceTable: React.FC<Props> = ({ loading, error, rows, onRefresh }) => (
-  <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-slate-800/60 via-slate-700/50 to-slate-900/60 p-6 shadow-[0_20px_55px_-32px_rgba(0,0,0,0.75),0_14px_36px_-24px_rgba(255,255,255,0.2)]">
-    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+  <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/50 via-slate-900/60 to-slate-950/50 p-5 sm:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+    <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
       <div>
-        <p className="text-sm font-semibold text-white">Bảng giá HanaGold</p>
+        <p className="text-base font-bold text-white">Bảng giá HanaGold</p>
         <p className="text-xs text-white/70">Mua/Bán theo ngày</p>
       </div>
       <button
         type="button"
         onClick={onRefresh}
-        className="rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20 border border-white/20"
+        className="rounded-lg bg-indigo-950/60 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-900/60 border border-indigo-400/40 focus:ring-indigo-400/60 focus:ring-2"
       >
         Làm mới
       </button>

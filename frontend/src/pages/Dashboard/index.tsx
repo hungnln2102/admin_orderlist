@@ -14,6 +14,7 @@ const Dashboard: React.FC = () => {
     statsData,
     revenueChartData,
     orderChartData,
+    profitChartData,
     availableYears,
     selectedYear,
     setSelectedYear,
@@ -41,13 +42,13 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="dashboard space-y-6">
+    <div className="dashboard space-y-6 sm:space-y-7 p-3 sm:p-4 lg:p-6">
       <DashboardHero />
 
       <SectionTabs activeSection={activeSection} onChange={setActiveSection} />
 
       {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{errorMessage}</div>
+        <div className="rounded-xl border border-red-300 bg-red-950/30 p-4 text-red-300 backdrop-blur">{errorMessage}</div>
       )}
 
       {activeSection === "overview" && (
@@ -55,6 +56,7 @@ const Dashboard: React.FC = () => {
           stats={statsData}
           revenueData={revenueChartData}
           orderData={orderChartData}
+          profitData={profitChartData}
           availableYears={availableYears}
           selectedYear={selectedYear}
           onYearChange={setSelectedYear}

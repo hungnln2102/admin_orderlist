@@ -12,6 +12,7 @@ import {
   type ChartsApiResponse,
   type OrderStatusData,
   type RevenueData,
+  type ProfitData,
 } from "../../../lib/api";
 import * as Helpers from "../../../lib/helpers";
 import { normalizeErrorMessage } from "../../../lib/textUtils";
@@ -94,6 +95,7 @@ export const useDashboardStats = () => {
   const [statsData, setStatsData] = useState<OverviewStat[]>([]);
   const [revenueChartData, setRevenueChartData] = useState<RevenueData[]>([]);
   const [orderChartData, setOrderChartData] = useState<OrderStatusData[]>([]);
+  const [profitChartData, setProfitChartData] = useState<ProfitData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [loading, setLoading] = useState(true);
@@ -120,6 +122,7 @@ export const useDashboardStats = () => {
         const charts: ChartsApiResponse = await fetchChartData(year);
         setRevenueChartData(charts.revenueData);
         setOrderChartData(charts.orderStatusData);
+        setProfitChartData(charts.profitData);
 
         const monthLimit = year === currentYear ? currentMonth : 12;
         const orderPoints = charts.orderStatusData
@@ -198,6 +201,7 @@ export const useDashboardStats = () => {
     statsData,
     revenueChartData,
     orderChartData,
+    profitChartData,
     availableYears,
     selectedYear,
     setSelectedYear,

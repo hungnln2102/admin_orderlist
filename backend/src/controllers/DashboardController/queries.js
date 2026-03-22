@@ -128,6 +128,7 @@ const buildYearsQuery = () => `
 `;
 
 const orderPriceColumn = quoteIdent(ORDER_COLS.PRICE);
+const orderCostColumn = quoteIdent(ORDER_COLS.COST);
 const orderIdStringColumn = quoteIdent(ORDER_COLS.ID_ORDER);
 
 const buildChartsQuery = () => `
@@ -147,25 +148,35 @@ const buildChartsQuery = () => `
       ${orderIdStringColumn},
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
       ${orderPriceColumn} AS amount,
+      ${createNumericExtraction(orderCostColumn)} AS cost,
+      ${quoteIdent(ORDER_COLS.STATUS)} AS status,
       1 AS order_count
     FROM ${TABLES.orderList}
     WHERE TRIM(${quoteIdent(ORDER_COLS.ORDER_DATE)}::text) <> ''
-      AND ${quoteIdent(ORDER_COLS.STATUS)} NOT IN ('${STATUS_PENDING_REFUND}', '${STATUS_REFUNDED}')
+      AND ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS.PAID}'
   ),
   refund_stream AS (
     SELECT
-      NULL AS id_order,
+      ${orderIdStringColumn} AS id_order,
       ${createDateNormalization(quoteIdent(ORDER_LIST_COLS.CANCELED_AT))} AS event_date,
-      (${orderPriceColumn} * -1) AS amount,
-      0 AS order_count
+      CASE
+        WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS.REFUNDED}' THEN (${orderPriceColumn} * -1)
+        ELSE 0
+      END AS amount,
+      CASE
+        WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS.REFUNDED}' THEN (${createNumericExtraction(orderCostColumn)} * -1)
+        ELSE 0
+      END AS cost,
+      ${quoteIdent(ORDER_COLS.STATUS)} AS status,
+      1 AS order_count
     FROM ${TABLES.orderList}
     WHERE TRIM(COALESCE(${quoteIdent(ORDER_LIST_COLS.CANCELED_AT)}::text, '')) <> ''
-      AND ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS_REFUNDED}'
+      AND ${quoteIdent(ORDER_COLS.STATUS)} IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}')
   ),
   all_transactions AS (
-      SELECT id_order, event_date, amount, order_count FROM income_stream
+      SELECT id_order, event_date, amount, cost, status, order_count FROM income_stream
       UNION ALL
-      SELECT id_order, event_date, amount, order_count FROM refund_stream
+      SELECT id_order, event_date, amount, cost, status, order_count FROM refund_stream
   ),
   filtered_trans AS (
     SELECT *
@@ -178,9 +189,11 @@ const buildChartsQuery = () => `
   monthly_stats AS (
     SELECT
       EXTRACT(MONTH FROM event_date) AS month_num,
-      SUM(amount) AS net_revenue,       
-      SUM(order_count) AS total_orders, 
-      SUM(CASE WHEN amount < 0 THEN 1 ELSE 0 END) AS total_refunds
+      SUM(CASE WHEN status = '${STATUS.PAID}' THEN 1 ELSE 0 END) AS total_orders,
+      SUM(CASE WHEN status IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}') THEN 1 ELSE 0 END) AS total_canceled,
+      SUM(amount) AS net_revenue,
+      SUM(cost) AS total_cost,
+      SUM(amount) - SUM(cost) AS net_profit
     FROM filtered_trans
     GROUP BY 1
   )
@@ -188,8 +201,9 @@ const buildChartsQuery = () => `
     months.month_num,
     months.month_label,
     COALESCE(monthly_stats.total_orders, 0) AS total_orders,
-    COALESCE(monthly_stats.total_refunds, 0) AS total_canceled,
-    COALESCE(monthly_stats.net_revenue, 0) AS total_revenue
+    COALESCE(monthly_stats.total_canceled, 0) AS total_canceled,
+    COALESCE(monthly_stats.net_revenue, 0) AS total_revenue,
+    COALESCE(monthly_stats.net_profit, 0) AS total_profit
   FROM months
   LEFT JOIN monthly_stats ON months.month_num = monthly_stats.month_num
   ORDER BY months.month_num;

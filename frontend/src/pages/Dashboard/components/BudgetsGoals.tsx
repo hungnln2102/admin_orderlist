@@ -390,8 +390,8 @@ const BudgetsGoals: React.FC<Props> = ({
   }, [walletRows, walletColumns, goldValue, goldCost]);
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
-      <div className="rounded-3xl bg-white/70 p-6 space-y-6 shadow-xl">
+    <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <div className="rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 lg:p-6 space-y-5 sm:space-y-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-white">Chi tiêu hàng tháng</p>
@@ -440,17 +440,17 @@ const BudgetsGoals: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-4 rounded-3xl bg-white/70 p-5 shadow-xl">
+      <div className="space-y-4 lg:space-y-5">
+        <div className="space-y-4 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 lg:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-white">Mục tiêu tiết kiệm</p>
+              <p className="text-base font-bold text-white">Mục tiêu tiết kiệm</p>
               <p className="text-xs text-white/70">Theo dõi tiến độ theo từng hàng mục</p>
             </div>
             <RocketLaunchIcon className="h-5 w-5 text-white/70" />
           </div>
 
-          <div className="rounded-2xl border border-white/30 bg-white/60 p-4 shadow-[0_16px_32px_-28px_rgba(0,0,0,0.4)]">
+          <div className="rounded-2xl border border-indigo-400/30 bg-indigo-950/20 p-4 shadow-[0_12px_24px_-12px_rgba(0,0,0,0.3)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-white/80">Tổng quan</p>
@@ -481,7 +481,7 @@ const BudgetsGoals: React.FC<Props> = ({
                   className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
                   style={{ left: `${milestone.position}%` }}
                 >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/70 bg-slate-900/90 text-[11px] font-semibold text-white shadow-[0_8px_16px_-12px_rgba(0,0,0,0.55)]">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-indigo-400/60 bg-indigo-950/80 text-[11px] font-semibold text-indigo-200 shadow-[0_8px_16px_-12px_rgba(79,70,229,0.4)]">
                     {milestone.index}
                   </div>
                 </div>
@@ -495,7 +495,7 @@ const BudgetsGoals: React.FC<Props> = ({
 
           <div className="space-y-3">
             {savingGoals.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/40 bg-white/40 px-4 py-3 text-xs text-white/70">
+              <div className="rounded-2xl border border-dashed border-indigo-400/40 bg-indigo-950/20 px-4 py-3 text-xs text-white/70">
                 Chưa có mục tiêu tiết kiệm nào.
               </div>
             ) : (
@@ -518,7 +518,7 @@ const BudgetsGoals: React.FC<Props> = ({
                 return (
                   <div
                     key={goal.id}
-                    className="rounded-2xl border border-white/35 bg-white/60 p-3 shadow-[0_12px_28px_-26px_rgba(0,0,0,0.35)]"
+                    className="rounded-2xl border border-indigo-400/30 bg-indigo-950/20 p-3 shadow-[0_12px_24px_-12px_rgba(0,0,0,0.3)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1">
@@ -582,7 +582,7 @@ const BudgetsGoals: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="w-full rounded-xl border border-white/30 bg-slate-900/80 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_-24px_rgba(0,0,0,0.45)] transition-colors hover:bg-slate-900"
+            className="w-full rounded-xl border border-indigo-400/40 bg-indigo-950/50 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_-12px_rgba(79,70,229,0.3)] transition-colors hover:bg-indigo-950/70 hover:border-indigo-400/60"
           >
             Thêm mục tiêu mới
           </button>

@@ -136,7 +136,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   }, []);
 
   return (
-    <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/60 to-slate-900/65 p-5 shadow-[0_20px_55px_-32px_rgba(0,0,0,0.7)]">
+    <div className="rounded-3xl border border-rose-500/30 bg-gradient-to-br from-slate-950/50 via-slate-900/60 to-slate-950/50 p-5 sm:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-xl">
       <WalletBalancesHeader
         labels={HEADER_LABELS}
         totalWallet5={totalWallet5}

@@ -18,7 +18,7 @@ const FinanceSummaryCard: React.FC<Props> = ({ title, value, delta, trend, accen
   const TrendIcon = trend === "up" ? ArrowTrendingUpIcon : ArrowTrendingDownIcon;
 
   return (
-    <div className="stats-card p-5 flex items-center justify-between gap-4 bg-white/70 border border-white/40 shadow-lg">
+    <div className="stats-card rounded-3xl flex items-center justify-between gap-4 bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6)]">
       <div className="flex items-center gap-3">
         <div className={`h-10 w-10 rounded-xl ${accentStyle.iconBg} flex items-center justify-center`}>
           <Icon className="h-5 w-5" />
