@@ -13,6 +13,7 @@ import {
   type OrderStatusData,
   type RevenueData,
   type ProfitData,
+  type RefundData,
 } from "../../../lib/api";
 import * as Helpers from "../../../lib/helpers";
 import { normalizeErrorMessage } from "../../../lib/textUtils";
@@ -96,6 +97,7 @@ export const useDashboardStats = () => {
   const [revenueChartData, setRevenueChartData] = useState<RevenueData[]>([]);
   const [orderChartData, setOrderChartData] = useState<OrderStatusData[]>([]);
   const [profitChartData, setProfitChartData] = useState<ProfitData[]>([]);
+  const [refundChartData, setRefundChartData] = useState<RefundData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [loading, setLoading] = useState(true);
@@ -123,6 +125,7 @@ export const useDashboardStats = () => {
         setRevenueChartData(charts.revenueData);
         setOrderChartData(charts.orderStatusData);
         setProfitChartData(charts.profitData);
+        setRefundChartData(charts.refundData);
 
         const monthLimit = year === currentYear ? currentMonth : 12;
         const orderPoints = charts.orderStatusData
@@ -202,6 +205,7 @@ export const useDashboardStats = () => {
     revenueChartData,
     orderChartData,
     profitChartData,
+    refundChartData,
     availableYears,
     selectedYear,
     setSelectedYear,

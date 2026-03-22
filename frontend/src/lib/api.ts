@@ -75,10 +75,16 @@ export interface ProfitData {
   total_profit: number;
 }
 
+export interface RefundData {
+  month: string;
+  total_refund: number;
+}
+
 export interface ChartsApiResponse {
   revenueData: RevenueData[];
   orderStatusData: OrderStatusData[];
   profitData: ProfitData[];
+  refundData: RefundData[];
   year?: number;
 }
 export interface YearsApiResponse {
@@ -94,6 +100,7 @@ type DashboardMonthRow = Partial<{
   total_revenue: number;
   total_sales: number;
   total_profit: number;
+  total_refund: number;
 }>;
 
 type DashboardChartsResponse = Partial<{
@@ -141,10 +148,16 @@ export async function fetchChartData(
     total_profit: Number(row.total_profit) || 0,
   }));
 
+  const refundData: RefundData[] = months.map((row) => ({
+    month: normalizeMonthLabel(row),
+    total_refund: Number(row.total_refund) || 0,
+  }));
+
   return {
     revenueData,
     orderStatusData,
     profitData,
+    refundData,
     year: Number.isFinite(payload.year) ? Number(payload.year) : undefined,
   };
 }

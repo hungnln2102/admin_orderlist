@@ -1,15 +1,15 @@
 import React from "react";
 import { OverviewStats, type OverviewStat } from "./OverviewStats";
-import { RevenueChartCard } from "./RevenueChartCard";
 import { OrderChartCard } from "./OrderChartCard";
-import { ProfitChartCard } from "./ProfitChartCard";
-import { type OrderStatusData, type RevenueData, type ProfitData } from "../../../lib/api";
+import { FinancialChartsPanel } from "./FinancialChartsPanel";
+import { type OrderStatusData, type RevenueData, type ProfitData, type RefundData } from "../../../lib/api";
 
 type OverviewSectionProps = {
   stats: OverviewStat[];
   revenueData: RevenueData[];
   orderData: OrderStatusData[];
   profitData: ProfitData[];
+  refundData: RefundData[];
   availableYears: number[];
   selectedYear: number;
   onYearChange: (year: number) => void;
@@ -20,6 +20,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   revenueData,
   orderData,
   profitData,
+  refundData,
   availableYears,
   selectedYear,
   onYearChange,
@@ -28,20 +29,16 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
     <div className="overview-section">
       <OverviewStats stats={stats} />
 
-      <div className="overview-section__charts grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3 xl:gap-5 mt-6 sm:mt-8 lg:mt-10">
-        <RevenueChartCard
-          data={revenueData}
+      <div className="overview-section__charts mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:gap-5 lg:mt-10 xl:grid-cols-[minmax(0,1.85fr)_minmax(340px,1fr)] xl:items-stretch">
+        <FinancialChartsPanel
+          revenueData={revenueData}
+          profitData={profitData}
+          refundData={refundData}
           availableYears={availableYears}
           selectedYear={selectedYear}
           onYearChange={onYearChange}
         />
         <OrderChartCard data={orderData} />
-        <ProfitChartCard
-          data={profitData}
-          availableYears={availableYears}
-          selectedYear={selectedYear}
-          onYearChange={onYearChange}
-        />
       </div>
     </div>
   );

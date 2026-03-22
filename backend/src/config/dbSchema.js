@@ -150,6 +150,18 @@ const FINANCE_SCHEMA = {
       CREATED_AT: "created_at",
     },
   },
+  DASHBOARD_MONTHLY_SUMMARY: {
+    TABLE: "dashboard_monthly_summary",
+    COLS: {
+      MONTH_KEY: "month_key",
+      TOTAL_ORDERS: "total_orders",
+      CANCELED_ORDERS: "canceled_orders",
+      TOTAL_REVENUE: "total_revenue",
+      TOTAL_PROFIT: "total_profit",
+      TOTAL_REFUND: "total_refund",
+      UPDATED_AT: "updated_at",
+    },
+  },
 };
 
 // -----------------------

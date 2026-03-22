@@ -15,6 +15,7 @@ const Dashboard: React.FC = () => {
     revenueChartData,
     orderChartData,
     profitChartData,
+    refundChartData,
     availableYears,
     selectedYear,
     setSelectedYear,
@@ -57,6 +58,7 @@ const Dashboard: React.FC = () => {
           revenueData={revenueChartData}
           orderData={orderChartData}
           profitData={profitChartData}
+          refundData={refundChartData}
           availableYears={availableYears}
           selectedYear={selectedYear}
           onYearChange={setSelectedYear}

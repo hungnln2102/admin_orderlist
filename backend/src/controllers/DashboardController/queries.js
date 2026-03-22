@@ -130,6 +130,7 @@ const buildYearsQuery = () => `
 const orderPriceColumn = quoteIdent(ORDER_COLS.PRICE);
 const orderCostColumn = quoteIdent(ORDER_COLS.COST);
 const orderIdStringColumn = quoteIdent(ORDER_COLS.ID_ORDER);
+const orderRefundColumn = quoteIdent(ORDER_LIST_COLS.REFUND);
 
 const buildChartsQuery = () => `
   WITH params AS (
@@ -149,6 +150,7 @@ const buildChartsQuery = () => `
       ${createDateNormalization(quoteIdent(ORDER_COLS.ORDER_DATE))} AS event_date,
       ${orderPriceColumn} AS amount,
       ${createNumericExtraction(orderCostColumn)} AS cost,
+      0::numeric AS refund_amount,
       ${quoteIdent(ORDER_COLS.STATUS)} AS status,
       1 AS order_count
     FROM ${TABLES.orderList}
@@ -167,6 +169,7 @@ const buildChartsQuery = () => `
         WHEN ${quoteIdent(ORDER_COLS.STATUS)} = '${STATUS.REFUNDED}' THEN (${createNumericExtraction(orderCostColumn)} * -1)
         ELSE 0
       END AS cost,
+      ${createNumericExtraction(orderRefundColumn)} AS refund_amount,
       ${quoteIdent(ORDER_COLS.STATUS)} AS status,
       1 AS order_count
     FROM ${TABLES.orderList}
@@ -174,9 +177,9 @@ const buildChartsQuery = () => `
       AND ${quoteIdent(ORDER_COLS.STATUS)} IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}')
   ),
   all_transactions AS (
-      SELECT id_order, event_date, amount, cost, status, order_count FROM income_stream
+      SELECT id_order, event_date, amount, cost, refund_amount, status, order_count FROM income_stream
       UNION ALL
-      SELECT id_order, event_date, amount, cost, status, order_count FROM refund_stream
+      SELECT id_order, event_date, amount, cost, refund_amount, status, order_count FROM refund_stream
   ),
   filtered_trans AS (
     SELECT *
@@ -193,7 +196,8 @@ const buildChartsQuery = () => `
       SUM(CASE WHEN status IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}') THEN 1 ELSE 0 END) AS total_canceled,
       SUM(amount) AS net_revenue,
       SUM(cost) AS total_cost,
-      SUM(amount) - SUM(cost) AS net_profit
+      SUM(amount) - SUM(cost) AS net_profit,
+      SUM(refund_amount) AS total_refund
     FROM filtered_trans
     GROUP BY 1
   )
@@ -203,7 +207,8 @@ const buildChartsQuery = () => `
     COALESCE(monthly_stats.total_orders, 0) AS total_orders,
     COALESCE(monthly_stats.total_canceled, 0) AS total_canceled,
     COALESCE(monthly_stats.net_revenue, 0) AS total_revenue,
-    COALESCE(monthly_stats.net_profit, 0) AS total_profit
+    COALESCE(monthly_stats.net_profit, 0) AS total_profit,
+    COALESCE(monthly_stats.total_refund, 0) AS total_refund
   FROM months
   LEFT JOIN monthly_stats ON months.month_num = monthly_stats.month_num
   ORDER BY months.month_num;
