@@ -1,4 +1,4 @@
-const { fetchDashboardStats, fetchDashboardYears, fetchDashboardCharts } = require("./service");
+const { fetchDashboardStats, fetchDashboardYears, fetchDashboardMonthlySummary, fetchDashboardChartsFromSummary } = require("./service");
 const { timezoneCandidate } = require("./constants");
 const logger = require("../../utils/logger");
 
@@ -45,7 +45,7 @@ const dashboardCharts = async (req, res) => {
   const limitToToday = filterYear === currentYear;
 
   try {
-    const result = await fetchDashboardCharts({
+    const result = await fetchDashboardChartsFromSummary({
       year: filterYear,
       limitToToday,
     });
@@ -58,8 +58,21 @@ const dashboardCharts = async (req, res) => {
   }
 };
 
+const dashboardMonthlySummary = async (_req, res) => {
+  try {
+    const data = await fetchDashboardMonthlySummary();
+    res.json({ months: data });
+  } catch (error) {
+    logger.error("[dashboard] Query failed (monthly summary)", { error: error.message, stack: error.stack });
+    res.status(500).json({
+      error: "Không thể tải dữ liệu tóm tắt hàng tháng.",
+    });
+  }
+};
+
 module.exports = {
   dashboardStats,
   dashboardYears,
   dashboardCharts,
+  dashboardMonthlySummary,
 };

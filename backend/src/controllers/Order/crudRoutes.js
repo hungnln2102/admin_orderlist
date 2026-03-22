@@ -42,15 +42,28 @@ const attachCrudRoutes = (router) => {
         }
 
         // Accept supply (name) or id_supply/supply_id (int): resolve name -> id
-        if (payload.supply != null && payload.supply !== "") {
-            const name = normalizeTextInput(String(payload.supply));
+        // NOTE: sanitizeOrderWritePayload only keeps DB columns, so `supply` (alias text field)
+        // must be read from req.body before it gets dropped.
+        const rawSupplyName = req.body?.supply ?? payload.supply;
+        if (rawSupplyName != null && rawSupplyName !== "") {
+            const name = normalizeTextInput(String(rawSupplyName));
             if (name) {
                 const resolvedId = await ensureSupplyRecord(name);
                 payload[supplyIdCol] = resolvedId;
             }
             delete payload.supply;
-        } else if (payload.id_supply != null || payload.supply_id != null) {
-            payload[supplyIdCol] = Number(payload.id_supply ?? payload.supply_id) || null;
+        } else if (
+            req.body?.id_supply != null ||
+            req.body?.supply_id != null ||
+            payload.id_supply != null ||
+            payload.supply_id != null
+        ) {
+            payload[supplyIdCol] = Number(
+                req.body?.id_supply ??
+                req.body?.supply_id ??
+                payload.id_supply ??
+                payload.supply_id
+            ) || null;
         }
 
         // Accept id_product as variant id (int) or product name (string): resolve name -> variant id

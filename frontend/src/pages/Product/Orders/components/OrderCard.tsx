@@ -19,6 +19,8 @@ type OrderCardProps = {
   showRemainingColumn: boolean;
   showActionButtons: boolean;
   isCanceled: boolean;
+  canEdit: boolean;
+  canRenewOrder: boolean;
   renewingOrderCode: string | null;
   onView: (order: Order) => void;
   onEdit: (order: Order) => void;
@@ -33,6 +35,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   showRemainingColumn,
   showActionButtons,
   isCanceled,
+  canEdit,
+  canRenewOrder,
   renewingOrderCode,
   onView,
   onEdit,
@@ -67,8 +71,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   // Determine which action buttons to show (matching OrderRow logic)
   const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
   const canRenew =
-    statusText === ORDER_STATUSES.CAN_GIA_HAN ||
-    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+    canRenewOrder &&
+    (statusText === ORDER_STATUSES.CAN_GIA_HAN ||
+      statusText === ORDER_STATUSES.ORDER_EXPIRED);
   const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
   const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
   const isRenewing = renewingOrderCode === orderCodeText;
@@ -192,7 +197,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 </button>
               )}
 
-              {!isCanceled && (
+              {canEdit && !isCanceled && (
                 <button
                   className="w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-90"
                   onClick={() => onEdit(order)}

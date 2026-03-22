@@ -41,7 +41,7 @@ export function useOrdersList({
       dataset,
     });
     const { updatedStats, totalRecords } =
-      computeOrderStats(ordersWithVirtual);
+      computeOrderStats(ordersWithVirtual, dataset);
     const { currentOrders, totalPages } = getPaginated(
       filteredOrders,
       currentPage,

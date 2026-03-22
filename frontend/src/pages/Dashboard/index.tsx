@@ -5,6 +5,7 @@ import { SectionTabs } from "./components/SectionTabs";
 import { DashboardHero } from "./components/DashboardHero";
 import { budgets, currencyFormatter, financeSummary } from "./constants";
 import { useDashboardStats } from "./hooks/useDashboardStats";
+import { useMonthlySummary } from "./hooks/useMonthlySummary";
 import { useGoldPrices } from "./hooks/useGoldPrices";
 import { useWalletBalances } from "./hooks/useWalletBalances";
 import { useSavingGoals } from "./hooks/useSavingGoals";
@@ -23,6 +24,7 @@ const Dashboard: React.FC = () => {
     errorMessage,
   } = useDashboardStats();
 
+  const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
   const { goldLoading, goldError, selectedGoldRows, fetchGoldPrices } = useGoldPrices();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
   const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
@@ -53,16 +55,19 @@ const Dashboard: React.FC = () => {
       )}
 
       {activeSection === "overview" && (
-        <OverviewSection
-          stats={statsData}
-          revenueData={revenueChartData}
-          orderData={orderChartData}
-          profitData={profitChartData}
-          refundData={refundChartData}
-          availableYears={availableYears}
-          selectedYear={selectedYear}
-          onYearChange={setSelectedYear}
-        />
+        <>
+          <OverviewSection
+            stats={statsData}
+            revenueData={revenueChartData}
+            orderData={orderChartData}
+            profitData={profitChartData}
+            refundData={refundChartData}
+            availableYears={availableYears}
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
+          />
+          {/* Monthly summary table intentionally hidden by UI request */}
+        </>
       )}
 
       {activeSection === "finance" && (

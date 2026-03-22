@@ -91,6 +91,20 @@ export interface YearsApiResponse {
   years: number[];
 }
 
+export interface MonthlySummaryData {
+  month_key: string;
+  total_orders: number;
+  canceled_orders: number;
+  total_revenue: number;
+  total_profit: number;
+  total_refund: number;
+  updated_at: string | null;
+}
+
+export interface MonthlySummaryApiResponse {
+  months: MonthlySummaryData[];
+}
+
 type DashboardMonthRow = Partial<{
   month: string;
   month_label: string;
@@ -177,4 +191,19 @@ export async function fetchAvailableYears(): Promise<number[]> {
   return data.years
     .map((year) => Number(year))
     .filter((year) => Number.isFinite(year));
+}
+
+/**
+ * Lấy dữ liệu tóm tắt hàng tháng từ dashboard_monthly_summary.
+ */
+export async function fetchMonthlySummary(): Promise<MonthlySummaryData[]> {
+  const response = await apiFetch("/api/dashboard/monthly-summary");
+  if (!response.ok) {
+    throw new Error("Không thể tải dữ liệu tóm tắt hàng tháng.");
+  }
+  const data: MonthlySummaryApiResponse = await response.json();
+  if (!data || !Array.isArray(data.months)) {
+    return [];
+  }
+  return data.months;
 }

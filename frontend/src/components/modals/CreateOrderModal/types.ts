@@ -17,6 +17,7 @@ export interface Supply {
 export interface Product {
   id: number;
   san_pham: string;
+  pct_promo?: number | null;
 }
 
 export interface SupplyPrice {
@@ -64,6 +65,7 @@ export interface UseCreateOrderLogicResult {
   setIsDataLoaded: (v: boolean) => void;
   customProductTouched: boolean;
   setCustomProductTouched: React.Dispatch<React.SetStateAction<boolean>>;
+  clearSelectedSupplySelection: () => void;
   handleChange: (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement

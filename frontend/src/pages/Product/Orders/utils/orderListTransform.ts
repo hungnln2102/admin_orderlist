@@ -15,7 +15,11 @@ import {
   sanitizeDateLike,
   sanitizeNumberLike,
 } from "./ordersHelpers";
-import { BASE_STOCK_STATS, type BaseStat } from "../constants";
+import {
+  BASE_REFUND_STATS,
+  BASE_STOCK_STATS,
+  type BaseStat,
+} from "../constants";
 
 /** Gắn các trường ảo (số ngày còn lại, giá trị còn lại, trạng thái, ngày hiển thị) vào từng đơn. */
 export function enrichOrdersWithVirtualFields(
@@ -125,6 +129,7 @@ export function filterAndSortOrders(
           ORDER_FIELDS.ID_ORDER,
           ORDER_FIELDS.ID_PRODUCT,
           ORDER_FIELDS.INFORMATION_ORDER,
+          ORDER_FIELDS.SLOT,
           ORDER_FIELDS.SUPPLY,
           ORDER_FIELDS.CONTACT,
         ]
@@ -238,18 +243,41 @@ export function filterAndSortOrders(
 }
 
 /** Tính thống kê từ danh sách đơn đã có trường ảo (dùng toàn bộ orders, không phải filtered). */
-export function computeOrderStats(ordersWithVirtual: Order[]): {
+export function computeOrderStats(
+  ordersWithVirtual: Order[],
+  dataset: OrderDatasetKey
+): {
   updatedStats: BaseStat[];
   totalRecords: number;
 } {
   const totalOrders = ordersWithVirtual.length;
+
+  if (dataset === "canceled") {
+    const refundedOrders = ordersWithVirtual.filter((order) => {
+      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+      return status === ORDER_STATUSES.DA_HOAN;
+    }).length;
+    const pendingRefundOrders = ordersWithVirtual.filter((order) => {
+      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+      return status === ORDER_STATUSES.CHO_HOAN;
+    }).length;
+
+    const updatedStats = [
+      { ...BASE_REFUND_STATS[0], value: String(totalOrders) },
+      { ...BASE_REFUND_STATS[1], value: String(refundedOrders) },
+      { ...BASE_REFUND_STATS[2], value: String(pendingRefundOrders) },
+    ];
+
+    return { updatedStats, totalRecords: totalOrders };
+  }
+
   const needsRenewal = ordersWithVirtual.filter((order) => {
     const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
     return Number.isFinite(remaining) && remaining > 0 && remaining <= 4;
   }).length;
-  const expiredOrders = ordersWithVirtual.filter((order) => {
-    const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
-    return Number.isFinite(remaining) && remaining <= 0;
+  const processingOrders = ordersWithVirtual.filter((order) => {
+    const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+    return status === ORDER_STATUSES.DANG_XU_LY;
   }).length;
 
   const registeredTodayCount = ordersWithVirtual.filter((order) => {
@@ -265,7 +293,7 @@ export function computeOrderStats(ordersWithVirtual: Order[]): {
   const updatedStats = [
     { ...BASE_STOCK_STATS[0], value: String(totalOrders) },
     { ...BASE_STOCK_STATS[1], value: String(needsRenewal) },
-    { ...BASE_STOCK_STATS[2], value: String(expiredOrders) },
+    { ...BASE_STOCK_STATS[2], value: String(processingOrders) },
     { ...BASE_STOCK_STATS[3], value: String(registeredTodayCount) },
   ];
 

@@ -6,6 +6,7 @@ const {
   buildYearsQuery,
   buildChartsQuery,
 } = require("./queries");
+const { tableName, SCHEMA_FINANCE, FINANCE_SCHEMA } = require("../../config/dbSchema");
 
 const fetchDashboardStats = async () => {
   const periods = Helpers.calculatePeriods();
@@ -48,8 +49,74 @@ const fetchDashboardCharts = async ({ year, limitToToday }) => {
   };
 };
 
+const fetchDashboardMonthlySummary = async () => {
+  const tableName_qualified = tableName(
+    FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
+    SCHEMA_FINANCE
+  );
+  
+  const result = await db(tableName_qualified)
+    .select('*')
+    .orderBy(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS.MONTH_KEY, 'desc');
+  
+  return (result || []).map((row) => ({
+    month_key: row.month_key || '',
+    total_orders: Number(row.total_orders || 0),
+    canceled_orders: Number(row.canceled_orders || 0),
+    total_revenue: Number(row.total_revenue || 0),
+    total_profit: Number(row.total_profit || 0),
+    total_refund: Number(row.total_refund || 0),
+    updated_at: row.updated_at || null,
+  }));
+};
+
+const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
+  const tableName_qualified = tableName(
+    FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
+    SCHEMA_FINANCE
+  );
+  const monthKeyCol = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS.MONTH_KEY;
+
+  let query = db(tableName_qualified).select('*');
+  
+  // Filter by year: month_key is in format YYYY-MM
+  const yearStr = String(year).padStart(4, '0');
+  const yearPrefix = `${yearStr}-%`;
+  query = query.where(monthKeyCol, 'like', yearPrefix);
+
+  // If limiting to today, only include months up to current month of current year
+  if (limitToToday && year === new Date().getFullYear()) {
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    const currentYearMonth = `${yearStr}-${currentMonth}`;
+    query = query.where(monthKeyCol, '<=', currentYearMonth);
+  }
+
+  const result = await query.orderBy(monthKeyCol, 'asc');
+
+  // Transform to match chart format (month number instead of month_key)
+  return {
+    year,
+    months: (result || []).map((row) => {
+      const [, monthStr] = (row.month_key || '').split('-');
+      const monthNum = parseInt(monthStr, 10);
+      return {
+        month: `T${monthNum}`,
+        month_num: monthNum,
+        month_key: row.month_key,
+        total_orders: Number(row.total_orders || 0),
+        total_canceled: Number(row.canceled_orders || 0),
+        total_revenue: Number(row.total_revenue || 0),
+        total_profit: Number(row.total_profit || 0),
+        total_refund: Number(row.total_refund || 0),
+      };
+    }),
+  };
+};
+
 module.exports = {
   fetchDashboardStats,
   fetchDashboardYears,
   fetchDashboardCharts,
+  fetchDashboardMonthlySummary,
+  fetchDashboardChartsFromSummary,
 };

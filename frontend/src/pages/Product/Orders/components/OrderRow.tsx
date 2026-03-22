@@ -23,6 +23,8 @@ type OrderRowProps = {
   showRemainingColumn: boolean;
   showActionButtons: boolean;
   isCanceled: boolean;
+  canEdit: boolean;
+  canRenewOrder: boolean;
   totalColumns: number;
   renewingOrderCode: string | null;
   onToggleDetails: (orderId: number) => void;
@@ -40,6 +42,8 @@ export const OrderRow = React.memo(function OrderRow({
   showRemainingColumn,
   showActionButtons,
   isCanceled,
+  canEdit,
+  canRenewOrder,
   totalColumns,
   renewingOrderCode,
   onToggleDetails,
@@ -81,8 +85,9 @@ export const OrderRow = React.memo(function OrderRow({
   const statusText = String(trangThaiText || "").trim();
   const canConfirmRefund = isCanceled && statusText === pendingRefundStatus;
   const canRenew =
-    statusText === ORDER_STATUSES.CAN_GIA_HAN ||
-    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+    canRenewOrder &&
+    (statusText === ORDER_STATUSES.CAN_GIA_HAN ||
+      statusText === ORDER_STATUSES.ORDER_EXPIRED);
   const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
   const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
 
@@ -200,7 +205,7 @@ export const OrderRow = React.memo(function OrderRow({
                 <CheckCircleIcon className="h-4 w-4" />
               </button>
             )}
-            {!isCanceled && (
+            {canEdit && !isCanceled && (
               <>
                 <button
                   onClick={stopPropagation(onEdit)}
@@ -327,6 +332,3 @@ export const OrderRow = React.memo(function OrderRow({
 });
 
 OrderRow.displayName = "OrderRow";
-
-
-

@@ -1,9 +1,11 @@
 import type React from "react";
 import {
   CheckCircleIcon,
+  CheckBadgeIcon,
+  ClockIcon,
   ExclamationTriangleIcon,
-  ArrowDownIcon,
   ArrowUpIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import {
   STAT_CARD_ACCENTS as CARD_ACCENTS,
@@ -11,7 +13,14 @@ import {
 } from "../../../components/ui/StatCard";
 import { ORDER_FIELDS, ORDER_STATUSES } from "../../../constants";
 
-export type StatFilterKey = "all" | "renewal" | "expired" | "today";
+export type StatFilterKey =
+  | "all"
+  | "renewal"
+  | "expired"
+  | "processing"
+  | "today"
+  | "refunded"
+  | "pending_refund";
 
 export type BaseStat = {
   name: string;
@@ -25,7 +34,10 @@ export const STAT_FILTER_MAP: Record<StatFilterKey, string> = {
   all: "all",
   renewal: ORDER_STATUSES.CAN_GIA_HAN,
   expired: ORDER_STATUSES.ORDER_EXPIRED,
+  processing: ORDER_STATUSES.DANG_XU_LY,
   today: "today",
+  refunded: ORDER_STATUSES.DA_HOAN,
+  pending_refund: ORDER_STATUSES.CHO_HOAN,
 };
 
 export const BASE_STOCK_STATS: BaseStat[] = [
@@ -44,11 +56,11 @@ export const BASE_STOCK_STATS: BaseStat[] = [
     filterKey: "renewal",
   },
   {
-    name: "Hết Hạn",
+    name: "Đang Xử Lý",
     value: "0",
-    icon: ArrowDownIcon,
-    accent: CARD_ACCENTS.rose,
-    filterKey: "expired",
+    icon: ArrowPathIcon,
+    accent: CARD_ACCENTS.teal,
+    filterKey: "processing",
   },
   {
     name: "Đăng Ký Hôm Nay",
@@ -56,6 +68,30 @@ export const BASE_STOCK_STATS: BaseStat[] = [
     icon: ArrowUpIcon,
     accent: CARD_ACCENTS.emerald,
     filterKey: "today",
+  },
+];
+
+export const BASE_REFUND_STATS: BaseStat[] = [
+  {
+    name: "Tổng đơn",
+    value: "0",
+    icon: CheckCircleIcon,
+    accent: CARD_ACCENTS.sky,
+    filterKey: "all",
+  },
+  {
+    name: "Đã Hoàn",
+    value: "0",
+    icon: CheckBadgeIcon,
+    accent: CARD_ACCENTS.emerald,
+    filterKey: "refunded",
+  },
+  {
+    name: "Chưa Hoàn",
+    value: "0",
+    icon: ClockIcon,
+    accent: CARD_ACCENTS.amber,
+    filterKey: "pending_refund",
   },
 ];
 

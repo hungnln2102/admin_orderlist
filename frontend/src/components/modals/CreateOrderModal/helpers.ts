@@ -53,6 +53,10 @@ export const INITIAL_FORM_DATA: Partial<Order> = {
 };
 
 export const inputClass =
-  "w-full transition-all";
-export const labelClass = "block text-[11px] font-black uppercase tracking-[0.15em] text-indigo-300/80 mb-2 px-1";
-export const readOnlyClass = "opacity-60 cursor-not-allowed bg-indigo-500/5";
+  "w-full rounded-xl border border-slate-600 bg-slate-800/95 px-4 py-3 text-[15px] text-slate-100 placeholder:text-slate-400 transition-colors duration-150 outline-none focus:border-cyan-400 focus:bg-slate-800 focus:ring-2 focus:ring-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60";
+
+export const labelClass =
+  "mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-200";
+
+export const readOnlyClass =
+  "cursor-not-allowed bg-slate-800/95 text-slate-300 border-slate-600";

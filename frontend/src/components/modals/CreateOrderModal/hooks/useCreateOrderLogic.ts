@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
   ORDER_FIELDS,
@@ -156,6 +156,11 @@ export const useCreateOrderLogic = (
     }));
   };
 
+  const clearSelectedSupplySelection = useCallback(() => {
+    setSelectedSupplyId(null);
+    setIsDataLoaded(false);
+  }, [setIsDataLoaded, setSelectedSupplyId]);
+
   const { handleSubmit } = useOrderSubmit({
     formData,
     isLoading,
@@ -178,6 +183,7 @@ export const useCreateOrderLogic = (
     setIsDataLoaded,
     customProductTouched,
     setCustomProductTouched,
+    clearSelectedSupplySelection,
     handleChange,
     handleProductSelect,
     handleSourceSelect,

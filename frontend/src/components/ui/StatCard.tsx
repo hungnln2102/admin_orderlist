@@ -4,6 +4,10 @@ export interface StatAccent {
   border: string;
   glow: string;
   iconBg: string;
+  activeBorder: string;
+  activeGlow: string;
+  activeShadow: string;
+  activeBackground: string;
 }
 
 export const STAT_CARD_ACCENTS = {
@@ -11,41 +15,81 @@ export const STAT_CARD_ACCENTS = {
     border: "border-sky-500/30",
     glow: "bg-sky-500/20",
     iconBg: "bg-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.5)]",
+    activeBorder: "border-sky-300/25",
+    activeGlow: "bg-sky-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(14,165,233,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   emerald: {
     border: "border-emerald-500/30",
     glow: "bg-emerald-500/20",
     iconBg: "bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]",
+    activeBorder: "border-emerald-300/25",
+    activeGlow: "bg-emerald-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(16,185,129,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(52,211,153,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   violet: {
     border: "border-violet-500/30",
     glow: "bg-violet-500/20",
     iconBg: "bg-violet-500 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]",
+    activeBorder: "border-violet-300/25",
+    activeGlow: "bg-violet-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(139,92,246,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(167,139,250,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   amber: {
     border: "border-amber-500/30",
     glow: "bg-amber-500/20",
     iconBg: "bg-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.5)]",
+    activeBorder: "border-amber-300/25",
+    activeGlow: "bg-amber-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(245,158,11,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   rose: {
     border: "border-rose-500/30",
     glow: "bg-rose-500/20",
     iconBg: "bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.5)]",
+    activeBorder: "border-rose-300/25",
+    activeGlow: "bg-rose-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(244,63,94,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(251,113,133,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   indigo: {
     border: "border-indigo-500/30",
     glow: "bg-indigo-500/20",
     iconBg: "bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]",
+    activeBorder: "border-indigo-300/25",
+    activeGlow: "bg-indigo-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(99,102,241,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(129,140,248,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   slate: {
     border: "border-slate-500/30",
     glow: "bg-slate-500/20",
     iconBg: "bg-slate-500 text-white shadow-[0_0_15px_rgba(100,116,139,0.5)]",
+    activeBorder: "border-slate-300/25",
+    activeGlow: "bg-slate-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(100,116,139,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(148,163,184,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
   teal: {
     border: "border-teal-500/30",
     glow: "bg-teal-500/20",
     iconBg: "bg-teal-500 text-white shadow-[0_0_15px_rgba(20,184,166,0.5)]",
+    activeBorder: "border-teal-300/25",
+    activeGlow: "bg-teal-400/25",
+    activeShadow: "shadow-[0_14px_34px_-20px_rgba(20,184,166,0.65)]",
+    activeBackground:
+      "bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.22),transparent_42%),linear-gradient(160deg,rgba(30,41,59,0.84),rgba(15,23,42,0.9))]",
   },
 } as const;
 
@@ -69,15 +113,22 @@ const StatCard: React.FC<StatCardProps> = ({
   children,
   isActive,
 }) => {
+  const panelClass = isActive
+    ? "backdrop-blur-[16px]"
+    : "glass-panel";
+  const hoverEffectClass = isActive ? "" : "holographic-hover";
+  const containerStateClass = isActive
+    ? `${accent.activeBorder} ${accent.activeBackground} ${accent.activeShadow} scale-[1.02]`
+    : `${accent.border} hover:scale-[1.02] cursor-pointer`;
+  const glowStateClass = isActive
+    ? `${accent.activeGlow} opacity-30`
+    : `${accent.glow} opacity-10 transition-opacity group-hover:opacity-25`;
+
   return (
     <div
-      className={`stat-card group relative isolate overflow-hidden rounded-[24px] glass-panel p-4 sm:p-5 transition-all duration-300 holographic-hover z-10 ${accent.border} ${
-        isActive
-          ? "ring-2 ring-indigo-400/60 scale-[1.03] shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
-          : "hover:scale-[1.02] cursor-pointer"
-      }`}
+      className={`stat-card group relative isolate overflow-hidden rounded-[24px] p-4 sm:p-5 transition-all duration-300 z-10 ${hoverEffectClass} ${panelClass} ${containerStateClass}`}
     >
-      <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] opacity-10 transition-opacity group-hover:opacity-25 ${accent.glow}`}></div>
+      <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] ${glowStateClass}`}></div>
       
       <div className="stat-card__content flex items-start justify-between gap-4">
         <div className="stat-card__text relative z-10">

@@ -1,4 +1,4 @@
-const { PARTNER_SCHEMA, ORDERS_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
+const { PARTNER_SCHEMA, ORDERS_SCHEMA, SCHEMA_PARTNER, FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
 const { resolveSupplierNameColumn } = require("../SuppliesController/helpers");
 const { STATUS } = require("./constants");
 const { toNullableNumber } = require("../../utils/normalizers");
@@ -10,12 +10,24 @@ const PAYMENT_SUPPLY_TABLE = tableName(
   SCHEMA_PARTNER
 );
 
+const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
+const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+
 const ceilToThousands = (value) => {
     const num = Number(value);
     if (!Number.isFinite(num) || num === 0) return 0;
     const abs = Math.abs(num);
     const rounded = Math.ceil(abs / 1000) * 1000;
     return num < 0 ? -rounded : rounded;
+};
+
+const getMonthKey = (date) => {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
 };
 
 const calcRemainingRefund = (orderRow, normalized) => {
@@ -304,6 +316,94 @@ const addSupplierImportOnProcessing = async (trx, beforeRow, afterRow) => {
     }
 };
 
+const updateDashboardMonthlySummaryOnStatusChange = async (trx, beforeRow, afterRow) => {
+    const prevStatus = beforeRow?.status || STATUS.UNPAID;
+    const nextStatus = afterRow?.status || STATUS.UNPAID;
+
+    if (prevStatus === nextStatus) return;
+
+    const orderDate = afterRow?.order_date || beforeRow?.order_date;
+    if (!orderDate) return;
+
+    const monthKey = getMonthKey(orderDate);
+    if (!monthKey) return;
+
+    const updates = {};
+
+    // Nếu trước là PAID, giờ không phải, giảm PAID counters
+    if (prevStatus === STATUS.PAID && nextStatus !== STATUS.PAID) {
+        const price = toNullableNumber(beforeRow?.price) || 0;
+        const cost = toNullableNumber(beforeRow?.cost) || 0;
+        const profit = price - cost;
+        updates.total_orders = (updates.total_orders || 0) - 1;
+        updates.total_revenue = (updates.total_revenue || 0) - price;
+        updates.total_profit = (updates.total_profit || 0) - profit;
+    }
+
+    // Nếu trước là REFUNDED hoặc PENDING_REFUND, giờ không phải, giảm REFUND counters
+    if ((prevStatus === STATUS.REFUNDED || prevStatus === STATUS.PENDING_REFUND) && 
+        nextStatus !== STATUS.REFUNDED && nextStatus !== STATUS.PENDING_REFUND) {
+        const refund = toNullableNumber(beforeRow?.refund) || 0;
+        updates.canceled_orders = (updates.canceled_orders || 0) - 1;
+        updates.total_refund = (updates.total_refund || 0) - refund;
+    }
+
+    // Nếu giờ là PAID, trước không phải, tăng PAID counters
+    if (nextStatus === STATUS.PAID && prevStatus !== STATUS.PAID) {
+        const price = toNullableNumber(afterRow?.price) || 0;
+        const cost = toNullableNumber(afterRow?.cost) || 0;
+        const profit = price - cost;
+        updates.total_orders = (updates.total_orders || 0) + 1;
+        updates.total_revenue = (updates.total_revenue || 0) + price;
+        updates.total_profit = (updates.total_profit || 0) + profit;
+    }
+
+    // Nếu giờ là REFUNDED hoặc PENDING_REFUND, trước không phải, tăng REFUND counters
+    if ((nextStatus === STATUS.REFUNDED || nextStatus === STATUS.PENDING_REFUND) && 
+        prevStatus !== STATUS.REFUNDED && prevStatus !== STATUS.PENDING_REFUND) {
+        const refund = toNullableNumber(afterRow?.refund) || 0;
+        updates.canceled_orders = (updates.canceled_orders || 0) + 1;
+        updates.total_refund = (updates.total_refund || 0) + refund;
+    }
+
+    if (Object.keys(updates).length === 0) return;
+
+    // Upsert
+    const insertData = {
+        [summaryCols.MONTH_KEY]: monthKey,
+        [summaryCols.UPDATED_AT]: new Date(),
+    };
+
+    const mergeData = {
+        [summaryCols.UPDATED_AT]: new Date(),
+    };
+
+    if (updates.total_orders !== undefined) {
+        mergeData[summaryCols.TOTAL_ORDERS] = trx.raw(`GREATEST(0, ${summaryCols.TOTAL_ORDERS} + ${updates.total_orders})`);
+    }
+
+    if (updates.canceled_orders !== undefined) {
+        mergeData[summaryCols.CANCELED_ORDERS] = trx.raw(`GREATEST(0, ${summaryCols.CANCELED_ORDERS} + ${updates.canceled_orders})`);
+    }
+
+    if (updates.total_revenue !== undefined) {
+        mergeData[summaryCols.TOTAL_REVENUE] = trx.raw(`${summaryCols.TOTAL_REVENUE} + ${updates.total_revenue}`);
+    }
+
+    if (updates.total_profit !== undefined) {
+        mergeData[summaryCols.TOTAL_PROFIT] = trx.raw(`${summaryCols.TOTAL_PROFIT} + ${updates.total_profit}`);
+    }
+
+    if (updates.total_refund !== undefined) {
+        mergeData[summaryCols.TOTAL_REFUND] = trx.raw(`GREATEST(0, ${summaryCols.TOTAL_REFUND} + ${updates.total_refund})`);
+    }
+
+    await trx(summaryTable)
+        .insert(insertData)
+        .onConflict(summaryCols.MONTH_KEY)
+        .merge(mergeData);
+};
+
 module.exports = {
     ceilToThousands,
     calcRemainingRefund,
@@ -313,4 +413,5 @@ module.exports = {
     adjustSupplierDebtIfNeeded,
     addSupplierImportOnProcessing,
     recordSupplierPaymentOnCompletion,
+    updateDashboardMonthlySummaryOnStatusChange,
 };

@@ -61,7 +61,7 @@ const aggregateSql = `
       COALESCE(
         SUM(
           CASE
-            WHEN status_value IN (${revenueStatusSql}) THEN price_value
+            WHEN status_value = '${STATUS.PAID}' THEN price_value
             ELSE 0
           END
         ),
@@ -70,7 +70,7 @@ const aggregateSql = `
       COALESCE(
         SUM(
           CASE
-            WHEN status_value IN (${revenueStatusSql}) THEN price_value - cost_value
+            WHEN status_value = '${STATUS.PAID}' THEN price_value - cost_value
             ELSE 0
           END
         ),
@@ -78,6 +78,7 @@ const aggregateSql = `
       ) AS total_profit
     FROM normalized_orders
     WHERE order_date IS NOT NULL
+      AND status_value = '${STATUS.PAID}'
     GROUP BY 1
   ),
   monthly_cancellations AS (
@@ -87,6 +88,7 @@ const aggregateSql = `
       COALESCE(SUM(refund_value), 0) AS total_refund
     FROM normalized_orders
     WHERE canceled_at IS NOT NULL
+      AND status_value IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}')
     GROUP BY 1
   ),
   all_months AS (
