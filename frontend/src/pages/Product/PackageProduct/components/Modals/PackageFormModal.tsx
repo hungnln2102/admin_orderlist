@@ -4,6 +4,7 @@ import {
   DEFAULT_SLOT_LIMIT,
   EMPTY_FORM_VALUES,
   EMPTY_MANUAL_ENTRY,
+  formatDisplayDate,
   ManualWarehouseEntry,
   PackageFormValues,
   PackageTemplate,
@@ -44,53 +45,220 @@ const MANUAL_FIELDS: Array<{ key: keyof ManualWarehouseEntry; label: string; pla
   { key: "note", label: "Ghi chú", placeholder: "Ghi chú thêm..." },
 ];
 
-type InfoEntry = { label: string; value?: string | null };
+type EditableWarehouseFields = {
+  account: string;
+  password: string;
+  backup_email: string;
+  two_fa: string;
+  note: string;
+};
 
-const buildInfoEntries = (item: WarehouseItem | AccountInfo): InfoEntry[] => [
-  { label: "Tài khoản", value: (item as WarehouseItem).account ?? (item as AccountInfo).account },
-  { label: "Mật khẩu", value: (item as WarehouseItem).password ?? (item as AccountInfo).password },
-  { label: "Email dự phòng", value: (item as WarehouseItem).backup_email ?? (item as AccountInfo).backup_email },
-  { label: "Mã 2FA", value: (item as WarehouseItem).two_fa ?? (item as AccountInfo).two_fa },
-  { label: "Ghi chú", value: (item as WarehouseItem).note ?? (item as AccountInfo).note },
+const normalizeWarehouseId = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const INLINE_EDIT_FIELDS: Array<{ key: keyof EditableWarehouseFields; label: string; placeholder: string }> = [
+  { key: "account", label: "Tài khoản", placeholder: "Email hoặc username..." },
+  { key: "password", label: "Mật khẩu", placeholder: "Mật khẩu tài khoản..." },
+  { key: "backup_email", label: "Email dự phòng", placeholder: "Email khôi phục..." },
+  { key: "two_fa", label: "Mã 2FA", placeholder: "Mã xác thực hai lớp..." },
+  { key: "note", label: "Ghi chú", placeholder: "Ghi chú thêm..." },
 ];
 
-const ItemDetailCard: React.FC<{ item: WarehouseItem | AccountInfo; onChange: () => void }> = ({ item, onChange }) => {
+type InfoEntry = {
+  key: keyof EditableWarehouseFields | "expires_at";
+  label: string;
+  value?: string | null;
+  placeholder: string;
+};
+
+type AccountDisplayInfo = AccountInfo & { expires_at?: string | null };
+
+const buildInfoEntries = (item: WarehouseItem | AccountDisplayInfo): InfoEntry[] => {
+  const editableEntries: InfoEntry[] = INLINE_EDIT_FIELDS.map((field) => ({
+    key: field.key,
+    label: field.label,
+    placeholder: field.placeholder,
+    value:
+      ((item as WarehouseItem)[field.key] as string | null | undefined) ??
+      ((item as AccountDisplayInfo)[field.key] as string | null | undefined) ??
+      "",
+  }));
+
+  const expiryValue =
+    (item as WarehouseItem).expires_at ??
+    (item as AccountDisplayInfo).expires_at ??
+    null;
+
+  return [
+    ...editableEntries,
+    {
+      key: "expires_at",
+      label: "Ngày hết hạn",
+      placeholder: "",
+      value: formatDisplayDate(expiryValue),
+    },
+  ];
+};
+
+const toEditableWarehouseFields = (
+  item: WarehouseItem | AccountInfo | null | undefined
+): EditableWarehouseFields => ({
+  account: item?.account ? String(item.account) : "",
+  password: item?.password ? String(item.password) : "",
+  backup_email: item?.backup_email ? String(item.backup_email) : "",
+  two_fa: item?.two_fa ? String(item.two_fa) : "",
+  note: item?.note ? String(item.note) : "",
+});
+
+const mergeDisplayInfo = (
+  selectedItem: WarehouseItem | null,
+  fallbackInfo?: AccountInfo | null
+): (WarehouseItem & AccountDisplayInfo) | AccountDisplayInfo | null => {
+  if (!selectedItem && !fallbackInfo) return null;
+  if (!selectedItem) return fallbackInfo ?? null;
+  if (!fallbackInfo) return selectedItem;
+
+  return {
+    ...fallbackInfo,
+    ...selectedItem,
+    account: selectedItem.account ?? fallbackInfo.account ?? null,
+    password: selectedItem.password ?? fallbackInfo.password ?? null,
+    backup_email: selectedItem.backup_email ?? fallbackInfo.backup_email ?? null,
+    two_fa: selectedItem.two_fa ?? fallbackInfo.two_fa ?? null,
+    note: selectedItem.note ?? fallbackInfo.note ?? null,
+    expires_at: selectedItem.expires_at ?? fallbackInfo.expires_at ?? null,
+  };
+};
+
+const ItemDetailCard: React.FC<{
+  item: WarehouseItem | AccountDisplayInfo;
+  onChange: () => void;
+  onEditInfo?: (() => void) | null;
+  editingInfo?: boolean;
+  draft?: EditableWarehouseFields;
+  onDraftChange?: (next: EditableWarehouseFields) => void;
+  onCancelEditInfo?: () => void;
+  onSaveEditInfo?: () => void;
+  savingInfo?: boolean;
+  editInfoError?: string | null;
+}> = ({
+  item,
+  onChange,
+  onEditInfo,
+  editingInfo,
+  draft,
+  onDraftChange,
+  onCancelEditInfo,
+  onSaveEditInfo,
+  savingInfo,
+  editInfoError,
+}) => {
   const entries = buildInfoEntries(item);
   const hasAnyValue = entries.some((e) => e.value != null && String(e.value).trim() !== "");
-  if (!hasAnyValue) {
+  const isEditingInfo = Boolean(editingInfo && draft && onDraftChange);
+
+  if (!hasAnyValue && !isEditingInfo) {
     return (
       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-xs text-white/30">
         Không có thông tin tài khoản.
         <button type="button" onClick={onChange} className="ml-2 text-indigo-400 hover:text-indigo-300 transition-colors">
           Chọn tài khoản
         </button>
+        {onEditInfo && (
+          <button
+            type="button"
+            onClick={onEditInfo}
+            className="ml-2 text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            Sửa thông tin
+          </button>
+        )}
       </div>
     );
   }
+
   return (
     <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
       <div className="divide-y divide-white/[0.04]">
-        {entries.map(({ label, value }) => {
+        {entries.map(({ key, label, value, placeholder }) => {
           const hasVal = value != null && String(value).trim() !== "";
+          const canEditRow = key !== "expires_at";
           return (
-            <div key={label} className="flex items-start gap-3 px-3 py-2">
+            <div key={key} className="flex items-start gap-3 px-3 py-2">
               <span className="text-[11px] text-white/30 w-24 shrink-0 pt-0.5">{label}</span>
-              <span className={`text-sm break-all min-w-0 ${hasVal ? "text-white" : "text-white/15 italic"}`}>
-                {hasVal ? String(value) : "—"}
-              </span>
+              {isEditingInfo && draft && onDraftChange && canEditRow ? (
+                <input
+                  type="text"
+                  value={draft[key as keyof EditableWarehouseFields]}
+                  onChange={(e) =>
+                    onDraftChange({
+                      ...draft,
+                      [key as keyof EditableWarehouseFields]: e.target.value,
+                    })
+                  }
+                  placeholder={placeholder}
+                  className={`${manualFieldCls} py-1.5`}
+                />
+              ) : (
+                <span className={`text-sm break-all min-w-0 ${hasVal ? "text-white" : "text-white/15 italic"}`}>
+                  {hasVal ? String(value) : "—"}
+                </span>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="px-3 py-2 border-t border-white/[0.04]">
-        <button
-          type="button"
-          onClick={onChange}
-          className="flex items-center gap-1 text-[10px] font-medium text-white/30 hover:text-white/50 transition-colors"
-        >
-          <PencilIcon className="h-3 w-3" />
-          Thay đổi tài khoản
-        </button>
+      <div className="px-3 py-2 border-t border-white/[0.04] space-y-2">
+        {isEditingInfo ? (
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancelEditInfo}
+              disabled={savingInfo}
+              className="px-2.5 py-1 text-[11px] font-medium text-white/60 border border-white/[0.12] rounded-md hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={onSaveEditInfo}
+              disabled={savingInfo}
+              className="px-2.5 py-1 text-[11px] font-medium text-white bg-indigo-500 rounded-md hover:bg-indigo-400 transition-colors disabled:opacity-40"
+            >
+              {savingInfo ? "Đang lưu..." : "Lưu tài khoản"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={onChange}
+              className="flex items-center gap-1 text-[10px] font-medium text-white/30 hover:text-white/50 transition-colors"
+            >
+              <PencilIcon className="h-3 w-3" />
+              Thay đổi tài khoản
+            </button>
+            {onEditInfo && (
+              <button
+                type="button"
+                onClick={onEditInfo}
+                className="flex items-center gap-1 text-[10px] font-medium text-indigo-400/80 hover:text-indigo-300 transition-colors"
+              >
+                <PencilIcon className="h-3 w-3" />
+                Sửa thông tin tại đây
+              </button>
+            )}
+          </div>
+        )}
+
+        {editInfoError && (
+          <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-md px-2.5 py-1.5" role="alert">
+            {editInfoError}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -117,6 +285,7 @@ type StockDropdownProps = {
   onManualEntryChange: (entry: ManualWarehouseEntry) => void;
   readOnly?: boolean;
   fallbackInfo?: AccountInfo | null;
+  onUpdateSelected?: (id: number, fields: EditableWarehouseFields) => Promise<void>;
 };
 
 const StockDropdown: React.FC<StockDropdownProps> = ({
@@ -140,8 +309,66 @@ const StockDropdown: React.FC<StockDropdownProps> = ({
   onManualEntryChange,
   readOnly,
   fallbackInfo,
+  onUpdateSelected,
 }) => {
   const [editing, setEditing] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [editInfoError, setEditInfoError] = useState<string | null>(null);
+  const [editInfoDraft, setEditInfoDraft] = useState<EditableWarehouseFields>(
+    toEditableWarehouseFields(mergeDisplayInfo(selectedItem, fallbackInfo))
+  );
+
+  useEffect(() => {
+    if (editingInfo) return;
+    setEditInfoDraft(
+      toEditableWarehouseFields(mergeDisplayInfo(selectedItem, fallbackInfo))
+    );
+  }, [selectedItem, fallbackInfo, editingInfo]);
+
+  useEffect(() => {
+    setEditingInfo(false);
+    setEditInfoError(null);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (readOnly && selectedId != null) {
+      setEditing(false);
+    }
+  }, [readOnly, selectedId]);
+
+  const canInlineEdit = Boolean(readOnly && selectedId != null && onUpdateSelected);
+
+  const handleOpenInlineEdit = () => {
+    setEditInfoError(null);
+    setEditInfoDraft(
+      toEditableWarehouseFields(mergeDisplayInfo(selectedItem, fallbackInfo))
+    );
+    setEditingInfo(true);
+  };
+
+  const handleCancelInlineEdit = () => {
+    setEditInfoError(null);
+    setEditingInfo(false);
+    setEditInfoDraft(
+      toEditableWarehouseFields(mergeDisplayInfo(selectedItem, fallbackInfo))
+    );
+  };
+
+  const handleSaveInlineEdit = async () => {
+    const targetId = normalizeWarehouseId(selectedItem?.id ?? selectedId);
+    if (!onUpdateSelected || targetId == null) return;
+    setSavingInfo(true);
+    setEditInfoError(null);
+    try {
+      await onUpdateSelected(targetId, editInfoDraft);
+      setEditingInfo(false);
+    } catch {
+      setEditInfoError("Không thể cập nhật tài khoản. Vui lòng thử lại.");
+    } finally {
+      setSavingInfo(false);
+    }
+  };
 
   if (readOnly && selectedId != null && !editing) {
     if (loading && !selectedItem && !fallbackInfo) {
@@ -154,12 +381,24 @@ const StockDropdown: React.FC<StockDropdownProps> = ({
         </div>
       );
     }
-    const displayItem = selectedItem ?? fallbackInfo;
+
+    const displayItem = mergeDisplayInfo(selectedItem, fallbackInfo);
     if (displayItem) {
       return (
-        <div>
+        <div className="space-y-2">
           <label className="block text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5">{label}</label>
-          <ItemDetailCard item={displayItem} onChange={() => setEditing(true)} />
+          <ItemDetailCard
+            item={displayItem}
+            onChange={() => setEditing(true)}
+            onEditInfo={!editingInfo && canInlineEdit ? handleOpenInlineEdit : null}
+            editingInfo={editingInfo && canInlineEdit}
+            draft={editInfoDraft}
+            onDraftChange={setEditInfoDraft}
+            onCancelEditInfo={handleCancelInlineEdit}
+            onSaveEditInfo={handleSaveInlineEdit}
+            savingInfo={savingInfo}
+            editInfoError={editInfoError}
+          />
         </div>
       );
     }
@@ -418,13 +657,70 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
   const filteredStockItems = useMemo(() => filterItems(stockSearch), [filterItems, stockSearch]);
   const filteredStorageItems = useMemo(() => filterItems(storageSearch), [filterItems, storageSearch]);
 
-  const selectedStockItem = useMemo(
-    () => (values.stockId != null ? warehouseItems.find((w) => w.id === values.stockId) ?? null : null),
-    [values.stockId, warehouseItems]
-  );
-  const selectedStorageItem = useMemo(
-    () => (values.storageId != null ? warehouseItems.find((w) => w.id === values.storageId) ?? null : null),
-    [values.storageId, warehouseItems]
+  const selectedStockItem = useMemo(() => {
+    const targetId = normalizeWarehouseId(values.stockId);
+    if (targetId == null) return null;
+    return (
+      warehouseItems.find(
+        (w) => normalizeWarehouseId(w.id) === targetId
+      ) ?? null
+    );
+  }, [values.stockId, warehouseItems]);
+  const selectedStorageItem = useMemo(() => {
+    const targetId = normalizeWarehouseId(values.storageId);
+    if (targetId == null) return null;
+    return (
+      warehouseItems.find(
+        (w) => normalizeWarehouseId(w.id) === targetId
+      ) ?? null
+    );
+  }, [values.storageId, warehouseItems]);
+
+  const handleUpdateWarehouseInfo = useCallback(
+    async (id: number, fields: EditableWarehouseFields) => {
+      const targetId = normalizeWarehouseId(id);
+      const currentItem =
+        targetId == null
+          ? undefined
+          : warehouseItems.find(
+              (item) => normalizeWarehouseId(item.id) === targetId
+            );
+      if (!currentItem) throw new Error("WAREHOUSE_ITEM_NOT_FOUND");
+
+      const payload = {
+        category: currentItem.category ?? null,
+        account: fields.account || null,
+        password: fields.password || null,
+        backup_email: fields.backup_email || null,
+        two_fa: fields.two_fa || null,
+        note: fields.note || null,
+        status: currentItem.status ?? null,
+        expires_at: currentItem.expires_at ?? null,
+        is_verified: currentItem.is_verified ?? false,
+      };
+
+      const response = await apiFetch(`${API_ENDPOINTS.WAREHOUSE}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const updated = (await response.json()) as WarehouseItem;
+      setWarehouseItems((prev) =>
+        prev.map((item) =>
+          normalizeWarehouseId(item.id) === targetId
+            ? { ...item, ...updated }
+            : item
+        )
+      );
+      setValues((prev) =>
+        normalizeWarehouseId(prev.stockId) === targetId
+          ? { ...prev, supplier: updated.account || fields.account || "" }
+          : prev
+      );
+    },
+    [warehouseItems]
   );
 
   const handleChange = (
@@ -552,6 +848,7 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
                   onManualEntryChange={(entry) => setValues((prev) => ({ ...prev, manualStock: entry, supplier: entry.account }))}
                   readOnly={mode === "edit"}
                   fallbackInfo={stockInfo}
+                  onUpdateSelected={handleUpdateWarehouseInfo}
                 />
                 <div>
                   <label className={labelCls}>Nhà cung cấp (NCC)</label>
@@ -612,6 +909,7 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
                   onManualEntryChange={(entry) => setValues((prev) => ({ ...prev, manualStorage: entry }))}
                   readOnly={mode === "edit"}
                   fallbackInfo={storageInfo}
+                  onUpdateSelected={handleUpdateWarehouseInfo}
                 />
                 <div>
                   <label className={labelCls}>Dung lượng (GB)</label>

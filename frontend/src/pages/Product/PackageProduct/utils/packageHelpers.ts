@@ -126,6 +126,7 @@ export type AccountInfo = {
   backup_email?: string | null;
   two_fa?: string | null;
   note?: string | null;
+  expires_at?: string | null;
 };
 
 export type EditContext = {

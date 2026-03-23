@@ -90,7 +90,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
           <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/5">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Vị trí</span>
-              <span className="text-xs font-bold text-white">
+              <span className="text-xs font-bold text-white whitespace-nowrap">
                 <span className="text-indigo-400">{slotUsed}</span>
                 <span className="text-white/20 mx-0.5">/</span>
                 {totalSlots}
@@ -102,7 +102,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
                 style={{ width: `${slotAvailabilityRatio}%` }}
               />
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 mt-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 mt-1.5 whitespace-nowrap">
               Trống: {remainingSlots}
             </p>
           </div>
@@ -112,7 +112,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
             <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em]">Dung lượng</span>
-                <span className="text-xs font-bold text-white">
+                <span className="text-xs font-bold text-white whitespace-nowrap">
                   <span className="text-purple-400">{capacityUsed}</span>
                   <span className="text-white/20 mx-0.5">/</span>
                   {capacityLimit} GB
@@ -124,7 +124,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
                   style={{ width: `${capacityRatio}%` }}
                 />
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-1.5 whitespace-nowrap">
                 Trống: {remainingCapacity} GB
               </p>
             </div>

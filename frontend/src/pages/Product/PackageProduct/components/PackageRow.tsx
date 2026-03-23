@@ -90,7 +90,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           </div>
         </td>
         <td className="package-row__cell px-1 py-4 lg:px-2">
-          <div className="package-row__slot-summary text-sm font-bold text-white flex items-center gap-2">
+          <div className="package-row__slot-summary text-sm font-bold text-white flex items-center gap-2 whitespace-nowrap">
             <span className="text-indigo-400">{slotUsed}</span>
             <span className="text-white/20">/</span>
             <span>{totalSlots} Vị trí</span>
@@ -101,7 +101,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
               style={{ width: `${slotAvailabilityRatio}%` }}
             />
           </div>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-2 whitespace-nowrap">
             Trống: {remainingSlots}
           </div>
         </td>
@@ -109,7 +109,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           <td className="package-row__cell px-1 py-4 lg:px-2">
             {showRowCapacity ? (
               <>
-                <div className="text-sm font-bold text-white flex items-center gap-2">
+                <div className="text-sm font-bold text-white flex items-center gap-2 whitespace-nowrap">
                   <span className="text-purple-400">{capacityUsed}</span>
                   <span className="text-white/20">/</span>
                   <span>{capacityLimit} GB</span>
@@ -122,7 +122,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
                     }}
                   />
                 </div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-2 whitespace-nowrap">
                   Trống: {remainingCapacity} GB
                 </div>
               </>
