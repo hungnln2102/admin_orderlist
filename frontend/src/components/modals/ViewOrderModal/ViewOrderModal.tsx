@@ -16,6 +16,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 }) => {
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
+  const variantId = order?.variant_id;
   const basePrice = Number(order?.[ORDER_FIELDS.PRICE]) || 0;
   const supplyName = (order?.[ORDER_FIELDS.SUPPLY] as string) || "";
   const customerType = order?.customer_type || supplyName || "";
@@ -32,6 +33,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     isOpen,
     orderId,
     productName,
+    variantId,
     customerType,
     basePrice,
     normalizedOrderDate,
@@ -39,16 +41,16 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   });
 
   // QR luôn dùng giá đơn hàng (số tiền lưu trong đơn)
-  const qrAmountFromOrder = useMemo(
+  const orderAmount = useMemo(
     () => Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0),
     [order]
   );
 
   // Giá bán hiển thị: sau khi tạo đơn = giữ theo form; bấm icon xem = giá tính lại
   const displayAmount = keepOrderPrice
-    ? qrAmountFromOrder
-    : (calculatedPrice ?? qrAmountFromOrder);
-  const safeDisplayAmount = Helpers.roundGiaBanValue(displayAmount);
+    ? orderAmount
+    : (calculatedPrice ?? orderAmount);
+  const effectiveQrAmount = Helpers.roundGiaBanValue(displayAmount);
 
   if (!isOpen || !order) return null;
 
@@ -103,11 +105,10 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     String((order[ORDER_FIELDS.EXPIRY_DATE] as string) || "");
 
   const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
-  const safeQrAmount = Helpers.roundGiaBanValue(qrAmountFromOrder);
   const qrCodeImageUrl = Helpers.buildSepayQrUrl({
     accountNumber: ACCOUNT_NO,
     bankCode: BANK_SHORT_CODE,
-    amount: safeQrAmount,
+    amount: effectiveQrAmount,
     description: qrMessage,
     accountName: ACCOUNT_NAME,
   });
@@ -275,7 +276,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
               <p>
                 Số tiền:{" "}
                 <strong className="text-xl text-red-600">
-                  {formatCurrency(keepOrderPrice ? safeQrAmount : safeDisplayAmount)}
+                  {formatCurrency(effectiveQrAmount)}
                 </strong>
               </p>
               {!keepOrderPrice && priceLoading && (

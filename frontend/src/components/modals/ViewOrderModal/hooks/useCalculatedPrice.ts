@@ -8,6 +8,7 @@ type UseCalculatedPriceParams = {
   isOpen: boolean;
   orderId?: string;
   productName?: string;
+  variantId?: string | number | null;
   customerType?: string;
   basePrice: number;
   normalizedOrderDate: string | null;
@@ -19,6 +20,7 @@ export const useCalculatedPrice = ({
   isOpen,
   orderId,
   productName,
+  variantId,
   customerType,
   basePrice,
   normalizedOrderDate,
@@ -29,7 +31,11 @@ export const useCalculatedPrice = ({
   const [priceError, setPriceError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !orderId || !productName) {
+    const normalizedVariantId = Number(variantId);
+    const hasVariantId =
+      Number.isFinite(normalizedVariantId) && normalizedVariantId > 0;
+
+    if (!isOpen || !orderId || (!productName && !hasVariantId)) {
       setCalculatedPrice(null);
       setPriceLoading(false);
       setPriceError(null);
@@ -50,6 +56,10 @@ export const useCalculatedPrice = ({
       id_product: productName,
       id_order: orderId,
     };
+
+    if (hasVariantId) {
+      payload.variant_id = normalizedVariantId;
+    }
 
     if (normalizedOrderDate) {
       payload.order_date = normalizedOrderDate;
@@ -119,6 +129,7 @@ export const useCalculatedPrice = ({
     orderId,
     productName,
     skipRecalc,
+    variantId,
   ]);
 
   return { calculatedPrice, priceLoading, priceError };
