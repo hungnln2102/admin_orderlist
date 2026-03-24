@@ -83,6 +83,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       })),
     [supplies]
   );
+  const canSelectCustomerType = useMemo(() => {
+    const hasProduct = Boolean(formData[ORDER_FIELDS.ID_PRODUCT]);
+    const hasSupply = Boolean(
+      selectedSupplyId !== null ||
+        ((formData[ORDER_FIELDS.SUPPLY] as string) || "").trim()
+    );
+    return hasProduct && hasSupply;
+  }, [formData, selectedSupplyId]);
 
   const currentProductPctPromo = useMemo(() => {
     const productName = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
@@ -93,10 +101,15 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     return product?.pct_promo ?? null;
   }, [products, formData]);
 
-  const filteredCustomerTypeOptions = useMemo(() => {
-    const hasPromoPrice =
-      currentProductPctPromo !== null && currentProductPctPromo !== undefined;
+  const hasPromoPrice = useMemo(() => {
+    if (currentProductPctPromo === null || currentProductPctPromo === undefined) {
+      return false;
+    }
+    const promoValue = Number(currentProductPctPromo);
+    return Number.isFinite(promoValue) && promoValue > 0;
+  }, [currentProductPctPromo]);
 
+  const filteredCustomerTypeOptions = useMemo(() => {
     return ORDER_CODE_OPTIONS.filter((option) => {
       const value = option.value;
       if (hasPromoPrice) {
@@ -104,9 +117,23 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       }
       return value !== ORDER_CODE_PREFIXES.PROMO;
     });
-  }, [currentProductPctPromo]);
+  }, [hasPromoPrice]);
 
   useEffect(() => {
+    if (hasPromoPrice && customerType === ORDER_CODE_PREFIXES.RETAIL) {
+      handleCustomerTypeChange({
+        target: { value: ORDER_CODE_PREFIXES.PROMO },
+      } as unknown as React.ChangeEvent<HTMLSelectElement>);
+      return;
+    }
+
+    if (!hasPromoPrice && customerType === ORDER_CODE_PREFIXES.PROMO) {
+      handleCustomerTypeChange({
+        target: { value: ORDER_CODE_PREFIXES.RETAIL },
+      } as unknown as React.ChangeEvent<HTMLSelectElement>);
+      return;
+    }
+
     const isCurrentTypeValid = filteredCustomerTypeOptions.some(
       (opt) => opt.value === customerType
     );
@@ -115,7 +142,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         target: { value: filteredCustomerTypeOptions[0].value },
       } as unknown as React.ChangeEvent<HTMLSelectElement>);
     }
-  }, [filteredCustomerTypeOptions, customerType, handleCustomerTypeChange]);
+  }, [
+    filteredCustomerTypeOptions,
+    customerType,
+    handleCustomerTypeChange,
+    hasPromoPrice,
+  ]);
 
   const handlePriceInput = useCallback(
     (
@@ -351,6 +383,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       value={customerType}
                       onChange={handleCustomerTypeChange}
                       className={inputClass}
+                      disabled={!canSelectCustomerType}
                     >
                       {filteredCustomerTypeOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -358,6 +391,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                         </option>
                       ))}
                     </select>
+                    {!canSelectCustomerType && (
+                      <p className="mt-2 text-xs text-slate-400">
+                        Chọn sản phẩm và nguồn trước khi chọn loại khách.
+                      </p>
+                    )}
                   </div>
                 </div>
 

@@ -140,19 +140,10 @@ export const useCreateOrderLogic = (
   ) => {
     const newType = e.target.value as CustomerType;
     setCustomerType(newType);
-    setSelectedSupplyId(null);
-    setSupplies([]);
-    setSupplyPrices([]);
     setIsDataLoaded(false);
     setFormData((prev) => ({
       ...prev,
-      [ORDER_FIELDS.ID_PRODUCT]: "",
-      [ORDER_FIELDS.SUPPLY]: "",
-      [ORDER_FIELDS.COST]: 0,
-      [ORDER_FIELDS.PRICE]: 0,
-      [ORDER_FIELDS.DAYS]: "0",
-      [ORDER_FIELDS.EXPIRY_DATE]:
-        prev[ORDER_FIELDS.ORDER_DATE] || Helpers.getTodayDMY(),
+      [ORDER_FIELDS.ID_ORDER]: newType,
     }));
   };
 

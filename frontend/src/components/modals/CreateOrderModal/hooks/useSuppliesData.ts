@@ -63,7 +63,7 @@ export const useSuppliesData = (apiBase: string) => {
         `products:${apiBase}`,
         async () => {
           const response = await fetch(
-            `${apiBase}${API_ENDPOINTS.PRODUCTS_ALL}`,
+            `${apiBase}${API_ENDPOINTS.PRODUCT_PRICES}`,
             {
               credentials: "include",
             }
