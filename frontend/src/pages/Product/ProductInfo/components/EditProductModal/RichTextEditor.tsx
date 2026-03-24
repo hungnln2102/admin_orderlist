@@ -1,12 +1,12 @@
-import React, { useRef, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Bars3Icon,
   BoldIcon,
+  ChatBubbleBottomCenterTextIcon,
   ItalicIcon,
-  UnderlineIcon,
   LinkIcon,
   ListBulletIcon,
-  Bars3Icon,
-  ChatBubbleBottomCenterTextIcon,
+  UnderlineIcon,
 } from "@heroicons/react/24/outline";
 
 interface RichTextEditorProps {
@@ -15,6 +15,7 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   minHeight?: string;
+  helperText?: string;
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
@@ -23,6 +24,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   placeholder = "Nhập nội dung...",
   minHeight = "200px",
+  helperText,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
@@ -36,17 +38,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }, [value]);
 
   const handleInput = () => {
-    if (editorRef.current) {
-      isUpdatingRef.current = true;
-      onChange(editorRef.current.innerHTML);
-      setTimeout(() => {
-        isUpdatingRef.current = false;
-      }, 0);
-    }
+    if (!editorRef.current) return;
+    isUpdatingRef.current = true;
+    onChange(editorRef.current.innerHTML);
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
   };
 
-  const execCommand = (command: string, value?: string) => {
-    document.execCommand(command, false, value);
+  const execCommand = (command: string, commandValue?: string) => {
+    document.execCommand(command, false, commandValue);
     editorRef.current?.focus();
     handleInput();
   };
@@ -63,43 +64,41 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   const toolbarButtonClass =
-    "p-2.5 rounded-lg border border-white/10 bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white hover:border-white/20 transition-all flex items-center justify-center min-w-[40px]";
-
+    "product-edit-editor__button inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-xl border transition-all";
   const toolbarSelectClass =
-    "px-3 py-2 rounded-lg border border-white/10 bg-slate-800/60 text-slate-300 text-sm hover:bg-slate-700/80 hover:border-white/20 transition-all cursor-pointer min-w-[140px]";
+    "product-edit-editor__select min-h-[42px] min-w-[184px] rounded-xl border px-4 text-sm transition-all";
 
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+    <div className="product-edit-editor space-y-3">
+      <label className="product-edit-editor__label block text-xs font-semibold uppercase tracking-wide">
         {label}
       </label>
-      
-      {/* SEO-Friendly Toolbar */}
-      <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-white/10 bg-slate-950/40">
-        {/* Heading Selector */}
+      {helperText && (
+        <p className="product-edit-editor__helper text-xs">{helperText}</p>
+      )}
+
+      <div className="product-edit-editor__toolbar flex flex-wrap items-center gap-2">
         <select
           onChange={(e) => {
             if (e.target.value) {
               formatBlock(e.target.value);
-              e.target.value = ""; // Reset after selection
+              e.target.value = "";
             }
           }}
           className={toolbarSelectClass}
           defaultValue=""
         >
-          <option value="" disabled>Định dạng tiêu đề</option>
-          <option value="h1">H1 - Tiêu đề chính</option>
-          <option value="h2">H2 - Tiêu đề phụ</option>
-          <option value="h3">H3 - Tiêu đề cấp 3</option>
-          <option value="h4">H4 - Tiêu đề cấp 4</option>
-          <option value="h5">H5 - Tiêu đề cấp 5</option>
-          <option value="h6">H6 - Tiêu đề cấp 6</option>
+          <option value="" disabled>
+            Định dạng tiêu đề
+          </option>
+          <option value="h2">H2 - Tiêu đề section</option>
+          <option value="h3">H3 - Tiêu đề mục con</option>
+          <option value="h4">H4 - Tiêu đề nhỏ</option>
           <option value="p">Đoạn văn bản</option>
         </select>
 
-        <div className="w-px h-10 bg-white/10" />
+        <div className="product-edit-editor__divider h-10 w-px" />
 
-        {/* Text Formatting */}
         <button
           type="button"
           onClick={() => execCommand("bold")}
@@ -125,9 +124,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <UnderlineIcon className="h-4 w-4" />
         </button>
 
-        <div className="w-px h-10 bg-white/10" />
+        <div className="product-edit-editor__divider h-10 w-px" />
 
-        {/* Lists */}
         <button
           type="button"
           onClick={() => execCommand("insertUnorderedList")}
@@ -145,9 +143,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <Bars3Icon className="h-4 w-4" />
         </button>
 
-        <div className="w-px h-10 bg-white/10" />
+        <div className="product-edit-editor__divider h-10 w-px" />
 
-        {/* Link & Quote */}
         <button
           type="button"
           onClick={insertLink}
@@ -165,113 +162,109 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <ChatBubbleBottomCenterTextIcon className="h-4 w-4" />
         </button>
 
-        <div className="w-px h-10 bg-white/10" />
+        <div className="product-edit-editor__divider h-10 w-px" />
 
-        {/* Clear Formatting */}
         <button
           type="button"
           onClick={() => execCommand("removeFormat")}
-          className={`${toolbarButtonClass} text-red-400 hover:text-red-300`}
+          className={`${toolbarButtonClass} product-edit-editor__button--danger`}
           title="Xóa định dạng"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
 
-      {/* Editor */}
       <div
         ref={editorRef}
         contentEditable
         onInput={handleInput}
-        className="w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all overflow-y-auto prose prose-invert prose-headings:text-white prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-xs prose-p:text-sm prose-a:text-indigo-400 prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:pl-4 prose-blockquote:italic max-w-none"
+        className="product-edit-editor__canvas w-full overflow-y-auto rounded-[20px] border px-4 py-4 text-sm outline-none transition-all max-w-none"
         style={{ minHeight }}
         data-placeholder={placeholder}
       />
-      
+
       <style>{`
-        [contentEditable][data-placeholder]:empty:before {
+        .product-edit-editor__canvas[data-placeholder]:empty:before {
           content: attr(data-placeholder);
           color: rgb(148 163 184);
           pointer-events: none;
         }
-        
-        /* SEO-friendly heading styles */
-        [contentEditable] h1 {
+
+        .product-edit-editor__canvas h1 {
           font-size: 1.5rem;
           font-weight: 700;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
           line-height: 1.2;
         }
-        
-        [contentEditable] h2 {
+
+        .product-edit-editor__canvas h2 {
           font-size: 1.25rem;
           font-weight: 700;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
           line-height: 1.3;
         }
-        
-        [contentEditable] h3 {
+
+        .product-edit-editor__canvas h3 {
           font-size: 1.125rem;
           font-weight: 600;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
           line-height: 1.4;
         }
-        
-        [contentEditable] h4 {
+
+        .product-edit-editor__canvas h4 {
           font-size: 1rem;
           font-weight: 600;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
         }
-        
-        [contentEditable] h5 {
+
+        .product-edit-editor__canvas h5 {
           font-size: 0.875rem;
           font-weight: 600;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
         }
-        
-        [contentEditable] h6 {
+
+        .product-edit-editor__canvas h6 {
           font-size: 0.75rem;
           font-weight: 600;
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+          margin: 0.5rem 0;
         }
-        
-        [contentEditable] p {
-          margin-top: 0.5rem;
-          margin-bottom: 0.5rem;
+
+        .product-edit-editor__canvas p {
+          margin: 0.5rem 0;
         }
-        
-        [contentEditable] blockquote {
-          border-left: 4px solid rgb(99 102 241);
+
+        .product-edit-editor__canvas blockquote {
+          border-left: 4px solid rgb(129 140 248);
           padding-left: 1rem;
           font-style: italic;
           color: rgb(203 213 225);
-          margin: 0.5rem 0;
+          margin: 0.75rem 0;
         }
-        
-        [contentEditable] ul, [contentEditable] ol {
-          margin: 0.5rem 0;
+
+        .product-edit-editor__canvas ul,
+        .product-edit-editor__canvas ol {
+          margin: 0.75rem 0;
           padding-left: 1.5rem;
         }
-        
-        [contentEditable] li {
+
+        .product-edit-editor__canvas li {
           margin: 0.25rem 0;
         }
-        
-        [contentEditable] a {
-          color: rgb(129 140 248);
+
+        .product-edit-editor__canvas a {
+          color: rgb(165 180 252);
           text-decoration: underline;
         }
-        
-        [contentEditable] a:hover {
-          color: rgb(165 180 252);
+
+        .product-edit-editor__canvas a:hover {
+          color: rgb(196 181 253);
         }
       `}</style>
     </div>

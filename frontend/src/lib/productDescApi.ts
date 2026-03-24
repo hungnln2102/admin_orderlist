@@ -9,6 +9,7 @@ export interface ProductDescription {
   rulesHtml?: string | null;
   description: string;
   descriptionHtml?: string | null;
+  shortDescription?: string | null;
   imageUrl?: string | null;
 }
 
@@ -30,6 +31,7 @@ export interface ProductDescriptionSavePayload {
   productId: string;
   rules?: string;
   description?: string;
+  shortDesc?: string;
   imageUrl?: string | null;
 }
 
@@ -79,6 +81,10 @@ export const saveProductDescription = async (
     description: (data as any).description || "",
     descriptionHtml:
       (data as any).descriptionHtml || (data as any).description || "",
+    shortDescription:
+      (data as any).shortDescription ??
+      (data as any).shortDesc ??
+      null,
     imageUrl: (data as any).imageUrl ?? null,
   };
 };
@@ -197,8 +203,28 @@ export const fetchProductDescriptions = async (
     typeof data.total === "number" && Number.isFinite(data.total)
       ? data.total
       : normalizedCount;
+  const normalizedItems = data.items.map((item: any) => ({
+    id: Number(item?.id) || 0,
+    productId: item?.productId || item?.product_id || "",
+    productName: item?.productName ?? item?.product_name ?? null,
+    rules: item?.rules || "",
+    rulesHtml: item?.rulesHtml || item?.rules_html || item?.rules || "",
+    description: item?.description || "",
+    descriptionHtml:
+      item?.descriptionHtml ||
+      item?.description_html ||
+      item?.description ||
+      "",
+    shortDescription:
+      item?.shortDescription ??
+      item?.shortDesc ??
+      item?.short_desc ??
+      null,
+    imageUrl: item?.imageUrl ?? item?.image_url ?? null,
+  }));
   return {
     ...data,
+    items: normalizedItems,
     count: normalizedCount,
     total: normalizedTotal,
     offset:

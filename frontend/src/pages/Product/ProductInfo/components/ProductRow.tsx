@@ -24,7 +24,7 @@ const ProductAvatar: React.FC<{
 }> = ({ item, size = "small" }) => {
   const displayName = item.productName || item.productId || "--";
   const dimensions =
-    size === "large" ? "w-32 h-32 text-2xl" : "w-12 h-12 text-xs";
+    size === "large" ? "h-32 w-32 text-2xl" : "h-12 w-12 text-xs";
 
   if (item.imageUrl) {
     return (
@@ -54,8 +54,10 @@ export const ProductRow: React.FC<ProductRowProps> = ({
   const rawRulesHtml = item.rulesHtml || toHtmlFromPlain(item.rules || "");
   const rawDescriptionHtml =
     item.descriptionHtml || toHtmlFromPlain(item.description || "");
-  const { rulesHtml: displayRulesHtml, descriptionHtml: displayDescriptionHtml } =
-    splitCombinedContent(rawRulesHtml, rawDescriptionHtml);
+  const {
+    rulesHtml: displayRulesHtml,
+    descriptionHtml: displayDescriptionHtml,
+  } = splitCombinedContent(rawRulesHtml, rawDescriptionHtml);
   const safeRulesHtml =
     sanitizeHtmlForDisplay(displayRulesHtml) || "Không có thông tin bán hàng";
   const safeDescriptionHtml =
@@ -66,9 +68,9 @@ export const ProductRow: React.FC<ProductRowProps> = ({
   return (
     <React.Fragment key={`${item.id}-${item.productId}`}>
       <tr
-        className={`product-row ${isExpanded ? "product-row--expanded" : ""} hover:bg-white/5 cursor-pointer ${
-          isExpanded ? "bg-white/5" : ""
-        }`}
+        className={`product-row product-info-surface__row ${
+          isExpanded ? "product-row--expanded bg-white/5" : ""
+        } cursor-pointer hover:bg-white/5`}
         onClick={() => onToggle(isExpanded ? null : Number(item.id))}
       >
         <td className="product-row__cell px-4 py-3">
@@ -83,6 +85,7 @@ export const ProductRow: React.FC<ProductRowProps> = ({
             />
           ) : null}
         </td>
+
         <td className="px-4 py-3 text-white">
           <div className="flex flex-col">
             <span className="font-semibold text-white">
@@ -90,17 +93,18 @@ export const ProductRow: React.FC<ProductRowProps> = ({
             </span>
           </div>
         </td>
-        <td className="px-4 py-3 text-white">
-          {displayName || "--"}
-        </td>
-        <td className="px-4 py-3 text-white/80 border-r border-white/10 min-w-[160px]">
+
+        <td className="px-4 py-3 text-white">{displayName || "--"}</td>
+
+        <td className="min-w-[160px] border-r border-white/10 px-4 py-3 text-white/80">
           <span className="block truncate" title={categoryLabel || undefined}>
             {categoryLabel || "--"}
           </span>
         </td>
-        <td className="px-5 py-3 pr-5 text-white/80 align-top border-r border-white/10 min-w-[240px]">
+
+        <td className="min-w-[240px] border-r border-white/10 px-5 py-3 pr-5 align-top text-white/80">
           <span
-            className="block whitespace-pre-line break-words rich-display"
+            className="rich-display block break-words whitespace-pre-line"
             style={{
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -113,9 +117,10 @@ export const ProductRow: React.FC<ProductRowProps> = ({
             }}
           />
         </td>
-        <td className="px-5 py-3 pl-5 text-white/80 align-top border-r border-white/10 min-w-[240px]">
+
+        <td className="min-w-[240px] border-r border-white/10 px-5 py-3 pl-5 align-top text-white/80">
           <span
-            className="block whitespace-pre-line break-words rich-display"
+            className="rich-display block break-words whitespace-pre-line"
             style={{
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -128,16 +133,22 @@ export const ProductRow: React.FC<ProductRowProps> = ({
             }}
           />
         </td>
-        <td className="product-row__actions px-4 py-3 space-x-2 whitespace-nowrap text-center align-top">
+
+        <td className="product-row__actions px-4 py-3 text-center align-top whitespace-nowrap">
           <button
-            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-blue-400 border border-white/10 hover:bg-blue-500/10 hover:border-blue-500/30 transition-all active:scale-90"
+            className="product-info-action-button product-info-action-button--view inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-blue-400 transition-all hover:border-blue-500/30 hover:bg-blue-500/10 active:scale-90"
             title="Xem"
             type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle(isExpanded ? null : Number(item.id));
+            }}
           >
             <EyeIcon className="h-3.5 w-3.5" />
           </button>
+
           <button
-            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-emerald-400 border border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all active:scale-90"
+            className="product-info-action-button product-info-action-button--edit ml-2 inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-emerald-400 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 active:scale-90"
             title="Sửa"
             type="button"
             onClick={(event) => {
@@ -147,37 +158,45 @@ export const ProductRow: React.FC<ProductRowProps> = ({
           >
             <PencilSquareIcon className="h-3.5 w-3.5" />
           </button>
+
           <button
-            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 text-rose-400 border border-white/10 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all active:scale-90"
+            className="product-info-action-button product-info-action-button--delete ml-2 inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-rose-400 transition-all hover:border-rose-500/30 hover:bg-rose-500/10 active:scale-90"
             title="Xóa"
             type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
           >
             <TrashIcon className="h-3.5 w-3.5" />
           </button>
         </td>
       </tr>
+
       {isExpanded && (
-        <tr className="bg-white/5">
-          <td colSpan={6} className="px-6 py-4">
-            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 mb-3 flex flex-col items-center text-center">
-              <p className="text-sm font-semibold text-white">
-                Thông tin chi tiết
-              </p>
-              <p className="mt-2 text-white/80 leading-relaxed">
-                {item.packageProduct || item.productName || item.productId || "Không có thông tin chi tiết."}
+        <tr className="product-info-surface__expanded-row bg-white/5">
+          <td colSpan={7} className="px-6 py-4">
+            <div className="mb-3 flex flex-col items-center rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-center">
+              <p className="text-sm font-semibold text-white">Thông tin chi tiết</p>
+              <p className="mt-2 leading-relaxed text-white/80">
+                {item.packageProduct ||
+                  item.productName ||
+                  item.productId ||
+                  "Không có thông tin chi tiết."}
               </p>
             </div>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="w-full md:w-64 rounded-lg border border-white/10 bg-white/5 p-4 flex flex-col items-center justify-center text-white">
+
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className="flex w-full flex-col items-center justify-center rounded-lg border border-white/10 bg-white/5 p-4 text-white md:w-64">
                 <ProductAvatar item={item} size="large" />
               </div>
+
               <div className="flex-1 space-y-3">
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
                   <p className="text-sm font-semibold text-white">
                     Quy tắc bán hàng
                   </p>
                   <div
-                    className="mt-2 text-white/80 leading-relaxed break-words rich-display"
+                    className="rich-display mt-2 break-words leading-relaxed text-white/80"
                     dangerouslySetInnerHTML={{
                       __html:
                         sanitizeHtmlForDisplay(
@@ -190,12 +209,13 @@ export const ProductRow: React.FC<ProductRowProps> = ({
                     }}
                   />
                 </div>
+
                 <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3">
                   <p className="text-sm font-semibold text-white">
                     Thông tin sản phẩm
                   </p>
                   <div
-                    className="mt-2 text-white/80 leading-relaxed break-words rich-display"
+                    className="rich-display mt-2 break-words leading-relaxed text-white/80"
                     dangerouslySetInnerHTML={{
                       __html:
                         sanitizeHtmlForDisplay(

@@ -8,6 +8,8 @@ import { normalizeErrorMessage } from "../../../../lib/textUtils";
 import { SavePayload } from "../components/EditProductModal";
 import {
   MergedProduct,
+  normalizeRichHtmlForSave,
+  normalizeShortDescriptionForSave,
   normalizeProductKey,
 } from "../utils/productInfoHelpers";
 
@@ -53,12 +55,23 @@ export const useProductEdit = ({
     async (form: SavePayload) => {
       if (!editingProduct) return;
       setEditSaving(true);
-      
+
+      const normalizedRulesHtml = normalizeRichHtmlForSave(
+        form.rulesHtml || form.rules
+      );
+      const normalizedDescriptionHtml = normalizeRichHtmlForSave(
+        form.descriptionHtml || form.description
+      );
+      const normalizedShortDescription = normalizeShortDescriptionForSave(
+        form.shortDescription
+      );
+
       // Payload for product_desc table
       const descPayload = {
         productId: form.productId.trim() || editingProduct.productId || "",
-        rules: form.rulesHtml || form.rules,
-        description: form.descriptionHtml || form.description,
+        rules: normalizedRulesHtml,
+        description: normalizedDescriptionHtml,
+        shortDesc: normalizedShortDescription,
         imageUrl: form.imageUrl || null,
       };
 
@@ -76,10 +89,16 @@ export const useProductEdit = ({
         }
         
         const rulesHtml =
-          saved.rulesHtml || saved.rules || form.rulesHtml || form.rules || "";
+          saved.rulesHtml ||
+          saved.rules ||
+          normalizedRulesHtml ||
+          form.rulesHtml ||
+          form.rules ||
+          "";
         const descriptionHtml =
           saved.descriptionHtml ||
           saved.description ||
+          normalizedDescriptionHtml ||
           form.descriptionHtml ||
           form.description ||
           "";
@@ -94,6 +113,8 @@ export const useProductEdit = ({
           rulesHtml,
           description: saved.description || "",
           descriptionHtml,
+          shortDescription:
+            saved.shortDescription || normalizedShortDescription || null,
           imageUrl: saved.imageUrl || form.imageUrl || null,
         };
 
@@ -115,6 +136,8 @@ export const useProductEdit = ({
                 rulesHtml,
                 description: saved.description || "",
                 descriptionHtml,
+                shortDescription:
+                  saved.shortDescription || normalizedShortDescription || null,
                 imageUrl: saved.imageUrl || null,
               },
             ];
@@ -129,6 +152,8 @@ export const useProductEdit = ({
             rulesHtml,
             description: saved.description || "",
             descriptionHtml,
+            shortDescription:
+              saved.shortDescription || normalizedShortDescription || null,
             imageUrl: saved.imageUrl || null,
           };
           return next;

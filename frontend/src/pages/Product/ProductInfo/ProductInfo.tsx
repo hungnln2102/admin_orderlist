@@ -98,11 +98,13 @@ const ProductInfo: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold text-white">Thông Tin Sản Phẩm</h1>
-        <p className="text-sm text-white/70">
-          Đồng bộ với bảng product_desc trong database.
+    <div className="product-info-page space-y-6">
+      <div className="product-info-page__intro flex flex-col gap-2">
+        <h1 className="product-info-page__title text-2xl font-bold text-white">
+          Thông Tin Sản Phẩm
+        </h1>
+        <p className="product-info-page__description text-sm text-white/70">
+          Đồng bộ với bảng `product_desc` trong database.
         </p>
       </div>
 
@@ -113,7 +115,7 @@ const ProductInfo: React.FC = () => {
       />
 
       {error && (
-        <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+        <div className="product-info-page__error rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {error}
         </div>
       )}

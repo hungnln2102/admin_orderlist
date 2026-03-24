@@ -1,10 +1,10 @@
 import React, { useRef, useState } from "react";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
+  ProductImageItem,
+  deleteProductImage,
   fetchProductImages,
   uploadProductImage,
-  deleteProductImage,
-  ProductImageItem,
 } from "../../../../../lib/productImagesApi";
 
 interface ImageUploadProps {
@@ -13,7 +13,6 @@ interface ImageUploadProps {
   onImageRemove: () => void;
 }
 
-// Image Picker Modal Component
 interface ImagePickerModalProps {
   open: boolean;
   images: ProductImageItem[];
@@ -48,32 +47,36 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 py-6">
-      <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-          <h3 className="text-lg font-semibold text-white">Chọn hình ảnh sản phẩm</h3>
+    <div className="product-image-picker__overlay fixed inset-0 z-[10000] flex items-center justify-center px-4 py-6">
+      <div className="product-image-picker w-full max-w-4xl overflow-hidden rounded-[28px] border">
+        <div className="product-image-picker__header flex items-center justify-between border-b px-5 py-4">
+          <h3 className="product-image-picker__title text-lg font-semibold text-white">
+            Chọn hình ảnh sản phẩm
+          </h3>
         </div>
-        <div className="p-4 space-y-4">
+
+        <div className="product-image-picker__body space-y-4 p-4">
           {loading ? (
             <p className="text-sm text-white/70">Đang tải hình ảnh...</p>
           ) : images.length === 0 ? (
             <p className="text-sm text-white/70">Chưa có hình ảnh nào.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
+            <div className="product-image-picker__grid grid max-h-[400px] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
               {images.map((item) => {
                 const isSelected = selectedImage?.fileName === item.fileName;
+
                 return (
                   <button
                     key={item.fileName}
                     type="button"
-                    className={`rounded-xl border p-2 text-left transition ${
+                    className={`product-image-picker__card rounded-2xl border p-2 text-left transition ${
                       isSelected
-                        ? "border-indigo-400 ring-2 ring-indigo-400/40"
-                        : "border-white/10 hover:border-white/30"
+                        ? "product-image-picker__card--selected"
+                        : "hover:border-white/30"
                     }`}
                     onClick={() => onSelect(item)}
                   >
-                    <div className="aspect-square w-full overflow-hidden rounded-lg bg-black/30">
+                    <div className="product-image-picker__thumb w-full overflow-hidden rounded-xl">
                       <img
                         src={item.url}
                         alt={item.fileName}
@@ -92,9 +95,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           {(error || uploadError) && (
             <div className="space-y-1">
               {error && <p className="text-xs text-rose-300">{error}</p>}
-              {uploadError && (
-                <p className="text-xs text-rose-300">{uploadError}</p>
-              )}
+              {uploadError && <p className="text-xs text-rose-300">{uploadError}</p>}
             </div>
           )}
 
@@ -102,7 +103,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-white/40 bg-transparent px-4 py-2 text-sm font-semibold text-white/90 hover:border-white hover:text-white disabled:opacity-60"
+                className="product-image-picker__button product-image-picker__button--ghost"
                 onClick={onUploadClick}
                 disabled={uploading}
               >
@@ -110,24 +111,25 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
               </button>
               <button
                 type="button"
-                className="rounded-lg border border-rose-400/60 bg-transparent px-4 py-2 text-sm font-semibold text-rose-200 hover:border-rose-300 hover:text-rose-100 disabled:opacity-60"
+                className="product-image-picker__button product-image-picker__button--danger"
                 onClick={onDeleteSelected}
                 disabled={!selectedImage || deleting}
               >
-                {deleting ? "Đang xóa..." : "Xoá hình đã chọn"}
+                {deleting ? "Đang xóa..." : "Xóa hình đã chọn"}
               </button>
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-semibold text-white/70 hover:text-white"
+                className="product-image-picker__button product-image-picker__button--text"
                 onClick={onClose}
               >
                 Hủy
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="product-image-picker__button product-image-picker__button--primary"
                 onClick={onUseSelected}
                 disabled={!selectedImage}
               >
@@ -141,7 +143,6 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   );
 };
 
-// Main ImageUpload Component
 const ImageUpload: React.FC<ImageUploadProps> = ({
   imageUrl,
   onImageChange,
@@ -149,21 +150,21 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Image Picker State
   const [pickerOpen, setPickerOpen] = useState(false);
   const [images, setImages] = useState<ProductImageItem[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imagesError, setImagesError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<ProductImageItem | null>(null);
+  const [selectedImage, setSelectedImage] = useState<ProductImageItem | null>(
+    null
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Load images from server
   const loadImages = async (preferred?: ProductImageItem | null) => {
     setImagesLoading(true);
     setImagesError(null);
+
     try {
       const data = await fetchProductImages();
       const items = Array.isArray(data.items) ? data.items : [];
@@ -184,6 +185,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       if (!nextSelected && items.length) {
         nextSelected = items[0];
       }
+
       setSelectedImage(nextSelected);
     } catch (err) {
       setImagesError(err instanceof Error ? err.message : "Failed to load images.");
@@ -193,7 +195,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   };
 
-  // Open picker modal
   const handleOpenPicker = () => {
     setPickerOpen(true);
     setImagesError(null);
@@ -201,7 +202,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     void loadImages();
   };
 
-  // Local file upload handlers
   const handleFileSelect = (file: File) => {
     if (file && file.type.startsWith("image/")) {
       const reader = new FileReader();
@@ -217,7 +217,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (file) {
       handleFileSelect(file);
@@ -233,21 +233,15 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     setIsDragging(false);
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileSelect(file);
-    }
-  };
-
-  // Server upload handler
   const handleServerUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
     setUploading(true);
     setUploadError(null);
+
     try {
       const result = await uploadProductImage(file);
       onImageChange(result.url);
@@ -272,8 +266,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
 
   const handleDeleteSelected = async () => {
     if (!selectedImage || deleting) return;
+
     setDeleting(true);
     setImagesError(null);
+
     try {
       await deleteProductImage(selectedImage.fileName);
       if (imageUrl === selectedImage.url) {
@@ -288,7 +284,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   };
 
   return (
-    <div className="relative h-full">
+    <div className="product-edit-image relative h-full">
       <input
         ref={fileInputRef}
         type="file"
@@ -296,26 +292,27 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         onChange={handleServerUpload}
         className="hidden"
       />
-      
+
       {imageUrl ? (
-        <div className="relative h-full rounded-2xl overflow-hidden border border-white/15 bg-slate-950/40 group">
+        <div className="product-edit-image__preview group relative h-full overflow-hidden rounded-[28px] border">
           <img
             src={imageUrl}
             alt="Product preview"
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+
+          <div className="product-edit-image__preview-overlay absolute inset-0 flex items-end justify-center gap-3 p-5">
             <button
               type="button"
               onClick={handleOpenPicker}
-              className="px-4 py-2 rounded-lg bg-indigo-500 text-white font-semibold hover:bg-indigo-600 transition-colors"
+              className="product-edit-image__action product-edit-image__action--primary"
             >
-              Chọn từ Server
+              Chọn từ server
             </button>
             <button
               type="button"
               onClick={onImageRemove}
-              className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+              className="product-edit-image__action product-edit-image__action--danger"
             >
               Xóa
             </button>
@@ -327,18 +324,16 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          className={`h-full rounded-2xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center gap-4 p-6 ${
-            isDragging
-              ? "border-indigo-400 bg-indigo-500/20"
-              : "border-white/20 bg-slate-950/40 hover:border-indigo-400/60 hover:bg-slate-900/60"
+          className={`product-edit-image__empty flex h-full cursor-pointer flex-col items-center justify-center gap-4 rounded-[28px] border p-6 text-center transition-all ${
+            isDragging ? "product-edit-image__empty--dragging" : ""
           }`}
         >
-          <PhotoIcon className="h-16 w-16 text-slate-400" />
-          <div className="text-center">
-            <p className="text-sm font-semibold text-white mb-1">
+          <PhotoIcon className="product-edit-image__icon h-16 w-16" />
+          <div>
+            <p className="product-edit-image__title mb-2 text-sm font-semibold text-white">
               Chọn hình ảnh sản phẩm
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="product-edit-image__hint text-xs">
               Nhấp để chọn từ server hoặc kéo thả file
             </p>
           </div>
