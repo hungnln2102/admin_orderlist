@@ -9,6 +9,9 @@ const {
   listProductImages,
   deleteProductImage,
 } = require("../controllers/ProductDescriptionsController");
+const {
+  auditProductSeoProxy,
+} = require("../controllers/ProductDescriptionsController/websiteSeoAudit");
 
 const router = express.Router();
 
@@ -42,6 +45,7 @@ const upload = multer({
 
 router.get("/", listProductDescriptions);
 router.get("/images", listProductImages);
+router.post("/seo-audit", auditProductSeoProxy);
 router.post("/", saveProductDescription);
 router.post("/upload-image", (req, res) => {
   upload.single("image")(req, res, (err) => {

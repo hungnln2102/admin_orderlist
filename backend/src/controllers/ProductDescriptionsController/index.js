@@ -46,6 +46,11 @@ const TABLES = {
   variant: tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT),
 };
 
+const WEBSITE_CACHE_INVALIDATE_URL =
+  process.env.WEBSITE_CACHE_INVALIDATE_URL ||
+  process.env.WEBSITE_API_BASE_URL ||
+  "";
+
 const IMAGE_DIR = path.join(__dirname, "../../../image");
 try {
   fs.mkdirSync(IMAGE_DIR, { recursive: true });
@@ -70,17 +75,49 @@ const isImageFile = (filename) => {
 const findVariantForProductId = async (productId) => {
   const query = `
     SELECT
-      ${quoteIdent(variantColNames.id)} AS id,
-      ${quoteIdent(variantColNames.displayName)} AS display_name,
-      ${quoteIdent(variantColNames.variantName)} AS variant_name
-    FROM ${TABLES.variant}
+      v.${quoteIdent(variantColNames.id)} AS id,
+      v.${quoteIdent(variantColNames.displayName)} AS display_name,
+      v.${quoteIdent(variantColNames.variantName)} AS variant_name,
+      p.${quoteIdent(productColNames.packageName)} AS package_name
+    FROM ${TABLES.variant} v
+    LEFT JOIN ${TABLES.product} p
+      ON p.${quoteIdent(productColNames.id)} = v.product_id
     WHERE
-      LOWER(TRIM(${quoteIdent(variantColNames.displayName)}::text)) = LOWER(TRIM(?))
-      OR LOWER(TRIM(regexp_replace(${quoteIdent(variantColNames.displayName)}::text, '--\\d+m$', '', 'i'))) = LOWER(TRIM(?))
+      LOWER(TRIM(v.${quoteIdent(variantColNames.displayName)}::text)) = LOWER(TRIM(?))
+      OR LOWER(TRIM(regexp_replace(v.${quoteIdent(variantColNames.displayName)}::text, '--\\d+m$', '', 'i'))) = LOWER(TRIM(?))
     LIMIT 1;
   `;
   const result = await db.raw(query, [productId, productId]);
   return result.rows?.[0] || null;
+};
+
+const buildWebsiteInvalidateUrl = () => {
+  const trimmed = normalizeBaseUrl(WEBSITE_CACHE_INVALIDATE_URL);
+  if (!trimmed) return "";
+  if (/\/cache\/invalidate(?:\?|$)/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${trimmed}/cache/invalidate`;
+};
+
+const invalidateWebsiteSeoCache = async () => {
+  const url = buildWebsiteInvalidateUrl();
+  if (!url || typeof fetch !== "function") return;
+
+  try {
+    const response = await fetch(url, { method: "POST" });
+    if (!response.ok) {
+      logger.warn("Website cache invalidate responded non-OK", {
+        url,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    logger.warn("Website cache invalidate failed", {
+      url,
+      error: error?.message || String(error || ""),
+    });
+  }
 };
 
 const mapProductDescRow = (req, row = {}) => {
@@ -395,6 +432,7 @@ const saveProductDescription = async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Variant không tồn tại." });
     }
+    await invalidateWebsiteSeoCache();
     const withProductId = { ...row, product_id: variantRow.display_name, product_name: variantRow.variant_name || variantRow.display_name };
     res.json(mapProductDescRow(req, withProductId));
   } catch (error) {

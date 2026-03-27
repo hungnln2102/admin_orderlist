@@ -35,6 +35,36 @@ export interface ProductDescriptionSavePayload {
   imageUrl?: string | null;
 }
 
+export interface ProductSeoAuditPayload {
+  shortDesc?: string;
+  rulesHtml?: string;
+  descriptionHtml?: string;
+}
+
+export interface ProductSeoAuditCheck {
+  label: string;
+  detail: string;
+  ready: boolean;
+  weight: number;
+}
+
+export interface ProductSeoAuditResult {
+  source: "website-render";
+  passThreshold: number;
+  checks: ProductSeoAuditCheck[];
+  score: number;
+  level: "critical" | "warning" | "good" | "excellent";
+  readyCount: number;
+  heading: string;
+  slug: string;
+  shortDescription: string;
+  descriptionPlainText: string;
+  rulesPlainText: string;
+  titlePreview: string;
+  metaPreview: string;
+  imageAlt: string;
+}
+
 export interface ProductImageUploadResponse {
   url: string;
   fileName?: string;
@@ -87,6 +117,44 @@ export const saveProductDescription = async (
       null,
     imageUrl: (data as any).imageUrl ?? null,
   };
+};
+
+export const auditProductSeo = async (
+  payload: ProductSeoAuditPayload,
+  signal?: AbortSignal
+): Promise<ProductSeoAuditResult> => {
+  const response = await apiFetch("/api/product-descriptions/seo-audit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok) {
+    const jsonPayload = (await response.json().catch(() => null)) as
+      | { error?: string; message?: string }
+      | null;
+    const message =
+      jsonPayload?.error ||
+      jsonPayload?.message ||
+      (await response.text().catch(() => ""));
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Không thể audit SEO từ Website.",
+      })
+    );
+  }
+  const body = (await response.json().catch(() => null)) as
+    | { data?: ProductSeoAuditResult }
+    | ProductSeoAuditResult
+    | null;
+  const data =
+    body && typeof body === "object" && "data" in body ? body.data : body;
+
+  if (!data || typeof data !== "object") {
+    throw new Error("Phản hồi SEO audit không hợp lệ.");
+  }
+
+  return data as ProductSeoAuditResult;
 };
 
 export const uploadProductImage = async (

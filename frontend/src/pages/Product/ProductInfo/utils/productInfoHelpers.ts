@@ -241,7 +241,7 @@ const normalizeSeoHtmlTree = (
     } else if (tagName === "H1") {
       current = replaceElementTag(
         current,
-        options.allowHeadings === false ? "p" : "h2"
+        options.allowHeadings === false ? "p" : "h1"
       );
     } else if (tagName === "H5" || tagName === "H6") {
       current = replaceElementTag(
@@ -307,7 +307,16 @@ const normalizeSeoHtmlTree = (
     });
   });
 
-  const rootBlockTags = new Set(["P", "H2", "H3", "H4", "UL", "OL", "BLOCKQUOTE"]);
+  const rootBlockTags = new Set([
+    "P",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "UL",
+    "OL",
+    "BLOCKQUOTE",
+  ]);
   const wrapInlineRuns = () => {
     const nodes = Array.from(body.childNodes);
     let buffer: ChildNode[] = [];
@@ -347,8 +356,15 @@ const normalizeSeoHtmlTree = (
 
   wrapInlineRuns();
 
+  const h1Elements = Array.from(body.querySelectorAll("h1"));
+  h1Elements.forEach((element, index) => {
+    if (index === 0) return;
+    replaceElementTag(element as HTMLElement, "h2");
+  });
+
   const allowedTags = new Set([
     "P",
+    "H1",
     "H2",
     "H3",
     "H4",

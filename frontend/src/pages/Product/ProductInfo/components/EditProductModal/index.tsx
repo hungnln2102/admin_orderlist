@@ -5,9 +5,17 @@ import {
   normalizeRichHtmlForSave,
   toHtmlFromPlain,
 } from "../../utils/productInfoHelpers";
+import { BasicInfoPanel } from "./BasicInfoPanel";
 import ImageUpload from "./ImageUpload";
-import RichTextEditor from "./RichTextEditor";
+import { SeoContentSection } from "./SeoContentSection";
+import { SeoPreviewPanel } from "./SeoPreviewPanel";
 import { EditFormState, EditProductModalProps } from "./types";
+import { useWebsiteSeoAudit } from "./useWebsiteSeoAudit";
+
+const INPUT_BASE =
+  "product-edit-modal__input w-full rounded-xl border px-4 py-3.5 text-sm text-white placeholder:text-slate-400 outline-none transition-all";
+const LABEL_BASE =
+  "product-edit-modal__label mb-2 block text-xs font-semibold uppercase tracking-wide";
 
 export const EditProductModal: React.FC<EditProductModalProps> = ({
   product,
@@ -42,16 +50,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
     setForm(initialForm);
   }, [initialForm, product]);
 
+  const {
+    evaluation: seoEvaluation,
+    loading: seoAuditLoading,
+    error: seoAuditError,
+  } = useWebsiteSeoAudit({
+    shortDescription: form.shortDescription,
+    rulesHtml: form.rulesHtml,
+    descriptionHtml: form.descriptionHtml,
+  });
+
   const handleSubmit = () => {
     onSave(form);
   };
 
   if (!product) return null;
-
-  const inputBase =
-    "product-edit-modal__input w-full rounded-xl border px-4 py-3.5 text-sm text-white placeholder:text-slate-400 outline-none transition-all";
-  const labelBase =
-    "product-edit-modal__label mb-2 block text-xs font-semibold uppercase tracking-wide";
 
   return (
     <div className="product-edit-modal__overlay fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -72,8 +85,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             </h2>
           </div>
 
-          <div className="product-edit-modal__layout grid gap-6 xl:grid-cols-[368px_minmax(0,1fr)]">
-            <aside className="product-edit-modal__sidebar space-y-5">
+          <div className="product-edit-modal__layout">
+            <aside className="product-edit-modal__sidebar">
               <section className="product-edit-modal__image-frame">
                 <ImageUpload
                   imageUrl={form.imageUrl}
@@ -86,117 +99,58 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
                 />
               </section>
 
-              <section className="product-edit-modal__panel product-edit-modal__panel--basic p-5">
-                <h3 className="product-edit-modal__panel-title mb-5">
-                  Thông Tin Cơ Bản
-                </h3>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelBase}>Mã sản phẩm</label>
-                    <input
-                      type="text"
-                      value={form.productId}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, productId: e.target.value }))
-                      }
-                      placeholder="Nhập mã sản phẩm..."
-                      className={inputBase}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelBase}>Tên sản phẩm</label>
-                    <input
-                      type="text"
-                      value={form.productName}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          productName: e.target.value,
-                        }))
-                      }
-                      placeholder="Nhập tên sản phẩm..."
-                      className={inputBase}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelBase}>Gói sản phẩm</label>
-                    <input
-                      type="text"
-                      value={form.packageName}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          packageName: e.target.value,
-                        }))
-                      }
-                      placeholder="Nhập gói sản phẩm..."
-                      className={inputBase}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelBase}>Mô tả ngắn</label>
-                    <p className="product-edit-editor__helper mb-2">
-                      Viết 1-2 câu ngắn, chứa từ khóa chính và lợi ích nổi bật
-                      của sản phẩm. Khi lưu sẽ được chuyển thành đoạn HTML `p`
-                      chuẩn SEO.
-                    </p>
-                    <textarea
-                      value={form.shortDescription}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          shortDescription: e.target.value,
-                        }))
-                      }
-                      rows={4}
-                      placeholder="Nhập mô tả ngắn về sản phẩm..."
-                      className={`${inputBase} product-edit-modal__textarea resize-none`}
-                    />
-                  </div>
-                </div>
-              </section>
+              <BasicInfoPanel
+                form={form}
+                setForm={setForm}
+                inputBase={INPUT_BASE}
+                labelBase={LABEL_BASE}
+              />
             </aside>
 
             <section className="product-edit-modal__panel product-edit-modal__panel--editor p-5">
-              <div className="space-y-5">
-                <div className="product-edit-modal__seo-note rounded-2xl border px-4 py-3 text-sm">
-                  HTML khi lưu sẽ tự chuẩn hóa về `p`, `h2-h4`, `ul/ol/li`,
-                  `strong/em`, `a`, `blockquote`. Không dùng `H1` trong mô tả
-                  sản phẩm để tránh xung đột SEO trên trang chi tiết.
+              <div className="product-edit-modal__editor-stack">
+                <div className="product-edit-modal__editor-row">
+                  <SeoContentSection
+                    kicker="Cấu trúc nội dung"
+                    title="Quy tắc sản phẩm"
+                    description="Dùng để viết điều kiện sử dụng, lưu ý, checklist và hướng dẫn ngắn cho khách hàng."
+                    badgeText="HTML SEO"
+                    badgeClassName="product-edit-modal__content-badge product-edit-modal__content-badge--rules"
+                    editorLabel="Quy tắc sản phẩm"
+                    editorValue={form.rulesHtml || ""}
+                    editorPlaceholder="Nhập quy tắc sản phẩm..."
+                    onEditorChange={(value) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        rulesHtml: value,
+                        rules: value.replace(/<[^>]*>/g, ""),
+                      }))
+                    }
+                  />
+
+                  <SeoContentSection
+                    kicker="Nội dung chính"
+                    title="Mô tả sản phẩm"
+                    description="Dùng để viết nội dung chính của trang: H1 mở bài, các section H2 và phần mô tả chi tiết."
+                    badgeText="HTML SEO"
+                    badgeClassName="product-edit-modal__content-badge product-edit-modal__content-badge--description"
+                    editorLabel="Mô tả sản phẩm"
+                    editorValue={form.descriptionHtml || ""}
+                    editorPlaceholder="Nhập mô tả chi tiết sản phẩm..."
+                    onEditorChange={(value) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        descriptionHtml: value,
+                        description: value.replace(/<[^>]*>/g, ""),
+                      }))
+                    }
+                  />
                 </div>
 
-                <RichTextEditor
-                  label="Quy tắc sản phẩm"
-                  helperText="Dùng H2 cho tiêu đề section, H3 cho mục con, danh sách cho điều kiện hoặc lưu ý."
-                  value={form.rulesHtml || ""}
-                  onChange={(value) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      rulesHtml: value,
-                      rules: value.replace(/<[^>]*>/g, ""),
-                    }));
-                  }}
-                  placeholder="Nhập quy tắc sản phẩm..."
-                  minHeight="140px"
-                />
-
-                <RichTextEditor
-                  label="Mô tả sản phẩm"
-                  helperText="Nên chia theo H2/H3, mỗi đoạn tập trung một ý chính và chèn liên kết nội bộ khi phù hợp."
-                  value={form.descriptionHtml || ""}
-                  onChange={(value) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      descriptionHtml: value,
-                      description: value.replace(/<[^>]*>/g, ""),
-                    }));
-                  }}
-                  placeholder="Nhập mô tả chi tiết sản phẩm..."
-                  minHeight="188px"
+                <SeoPreviewPanel
+                  evaluation={seoEvaluation}
+                  loading={seoAuditLoading}
+                  error={seoAuditError}
                 />
               </div>
             </section>

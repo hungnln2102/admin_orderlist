@@ -8,7 +8,9 @@ import {
 import * as Helpers from "../../../../lib/helpers";
 import {
   formatCurrency,
+  formatOrderCodeShort,
 } from "../utils/ordersHelpers";
+import { getOrderCodeTheme } from "../utils/orderCodeTheme";
 import {
   CheckCircleIcon,
   EyeIcon,
@@ -94,6 +96,8 @@ export const OrderRow = React.memo(function OrderRow({
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
   const expiryDateDisplay = order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
   const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+  const orderCodeDisplay = formatOrderCodeShort(orderCodeText);
+  const orderTheme = getOrderCodeTheme(orderCodeText);
   const isRenewing = renewingOrderCode === orderCodeText;
 
   const remainingValue = Number.isFinite(Number(soNgayConLai))
@@ -123,37 +127,42 @@ export const OrderRow = React.memo(function OrderRow({
       action(order);
     };
 
+  const cellClass = `order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y transition-all duration-500 ${orderTheme.rowSurfaceClass}`;
+
   return (
     <React.Fragment>
       <tr
         onClick={handleToggle}
         className={`order-row ${isExpanded ? "order-row--expanded" : ""} group/row cursor-pointer transition-all duration-500 ${isExpanded ? "z-20" : "z-10"}`}
       >
-        <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 first:rounded-l-[16px] sm:first:rounded-l-[24px] last:rounded-r-[16px] sm:last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 overflow-hidden max-w-0">
+        <td className={`${cellClass} first:rounded-l-[16px] sm:first:rounded-l-[24px] overflow-hidden max-w-0`}>
           <div className="flex flex-col items-center w-full">
-            <span className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase truncate w-full block text-center">
-              {order[ORDER_FIELDS.ID_ORDER] || ""}
+            <span
+              className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase truncate w-full block text-center"
+              title={orderCodeText}
+            >
+              {orderCodeDisplay}
             </span>
-            <span className="text-indigo-400/80 text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider truncate w-full block text-center">
+            <span className={`${orderTheme.accentTextClass} text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider truncate w-full block text-center`}>
               {order[ORDER_FIELDS.ID_PRODUCT] || ""}
             </span>
           </div>
         </td>
 
-        <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 overflow-hidden max-w-0">
+        <td className={`${cellClass} overflow-hidden max-w-0`}>
           <div className="flex flex-col items-center w-full">
             <span className="text-indigo-100/90 text-xs font-medium tracking-wide text-center truncate w-full block">
               {order[ORDER_FIELDS.INFORMATION_ORDER] || "—"}
             </span>
             {order[ORDER_FIELDS.SLOT] ? (
-              <div className="mt-1 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-indigo-300/80 uppercase w-full truncate text-center block">
+              <div className={`mt-1 px-2 py-0.5 rounded-md border text-[11px] font-bold uppercase w-full truncate text-center block ${orderTheme.badgeClass} ${orderTheme.badgeTextClass}`}>
                 {order[ORDER_FIELDS.SLOT]}
               </div>
             ) : null}
           </div>
         </td>
 
-        <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 overflow-hidden max-w-0">
+        <td className={`${cellClass} overflow-hidden max-w-0`}>
           <div className="flex flex-col items-center w-full">
             <span className="text-sm font-bold text-white tracking-tight truncate w-full block text-center">
               {order[ORDER_FIELDS.CUSTOMER] || "Khách ẩn"}
@@ -164,7 +173,7 @@ export const OrderRow = React.memo(function OrderRow({
           </div>
         </td>
 
-        <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
+        <td className={`${cellClass} text-center`}>
           <div className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-[11px] font-bold text-indigo-200 w-full truncate">
             <span className="truncate">{orderDateDisplay || "—"}</span>
             <span className="text-white/20 shrink-0">/</span>
@@ -172,14 +181,14 @@ export const OrderRow = React.memo(function OrderRow({
           </div>
         </td>
         {showRemainingColumn && (
-          <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
+          <td className={`${cellClass} text-center`}>
             <span className={`text-sm font-black transition-all group-hover/row:scale-110 inline-block w-full truncate ${remainingClass}`}>
               {remainingDisplay}
             </span>
           </td>
         )}
 
-        <td className="order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-center">
+        <td className={`${cellClass} text-center`}>
           <span
             className={`inline-block px-2 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-full border shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)] whitespace-nowrap w-full truncate overflow-hidden text-ellipsis ${Helpers.getStatusColor(
               String(trangThaiText || "")
@@ -188,7 +197,7 @@ export const OrderRow = React.memo(function OrderRow({
             {String(trangThaiText || "")}
           </span>
         </td>
-        <td className="order-row__actions px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 last:rounded-r-[16px] sm:last:rounded-r-[24px]">
+        <td className={`order-row__actions px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y transition-all duration-500 last:rounded-r-[16px] sm:last:rounded-r-[24px] ${orderTheme.rowSurfaceClass}`}>
           <div className="flex space-x-2 justify-end flex-shrink-0">
             <button
               onClick={stopPropagation(onView)}
@@ -228,7 +237,7 @@ export const OrderRow = React.memo(function OrderRow({
       {isExpanded && (
         <tr className="order-row__expandable animate-in fade-in slide-in-from-top-2 duration-300">
           <td colSpan={totalColumns} className="order-row__expandable-cell px-6 pb-8 pt-2">
-            <div className="order-row__expandable-content rounded-[32px] glass-panel-light p-6 shadow-2xl border border-indigo-500/20">
+            <div className={`order-row__expandable-content rounded-[32px] glass-panel-light p-6 shadow-2xl border ${orderTheme.expandablePanelClass}`}>
               <div className="order-row__expandable-header mb-4 flex items-center justify-between">
                 <div className="flex-1 text-center">
                   <p className="text-sm font-semibold text-indigo-50">
@@ -274,48 +283,48 @@ export const OrderRow = React.memo(function OrderRow({
                 )}
               </div>
               <div className="order-row__detail-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <div className="order-row__detail-item rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Nguồn
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     {order[ORDER_FIELDS.SUPPLY] || "N/A"}
                   </p>
                 </div>
-                <div className="order-row__detail-item rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Giá nhập
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     {formatCurrency(costValue)}
                   </p>
                 </div>
-                <div className="order-row__detail-item rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Giá bán
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     {formatCurrency(priceValue)}
                   </p>
                 </div>
-                <div className="order-row__detail-item rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Giá trị còn lại
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     {formatCurrency(giaTriConLaiForCanceled)}
                   </p>
                 </div>
-                <div className="order-row__detail-item rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Số ngày
                   </p>
                   <p className="mt-1 text-sm font-semibold text-white">
                     {order[ORDER_FIELDS.DAYS] || 0}
                   </p>
                 </div>
-                <div className="order-row__detail-item order-row__detail-item--note rounded-xl border border-indigo-200/60 bg-indigo-500/20 p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center">
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-200">
+                <div className={`order-row__detail-item order-row__detail-item--note rounded-xl border p-3 text-center sm:col-span-2 lg:col-span-5 flex flex-col items-center justify-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
                     Ghi chú
                   </p>
                   <p className="mt-1 text-sm text-indigo-50 text-center">

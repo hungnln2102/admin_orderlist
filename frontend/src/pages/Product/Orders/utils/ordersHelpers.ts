@@ -40,6 +40,22 @@ export const normalizeSearchText = (value: unknown): string => {
 export const normalizeOrderCode = (value: unknown): string =>
   normalizeSearchText(value).replace(/[^a-z0-9]/g, "");
 
+export const formatOrderCodeShort = (
+  value: unknown,
+  headLength = 8,
+  tailLength = 4
+): string => {
+  if (value === null || value === undefined) return "";
+
+  const code = String(value).trim();
+  if (!code) return "";
+
+  const minLengthToShorten = headLength + tailLength + 1;
+  if (code.length <= minLengthToShorten) return code;
+
+  return `${code.slice(0, headLength)}...${code.slice(-tailLength)}`;
+};
+
 export const resolveDateDisplay = (
   displayValue: string | number | Date | null | undefined,
   fallbackValue: string | number | Date | null | undefined

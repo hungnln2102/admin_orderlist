@@ -80,7 +80,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <div className="absolute z-30 mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 shadow-[0_24px_45px_-18px_rgba(2,6,23,0.95)] max-h-64 overflow-auto animate-in fade-in slide-in-from-top-2 duration-150">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-slate-400 italic">
-              Khong co ket qua
+              Không có kết quả
             </div>
           ) : (
             filtered.map((opt) => (

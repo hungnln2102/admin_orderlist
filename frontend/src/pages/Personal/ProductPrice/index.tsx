@@ -86,7 +86,7 @@ export default function ProductPrice() {
           setProductPrices([]);
         }
       } catch (err) {
-        console.error("Khong the tai pricing:", err);
+        console.error("Không thể tải pricing:", err);
       }
     };
     fetchProductPrices();
@@ -108,7 +108,7 @@ export default function ProductPrice() {
           );
         }
       } catch (err) {
-        console.error("Khong the tai product_desc:", err);
+        console.error("Không thể tải product_desc:", err);
       }
     };
     fetchProductDescs();
