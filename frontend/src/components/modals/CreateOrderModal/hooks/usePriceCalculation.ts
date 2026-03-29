@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  API_ENDPOINTS,
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import { apiFetch } from "../../../../lib/api";
 import * as Helpers from "../../../../lib/helpers";
 import { showAppNotification } from "@/lib/notifications";
+import { fetchCalculatedPrice } from "../../../../lib/pricingApi";
 import {
   calculateExpirationDate,
   convertDMYToYMD,
@@ -66,31 +65,26 @@ export const usePriceCalculation = ({
       try {
         const normalizedOrderDate =
           convertDMYToYMD(registerDateStr) || registerDateStr || null;
-        const response = await apiFetch(API_ENDPOINTS.CALCULATE_PRICE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = (await fetchCalculatedPrice(
+          {
             supply_id: supplyId,
             san_pham_name: productNameParam,
             id_product: productNameParam,
             id_order: orderIdParam,
             order_date: normalizedOrderDate,
             customer_type: customerType,
-          }),
-          signal: controller.signal,
-        });
-
-        const { data, rawText } =
-          await Helpers.readJsonOrText<RawCalculatedPriceResult>(response);
+          },
+          { signal: controller.signal }
+        )) as RawCalculatedPriceResult;
 
         if (requestId !== requestSeqRef.current) {
           return undefined;
         }
 
-        if (!response.ok) {
+        /* legacy response guard removed
           const message =
             (data as { error?: string } | null)?.error ||
-            rawText ||
+            "" ||
             "Lỗi tính giá từ Server.";
           throw new Error(message);
         }
@@ -98,6 +92,7 @@ export const usePriceCalculation = ({
         if (!data) {
           throw new Error("Phản hồi không hợp lệ từ server.");
         }
+        */
 
         const raw = (data || {}) as RawCalculatedPriceResult;
         const normalizedRegisterDMY =

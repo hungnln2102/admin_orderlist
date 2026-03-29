@@ -1,5 +1,5 @@
 import React from "react";
-import {
+import type {
   DeleteProductState,
   NewSupplyRowState,
   ProductEditFormState,
@@ -7,9 +7,13 @@ import {
   SupplierOption,
   SupplyPriceState,
 } from "../types";
-import { normalizeProductKey } from "../utils";
-import ProductRow from "./ProductRow";
-import { PriceCard } from "./PriceCard";
+import type {
+  ProductRowEditControls,
+  ProductRowSupplyControls,
+} from "./productRowContracts";
+import { ProductTableDesktopSection } from "./product-table/ProductTableDesktopSection";
+import { ProductTableMobileSection } from "./product-table/ProductTableMobileSection";
+import { ProductTablePagination } from "./product-table/ProductTablePagination";
 
 interface ProductTableProps {
   items: ProductPricingRow[];
@@ -29,7 +33,6 @@ interface ProductTableProps {
   editingSupplyRows: Record<string, boolean>;
   supplyPriceDrafts: Record<string, string>;
   savingSupplyRows: Record<string, boolean>;
-  supplyRowErrors: Record<string, string | null>;
   newSupplyRows: Record<number, NewSupplyRowState>;
   editingProductId: number | null;
   productEditForm: ProductEditFormState | null;
@@ -104,7 +107,6 @@ const ProductTable: React.FC<ProductTableProps> = ({
   editingSupplyRows,
   supplyPriceDrafts,
   savingSupplyRows,
-  supplyRowErrors,
   newSupplyRows,
   editingProductId,
   productEditForm,
@@ -131,7 +133,6 @@ const ProductTable: React.FC<ProductTableProps> = ({
 }) => {
   const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
   const clampedCurrent = Math.min(Math.max(currentPage, 1), totalPages);
-  const pageOptions = [10, 20, 50];
   const paginationItems = React.useMemo<(number | "ellipsis")[]>(() => {
     const addPage = (page: number, target: Set<number>) => {
       if (page >= 1 && page <= totalPages) target.add(page);
@@ -170,281 +171,112 @@ const ProductTable: React.FC<ProductTableProps> = ({
     onPageChange(nextPage);
   };
 
-  const controlButtonClass =
-    "w-10 h-10 flex items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition-all hover:bg-white/10 hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95";
-  const pageButtonClass =
-    "w-10 h-10 flex items-center justify-center rounded-xl font-bold border border-white/10 bg-white/5 text-white/80 transition-all hover:bg-white/10 hover:border-white/20 active:scale-95";
-  const activePageClass =
-    "bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-white/20 shadow-[0_8px_20px_-6px_rgba(99,102,241,0.6)]";
+  const editControls = React.useMemo<ProductRowEditControls>(
+    () => ({
+      editingProductId,
+      productEditForm,
+      productEditError,
+      isSavingProductEdit,
+      onStartProductEdit,
+      onProductEditChange,
+      onCancelProductEdit,
+      onSubmitProductEdit,
+      onRequestDeleteProduct,
+    }),
+    [
+      editingProductId,
+      productEditForm,
+      productEditError,
+      isSavingProductEdit,
+      onStartProductEdit,
+      onProductEditChange,
+      onCancelProductEdit,
+      onSubmitProductEdit,
+      onRequestDeleteProduct,
+    ]
+  );
+
+  const supplyControls = React.useMemo<ProductRowSupplyControls>(
+    () => ({
+      supplierOptions,
+      isLoadingSuppliers,
+      editingSupplyRows,
+      supplyPriceDrafts,
+      savingSupplyRows,
+      onStartEditingSupply,
+      onSupplyInputChange,
+      onCancelSupplyEditing,
+      onConfirmSupplyEditing,
+      onStartAddSupplierRow,
+      onNewSupplierInputChange,
+      onCancelAddSupplierRow,
+      onConfirmAddSupplierRow,
+      onDeleteSupplyRow,
+      fetchSupplyPricesForProduct,
+    }),
+    [
+      supplierOptions,
+      isLoadingSuppliers,
+      editingSupplyRows,
+      supplyPriceDrafts,
+      savingSupplyRows,
+      onStartEditingSupply,
+      onSupplyInputChange,
+      onCancelSupplyEditing,
+      onConfirmSupplyEditing,
+      onStartAddSupplierRow,
+      onNewSupplierInputChange,
+      onCancelAddSupplierRow,
+      onConfirmAddSupplierRow,
+      onDeleteSupplyRow,
+      fetchSupplyPricesForProduct,
+    ]
+  );
 
   return (
     <div className="overflow-hidden rounded-[32px] border border-white/5 bg-white/5 text-white shadow-2xl backdrop-blur-xl">
-      {/* ───── Mobile card view (< md) ───── */}
       <div className="md:hidden">
-        {isLoading ? (
-          <div className="px-6 py-8 text-center text-sm text-white/80">
-            Đang Tải Dữ Liệu...
-          </div>
-        ) : items.length === 0 ? (
-          <div className="px-6 py-8 text-center text-sm text-white/80">
-            {error ? "Không thể tải dữ liệu. Vui lòng thử lại." : "Không có sản phẩm."}
-          </div>
-        ) : (
-          <div className="p-3 space-y-3">
-            {items.map((item) => {
-              const isExpanded = expandedProductId === item.id;
-              const isDeletingCurrent =
-                deleteProductState.product?.id === item.id && deleteProductState.loading;
-              const productKey = normalizeProductKey(item.sanPhamRaw);
-              const supplyState = supplyPriceMap[productKey];
-              const pendingNewSupply = newSupplyRows[item.id] || null;
-
-              return (
-                <div key={`card-${item.id}`}>
-                  <PriceCard
-                    item={item}
-                    isExpanded={isExpanded}
-                    statusOverride={statusOverrides[item.id]}
-                    updatedTimestamp={updatedTimestampMap[item.id]}
-                    isDeletingProduct={isDeletingCurrent}
-                    onToggleProductDetails={onToggleProductDetails}
-                    onStartProductEdit={(e, product) => {
-                    if (!isExpanded) {
-                      onToggleProductDetails(product);
-                    }
-                    onStartProductEdit(e, product);
-                  }}
-                    onRequestDeleteProduct={onRequestDeleteProduct}
-                    onToggleStatus={onToggleStatus}
-                  />
-                  {/* Expanded detail rendered via ProductRow inside a table wrapper */}
-                  {isExpanded && (
-                    <div className="mt-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/60">
-                      <table className="w-full text-white">
-                        <tbody>
-                          <ProductRow
-                            item={item}
-                            productKey={productKey}
-                            isExpanded={true}
-                            statusOverride={statusOverrides[item.id]}
-                            updatedTimestamp={updatedTimestampMap[item.id]}
-                            supplyState={supplyState}
-                            pendingNewSupply={pendingNewSupply}
-                            supplierOptions={supplierOptions}
-                            isLoadingSuppliers={isLoadingSuppliers}
-                            editingProductId={editingProductId}
-                            productEditForm={productEditForm}
-                            productEditError={productEditError}
-                            isSavingProductEdit={isSavingProductEdit}
-                            isDeletingProduct={isDeletingCurrent}
-                            editingSupplyRows={editingSupplyRows}
-                            supplyPriceDrafts={supplyPriceDrafts}
-                            savingSupplyRows={savingSupplyRows}
-                            supplyRowErrors={supplyRowErrors}
-                            onToggleProductDetails={onToggleProductDetails}
-                            onStartProductEdit={onStartProductEdit}
-                            onProductEditChange={onProductEditChange}
-                            onCancelProductEdit={onCancelProductEdit}
-                            onSubmitProductEdit={onSubmitProductEdit}
-                            onRequestDeleteProduct={onRequestDeleteProduct}
-                            onStartEditingSupply={onStartEditingSupply}
-                            onSupplyInputChange={onSupplyInputChange}
-                            onCancelSupplyEditing={onCancelSupplyEditing}
-                            onConfirmSupplyEditing={onConfirmSupplyEditing}
-                            onStartAddSupplierRow={onStartAddSupplierRow}
-                            onNewSupplierInputChange={onNewSupplierInputChange}
-                            onCancelAddSupplierRow={onCancelAddSupplierRow}
-                            onConfirmAddSupplierRow={onConfirmAddSupplierRow}
-                            onDeleteSupplyRow={onDeleteSupplyRow}
-                            onToggleStatus={onToggleStatus}
-                            fetchSupplyPricesForProduct={fetchSupplyPricesForProduct}
-                          />
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <ProductTableMobileSection
+          items={items}
+          isLoading={isLoading}
+          error={error}
+          expandedProductId={expandedProductId}
+          supplyPriceMap={supplyPriceMap}
+          statusOverrides={statusOverrides}
+          updatedTimestampMap={updatedTimestampMap}
+          newSupplyRows={newSupplyRows}
+          deleteProductState={deleteProductState}
+          editControls={editControls}
+          supplyControls={supplyControls}
+          onToggleProductDetails={onToggleProductDetails}
+          onToggleStatus={onToggleStatus}
+        />
       </div>
 
-      {/* ───── Desktop table view (>= md) ───── */}
-      <div className="overflow-x-auto hidden md:block">
-        <table className="min-w-full divide-y divide-white/10 text-white">
-          <thead className="bg-white/5">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Sản Phẩm
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Giá Sỉ
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Giá Lẻ
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Giá Khuyến Mãi
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Tình Trạng Sản Phẩm
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Cập Nhật
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
-                Thao Tác
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/10 bg-white/5">
-            {isLoading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-6 py-8 text-center text-sm text-white/80"
-                >
-                  Đang Tải Dữ Liệu...
-                </td>
-              </tr>
-            ) : items.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-6 py-8 text-center text-sm text-white/80"
-                >
-                  {error
-                    ? "Không thể tải dữ liệu. Vui lòng thử lại."
-                    : "Không có sản phẩm."}
-                </td>
-              </tr>
-            ) : (
-              items.map((item) => {
-                const isExpanded = expandedProductId === item.id;
-                const productKey = normalizeProductKey(item.sanPhamRaw);
-                const supplyState = supplyPriceMap[productKey];
-                const pendingNewSupply = newSupplyRows[item.id] || null;
-                const isDeletingCurrent =
-                  deleteProductState.product?.id === item.id &&
-                  deleteProductState.loading;
+      <ProductTableDesktopSection
+        items={items}
+        isLoading={isLoading}
+        error={error}
+        expandedProductId={expandedProductId}
+        supplyPriceMap={supplyPriceMap}
+        statusOverrides={statusOverrides}
+        updatedTimestampMap={updatedTimestampMap}
+        newSupplyRows={newSupplyRows}
+        deleteProductState={deleteProductState}
+        editControls={editControls}
+        supplyControls={supplyControls}
+        onToggleProductDetails={onToggleProductDetails}
+        onToggleStatus={onToggleStatus}
+      />
 
-                return (
-                  <ProductRow
-                    key={item.id}
-                    item={item}
-                    productKey={productKey}
-                    isExpanded={isExpanded}
-                    statusOverride={statusOverrides[item.id]}
-                    updatedTimestamp={updatedTimestampMap[item.id]}
-                    supplyState={supplyState}
-                    pendingNewSupply={pendingNewSupply}
-                    supplierOptions={supplierOptions}
-                    isLoadingSuppliers={isLoadingSuppliers}
-                    editingProductId={editingProductId}
-                    productEditForm={productEditForm}
-                    productEditError={productEditError}
-                    isSavingProductEdit={isSavingProductEdit}
-                    isDeletingProduct={isDeletingCurrent}
-                    editingSupplyRows={editingSupplyRows}
-                    supplyPriceDrafts={supplyPriceDrafts}
-                    savingSupplyRows={savingSupplyRows}
-                    supplyRowErrors={supplyRowErrors}
-                    onToggleProductDetails={onToggleProductDetails}
-                    onStartProductEdit={onStartProductEdit}
-                    onProductEditChange={onProductEditChange}
-                    onCancelProductEdit={onCancelProductEdit}
-                    onSubmitProductEdit={onSubmitProductEdit}
-                    onRequestDeleteProduct={onRequestDeleteProduct}
-                    onStartEditingSupply={onStartEditingSupply}
-                    onSupplyInputChange={onSupplyInputChange}
-                    onCancelSupplyEditing={onCancelSupplyEditing}
-                    onConfirmSupplyEditing={onConfirmSupplyEditing}
-                    onStartAddSupplierRow={onStartAddSupplierRow}
-                    onNewSupplierInputChange={onNewSupplierInputChange}
-                    onCancelAddSupplierRow={onCancelAddSupplierRow}
-                    onConfirmAddSupplierRow={onConfirmAddSupplierRow}
-                    onDeleteSupplyRow={onDeleteSupplyRow}
-                    onToggleStatus={onToggleStatus}
-                    fetchSupplyPricesForProduct={fetchSupplyPricesForProduct}
-                  />
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex flex-col gap-3 border-t border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white/80 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2">
-          <span>Hiển thị</span>
-          <select
-            className="rounded-lg border border-white/20 bg-slate-900 px-3 py-1 text-white shadow-sm focus:border-indigo-400 focus:outline-none"
-            value={rowsPerPage}
-            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-          >
-            {pageOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-          <span>dòng</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            className={controlButtonClass}
-            onClick={() => handlePageSelect(1)}
-            disabled={clampedCurrent === 1}
-            aria-label="Trang đầu"
-          >
-            {"<<"}
-          </button>
-          <button
-            className={controlButtonClass}
-            onClick={() => handlePageSelect(clampedCurrent - 1)}
-            disabled={clampedCurrent === 1}
-            aria-label="Trang trước"
-          >
-            {"<"}
-          </button>
-          {paginationItems.map((item, index) =>
-            item === "ellipsis" ? (
-              <span
-                key={`ellipsis-${index}`}
-                className="w-10 h-10 flex items-center justify-center text-white/50"
-              >
-                ...
-              </span>
-            ) : (
-              <button
-                key={item}
-                className={`${pageButtonClass} ${
-                  clampedCurrent === item ? activePageClass : ""
-                }`}
-                onClick={() => handlePageSelect(item)}
-              >
-                {item}
-              </button>
-            )
-          )}
-          <button
-            className={controlButtonClass}
-            onClick={() => handlePageSelect(clampedCurrent + 1)}
-            disabled={clampedCurrent === totalPages}
-            aria-label="Trang sau"
-          >
-            {">"}
-          </button>
-          <button
-            className={controlButtonClass}
-            onClick={() => handlePageSelect(totalPages)}
-            disabled={clampedCurrent === totalPages}
-            aria-label="Trang cuối"
-          >
-            {">>"}
-          </button>
-        </div>
-      </div>
+      <ProductTablePagination
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={onRowsPerPageChange}
+        clampedCurrent={clampedCurrent}
+        totalPages={totalPages}
+        paginationItems={paginationItems}
+        handlePageSelect={handlePageSelect}
+      />
     </div>
   );
 };

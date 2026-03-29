@@ -1,5 +1,5 @@
 import React from "react";
-import { MonthlySummaryData } from "../../../lib/api";
+import type { MonthlySummaryData } from "@/features/dashboard/api/dashboardApi";
 import * as Helpers from "../../../lib/helpers";
 
 interface MonthlySummaryTableProps {

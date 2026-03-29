@@ -167,7 +167,6 @@ export const usePricingData = () => {
     editingSupplyRows: supplyActions.editingSupplyRows,
     supplyPriceDrafts: supplyActions.supplyPriceDrafts,
     savingSupplyRows: supplyActions.savingSupplyRows,
-    supplyRowErrors: supplyActions.supplyRowErrors,
     newSupplyRows: supplyActions.newSupplyRows,
     editingProductId: productActions.editingProductId,
     productEditForm: productActions.productEditForm,

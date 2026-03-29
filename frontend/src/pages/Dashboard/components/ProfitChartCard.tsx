@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ProfitData } from "../../../lib/api";
+import type { ProfitData } from "@/features/dashboard/api/dashboardApi";
 import * as Helpers from "../../../lib/helpers";
 
 type ProfitChartCardProps = {

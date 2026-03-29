@@ -9,7 +9,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ProfitData, RefundData, RevenueData } from "../../../lib/api";
+import type {
+  ProfitData,
+  RefundData,
+  RevenueData,
+} from "@/features/dashboard/api/dashboardApi";
 import * as Helpers from "../../../lib/helpers";
 
 type FinancialChartsPanelProps = {

@@ -1,632 +1,76 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
-} from "@heroicons/react/24/outline";
-import { STAT_CARD_ACCENTS } from "../../../components/ui/StatCard";
-import { apiFetch } from "../../../lib/api";
+import React from "react";
 import ConfirmModal from "../../../components/modals/ConfirmModal/ConfirmModal";
 import { CreatePackageModal } from "./components/Modals/CreatePackageModal";
 import { PackageFormModal } from "./components/Modals/PackageFormModal";
 import { PackageViewModal } from "./components/Modals/PackageViewModal";
-import { usePackageData } from "./hooks/usePackageData";
+import { usePackageProductPage } from "./hooks/usePackageProductPage";
 import {
   PackageStatsSection,
   PackageSummarySection,
   SelectedPackageSection,
 } from "./sections";
-import { showAppNotification } from "@/lib/notifications";
-import {
-  DEFAULT_SLOT_LIMIT,
-  PACKAGE_FIELD_OPTIONS,
-  ManualWarehouseEntry,
-  PackageField,
-  PackageFormValues,
-  AugmentedRow,
-  EditContext,
-  PackageRow,
-  buildFormValuesFromRow,
-  parseNumericValue,
-  toMatchColumnValue,
-} from "./utils/packageHelpers";
-import { API_ENDPOINTS } from "../../../constants";
-import { WarehouseItem } from "../../Personal/Storage/types";
 
 const PackageProduct: React.FC = () => {
   const {
     data: {
-      rows,
-      templates,
       filteredRows,
       sortedRows,
       selectedPackage,
       selectedTemplate,
       packageSummaries,
-      slotStats,
       showCapacityColumn,
       tableColumnCount,
       loading,
-      defaultTemplateFields,
+      usedProductIds,
+      productHasStorage,
+      slotCards,
     },
-    filters: { searchTerm, categoryFilter, statusFilter },
+    filters: { searchTerm, statusFilter },
+    modalState: {
+      createModalOpen,
+      createInitialProductId,
+      createInitialName,
+      createInitialFields,
+      createModalMode,
+      addModalOpen,
+      editModalOpen,
+      editContext,
+      viewModalOpen,
+      viewRow,
+    },
     actions: {
       setSearchTerm,
-      setCategoryFilter,
       setStatusFilter,
-      setRows,
-      setTemplates,
-      persistSlotLinkPreference,
-      applySlotLinkPrefs,
+      setCreateModalOpen,
+      handleCategorySelect,
+      handleCreateButtonClick,
+      handleEditTemplateFields,
+      handleAddButtonClick,
+      openEditModal,
+      openViewModal,
+      closeAddModal,
+      closeEditModal,
+      closeViewModal,
+      handleCreateTemplate,
+      handleAddSubmit,
+      handleEditSubmit,
     },
-  } = usePackageData();
-
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createInitialProductId, setCreateInitialProductId] = useState<number | null>(null);
-  const [createInitialName, setCreateInitialName] = useState("");
-  const [createInitialFields, setCreateInitialFields] = useState<PackageField[]>(
-    PACKAGE_FIELD_OPTIONS.map((opt) => opt.value)
-  );
-  const [createModalMode, setCreateModalMode] = useState<"create" | "edit">(
-    "create"
-  );
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editContext, setEditContext] = useState<EditContext | null>(null);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewRow, setViewRow] = useState<AugmentedRow | null>(null);
-  const [deleteMode, setDeleteMode] = useState(false);
-  const [deleteProcessing, setDeleteProcessing] = useState(false);
-  const [packagesMarkedForDeletion, setPackagesMarkedForDeletion] = useState<
-    Set<string>
-  >(new Set());
-  const [deleteRowTarget, setDeleteRowTarget] = useState<AugmentedRow | null>(
-    null
-  );
-  const [deleteRowProcessing, setDeleteRowProcessing] = useState(false);
-  const [deleteRowError, setDeleteRowError] = useState<string | null>(null);
-
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const packageParam = params.get("package");
-    const normalizedCategory = packageParam || "all";
-    setCategoryFilter((prev) =>
-      prev === normalizedCategory ? prev : normalizedCategory
-    );
-  }, [location.search, setCategoryFilter]);
-
-  const handleCategorySelect = useCallback(
-    (value: string) => {
-      const next =
-        value === "all" ? "all" : categoryFilter === value ? "all" : value;
-
-      if (next !== categoryFilter) {
-        setCategoryFilter(next);
-      }
-
-      const params = new URLSearchParams(location.search);
-      if (next === "all") {
-        params.delete("package");
-      } else {
-        params.set("package", next);
-      }
-      const search = params.toString();
-      const nextSearch = search ? `?${search}` : "";
-      if (nextSearch !== location.search) {
-        navigate(
-          {
-            pathname: location.pathname,
-            search: nextSearch,
-          },
-          { replace: true }
-        );
-      }
+    deleteActions: {
+      deleteMode,
+      deleteProcessing,
+      packagesMarkedForDeletion,
+      deleteRowTarget,
+      deleteRowProcessing,
+      deleteRowError,
+      handleStartDeleteMode,
+      resetDeleteSelection,
+      togglePackageMarked,
+      handleConfirmDeletePackages,
+      handleDeleteRow,
+      closeDeleteRowModal,
+      confirmDeleteRow,
     },
-    [
-      categoryFilter,
-      location.pathname,
-      location.search,
-      navigate,
-      setCategoryFilter,
-    ]
-  );
-
-  const handleCreateButtonClick = () => {
-    if (selectedPackage && selectedTemplate) {
-      openCreateModal({
-        productId: selectedTemplate.productId ?? null,
-        name: selectedPackage,
-        fields: selectedTemplate.fields,
-        mode: "edit",
-      });
-      return;
-    }
-    openCreateModal();
-  };
-
-  const handleAddButtonClick = () => {
-    if (!selectedPackage) return;
-    if (!selectedTemplate) {
-      openCreateModal({
-        productId: null,
-        name: selectedPackage,
-        fields: defaultTemplateFields,
-        mode: "create",
-      });
-      return;
-    }
-    setAddModalOpen(true);
-  };
-
-  const openCreateModal = useCallback(
-    (options?: {
-      productId?: number | null;
-      name?: string;
-      fields?: PackageField[];
-      mode?: "create" | "edit";
-    }) => {
-      setCreateInitialProductId(options?.productId ?? null);
-      setCreateInitialName(options?.name ?? "");
-      setCreateInitialFields(
-        options?.fields && options.fields.length > 0
-          ? options.fields
-          : defaultTemplateFields
-      );
-      setCreateModalMode(options?.mode ?? "create");
-      setCreateModalOpen(true);
-    },
-    [defaultTemplateFields]
-  );
-
-  const handleCreateTemplate = useCallback(
-    async (packageId: number, productName: string, fields: PackageField[]) => {
-      if (!Number.isFinite(packageId) || packageId < 1) return;
-      try {
-        const res = await apiFetch("/api/package-products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            packageId,
-            slotLimit: 0,
-            matchMode: null,
-            supplier: null,
-            importPrice: null,
-          }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const created = (await res.json()) as PackageRow;
-        setRows((prev) => [...prev, created]);
-        setCreateModalOpen(false);
-        handleCategorySelect(created.package ?? productName);
-      } catch (err) {
-        console.error("Tạo loại gói thất bại:", err);
-        showAppNotification({
-          type: "error",
-          title: "Lỗi tạo loại gói",
-          message: err instanceof Error ? err.message : "Không thể tạo loại gói.",
-        });
-      }
-    },
-    [handleCategorySelect, setRows]
-  );
-
-  const handleEditTemplateFields = useCallback(
-    (packageName: string) => {
-      const template =
-        templates.find((tpl) => tpl.name === packageName) ?? null;
-      openCreateModal({
-        productId: template?.productId ?? null,
-        name: packageName,
-        fields: template?.fields ?? defaultTemplateFields,
-        mode: "edit",
-      });
-    },
-    [templates, openCreateModal, defaultTemplateFields]
-  );
-
-  const resetDeleteSelection = useCallback(() => {
-    setDeleteMode(false);
-    setPackagesMarkedForDeletion(new Set());
-  }, []);
-
-  const togglePackageMarked = useCallback((name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setPackagesMarkedForDeletion((prev) => {
-      const next = new Set(prev);
-      if (next.has(trimmed)) next.delete(trimmed);
-      else next.add(trimmed);
-      return next;
-    });
-  }, []);
-
-  const handleConfirmDeletePackages = useCallback(async () => {
-    if (packagesMarkedForDeletion.size === 0) {
-      resetDeleteSelection();
-      return;
-    }
-    setDeleteProcessing(true);
-    const names = Array.from(packagesMarkedForDeletion);
-    const packageIds = names
-      .map((name) => rows.find((r) => (r.package || "").trim() === name)?.productId)
-      .filter((id): id is number => id != null && Number.isFinite(id));
-    if (packageIds.length === 0) {
-      setDeleteProcessing(false);
-      resetDeleteSelection();
-      return;
-    }
-    try {
-      const res = await apiFetch(`/api/package-products/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageIds }),
-      });
-      if (!res.ok) {
-        const message = await res.text();
-        throw new Error(message || `HTTP ${res.status}`);
-      }
-      setRows((prev) =>
-        prev.filter((row) => !packageIds.includes(row.productId ?? -1))
-      );
-      setTemplates((prev) =>
-        prev.filter((tpl) => !packageIds.includes(tpl.productId ?? -1))
-      );
-      if (selectedPackage && names.includes(selectedPackage)) {
-        handleCategorySelect("all");
-      }
-    } catch (error) {
-      console.error("Xóa nhóm thất bại:", error);
-      showAppNotification({
-        type: "error",
-        title: "Lỗi xóa loại gói",
-        message: `Xóa nhóm thất bại: ${
-          error instanceof Error ? error.message : "Lỗi không xác định"
-        }`,
-      });
-    } finally {
-      setDeleteProcessing(false);
-      resetDeleteSelection();
-    }
-  }, [
-    packagesMarkedForDeletion,
-    resetDeleteSelection,
-    selectedPackage,
-    handleCategorySelect,
-    setRows,
-    setTemplates,
-    rows,
-  ]);
-
-  const openEditModal = useCallback(
-    (row: AugmentedRow) => {
-      const template = templates.find((tpl) => tpl.name === row.package) ?? {
-        name: row.package,
-        fields: defaultTemplateFields,
-        isCustom: false,
-      };
-      setEditContext({
-        rowId: row.id,
-        template,
-        initialValues: buildFormValuesFromRow(row),
-        stockInfo: row.stockId
-          ? {
-              account: row.informationUser,
-              password: row.informationPass,
-              backup_email: row.informationMail,
-              two_fa: row.informationTwoFa,
-              note: row.informationNote,
-              expires_at: row.expired,
-            }
-          : null,
-        storageInfo: row.storageId
-          ? {
-              account: row.accountUser,
-              password: row.accountPass,
-              backup_email: row.accountMail,
-              two_fa: row.accountTwoFa,
-              note: row.accountNote,
-            }
-          : null,
-      });
-      setEditModalOpen(true);
-    },
-    [templates, defaultTemplateFields]
-  );
-
-  const closeEditModal = useCallback(() => {
-    setEditModalOpen(false);
-    setEditContext(null);
-  }, []);
-
-  const openViewModal = useCallback((row: AugmentedRow) => {
-    setViewRow(row);
-    setViewModalOpen(true);
-  }, []);
-
-  const closeViewModal = useCallback(() => {
-    setViewModalOpen(false);
-    setViewRow(null);
-  }, []);
-
-  const handleDeleteRow = useCallback((row: AugmentedRow) => {
-    setDeleteRowError(null);
-    setDeleteRowTarget(row);
-  }, []);
-
-  const closeDeleteRowModal = useCallback(() => {
-    setDeleteRowProcessing(false);
-    setDeleteRowError(null);
-    setDeleteRowTarget(null);
-  }, []);
-
-  const confirmDeleteRow = useCallback(async () => {
-    if (!deleteRowTarget || deleteRowProcessing) return;
-    const targetId = deleteRowTarget.id;
-    const targetName = (deleteRowTarget.package || "").trim();
-
-    if (targetId === undefined || targetId === null) {
-      setDeleteRowError("Không tìm thấy ID gói để xóa.");
-      return;
-    }
-
-    setDeleteRowProcessing(true);
-
-    const parseError = async (res: Response) => {
-      const rawText = await res.text().catch(() => "");
-      const cleanedMessage = rawText
-        ? rawText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
-        : "";
-      const statusLabel = res.status ? ` (HTTP ${res.status})` : "";
-      const friendlyMessage =
-        cleanedMessage || res.statusText || "Không thể thực hiện xóa trên máy chủ";
-      throw new Error(`Không thể xóa gói${statusLabel}: ${friendlyMessage}`);
-    };
-
-    try {
-      const res = await apiFetch(`/api/package-products/${targetId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        await parseError(res);
-      }
-      const data = (await res.json().catch(() => ({}))) as {
-        deletedIds?: Array<number | string>;
-        deletedNames?: string[];
-      };
-      console.log("Delete package product response", {
-        targetId,
-        targetName,
-        data,
-      });
-      const deletedIds = new Set(
-        (data.deletedIds && data.deletedIds.length
-          ? data.deletedIds
-          : [targetId]
-        ).map((v) => String(v))
-      );
-
-      setRows((prev) =>
-        prev.filter((item) => {
-          const idStr =
-            item.id !== undefined && item.id !== null ? String(item.id) : "__";
-          return !deletedIds.has(idStr);
-        })
-      );
-      closeDeleteRowModal();
-    } catch (error) {
-      console.error("Xóa gói thất bại:", error);
-      setDeleteRowError(error instanceof Error ? error.message : "Lỗi không xác định");
-      setDeleteRowProcessing(false);
-    }
-  }, [
-    deleteRowProcessing,
-    deleteRowTarget,
-    setRows,
-    setTemplates,
-    selectedPackage,
-    handleCategorySelect,
-    closeDeleteRowModal,
-    setDeleteRowError,
-  ]);
-
-  const createWarehouseItem = useCallback(
-    async (entry: ManualWarehouseEntry, fallbackCategory?: string): Promise<number | null> => {
-      if (!entry.account.trim()) return null;
-      try {
-        const res = await apiFetch(API_ENDPOINTS.WAREHOUSE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            category: entry.product_type?.trim() || fallbackCategory || "Khác",
-            account: entry.account || null,
-            password: entry.password || null,
-            backup_email: entry.backup_email || null,
-            two_fa: entry.two_fa || null,
-            note: entry.note || null,
-            status: "Tồn",
-          }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const created = (await res.json()) as WarehouseItem;
-        return created.id ?? null;
-      } catch (error) {
-        console.error("Lỗi khi tạo kho hàng:", error);
-        return null;
-      }
-    },
-    []
-  );
-
-  const handleAddSubmit = useCallback(
-    async (values: PackageFormValues) => {
-      if (!selectedTemplate) return;
-      const includeSupplier = selectedTemplate.fields.includes("supplier");
-      const includeImport = selectedTemplate.fields.includes("import");
-      const parsedSlotLimit = parseNumericValue(values.slot);
-      const slotLimit =
-        parsedSlotLimit !== null && parsedSlotLimit > 0
-          ? Math.floor(parsedSlotLimit)
-          : DEFAULT_SLOT_LIMIT;
-
-      let resolvedStockId = values.stockId;
-      let resolvedStorageId = values.storageId;
-      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
-
-      if (!resolvedStockId && values.manualStock.account.trim()) {
-        resolvedStockId = await createWarehouseItem(values.manualStock, selectedTemplate.name);
-        resolvedSupplier = values.manualStock.account || null;
-      }
-      if (!resolvedStorageId && values.manualStorage.account.trim()) {
-        resolvedStorageId = await createWarehouseItem(values.manualStorage, selectedTemplate.name);
-      }
-
-      const payload = {
-        packageId: selectedTemplate.productId ?? undefined,
-        supplier: resolvedSupplier,
-        importPrice: includeImport ? parseNumericValue(values.import) ?? 0 : null,
-        slotLimit,
-        matchMode: toMatchColumnValue(values.slotLinkMode),
-        stockId: resolvedStockId ?? null,
-        storageId: resolvedStorageId ?? null,
-        storageTotal: parseNumericValue(values.storageTotal),
-      };
-      try {
-        const res = await apiFetch(`/api/package-products`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const created = (await res.json()) as PackageRow;
-        const mergedRow = applySlotLinkPrefs({
-          ...created,
-          slot: slotLimit,
-          slotUsed: 0,
-          match: created.match ?? toMatchColumnValue(values.slotLinkMode),
-        });
-        setRows((prev) => [...prev, mergedRow]);
-        if (created.id !== undefined && created.id !== null) {
-          persistSlotLinkPreference(created.id, values.slotLinkMode);
-        }
-        setAddModalOpen(false);
-      } catch (error) {
-        console.error("Lỗi khi tạo gói sản phẩm:", error);
-      }
-    },
-    [
-      selectedTemplate,
-      createWarehouseItem,
-      applySlotLinkPrefs,
-      setRows,
-      persistSlotLinkPreference,
-    ]
-  );
-
-  const handleEditSubmit = useCallback(
-    async (values: PackageFormValues) => {
-      if (!editContext) return;
-      const { template, rowId } = editContext;
-      const includeSupplier = template.fields.includes("supplier");
-      const includeImport = template.fields.includes("import");
-      const parsedSlotLimit = parseNumericValue(values.slot);
-      const slotLimit =
-        parsedSlotLimit !== null && parsedSlotLimit > 0
-          ? Math.floor(parsedSlotLimit)
-          : DEFAULT_SLOT_LIMIT;
-
-      let resolvedStockId = values.stockId;
-      let resolvedStorageId = values.storageId;
-      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
-
-      if (!resolvedStockId && values.manualStock.account.trim()) {
-        resolvedStockId = await createWarehouseItem(values.manualStock, template.name);
-        resolvedSupplier = values.manualStock.account || null;
-      }
-      if (!resolvedStorageId && values.manualStorage.account.trim()) {
-        resolvedStorageId = await createWarehouseItem(values.manualStorage, template.name);
-      }
-
-      const payload = {
-        supplier: resolvedSupplier,
-        importPrice: includeImport ? parseNumericValue(values.import) ?? 0 : null,
-        slotLimit,
-        matchMode: toMatchColumnValue(values.slotLinkMode),
-        stockId: resolvedStockId ?? null,
-        storageId: resolvedStorageId ?? null,
-        storageTotal: parseNumericValue(values.storageTotal),
-      };
-      try {
-        const res = await apiFetch(`/api/package-products/${rowId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const updated = (await res.json()) as PackageRow;
-        const mergedRow = applySlotLinkPrefs({
-          ...updated,
-          slot: slotLimit,
-          match: updated.match ?? toMatchColumnValue(values.slotLinkMode),
-        });
-        setRows((prev) =>
-          prev.map((row) => (row.id === rowId ? mergedRow : row))
-        );
-        persistSlotLinkPreference(rowId, values.slotLinkMode);
-        closeEditModal();
-      } catch (error) {
-        console.error(`Cập nhật Gói Sản Phẩm ${rowId} Lỗi:`, error);
-      }
-    },
-    [editContext, createWarehouseItem, closeEditModal, applySlotLinkPrefs, setRows, persistSlotLinkPreference]
-  );
-
-  const usedProductIds = useMemo(
-    () => new Set(templates.map((t) => t.productId).filter((id): id is number => id != null)),
-    [templates]
-  );
-
-  const productHasStorage = useMemo(() => {
-    if (!selectedTemplate?.productId) return false;
-    const productId = selectedTemplate.productId;
-    return rows
-      .filter((r) => r.productId === productId)
-      .some((r) => r.storageTotal != null);
-  }, [rows, selectedTemplate]);
-
-  const slotCards = useMemo(
-    () => [
-      {
-        name: "Tổng",
-        value: String(slotStats.total),
-        icon: CheckCircleIcon,
-        accent: STAT_CARD_ACCENTS.sky,
-      },
-      {
-        name: "Gói sắp hết",
-        value: String(slotStats.low),
-        icon: ExclamationTriangleIcon,
-        accent: STAT_CARD_ACCENTS.amber,
-      },
-      {
-        name: "Gói đã hết",
-        value: String(slotStats.out),
-        icon: ArrowDownIcon,
-        accent: STAT_CARD_ACCENTS.rose,
-      },
-      {
-        name: "Thêm hôm nay",
-        value: "0",
-        icon: ArrowUpIcon,
-        accent: STAT_CARD_ACCENTS.emerald,
-      },
-    ],
-    [slotStats]
-  );
+  } = usePackageProductPage();
 
   return (
     <div className="space-y-6">
@@ -662,10 +106,7 @@ const PackageProduct: React.FC = () => {
             deleteProcessing={deleteProcessing}
             onSearchTermChange={setSearchTerm}
             onStatusFilterChange={setStatusFilter}
-            onStartDeleteMode={() => {
-              setDeleteMode(true);
-              setPackagesMarkedForDeletion(new Set());
-            }}
+            onStartDeleteMode={handleStartDeleteMode}
             onConfirmDeletePackages={handleConfirmDeletePackages}
             onResetDeleteSelection={resetDeleteSelection}
             onAddButtonClick={handleAddButtonClick}
@@ -691,10 +132,7 @@ const PackageProduct: React.FC = () => {
             deleteProcessing={deleteProcessing}
             onSearchTermChange={setSearchTerm}
             onStatusFilterChange={setStatusFilter}
-            onStartDeleteMode={() => {
-              setDeleteMode(true);
-              setPackagesMarkedForDeletion(new Set());
-            }}
+            onStartDeleteMode={handleStartDeleteMode}
             onConfirmDeletePackages={handleConfirmDeletePackages}
             onResetDeleteSelection={resetDeleteSelection}
             onAddButtonClick={handleAddButtonClick}
@@ -720,7 +158,7 @@ const PackageProduct: React.FC = () => {
           open={addModalOpen}
           template={selectedTemplate}
           hasStorage={productHasStorage}
-          onClose={() => setAddModalOpen(false)}
+          onClose={closeAddModal}
           onSubmit={handleAddSubmit}
         />
       )}

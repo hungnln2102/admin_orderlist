@@ -1,5 +1,15 @@
 {
-  "dependencies": {
-    "express": "^5.2.1"
+  "name": "admin-orderlist",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Workspace orchestrator for admin_orderlist. Runtime dependencies live inside backend/ and frontend/.",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "lint:backend": "npm --prefix backend run lint",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "test:backend": "npm --prefix backend run test",
+    "test:frontend": "npm --prefix frontend run test"
   }
 }

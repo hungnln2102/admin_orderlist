@@ -1,5 +1,7 @@
 /* Utility helpers for Sepay webhook */
-const { monthsFromString, ORDER_PREFIXES } = require("../../helpers");
+const {
+  calculateOrderPricingFromResolvedValues,
+} = require("../../src/services/pricing/core");
 const {
   pool,
   ORDER_COLS,
@@ -193,66 +195,38 @@ const formatCurrency = (value) => {
   }
 };
 
-const calcGiaBan = ({ orderId, giaNhap, priceMax, pctCtv, pctKhach, giaBanFallback, pctPromo, forceKhachLe = false }) => {
-  const code = String(orderId || "").toUpperCase();
-  const normalizePct = (val) => {
-    const num = Number(val);
-    if (!Number.isFinite(num) || num <= 0) return 1;
-    if (num > 10) return num / 100;
-    return num;
-  };
-  const pctC = normalizePct(pctCtv);
-  const pctK = normalizePct(pctKhach);
-  const promoNormRaw = Number(pctPromo);
-  const promoNorm =
-    Number.isFinite(promoNormRaw) && promoNormRaw > 0
-      ? promoNormRaw > 1
-        ? promoNormRaw / 100
-        : promoNormRaw
-      : 0;
-  const basePrice =
-    Number.isFinite(Number(priceMax)) && Number(priceMax) > 0
-      ? Number(priceMax)
-      : Number.isFinite(Number(giaNhap))
-      ? Number(giaNhap)
-      : 0;
-  const fallback =
-    Number.isFinite(Number(giaBanFallback)) && Number(giaBanFallback) > 0
-      ? Number(giaBanFallback)
-      : Number.isFinite(Number(giaNhap))
-      ? Number(giaNhap)
-      : basePrice;
-
+const calcGiaBan = ({
+  orderId,
+  giaNhap,
+  priceMax,
+  pctCtv,
+  pctKhach,
+  giaBanFallback,
+  pctPromo,
+  forceKhachLe = false,
+}) => {
   try {
-    if (ORDER_PREFIXES?.ctv && code.startsWith(ORDER_PREFIXES.ctv)) {
-      return basePrice * pctC;
-    }
-    if (ORDER_PREFIXES?.le && code.startsWith(ORDER_PREFIXES.le)) {
-      return basePrice * pctC * pctK;
-    }
-    if (ORDER_PREFIXES?.khuyen && code.startsWith(ORDER_PREFIXES.khuyen)) {
-      // Gói khuyến mãi hết hạn → báo giá khách lẻ (không áp chiết khấu promo)
-      if (forceKhachLe) {
-        return basePrice * pctC * pctK;
-      }
-      if (promoNorm > 0) {
-        const factor = Math.max(0, 1 - promoNorm);
-        return basePrice * pctC * pctK * factor;
-      }
-      // No promo -> behave like MAVL (customer price)
-      return basePrice * pctC * pctK;
-    }
-    if (ORDER_PREFIXES?.tang && code.startsWith(ORDER_PREFIXES.tang)) {
-      return 0;
-    }
-    if (ORDER_PREFIXES?.nhap && code.startsWith(ORDER_PREFIXES.nhap)) {
-      return Number.isFinite(Number(giaNhap)) ? Number(giaNhap) : basePrice || fallback;
-    }
-    return basePrice || fallback;
+    const result = calculateOrderPricingFromResolvedValues({
+      orderId,
+      pricingBase: priceMax,
+      importPrice: giaNhap,
+      fallbackPrice: giaBanFallback,
+      fallbackCost: giaNhap,
+      pctCtv,
+      pctKhach,
+      pctPromo,
+      forceKhachLe,
+      roundCostToThousands: false,
+    });
+    return result.price;
   } catch (err) {
     const logger = require("../../src/utils/logger");
-    logger.error("Error calculating gia_ban", { orderId, error: err?.message, stack: err?.stack });
-    return basePrice || fallback;
+    logger.error("Error calculating gia_ban", {
+      orderId,
+      error: err?.message,
+      stack: err?.stack,
+    });
+    return normalizeMoney(giaBanFallback || priceMax || giaNhap);
   }
 };
 

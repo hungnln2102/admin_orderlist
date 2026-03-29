@@ -5,8 +5,8 @@ import {
   ChartBarIcon,
   ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
+import { apiFetch } from "@/shared/api/client";
 import {
-  apiFetch,
   fetchAvailableYears,
   fetchChartData,
   type ChartsApiResponse,
@@ -14,7 +14,7 @@ import {
   type RevenueData,
   type ProfitData,
   type RefundData,
-} from "../../../lib/api";
+} from "@/features/dashboard/api/dashboardApi";
 import * as Helpers from "../../../lib/helpers";
 import { normalizeErrorMessage } from "../../../lib/textUtils";
 import { type OverviewStat } from "../components/OverviewStats";

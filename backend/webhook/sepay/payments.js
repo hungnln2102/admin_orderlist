@@ -20,11 +20,12 @@ const {
   safeIdent,
   normalizeMoney,
   normalizeImportValue,
-  calcGiaBan,
-  roundToThousands,
   fetchProductPricing,
 } = require("./utils");
 const logger = require("../../src/utils/logger");
+const {
+  calculateOrderPricingFromResolvedValues,
+} = require("../../src/services/pricing/core");
 
 let paymentReceiptOrderColCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
@@ -420,17 +421,28 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
   }
 };
 
-const calculateSalePrice = ({ orderCode, giaNhap, giaBanCu, priceMax, pctCtv, pctKhach }) =>
-  roundToThousands(
-    calcGiaBan({
-      orderId: orderCode,
-      giaNhap,
-      priceMax,
-      pctCtv,
-      pctKhach,
-      giaBanFallback: giaBanCu,
-    })
-  );
+const calculateSalePrice = ({
+  orderCode,
+  giaNhap,
+  giaBanCu,
+  priceMax,
+  pctCtv,
+  pctKhach,
+  pctPromo,
+  forceKhachLe = false,
+}) =>
+  calculateOrderPricingFromResolvedValues({
+    orderId: orderCode,
+    pricingBase: priceMax,
+    importPrice: giaNhap,
+    fallbackPrice: giaBanCu,
+    fallbackCost: giaNhap,
+    pctCtv,
+    pctKhach,
+    pctPromo,
+    forceKhachLe,
+    roundCostToThousands: false,
+  }).price;
 
 module.exports = {
   insertPaymentReceipt,

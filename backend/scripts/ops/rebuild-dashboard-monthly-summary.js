@@ -1,17 +1,17 @@
-const { db } = require("../src/db");
+const { db } = require("../../src/db");
 const {
   FINANCE_SCHEMA,
   ORDERS_SCHEMA,
   SCHEMA_FINANCE,
   SCHEMA_ORDERS,
   tableName,
-} = require("../src/config/dbSchema");
-const { STATUS } = require("../src/utils/statuses");
+} = require("../../src/config/dbSchema");
+const { STATUS } = require("../../src/utils/statuses");
 const {
   createDateNormalization,
   createNumericExtraction,
   quoteIdent,
-} = require("../src/utils/sql");
+} = require("../../src/utils/sql");
 
 const orderTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const summaryTable = tableName(

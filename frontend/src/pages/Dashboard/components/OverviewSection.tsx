@@ -2,7 +2,12 @@ import React from "react";
 import { OverviewStats, type OverviewStat } from "./OverviewStats";
 import { OrderChartCard } from "./OrderChartCard";
 import { FinancialChartsPanel } from "./FinancialChartsPanel";
-import { type OrderStatusData, type RevenueData, type ProfitData, type RefundData } from "../../../lib/api";
+import type {
+  OrderStatusData,
+  RevenueData,
+  ProfitData,
+  RefundData,
+} from "@/features/dashboard/api/dashboardApi";
 
 type OverviewSectionProps = {
   stats: OverviewStat[];

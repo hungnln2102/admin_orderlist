@@ -1,5 +1,9 @@
 import { roundGiaBanValue } from "../../../lib/helpers";
 import { VARIANT_PRICING_COLS } from "../../../lib/tableSql";
+import {
+  calculateSellingPriceFromMarginInput,
+  getDiscountRatioInput,
+} from "../../../shared/utils/pricing";
 
 export type QuoteLine = {
   id: string;
@@ -89,6 +93,7 @@ export const computeLinePricing = (
     pctPromo?: number;
     pctKhach?: number;
     pctCtv?: number;
+    wholesalePrice?: number;
   }
 ) => {
   if (apiPricing) {
@@ -100,21 +105,20 @@ export const computeLinePricing = (
     return { unitPrice, discount };
   }
 
-  const basePrice = selected?.basePrice ?? selected?.unitPrice ?? 0;
-  const pctPromo =
-    selected?.pctPromo !== undefined ? toNumber(selected.pctPromo) : 0;
-  const pctPromoDecimal =
-    pctPromo > 1 ? pctPromo / 100 : Math.max(0, pctPromo);
-  const pctKhach =
-    selected?.pctKhach !== undefined && selected?.pctKhach > 0
-      ? selected.pctKhach
-      : 1;
-  const pctCtv =
-    selected?.pctCtv !== undefined && selected?.pctCtv > 0
-      ? selected.pctCtv
-      : 1;
-
-  const retailPrice = roundGiaBanValue(basePrice * pctKhach * pctCtv);
+  const basePrice = selected?.basePrice ?? 0;
+  const fallbackRetailPrice = selected?.unitPrice ?? basePrice;
+  const wholesalePrice =
+    selected?.wholesalePrice && selected.wholesalePrice > 0
+      ? selected.wholesalePrice
+      : basePrice > 0 && basePrice < fallbackRetailPrice
+        ? calculateSellingPriceFromMarginInput(basePrice, selected?.pctCtv) ??
+          fallbackRetailPrice
+        : fallbackRetailPrice;
+  const retailPrice = roundGiaBanValue(
+    calculateSellingPriceFromMarginInput(wholesalePrice, selected?.pctKhach) ??
+      fallbackRetailPrice
+  );
+  const pctPromoDecimal = getDiscountRatioInput(selected?.pctPromo) ?? 0;
   const discount =
     pctPromoDecimal > 0
       ? roundGiaBanValue(retailPrice * pctPromoDecimal)
@@ -211,17 +215,18 @@ export const buildProductOptions = (
     const pctKhachRaw = toNumber(
       row?.pct_khach ?? row?.[VARIANT_PRICING_COLS.pctKhach]
     );
-    const pctCtvRaw = toNumber(row?.pct_ctv ?? row?.[VARIANT_PRICING_COLS.pctCtv]);
-    const pctKhach =
-      pctKhachRaw > 10 ? pctKhachRaw / 100 : pctKhachRaw > 0 ? pctKhachRaw : 1;
-    const pctCtv =
-      pctCtvRaw > 10 ? pctCtvRaw / 100 : pctCtvRaw > 0 ? pctCtvRaw : 1;
+    const pctCtvRaw = toNumber(
+      row?.pct_ctv ?? row?.[VARIANT_PRICING_COLS.pctCtv]
+    );
     const pctPromoRaw = toNumber(
       row?.pct_promo ?? row?.[VARIANT_PRICING_COLS.pctPromo]
     );
-    const pctPromo =
-      pctPromoRaw > 1 ? pctPromoRaw / 100 : Math.max(0, pctPromoRaw);
+    const pctPromo = getDiscountRatioInput(pctPromoRaw) ?? 0;
     const baseSupply = toNumber(row?.max_supply_price);
+    const wholesaleRaw =
+      calculateSellingPriceFromMarginInput(baseSupply, pctCtvRaw) ?? baseSupply;
+    const wholesaleRounded =
+      wholesaleRaw > 0 ? roundGiaBanValue(wholesaleRaw) : 0;
 
     const retailBase =
       toNumber(
@@ -238,18 +243,19 @@ export const buildProductOptions = (
           row?.gia_km
       ) || 0;
 
-    const wholesaleRounded = baseSupply > 0 ? roundGiaBanValue(baseSupply) : 0;
-    const fallbackRetail = retailBase || promoBase || wholesaleRounded;
     const retailPriceRaw =
-      fallbackRetail *
-      (pctCtv > 0 ? pctCtv : 1) *
-      (pctKhach > 0 ? pctKhach : 1);
+      calculateSellingPriceFromMarginInput(wholesaleRounded, pctKhachRaw) ??
+      retailBase ??
+      promoBase ??
+      wholesaleRounded;
     const retailPrice = roundGiaBanValue(retailPriceRaw);
     const promoPriceRaw = retailPrice * (1 - pctPromo);
     const promoRounded = roundGiaBanValue(promoPriceRaw);
     const promoClamped = Math.min(
       retailPrice,
-      wholesaleRounded > 0 ? Math.max(wholesaleRounded, promoRounded) : promoRounded
+      wholesaleRounded > 0
+        ? Math.max(wholesaleRounded, promoRounded)
+        : promoRounded
     );
     const discountValue = promoClamped > 0 ? retailPrice - promoClamped : 0;
     const unitPrice = retailPrice;
@@ -263,8 +269,8 @@ export const buildProductOptions = (
     const label = packageProduct
       ? `${packageProduct} (${value})`
       : row?.package
-      ? `${row?.package} (${value})`
-      : value;
+        ? `${row?.package} (${value})`
+        : value;
 
     const priceKey = normalizeProductKey(value);
     const apiPrice = priceMap[priceKey];
@@ -280,12 +286,11 @@ export const buildProductOptions = (
       term: durationInfo.days ? `${durationInfo.days} ngày` : "",
       unitPrice: retailPrice,
       discountValue,
-      basePrice:
-        apiPrice?.price ?? apiPrice?.resellPrice ?? retailBase ?? retailPrice,
+      basePrice: baseSupply || wholesaleRounded || retailBase || retailPrice,
       promoPrice: apiPrice?.promoPrice ?? 0,
-      pctPromo,
-      pctKhach,
-      pctCtv,
+      pctPromo: pctPromoRaw,
+      pctKhach: pctKhachRaw,
+      pctCtv: pctCtvRaw,
       wholesalePrice: wholesaleRounded,
     });
   });

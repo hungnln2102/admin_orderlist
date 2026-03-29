@@ -2,10 +2,12 @@ import React, { useMemo } from "react";
 import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
-import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
+import { ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
 import { ViewOrderModalProps } from "./types";
 import { normalizeDateLike, parseNumberLike } from "./utils";
+import { OrderDetailsSection } from "./components/OrderDetailsSection";
+import { OrderPaymentQrSection } from "./components/OrderPaymentQrSection";
 
 const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
@@ -137,160 +139,26 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         </div>
 
         <div className="view-order-modal__body p-3 sm:p-6 overflow-y-auto flex-grow space-y-4 sm:space-y-5 text-gray-700">
-          {/* Thong tin chung */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-xs sm:text-sm">
-            {/* Left */}
-            <dl className="space-y-2">
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">ID Đơn:</dt>
-                <dd className="text-slate-100 font-semibold w-2/3 text-right">
-                  {order[ORDER_FIELDS.ID_ORDER]}
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Sản Phẩm:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {order[ORDER_FIELDS.ID_PRODUCT]}
-                </dd>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 sm:w-1/3 mb-1 sm:mb-0">
-                  Thông Tin Sản Phẩm:
-                </dt>
-                <dd className="text-slate-100 w-full sm:w-2/3 text-left sm:text-right break-words">
-                  {order[ORDER_FIELDS.INFORMATION_ORDER]}
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Slot:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {order[ORDER_FIELDS.SLOT]}
-                </dd>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 sm:w-1/3 mb-1 sm:mb-0">Ghi Chú:</dt>
-                <dd className="text-slate-100 w-full sm:w-2/3 text-left sm:text-right break-words">
-                  {order[ORDER_FIELDS.NOTE] || "-"}
-                </dd>
-              </div>
-              <div className="flex justify-between pt-1 pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Trạng Thái:</dt>
-                <dd className="w-2/3 text-right">
-                  <span
-                    className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
-                      displayStatus
-                    )}`}
-                  >
-                    {displayStatus}
-                  </span>
-                </dd>
-              </div>
-            </dl>
+          <OrderDetailsSection
+            order={order}
+            displayStatus={displayStatus}
+            registrationDisplay={registrationDisplay}
+            expiryDisplay={expiryDisplay}
+            displayRemainingDays={displayRemainingDays}
+          />
 
-            {/* Right */}
-            <dl className="space-y-2">
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Khách Hàng:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {order[ORDER_FIELDS.CUSTOMER]}
-                </dd>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between border-b pb-1 items-start">
-                <dt className="font-medium text-slate-400 sm:w-1/3 shrink-0 mb-1 sm:mb-0">
-                  Liên Hệ:
-                </dt>
-                <dd className="w-full sm:w-2/3 text-left sm:text-right break-all">
-                  <a
-                    href={order[ORDER_FIELDS.CONTACT] as string}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {order[ORDER_FIELDS.CONTACT] || "-"}
-                  </a>
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Ngày Order:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {registrationDisplay}
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">Số Ngày:</dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {order[ORDER_FIELDS.DAYS]}
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">
-                  Ngày Hết Hạn:
-                </dt>
-                <dd className="text-slate-100 w-2/3 text-right">
-                  {expiryDisplay}
-                </dd>
-              </div>
-              <div className="flex justify-between border-b pb-1">
-                <dt className="font-medium text-slate-400 w-1/3">
-                  Số Ngày Còn Lại:
-                </dt>
-                <dd className="text-indigo-600 font-bold w-2/3 text-right">
-                  {displayRemainingDays}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          {/* Divider */}
           <hr className="my-4 border-white/10" />
 
-          <div className="view-order-modal__qr text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
-            <h4 className="text-lg font-semibold text-indigo-100 mb-3">
-              Quét mã QR để thanh toán (VietQR)
-            </h4>
-            {qrCodeImageUrl ? (
-              <div className="flex justify-center mb-3">
-                <img
-                  src={qrCodeImageUrl}
-                  alt={`QR Code thanh toán ${order[ORDER_FIELDS.ID_ORDER]}`}
-                  className="border-2 border-indigo-200/60 rounded-lg p-1 bg-white shadow-lg shadow-indigo-900/40 w-full max-w-[240px] sm:max-w-[280px] h-auto"
-                  width={280}
-                  height={280}
-                />
-              </div>
-            ) : (
-              <p className="text-red-600 font-medium">
-                Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình
-              </p>
-            )}
-            <div className="text-sm text-slate-100 space-y-1">
-              <p>
-                Ngân hàng: <strong className="text-indigo-100">VP Bank</strong>
-              </p>
-              <p>
-                Số tài khoản: <strong className="text-indigo-100">{ACCOUNT_NO}</strong>
-              </p>
-              <p>
-                Chủ tài khoản: <strong className="text-indigo-100">{ACCOUNT_NAME}</strong>
-              </p>
-              <p>
-                Số tiền:{" "}
-                <strong className="text-xl text-red-600">
-                  {formatCurrency(effectiveQrAmount)}
-                </strong>
-              </p>
-              {!keepOrderPrice && priceLoading && (
-                <p className="text-xs text-slate-400">Đang tính lại giá...</p>
-              )}
-              {priceError && (
-                <p className="text-xs text-red-500">{priceError}</p>
-              )}
-              <p>
-                Nội dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
-                (Vui lòng điền đúng)
-              </p>
-            </div>
-          </div>
+          <OrderPaymentQrSection
+            orderId={String(order[ORDER_FIELDS.ID_ORDER] || "")}
+            qrCodeImageUrl={qrCodeImageUrl}
+            effectiveQrAmount={effectiveQrAmount}
+            qrMessage={qrMessage}
+            keepOrderPrice={keepOrderPrice}
+            priceLoading={priceLoading}
+            priceError={priceError}
+            formatCurrency={formatCurrency}
+          />
         </div>
       </div>
     </div>

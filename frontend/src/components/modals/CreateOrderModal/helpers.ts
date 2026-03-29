@@ -60,3 +60,11 @@ export const labelClass =
 
 export const readOnlyClass =
   "cursor-not-allowed bg-slate-800/95 text-slate-300 border-slate-600";
+
+export const panelClass =
+  "relative overflow-hidden rounded-[20px] border border-slate-700/80 bg-slate-900/96 p-4 sm:p-5 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.9)]";
+
+export const panelTitleClass =
+  "text-lg sm:text-xl font-black text-slate-50 tracking-tight";
+
+export const panelSubtitleClass = "mt-1 text-xs text-slate-300/90";

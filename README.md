@@ -224,7 +224,14 @@ npm run lint        # Check for issues
 ### Docker
 
 ```bash
-docker-compose up -d
+docker compose up -d --build
+```
+
+Nếu frontend vẫn giữ bản cũ sau deploy, rebuild sạch container frontend:
+
+```bash
+docker compose build --no-cache frontend
+docker compose up -d --force-recreate frontend
 ```
 
 ### Manual Deployment

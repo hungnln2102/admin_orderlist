@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchMonthlySummary, type MonthlySummaryData } from "../../../lib/api";
+import {
+  fetchMonthlySummary,
+  type MonthlySummaryData,
+} from "@/features/dashboard/api/dashboardApi";
 import { normalizeErrorMessage } from "../../../lib/textUtils";
 
 export const useMonthlySummary = () => {

@@ -1,19 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  MinusCircleIcon,
-  PlusCircleIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../constants";
 import * as Helpers from "../../../lib/helpers";
 import { useEditOrderLogic } from "./hooks/useEditOrderLogic";
 import { EditOrderModalProps, Order } from "./types";
-import { inputClass, labelClass, readOnlyClass } from "./styles";
-import {
-  formatCurrency,
-  getSupplyName,
-  normalizeDateLike,
-} from "./utils";
+import { getSupplyName, normalizeDateLike } from "./utils";
+import { EditOrderIdentitySection } from "./components/EditOrderIdentitySection";
+import { EditOrderMetaSection } from "./components/EditOrderMetaSection";
 
 const EditOrderModal: React.FC<EditOrderModalProps> = ({
   isOpen,
@@ -58,7 +51,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
   const supplySelectValue = useMemo(() => {
     if (!formData) return "";
     const found = supplies.find(
-      (s) => getSupplyName(s) === formData[ORDER_FIELDS.SUPPLY]
+      (supply) => getSupplyName(supply) === formData[ORDER_FIELDS.SUPPLY]
     );
     return found ? String(found.id) : "";
   }, [formData, supplies]);
@@ -114,216 +107,24 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Mã đơn hàng</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.ID_ORDER}
-                value={stringField(ORDER_FIELDS.ID_ORDER as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Khách hàng</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.CUSTOMER}
-                value={stringField(ORDER_FIELDS.CUSTOMER as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Liên hệ</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.CONTACT}
-                value={stringField(ORDER_FIELDS.CONTACT as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Slot</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.SLOT}
-                value={stringField(ORDER_FIELDS.SLOT as keyof Order)}
-                onChange={handleInputChange}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          <EditOrderIdentitySection
+            supplies={supplies}
+            isCustomSupply={isCustomSupply}
+            supplySelectValue={supplySelectValue}
+            stringField={stringField}
+            onInputChange={handleInputChange}
+            onSupplySelect={handleSupplySelect}
+            onCustomSupplyChange={handleCustomSupplyChange}
+            onToggleCustomSupply={toggleCustomSupply}
+          />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Sản phẩm</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.ID_PRODUCT}
-                value={stringField(ORDER_FIELDS.ID_PRODUCT as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Nguồn</label>
-              <div className="flex items-center gap-2">
-                {isCustomSupply ? (
-                  <input
-                    type="text"
-                    name={ORDER_FIELDS.SUPPLY}
-                    value={stringField(ORDER_FIELDS.SUPPLY as keyof Order)}
-                    onChange={(e) => handleCustomSupplyChange(e.target.value)}
-                    className={inputClass}
-                    placeholder="Nhập nguồn mới"
-                  />
-                ) : (
-                  <select
-                    name={ORDER_FIELDS.SUPPLY}
-                    value={supplySelectValue}
-                    onChange={(e) => handleSupplySelect(Number(e.target.value))}
-                    className={inputClass}
-                  >
-                    <option value="">-- Giữ nguyên hoặc chọn --</option>
-                    {supplies.map((supply) => (
-                      <option key={supply.id} value={supply.id}>
-                        {getSupplyName(supply)}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  type="button"
-                  onClick={toggleCustomSupply}
-                  className={`inline-flex items-center justify-center w-10 h-10 rounded-md text-white ${
-                    isCustomSupply
-                      ? "bg-red-500 hover:bg-red-600"
-                      : "bg-green-500 hover:bg-green-600"
-                  }`}
-                  aria-label={isCustomSupply ? "Tắt nhập nguồn mới" : "Nhập nguồn mới"}
-                >
-                  {isCustomSupply ? (
-                    <MinusCircleIcon className="h-6 w-6" aria-hidden="true" />
-                  ) : (
-                    <PlusCircleIcon className="h-6 w-6" aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-              {!supplies.length && !isCustomSupply && (
-                <p className="mt-1 text-xs text-slate-300">
-                  Không có danh sách nguồn cho sản phẩm hiện tại.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>Thông tin đơn hàng</label>
-            <input
-              type="text"
-              name={ORDER_FIELDS.INFORMATION_ORDER}
-              value={stringField(ORDER_FIELDS.INFORMATION_ORDER as keyof Order)}
-              onChange={handleInputChange}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Ngày đăng ký</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.ORDER_DATE}
-                value={orderDateDisplay}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Số ngày</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.DAYS}
-                value={stringField(ORDER_FIELDS.DAYS as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Ngày hết hạn</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.EXPIRY_DATE}
-                value={orderExpiredDisplay}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Giá nhập</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.COST}
-                value={formatCurrency(
-                  numericField(ORDER_FIELDS.COST as keyof Order)
-                )}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass} font-semibold`}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Giá bán</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.PRICE}
-                value={formatCurrency(
-                  numericField(ORDER_FIELDS.PRICE as keyof Order)
-                )}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass} font-semibold text-emerald-300`}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <div>
-              <label className={labelClass}>Trạng thái</label>
-              <input
-                type="text"
-                name={ORDER_FIELDS.STATUS}
-                value={stringField(ORDER_FIELDS.STATUS as keyof Order)}
-                readOnly
-                disabled
-                className={`${inputClass} ${readOnlyClass}`}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>Ghi chú</label>
-            <textarea
-              name={ORDER_FIELDS.NOTE}
-              value={stringField(ORDER_FIELDS.NOTE as keyof Order)}
-              rows={4}
-              onChange={handleInputChange}
-              className={inputClass}
-            />
-          </div>
+          <EditOrderMetaSection
+            orderDateDisplay={orderDateDisplay}
+            orderExpiredDisplay={orderExpiredDisplay}
+            stringField={stringField}
+            numericField={numericField}
+            onInputChange={handleInputChange}
+          />
 
           <div className="flex justify-end gap-3 border-t border-white/10 pt-4">
             <button

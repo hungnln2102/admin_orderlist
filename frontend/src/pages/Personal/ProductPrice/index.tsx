@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_ENDPOINTS } from "../../../constants";
-import { apiFetch } from "../../../lib/api";
+import { fetchCalculatedPrice } from "../../../lib/pricingApi";
 import { VARIANT_PRICING_COLS } from "../../../lib/tableSql";
 import {
   ApiPriceEntry,
@@ -24,7 +24,7 @@ import { QuoteTable } from "./components/QuoteTable";
 import { ProductInfoSection } from "./components/ProductInfoSection";
 import { SignatureBlock } from "./components/SignatureBlock";
 
-const LOGO_SRC = "/mavryk-logo.png"; // Place transparent logo at public/mavryk-logo.png
+const LOGO_SRC = "/mavryk-logo.jpg"; // Place transparent logo at public/mavryk-logo.jpg
 
 const API_BASE =
   (typeof import.meta !== "undefined" &&
@@ -142,18 +142,12 @@ export default function ProductPrice() {
 
         const request = (async (): Promise<ApiPriceEntry | null> => {
           try {
-            const response = await apiFetch(API_ENDPOINTS.CALCULATE_PRICE, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                san_pham_name: original,
-                id_product: original,
-                customer_type: "LE",
-                for_quote: true,
-              }),
+            const data = await fetchCalculatedPrice({
+              san_pham_name: original,
+              id_product: original,
+              customer_type: "LE",
+              for_quote: true,
             });
-            const data = await response.json().catch(() => null);
-            if (!response.ok) throw new Error(data?.error || "Fail calculate-price");
             return parseApiPriceEntry(data);
           } catch (err) {
             console.error("calculate-price failed", original, err);

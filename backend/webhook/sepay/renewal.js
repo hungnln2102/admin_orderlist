@@ -15,7 +15,6 @@ const {
   normalizeProductDuration,
   normalizeMoney,
   normalizeImportValue,
-  roundToThousands,
   formatDateDMY,
   formatDateDB,
   addMonthsClamped,
@@ -24,13 +23,76 @@ const {
   fetchSupplyPrice,
   fetchMaxSupplyPrice,
   daysUntil,
-  calcGiaBan,
 } = require("./utils");
 const { updatePaymentSupplyBalance } = require("./payments");
 const { sendRenewalNotification } = require("./notifications");
 const logger = require("../../src/utils/logger");
+const {
+  calculateOrderPricingFromResolvedValues,
+  resolveMoney,
+} = require("../../src/services/pricing/core");
 
 const pendingRenewalTasks = new Map(); // orderCode -> task state
+
+const calculateRenewalPricing = async (
+  client,
+  { sanPham, supplierId, orderCode, fallbackCost, fallbackPrice, forceKhachLe }
+) => {
+  const { productId, variantId, pctCtv, pctKhach, pctPromo } =
+    await fetchProductPricing(client, sanPham);
+  const giaNhapSource = await fetchSupplyPrice(
+    client,
+    { variantId, productId },
+    supplierId
+  );
+  const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
+
+  const normalizedNhap = normalizeImportValue(giaNhapSource, fallbackCost || undefined);
+  const latestGiaNhap = resolveMoney(
+    normalizedNhap?.value,
+    giaNhapSource,
+    fallbackCost
+  );
+
+  const normalizedPriceMax = normalizeImportValue(
+    maxPriceRow,
+    latestGiaNhap || fallbackCost || undefined
+  );
+  const priceMax = resolveMoney(
+    normalizedPriceMax?.value,
+    maxPriceRow,
+    fallbackPrice,
+    latestGiaNhap
+  );
+  const effectivePriceMax = resolveMoney(priceMax, fallbackPrice, latestGiaNhap);
+
+  const pricing = calculateOrderPricingFromResolvedValues({
+    orderId: orderCode,
+    pricingBase: effectivePriceMax,
+    importPrice: latestGiaNhap,
+    fallbackPrice,
+    fallbackCost,
+    pctCtv,
+    pctKhach,
+    pctPromo,
+    forceKhachLe,
+    roundCostToThousands: false,
+  });
+
+  return {
+    pricing,
+    productId,
+    variantId,
+    pctCtv,
+    pctKhach,
+    pctPromo,
+    giaNhapSource,
+    maxPriceRow,
+    normalizedNhap,
+    normalizedPriceMax,
+    effectivePriceMax,
+  };
+};
 
 const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
   if (!orderCode) {
@@ -74,23 +136,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const giaBanCu = normalizeMoney(order[ORDER_COLS.price]);
     const thongTin = order[ORDER_COLS.informationOrder];
     const slot = order[ORDER_COLS.slot];
-
-    const resolveMoney = (computedValue, ...fallbackValues) => {
-      if (Number.isFinite(computedValue) && computedValue > 0) {
-        return Math.round(computedValue);
-      }
-      for (const candidate of fallbackValues) {
-        if (candidate === null || candidate === undefined) continue;
-        const normalized = normalizeMoney(candidate);
-        if (Number.isFinite(normalized) && normalized > 0) {
-          return normalized;
-        }
-      }
-      const lastDefined = fallbackValues.find(
-        (candidate) => candidate !== null && candidate !== undefined
-      );
-      return lastDefined !== undefined ? normalizeMoney(lastDefined) : 0;
-    };
 
     if (!hetHan) {
       return {
@@ -153,51 +198,35 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     const fallbackSoNgay = months * 30;
 
-    const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
-    const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
-    const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
-
-    const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
-    const latestGiaNhap = resolveMoney(
-      normalizedNhap?.value,
-      giaNhapSource,
-      giaNhapCu
-    );
-
-    const normalizedPriceMax = normalizeImportValue(
-      maxPriceRow,
-      latestGiaNhap || giaNhapCu || undefined
-    );
-    const priceMax = resolveMoney(
-      normalizedPriceMax?.value,
-      maxPriceRow,
-      giaBanCu,
-      latestGiaNhap
-    );
-
-    const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
-
-    // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
-    const isPromoOrder =
-      Boolean(ORDER_PREFIXES?.khuyen) &&
-      orderCode.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase());
-    const finalGiaBanRaw = calcGiaBan({
-      orderId: orderCode,
-      giaNhap: latestGiaNhap,
-      priceMax: effectivePriceMax,
+    const {
+      pricing,
+      productId,
+      variantId,
       pctCtv,
       pctKhach,
-      giaBanFallback: giaBanCu,
-      forceKhachLe: isPromoOrder,
-    });
-
-    const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);
-    const finalGiaBan = resolveMoney(
-      roundToThousands(finalGiaBanRaw || 0),
+      giaNhapSource,
+      maxPriceRow,
+      normalizedNhap,
+      normalizedPriceMax,
       effectivePriceMax,
-      giaBanCu,
-      latestGiaNhap
-    );
+    } = await calculateRenewalPricing(client, {
+      sanPham,
+      supplierId,
+      orderCode,
+      fallbackCost: giaNhapCu,
+      fallbackPrice: giaBanCu,
+      forceKhachLe:
+        Boolean(ORDER_PREFIXES?.khuyen) &&
+        orderCode.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase()),
+    });
+    const pricingMeta = pricing.meta;
+    const pctCtvNormalized = pricingMeta?.pctCtv ?? 0;
+
+    const pctKhachNormalized = pricingMeta?.pctKhach ?? 0;
+
+    // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
+    const finalGiaNhap = pricing.cost;
+    const finalGiaBan = pricing.price;
 
     const ngayHetHanCu = new Date(hetHan.getTime());
     ngayHetHanCu.setHours(0, 0, 0, 0);
@@ -226,12 +255,8 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       pctCtv,
       pctKhach,
       variantId,
-      pctCtvNormalized:
-        Number.isFinite(Number(pctCtv)) && Number(pctCtv) > 10 ? Number(pctCtv) / 100 : Number(pctCtv) || 1,
-      pctKhachNormalized:
-        Number.isFinite(Number(pctKhach)) && Number(pctKhach) > 10
-          ? Number(pctKhach) / 100
-          : Number(pctKhach) || 1,
+      pctCtvNormalized,
+      pctKhachNormalized,
       supplierId,
       productId: variantId || productId,
       variantId,
@@ -512,17 +537,6 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
   const fallbackPrice = normalizeMoney(orderRow?.[ORDER_COLS.price] ?? 0);
   const fallbackCost = normalizeMoney(orderRow?.[ORDER_COLS.cost] ?? 0);
 
-  const resolveMoney = (computedValue, ...fallbackValues) => {
-    if (Number.isFinite(computedValue) && computedValue > 0) return Math.round(computedValue);
-    for (const candidate of fallbackValues) {
-      if (candidate === null || candidate === undefined) continue;
-      const normalized = normalizeMoney(candidate);
-      if (Number.isFinite(normalized) && normalized > 0) return normalized;
-    }
-    const lastDefined = fallbackValues.find((c) => c !== null && c !== undefined);
-    return lastDefined !== undefined ? normalizeMoney(lastDefined) : 0;
-  };
-
   try {
     const sanPham = orderRow?.[ORDER_COLS.idProduct];
     const idSupplyRaw = orderRow?.[ORDER_COLS.idSupply];
@@ -535,8 +549,20 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
       return { price: fallbackPrice, cost: fallbackCost };
     }
 
-    const { productId, variantId, pctCtv, pctKhach } = await fetchProductPricing(client, sanPham);
-    const giaNhapSource = await fetchSupplyPrice(client, { variantId, productId }, supplierId);
+    const { pricing } = await calculateRenewalPricing(client, {
+      sanPham,
+      supplierId,
+      orderCode: String(orderRow?.[ORDER_COLS.idOrder] || ""),
+      fallbackCost: giaNhapCu,
+      fallbackPrice: giaBanCu,
+      forceKhachLe:
+        Boolean(ORDER_PREFIXES?.khuyen) &&
+        String(orderRow?.[ORDER_COLS.idOrder] || "")
+          .toUpperCase()
+          .startsWith(ORDER_PREFIXES.khuyen.toUpperCase()),
+    });
+    return { price: pricing.price, cost: pricing.cost };
+    /* legacy pricing path removed
     const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
 
     const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
@@ -577,7 +603,7 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
       latestGiaNhap
     );
 
-    return { price: finalGiaBan, cost: finalGiaNhap };
+    */
   } catch (err) {
     logger.warn("[Renewal] computeOrderCurrentPrice failed, using stored price", {
       orderCode: orderRow?.[ORDER_COLS.idOrder],

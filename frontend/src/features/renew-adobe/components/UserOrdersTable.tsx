@@ -7,13 +7,23 @@
  * 3. Match email ↔ users_snapshot JSON → điền profile, tình trạng gói
  */
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
-import * as Helpers from "@/lib/helpers";
-import { API_BASE_URL } from "@/lib/api";
-import { API_ENDPOINTS } from "@/constants";
-import type { AdobeAdminAccount, LicenseStatus, SnapshotUser } from "../index";
+import type {
+  AdobeAdminAccount,
+  LicenseStatus,
+} from "@/features/renew-adobe/types";
+import { fetchRenewAdobeUserOrders } from "@/features/renew-adobe/user-orders/api";
+import type {
+  DisplayStatus,
+  OrderInfo,
+  UserOrderRow,
+} from "@/features/renew-adobe/user-orders/types";
+import {
+  buildEmailOrderMap,
+  flattenToUserRows,
+} from "@/features/renew-adobe/user-orders/utils";
 
 const STATUS_LABELS: Record<LicenseStatus, string> = {
   paid: "Còn gói",
@@ -23,115 +33,12 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
 };
 
 /** User có product === false → hết quyền (không dùng license_status của account) */
-export type DisplayStatus = LicenseStatus | "no_product";
-
 const DISPLAY_LABELS: Record<DisplayStatus, string> = {
   ...STATUS_LABELS,
   no_product: "Hết quyền",
 };
 
-export type UserOrderRow = {
-  id: string;
-  order_code: string;
-  customer_name: string;
-  email: string;
-  profile: string;
-  display_status: DisplayStatus;
-  expiry: string;
-  accountId: number;
-};
-
-type OrderInfo = {
-  order_code: string;
-  information_order: string;
-  customer: string;
-  contact: string;
-  expiry_date: string | null;
-  status: string;
-};
-
-/** Ưu tiên product của user: product === false hoặc falsy → "Hết quyền", còn lại dùng license_status của account */
-function resolveDisplayStatus(
-  userProduct: boolean | string | undefined,
-  accountLicenseStatus: LicenseStatus
-): DisplayStatus {
-  if (userProduct === false || userProduct === "false") return "no_product";
-  return accountLicenseStatus;
-}
-
 const PAGE_SIZE = 10;
-
-/**
- * Build Map<email_lowercase, OrderInfo> từ đơn hàng (order_list theo variant renew_adobe).
- * Nếu 1 email có nhiều đơn → lấy đơn đầu tiên (đã sort theo order_code ASC).
- */
-function buildEmailOrderMap(orders: OrderInfo[]): Map<string, OrderInfo> {
-  const map = new Map<string, OrderInfo>();
-  for (const o of orders) {
-    const email = (o.information_order || "").trim().toLowerCase();
-    if (email && !map.has(email)) {
-      map.set(email, o);
-    }
-  }
-  return map;
-}
-
-/**
- * Nguồn chính = đơn hàng (emailOrderMap từ order_list theo variant renew_adobe).
- * Match ngược vào users_snapshot để lấy Profile (org_name) & trạng thái product.
- */
-function flattenToUserRows(
-  accounts: AdobeAdminAccount[],
-  emailOrderMap: Map<string, OrderInfo>
-): UserOrderRow[] {
-  // Build lookup: email → snapshot info (account nào chứa user này)
-  type SnapInfo = { accountId: number; orgName: string; product: boolean | string | undefined; licenseStatus: LicenseStatus };
-  const snapLookup = new Map<string, SnapInfo>();
-
-  for (const acc of accounts) {
-    let users: SnapshotUser[] = [];
-    if (acc.users_snapshot) {
-      try {
-        users = JSON.parse(acc.users_snapshot) as SnapshotUser[];
-      } catch {
-        users = [];
-      }
-    }
-    for (const u of users) {
-      const key = (u.email || "").toLowerCase().trim();
-      if (key && !snapLookup.has(key)) {
-        snapLookup.set(key, {
-          accountId: acc.id,
-          orgName: acc.org_name ?? "—",
-          product: u.product,
-          licenseStatus: acc.license_status,
-        });
-      }
-    }
-  }
-
-  // Duyệt từ đơn hàng → tạo row
-  const rows: UserOrderRow[] = [];
-  for (const [email, order] of emailOrderMap) {
-    const snap = snapLookup.get(email);
-    rows.push({
-      id: snap ? `acc-${snap.accountId}-${email}` : `order-${email}`,
-      order_code: order.order_code ?? "—",
-      customer_name: order.customer || "—",
-      email,
-      profile: snap?.orgName ?? "—",
-      display_status: snap
-        ? resolveDisplayStatus(snap.product, snap.licenseStatus)
-        : "unknown",
-      expiry: order.expiry_date
-        ? Helpers.formatDateToDMY(order.expiry_date)
-        : "—",
-      accountId: snap?.accountId ?? 0,
-    });
-  }
-
-  return rows;
-}
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
   const label = DISPLAY_LABELS[status];
@@ -170,14 +77,8 @@ export function UserOrdersTable({
   const [orderData, setOrderData] = useState<OrderInfo[]>([]);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS}`, {
-      credentials: "include",
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Lỗi tải user-orders");
-        return res.json();
-      })
-      .then((data: OrderInfo[]) => setOrderData(data))
+    fetchRenewAdobeUserOrders()
+      .then((data) => setOrderData(data))
       .catch(() => setOrderData([]));
   }, [accounts]);
 

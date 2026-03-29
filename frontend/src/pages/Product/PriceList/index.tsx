@@ -31,7 +31,6 @@ function Pricing() {
     editingSupplyRows,
     supplyPriceDrafts,
     savingSupplyRows,
-    supplyRowErrors,
     newSupplyRows,
     editingProductId,
     productEditForm,
@@ -146,7 +145,6 @@ function Pricing() {
           editingSupplyRows={editingSupplyRows}
           supplyPriceDrafts={supplyPriceDrafts}
           savingSupplyRows={savingSupplyRows}
-          supplyRowErrors={supplyRowErrors}
           newSupplyRows={newSupplyRows}
           editingProductId={editingProductId}
           productEditForm={productEditForm}

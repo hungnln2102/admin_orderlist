@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { API_ENDPOINTS } from "../../../../constants";
-import { apiFetch } from "../../../../lib/api";
-import * as Helpers from "../../../../lib/helpers";
 import { CalculatePriceResponse } from "../types";
+import { fetchCalculatedPrice } from "../../../../lib/pricingApi";
 
 type UseCalculatedPriceParams = {
   isOpen: boolean;
@@ -74,24 +72,9 @@ export const useCalculatedPrice = ({
         setPriceLoading(true);
         setPriceError(null);
 
-        const response = await apiFetch(API_ENDPOINTS.CALCULATE_PRICE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const { data, rawText } =
-          await Helpers.readJsonOrText<CalculatePriceResponse>(response);
-
-        if (!response.ok) {
-          const message =
-            (data?.error as string | undefined) ||
-            rawText ||
-            `Server responded with ${response.status}`;
-          throw new Error(message);
-        }
-
-        const result: CalculatePriceResponse = data ?? {};
+        const result = (await fetchCalculatedPrice(
+          payload
+        )) as CalculatePriceResponse;
 
         if (!ignore) {
           const backendPrice = Number(result.price ?? result.gia_ban);

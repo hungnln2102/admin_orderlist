@@ -9,7 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
-import { OrderStatusData } from "../../../lib/api";
+import type { OrderStatusData } from "@/features/dashboard/api/dashboardApi";
 
 type OrderChartCardProps = {
   data: OrderStatusData[];

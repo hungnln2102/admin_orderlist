@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 
 export type DeleteUserByEmailProps = {

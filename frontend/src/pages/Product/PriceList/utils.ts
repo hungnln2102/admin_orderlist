@@ -1,5 +1,11 @@
 import { VARIANT_PRICING_COLS } from "../../../lib/tableSql";
 import {
+  calculateSellingPriceFromMarginInput,
+  formatNormalizedPercent,
+  getDiscountRatioInput,
+  getMarginRatioInput,
+} from "../../../shared/utils/pricing";
+import {
   CreateSupplierEntry,
   ProductPricingRow,
   RateDescriptionInput,
@@ -86,12 +92,11 @@ export const parseBoolean = (value: unknown): boolean => {
   return ["true", "1", "t", "y", "yes"].includes(normalized);
 };
 
-const resolvePromoMultiplier = (pctKhach?: number | null, pctPromo?: number | null): number | null => {
-  if (typeof pctPromo !== "number" || !Number.isFinite(pctPromo)) {
-    return null;
-  }
-  const promo = pctPromo > 1 ? pctPromo / 100 : pctPromo;
-  if (promo < 0 || promo >= 1) return null;
+export { getMarginRatioInput, getDiscountRatioInput };
+
+const resolvePromoMultiplier = (pctPromo?: number | null): number | null => {
+  const promo = getDiscountRatioInput(pctPromo);
+  if (promo === null) return null;
   return 1 - promo;
 };
 
@@ -100,20 +105,14 @@ export const hasValidPromoRatio = (
   pctKhach?: number | null,
   pctCtv?: number | null
 ): boolean => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < MIN_PROMO_RATIO) {
+  const promoRatio = getDiscountRatioInput(value);
+  if (promoRatio === null || promoRatio < MIN_PROMO_RATIO) {
     return false;
   }
-  if (
-    typeof pctKhach !== "number" ||
-    typeof pctCtv !== "number" ||
-    !Number.isFinite(pctKhach) ||
-    !Number.isFinite(pctCtv) ||
-    pctKhach <= 0 ||
-    pctCtv <= 0
-  ) {
+  if (getMarginRatioInput(pctKhach) === null || getMarginRatioInput(pctCtv) === null) {
     return false;
   }
-  return resolvePromoMultiplier(pctKhach, value) !== null;
+  return resolvePromoMultiplier(value) !== null;
 };
 
 const normalizeSupplyName = (value: string | null | undefined): string => {
@@ -165,17 +164,7 @@ export const sortSupplyItems = (items: SupplyPriceItem[]): SupplyPriceItem[] => 
 export const buildSupplyRowKey = (productId: number, sourceId: number): string => `${productId}-${sourceId}`;
 
 export const multiplyValue = (value?: number | null, ratio?: number | null): number | null => {
-  if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    value <= 0 ||
-    typeof ratio !== "number" ||
-    !Number.isFinite(ratio) ||
-    ratio <= 0
-  ) {
-    return null;
-  }
-  return value * ratio;
+  return calculateSellingPriceFromMarginInput(value, ratio);
 };
 
 export const multiplyBasePrice = (ratio?: number | null, basePrice?: number | null): number | null =>
@@ -207,10 +196,11 @@ export const calculatePromoPrice = (
     return null;
   }
 
-  const promoRatio = pctPromo > 1 ? pctPromo / 100 : pctPromo;
-  const khachRatio = pctKhach && pctKhach > 1 ? pctKhach : pctKhach || 1;
-
-  const retailPrice = baseValue * khachRatio;
+  const promoRatio = getDiscountRatioInput(pctPromo);
+  const retailPrice = calculateSellingPriceFromMarginInput(baseValue, pctKhach);
+  if (promoRatio === null || retailPrice === null) {
+    return null;
+  }
   const promoPriceRaw = retailPrice - retailPrice * promoRatio;
   const promoPriceClamped = Math.min(retailPrice, Math.max(baseValue, promoPriceRaw));
 
@@ -298,12 +288,7 @@ export const formatCurrencyValue = (value?: number | null): string => {
 };
 
 export const formatPromoPercent = (value?: number | null): string | null => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null;
-  }
-  const percent = value * 100;
-  const rounded = Math.abs(percent - Math.round(percent)) < 0.01 ? Math.round(percent).toString() : percent.toFixed(2).replace(/\.?0+$/, "");
-  return `${rounded}%`;
+  return formatNormalizedPercent(getDiscountRatioInput(value));
 };
 
 export const formatDateLabel = (value?: string | null): string => {

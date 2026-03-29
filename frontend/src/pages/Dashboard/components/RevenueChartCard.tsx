@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { RevenueData } from "../../../lib/api";
+import type { RevenueData } from "@/features/dashboard/api/dashboardApi";
 import * as Helpers from "../../../lib/helpers";
 
 type RevenueChartCardProps = {

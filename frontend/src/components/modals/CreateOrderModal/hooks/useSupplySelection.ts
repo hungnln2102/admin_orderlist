@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from "react";
-import {
-  ORDER_CODE_PREFIXES,
-  ORDER_FIELDS,
-} from "../../../../constants";
+import { ORDER_FIELDS } from "../../../../constants";
 import { CustomerType, Order, Supply, SupplyPrice } from "../types";
 
 type RecalcPrice = (
@@ -116,15 +113,11 @@ export const useSupplySelection = ({
       );
       setSelectedSupplyId(sourceId === 0 ? null : sourceId);
       setFormData((prev) => {
-        const updated: Partial<Order> = {
+        return {
           ...prev,
           [ORDER_FIELDS.SUPPLY]: selectedSupply ? supplyName : "",
           [ORDER_FIELDS.COST]: newBasePrice,
         };
-        if (customerType === ORDER_CODE_PREFIXES.PROMO) {
-          updated[ORDER_FIELDS.PRICE] = newBasePrice;
-        }
-        return updated;
       });
 
       if (!productName || !orderId || !registerDate) {
