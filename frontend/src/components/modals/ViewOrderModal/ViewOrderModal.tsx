@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
-import { ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
+import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
 import { ViewOrderModalProps } from "./types";
 import { normalizeDateLike, parseNumberLike } from "./utils";
