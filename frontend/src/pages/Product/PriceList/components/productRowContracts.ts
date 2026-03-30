@@ -18,6 +18,7 @@ export interface ProductRowEditControls {
   productEditForm: ProductEditFormState | null;
   productEditError: string | null;
   isSavingProductEdit: boolean;
+  productNameOptions: string[];
   onStartProductEdit: (
     event: React.MouseEvent<HTMLButtonElement>,
     product: ProductPricingRow

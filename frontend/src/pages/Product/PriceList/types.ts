@@ -15,6 +15,7 @@ export interface ProductPricingRow {
   pctKhach: number | null;
   pctPromo: number | null;
   isActive: boolean;
+  basePrice: number | null;
   baseSupplyPrice: number | null;
   wholesalePrice: number | null;
   retailPrice: number | null;
@@ -28,6 +29,7 @@ export interface PricingStat {
   icon: typeof CurrencyDollarIcon;
   accent: StatAccent;
   subtitle: string;
+  filterValue: StatusFilter;
 }
 
 export interface RateDescriptionInput {
@@ -55,6 +57,7 @@ export interface ProductEditFormState {
   packageName: string;
   packageProduct: string;
   sanPham: string;
+  basePrice: string;
   pctCtv: string;
   pctKhach: string;
   pctPromo: string;
@@ -76,6 +79,7 @@ export interface CreateProductFormState {
   packageName: string;
   packageProduct: string;
   sanPham: string;
+  basePrice: string;
   pctCtv: string;
   pctKhach: string;
   pctPromo: string;

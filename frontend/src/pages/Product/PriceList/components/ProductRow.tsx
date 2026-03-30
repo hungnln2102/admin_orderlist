@@ -117,7 +117,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
     Number.isFinite(highestSupplyPrice) &&
     highestSupplyPrice > 0
       ? formatCurrencyValue(highestSupplyPrice)
-      : "ChÆ°a cÃ³ dá»¯ liá»‡u";
+      : "Chưa có dữ liệu";
 
   const handleReloadSupply = () => {
     supplyControls.fetchSupplyPricesForProduct(item.sanPhamRaw);
@@ -143,6 +143,12 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
               <div className="text-xs text-white/70">{item.variantLabel}</div>
             </div>
           </div>
+        </td>
+        <td className="whitespace-nowrap px-6 py-4">
+          <div className="text-sm font-semibold text-slate-200">
+            {formatCurrencyValue(item.basePrice)}
+          </div>
+          <div className="text-xs text-white/50">Giá gốc</div>
         </td>
         <td className="whitespace-nowrap px-6 py-4">
           <div className="text-sm font-semibold text-white">
@@ -228,9 +234,11 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       </tr>
       {isEditingProduct && currentEditForm && (
         <tr>
-          <td colSpan={7} className="px-2 md:px-6 pb-4 md:pb-6">
+          <td colSpan={8} className="px-2 md:px-6 pb-4 md:pb-6">
             <ProductEditPanel
+              productId={item.id}
               currentEditForm={currentEditForm}
+              productNameOptions={editControls.productNameOptions}
               highestSupplyPriceDisplay={highestSupplyPriceDisplay}
               previewWholesalePrice={previewWholesalePrice}
               previewRetailPrice={previewRetailPrice}
@@ -248,7 +256,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       )}
       {isExpanded && (
         <tr>
-          <td colSpan={7} className="px-2 md:px-6 pb-4 md:pb-6">
+          <td colSpan={8} className="px-2 md:px-6 pb-4 md:pb-6">
             <ProductExpandedDetails
               item={item}
               productKey={productKey}

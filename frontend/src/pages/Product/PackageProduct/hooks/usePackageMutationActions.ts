@@ -89,7 +89,6 @@ export const usePackageMutationActions = ({
           values.manualStock,
           selectedTemplate.name
         );
-        resolvedSupplier = values.manualStock.account || null;
       }
       if (!resolvedStorageId && values.manualStorage.account.trim()) {
         resolvedStorageId = await createWarehouseItem(
@@ -168,7 +167,6 @@ export const usePackageMutationActions = ({
           values.manualStock,
           template.name
         );
-        resolvedSupplier = values.manualStock.account || null;
       }
       if (!resolvedStorageId && values.manualStorage.account.trim()) {
         resolvedStorageId = await createWarehouseItem(

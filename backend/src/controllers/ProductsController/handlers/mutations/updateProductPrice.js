@@ -31,6 +31,8 @@ const updateProductPrice = async (req, res) => {
     packageName,
     packageProduct,
     sanPham,
+    basePrice,
+    base_price,
     categoryIds,
     categoryColors,
     pctCtv,
@@ -56,6 +58,7 @@ const updateProductPrice = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     const productSchemaId = variantRes.rows[0]?.product_id || null;
+    let targetProductId = productSchemaId;
 
     const variantUpdates = [];
     const variantValues = [];
@@ -63,6 +66,41 @@ const updateProductPrice = async (req, res) => {
       variantUpdates.push(`${quoteIdent(column)} = ?`);
       variantValues.push(value);
     };
+
+    if (packageName !== undefined) {
+      const normalizedPackageName = normalizeTextInput(packageName);
+      if (!normalizedPackageName) {
+        return res
+          .status(400)
+          .json({ error: "Tên sản phẩm không được để trống." });
+      }
+
+      const existingProduct = await db(TABLES.product)
+        .select("id")
+        .where(productSchemaCols.packageName, normalizedPackageName)
+        .first();
+
+      targetProductId = existingProduct?.id ?? existingProduct?.ID ?? null;
+
+      if (!targetProductId) {
+        const insertPayload = {
+          [productSchemaCols.packageName]: normalizedPackageName,
+        };
+        const insertedProduct = await db(TABLES.product)
+          .insert(insertPayload)
+          .returning("id");
+        targetProductId =
+          insertedProduct?.[0]?.id ?? insertedProduct?.[0]?.ID ?? null;
+      }
+
+      if (!targetProductId) {
+        throw new Error("Unable to resolve product id.");
+      }
+
+      if (targetProductId !== productSchemaId) {
+        addVariantUpdate(variantCols.productId, targetProductId);
+      }
+    }
 
     if (sanPham !== undefined) {
       const normalized = normalizeTextInput(sanPham);
@@ -73,6 +111,9 @@ const updateProductPrice = async (req, res) => {
     }
     if (packageProduct !== undefined) {
       addVariantUpdate(variantCols.variantName, normalizeTextInput(packageProduct) || null);
+    }
+    if (basePrice !== undefined || base_price !== undefined) {
+      addVariantUpdate(variantCols.basePrice, toNullableNumber(basePrice ?? base_price));
     }
     if (is_active !== undefined) {
       const isActive =
@@ -112,13 +153,9 @@ const updateProductPrice = async (req, res) => {
       );
     }
 
-    if (productSchemaId && (packageName !== undefined || imageUrl !== undefined)) {
+    if (targetProductId && imageUrl !== undefined) {
       const productUpdates = [];
       const productValues = [];
-      if (packageName !== undefined) {
-        productUpdates.push(`${quoteIdent(productSchemaCols.packageName)} = ?`);
-        productValues.push(normalizeTextInput(packageName) || null);
-      }
       if (imageUrl !== undefined) {
         productUpdates.push(`${quoteIdent(productSchemaCols.imageUrl)} = ?`);
         productValues.push(normalizeTextInput(imageUrl) || null);
@@ -130,12 +167,12 @@ const updateProductPrice = async (req, res) => {
           SET ${productUpdates.join(", ")}
           WHERE ${quoteIdent(productSchemaCols.id)} = ?;
         `,
-          [...productValues, productSchemaId]
+          [...productValues, targetProductId]
         );
       }
     }
 
-    if (productSchemaId && Array.isArray(normalizedCategoryIds)) {
+    if (targetProductId && Array.isArray(normalizedCategoryIds)) {
       let existingColors = null;
       if (hasProductCategoryColor) {
         const colorRes = await db.raw(
@@ -146,7 +183,7 @@ const updateProductPrice = async (req, res) => {
           FROM ${TABLES.productCategory}
           WHERE ${quoteIdent(productCategoryCols.productId)} = ?;
         `,
-          [productSchemaId]
+          [targetProductId]
         );
         existingColors = new Map(
           (colorRes.rows || [])
@@ -165,12 +202,12 @@ const updateProductPrice = async (req, res) => {
         DELETE FROM ${TABLES.productCategory}
         WHERE ${quoteIdent(productCategoryCols.productId)} = ?;
       `,
-        [productSchemaId]
+        [targetProductId]
       );
       if (normalizedCategoryIds.length) {
         const rows = normalizedCategoryIds.map((categoryId) => {
           const row = {
-            [productCategoryCols.productId]: productSchemaId,
+            [productCategoryCols.productId]: targetProductId,
             [productCategoryCols.categoryId]: categoryId,
           };
           if (hasProductCategoryColor) {

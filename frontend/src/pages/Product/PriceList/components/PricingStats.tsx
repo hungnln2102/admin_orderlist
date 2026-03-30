@@ -1,13 +1,18 @@
 import React from "react";
 import StatCard, { STAT_CARD_ACCENTS } from "../../../../components/ui/StatCard";
-import { PricingStat } from "../types";
+import { PricingStat, StatusFilter } from "../types";
 
 interface PricingStatsProps {
   stats: PricingStat[];
-  onAddProduct: () => void;
+  statusFilter: StatusFilter;
+  onStatusChange: (value: StatusFilter) => void;
 }
 
-const PricingStats: React.FC<PricingStatsProps> = ({ stats }) => {
+const PricingStats: React.FC<PricingStatsProps> = ({
+  stats,
+  statusFilter,
+  onStatusChange,
+}) => {
   return (
     <div className="pricing-stats space-y-4">
       <div className="pricing-stats__panel rounded-[32px] border border-white/5 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-slate-900/40 p-6 shadow-2xl backdrop-blur-xl">
@@ -20,6 +25,8 @@ const PricingStats: React.FC<PricingStatsProps> = ({ stats }) => {
               icon={stat.icon}
               subtitle={stat.subtitle}
               accent={STAT_CARD_ACCENTS[stat.accent]}
+              isActive={statusFilter === stat.filterValue}
+              onClick={() => onStatusChange(stat.filterValue)}
             />
           ))}
         </div>

@@ -62,6 +62,7 @@ export const VARIANT_PRICING_COLS = {
   code: "id_product", // alias cho variant.display_name
   packageName: "package", // alias cho product.package_name
   variantName: "package_product", // alias cho variant.variant_name
+  basePrice: "base_price",
   pctCtv: "pct_ctv",
   pctKhach: "pct_khach",
   pctPromo: "pct_promo",

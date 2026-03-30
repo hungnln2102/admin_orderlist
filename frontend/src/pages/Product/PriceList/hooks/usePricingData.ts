@@ -129,6 +129,7 @@ export const usePricingData = () => {
         icon: CurrencyDollarIcon,
         accent: "emerald",
         subtitle: "Tất cả sản phẩm",
+        filterValue: "all",
       },
       {
         name: "Đang Hoạt Động",
@@ -136,6 +137,7 @@ export const usePricingData = () => {
         icon: ArrowTrendingUpIcon,
         accent: "sky",
         subtitle: "Sẵn sàng bán",
+        filterValue: "active",
       },
       {
         name: "Tạm Dừng",
@@ -143,6 +145,7 @@ export const usePricingData = () => {
         icon: PencilIcon,
         accent: "violet",
         subtitle: "Đang ẩn trên bảng giá",
+        filterValue: "inactive",
       },
     ];
   }, [productPrices]);
@@ -177,6 +180,7 @@ export const usePricingData = () => {
     createSuppliers: productActions.createSuppliers,
     createError: productActions.createError,
     isSubmittingCreate: productActions.isSubmittingCreate,
+    productNameOptions: productActions.productNameOptions,
     supplierOptions: productActions.supplierOptions,
     isLoadingSuppliers: productActions.isLoadingSuppliers,
     bankOptions: productActions.bankOptions,

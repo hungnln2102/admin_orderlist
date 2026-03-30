@@ -15,8 +15,8 @@ const attachListRoutes = (router) => {
             const today = todayYMDInVietnam();
             const normalized = rows.map((row) =>
                 normalizeOrderRow(row, today, {
-                    // Refund/canceled table should display the stored status from DB (e.g. ChÆ°a HoÃ n/ÄÃ£ HoÃ n)
-                    // and must not be auto-overridden to Háº¿t Háº¡n/CÃ²n Gia Háº¡n based on expiry.
+                    // Refund/canceled table should display the stored status from DB (e.g. Chưa Hoàn/Đã Hoàn)
+                    // and must not be auto-overridden to Hết Hạn/Còn Gia Hạn based on expiry.
                     enableAutoStatus: !(scope === "canceled" || scope === "cancelled" || scope === "expired"),
                 })
             );

@@ -115,7 +115,7 @@ Phần này mô tả theo đúng các bước log trong V2.
 
 - **Thực hiện**: giống B5 nhưng xảy ra sau khi đã nhập password.
 
-### B8 — Skip các màn “progressive profile” (phone/backup/security prompt)
+### B8 — Skip các màn "progressive profile" (phone/backup/security prompt)
 
 - **Thực hiện**:
   - Nếu gặp màn add phone / backup email / verify khác → click `Skip/Not now/Later` hoặc xử lý 2FA.
@@ -132,7 +132,7 @@ Phần này mô tả theo đúng các bước log trong V2.
   - Click `button[data-testid="org-switch-button"]` trên adminconsole.
 - **Mục đích**: mở menu chọn organization.
 
-### B11 — Chọn dòng có tag “Business ID” để lấy Profile Name
+### B11 — Chọn dòng có tag "Business ID" để lấy Profile Name
 
 - **Thực hiện**:
   - Đọc menu `role="listbox"` và các item `role="option"`.
@@ -278,7 +278,7 @@ Ngoài ra:
 - `users_snapshot` (JSON)
 - `alert_config` (cookies / session payload)
 
-Trong UI, danh sách “user & đơn hàng” đọc từ `users_snapshot`.
+Trong UI, danh sách "user & đơn hàng" đọc từ `users_snapshot`.
 
 ---
 
@@ -319,7 +319,7 @@ Giải pháp:
 
 ## 8. Ghi chú mở rộng (khi cần nâng cấp)
 
-- Nếu cần “user có gói/không” thật chuẩn (loại trừ free products):
+- Nếu cần "user có gói/không" thật chuẩn (loại trừ free products):
   - Nên dùng API JIL `/products/{id}/users` và chỉ lấy **paid products**
   - (Hiện logic này đã có trong `adobe-http`, có thể port sang V2 nếu muốn)
 ----------------------------------------------------

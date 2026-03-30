@@ -61,6 +61,7 @@ const mapProductPriceRow = (row = {}) => {
       row.package_product ?? row[variantCols.variantName] ?? null,
     package: row.package ?? row[productSchemaCols.packageName] ?? null,
     image_url: row.image_url ?? row[productSchemaCols.imageUrl] ?? null,
+    base_price: toNullableNumber(row.base_price ?? row[variantCols.basePrice]),
     category: categoryFallback,
     categories,
     pct_ctv: pctCtv,

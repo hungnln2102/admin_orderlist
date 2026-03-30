@@ -104,7 +104,20 @@ export const PriceCard: React.FC<PriceCardProps> = ({
         </div>
 
         {/* Prices grid */}
-        <div className={`grid gap-2 ${hasPromo ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className={`grid gap-2 ${hasPromo ? "grid-cols-4" : "grid-cols-3"}`}>
+          {/* Base price */}
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
+            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] block mb-1">
+              Giá gốc
+            </span>
+            <p className="text-[13px] font-bold text-slate-200 tabular-nums">
+              {formatCurrencyValue(item.basePrice)}
+            </p>
+            <p className="text-[9px] text-white/40 mt-0.5 truncate">
+              Base price
+            </p>
+          </div>
+
           {/* Wholesale price */}
           <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
             <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] block mb-1">

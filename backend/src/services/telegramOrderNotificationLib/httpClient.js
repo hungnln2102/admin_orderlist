@@ -6,6 +6,17 @@ const https = require("https");
 const dns = require("dns");
 const logger = require("../../utils/logger");
 const { HTTP_TIMEOUT_MS } = require("./constants");
+const TRANSIENT_FETCH_ERROR_CODES = new Set([
+  "ABORT_ERR",
+  "UND_ERR_ABORTED",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ECONNABORTED",
+]);
 
 const preferIpv4Lookup = (hostname, options, cb) =>
   dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
@@ -14,6 +25,31 @@ const preferIpv4Lookup = (hostname, options, cb) =>
     }
     cb(null, address, family);
   });
+
+const getErrorCode = (err) =>
+  String(err?.code || err?.cause?.code || "")
+    .trim()
+    .toUpperCase();
+
+const getErrorMessage = (err) =>
+  [err?.message, err?.cause?.message].filter(Boolean).join(" | ");
+
+const isTransientFetchError = (err, timeoutSignal) => {
+  const code = getErrorCode(err);
+  const message = getErrorMessage(err);
+
+  return (
+    timeoutSignal?.aborted === true ||
+    err?.name === "AbortError" ||
+    err?.name === "TimeoutError" ||
+    TRANSIENT_FETCH_ERROR_CODES.has(code) ||
+    /fetch failed/i.test(message) ||
+    /aborted due to timeout/i.test(message) ||
+    /timed out/i.test(message) ||
+    /socket hang up/i.test(message) ||
+    /network is unreachable/i.test(message)
+  );
+};
 
 /**
  * POST body qua https.request với keepAlive và IPv4.
@@ -60,7 +96,9 @@ const sendWithHttps = (
     );
 
     req.setTimeout(HTTP_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Request timed out after ${HTTP_TIMEOUT_MS}ms`));
+      const timeoutError = new Error(`Request timed out after ${HTTP_TIMEOUT_MS}ms`);
+      timeoutError.code = "ETIMEDOUT";
+      req.destroy(timeoutError);
     });
     req.on("error", reject);
     req.write(body);
@@ -95,20 +133,15 @@ const postJson = async (url, data) => {
       }
       return await res.text();
     } catch (err) {
-      const code = err?.code || err?.cause?.code;
-      const isTransient =
-        err?.name === "AbortError" ||
-        code === "ETIMEDOUT" ||
-        code === "EAI_AGAIN" ||
-        code === "ENOTFOUND" ||
-        code === "ECONNRESET" ||
-        /fetch failed/i.test(err?.message || "");
-      if (!isTransient) {
+      const code = getErrorCode(err);
+      if (!isTransientFetchError(err, timeoutSignal)) {
         throw err;
       }
       logger.warn("[Order][Telegram] Fetch failed, retrying with https client", {
+        name: err?.name,
         code,
         status: err?.status,
+        message: err?.message,
       });
     }
   }
@@ -119,4 +152,5 @@ const postJson = async (url, data) => {
 module.exports = {
   sendWithHttps,
   postJson,
+  isTransientFetchError,
 };

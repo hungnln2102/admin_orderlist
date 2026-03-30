@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type React from "react";
 import { API_ENDPOINTS } from "../../../../constants";
 import type {
@@ -39,6 +39,7 @@ interface UseProductActionsParams {
 
 export const useProductActions = ({
   apiBase,
+  productPrices,
   setProductPrices,
   fetchProductPrices,
   statusOverrides,
@@ -60,6 +61,22 @@ export const useProductActions = ({
   );
   const [createError, setCreateError] = useState<string | null>(null);
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
+
+  const productNameOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return productPrices
+      .map((product) => (product.packageName || "").trim())
+      .filter(Boolean)
+      .filter((name) => {
+        const key = name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((left, right) =>
+        left.localeCompare(right, "vi", { sensitivity: "base" })
+      );
+  }, [productPrices]);
 
   const referenceOptions = useProductReferenceOptions({
     apiBase,
@@ -102,7 +119,10 @@ export const useProductActions = ({
     field: keyof ProductEditFormState,
     value: string
   ) => {
-    setProductEditForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+    const nextValue = field === "basePrice" ? formatVndInput(value) : value;
+    setProductEditForm((prev) =>
+      prev ? { ...prev, [field]: nextValue } : prev
+    );
   };
 
   const handleCancelProductEdit = () => {
@@ -136,6 +156,7 @@ export const useProductActions = ({
             packageName: validation.normalizedPackageName,
             packageProduct: validation.normalizedPackageProduct,
             sanPham: validation.normalizedSanPham,
+            basePrice: validation.nextBasePrice,
             pctCtv: validation.nextPctCtv,
             pctKhach: validation.nextPctKhach,
             pctPromo: validation.nextPctPromo,
@@ -213,7 +234,8 @@ export const useProductActions = ({
     field: keyof CreateProductFormState,
     value: string
   ) => {
-    setCreateForm((prev) => ({ ...prev, [field]: value }));
+    const nextValue = field === "basePrice" ? formatVndInput(value) : value;
+    setCreateForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handleSupplierChange = (
@@ -327,6 +349,7 @@ export const useProductActions = ({
     createSuppliers,
     createError,
     isSubmittingCreate,
+    productNameOptions,
     supplierOptions: referenceOptions.supplierOptions,
     isLoadingSuppliers: referenceOptions.isLoadingSuppliers,
     bankOptions: referenceOptions.bankOptions,

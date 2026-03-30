@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import {
   MIN_PROMO_RATIO,
+  formatVndDisplay,
   getDiscountRatioInput,
   getMarginRatioInput,
   parseRatioInput,
@@ -28,6 +29,7 @@ type ProductEditValidationResult =
       normalizedPackageName: string;
       normalizedPackageProduct: string;
       normalizedSanPham: string;
+      nextBasePrice: number | null;
       nextPctCtv: number;
       nextPctKhach: number;
       nextPctPromo: number | null;
@@ -44,6 +46,7 @@ type CreateProductValidationResult =
         packageName?: string;
         packageProduct?: string;
         sanPham: string;
+        basePrice: number | null;
         pctCtv?: number;
         pctKhach?: number;
         pctPromo?: number;
@@ -58,6 +61,13 @@ type CreateProductValidationResult =
 const formatPercent = (ratio: number): string =>
   `${(ratio * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
+const parseCurrencyInput = (value: string): number | null => {
+  const digits = String(value ?? "").replace(/\D+/g, "");
+  if (!digits) return null;
+  const parsed = Number(digits);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export function buildProductEditForm(
   product: ProductPricingRow
 ): ProductEditFormState {
@@ -65,6 +75,10 @@ export function buildProductEditForm(
     packageName: product.packageName || "",
     packageProduct: product.packageProduct || "",
     sanPham: product.sanPhamRaw || "",
+    basePrice:
+      product.basePrice !== null && product.basePrice !== undefined
+        ? formatVndDisplay(product.basePrice)
+        : "",
     pctCtv:
       product.pctCtv !== null && product.pctCtv !== undefined
         ? String(product.pctCtv)
@@ -85,6 +99,7 @@ export function createEmptyCreateForm(): CreateProductFormState {
     packageName: "",
     packageProduct: "",
     sanPham: "",
+    basePrice: "",
     pctCtv: "",
     pctKhach: "",
     pctPromo: "",
@@ -223,11 +238,20 @@ export function validateProductEditForm(
   const normalizedPackageName = form.packageName?.trim() ?? "";
   const normalizedPackageProduct = form.packageProduct?.trim() ?? "";
   const normalizedSanPham = form.sanPham?.trim() ?? "";
+  const rawBasePrice = form.basePrice?.trim() ?? "";
+  const nextBasePrice = parseCurrencyInput(rawBasePrice);
 
   if (!normalizedSanPham) {
     return {
       ok: false,
       error: "Vui lòng nhập mã sản phẩm hợp lệ",
+    };
+  }
+
+  if (rawBasePrice && (!nextBasePrice || nextBasePrice <= 0)) {
+    return {
+      ok: false,
+      error: "Giá gốc phải lớn hơn 0",
     };
   }
 
@@ -305,6 +329,7 @@ export function validateProductEditForm(
     normalizedPackageName,
     normalizedPackageProduct,
     normalizedSanPham,
+    nextBasePrice,
     nextPctCtv,
     nextPctKhach,
     nextPctPromo,
@@ -318,6 +343,8 @@ export function validateCreateProductForm(
   const trimmedPackage = form.packageName.trim();
   const trimmedProduct = form.packageProduct.trim();
   const trimmedSanPham = form.sanPham.trim();
+  const trimmedBasePrice = form.basePrice.trim();
+  const parsedBasePrice = parseCurrencyInput(trimmedBasePrice);
   const pctCtvValue = parseRatioInput(form.pctCtv);
   const pctKhachValue = parseRatioInput(form.pctKhach);
   const pctPromoValue = parseRatioInput(form.pctPromo);
@@ -332,6 +359,13 @@ export function validateCreateProductForm(
     return {
       ok: false,
       error: "Vui lòng nhập mã sản phẩm",
+    };
+  }
+
+  if (trimmedBasePrice && (!parsedBasePrice || parsedBasePrice <= 0)) {
+    return {
+      ok: false,
+      error: "Giá gốc phải lớn hơn 0.",
     };
   }
 
@@ -441,13 +475,14 @@ export function validateCreateProductForm(
 
   return {
     ok: true,
-    payload: {
-      packageName: trimmedPackage || undefined,
-      packageProduct: trimmedProduct || undefined,
-      sanPham: trimmedSanPham,
-      pctCtv: pctCtvValue ?? undefined,
-      pctKhach: pctKhachValue ?? undefined,
-      pctPromo: pctPromoValue ?? undefined,
+      payload: {
+        packageName: trimmedPackage || undefined,
+        packageProduct: trimmedProduct || undefined,
+        sanPham: trimmedSanPham,
+        basePrice: parsedBasePrice,
+        pctCtv: pctCtvValue ?? undefined,
+        pctKhach: pctKhachValue ?? undefined,
+        pctPromo: pctPromoValue ?? undefined,
       suppliers: normalizedSuppliers,
     },
   };

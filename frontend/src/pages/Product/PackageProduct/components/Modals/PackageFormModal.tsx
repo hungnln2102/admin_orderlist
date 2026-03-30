@@ -146,7 +146,6 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
                     setValues((prev) => ({
                       ...prev,
                       manualStock: entry,
-                      supplier: entry.account,
                     }))
                   }
                   readOnly={mode === "edit"}

@@ -4,7 +4,12 @@ const cors = require("cors");
 const morgan = require("morgan");
 const session = require("express-session");
 const helmet = require("helmet");
-const { allowedOrigins, session: sessionConfig } = require("./config/appConfig");
+const {
+  allowedOrigins,
+  allowedOriginSet,
+  normalizeOrigin,
+  session: sessionConfig,
+} = require("./config/appConfig");
 const routes = require("./routes");
 const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -38,7 +43,7 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOriginSet.has(normalizeOrigin(origin))) {
         return callback(null, true);
       }
       return callback(new Error(`Blocked by CORS: ${origin}`));

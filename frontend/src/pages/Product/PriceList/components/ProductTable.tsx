@@ -38,6 +38,7 @@ interface ProductTableProps {
   productEditForm: ProductEditFormState | null;
   productEditError: string | null;
   isSavingProductEdit: boolean;
+  productNameOptions: string[];
   deleteProductState: DeleteProductState;
   onToggleProductDetails: (product: ProductPricingRow) => void;
   onStartProductEdit: (
@@ -112,6 +113,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
   productEditForm,
   productEditError,
   isSavingProductEdit,
+  productNameOptions,
   deleteProductState,
   onToggleProductDetails,
   onStartProductEdit,
@@ -177,6 +179,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
       productEditForm,
       productEditError,
       isSavingProductEdit,
+      productNameOptions,
       onStartProductEdit,
       onProductEditChange,
       onCancelProductEdit,
@@ -188,6 +191,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
       productEditForm,
       productEditError,
       isSavingProductEdit,
+      productNameOptions,
       onStartProductEdit,
       onProductEditChange,
       onCancelProductEdit,

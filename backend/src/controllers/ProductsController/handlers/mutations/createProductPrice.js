@@ -27,6 +27,8 @@ const createProductPrice = async (req, res) => {
     packageName,
     packageProduct,
     sanPham,
+    basePrice,
+    base_price,
     categoryIds,
     categoryColors,
     pctCtv,
@@ -51,6 +53,7 @@ const createProductPrice = async (req, res) => {
   const pctCtvVal = toNullableNumber(pctCtv);
   const pctKhachVal = toNullableNumber(pctKhach);
   const pctPromoVal = toNullableNumber(pctPromo);
+  const basePriceVal = toNullableNumber(basePrice ?? base_price);
   const isActive =
     typeof is_active === "boolean"
       ? is_active
@@ -112,6 +115,7 @@ const createProductPrice = async (req, res) => {
               [variantCols.displayName]: productCode,
               [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
               [variantCols.isActive]: isActive,
+              [variantCols.basePrice]: basePriceVal,
               [variantCols.pctCtv]: pctCtvVal,
               [variantCols.pctKhach]: pctKhachVal,
               [variantCols.pctPromo]: pctPromoVal,

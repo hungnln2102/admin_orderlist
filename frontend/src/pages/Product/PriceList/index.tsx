@@ -42,6 +42,7 @@ function Pricing() {
     createSuppliers,
     createError,
     isSubmittingCreate,
+    productNameOptions,
     supplierOptions,
     isLoadingSuppliers,
     bankOptions,
@@ -111,16 +112,15 @@ function Pricing() {
       <div className="space-y-6">
         <PricingStats
           stats={pricingStats}
-          onAddProduct={handleOpenCreateModal}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
         />
         <PricingFilters
           searchTerm={searchTerm}
-          statusFilter={statusFilter}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
           error={error}
           onSearchChange={setSearchTerm}
-          onStatusChange={setStatusFilter}
           onRefresh={handleRefreshAll}
           onAddProduct={handleOpenCreateModal}
         />
@@ -150,6 +150,7 @@ function Pricing() {
           productEditForm={productEditForm}
           productEditError={productEditError}
           isSavingProductEdit={isSavingProductEdit}
+          productNameOptions={productNameOptions}
           deleteProductState={deleteProductState}
           onToggleProductDetails={handleToggleProductDetails}
           onStartProductEdit={handleStartProductEdit}

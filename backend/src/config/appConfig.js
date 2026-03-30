@@ -8,10 +8,32 @@ const port = Number(process.env.PORT) || 3001;
 const SEPAY_PORT = Number(process.env.SEPAY_PORT) || 5000;
 const SEPAY_HOST = process.env.SEPAY_HOST || "0.0.0.0";
 
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const normalizeOrigin = (origin) => {
+  if (typeof origin !== "string") {
+    return "";
+  }
+
+  const trimmedOrigin = origin.trim();
+  if (!trimmedOrigin) {
+    return "";
+  }
+
+  try {
+    return new URL(trimmedOrigin).origin.toLowerCase();
+  } catch {
+    return trimmedOrigin.replace(/\/+$/, "").toLowerCase();
+  }
+};
+
+const allowedOrigins = Array.from(
+  new Set(
+    (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
+      .split(",")
+      .map(normalizeOrigin)
+      .filter(Boolean)
+  )
+);
+const allowedOriginSet = new Set(allowedOrigins);
 
 const sessionName =
   process.env.SESSION_NAME ||
@@ -56,6 +78,8 @@ if (isProd && (!process.env.SESSION_SECRET || sessionSecret === "change_this_sec
 module.exports = {
   port,
   allowedOrigins,
+  allowedOriginSet,
+  normalizeOrigin,
   sepay: {
     host: SEPAY_HOST,
     port: SEPAY_PORT,

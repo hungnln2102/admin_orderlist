@@ -202,11 +202,6 @@ export const usePackageFormState = ({
             : item
         )
       );
-      setValues((prev) =>
-        normalizeWarehouseId(prev.stockId) === targetId
-          ? { ...prev, supplier: updated.account || fields.account || "" }
-          : prev
-      );
     },
     [warehouseItems]
   );
@@ -231,14 +226,13 @@ export const usePackageFormState = ({
     setValues((prev) => ({
       ...prev,
       stockId: item.id ?? null,
-      supplier: item.account || "",
     }));
     setStockDropdownOpen(false);
     setStockSearch("");
   }, []);
 
   const handleClearStock = useCallback(() => {
-    setValues((prev) => ({ ...prev, stockId: null, supplier: "" }));
+    setValues((prev) => ({ ...prev, stockId: null }));
   }, []);
 
   const handleToggleStockManual = useCallback(() => {
@@ -248,7 +242,6 @@ export const usePackageFormState = ({
       setValues((prev) => ({
         ...prev,
         stockId: null,
-        supplier: "",
         manualStock: { ...EMPTY_MANUAL_ENTRY },
       }));
     }

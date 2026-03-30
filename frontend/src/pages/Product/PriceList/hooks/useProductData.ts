@@ -1,12 +1,20 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_ENDPOINTS } from "../../../../constants";
 import { ProductPricingRow, StatusFilter } from "../types";
 import {
   applyBasePriceToProduct,
   mapProductPriceRow,
-  normalizeProductKey,
   toTimestamp,
 } from "../utils";
+
+const normalizeSearchText = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+};
 
 interface UseProductDataResult {
   currentPage: number;
@@ -37,8 +45,8 @@ interface UseProductDataResult {
 }
 
 export const useProductData = (apiBase: string): UseProductDataResult => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [searchTerm, setSearchTermState] = useState("");
+  const [statusFilter, setStatusFilterState] = useState<StatusFilter>("active");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [productPrices, setProductPrices] = useState<ProductPricingRow[]>([]);
@@ -54,6 +62,16 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     Record<number, string>
   >({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const setSearchTerm = useCallback((value: string) => {
+    setSearchTermState(value);
+    setCurrentPage(1);
+  }, []);
+
+  const setStatusFilter = useCallback((value: StatusFilter) => {
+    setStatusFilterState(value);
+    setCurrentPage(1);
+  }, []);
 
   const fetchProductPrices = useCallback(async () => {
     setIsLoading(true);
@@ -106,25 +124,32 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     }
   }, [apiBase]);
 
-  const filteredPricing = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  const searchTokens = useMemo(
+    () =>
+      normalizeSearchText(searchTerm)
+        .split(/\s+/)
+        .filter(Boolean),
+    [searchTerm]
+  );
 
+  const filteredPricing = useMemo(() => {
     return productPrices
       .filter((item) => {
-        if (statusFilter === "active" && !item.isActive) return false;
-        if (statusFilter === "inactive" && item.isActive) return false;
-        if (!normalizedSearch) return true;
+        const resolvedIsActive = statusOverrides[item.id] ?? item.isActive;
+        if (statusFilter === "active" && !resolvedIsActive) return false;
+        if (statusFilter === "inactive" && resolvedIsActive) return false;
+        if (!searchTokens.length) return true;
 
-        const haystack = [
-          item.packageName,
-          item.packageProduct,
-          item.sanPhamRaw,
-          item.variantLabel,
-        ]
-          .join(" ")
-          .toLowerCase();
+        const haystack = normalizeSearchText(
+          [
+            item.packageName,
+            item.packageProduct,
+            item.sanPhamRaw,
+            item.variantLabel,
+          ].join(" ")
+        );
 
-        return haystack.includes(normalizedSearch);
+        return searchTokens.every((token) => haystack.includes(token));
       })
       .sort((a, b) => {
         const aInactive = !(statusOverrides[a.id] ?? a.isActive);
@@ -145,19 +170,26 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
       });
   }, [
     productPrices,
-    searchTerm,
+    searchTokens,
     statusFilter,
     statusOverrides,
     updatedTimestampMap,
   ]);
+
+  const totalRows = filteredPricing.length;
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, rowsPerPage, totalRows]);
 
   const pagedPricing = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     const end = start + rowsPerPage;
     return filteredPricing.slice(start, end);
   }, [filteredPricing, currentPage, rowsPerPage]);
-
-  const totalRows = filteredPricing.length;
 
   return {
     currentPage,

@@ -65,7 +65,7 @@ Cập nhật: 2026-03-22
 - [ ] Xóa file legacy không còn tham chiếu:
   - `backend/src/services/adobeCheckService.js`
   - Toàn bộ thư mục `backend/src/services/adobe-http/*` (sau khi đã tách shared)
-- [ ] Cập nhật docs để bỏ mô tả “hybrid HTTP + Playwright”
+- [ ] Cập nhật docs để bỏ mô tả "hybrid HTTP + Playwright"
   - `docs/Renew_Adobe_V2.md`
   - `docs/Renew_Adobe_V2_Flow.md`
   - `docs/Renew_Adobe_Check_Flow.md`

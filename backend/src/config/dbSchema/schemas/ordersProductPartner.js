@@ -88,6 +88,7 @@ const PRODUCT_SCHEMA = {
       DESCRIPTION: "description",
       RULES: "rules",
       IMAGE_URL: "image_url",
+      BASE_PRICE: "base_price",
       PCT_CTV: "pct_ctv",
       PCT_KHACH: "pct_khach",
       PCT_PROMO: "pct_promo",

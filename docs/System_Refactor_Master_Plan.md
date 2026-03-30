@@ -19,7 +19,7 @@ Hướng được chọn: **modular monolith theo business domain**.
 - hệ thống đã có nhiều domain đủ lớn để tách riêng
 - repo chưa cần microservices
 - một số chỗ đã có dấu hiệu modular hóa nhưng chưa đồng bộ
-- nếu refactor kiểu “big-bang” theo layer kỹ thuật, repo sẽ rối hơn thay vì sạch hơn
+- nếu refactor kiểu "big-bang" theo layer kỹ thuật, repo sẽ rối hơn thay vì sạch hơn
 
 ## Nguyên tắc kiến trúc đích
 

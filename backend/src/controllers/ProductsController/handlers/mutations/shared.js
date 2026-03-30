@@ -20,6 +20,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.variantName)} AS package_product,
       p.${quoteIdent(productSchemaCols.packageName)} AS package,
       COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+      v.${quoteIdent(variantCols.basePrice)} AS base_price,
       COALESCE(
         json_agg(
           DISTINCT jsonb_build_object(
@@ -60,6 +61,7 @@ const fetchVariantView = async (variantId) => {
       v.id,
       v.${quoteIdent(variantCols.displayName)},
       v.${quoteIdent(variantCols.variantName)},
+      v.${quoteIdent(variantCols.basePrice)},
       p.${quoteIdent(productSchemaCols.packageName)},
       p.${quoteIdent(productSchemaCols.imageUrl)},
       pd.desc_image_url,

@@ -126,29 +126,29 @@ Form khách hàng nằm ở **Website** (Renew Adobe page), gọi các API trên
 
 ## 7. Tại sao phải duyệt qua tài khoản admin để lấy tài khoản cần check?
 
-**Câu hỏi:** Tại sao không lấy trực tiếp “user” cần check, mà lại phải tìm **tài khoản admin** chứa user đó?
+**Câu hỏi:** Tại sao không lấy trực tiếp "user" cần check, mà lại phải tìm **tài khoản admin** chứa user đó?
 
-**Trả lời ngắn gọn:** Trong hệ thống hiện tại, **không có bảng/khóa riêng** lưu quan hệ “email user → tài khoản admin”. Thông tin “user này thuộc tài khoản nào” **chỉ nằm bên trong** từng tài khoản admin, trong cột `users_snapshot` (JSON). Vì vậy muốn biết “tài khoản cần check” cho một email thì phải **duyệt qua các tài khoản admin** và mở `users_snapshot` ra xem.
+**Trả lời ngắn gọn:** Trong hệ thống hiện tại, **không có bảng/khóa riêng** lưu quan hệ "email user → tài khoản admin". Thông tin "user này thuộc tài khoản nào" **chỉ nằm bên trong** từng tài khoản admin, trong cột `users_snapshot` (JSON). Vì vậy muốn biết "tài khoản cần check" cho một email thì phải **duyệt qua các tài khoản admin** và mở `users_snapshot` ra xem.
 
 **Chi tiết:**
 
 1. **Mô hình dữ liệu hiện tại**
    - Có bảng **tài khoản admin** (ví dụ `accounts_admin`): mỗi dòng = 1 tài khoản Adobe (email admin, org_name, license_status, …).
-   - Mỗi tài khoản có cột **`users_snapshot`**: một JSON array chứa danh sách user (email, name, product, …) **đang nằm trong tài khoản đó** — dữ liệu này được cập nhật khi “check” (scrape từ Adobe).
-   - **Không** có bảng kiểu “user → account_id” hay index riêng: tức là không có chỗ nào lưu trực tiếp “email `user@gmail.com` thuộc account_id 5”.
+   - Mỗi tài khoản có cột **`users_snapshot`**: một JSON array chứa danh sách user (email, name, product, …) **đang nằm trong tài khoản đó** — dữ liệu này được cập nhật khi "check" (scrape từ Adobe).
+   - **Không** có bảng kiểu "user → account_id" hay index riêng: tức là không có chỗ nào lưu trực tiếp "email `user@gmail.com` thuộc account_id 5".
 
 2. **Vì vậy lookup phải làm gì?**
    - Input: **email user** (ví dụ email khách nhập ở form).
-   - Câu hỏi cần trả lời: “User này đang nằm trong **tài khoản admin nào**?” (để lấy org_name, license_status, …).
+   - Câu hỏi cần trả lời: "User này đang nằm trong **tài khoản admin nào**?" (để lấy org_name, license_status, …).
    - Cách duy nhất với dữ liệu hiện tại:  
      - Bước 1: thử tìm theo **email = email admin** (trường hợp user chính là admin).  
-     - Bước 2: nếu không trùng, **duyệt lần lượt từng tài khoản admin**, parse `users_snapshot`, kiểm tra xem có phần tử nào có `email` trùng với email cần tìm không → tìm được “tài khoản admin chứa user này”.
+     - Bước 2: nếu không trùng, **duyệt lần lượt từng tài khoản admin**, parse `users_snapshot`, kiểm tra xem có phần tử nào có `email` trùng với email cần tìm không → tìm được "tài khoản admin chứa user này".
 
-3. **Tại sao cần “tài khoản admin” chứ không chỉ “user”?**
-   - Form cần hiển thị **org_name** (tên Profile/Org) và **license_status** (còn gói / hết hạn) — đây là thông tin **của tài khoản admin**, không lưu tách ở “user”.
-   - Trạng thái “còn gói / hết hạn” được xác định theo gói của **tài khoản admin** đó (check product ở trang Adobe, cập nhật license_status). Vì vậy phải có **tài khoản admin** thì mới có đủ dữ liệu để “check” đúng nghĩa.
+3. **Tại sao cần "tài khoản admin" chứ không chỉ "user"?**
+   - Form cần hiển thị **org_name** (tên Profile/Org) và **license_status** (còn gói / hết hạn) — đây là thông tin **của tài khoản admin**, không lưu tách ở "user".
+   - Trạng thái "còn gói / hết hạn" được xác định theo gói của **tài khoản admin** đó (check product ở trang Adobe, cập nhật license_status). Vì vậy phải có **tài khoản admin** thì mới có đủ dữ liệu để "check" đúng nghĩa.
 
-**Tóm lại:** Phải duyệt qua tài khoản admin vì quan hệ “email user → tài khoản” **chỉ tồn tại bên trong** `users_snapshot` của từng tài khoản, chưa có bảng/index tra ngược. Nếu sau này bổ sung bảng hoặc cache dạng “user_email → account_id” (đồng bộ khi lưu snapshot), có thể đổi lookup thành một truy vấn trực tiếp theo email user mà không cần duyệt toàn bộ tài khoản admin.
+**Tóm lại:** Phải duyệt qua tài khoản admin vì quan hệ "email user → tài khoản" **chỉ tồn tại bên trong** `users_snapshot` của từng tài khoản, chưa có bảng/index tra ngược. Nếu sau này bổ sung bảng hoặc cache dạng "user_email → account_id" (đồng bộ khi lưu snapshot), có thể đổi lookup thành một truy vấn trực tiếp theo email user mà không cần duyệt toàn bộ tài khoản admin.
 
 ---
 
@@ -156,7 +156,7 @@ Form khách hàng nằm ở **Website** (Renew Adobe page), gọi các API trên
 
 **Câu hỏi:** Giữa bảng `key_active` (order_auto_keys) và `accounts_admin` cần bảng gì ở giữa để có thể đối chiếu nhanh (lookup email user → tài khoản admin mà không duyệt hết snapshot)?
 
-**Gợi ý: bảng ánh xạ “user email → account”**
+**Gợi ý: bảng ánh xạ "user email → account"**
 
 Thêm một bảng **trung gian** lưu quan hệ **email user → account_id**, cập nhật mỗi khi lưu/check `users_snapshot` của một tài khoản admin. Khi đó lookup chỉ cần 1 truy vấn theo email, không cần duyệt toàn bộ `accounts_admin`.
 
@@ -170,7 +170,7 @@ Thêm một bảng **trung gian** lưu quan hệ **email user → account_id**, 
 
 - `user_email` (VARCHAR, unique hoặc unique cùng account_id tùy logic) — email user (lowercase, trim).
 - `account_id` (FK → accounts_admin.id) — tài khoản admin chứa user này.
-- `order_code` (VARCHAR, nullable, optional) — mã đơn từ order_auto_keys/order_list nếu muốn gắn “user này đang dùng đơn nào” (có thể lấy từ order_list qua information_order = email).
+- `order_code` (VARCHAR, nullable, optional) — mã đơn từ order_auto_keys/order_list nếu muốn gắn "user này đang dùng đơn nào" (có thể lấy từ order_list qua information_order = email).
 - `updated_at` (timestamp) — lần cập nhật cuối (khi sync từ snapshot).
 
 **Luồng đồng bộ:**
@@ -183,7 +183,7 @@ Thêm một bảng **trung gian** lưu quan hệ **email user → account_id**, 
 **Quan hệ với key_active / order_list:**
 
 - `key_active.order_auto_keys` ↔ `order_list`: đã có (order_code = id_order) → có email qua `order_list.information_order`, expiry qua `order_list.expired_at`.
-- Bảng trung gian **không thay thế** key_active hay order_list; nó chỉ bổ sung **tra cứu nhanh**: email user → account_id. Đối chiếu “đơn hàng – tài khoản” vẫn có thể qua order_list (email) + bảng trung gian (email → account_id).
+- Bảng trung gian **không thay thế** key_active hay order_list; nó chỉ bổ sung **tra cứu nhanh**: email user → account_id. Đối chiếu "đơn hàng – tài khoản" vẫn có thể qua order_list (email) + bảng trung gian (email → account_id).
 
 **Kết quả:** Lookup API có thể: `SELECT account_id FROM renew_adobe_user_account WHERE user_email = ?` rồi `SELECT * FROM accounts_admin WHERE id = ?`, thay vì duyệt toàn bộ tài khoản admin và parse `users_snapshot`.
 
@@ -197,13 +197,13 @@ Thêm một bảng **trung gian** lưu quan hệ **email user → account_id**, 
 
 - **Check (lookup + user-orders):** User chỉ cần nhập email. Không bắt buộc nhập mã đơn hay chứng minh đã mua hàng.
 - **Kích hoạt (fix-user):** Backend **không** kiểm tra email có nằm trong `order_list` / `key_active` hay không. Bất kỳ email nào gửi lên đều có thể được add vào tài khoản admin còn slot.  
-→ Về mặt kỹ thuật, **hiện tại không cần Key** để “dùng” được (check + kích hoạt).
+→ Về mặt kỹ thuật, **hiện tại không cần Key** để "dùng" được (check + kích hoạt).
 
 **Nên hay không (gợi ý):**
 
 - **Nếu mục tiêu là chỉ phục vụ khách đã mua đơn:** **Nên** yêu cầu có Key (đơn hàng hợp lệ). Cụ thể:
   - Chỉ cho phép **kích hoạt** khi email có đơn trong hệ thống (order_list / key_active) và đơn **chưa hết hạn** (expiry_date ≥ hôm nay).  
-  - Có thể vẫn cho **check** (xem trạng thái) mà không cần Key; chỉ khi bấm “Kích hoạt lại” mới bắt buộc kiểm tra đơn.
+  - Có thể vẫn cho **check** (xem trạng thái) mà không cần Key; chỉ khi bấm "Kích hoạt lại" mới bắt buộc kiểm tra đơn.
 - **Cách làm:** Trong API `POST /api/renew-adobe/fix-user`, trước khi add user vào tài khoản admin, thêm bước:
   - Tra order_list (hoặc user-orders) theo email (`information_order` = email).
   - Nếu không có đơn **hoặc** mọi đơn đều đã hết hạn → trả 403/400, message kiểu: *"Chỉ khách hàng có đơn hàng còn hiệu lực mới được kích hoạt. Vui lòng mua đơn hoặc gia hạn."*
@@ -229,14 +229,14 @@ Thêm một bảng **trung gian** lưu quan hệ **email user → account_id**, 
 
 ### 10.1. Có còn cần bảng `key_active` (order_auto_keys) không?
 
-- **Cho riêng luồng Renew Adobe:** **Không bắt buộc.** Nếu “key active” = chính mã đơn hàng thì ta chỉ cần `order_list` + một cách để biết “đơn này có dùng Renew Adobe không” (ví dụ: sản phẩm thuộc danh sách Renew Adobe). Khi đó:
-  - “Đơn active cho Renew Adobe” = đơn có trong `order_list`, **và** `id_product` (variant_id) nằm trong danh sách sản phẩm dùng Renew Adobe, và (nếu cần) chưa hết hạn, status hợp lệ.
+- **Cho riêng luồng Renew Adobe:** **Không bắt buộc.** Nếu "key active" = chính mã đơn hàng thì ta chỉ cần `order_list` + một cách để biết "đơn này có dùng Renew Adobe không" (ví dụ: sản phẩm thuộc danh sách Renew Adobe). Khi đó:
+  - "Đơn active cho Renew Adobe" = đơn có trong `order_list`, **và** `id_product` (variant_id) nằm trong danh sách sản phẩm dùng Renew Adobe, và (nếu cần) chưa hết hạn, status hợp lệ.
   - Không cần lưu thêm bản ghi tương ứng trong `key_active.order_auto_keys` cho Renew Adobe.
 - **Nếu `key_active` đang phục vụ hệ thống khác** (ví dụ sản phẩm khác, system_code khác): giữ bảng `key_active` cho các hệ thống đó; chỉ **Renew Adobe** là không dùng `key_active`, mà dùng `order_list` + bảng whitelist sản phẩm (xem dưới).
 
-### 10.2. Làm sao biết “chỉ một số sản phẩm dùng Renew Adobe”?
+### 10.2. Làm sao biết "chỉ một số sản phẩm dùng Renew Adobe"?
 
-Cần một **danh sách “sản phẩm Renew Adobe”** (theo variant hoặc product). Hai hướng thường dùng:
+Cần một **danh sách "sản phẩm Renew Adobe"** (theo variant hoặc product). Hai hướng thường dùng:
 
 **Cách 1: Bảng whitelist (nên dùng)**
 
@@ -259,7 +259,7 @@ Ví dụ cấu trúc (theo **variant** — vì đơn lưu `id_product` = variant
 - Đơn thuộc Renew Adobe khi: `order_list.id_product` trỏ tới variant có `use_renew_adobe = true`.
 - Ưu: không thêm bảng. Nhược: gắn chặt logic Renew Adobe vào schema sản phẩm chung.
 
-Gợi ý: dùng **Cách 1** (bảng whitelist) để tách rõ “hệ thống Renew Adobe” và dễ bảo trì.
+Gợi ý: dùng **Cách 1** (bảng whitelist) để tách rõ "hệ thống Renew Adobe" và dễ bảo trì.
 
 ### 10.3. Thiết kế database tổng thể (tóm tắt)
 
@@ -273,8 +273,8 @@ Gợi ý: dùng **Cách 1** (bảng whitelist) để tách rõ “hệ thống R
   - (Đã bàn ở mục 8) **`renew_adobe_user_account`** (optional): `user_email`, `account_id`, (optional) `order_code`, `updated_at` — dùng cho tra cứu nhanh email → account, không thay thế key.
 
 - **Quan hệ:**  
-  - “Key active” cho Renew Adobe = **mã đơn hàng** = `order_list.id_order`.  
-  - Đơn “được dùng” trong Renew Adobe khi: `order_list.id_product` ∈ `renew_adobe_product.variant_id` (và có thể thêm điều kiện status, expired_at).
+  - "Key active" cho Renew Adobe = **mã đơn hàng** = `order_list.id_order`.  
+  - Đơn "được dùng" trong Renew Adobe khi: `order_list.id_product` ∈ `renew_adobe_product.variant_id` (và có thể thêm điều kiện status, expired_at).
 
 - **Không bắt buộc với Renew Adobe:**  
   - Không cần thêm bản ghi tương ứng trong `key_active.order_auto_keys` cho từng đơn Renew Adobe. Có thể bỏ qua bảng này hoàn toàn cho luồng Renew Adobe.
@@ -286,10 +286,10 @@ Gợi ý: dùng **Cách 1** (bảng whitelist) để tách rõ “hệ thống R
   `INNER JOIN renew_adobe_product ON order_list.id_product = renew_adobe_product.variant_id`  
   (và lọc status, expired_at nếu cần). Có thể vẫn trả về dạng: order_code, information_order, customer, expiry_date, status.
 
-- **Kiểm tra “user có Key (đơn) hợp lệ” khi kích hoạt:**  
+- **Kiểm tra "user có Key (đơn) hợp lệ" khi kích hoạt:**  
   - Input: email (và có thể mã đơn hàng nếu muốn bắt nhập).  
   - Tìm đơn: `order_list` WHERE `information_order` = email AND `id_product` IN (SELECT variant_id FROM renew_adobe_product) AND `expired_at` >= today (và status hợp lệ).  
-  - Nếu có ít nhất một đơn thỏa mãn → cho phép gọi fix-user (add user vào account). Không có đơn hợp lệ → 403/400 “Chỉ khách có đơn Renew Adobe còn hiệu lực mới được kích hoạt”.
+  - Nếu có ít nhất một đơn thỏa mãn → cho phép gọi fix-user (add user vào account). Không có đơn hợp lệ → 403/400 "Chỉ khách có đơn Renew Adobe còn hiệu lực mới được kích hoạt".
 
 - **Check trạng thái:** Có thể vẫn dùng lookup theo email + so expiry từ tập đơn lấy từ `order_list` + `renew_adobe_product` (không cần key_active).
 

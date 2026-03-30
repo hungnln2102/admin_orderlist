@@ -15,7 +15,23 @@ export function PricingRatiosSection({
       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300 mb-4">
         Tỷ Giá
       </p>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <label className={labelBase}>Giá Gốc</label>
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="numeric"
+              className={inputBase}
+              placeholder="0"
+              value={createForm.basePrice}
+              onChange={(event) => onFormChange("basePrice", event.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+              VNĐ
+            </span>
+          </div>
+        </div>
         <div>
           <label className={labelBase}>Tỷ Giá CTV</label>
           <input

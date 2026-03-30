@@ -1,6 +1,6 @@
 # Bảng Task Refactor
 
-Ngày cập nhật: `2026-03-30`
+Ngày cập nhật: `2026-03-31`
 
 ## Mục tiêu
 
@@ -122,6 +122,83 @@ Task board này bám theo [System_Refactor_Master_Plan.md](D:/Desktop/Personal/P
 - [x] Chạy `npm run build` trong `frontend/` sau khi đổi công thức
 - [x] Bỏ legacy conversion khi đọc `pct_ctv` và `pct_khach`, chuyển sang dùng trực tiếp biên độ đã chuẩn hóa từ DB
 - [x] Thêm migration `database/migrations/017_normalize_variant_margin_ratios.sql` để trừ `1` cho `pct_ctv` và `pct_khach`
+
+## Cập nhật 2026-03-30 - Package supplier binding
+
+- [x] Bỏ auto-sync `supplier` từ `stock account` trong `PackageFormModal`
+- [x] Bỏ ghi đè `supplier` khi chọn, bỏ chọn, hoặc cập nhật `stock account`
+- [x] Bỏ fallback `manualStock.account -> supplier` trong `usePackageMutationActions.ts`
+- [x] Xác nhận `npm run build` trong `frontend/` pass sau khi sửa
+
+## Cập nhật 2026-03-30 - Text encoding cleanup
+
+- [x] Quét lại toàn repo bằng `UTF-8 + ftfy` để phân biệt lỗi text thật với lỗi hiển thị của terminal
+- [x] Sửa các file còn text mojibake thật trong `docs/*`
+- [x] Sửa text lỗi trong `backend/src/controllers/Order/listRoutes.js`
+- [x] Sửa text lỗi trong `frontend/src/pages/Product/PriceList/components/ProductRow.tsx`
+- [x] Xác nhận không còn file source nào cần `ftfy` fix thêm
+- [x] Chạy `node --check` cho `backend/src/controllers/Order/listRoutes.js`
+- [x] Chạy `npm run build` trong `frontend/` sau khi cleanup text
+
+## Cập nhật 2026-03-31 - Product dropdown trong edit panel
+
+- [x] Tạo danh sách `productNameOptions` từ `productPrices` hiện có trong feature `price-list`
+- [x] Truyền `productNameOptions` qua `usePricingData -> ProductTable -> ProductRow -> ProductEditPanel`
+- [x] Đổi field `Tên sản phẩm` trong `ProductEditPanel` thành dropdown chọn product có sẵn
+- [x] Thêm nút `+` để chuyển sang nhập `product` mới thủ công khi cần
+- [x] Thêm nút `Chọn sẵn` để quay lại dropdown mà không làm vỡ flow edit hiện tại
+- [x] Chạy `npm run build` trong `frontend/` sau khi thêm dropdown
+
+## Cập nhật 2026-03-31 - Fix lan thay đổi giữa các variant cùng product
+
+- [x] Xác định nguyên nhân: `PATCH /api/product-prices/:productId` đang update `product.package_name`, nên đổi một row sẽ lan sang mọi `variant` chung `product_id`
+- [x] Đổi semantics update: khi sửa `Tên sản phẩm`, API sẽ resolve `product` đích rồi chỉ update `variant.product_id` của row đang sửa
+- [x] Nếu product chưa tồn tại, API tự tạo product mới rồi gán đúng `variant` vào product đó
+- [x] Giữ nguyên update `variant` cho `packageProduct`, `sanPham`, `pctCtv`, `pctKhach`, `pctPromo`
+- [x] Chạy `node --check` cho `backend/src/controllers/ProductsController/handlers/mutations/updateProductPrice.js`
+
+## Cập nhật 2026-03-31 - Tab trạng thái cho price list
+
+- [x] Thay dropdown `Trạng thái` trong `PricingFilters` bằng 2 tab `Đang hoạt động` và `Không hoạt động`
+- [x] Giữ nguyên search box, nút `Thêm sản phẩm` và `Đồng bộ lại`
+- [x] Đổi default `statusFilter` của `price-list` sang `active` để tab đầu hiển thị đúng dữ liệu ngay khi vào trang
+- [x] Chạy `npm run build` trong `frontend/` sau khi đổi filter UI
+
+## Cập nhật 2026-03-31 - Chuyển filter trạng thái sang stat cards
+
+- [x] Bỏ 2 nút tab trạng thái khỏi `PricingFilters`
+- [x] Biến 3 stat card trong `PricingStats` thành button filter cho `all`, `active`, `inactive`
+- [x] Highlight stat card đang active theo `statusFilter`
+- [x] Giữ lại search box, nút `Thêm sản phẩm` và `Đồng bộ lại` trong filter panel
+- [x] Chạy `npm run build` trong `frontend/` sau khi chuyển filter sang stat cards
+
+## Cập nhật 2026-03-31 - Thêm cột giá gốc cho price list
+
+- [x] Thêm cột `Giá gốc` vào table desktop của `price-list`
+- [x] Hoàn thiện khung hiển thị `Giá gốc` cho desktop và mobile để sẵn sàng nối dữ liệu chuẩn từ DB
+- [x] Cập nhật `colSpan` của các row expand/edit để khớp số cột mới
+- [x] Đồng bộ mobile card bằng tile `Giá gốc`
+- [x] Chạy `npm run build` trong `frontend/` sau khi thêm cột
+
+## Cập nhật 2026-03-31 - Match `base_price` cho cột Giá gốc
+
+- [x] Thêm `BASE_PRICE: "base_price"` vào config schema `product.variant`
+- [x] Đưa `base_price` vào các query list/detail trong `ProductsController`
+- [x] Map `base_price` qua backend mapper `mapProductPriceRow`
+- [x] Đồng bộ `VARIANT_PRICING_COLS.basePrice` và `ProductPricingRow.basePrice` ở frontend
+- [x] Đổi cột `Giá gốc` desktop sang dùng `variant.base_price`
+- [x] Đổi tile `Giá gốc` mobile sang dùng `variant.base_price`
+- [x] Giữ `baseSupplyPrice` cho logic giá nguồn / supplier pricing, không dùng nó để hiển thị `Giá gốc` nữa
+
+## Cập nhật 2026-03-31 - Thêm input `Giá gốc` cho form tạo và sửa sản phẩm
+
+- [x] Thêm field `basePrice` vào `CreateProductFormState` và `ProductEditFormState`
+- [x] Thêm input `Giá gốc` vào `CreateProductModal`
+- [x] Thêm input `Giá gốc` vào `ProductEditPanel`
+- [x] Format input `Giá gốc` theo kiểu VND khi nhập ở frontend
+- [x] Bổ sung validation và payload `basePrice` cho flow `POST/PATCH /api/product-prices`
+- [x] Lưu `basePrice` vào `variant.base_price` ở backend create/update handlers
+- [x] Giữ `basePrice` là trường dữ liệu độc lập để so sánh/hiển thị, không dùng nó trong công thức tính giá sỉ/lẻ/khuyến mãi
 
 ## Ghi chú sau refactor
 

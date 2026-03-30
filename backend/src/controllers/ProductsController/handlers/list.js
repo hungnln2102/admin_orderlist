@@ -55,6 +55,7 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
         COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        v.${quoteIdent(variantCols.basePrice)} AS base_price,
         COALESCE(
           json_agg(
             DISTINCT jsonb_build_object(
@@ -107,6 +108,7 @@ const listProductPrices = async (_req, res) => {
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
         COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        v.${quoteIdent(variantCols.basePrice)} AS base_price,
         v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
         v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
@@ -154,6 +156,7 @@ const getProductPriceById = async (req, res) => {
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
         COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        v.${quoteIdent(variantCols.basePrice)} AS base_price,
         v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
         v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,

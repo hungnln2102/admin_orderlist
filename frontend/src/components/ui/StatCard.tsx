@@ -102,6 +102,7 @@ export interface StatCardProps {
   children?: React.ReactNode;
   iconClassName?: string;
   isActive?: boolean;
+  onClick?: () => void;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -112,21 +113,28 @@ const StatCard: React.FC<StatCardProps> = ({
   subtitle,
   children,
   isActive,
+  onClick,
 }) => {
+  const isInteractive = typeof onClick === "function";
   const panelClass = isActive
     ? "backdrop-blur-[16px]"
     : "glass-panel";
-  const hoverEffectClass = isActive ? "" : "holographic-hover";
+  const hoverEffectClass =
+    isInteractive && !isActive ? "holographic-hover" : "";
   const containerStateClass = isActive
     ? `${accent.activeBorder} ${accent.activeBackground} ${accent.activeShadow} scale-[1.02]`
-    : `${accent.border} hover:scale-[1.02] cursor-pointer`;
+    : `${accent.border} ${isInteractive ? "hover:scale-[1.02] cursor-pointer" : ""}`;
   const glowStateClass = isActive
     ? `${accent.activeGlow} opacity-30`
     : `${accent.glow} opacity-10 transition-opacity group-hover:opacity-25`;
+  const Component = isInteractive ? "button" : "div";
 
   return (
-    <div
-      className={`stat-card group relative isolate overflow-hidden rounded-[24px] p-4 sm:p-5 transition-all duration-300 z-10 ${hoverEffectClass} ${panelClass} ${containerStateClass}`}
+    <Component
+      {...(isInteractive ? { type: "button", onClick } : {})}
+      className={`stat-card group relative isolate overflow-hidden rounded-[24px] p-4 sm:p-5 transition-all duration-300 z-10 ${hoverEffectClass} ${panelClass} ${containerStateClass} ${
+        isInteractive ? "w-full text-left" : ""
+      }`}
     >
       <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] ${glowStateClass}`}></div>
       
@@ -161,7 +169,7 @@ const StatCard: React.FC<StatCardProps> = ({
           {children}
         </div>
       )}
-    </div>
+    </Component>
   );
 };
 
