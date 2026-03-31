@@ -7,7 +7,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen app-aurora">
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-      <div className="transition-all duration-500 ease-in-out lg:ml-72 min-h-screen flex flex-col">
+      <div className="transition-all duration-500 ease-in-out lg:ml-[22.5rem] min-h-screen flex flex-col">
         {!sidebarOpen && (
           <div className="lg:hidden fixed top-6 left-6 z-40 animate-in fade-in duration-500">
             <button

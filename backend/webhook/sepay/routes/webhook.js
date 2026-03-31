@@ -1,6 +1,6 @@
 const express = require("express");
 const { ORDER_COLS, ORDER_TABLE, pool } = require("../config");
-const { safeStringify, normalizeAmount, extractOrderCodes } = require("../utils");
+const { safeStringify, normalizeAmount, extractOrderCodes, resolveOrderByPayment } = require("../utils");
 const {
   normalizeTransactionPayload,
   deriveOrderCode,
@@ -68,15 +68,15 @@ router.post("/", async (req, res) => {
     .map((code) => String(code || "").trim().toUpperCase())
     .filter(Boolean);
   // Nhiều mã đơn phân cách bằng "-": dùng đủ danh sách đã tách, không chỉ primary
-  const orderCodes = Array.from(
-    new Set(
+  const orderCodes = [
+    ...new Set(
       normalizedExtracted.length > 0
         ? normalizedExtracted
         : normalizedPrimary
           ? [normalizedPrimary]
           : []
-    )
-  );
+    ),
+  ];
   logger.debug("Order codes from webhook", { orderCodes, count: orderCodes.length });
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
@@ -90,6 +90,26 @@ router.post("/", async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // Fallback: nếu không extract được mã MAV, thử match theo số tiền + trạng thái
+      if (!orderCodes.length && transferAmountNormalized > 0) {
+        logger.info("[Webhook] No MAV order code found, trying amount-based fallback", {
+          amount: transferAmountNormalized,
+          content: transaction.transaction_content,
+        });
+        const fallbackCodes = await resolveOrderByPayment(client, {
+          amount: transferAmountNormalized,
+          transactionContent: transaction.transaction_content,
+        });
+        if (fallbackCodes.length) {
+          orderCodes.push(...fallbackCodes);
+          logger.info("[Webhook] Fallback matched orders", { orderCodes: fallbackCodes });
+        } else {
+          logger.warn("[Webhook] Fallback could not match any order", {
+            amount: transferAmountNormalized,
+          });
+        }
+      }
 
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
         const stateRes = await client.query(
@@ -114,7 +134,9 @@ router.post("/", async (req, res) => {
         );
       }
 
-      receiptResult = await insertPaymentReceipt(transaction, { client, orderCode });
+      // Dùng mã đơn đã resolve (fallback hoặc extract) thay vì orderCode gốc
+      const resolvedOrderCode = orderCodes[0] || orderCode;
+      receiptResult = await insertPaymentReceipt(transaction, { client, orderCode: resolvedOrderCode });
 
       if (receiptResult?.inserted) {
         const referenceImport =

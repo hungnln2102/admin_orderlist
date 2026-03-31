@@ -1,4 +1,11 @@
+const isDev =
+  typeof import.meta !== "undefined" && (import.meta as any).env?.DEV === true;
+
 const RAW_API_BASE: string = (() => {
+  // Dev: always use same-origin /api via Vite proxy to avoid stale or mismatched
+  // direct backend targets between shells, env files, and browser sessions.
+  if (isDev) return "";
+
   const metaBase =
     typeof import.meta !== "undefined"
       ? ((import.meta as any).env?.VITE_API_BASE_URL as string) || ""
@@ -10,12 +17,6 @@ const RAW_API_BASE: string = (() => {
       ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
       : "";
   if (envBase) return envBase;
-
-  // Dev: use same-origin via Vite proxy when no explicit base URL is provided.
-  const isDev =
-    typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.DEV === true;
-  if (isDev) return "";
 
   return "http://localhost:3001";
 })();

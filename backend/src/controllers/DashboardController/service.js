@@ -93,24 +93,37 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
 
   const result = await query.orderBy(monthKeyCol, 'asc');
 
-  // Transform to match chart format (month number instead of month_key)
-  return {
-    year,
-    months: (result || []).map((row) => {
-      const [, monthStr] = (row.month_key || '').split('-');
-      const monthNum = parseInt(monthStr, 10);
-      return {
-        month: `T${monthNum}`,
-        month_num: monthNum,
-        month_key: row.month_key,
-        total_orders: Number(row.total_orders || 0),
-        total_canceled: Number(row.canceled_orders || 0),
-        total_revenue: Number(row.total_revenue || 0),
-        total_profit: Number(row.total_profit || 0),
-        total_refund: Number(row.total_refund || 0),
-      };
-    }),
-  };
+  // Build a map from existing rows
+  const rowMap = new Map();
+  for (const row of (result || [])) {
+    const [, monthStr] = (row.month_key || '').split('-');
+    const monthNum = parseInt(monthStr, 10);
+    if (monthNum >= 1 && monthNum <= 12) {
+      rowMap.set(monthNum, row);
+    }
+  }
+
+  // Determine how many months to show
+  const now = new Date();
+  const maxMonth = (year === now.getFullYear()) ? (now.getMonth() + 1) : 12;
+
+  // Fill all months from 1 to maxMonth, using 0 for missing months
+  const months = [];
+  for (let m = 1; m <= maxMonth; m++) {
+    const row = rowMap.get(m);
+    months.push({
+      month: `T${m}`,
+      month_num: m,
+      month_key: `${yearStr}-${String(m).padStart(2, '0')}`,
+      total_orders: row ? Number(row.total_orders || 0) : 0,
+      total_canceled: row ? Number(row.canceled_orders || 0) : 0,
+      total_revenue: row ? Number(row.total_revenue || 0) : 0,
+      total_profit: row ? Number(row.total_profit || 0) : 0,
+      total_refund: row ? Number(row.total_refund || 0) : 0,
+    });
+  }
+
+  return { year, months };
 };
 
 module.exports = {

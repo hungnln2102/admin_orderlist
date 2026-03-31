@@ -14,6 +14,7 @@ import CtvList from "@/pages/CustomerCtv/CtvList";
 import PromoCodes from "@/pages/CustomerCtv/PromoCodes";
 import AddMcoin from "@/pages/CustomerCtv/AddMcoin";
 import ActiveKeys from "@/pages/CustomerCtv/ActiveKeys";
+import IpWhitelist from "@/pages/CustomerCtv/IpWhitelist";
 import RenewAdobeAdmin from "@/pages/CustomerCtv/RenewAdobeAdmin";
 import ProductSystem from "@/pages/CustomerCtv/ProductSystem";
 
@@ -36,6 +37,7 @@ export function AppRoutes() {
       <Route path="/promo-codes" element={<PromoCodes />} />
       <Route path="/add-mcoin" element={<AddMcoin />} />
       <Route path="/active-keys" element={<ActiveKeys />} />
+      <Route path="/ip-whitelist" element={<IpWhitelist />} />
       <Route path="/renew-adobe-admin" element={<RenewAdobeAdmin />} />
       <Route path="/product-system" element={<ProductSystem />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

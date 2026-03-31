@@ -1,18 +1,20 @@
 import type { ComponentType, SVGProps } from "react";
 import {
+  ArchiveBoxIcon,
+  ArrowPathIcon,
+  BanknotesIcon,
   ChartBarIcon,
-  ShoppingBagIcon,
+  ClipboardDocumentIcon,
   CubeIcon,
-  DocumentTextIcon,
   CurrencyDollarIcon,
   DocumentIcon,
+  DocumentTextIcon,
   InformationCircleIcon,
-  ArchiveBoxIcon,
-  UserGroupIcon,
-  TicketIcon,
-  BanknotesIcon,
   KeyIcon,
-  ClipboardDocumentIcon,
+  ShieldCheckIcon,
+  ShoppingBagIcon,
+  TicketIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 
 export type MenuItem = {
@@ -21,24 +23,56 @@ export type MenuItem = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
+export type MenuTone =
+  | "indigo"
+  | "sky"
+  | "emerald"
+  | "rose"
+  | "amber";
+
 export type MenuSection = {
+  id: string;
   title: string;
+  description: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   items: MenuItem[];
+  tone: MenuTone;
+  defaultOpen?: boolean;
 };
 
 export const menuSections: MenuSection[] = [
   {
-    title: "Tổng Quan",
-    items: [{ name: "Tổng Quan", href: "/dashboard", icon: ChartBarIcon }],
+    id: "overview",
+    title: "Tổng quan",
+    description: "Theo dõi nhanh toàn bộ hoạt động quản trị.",
+    icon: ChartBarIcon,
+    tone: "indigo",
+    defaultOpen: true,
+    items: [{ name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon }],
   },
   {
-    title: "Sản Phẩm",
+    id: "sales",
+    title: "Bán hàng",
+    description: "Điều phối đơn hàng, giá bán và dòng tiền giao dịch.",
+    icon: ShoppingBagIcon,
+    tone: "indigo",
+    defaultOpen: true,
     items: [
-      { name: "Đơn Hàng", href: "/orders", icon: ShoppingBagIcon },
-      { name: "Gói Sản Phẩm", href: "/package-products", icon: CubeIcon },
-      { name: "Bảng Giá", href: "/pricing", icon: CurrencyDollarIcon },
+      { name: "Đơn hàng", href: "/orders", icon: ShoppingBagIcon },
+      { name: "Bảng giá", href: "/pricing", icon: CurrencyDollarIcon },
+    ],
+  },
+  {
+    id: "catalog",
+    title: "Danh mục sản phẩm",
+    description: "Quản lý cấu trúc sản phẩm, form và key phân phối.",
+    icon: CubeIcon,
+    tone: "sky",
+    defaultOpen: true,
+    items: [
+      { name: "Gói sản phẩm", href: "/package-products", icon: CubeIcon },
       {
-        name: "Thông Tin Sản Phẩm",
+        name: "Thông tin sản phẩm",
         href: "/product-info",
         icon: InformationCircleIcon,
       },
@@ -47,37 +81,57 @@ export const menuSections: MenuSection[] = [
         href: "/form-info",
         icon: ClipboardDocumentIcon,
       },
-      { name: "Add Mcoin", href: "/add-mcoin", icon: BanknotesIcon },
-      { name: "Danh sách Key", href: "/active-keys", icon: KeyIcon },
       {
         name: "Danh sách sản phẩm",
         href: "/active-key-products",
         icon: CubeIcon,
       },
+      { name: "Danh sách Key", href: "/active-keys", icon: KeyIcon },
     ],
   },
   {
-    title: "Cung Cấp",
+    id: "sourcing",
+    title: "Nguồn hàng",
+    description: "Theo dõi nhà cung cấp, chứng từ và các lô nhập.",
+    icon: DocumentTextIcon,
+    tone: "emerald",
     items: [
-      { name: "Nhà Cung Cấp", href: "/sources", icon: DocumentTextIcon },
-      { name: "Báo Giá", href: "/show-price", icon: DocumentIcon },
-      { name: "Hóa Đơn", href: "/bill-order", icon: DocumentIcon },
-      { name: "Biên Lai", href: "/invoices", icon: DocumentIcon },
-      { name: "Lô Hàng", href: "/warehouse", icon: ArchiveBoxIcon },
+      { name: "Nhà cung cấp", href: "/sources", icon: DocumentTextIcon },
+      { name: "Báo giá", href: "/show-price", icon: DocumentIcon },
+      { name: "Hóa đơn", href: "/bill-order", icon: DocumentIcon },
+      { name: "Biên lai", href: "/invoices", icon: DocumentIcon },
+      { name: "Lô hàng", href: "/warehouse", icon: ArchiveBoxIcon },
     ],
   },
   {
+    id: "customers",
     title: "Khách hàng & CTV",
-    items: [
-      { name: "Danh sách Khách Hàng", href: "/customer-list", icon: UserGroupIcon },
-      { name: "Danh sách mã khuyến mãi", href: "/promo-codes", icon: TicketIcon },
-    ],
-  },
-  {
-    title: "Hệ Thống Renew",
+    description: "Chăm sóc khách hàng, khuyến mãi và số dư Mcoin.",
+    icon: UserGroupIcon,
+    tone: "rose",
     items: [
       {
-        name: "Danh Sách Admin Adobe",
+        name: "Danh sách khách hàng",
+        href: "/customer-list",
+        icon: UserGroupIcon,
+      },
+      {
+        name: "Danh sách mã khuyến mãi",
+        href: "/promo-codes",
+        icon: TicketIcon,
+      },
+      { name: "Add Mcoin", href: "/add-mcoin", icon: BanknotesIcon },
+    ],
+  },
+  {
+    id: "renew",
+    title: "Hệ thống Renew",
+    description: "Quản trị Adobe admin và nhóm sản phẩm hệ thống.",
+    icon: ArrowPathIcon,
+    tone: "amber",
+    items: [
+      {
+        name: "Danh sách Admin Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
       },
@@ -85,6 +139,11 @@ export const menuSections: MenuSection[] = [
         name: "Sản phẩm hệ thống",
         href: "/product-system",
         icon: CubeIcon,
+      },
+      {
+        name: "IP whitelist",
+        href: "/ip-whitelist",
+        icon: ShieldCheckIcon,
       },
     ],
   },

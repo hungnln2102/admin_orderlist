@@ -9,6 +9,25 @@ const ADMIN_SCHEMA = {
       CREATED_AT: "createdat",
     },
   },
+  IP_WHITELISTS: {
+    TABLE: "ip_whitelist",
+    COLS: {
+      ID: "id",
+      IP_ADDRESS: "ip_address",
+      LABEL: "label",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  SITE_SETTINGS: {
+    TABLE: "site_settings",
+    COLS: {
+      KEY: "key",
+      VALUE: "value",
+      UPDATED_AT: "updated_at",
+    },
+  },
 };
 
 const FINANCE_SCHEMA = {

@@ -74,6 +74,9 @@ export const API_ENDPOINTS = {
     `/api/renew-adobe/product-system/${id}`,
 
   CUSTOMER_STATUS: "/api/customer-status",
+  IP_WHITELISTS: "/api/ip-whitelists",
+  IP_WHITELIST_BY_ID: (id: number) => `/api/ip-whitelists/${id}`,
+  SITE_MAINTENANCE: "/api/site-maintenance",
 };
 
 // Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.

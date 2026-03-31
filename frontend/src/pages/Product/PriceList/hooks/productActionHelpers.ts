@@ -263,17 +263,17 @@ export function validateProductEditForm(
   const nextPctPromoRatio =
     nextPctPromo !== null ? getDiscountRatioInput(nextPctPromo) : null;
 
-  if (!nextPctCtv || nextPctCtv <= 0) {
+  if (nextPctCtv === null || nextPctCtv < 0) {
     return {
       ok: false,
-      error: "Tỷ giá CTV phải lớn hơn 0",
+      error: "Tỷ giá CTV không được nhỏ hơn 0",
     };
   }
 
-  if (!nextPctKhach || nextPctKhach <= 0) {
+  if (nextPctKhach === null || nextPctKhach < 0) {
     return {
       ok: false,
-      error: "Tỷ giá Khách phải lớn hơn 0",
+      error: "Tỷ giá Khách không được nhỏ hơn 0",
     };
   }
 
@@ -369,17 +369,17 @@ export function validateCreateProductForm(
     };
   }
 
-  if (pctCtvValue !== null && pctCtvValue <= 0) {
+  if (pctCtvValue !== null && pctCtvValue < 0) {
     return {
       ok: false,
-      error: "Tỷ giá CTV phải lớn hơn 0.",
+      error: "Tỷ giá CTV không được nhỏ hơn 0.",
     };
   }
 
-  if (pctKhachValue !== null && pctKhachValue <= 0) {
+  if (pctKhachValue !== null && pctKhachValue < 0) {
     return {
       ok: false,
-      error: "Tỷ giá khách phải lớn hơn 0.",
+      error: "Tỷ giá khách không được nhỏ hơn 0.",
     };
   }
 

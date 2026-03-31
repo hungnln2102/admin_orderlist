@@ -26,6 +26,8 @@ const promotionCodesRoutes = require("./promotionCodesRoutes");
 const formInfoRoutes = require("./formInfoRoutes");
 const renewAdobeRoutes = require("./renewAdobeRoutes");
 const customerStatusRoutes = require("./customerStatusRoutes");
+const ipWhitelistRoutes = require("./ipWhitelistRoutes");
+const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -37,6 +39,8 @@ router.use(authGuard);
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
 router.use("/renew-adobe", renewAdobeRoutes);
+router.use("/ip-whitelists", ipWhitelistRoutes);
+router.use("/site-maintenance", siteMaintenanceRoutes);
 router.use("/", customerStatusRoutes);
 router.use("/", accountsRoutes);
 router.use("/", promotionCodesRoutes);

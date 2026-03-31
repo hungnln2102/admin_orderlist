@@ -5,6 +5,7 @@ const {
 const {
   pool,
   ORDER_COLS,
+  ORDER_TABLE,
   PAYMENT_RECEIPT_COLS,
   VARIANT_COLS,
   SUPPLIER_COLS,
@@ -266,8 +267,64 @@ const extractOrderCodes = (transaction) => {
 
 const deriveOrderCode = (transaction) => {
   const codes = extractOrderCodes(transaction);
+  if (codes.length > 0) return codes[0];
+  // Fallback: chỉ chấp nhận nếu có prefix MAV
   const [fromSplit] = splitTransactionContent(transaction?.transaction_content);
-  return (codes[0] || fromSplit || "").trim();
+  const candidate = (fromSplit || "").trim().toUpperCase();
+  return /^MAV\w{3,}$/i.test(candidate) ? candidate : "";
+};
+
+/**
+ * Fallback: khi không extract được mã đơn MAV từ nội dung chuyển khoản,
+ * thử match theo số tiền + trạng thái (RENEWAL hoặc UNPAID).
+ * Chỉ trả kết quả nếu tìm được đúng 1 đơn duy nhất (tránh nhầm lẫn).
+ */
+const resolveOrderByPayment = async (client, { amount, transactionContent }) => {
+  if (!amount || amount <= 0) return [];
+  const { STATUS } = require("../../src/utils/statuses");
+  const statusList = [STATUS.RENEWAL, STATUS.UNPAID];
+
+  const sql = `
+    SELECT
+      ${safeIdent(ORDER_COLS.idOrder)} AS id_order,
+      ${safeIdent(ORDER_COLS.status)} AS status,
+      ${safeIdent(ORDER_COLS.price)} AS price,
+      ${safeIdent(ORDER_COLS.expiryDate)} AS expired_at,
+      ${safeIdent(ORDER_COLS.customer)} AS customer
+    FROM ${ORDER_TABLE}
+    WHERE ${safeIdent(ORDER_COLS.status)} = ANY($1)
+      AND ${safeIdent(ORDER_COLS.price)} = $2
+    ORDER BY ${safeIdent(ORDER_COLS.expiryDate)} ASC
+    LIMIT 10
+  `;
+
+  const res = await client.query(sql, [statusList, amount]);
+  if (!res.rows.length) return [];
+
+  // Ưu tiên đơn RENEWAL sắp hết hạn (daysLeft <= 4)
+  const renewalCandidates = res.rows.filter((r) => {
+    if (r.status !== STATUS.RENEWAL) return false;
+    const dl = daysUntil(r.expired_at);
+    return dl <= 4;
+  });
+
+  if (renewalCandidates.length === 1) return [renewalCandidates[0].id_order];
+
+  // Nếu có nhiều ứng viên, thử match thêm theo tên khách hàng trong nội dung giao dịch
+  if (res.rows.length > 1 && transactionContent) {
+    const contentNorm = stripAccents(String(transactionContent).toLowerCase());
+    const nameMatched = res.rows.filter((r) => {
+      if (!r.customer) return false;
+      const custNorm = stripAccents(String(r.customer).toLowerCase()).replace(/\s+/g, "");
+      return contentNorm.includes(custNorm);
+    });
+    if (nameMatched.length === 1) return [nameMatched[0].id_order];
+  }
+
+  // Đúng 1 đơn duy nhất → dùng luôn
+  if (res.rows.length === 1) return [res.rows[0].id_order];
+
+  return [];
 };
 
 const fetchProductPricing = async (client, productNameOrVariantId) => {
@@ -380,6 +437,7 @@ module.exports = {
   calcGiaBan,
   extractOrderCodes,
   deriveOrderCode,
+  resolveOrderByPayment,
   fetchProductPricing,
   findSupplyId,
   fetchSupplyPrice,
