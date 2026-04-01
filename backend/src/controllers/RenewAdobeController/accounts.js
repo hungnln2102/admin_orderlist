@@ -1,6 +1,7 @@
 const { db } = require("../../db");
 const logger = require("../../utils/logger");
 const { TABLE, COLS } = require("./accountTable");
+const { findAccountMatchByEmail, normalizeEmail } = require("./accountLookup");
 
 const CHECK_EMPTY_COLS = [
   COLS.EMAIL,
@@ -80,61 +81,13 @@ const listAccounts = async (_req, res) => {
 };
 
 const lookupAccountByEmail = async (req, res) => {
-  const email = (req.query.email || "").toString().trim();
+  const email = normalizeEmail(req.query.email);
   if (!email) {
     return res.status(400).json({ error: "Thiếu tham số email." });
   }
 
-  const emailLower = email.toLowerCase();
-
   try {
-    let row = await db(TABLE)
-      .select(
-        `${TABLE}.${COLS.ID}`,
-        `${TABLE}.${COLS.EMAIL}`,
-        `${TABLE}.${COLS.ORG_NAME}`,
-        `${TABLE}.${COLS.LICENSE_STATUS}`,
-        `${TABLE}.${COLS.USER_COUNT}`,
-        `${TABLE}.${COLS.USERS_SNAPSHOT}`,
-        `${TABLE}.${COLS.LAST_CHECKED}`,
-        `${TABLE}.${COLS.IS_ACTIVE}`,
-        `${TABLE}.${COLS.CREATED_AT}`
-      )
-      .where(COLS.EMAIL, email)
-      .first();
-
-    if (!row) {
-      const rows = await db(TABLE)
-        .select(
-          `${TABLE}.${COLS.ID}`,
-          `${TABLE}.${COLS.EMAIL}`,
-          `${TABLE}.${COLS.ORG_NAME}`,
-          `${TABLE}.${COLS.LICENSE_STATUS}`,
-          `${TABLE}.${COLS.USER_COUNT}`,
-          `${TABLE}.${COLS.USERS_SNAPSHOT}`,
-          `${TABLE}.${COLS.LAST_CHECKED}`,
-          `${TABLE}.${COLS.IS_ACTIVE}`,
-          `${TABLE}.${COLS.CREATED_AT}`
-        )
-        .whereNotNull(COLS.USERS_SNAPSHOT)
-        .where(COLS.USERS_SNAPSHOT, "!=", "");
-
-      for (const candidate of rows) {
-        try {
-          const users = JSON.parse(candidate[COLS.USERS_SNAPSHOT] || "[]");
-          if (
-            Array.isArray(users) &&
-            users.some(
-              (user) =>
-                String(user?.email || "").toLowerCase() === emailLower
-            )
-          ) {
-            row = candidate;
-            break;
-          }
-        } catch (_) {}
-      }
-    }
+    const { account: row } = await findAccountMatchByEmail(email);
 
     if (!row) {
       return res.status(404).json({

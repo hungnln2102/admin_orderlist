@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
   fetchProductImages,
@@ -40,8 +41,8 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 }) => {
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 py-6">
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 py-6">
       <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
           <h3 className="text-lg font-semibold text-white">Chọn hình ảnh sản phẩm</h3>
@@ -130,7 +131,8 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

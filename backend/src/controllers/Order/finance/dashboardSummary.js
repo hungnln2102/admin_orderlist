@@ -14,6 +14,18 @@ const getMonthKey = (date) => {
     return `${year}-${month}`;
 };
 
+// Statuses that count the order as "successful" (entered lifecycle from PROCESSING onwards)
+const ORDER_COUNTED_STATUSES = [
+    STATUS.PROCESSING, STATUS.PAID, STATUS.PENDING_REFUND,
+    STATUS.REFUNDED, STATUS.EXPIRED, STATUS.RENEWAL,
+];
+
+// Statuses that count the order as a refund
+const REFUND_COUNTED_STATUSES = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
+
+const isOrderCounted = (status) => ORDER_COUNTED_STATUSES.includes(status);
+const isRefundCounted = (status) => REFUND_COUNTED_STATUSES.includes(status);
+
 const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
     const prevStatus = beforeRow?.status || STATUS.UNPAID;
     const nextStatus = afterRow?.status || STATUS.UNPAID;
@@ -28,7 +40,8 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 
     const updates = {};
 
-    if (prevStatus === STATUS.PAID && nextStatus !== STATUS.PAID) {
+    // Order left the "counted" lifecycle → -1 order, -revenue, -profit
+    if (isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
         const price = toNullableNumber(beforeRow?.price) || 0;
         const cost = toNullableNumber(beforeRow?.cost) || 0;
         const profit = price - cost;
@@ -37,14 +50,15 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         updates.total_profit = (updates.total_profit || 0) - profit;
     }
 
-    if ((prevStatus === STATUS.REFUNDED || prevStatus === STATUS.PENDING_REFUND) &&
-        nextStatus !== STATUS.REFUNDED && nextStatus !== STATUS.PENDING_REFUND) {
+    // Order left refund lifecycle → -1 canceled, -refund
+    if (isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(beforeRow?.refund) || 0;
         updates.canceled_orders = (updates.canceled_orders || 0) - 1;
         updates.total_refund = (updates.total_refund || 0) - refund;
     }
 
-    if (nextStatus === STATUS.PAID && prevStatus !== STATUS.PAID) {
+    // Order entered the "counted" lifecycle ONLY via PROCESSING (UNPAID/CANCELLED → PROCESSING)
+    if (!isOrderCounted(prevStatus) && nextStatus === STATUS.PROCESSING) {
         const price = toNullableNumber(afterRow?.price) || 0;
         const cost = toNullableNumber(afterRow?.cost) || 0;
         const profit = price - cost;
@@ -53,8 +67,8 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         updates.total_profit = (updates.total_profit || 0) + profit;
     }
 
-    if ((nextStatus === STATUS.REFUNDED || nextStatus === STATUS.PENDING_REFUND) &&
-        prevStatus !== STATUS.REFUNDED && prevStatus !== STATUS.PENDING_REFUND) {
+    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund
+    if (!isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         updates.canceled_orders = (updates.canceled_orders || 0) + 1;
         updates.total_refund = (updates.total_refund || 0) + refund;

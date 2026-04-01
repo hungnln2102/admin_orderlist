@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArchiveBoxIcon,
-  CalendarDaysIcon,
+  BanknotesIcon,
   ChartBarIcon,
+  CurrencyDollarIcon,
   ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
 import { apiFetch } from "@/shared/api/client";
@@ -21,9 +22,9 @@ import { type OverviewStat } from "../components/OverviewStats";
 
 interface StatsApiResponse {
   totalOrders: { current: number; previous: number };
+  totalRevenue: { current: number; previous: number };
   totalImports: { current: number; previous: number };
-  totalProfit: { current: number; previous: number };
-  overdueOrders: { count: number };
+  totalRefund: { current: number; previous: number };
 }
 
 const formatCurrency = Helpers.formatCurrency;
@@ -70,11 +71,8 @@ const buildStats = (stats: StatsApiResponse): OverviewStat[] => [
     accent: "sky",
   },
   {
-    name: "Đơn sắp hết hạn",
-    value: stats.overdueOrders.count.toLocaleString("vi-VN"),
-    change: "Cần xử lý",
-    changeType: "alert",
-    icon: CalendarDaysIcon,
+    ...calculateStat("Doanh thu", stats.totalRevenue.current, stats.totalRevenue.previous, true),
+    icon: BanknotesIcon,
     accent: "rose",
   },
   {
@@ -83,8 +81,8 @@ const buildStats = (stats: StatsApiResponse): OverviewStat[] => [
     accent: "amber",
   },
   {
-    ...calculateStat("Tổng lợi nhuận", stats.totalProfit.current, stats.totalProfit.previous, true),
-    icon: ChartBarIcon,
+    ...calculateStat("Hoàn tiền", stats.totalRefund.current, stats.totalRefund.previous, true),
+    icon: CurrencyDollarIcon,
     accent: "emerald",
   },
 ];

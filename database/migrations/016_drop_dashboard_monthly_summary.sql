@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS finance.dashboard_monthly_summary;
-
--- Optional: keep schema for future use
--- DROP SCHEMA IF EXISTS finance;
+-- Previously dropped dashboard_monthly_summary, but the table is now
+-- actively used by the dashboard stats API. Keeping as no-op.
+-- DROP TABLE IF EXISTS finance.dashboard_monthly_summary;

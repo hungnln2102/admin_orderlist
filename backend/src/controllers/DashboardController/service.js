@@ -1,36 +1,50 @@
 const { db } = require("../../db");
-const Helpers = require("../../../helpers");
 const {
-  buildStatsBindings,
-  buildStatsQuery,
-  buildYearsQuery,
   buildChartsQuery,
+  buildYearsQuery,
 } = require("./queries");
 const { tableName, SCHEMA_FINANCE, FINANCE_SCHEMA } = require("../../config/dbSchema");
 
+const summaryTableName = tableName(
+  FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
+  SCHEMA_FINANCE
+);
+const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+
 const fetchDashboardStats = async () => {
-  const periods = Helpers.calculatePeriods();
-  const bindings = buildStatsBindings(periods);
-  const result = await db.raw(buildStatsQuery(), bindings);
-  const data = (result.rows && result.rows[0]) || {};
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+
+  const rows = await db(summaryTableName)
+    .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]);
+
+  const currentRow = rows.find((r) => r.month_key === currentMonthKey) || {};
+  const previousRow = rows.find((r) => r.month_key === previousMonthKey) || {};
+
+  const curr = {
+    total_orders: Number(currentRow.total_orders || 0),
+    total_revenue: Number(currentRow.total_revenue || 0),
+    total_profit: Number(currentRow.total_profit || 0),
+    total_refund: Number(currentRow.total_refund || 0),
+  };
+
+  const prev = {
+    total_orders: Number(previousRow.total_orders || 0),
+    total_revenue: Number(previousRow.total_revenue || 0),
+    total_profit: Number(previousRow.total_profit || 0),
+    total_refund: Number(previousRow.total_refund || 0),
+  };
 
   return {
-    totalOrders: {
-      current: Number(data.total_orders_current || 0),
-      previous: Number(data.total_orders_previous || 0),
-    },
+    totalOrders: { current: curr.total_orders, previous: prev.total_orders },
+    totalRevenue: { current: curr.total_revenue, previous: prev.total_revenue },
     totalImports: {
-      current: Number(data.total_imports_current || 0),
-      previous: Number(data.total_imports_previous || 0),
+      current: curr.total_revenue - curr.total_profit,
+      previous: prev.total_revenue - prev.total_profit,
     },
-    totalProfit: {
-      current: Number(data.total_profit_current || 0),
-      previous: Number(data.total_profit_previous || 0),
-    },
-    overdueOrders: {
-      count: Number(data.overdue_orders_count || 0),
-    },
-    periods,
+    totalRefund: { current: curr.total_refund, previous: prev.total_refund },
   };
 };
 

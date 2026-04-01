@@ -28,9 +28,8 @@ const priceExpr = createNumericExtraction(quoteIdent(orderCols.PRICE));
 const costExpr = createNumericExtraction(quoteIdent(orderCols.COST));
 const refundExpr = createNumericExtraction(quoteIdent(orderCols.REFUND));
 
-// Revenue/profit uses paid-like statuses. This keeps original month revenue
-// even when the order later moves to refund/renewal/expired states.
-const revenueStatuses = [
+// Order-counted statuses: everything from PROCESSING onwards in the lifecycle
+const orderCountedStatuses = [
   STATUS.PROCESSING,
   STATUS.PAID,
   STATUS.PENDING_REFUND,
@@ -39,9 +38,12 @@ const revenueStatuses = [
   STATUS.EXPIRED,
 ];
 
+const refundCountedStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
+
 const toSqlLiteral = (value) => `'${String(value).replace(/'/g, "''")}'`;
 
-const revenueStatusSql = revenueStatuses.map(toSqlLiteral).join(", ");
+const orderCountedSql = orderCountedStatuses.map(toSqlLiteral).join(", ");
+const refundCountedSql = refundCountedStatuses.map(toSqlLiteral).join(", ");
 
 const aggregateSql = `
   WITH normalized_orders AS (
@@ -58,27 +60,11 @@ const aggregateSql = `
     SELECT
       TO_CHAR(date_trunc('month', order_date), 'YYYY-MM') AS month_key,
       COUNT(*) AS total_orders,
-      COALESCE(
-        SUM(
-          CASE
-            WHEN status_value = '${STATUS.PAID}' THEN price_value
-            ELSE 0
-          END
-        ),
-        0
-      ) AS total_revenue,
-      COALESCE(
-        SUM(
-          CASE
-            WHEN status_value = '${STATUS.PAID}' THEN price_value - cost_value
-            ELSE 0
-          END
-        ),
-        0
-      ) AS total_profit
+      COALESCE(SUM(price_value), 0) AS total_revenue,
+      COALESCE(SUM(price_value - cost_value), 0) AS total_profit
     FROM normalized_orders
     WHERE order_date IS NOT NULL
-      AND status_value = '${STATUS.PAID}'
+      AND status_value IN (${orderCountedSql})
     GROUP BY 1
   ),
   monthly_cancellations AS (
@@ -88,7 +74,7 @@ const aggregateSql = `
       COALESCE(SUM(refund_value), 0) AS total_refund
     FROM normalized_orders
     WHERE canceled_at IS NOT NULL
-      AND status_value IN ('${STATUS.REFUNDED}', '${STATUS.PENDING_REFUND}')
+      AND status_value IN (${refundCountedSql})
     GROUP BY 1
   ),
   all_months AS (

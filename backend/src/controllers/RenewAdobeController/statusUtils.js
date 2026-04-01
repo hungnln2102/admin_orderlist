@@ -1,0 +1,191 @@
+const ACTIVE_LICENSE_STATUSES = new Set(["paid", "active"]);
+
+function normalizeLicenseStatus(value) {
+  return String(value || "unknown").trim().toLowerCase() || "unknown";
+}
+
+function resolveUserProductState(user) {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const raw = user.product;
+  if (raw === false || raw === 0) {
+    return false;
+  }
+  if (raw === true || raw === 1) {
+    return true;
+  }
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+    if (["false", "0", "no"].includes(normalized)) {
+      return false;
+    }
+    if (["true", "1", "yes"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  if (raw == null) {
+    return null;
+  }
+
+  return Boolean(raw);
+}
+
+function toDateOnly(dateValue) {
+  if (!dateValue) {
+    return null;
+  }
+
+  if (dateValue instanceof Date) {
+    const next = new Date(dateValue);
+    next.setHours(0, 0, 0, 0);
+    return next;
+  }
+
+  if (typeof dateValue === "string") {
+    const trimmed = dateValue.trim();
+    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, year, month, day] = match;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+function isOrderExpired(dateValue, now = new Date()) {
+  const expiryDate = toDateOnly(dateValue);
+  if (!expiryDate) {
+    return false;
+  }
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  return expiryDate < today;
+}
+
+function formatDateToDMY(dateValue) {
+  const parsed = toDateOnly(dateValue);
+  if (!parsed) {
+    return null;
+  }
+
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = parsed.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function isAccountEnabled(value) {
+  if (value === false || value === 0 || value === "0") {
+    return false;
+  }
+
+  if (typeof value === "string" && value.trim().toLowerCase() === "false") {
+    return false;
+  }
+
+  return true;
+}
+
+function buildWebsiteStatusPayload({
+  email,
+  order,
+  account,
+  matchedUser,
+  now = new Date(),
+}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const profileName = account?.org_name ?? null;
+  const licenseStatus = normalizeLicenseStatus(account?.license_status);
+  const accountIsActive = account ? isAccountEnabled(account.is_active) : false;
+  const userHasProduct = resolveUserProductState(matchedUser);
+  const orderExpired = order ? isOrderExpired(order.expiry_date, now) : false;
+  const hasValidOrder = Boolean(order) && !orderExpired;
+  const hasUsableAccount =
+    Boolean(account) &&
+    accountIsActive &&
+    ACTIVE_LICENSE_STATUSES.has(licenseStatus) &&
+    userHasProduct !== false;
+
+  let status = "needs_activation";
+  if (hasValidOrder && hasUsableAccount) {
+    status = "active";
+  } else if (!order) {
+    status = "no_order";
+  } else if (orderExpired) {
+    status = "order_expired";
+  }
+
+  const profileLabel = profileName ? `Profile ${profileName}` : "Profile hiện tại";
+  let message = "Không thể xác định trạng thái profile.";
+
+  if (status === "active") {
+    message = "Profile đang hoạt động bình thường.";
+  } else if (status === "no_order") {
+    message = "Không tìm thấy đơn Renew Adobe còn hiệu lực cho email này.";
+  } else if (status === "order_expired") {
+    const expiryText = formatDateToDMY(order?.expiry_date);
+    message = expiryText
+      ? `Gói Renew Adobe đã hết hạn sử dụng (Hạn: ${expiryText}).`
+      : "Gói Renew Adobe đã hết hạn sử dụng.";
+  } else if (!account) {
+    message =
+      "Chưa thấy email này được add vào profile nào. Bấm nút bên dưới để kích hoạt.";
+  } else if (!accountIsActive) {
+    message = `${profileLabel} hiện đang bị tắt. Bấm nút bên dưới để kích hoạt lại.`;
+  } else if (userHasProduct === false) {
+    message = `${profileLabel} hiện chưa có product sử dụng. Bấm nút bên dưới để kích hoạt lại.`;
+  } else if (!ACTIVE_LICENSE_STATUSES.has(licenseStatus)) {
+    message = `${profileLabel} hiện không còn gói. Bấm nút bên dưới để kích hoạt lại.`;
+  }
+
+  return {
+    success: true,
+    email: normalizedEmail,
+    status,
+    canActivate: status === "needs_activation",
+    profileName,
+    message,
+    order: order
+      ? {
+          orderCode: order.order_code ?? null,
+          expiryDate: order.expiry_date ?? null,
+          isExpired: orderExpired,
+          status: order.status ?? null,
+        }
+      : null,
+    account: account
+      ? {
+          id: Number(account.id) || 0,
+          email: account.email ?? null,
+          orgName: profileName,
+          licenseStatus,
+          userCount: Number(account.user_count) || 0,
+          isActive: accountIsActive,
+          userHasProduct,
+        }
+      : null,
+  };
+}
+
+module.exports = {
+  ACTIVE_LICENSE_STATUSES,
+  normalizeLicenseStatus,
+  resolveUserProductState,
+  isOrderExpired,
+  formatDateToDMY,
+  buildWebsiteStatusPayload,
+};

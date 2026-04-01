@@ -25,12 +25,14 @@ const accountsRoutes = require("./accountsRoutes");
 const promotionCodesRoutes = require("./promotionCodesRoutes");
 const formInfoRoutes = require("./formInfoRoutes");
 const renewAdobeRoutes = require("./renewAdobeRoutes");
+const renewAdobePublicRoutes = require("./renewAdobePublicRoutes");
 const customerStatusRoutes = require("./customerStatusRoutes");
 const ipWhitelistRoutes = require("./ipWhitelistRoutes");
 const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
+router.use("/renew-adobe/public", renewAdobePublicRoutes);
 router.use("/test-telegram", testTelegramRoutes);
 router.use("/", systemRoutes);
 

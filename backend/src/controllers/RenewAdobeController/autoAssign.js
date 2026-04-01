@@ -3,6 +3,10 @@ const logger = require("../../utils/logger");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
+  buildAvailableAccounts,
+  assignUserToAvailableAccount,
+} = require("./assignmentService");
+const {
   TBL_ORDER,
   ORD_COLS,
   ALLOWED_ORDER_STATUSES,
@@ -10,24 +14,6 @@ const {
 } = require("./orderAccess");
 
 const MAX_CHECK_ALL_CONCURRENT = 3;
-
-function buildAvailableAccounts(accounts) {
-  return accounts
-    .filter((account) => {
-      const licenseStatus = (account[COLS.LICENSE_STATUS] || "").toLowerCase();
-      return licenseStatus !== "expired" && licenseStatus !== "unknown";
-    })
-    .map((account) => ({
-      ...account,
-      currentCount: Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0),
-    }))
-    .filter((account) => account.currentCount < MAX_USERS_PER_ACCOUNT)
-    .sort((a, b) => {
-      const slotsA = MAX_USERS_PER_ACCOUNT - a.currentCount;
-      const slotsB = MAX_USERS_PER_ACCOUNT - b.currentCount;
-      return slotsA - slotsB;
-    });
-}
 
 function logAutoAssign(onProgress, data) {
   if (onProgress) {
@@ -226,68 +212,14 @@ const fixSingleUser = async (req, res) => {
   }
 
   try {
-    const accounts = await db(TABLE)
-      .select(
-        COLS.ID,
-        COLS.EMAIL,
-        COLS.PASSWORD_ENC,
-        COLS.ORG_NAME,
-        COLS.LICENSE_STATUS,
-        COLS.USER_COUNT,
-        COLS.ALERT_CONFIG,
-        COLS.MAIL_BACKUP_ID
-      )
-      .where(COLS.IS_ACTIVE, true)
-      .orderBy(COLS.ID, "asc");
-
-    const available = buildAvailableAccounts(accounts);
-    if (available.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Không có tài khoản nào còn slot.",
-      });
-    }
-
-    const target = available[0];
-    const accountId = target[COLS.ID];
-    const accountEmail = target[COLS.EMAIL];
-    const accountPassword = target[COLS.PASSWORD_ENC] || "";
-    const mailBackupId =
-      target[COLS.MAIL_BACKUP_ID] != null
-        ? Number(target[COLS.MAIL_BACKUP_ID])
-        : null;
-
-    logger.info("[renew-adobe] fixSingleUser: email=%s → account=%s", userEmail, accountId);
-
-    const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
-    const v2 = await adobeRenewV2.addUsersWithProductV2(
-      accountEmail,
-      accountPassword,
-      [userEmail],
-      {
-        savedCookies,
-        mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-      }
-    );
-    if (!v2.success) {
-      throw new Error(v2.error || "addUsersWithProductV2 thất bại");
-    }
-
-    const updatePayload = {
-      [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-      [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
-    };
-    if (v2.savedCookies) {
-      updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
-    }
-    await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
+    const assigned = await assignUserToAvailableAccount(userEmail);
 
     return res.json({
       success: true,
-      message: `Đã gán ${userEmail} vào ${accountEmail}.`,
-      accountId,
-      accountEmail,
-      profile: target[COLS.ORG_NAME] ?? "—",
+      message: `Đã gán ${userEmail} vào ${assigned.accountEmail}.`,
+      accountId: assigned.accountId,
+      accountEmail: assigned.accountEmail,
+      profile: assigned.profileName ?? "—",
     });
   } catch (err) {
     logger.error("[renew-adobe] fixSingleUser failed", {

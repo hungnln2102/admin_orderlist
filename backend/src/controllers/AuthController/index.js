@@ -99,6 +99,21 @@ const me = (req, res) => {
   return res.json({ user: req.session.user });
 };
 
+const getCsrfToken = (req, res) => {
+  const token = req.csrfToken || null;
+
+  if (token) {
+    res.cookie("csrf-token", token, {
+      httpOnly: false,
+      sameSite: sessionConfig.cookieSameSite,
+      secure: sessionConfig.cookieSecure === true,
+      path: "/",
+    });
+  }
+
+  return res.json({ csrfToken: token });
+};
+
 const changePassword = async (req, res) => {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: "Không có quyền truy cập" });
@@ -195,6 +210,7 @@ module.exports = {
   login,
   logout,
   me,
+  getCsrfToken,
   changePassword,
   ensureDefaultAdmin,
 };

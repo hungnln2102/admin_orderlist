@@ -26,6 +26,10 @@ const {
   deleteProductSystem,
 } = require("./productSystem");
 const { listUserOrders } = require("./userOrders");
+const {
+  getWebsiteStatus,
+  activateWebsiteUser,
+} = require("./publicWebsite");
 
 const runAutoDeleteUsers = (req, res) =>
   runAutoDeleteUsersHandler({
@@ -59,4 +63,6 @@ module.exports = {
   listProductSystem,
   createProductSystem,
   deleteProductSystem,
+  getWebsiteStatus,
+  activateWebsiteUser,
 };

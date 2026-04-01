@@ -41,9 +41,9 @@ export interface MonthlySummaryData {
 
 export interface DashboardStatsResponse {
   totalOrders: { current: number; previous: number };
+  totalRevenue: { current: number; previous: number };
   totalImports: { current: number; previous: number };
-  totalProfit: { current: number; previous: number };
-  overdueOrders: { count: number };
+  totalRefund: { current: number; previous: number };
 }
 
 interface YearsApiResponse {

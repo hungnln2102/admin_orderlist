@@ -15,6 +15,42 @@ function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+async function clickBestEffort(locator, timeout = 5000) {
+  try {
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    await locator.click({ timeout, force: true });
+    return true;
+  } catch (_) {}
+
+  try {
+    await locator.evaluate((el) => el.click());
+    return true;
+  } catch (_) {}
+
+  return false;
+}
+
+async function waitForAssignButtonEnabled(modal, slotIndex, timeoutMs = 6000) {
+  const assignButton = modal
+    .locator('button[data-testid="assignment-modal-open-button"]')
+    .nth(slotIndex);
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const visible = await assignButton.isVisible({ timeout: 300 }).catch(() => false);
+    if (visible) {
+      const disabled = await assignButton.isDisabled().catch(() => true);
+      if (!disabled) {
+        return true;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return false;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
@@ -102,7 +138,10 @@ async function fillEmailInSlot(page, modal, email, slotIndex) {
   const chevronCount = await allChevrons.count().catch(() => 0);
 
   // Bước 0: Sau khi fill email, Adobe có thể tự mở dropdown suggestions → kiểm tra trước
-  const newUserOptionCheck = page.locator('[data-testid="new-user-row"]').first();
+  const newUserOptionCheck = page
+    .locator('[data-testid="new-user-row"], [role="option"], [role="menuitem"], button, [role="button"], li, div')
+    .filter({ hasText: /add as a new user|new user/i })
+    .first();
   const autoOpened = await newUserOptionCheck.isVisible({ timeout: 2000 }).catch(() => false);
 
   if (!autoOpened) {
@@ -193,6 +232,115 @@ async function fillEmailInSlot(page, modal, email, slotIndex) {
  * Assign product cho user slot thứ `slotIndex` (0-based) trong modal.
  * Flow: bấm "+" (assignment-modal-open-button) → chọn product → "Áp dụng".
  */
+async function fillEmailInSlotV2(page, modal, email, slotIndex) {
+  const emailNorm = String(email || "").trim().toLowerCase();
+  if (!emailNorm) return false;
+
+  const allPickers = modal.locator('input[data-testid="user-picker"]');
+  const pickerCount = await allPickers.count().catch(() => 0);
+  if (slotIndex >= pickerCount) {
+    logger.warn("[adobe-v2] fillEmailInSlotV2: slotIndex=%d >= pickerCount=%d", slotIndex, pickerCount);
+    return false;
+  }
+
+  const picker = allPickers.nth(slotIndex);
+  if (!(await picker.isVisible({ timeout: 5000 }).catch(() => false))) {
+    logger.warn("[adobe-v2] fillEmailInSlotV2: picker slot %d not visible", slotIndex);
+    return false;
+  }
+
+  await picker.click({ timeout: 5000 }).catch(() => {});
+  await picker.fill("").catch(() => {});
+  await page.waitForTimeout(250);
+  await picker.fill(emailNorm).catch(async () => {
+    await page.keyboard.type(emailNorm, { delay: 20 });
+  });
+  await page.waitForTimeout(1000);
+
+  const allChevrons = modal.locator('button[aria-label="Show suggestions"]');
+  const chevronCount = await allChevrons.count().catch(() => 0);
+  const optionRegex = /add as a new user|new user/i;
+
+  const getOptionCandidates = () => [
+    page.locator('[data-testid="new-user-row"]').filter({ hasText: optionRegex }).first(),
+    page.locator('[role="option"], [role="menuitem"]').filter({ hasText: optionRegex }).first(),
+    page.locator('button, [role="button"], li, div').filter({ hasText: optionRegex }).first(),
+    page.locator(`[role="option"][data-key="${emailNorm}"]`).first(),
+    page.getByText(optionRegex).first(),
+  ];
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let dropdownOpened = false;
+
+    for (const option of getOptionCandidates()) {
+      const visible = await option.isVisible({ timeout: 600 }).catch(() => false);
+      if (visible) {
+        dropdownOpened = true;
+        break;
+      }
+    }
+
+    if (!dropdownOpened) {
+      if (slotIndex < chevronCount) {
+        const chevronBtn = allChevrons.nth(slotIndex);
+        const chevronVisible = await chevronBtn.isVisible({ timeout: 1200 }).catch(() => false);
+        if (chevronVisible) {
+          dropdownOpened = await clickBestEffort(chevronBtn, 4000);
+          if (dropdownOpened) {
+            await page.waitForTimeout(900);
+          }
+        }
+      }
+
+      if (!dropdownOpened) {
+        await picker.click({ timeout: 2500 }).catch(() => {});
+        await page.keyboard.press("ArrowDown").catch(() => {});
+        await page.waitForTimeout(700);
+      }
+    }
+
+    let picked = false;
+    for (const option of getOptionCandidates()) {
+      const visible = await option.isVisible({ timeout: 1200 }).catch(() => false);
+      if (!visible) {
+        continue;
+      }
+
+      picked = await clickBestEffort(option, 4000);
+      if (picked) {
+        await page.waitForTimeout(800);
+        break;
+      }
+    }
+
+    if (!picked) {
+      await picker.click({ timeout: 2500 }).catch(() => {});
+      await page.keyboard.press("ArrowDown").catch(() => {});
+      await page.waitForTimeout(150);
+      await page.keyboard.press("Enter").catch(() => {});
+      await page.waitForTimeout(800);
+    }
+
+    const slotReady = await waitForAssignButtonEnabled(modal, slotIndex, 4000);
+    if (slotReady) {
+      logger.info(
+        "[adobe-v2] fillEmailInSlotV2: selected new user for %s (attempt %d)",
+        emailNorm,
+        attempt + 1
+      );
+      return true;
+    }
+
+    logger.warn(
+      "[adobe-v2] fillEmailInSlotV2: assign button still disabled for %s (attempt %d)",
+      emailNorm,
+      attempt + 1
+    );
+  }
+
+  return false;
+}
+
 async function assignProductForSlot(page, modal, slotIndex) {
   // Tìm tất cả nút "+" (assignment-modal-open-button) trong modal — mỗi user slot có 1 nút
   const allAssignBtns = modal.locator('button[data-testid="assignment-modal-open-button"]');
@@ -343,7 +491,7 @@ async function addUsersToOrgViaUI(page, userEmails) {
       const email = batch[i];
       logger.info("[adobe-v2] AddUsers: slot %d → %s", i, email);
 
-      const filled = await fillEmailInSlot(page, modal, email, i);
+      const filled = await fillEmailInSlotV2(page, modal, email, i);
       if (!filled) {
         logger.warn("[adobe-v2] AddUsers: không điền được email %s vào slot %d", email, i);
         failed.push(email);

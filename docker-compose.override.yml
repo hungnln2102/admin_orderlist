@@ -1,0 +1,16 @@
+# DEV ONLY — Docker Compose tự động merge file này khi chạy local.
+# KHÔNG dùng trên server. Deploy script đã dùng -f để chỉ load docker-compose.yml.
+version: '3.8'
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules

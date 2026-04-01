@@ -42,9 +42,6 @@ services:
     ports:
       - "3001:3001"   # Main API
       - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     networks:
       - app-network
 
@@ -61,9 +58,6 @@ services:
     restart: always
     ports:
       - "8081:80"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - app-network
 
