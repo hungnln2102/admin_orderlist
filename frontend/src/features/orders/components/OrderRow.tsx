@@ -1,0 +1,384 @@
+import React, { useCallback } from "react";
+import {
+  ORDER_FIELDS,
+  ORDER_STATUSES,
+  VIRTUAL_FIELDS,
+  Order,
+} from "@/constants";
+import * as Helpers from "@/lib/helpers";
+import {
+  formatCurrency,
+  formatOrderCodeShort,
+} from "../utils/ordersHelpers";
+import { getOrderCodeTheme } from "../utils/orderCodeTheme";
+import {
+  CheckCircleIcon,
+  EyeIcon,
+  PencilIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+
+type OrderRowProps = {
+  order: Order;
+  index: number;
+  isExpanded: boolean;
+  showRemainingColumn: boolean;
+  showSupplierRefundColumn: boolean;
+  showActionButtons: boolean;
+  isCanceled: boolean;
+  canEdit: boolean;
+  canRenewOrder: boolean;
+  totalColumns: number;
+  renewingOrderCode: string | null;
+  onToggleDetails: (orderId: number) => void;
+  onView: (order: Order) => void;
+  onEdit: (order: Order) => void;
+  onDelete: (order: Order) => void;
+  onConfirmRefund: (order: Order) => void;
+  onMarkPaid: (order: Order) => void;
+  onRenew: (order: Order) => void;
+};
+
+export const OrderRow = React.memo(function OrderRow({
+  order,
+  isExpanded,
+  showRemainingColumn,
+  showSupplierRefundColumn,
+  showActionButtons,
+  isCanceled,
+  canEdit,
+  canRenewOrder,
+  totalColumns,
+  renewingOrderCode,
+  onToggleDetails,
+  onView,
+  onEdit,
+  onDelete,
+  onConfirmRefund,
+  onMarkPaid,
+  onRenew,
+}: OrderRowProps) {
+  const {
+    [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: soNgayConLai,
+    [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: giaTriConLai,
+    [VIRTUAL_FIELDS.HOAN_TU_NCC]: hoanTuNccRaw,
+    [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: trangThaiText,
+  } = order;
+
+  const costValue = Number.isFinite(Number(order[ORDER_FIELDS.COST]))
+    ? Number(order[ORDER_FIELDS.COST])
+    : 0;
+  const priceValue = Number.isFinite(Number(order[ORDER_FIELDS.PRICE]))
+    ? Number(order[ORDER_FIELDS.PRICE])
+    : 0;
+  const giaTriConLaiSafe = Number.isFinite(Number(giaTriConLai))
+    ? Number(giaTriConLai)
+    : 0;
+  const refundFromRow = Number.isFinite(Number(order.can_hoan))
+    ? Number(order.can_hoan)
+    : null;
+  const giaTriConLaiForCanceled = isCanceled
+    ? Math.max(
+        0,
+        refundFromRow !== null && Number.isFinite(giaTriConLaiSafe)
+          ? Math.min(refundFromRow, giaTriConLaiSafe)
+          : refundFromRow ?? giaTriConLaiSafe
+      )
+    : giaTriConLaiSafe;
+
+  const pendingRefundStatus = ORDER_STATUSES.CHO_HOAN;
+  const statusText = String(trangThaiText || "").trim();
+  const canConfirmRefund = isCanceled && statusText === pendingRefundStatus;
+  const canRenew =
+    canRenewOrder &&
+    (statusText === ORDER_STATUSES.CAN_GIA_HAN ||
+      statusText === ORDER_STATUSES.ORDER_EXPIRED);
+  const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
+  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
+
+  const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
+  const expiryDateDisplay = order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
+  const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+  const orderCodeDisplay = formatOrderCodeShort(orderCodeText);
+  const orderTheme = getOrderCodeTheme(orderCodeText);
+  const isRenewing = renewingOrderCode === orderCodeText;
+
+  const remainingValue = Number.isFinite(Number(soNgayConLai))
+    ? Number(soNgayConLai)
+    : 0;
+  const remainingClass = isCanceled
+    ? "text-indigo-600"
+    : remainingValue <= 0
+    ? "text-red-600"
+    : remainingValue <= 4
+    ? "text-orange-500"
+    : "text-green-500";
+  const remainingDisplay = isCanceled
+    ? formatCurrency(giaTriConLaiForCanceled)
+    : remainingValue;
+
+  const hoanTuNccDisplay = Number.isFinite(Number(hoanTuNccRaw))
+    ? formatCurrency(Number(hoanTuNccRaw))
+    : formatCurrency(0);
+
+  const handleToggle = useCallback(() => {
+    if (order.id !== undefined && order.id !== null) {
+      onToggleDetails(order.id);
+    }
+  }, [onToggleDetails, order.id]);
+
+  const stopPropagation =
+    (action: (targetOrder: Order) => void) =>
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      action(order);
+    };
+
+  const cellClass = `order-row__cell px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y transition-all duration-500 ${orderTheme.rowSurfaceClass}`;
+
+  return (
+    <React.Fragment>
+      <tr
+        onClick={handleToggle}
+        className={`order-row ${isExpanded ? "order-row--expanded" : ""} group/row cursor-pointer transition-all duration-500 ${isExpanded ? "z-20" : "z-10"}`}
+      >
+        <td className={`${cellClass} first:rounded-l-[16px] sm:first:rounded-l-[24px] overflow-hidden max-w-0`}>
+          <div className="flex flex-col items-center w-full">
+            <span
+              className="text-xs sm:text-sm font-bold text-white tracking-normal sm:tracking-wider uppercase truncate w-full block text-center"
+              title={orderCodeText}
+            >
+              {orderCodeDisplay}
+            </span>
+            <span className={`${orderTheme.accentTextClass} text-[10px] sm:text-[11px] font-bold mt-1 uppercase tracking-normal sm:tracking-wider truncate w-full block text-center`}>
+              {order[ORDER_FIELDS.ID_PRODUCT] || ""}
+            </span>
+          </div>
+        </td>
+
+        <td className={`${cellClass} overflow-hidden max-w-0`}>
+          <div className="flex flex-col items-center w-full">
+            <span className="text-indigo-100/90 text-xs font-medium tracking-wide text-center truncate w-full block">
+              {order[ORDER_FIELDS.INFORMATION_ORDER] || "—"}
+            </span>
+            {order[ORDER_FIELDS.SLOT] ? (
+              <div className={`mt-1 px-2 py-0.5 rounded-md border text-[11px] font-bold uppercase w-full truncate text-center block ${orderTheme.badgeClass} ${orderTheme.badgeTextClass}`}>
+                {order[ORDER_FIELDS.SLOT]}
+              </div>
+            ) : null}
+          </div>
+        </td>
+
+        <td className={`${cellClass} overflow-hidden max-w-0`}>
+          <div className="flex flex-col items-center w-full">
+            <span className="text-sm font-bold text-white tracking-tight truncate w-full block text-center">
+              {order[ORDER_FIELDS.CUSTOMER] || "Khách ẩn"}
+            </span>
+            <span className="text-white/60 text-[11px] font-medium mt-0.5 truncate w-full block text-center">
+              {order[ORDER_FIELDS.CONTACT] || ""}
+            </span>
+          </div>
+        </td>
+
+        <td className={`${cellClass} text-center`}>
+          <div className="flex flex-col items-center gap-1 w-full min-w-0">
+            <div className="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-[11px] font-bold text-indigo-200 w-full max-w-full truncate">
+              <span className="truncate">{orderDateDisplay || "—"}</span>
+              <span className="text-white/20 shrink-0">/</span>
+              <span className="truncate">{expiryDateDisplay || "—"}</span>
+            </div>
+            {isCanceled && (
+              <span className="text-[10px] sm:text-[11px] font-semibold text-sky-300/95 tabular-nums leading-tight">
+                {Number.isFinite(Number(soNgayConLai))
+                  ? `${remainingValue} ngày`
+                  : "—"}
+              </span>
+            )}
+          </div>
+        </td>
+        {showRemainingColumn && (
+          <td className={`${cellClass} text-center`}>
+            <span className={`text-sm font-black transition-all group-hover/row:scale-110 inline-block w-full truncate ${remainingClass}`}>
+              {remainingDisplay}
+            </span>
+          </td>
+        )}
+        {showSupplierRefundColumn && (
+          <td className={`${cellClass} text-center`}>
+            <span className="text-sm font-semibold text-violet-200/95 transition-all group-hover/row:scale-105 inline-block w-full truncate tabular-nums">
+              {hoanTuNccDisplay}
+            </span>
+          </td>
+        )}
+
+        <td className={`${cellClass} text-center`}>
+          <span
+            className={`inline-block px-2 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-full border shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)] whitespace-nowrap w-full truncate overflow-hidden text-ellipsis ${Helpers.getStatusColor(
+              String(trangThaiText || "")
+            )}`}
+          >
+            {String(trangThaiText || "")}
+          </span>
+        </td>
+        <td className={`order-row__actions px-2 sm:px-4 py-3 sm:py-5 glass-panel border-y transition-all duration-500 last:rounded-r-[16px] sm:last:rounded-r-[24px] ${orderTheme.rowSurfaceClass}`}>
+          <div className="flex space-x-2 justify-end flex-shrink-0">
+            <button
+              onClick={stopPropagation(onView)}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-indigo-300/60 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all flex-shrink-0"
+            >
+              <EyeIcon className="h-4 w-4" />
+            </button>
+            {canConfirmRefund && (
+              <button
+                onClick={stopPropagation(onConfirmRefund)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-all flex-shrink-0"
+                title="Xác nhận đã giải/hoàn tiền"
+              >
+                <CheckCircleIcon className="h-4 w-4" />
+              </button>
+            )}
+            {canEdit && !isCanceled && (
+              <>
+                <button
+                  onClick={stopPropagation(onEdit)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-all flex-shrink-0"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={stopPropagation(onDelete)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-all flex-shrink-0"
+                  title="Xoá đơn hàng"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className="order-row__expandable animate-in fade-in slide-in-from-top-2 duration-300">
+          <td colSpan={totalColumns} className="order-row__expandable-cell px-6 pb-8 pt-2">
+            <div className={`order-row__expandable-content rounded-[32px] glass-panel-light p-6 shadow-2xl border ${orderTheme.expandablePanelClass}`}>
+              <div className="order-row__expandable-header mb-4 flex items-center justify-between">
+                <div className="flex-1 text-center">
+                  <p className="text-sm font-semibold text-indigo-50">
+                    Chi tiết đơn hàng
+                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-200">
+                    #{order[ORDER_FIELDS.ID_ORDER] || ""}
+                  </p>
+                </div>
+                {showActionButtons && (
+                  <div className="ml-4 flex items-center gap-2">
+                    {canStartProcessing && (
+                      <button
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-md shadow-emerald-900/40"
+                        onClick={stopPropagation(onMarkPaid)}
+                      >
+                        Thanh Toán
+                      </button>
+                    )}
+                    {canMarkPaid && (
+                      <button
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-md shadow-amber-900/40"
+                        onClick={stopPropagation(onMarkPaid)}
+                      >
+                        Hoàn Thành
+                      </button>
+                    )}
+                    {canRenew && (
+                      <button
+                        className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-900/40 disabled:opacity-70 disabled:cursor-not-allowed"
+                        disabled={isRenewing}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isRenewing) {
+                            onRenew(order);
+                          }
+                        }}
+                      >
+                        {isRenewing ? "Đang Gia Hạn..." : "Gia Hạn"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div
+                className={`order-row__detail-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${
+                  showSupplierRefundColumn ? "xl:grid-cols-6" : "xl:grid-cols-5"
+                }`}
+              >
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Nguồn
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {order[ORDER_FIELDS.SUPPLY] || "N/A"}
+                  </p>
+                </div>
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Giá nhập
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatCurrency(costValue)}
+                  </p>
+                </div>
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Giá bán
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatCurrency(priceValue)}
+                  </p>
+                </div>
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Giá trị còn lại
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatCurrency(giaTriConLaiForCanceled)}
+                  </p>
+                </div>
+                {showSupplierRefundColumn && (
+                  <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                    <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                      Hoàn từ NCC
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-violet-200">
+                      {hoanTuNccDisplay}
+                    </p>
+                  </div>
+                )}
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Số ngày
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {order[ORDER_FIELDS.DAYS] || 0}
+                  </p>
+                </div>
+                <div
+                  className={`order-row__detail-item order-row__detail-item--note rounded-xl border p-3 text-center sm:col-span-2 ${
+                    showSupplierRefundColumn ? "xl:col-span-6" : "xl:col-span-5"
+                  } flex flex-col items-center justify-center ${orderTheme.detailItemClass}`}
+                >
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Ghi chú
+                  </p>
+                  <p className="mt-1 text-sm text-indigo-50 text-center">
+                    {order[ORDER_FIELDS.NOTE] || "Không có ghi chú."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
+});
+
+OrderRow.displayName = "OrderRow";

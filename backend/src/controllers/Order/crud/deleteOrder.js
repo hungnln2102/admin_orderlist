@@ -21,6 +21,19 @@ const attachDeleteOrderRoute = (router) => {
                 return res.status(404).json({ error: "Không tìm thấy đơn hàng." });
             }
 
+            const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
+            const currentStatus = String(order[statusCol] ?? order.status ?? "").trim();
+            if (
+                currentStatus === STATUS.PENDING_REFUND ||
+                currentStatus === STATUS.REFUNDED
+            ) {
+                await trx.rollback();
+                return res.status(400).json({
+                    error:
+                        "Đơn đang chờ hoàn hoặc đã hoàn không dùng lại thao tác xóa này.",
+                });
+            }
+
             const normalized = normalizeOrderRow(order, todayYMDInVietnam());
 
             const result = await deleteOrderWithArchive({

@@ -1,8 +1,19 @@
 const {
     todayYMDInVietnam,
     formatYMDToDMY,
+    ymdInVietnamFromInstant,
 } = require("../../../utils/normalizers");
 const { COLS, STATUS } = require("../constants");
+
+const wholeDaysBetweenYmd = (startYmd, endYmd) => {
+    if (!startYmd || !endYmd) return null;
+    const [sy, sm, sd] = startYmd.split("-").map(Number);
+    const [ey, em, ed] = endYmd.split("-").map(Number);
+    if (![sy, sm, sd, ey, em, ed].every((x) => Number.isFinite(x))) return null;
+    const a = Date.UTC(sy, sm - 1, sd);
+    const b = Date.UTC(ey, em - 1, ed);
+    return Math.floor((b - a) / (24 * 60 * 60 * 1000));
+};
 
 const normalizeRawToYMD = (value) => {
     if (value === undefined || value === null) return null;
@@ -52,16 +63,33 @@ const normalizeOrderRow = (
     let expiryYmd = normalizeRawToYMD(expiryRaw);
     if (!expiryYmd) expiryYmd = computeExpiryFromOrderDateAndDays(row);
 
+    const canceledRaw = row[COLS.ORDER.CANCELED_AT] ?? row.canceled_at;
+    const hasCanceledAt =
+        canceledRaw !== undefined &&
+        canceledRaw !== null &&
+        String(canceledRaw).trim() !== "";
+
     let soNgayConLai = null;
-    if (expiryYmd && todayYmd) {
+
+    // Đơn đã hủy: số ngày còn lại = ngày lịch từ canceled_at → expiry (chỉ YMD; ISO có giờ vẫn lấy 10 ký tự đầu).
+    if (hasCanceledAt) {
+        const canceledYmd =
+            normalizeRawToYMD(canceledRaw) || ymdInVietnamFromInstant(canceledRaw);
+        if (canceledYmd && expiryYmd) {
+            const diff = wholeDaysBetweenYmd(canceledYmd, expiryYmd);
+            if (Number.isFinite(diff)) {
+                soNgayConLai = Math.max(0, diff);
+            }
+        }
+    } else if (expiryYmd && todayYmd) {
         const [ey, em, ed] = expiryYmd.split("-").map(Number);
         const [ty, tm, td] = todayYmd.split("-").map(Number);
         const expiryUtc = Date.UTC(ey, em - 1, ed);
         const todayUtc = Date.UTC(ty, tm - 1, td);
         soNgayConLai = Math.floor((expiryUtc - todayUtc) / (24 * 60 * 60 * 1000));
-    }
-    if (!Number.isFinite(soNgayConLai) || soNgayConLai < 0) {
-        soNgayConLai = null;
+        if (!Number.isFinite(soNgayConLai) || soNgayConLai < 0) {
+            soNgayConLai = null;
+        }
     }
 
     const dbStatusRaw = row.status || STATUS.UNPAID;

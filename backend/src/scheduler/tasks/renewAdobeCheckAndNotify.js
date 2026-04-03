@@ -1,9 +1,10 @@
 /**
  * Job: Chạy check tất cả tài khoản Renew Adobe, sau đó:
- *  1. Xóa toàn bộ user khỏi tài khoản hết hạn + deactivate mapping.
- *  2. Auto-reassign user sang tài khoản còn gói (từ bảng user_account_mapping).
- *  3. Gửi Telegram thông báo hết gói (topic ZERO_DAYS_TOPIC_ID).
- * Chạy lúc 05:00 và 12:00 (theo timezone scheduler).
+ *  1. Xóa toàn bộ user khỏi tài khoản hết hạn + xóa mapping.
+ *  2. Xóa luôn bản ghi accounts_admin (license_status ≠ Paid) khỏi database.
+ *  3. Auto-reassign user sang tài khoản còn gói.
+ *  4. Gửi Telegram thông báo hết gói (topic ZERO_DAYS_TOPIC_ID).
+ * Chạy mỗi giờ một lần (phút 0, theo timezone scheduler — xem scheduler/index.js).
  */
 
 const logger = require("../../utils/logger");
@@ -18,8 +19,8 @@ const {
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 const { sendAdobeZeroDaysNotification } = require("../../services/telegramOrderNotification");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const { purgeAndDeleteNoLicenseAdobeAdminAccount } = require("../../services/renewAdobePurgeNoLicenseAccount");
 const {
-  removeMappingsForAccount,
   recordUsersAssigned,
   syncOrdersToMapping,
 } = require("../../services/userAccountMappingService");
@@ -31,53 +32,6 @@ const TABLE = tableName(TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
 const COLS = TABLE_DEF.COLS;
 
 const MAX_USERS_PER_ACCOUNT = 10;
-
-/**
- * Xóa toàn bộ user khỏi tài khoản hết hạn.
- * Deactivate mapping cũ, trả về danh sách email đã xóa để reassign.
- * @returns {string[]} danh sách email cần được reassign
- */
-async function deleteUsersFromExpiredAccount(account) {
-  const id = account[COLS.ID];
-  const email = (account[COLS.EMAIL] || "").toString().trim();
-  const password = (account[COLS.PASSWORD_ENC] || "").toString().trim();
-  const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
-  const savedCookiesRaw = COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null;
-
-  // Xóa mapping cũ (hard-delete) và lấy danh sách email để reassign
-  const removedRows = await removeMappingsForAccount(id);
-
-  // Fallback: nếu mapping table chưa có data, lấy từ users_snapshot
-  let userEmails = removedRows.map((r) => r.user_email);
-  if (userEmails.length === 0) {
-    try {
-      const snapshot = JSON.parse(account[COLS.USERS_SNAPSHOT] || "[]");
-      userEmails = snapshot.map((u) => (u.email || "").trim().toLowerCase()).filter(Boolean);
-    } catch (_) {}
-  }
-
-  if (userEmails.length === 0) {
-    logger.info("[CRON] Account %s hết hạn nhưng không có user nào — bỏ qua xóa.", id);
-    return [];
-  }
-
-  logger.info("[CRON] Bắt đầu xóa %d user khỏi account %s (%s) vì hết hạn", userEmails.length, id, email);
-  try {
-    await adobeRenewV2.autoDeleteUsers(email, password, userEmails, {
-      savedCookiesFromDb: savedCookiesRaw,
-      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-    });
-    await db(TABLE).where(COLS.ID, id).update({
-      [COLS.USERS_SNAPSHOT]: JSON.stringify([]),
-      [COLS.USER_COUNT]: 0,
-    });
-    logger.info("[CRON] Đã xóa toàn bộ user khỏi account %s (%s)", id, email);
-    return userEmails;
-  } catch (err) {
-    logger.error("[CRON] Xóa user thất bại cho account %s: %s", id, err.message);
-    return [];
-  }
-}
 
 /**
  * Reassign danh sách email vào các tài khoản còn gói còn slot.
@@ -261,11 +215,14 @@ function createRenewAdobeCheckAndNotifyTask() {
       statuses: expiredAccounts.map((r) => ({ id: r[COLS.ID], status: r[COLS.LICENSE_STATUS] })),
     });
 
-    // Bước 1: Xóa user + deactivate mapping, thu thập email cần reassign
+    // Bước 1: Xóa user trên Adobe + mapping + bản ghi accounts_admin (hết gói)
     const allEmailsToReassign = [];
     for (const account of expiredAccounts) {
-      const deleted = await deleteUsersFromExpiredAccount(account);
-      allEmailsToReassign.push(...deleted);
+      const { emailsForReassign } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
+        account,
+        { logPrefix: "[CRON]" }
+      );
+      allEmailsToReassign.push(...emailsForReassign);
       await new Promise((r) => setTimeout(r, 1000));
     }
 
@@ -274,7 +231,7 @@ function createRenewAdobeCheckAndNotifyTask() {
       await reassignUsersToAvailableAccounts(allEmailsToReassign);
     }
 
-    // Bước 3: Gửi Telegram thông báo
+    // Bước 3: Gửi Telegram thông báo (dữ liệu từ snapshot trước khi xóa DB)
     const toNotify = expiredAccounts
       .filter((r) => (r[COLS.EMAIL] || "").toString().trim())
       .map((r) => ({

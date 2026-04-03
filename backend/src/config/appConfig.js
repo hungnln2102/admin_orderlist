@@ -27,7 +27,8 @@ const normalizeOrigin = (origin) => {
 
 const allowedOrigins = Array.from(
   new Set(
-    (process.env.FRONTEND_ORIGINS || "http://localhost:5173")
+    (process.env.FRONTEND_ORIGINS ||
+      "http://localhost:5173,http://localhost:4001")
       .split(",")
       .map(normalizeOrigin)
       .filter(Boolean)
@@ -60,6 +61,16 @@ if (cookieSecure === true && hasHttpOrigin) {
 
 const cookieSameSite = cookieSecure === true ? "none" : "lax";
 
+/** % thuế ước tính trên doanh thu tháng (ô "Thuế của tháng" dashboard). 0 = 0 ₫. */
+const rawDashboardTax = process.env.DASHBOARD_MONTHLY_TAX_RATE_PERCENT;
+const parsedDashboardTax =
+  rawDashboardTax === undefined || String(rawDashboardTax).trim() === ""
+    ? 0
+    : Number(rawDashboardTax);
+const dashboardMonthlyTaxRatePercent = Number.isFinite(parsedDashboardTax)
+  ? Math.min(100, Math.max(0, parsedDashboardTax))
+  : 0;
+
 // Validate SESSION_SECRET in production
 const sessionSecret = process.env.SESSION_SECRET || "change_this_secret";
 if (isProd && (!process.env.SESSION_SECRET || sessionSecret === "change_this_secret")) {
@@ -80,6 +91,7 @@ module.exports = {
   allowedOrigins,
   allowedOriginSet,
   normalizeOrigin,
+  dashboardMonthlyTaxRatePercent,
   sepay: {
     host: SEPAY_HOST,
     port: SEPAY_PORT,

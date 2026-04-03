@@ -10,6 +10,8 @@ const productsRoutes = require("./productsRoutes");
 const productPricesRoutes = require("./productPricesRoutes");
 const productDescriptionsRoutes = require("./productDescriptionsRoutes");
 const productImagesRoutes = require("./productImagesRoutes");
+const contentMediaRoutes = require("./contentMediaRoutes");
+const contentRoutes = require("./contentRoutes");
 const categoriesRoutes = require("./categoriesRoutes");
 const banksRoutes = require("./banksRoutes");
 const packagesRoutes = require("./packagesRoutes");
@@ -29,12 +31,16 @@ const renewAdobePublicRoutes = require("./renewAdobePublicRoutes");
 const customerStatusRoutes = require("./customerStatusRoutes");
 const ipWhitelistRoutes = require("./ipWhitelistRoutes");
 const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
+const publicContentRoutes = require("./publicContentRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
 router.use("/renew-adobe/public", renewAdobePublicRoutes);
 router.use("/test-telegram", testTelegramRoutes);
 router.use("/", systemRoutes);
+
+/** Tin tức công khai (storefront) — không cần đăng nhập */
+router.use("/public/content", publicContentRoutes);
 
 router.use(authGuard);
 
@@ -53,6 +59,8 @@ router.use("/products", productsRoutes);
 router.use("/product-prices", productPricesRoutes);
 router.use("/product-descriptions", productDescriptionsRoutes);
 router.use("/product-images", productImagesRoutes);
+router.use("/content", contentMediaRoutes);
+router.use("/content", contentRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/banks", banksRoutes);
 router.use("/package-products", packagesRoutes);

@@ -4,6 +4,7 @@ const {
   buildYearsQuery,
 } = require("./queries");
 const { tableName, SCHEMA_FINANCE, FINANCE_SCHEMA } = require("../../config/dbSchema");
+const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
@@ -37,6 +38,9 @@ const fetchDashboardStats = async () => {
     total_refund: Number(previousRow.total_refund || 0),
   };
 
+  const taxFromRevenue = (revenue) =>
+    Math.round((Number(revenue) || 0) * (dashboardMonthlyTaxRatePercent / 100));
+
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
     totalRevenue: { current: curr.total_revenue, previous: prev.total_revenue },
@@ -45,6 +49,11 @@ const fetchDashboardStats = async () => {
       previous: prev.total_revenue - prev.total_profit,
     },
     totalRefund: { current: curr.total_refund, previous: prev.total_refund },
+    monthlyProfit: { current: curr.total_profit, previous: prev.total_profit },
+    monthlyTax: {
+      current: taxFromRevenue(curr.total_revenue),
+      previous: taxFromRevenue(prev.total_revenue),
+    },
   };
 };
 
@@ -125,15 +134,17 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
   const months = [];
   for (let m = 1; m <= maxMonth; m++) {
     const row = rowMap.get(m);
+    const revenue = row ? Number(row.total_revenue || 0) : 0;
     months.push({
       month: `T${m}`,
       month_num: m,
       month_key: `${yearStr}-${String(m).padStart(2, '0')}`,
       total_orders: row ? Number(row.total_orders || 0) : 0,
       total_canceled: row ? Number(row.canceled_orders || 0) : 0,
-      total_revenue: row ? Number(row.total_revenue || 0) : 0,
+      total_revenue: revenue,
       total_profit: row ? Number(row.total_profit || 0) : 0,
       total_refund: row ? Number(row.total_refund || 0) : 0,
+      total_tax: Math.round(revenue * (dashboardMonthlyTaxRatePercent / 100)),
     });
   }
 

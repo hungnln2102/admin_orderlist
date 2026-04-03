@@ -16,6 +16,10 @@ import { CreateOrderCustomerSection } from "./components/CreateOrderCustomerSect
 import { CreateOrderPricingSection } from "./components/CreateOrderPricingSection";
 import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
 
+/** Chỉ coi là đủ khi đúng dd/mm/yyyy (tránh parse lệch khi đang gõ). */
+const isCompleteDMY = (value: string): boolean =>
+  /^\d{2}\/\d{2}\/\d{4}$/.test((value || "").trim());
+
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
@@ -50,10 +54,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     | string
     | number
     | undefined;
-  const rawExpiryValue = useMemo(
-    () => (formData[ORDER_FIELDS.EXPIRY_DATE] as string) || "",
-    [formData]
-  );
   const registerDateDMY = useMemo(
     () => (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY(),
     [formData]
@@ -64,10 +64,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
   const productOptions = useMemo(
     () =>
-      products.map((p) => ({
-        value: p.san_pham,
-        label: p.san_pham,
-      })),
+      products
+        .filter((p) => p.is_active !== false)
+        .map((p) => ({
+          value: p.san_pham,
+          label: p.san_pham,
+        })),
     [products]
   );
   const supplyOptions = useMemo(
@@ -157,27 +159,79 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     [updateForm]
   );
 
-  const handleRegisterDateChange = useCallback(
+  const handleExpiryDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const nextDMY =
-        Helpers.formatDateToDMY(e.target.value) || e.target.value || "";
-      const computedExpiry =
-        totalDays > 0 ? calculateExpirationDate(nextDMY, totalDays) : nextDMY;
-
+      const raw = e.target.value || "";
       const patch: Partial<Order> = {
-        [ORDER_FIELDS.ORDER_DATE]: nextDMY,
+        [ORDER_FIELDS.EXPIRY_DATE]: raw,
       };
 
-      if (computedExpiry && computedExpiry !== "N/A") {
-        patch[ORDER_FIELDS.EXPIRY_DATE] = computedExpiry;
-      } else if (totalDays <= 0 && nextDMY) {
-        patch[ORDER_FIELDS.EXPIRY_DATE] = nextDMY;
+      const regRaw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
+      if (isCompleteDMY(raw) && isCompleteDMY(regRaw)) {
+        const normExpiry = Helpers.formatDateToDMY(raw) || raw;
+        const normReg = Helpers.formatDateToDMY(regRaw) || regRaw;
+        const days = Helpers.inclusiveDaysBetween(normReg, normExpiry);
+        if (Number.isFinite(days) && days > 0) {
+          patch[ORDER_FIELDS.EXPIRY_DATE] = normExpiry;
+          patch[ORDER_FIELDS.DAYS] = String(days);
+        }
+      }
+
+      updateForm(patch);
+    },
+    [formData, updateForm]
+  );
+
+  const handleExpiryDateBlur = useCallback(() => {
+    const raw = (formData[ORDER_FIELDS.EXPIRY_DATE] as string) || "";
+    const normalized = Helpers.formatDateToDMY(raw);
+    const nextExpiry = normalized || raw;
+    const patch: Partial<Order> = {
+      [ORDER_FIELDS.EXPIRY_DATE]: nextExpiry,
+    };
+    const regRaw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
+    const normReg = Helpers.formatDateToDMY(regRaw) || regRaw;
+    if (nextExpiry && normReg) {
+      const days = Helpers.inclusiveDaysBetween(normReg, nextExpiry);
+      if (Number.isFinite(days) && days > 0) {
+        patch[ORDER_FIELDS.DAYS] = String(days);
+      }
+    }
+    updateForm(patch);
+  }, [formData, updateForm]);
+
+  const handleRegisterDateChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value || "";
+      const patch: Partial<Order> = {
+        [ORDER_FIELDS.ORDER_DATE]: raw,
+      };
+
+      if (isCompleteDMY(raw)) {
+        const normalized = Helpers.formatDateToDMY(raw) || raw;
+        if (totalDays > 0) {
+          const computedExpiry = calculateExpirationDate(normalized, totalDays);
+          if (computedExpiry && computedExpiry !== "N/A") {
+            patch[ORDER_FIELDS.EXPIRY_DATE] = computedExpiry;
+          }
+        } else {
+          patch[ORDER_FIELDS.EXPIRY_DATE] = normalized;
+        }
       }
 
       updateForm(patch);
     },
     [totalDays, updateForm]
   );
+
+  const handleRegisterDateBlur = useCallback(() => {
+    const raw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
+    const normalized = Helpers.formatDateToDMY(raw);
+    if (!normalized || normalized === raw.trim()) return;
+    updateForm({
+      [ORDER_FIELDS.ORDER_DATE]: normalized,
+    } as Partial<Order>);
+  }, [formData, updateForm]);
 
   useEffect(() => {
     if (!customMode || !customProductTouched) return;
@@ -202,25 +256,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     registerDateValue,
     updateForm,
   ]);
-
-  useEffect(() => {
-    if (!rawExpiryValue) return;
-
-    const normalized = Helpers.formatDateToDMY(rawExpiryValue);
-
-    if (!normalized && registerDateDMY && totalDays > 0) {
-      const computed = calculateExpirationDate(registerDateDMY, totalDays);
-      if (computed && computed !== "N/A" && computed !== rawExpiryValue) {
-        updateForm({
-          [ORDER_FIELDS.EXPIRY_DATE]: computed,
-        } as Partial<Order>);
-      }
-    } else if (normalized && normalized !== rawExpiryValue) {
-      updateForm({
-        [ORDER_FIELDS.EXPIRY_DATE]: normalized,
-      } as Partial<Order>);
-    }
-  }, [rawExpiryValue, registerDateDMY, totalDays, updateForm]);
 
   const readyToLoad = useMemo(() => {
     const prod = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
@@ -311,6 +346,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 costValue={costValue}
                 priceValue={priceValue}
                 onRegisterDateChange={handleRegisterDateChange}
+                onRegisterDateBlur={handleRegisterDateBlur}
+                onExpiryDateChange={handleExpiryDateChange}
+                onExpiryDateBlur={handleExpiryDateBlur}
                 onCostChange={handlePriceInput(ORDER_FIELDS.COST)}
                 onPriceChange={handlePriceInput(ORDER_FIELDS.PRICE)}
               />

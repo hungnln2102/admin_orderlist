@@ -52,6 +52,19 @@ const todayYMDInVietnam = () => {
   return `${y}-${m}-${day}`;
 };
 
+/** Ngày lịch (YYYY-MM-DD) theo múi Việt Nam tại một mốc thời gian (timestamptz / Date / ISO). */
+const ymdInVietnamFromInstant = (value) => {
+  if (value === undefined || value === null) return null;
+  const t = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  if (!Number.isFinite(t)) return null;
+  const vnMs = t + 7 * 60 * 60 * 1000;
+  const d = new Date(vnMs);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 const formatDateOutput = (value) => {
   if (!value) return null;
   if (typeof value === "string") {
@@ -180,6 +193,7 @@ module.exports = {
   normalizeTextInput,
   trimToLength,
   todayYMDInVietnam,
+  ymdInVietnamFromInstant,
   formatDateOutput,
   formatYMDToDMY,
   normalizeCheckFlagValue,

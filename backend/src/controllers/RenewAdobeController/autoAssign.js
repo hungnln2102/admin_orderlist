@@ -12,6 +12,9 @@ const {
   ALLOWED_ORDER_STATUSES,
   getRenewAdobeVariantIds,
 } = require("./orderAccess");
+const {
+  purgeAndDeleteNoLicenseAdobeAdminAccount,
+} = require("../../services/renewAdobePurgeNoLicenseAccount");
 
 const MAX_CHECK_ALL_CONCURRENT = 3;
 
@@ -302,7 +305,18 @@ const checkAllAccounts = async ({
             try {
               await runCheckForAccountId(id);
               completed++;
-              const updated = await db(TABLE).where(COLS.ID, id).first();
+              let updated = await db(TABLE).where(COLS.ID, id).first();
+              let removedFromDb = false;
+              if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
+                const { deletedFromDb } =
+                  await purgeAndDeleteNoLicenseAdobeAdminAccount(updated, {
+                    logPrefix: "[renew-adobe][check-all]",
+                  });
+                if (deletedFromDb) {
+                  removedFromDb = true;
+                  updated = null;
+                }
+              }
               sendEvent({
                 type: "done",
                 id,
@@ -310,6 +324,7 @@ const checkAllAccounts = async ({
                 completed,
                 failed,
                 total,
+                removed_from_db: removedFromDb,
                 org_name: updated?.[COLS.ORG_NAME] ?? null,
                 user_count: updated?.[COLS.USER_COUNT] ?? 0,
                 license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",

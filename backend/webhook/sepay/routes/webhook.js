@@ -1,6 +1,6 @@
 const express = require("express");
 const { ORDER_COLS, ORDER_TABLE, pool } = require("../config");
-const { safeStringify, normalizeAmount, extractOrderCodes, resolveOrderByPayment } = require("../utils");
+const { safeStringify, normalizeAmount, extractOrderCodes, resolveOrderByPayment, parseFlexibleDate, normalizeMoney } = require("../utils");
 const {
   normalizeTransactionPayload,
   deriveOrderCode,
@@ -22,9 +22,49 @@ const {
   isEligibleForRenewal,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const logger = require("../../../src/utils/logger");
 
 const router = express.Router();
+const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
+const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+
+const toMonthKey = (value) => {
+  const parsedDate = parseFlexibleDate(value);
+  if (!parsedDate) return null;
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
+
+const incrementDashboardSummaryOnProcessing = async (client, orderState) => {
+  const monthKey = toMonthKey(orderState?.[ORDER_COLS.orderDate]);
+  if (!monthKey) return;
+
+  const price = normalizeMoney(orderState?.[ORDER_COLS.price]);
+  const cost = normalizeMoney(orderState?.[ORDER_COLS.cost]);
+  const profit = price - cost;
+
+  await client.query(
+    `
+      INSERT INTO ${summaryTable} (
+        ${summaryCols.MONTH_KEY},
+        ${summaryCols.TOTAL_ORDERS},
+        ${summaryCols.TOTAL_REVENUE},
+        ${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.UPDATED_AT}
+      )
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (${summaryCols.MONTH_KEY})
+      DO UPDATE SET
+        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
+        ${summaryCols.TOTAL_REVENUE} = ${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
+        ${summaryCols.TOTAL_PROFIT} = ${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.UPDATED_AT} = NOW()
+    `,
+    [monthKey, 1, price, profit]
+  );
+};
 
 // Health check for webhook endpoint
 router.get("/", (_req, res) => {
@@ -115,7 +155,10 @@ router.post("/", async (req, res) => {
         const stateRes = await client.query(
           `SELECT
             ${ORDER_COLS.status},
-            ${ORDER_COLS.expiryDate}
+            ${ORDER_COLS.expiryDate},
+            ${ORDER_COLS.orderDate},
+            ${ORDER_COLS.price},
+            ${ORDER_COLS.cost}
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
           LIMIT 1`,
@@ -187,13 +230,16 @@ router.post("/", async (req, res) => {
 
           const statusValue = state[ORDER_COLS.status];
           if (statusValue === ORDER_STATUS.UNPAID) {
-            await client.query(
+            const statusUpdateResult = await client.query(
               `UPDATE ${ORDER_TABLE}
                SET ${ORDER_COLS.status} = $2
                WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
                  AND ${ORDER_COLS.status} = $3`,
               [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID]
             );
+            if (statusUpdateResult.rowCount > 0) {
+              await incrementDashboardSummaryOnProcessing(client, state);
+            }
             logger.debug("[Webhook] Order status → Đang Xử Lý", {
               orderCode: code,
               previousStatus: statusValue,

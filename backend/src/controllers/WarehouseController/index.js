@@ -1,6 +1,7 @@
 const { db } = require("../../db");
 const { getDefinition, PRODUCT_SCHEMA, SCHEMA_PRODUCT, tableName } = require("../../config/dbSchema");
 const { normalizeDateInput } = require("../../utils/normalizers");
+const { syncOrdersForPackagesUsingStock } = require("../../services/packageOrderAccountSync");
 const logger = require("../../utils/logger");
 
 const warehouseDef = getDefinition("PRODUCT_STOCK", PRODUCT_SCHEMA);
@@ -109,21 +110,37 @@ const updateWarehouse = async (req, res) => {
   if (!id) return res.status(400).json({ error: "Missing id" });
 
   try {
-    const [row] = await db(warehouseTable)
-      .where(cols.id, id)
-      .update({
-        [cols.productType]: category ?? null,
-        [cols.accountUsername]: account ?? null,
-        [cols.passwordEncrypted]: password ?? null,
-        [cols.backupEmail]: backup_email ?? null,
-        [cols.twoFaEncrypted]: two_fa ?? null,
-        [cols.note]: note ?? null,
-        [cols.status]: status ?? null,
-        [cols.expiresAt]: normalizeDateInput(expires_at) || null,
-        [cols.isVerified]: is_verified ?? false,
-        [cols.updatedAt]: new Date().toISOString(),
-      })
-      .returning(SELECT_MAP);
+    const row = await db.transaction(async (trx) => {
+      const before = await trx(warehouseTable).where(cols.id, id).first();
+      const [updated] = await trx(warehouseTable)
+        .where(cols.id, id)
+        .update({
+          [cols.productType]: category ?? null,
+          [cols.accountUsername]: account ?? null,
+          [cols.passwordEncrypted]: password ?? null,
+          [cols.backupEmail]: backup_email ?? null,
+          [cols.twoFaEncrypted]: two_fa ?? null,
+          [cols.note]: note ?? null,
+          [cols.status]: status ?? null,
+          [cols.expiresAt]: normalizeDateInput(expires_at) || null,
+          [cols.isVerified]: is_verified ?? false,
+          [cols.updatedAt]: new Date().toISOString(),
+        })
+        .returning(SELECT_MAP);
+
+      if (!updated) return null;
+
+      if (before) {
+        const oldAcc = before[cols.accountUsername] ?? null;
+        const newAcc = updated.account ?? null;
+        const same =
+          String(oldAcc ?? "").trim() === String(newAcc ?? "").trim();
+        if (!same) {
+          await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
+        }
+      }
+      return updated;
+    });
 
     if (!row) {
       return res.status(404).json({ error: "Không tìm thấy" });

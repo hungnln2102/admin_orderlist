@@ -18,6 +18,8 @@ export interface Product {
   id: number;
   san_pham: string;
   pct_promo?: number | null;
+  /** false = gói đã tắt, không bán — ẩn khỏi dropdown tạo đơn */
+  is_active?: boolean;
 }
 
 export interface SupplyPrice {

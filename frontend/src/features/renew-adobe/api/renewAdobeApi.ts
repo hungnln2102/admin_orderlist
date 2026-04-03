@@ -2,6 +2,81 @@ import { API_ENDPOINTS } from "@/constants";
 import { API_BASE_URL } from "@/shared/api/client";
 import { normalizeAdobeAdminAccount } from "../utils/accountUtils";
 
+export type MailBackupMailboxOption = {
+  id: number;
+  email: string;
+  alias_prefix: string | null;
+  note: string | null;
+};
+
+export function fetchRenewAdobeMailBackupMailboxes(options?: {
+  /** Bỏ các hộp thư đã gán cho tài khoản admin (accounts_admin.mail_backup_id). */
+  excludeAssigned?: boolean;
+}): Promise<MailBackupMailboxOption[]> {
+  const params = new URLSearchParams();
+  if (options?.excludeAssigned) params.set("exclude_assigned", "1");
+  const qs = params.toString();
+  const url = `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES}${
+    qs ? `?${qs}` : ""
+  }`;
+  return fetch(url, { credentials: "include" }).then(async (res) => {
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg =
+        data &&
+        typeof data === "object" &&
+        "error" in data &&
+        typeof (data as { error?: string }).error === "string"
+          ? (data as { error: string }).error
+          : res.statusText || "Không tải được danh sách mail dự phòng.";
+      throw new Error(msg);
+    }
+    if (!Array.isArray(data)) return [];
+    return data as MailBackupMailboxOption[];
+  });
+}
+
+export function createRenewAdobeMailBackupMailbox(payload: {
+  alias_prefix: string;
+  email?: string;
+  app_password?: string;
+  provider?: string;
+  note?: string;
+}): Promise<{ success: boolean; id: number; alias_prefix: string }> {
+  return fetch(
+    `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        alias_prefix: payload.alias_prefix.trim(),
+        ...(payload.email?.trim() ? { email: payload.email.trim() } : {}),
+        ...(payload.app_password?.trim()
+          ? { app_password: payload.app_password.trim() }
+          : {}),
+        ...(payload.provider?.trim() ? { provider: payload.provider.trim() } : {}),
+        ...(payload.note != null && String(payload.note).trim() !== ""
+          ? { note: String(payload.note).trim() }
+          : {}),
+      }),
+    }
+  ).then(async (res) => {
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      success?: boolean;
+      id?: number;
+      alias_prefix?: string;
+    };
+    if (!res.ok) {
+      throw new Error(
+        data.error || res.statusText || "Không tạo được hộp thư mail_backup."
+      );
+    }
+    return data as { success: boolean; id: number; alias_prefix: string };
+  });
+}
+
 export function fetchAdobeAdminAccounts() {
   return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`, {
     credentials: "include",
@@ -15,4 +90,33 @@ export function fetchAdobeAdminAccounts() {
     .then((rows: Record<string, unknown>[]) =>
       rows.map(normalizeAdobeAdminAccount)
     );
+}
+
+export function createAdobeAdminAccount(payload: {
+  email: string;
+  password: string;
+  mail_backup_id?: number | null;
+}) {
+  return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      email: payload.email.trim(),
+      password: payload.password,
+      ...(payload.mail_backup_id != null && payload.mail_backup_id > 0
+        ? { mail_backup_id: payload.mail_backup_id }
+        : {}),
+    }),
+  }).then(async (res) => {
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      success?: boolean;
+      id?: number;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || res.statusText || "Không thêm được tài khoản.");
+    }
+    return data;
+  });
 }

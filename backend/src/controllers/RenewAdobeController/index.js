@@ -1,6 +1,9 @@
 const {
+  listMailBackupMailboxes,
+  createMailBackupMailbox,
   listAccounts,
   lookupAccountByEmail,
+  createAccount,
   updateUrlAccess,
 } = require("./accounts");
 const {
@@ -45,8 +48,11 @@ const checkAllAccounts = (req, res) =>
   });
 
 module.exports = {
+  listMailBackupMailboxes,
+  createMailBackupMailbox,
   listAccounts,
   lookupAccountByEmail,
+  createAccount,
   runCheck,
   runCheckForAccountId,
   runCheckWithCookies,

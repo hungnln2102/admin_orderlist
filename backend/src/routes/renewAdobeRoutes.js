@@ -1,10 +1,13 @@
 const express = require("express");
-const { listAccounts, lookupAccountByEmail, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, updateUrlAccess, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, updateUrlAccess, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
 
 const router = express.Router();
 
 router.get("/queue-status", adobeQueueStatus);
+router.get("/mail-backup-mailboxes", listMailBackupMailboxes);
+router.post("/mail-backup-mailboxes", createMailBackupMailbox);
 router.get("/accounts", listAccounts);
+router.post("/accounts", createAccount);
 router.get("/accounts/lookup", lookupAccountByEmail);
 router.get("/accounts/check-all", checkAllAccounts);
 router.get("/user-orders", listUserOrders);

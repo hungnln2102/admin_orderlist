@@ -1,5 +1,6 @@
 /**
- * Tạo URL ảnh VietQR (Sepay / compact.png) cho thanh toán.
+ * URL ảnh VietQR qua img.vietqr.io — mẫu compact (540×540): QR + VietQR + Napas + ngân hàng.
+ * @see https://www.vietqr.io/danh-sach-api/link-tao-ma-nhanh/api-tao-ma-qr/
  */
 
 const {
@@ -8,9 +9,10 @@ const {
   QR_ACCOUNT_NAME,
 } = require("./constants");
 
+const VIETQR_IMAGE_TEMPLATE = "compact";
+
 /**
- * Build VietQR URL with compact.png format
- * Format: https://img.vietqr.io/image/{BANK_CODE}-{ACCOUNT}-compact.png?amount=...&addInfo=...&accountName=...
+ * Format: https://img.vietqr.io/image/{BANK_CODE}-{ACCOUNT}-{template}.png?amount=...&addInfo=...&accountName=...
  */
 function buildSepayQrUrl({
   accountNumber,
@@ -18,6 +20,7 @@ function buildSepayQrUrl({
   amount,
   description,
   accountName,
+  template = VIETQR_IMAGE_TEMPLATE,
 }) {
   const acc = String(accountNumber || "").trim();
   const bank = String(bankCode || "").trim();
@@ -41,7 +44,8 @@ function buildSepayQrUrl({
   }
 
   const queryString = params.toString();
-  return `https://img.vietqr.io/image/${bank}-${acc}-compact.png${queryString ? `?${queryString}` : ""}`;
+  const tpl = String(template || VIETQR_IMAGE_TEMPLATE).trim() || VIETQR_IMAGE_TEMPLATE;
+  return `https://img.vietqr.io/image/${bank}-${acc}-${tpl}.png${queryString ? `?${queryString}` : ""}`;
 }
 
 /**
@@ -56,10 +60,11 @@ function buildVietQrUrl({ amount, orderCode }) {
   params.set("addInfo", `Thanh toan ${orderCode}`);
   params.set("accountName", QR_ACCOUNT_NAME);
 
-  return `https://img.vietqr.io/image/${QR_BANK_CODE}-${QR_ACCOUNT_NUMBER}-compact.png?${params.toString()}`;
+  return `https://img.vietqr.io/image/${QR_BANK_CODE}-${QR_ACCOUNT_NUMBER}-${VIETQR_IMAGE_TEMPLATE}.png?${params.toString()}`;
 }
 
 module.exports = {
   buildSepayQrUrl,
   buildVietQrUrl,
+  VIETQR_IMAGE_TEMPLATE,
 };

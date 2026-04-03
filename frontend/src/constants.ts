@@ -57,6 +57,7 @@ export const API_ENDPOINTS = {
   WAREHOUSE: "/api/warehouse",
 
   RENEW_ADOBE_ACCOUNTS: "/api/renew-adobe/accounts",
+  RENEW_ADOBE_MAIL_BACKUP_MAILBOXES: "/api/renew-adobe/mail-backup-mailboxes",
   RENEW_ADOBE_ACCOUNT_LOOKUP: "/api/renew-adobe/accounts/lookup",
   RENEW_ADOBE_ACCOUNT_CHECK: (id: number) =>
     `/api/renew-adobe/accounts/${id}/check`,
@@ -99,6 +100,7 @@ export const SUPPLIER_COST_FIELDS = SUPPLIER_COST_FIELD_MAP;
 export const VIRTUAL_FIELDS = {
   SO_NGAY_CON_LAI: "so_ngay_con_lai_virtual",
   GIA_TRI_CON_LAI: "gia_tri_con_lai_virtual",
+  HOAN_TU_NCC: "hoan_tu_ncc_virtual",
   TRANG_THAI_TEXT: "trang_thai_text_virtual",
   ORDER_DATE_DISPLAY: "order_date_display_virtual",
   EXPIRY_DATE_DISPLAY: "expiry_date_display_virtual",
@@ -202,6 +204,7 @@ export interface Order {
 
   [VIRTUAL_FIELDS.SO_NGAY_CON_LAI]: number;
   [VIRTUAL_FIELDS.GIA_TRI_CON_LAI]: number;
+  [VIRTUAL_FIELDS.HOAN_TU_NCC]: number;
   [VIRTUAL_FIELDS.TRANG_THAI_TEXT]: string;
   [VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]: string;
   [VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]: string;

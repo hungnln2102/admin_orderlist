@@ -1,9 +1,17 @@
+/**
+ * Mẫu ảnh VietQR thống nhất: compact (540×540) — QR + logo VietQR + Napas + ngân hàng.
+ * @see https://www.vietqr.io/danh-sach-api/link-tao-ma-nhanh/api-tao-ma-qr/
+ */
+export const VIETQR_IMAGE_TEMPLATE = "compact" as const;
+
 export interface SepayQrOptions {
   accountNumber: string;
   bankCode: string;
   amount?: number | null;
   description?: string;
   accountName?: string;
+  /** Chỉ dùng khi cần lệch khỏi chuẩn dự án; mặc định = VIETQR_IMAGE_TEMPLATE */
+  template?: string;
 }
 
 export const buildSepayQrUrl = ({
@@ -12,6 +20,7 @@ export const buildSepayQrUrl = ({
   amount,
   description,
   accountName,
+  template = VIETQR_IMAGE_TEMPLATE,
 }: SepayQrOptions): string => {
   const account = (accountNumber || "").trim();
   const bank = (bankCode || "").trim();
@@ -35,7 +44,11 @@ export const buildSepayQrUrl = ({
   }
 
   const queryString = params.toString();
-  return `https://img.vietqr.io/image/${bank}-${account}-compact.png${
+  const tpl = (template || VIETQR_IMAGE_TEMPLATE).trim() || VIETQR_IMAGE_TEMPLATE;
+  return `https://img.vietqr.io/image/${bank}-${account}-${tpl}.png${
     queryString ? `?${queryString}` : ""
   }`;
 };
+
+/** Alias — cùng buildSepayQrUrl, tên rõ ràng cho ảnh VietQR chuẩn quốc gia */
+export const buildVietQrImageUrl = buildSepayQrUrl;

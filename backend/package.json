@@ -10,6 +10,7 @@
         "test:manage-team": "node scripts/test-manage-team.js",
         "test:form-info": "node scripts/test-form-info-supertest.js",
         "migrate:015": "node scripts/run-migration-015.js",
+        "migrate:021": "node scripts/migrations/run-migration-021.js",
         "proxy:local": "node scripts/local-proxy.js",
         "sync:dashboard-summary": "node scripts/rebuild-dashboard-monthly-summary.js",
         "start": "node index.js",
@@ -48,6 +49,7 @@
         "node-cron": "^4.2.1",
         "pg": "^8.16.3",
         "playwright": "^1.58.2",
+        "sharp": "^0.34.5",
         "tough-cookie": "^6.0.0",
         "winston": "^3.19.0",
         "winston-daily-rotate-file": "^5.0.0"

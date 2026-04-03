@@ -9,6 +9,7 @@ const {
   TELEGRAM_CHAT_ID,
   SEND_RENEWAL_TO_TOPIC,
 } = require("./config");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
 const { STATUS: ORDER_STATUS } = require("../../src/controllers/Order/constants");
 const {
   parseFlexibleDate,
@@ -33,6 +34,16 @@ const {
 } = require("../../src/services/pricing/core");
 
 const pendingRenewalTasks = new Map(); // orderCode -> task state
+const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
+const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+
+const toMonthKey = (value) => {
+  const parsedDate = parseFlexibleDate(value);
+  if (!parsedDate) return null;
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
 
 const calculateRenewalPricing = async (
   client,
@@ -284,6 +295,35 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       ORDER_STATUS.PROCESSING,
       orderCode,
     ]);
+
+    // Renewal flow: khi đơn từ Cần Gia Hạn -> Đang Xử Lý, ghi nhận vòng gia hạn mới vào dashboard tháng.
+    if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL) {
+      const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
+      if (monthKey) {
+        const revenue = normalizeMoney(finalGiaBan);
+        const cost = normalizeMoney(finalGiaNhap);
+        const profit = revenue - cost;
+        await client.query(
+          `
+            INSERT INTO ${summaryTable} (
+              ${summaryCols.MONTH_KEY},
+              ${summaryCols.TOTAL_ORDERS},
+              ${summaryCols.TOTAL_REVENUE},
+              ${summaryCols.TOTAL_PROFIT},
+              ${summaryCols.UPDATED_AT}
+            )
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (${summaryCols.MONTH_KEY})
+            DO UPDATE SET
+              ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
+              ${summaryCols.TOTAL_REVENUE} = ${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
+              ${summaryCols.TOTAL_PROFIT} = ${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+              ${summaryCols.UPDATED_AT} = NOW()
+          `,
+          [monthKey, 1, revenue, profit]
+        );
+      }
+    }
 
     if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0) {
       try {

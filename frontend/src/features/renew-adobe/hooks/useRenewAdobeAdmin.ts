@@ -156,8 +156,11 @@ export function useRenewAdobeAdmin() {
           });
           break;
         case "done":
-          setAccounts((prev) =>
-            prev.map((account) =>
+          setAccounts((prev) => {
+            if (event.removed_from_db) {
+              return prev.filter((account) => account.id !== event.id);
+            }
+            return prev.map((account) =>
               account.id === event.id
                 ? {
                     ...account,
@@ -169,8 +172,8 @@ export function useRenewAdobeAdmin() {
                       account.license_status,
                   }
                 : account
-            )
-          );
+            );
+          });
           setCheckAllProgress((prev) => {
             if (!prev) {
               return prev;

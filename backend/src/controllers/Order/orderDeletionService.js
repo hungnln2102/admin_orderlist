@@ -10,7 +10,7 @@ const deleteOrderWithArchive = async ({
         adjustSupplierDebtIfNeeded,
         calcRemainingRefund,
     } = require("./orderFinanceHelpers");
-    const { toNullableNumber } = require("../../utils/normalizers");
+    const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
     const logger = require("../../utils/logger");
 
     const orderId = order?.id;
@@ -59,11 +59,24 @@ const deleteOrderWithArchive = async ({
         const refundValue = bodyRefund !== null && bodyRefund !== undefined
             ? Math.max(0, bodyRefund)
             : calcRemainingRefund(order, normalized);
-        await trx(TABLES.orderList).where({ id: orderId }).update({
+
+        // canceled_at: chỉ ghi một lần lúc chuyển sang Chờ Hoàn (ngày VN, YYYY-MM-DD).
+        const existingCanceledRaw = order?.[canceledAtCol] ?? order?.canceled_at;
+        const hasCanceledAt =
+            existingCanceledRaw !== undefined &&
+            existingCanceledRaw !== null &&
+            String(existingCanceledRaw).trim() !== "" &&
+            String(existingCanceledRaw).trim().toLowerCase() !== "null";
+
+        const updatePayload = {
             [statusCol]: STATUS.PENDING_REFUND,
             [refundCol]: refundValue,
-            [canceledAtCol]: new Date(),
-        });
+        };
+        if (!hasCanceledAt) {
+            updatePayload[canceledAtCol] = todayYMDInVietnam();
+        }
+
+        await trx(TABLES.orderList).where({ id: orderId }).update(updatePayload);
     } else {
         await trx(TABLES.orderList).where({ id: orderId }).update({
             [statusCol]: STATUS.EXPIRED,

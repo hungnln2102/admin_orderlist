@@ -18,6 +18,9 @@ type CreateOrderPricingSectionProps = {
   costValue: string | number | undefined;
   priceValue: string | number | undefined;
   onRegisterDateChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRegisterDateBlur: () => void;
+  onExpiryDateChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onExpiryDateBlur: () => void;
   onCostChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onPriceChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
@@ -29,6 +32,9 @@ export const CreateOrderPricingSection = ({
   costValue,
   priceValue,
   onRegisterDateChange,
+  onRegisterDateBlur,
+  onExpiryDateChange,
+  onExpiryDateBlur,
   onCostChange,
   onPriceChange,
 }: CreateOrderPricingSectionProps) => {
@@ -42,13 +48,16 @@ export const CreateOrderPricingSection = ({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div>
-          <label className={labelClass}>Ngày đăng ký (dd/mm/yyyy)</label>
+          <label className={labelClass}>Ngày đăng ký</label>
           <input
             type="text"
             name={ORDER_FIELDS.ORDER_DATE}
             value={registerDateDMY}
             placeholder="dd/mm/yyyy"
+            autoComplete="off"
+            spellCheck={false}
             onChange={onRegisterDateChange}
+            onBlur={onRegisterDateBlur}
             className={inputClass}
           />
         </div>
@@ -68,8 +77,12 @@ export const CreateOrderPricingSection = ({
             type="text"
             name={ORDER_FIELDS.EXPIRY_DATE}
             value={(formData[ORDER_FIELDS.EXPIRY_DATE] as string) || ""}
-            readOnly
-            className={`${inputClass} font-black text-rose-300 ${readOnlyClass}`}
+            placeholder="dd/mm/yyyy"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={onExpiryDateChange}
+            onBlur={onExpiryDateBlur}
+            className={`${inputClass} font-black text-rose-300`}
           />
         </div>
         <div>

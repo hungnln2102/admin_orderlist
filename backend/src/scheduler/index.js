@@ -113,19 +113,13 @@ cron.schedule(
   { scheduled: true, timezone: schedulerTimezone }
 );
 
+// Check toàn bộ tài khoản Renew Adobe + notify: mỗi giờ (phút 0), theo schedulerTimezone
 cron.schedule(
-  "0 5 * * *",
+  "0 * * * *",
   () => {
-    logger.info("[Scheduler] Cron 05:00 — check tài khoản Adobe & thông báo hết gói");
-    runRenewAdobeCheckSafe("cron");
-  },
-  { scheduled: true, timezone: schedulerTimezone }
-);
-
-cron.schedule(
-  "0 12 * * *",
-  () => {
-    logger.info("[Scheduler] Cron 12:00 — check tài khoản Adobe & thông báo hết gói");
+    logger.info(
+      "[Scheduler] Cron hàng giờ — check tài khoản Adobe & thông báo hết gói"
+    );
     runRenewAdobeCheckSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }

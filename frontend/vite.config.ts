@@ -79,6 +79,16 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        "/image": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/image_product": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     resolve: {

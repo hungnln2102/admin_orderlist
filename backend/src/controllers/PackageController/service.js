@@ -7,6 +7,8 @@ const {
   mapPackageProductRow,
   fetchPackageProductById,
 } = require("../../services/packageProductService");
+const { syncOrdersMatchingPackageAccount } = require("../../services/packageOrderAccountSync");
+const logger = require("../../utils/logger");
 const { pkgCols, TABLES } = require("./constants");
 
 const normalizeMatchMode = (matchMode) =>
@@ -90,6 +92,8 @@ const updatePackageProduct = async (id, payload) => {
   const normalizedSlotLimit = toNullableNumber(slotLimit);
   const normalizedMatchMode = normalizeMatchMode(matchMode);
 
+  const beforePackage = await fetchPackageProductById(db, id);
+
   const updated = await withTransaction(async (trx) => {
     const [updatedPkg] = await trx(TABLES.packageProduct)
       .where(pkgCols.id, id)
@@ -115,20 +119,41 @@ const updatePackageProduct = async (id, payload) => {
       updatedPkg?.package_id;
 
     const fetched = await fetchPackageProductById(trx, packageId ?? id);
-    if (fetched) return fetched;
+    const resultRow =
+      fetched ||
+      mapPackageProductRow({
+        package_id: packageId ?? id,
+        product_id: null,
+        package_name: null,
+        package_supplier: supplier || null,
+        package_import: toNullableNumber(importPrice),
+        package_match: normalizedMatchMode,
+        stock_id: toNullableNumber(stockId),
+        storage_id: toNullableNumber(storageId),
+        storage_total: toNullableNumber(storageTotal),
+        package_products: [],
+      });
 
-    return mapPackageProductRow({
-      package_id: packageId ?? id,
-      product_id: null,
-      package_name: null,
-      package_supplier: supplier || null,
-      package_import: toNullableNumber(importPrice),
-      package_match: normalizedMatchMode,
-      stock_id: toNullableNumber(stockId),
-      storage_id: toNullableNumber(storageId),
-      storage_total: toNullableNumber(storageTotal),
-      package_products: [],
-    });
+    if (beforePackage && resultRow) {
+      try {
+        await syncOrdersMatchingPackageAccount(
+          trx,
+          resultRow,
+          beforePackage.informationUser,
+          resultRow.informationUser,
+          { matchModeSource: beforePackage }
+        );
+      } catch (syncErr) {
+        logger.error("[packages] Đồng bộ đơn theo tài khoản gói thất bại", {
+          id,
+          error: syncErr?.message || String(syncErr),
+          stack: syncErr?.stack,
+        });
+        throw syncErr;
+      }
+    }
+
+    return resultRow;
   });
 
   return updated;

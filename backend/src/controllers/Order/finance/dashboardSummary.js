@@ -1,9 +1,20 @@
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
 const { STATUS } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
+const { quoteIdent } = require("../../../utils/sql");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+const summaryTableBase = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE;
+
+/** Trong ON CONFLICT DO UPDATE, tên cột trần bị ambiguous với excluded.* — phải qualify bảng. */
+const qualifiedSummaryCol = (colName) => {
+    const c = quoteIdent(colName);
+    if (SCHEMA_FINANCE) {
+        return `${quoteIdent(SCHEMA_FINANCE)}.${quoteIdent(summaryTableBase)}.${c}`;
+    }
+    return `${quoteIdent(summaryTableBase)}.${c}`;
+};
 
 const getMonthKey = (date) => {
     if (!date) return null;
@@ -86,23 +97,33 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     };
 
     if (updates.total_orders !== undefined) {
-        mergeData[summaryCols.TOTAL_ORDERS] = trx.raw(`GREATEST(0, ${summaryCols.TOTAL_ORDERS} + ${updates.total_orders})`);
+        mergeData[summaryCols.TOTAL_ORDERS] = trx.raw(
+            `GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + ${updates.total_orders})`
+        );
     }
 
     if (updates.canceled_orders !== undefined) {
-        mergeData[summaryCols.CANCELED_ORDERS] = trx.raw(`GREATEST(0, ${summaryCols.CANCELED_ORDERS} + ${updates.canceled_orders})`);
+        mergeData[summaryCols.CANCELED_ORDERS] = trx.raw(
+            `GREATEST(0, ${qualifiedSummaryCol(summaryCols.CANCELED_ORDERS)} + ${updates.canceled_orders})`
+        );
     }
 
     if (updates.total_revenue !== undefined) {
-        mergeData[summaryCols.TOTAL_REVENUE] = trx.raw(`${summaryCols.TOTAL_REVENUE} + ${updates.total_revenue}`);
+        mergeData[summaryCols.TOTAL_REVENUE] = trx.raw(
+            `${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + ${updates.total_revenue}`
+        );
     }
 
     if (updates.total_profit !== undefined) {
-        mergeData[summaryCols.TOTAL_PROFIT] = trx.raw(`${summaryCols.TOTAL_PROFIT} + ${updates.total_profit}`);
+        mergeData[summaryCols.TOTAL_PROFIT] = trx.raw(
+            `${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + ${updates.total_profit}`
+        );
     }
 
     if (updates.total_refund !== undefined) {
-        mergeData[summaryCols.TOTAL_REFUND] = trx.raw(`GREATEST(0, ${summaryCols.TOTAL_REFUND} + ${updates.total_refund})`);
+        mergeData[summaryCols.TOTAL_REFUND] = trx.raw(
+            `GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_REFUND)} + ${updates.total_refund})`
+        );
     }
 
     await trx(summaryTable)
