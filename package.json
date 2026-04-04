@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "description": "Workspace orchestrator for admin_orderlist. Runtime dependencies live inside backend/ and frontend/.",
   "scripts": {
+    "docker:build": "node scripts/docker-build.js",
+    "docker:up": "docker compose up -d",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",
