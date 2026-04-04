@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",
+  ORDERS_IMPORT: "/api/orders/import",
   ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
 
   SUPPLIES: "/api/supplies",
@@ -165,6 +166,11 @@ export const ORDER_DATASET_CONFIG = {
     description: "Danh sách các đơn hàng đã hết hạn",
     endpoint: API_ENDPOINTS.ORDERS_EXPIRED,
   },
+  import: {
+    label: "Nhập hàng",
+    description: "Đơn nhập kho",
+    endpoint: API_ENDPOINTS.ORDERS_IMPORT,
+  },
   canceled: {
     label: "Hoàn Tiền",
     description: "Đơn đã hủy/hoàn tiền",
@@ -172,9 +178,9 @@ export const ORDER_DATASET_CONFIG = {
   },
 };
 
-export const ORDER_DATASET_SEQUENCE = ["active", "expired", "canceled"];
+export const ORDER_DATASET_SEQUENCE = ["active", "import", "expired", "canceled"];
 
-export type OrderDatasetKey = "active" | "expired" | "canceled";
+export type OrderDatasetKey = "active" | "import" | "expired" | "canceled";
 
 export interface Order {
   id: number;

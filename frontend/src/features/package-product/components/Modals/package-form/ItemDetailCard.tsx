@@ -68,14 +68,13 @@ export const ItemDetailCard: React.FC<ItemDetailCardProps> = ({
       <div className="divide-y divide-white/[0.04]">
         {entries.map(({ key, label, value, placeholder }) => {
           const hasValue = value != null && String(value).trim() !== "";
-          const canEditRow = key !== "expires_at";
 
           return (
             <div key={key} className="flex items-start gap-3 px-3 py-2">
               <span className="w-24 shrink-0 pt-0.5 text-[11px] text-white/30">
                 {label}
               </span>
-              {isEditingInfo && draft && onDraftChange && canEditRow ? (
+              {isEditingInfo && draft && onDraftChange ? (
                 <input
                   type="text"
                   value={draft[key as keyof EditableWarehouseFields]}

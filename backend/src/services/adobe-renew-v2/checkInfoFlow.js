@@ -196,7 +196,19 @@ function scrapeUsersPage(page) {
         const nameLink = row.querySelector('a.spectrum-Link--primary, a[href*="/users/"]');
         if (nameLink) name = nameLink.textContent?.trim() || "";
       }
-      const hasProduct = row ? !!row.querySelector('[data-testid="image-icon"], [data-testid="tooltip-button-action"]') : false;
+      // Chỉ đọc cột Sản phẩm (ô [role=gridcell] cuối). Không dùng tooltip-button-action trên cả hàng —
+      // Adobe hay đặt control đó ở cột khác → false positive "có gói" khi cột sản phẩm trống.
+      let hasProduct = false;
+      if (row) {
+        const cells = row.querySelectorAll('[role="gridcell"]');
+        const productCell = cells.length ? cells[cells.length - 1] : null;
+        if (productCell) {
+          hasProduct = !!(
+            productCell.querySelector('[data-testid="image-icon"]') ||
+            productCell.querySelector("img")
+          );
+        }
+      }
       out.push({ name, email, hasProduct });
     }
     return out;

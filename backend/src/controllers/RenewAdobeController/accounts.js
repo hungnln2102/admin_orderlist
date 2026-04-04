@@ -243,22 +243,38 @@ const createMailBackupMailbox = async (req, res) => {
 
 const listAccounts = async (_req, res) => {
   try {
-    const rows = await db(TABLE)
-      .select(
-        `${TABLE}.${COLS.ID}`,
-        `${TABLE}.${COLS.EMAIL}`,
-        `${TABLE}.${COLS.PASSWORD_ENC}`,
-        `${TABLE}.${COLS.ORG_NAME}`,
-        `${TABLE}.${COLS.LICENSE_STATUS}`,
-        `${TABLE}.${COLS.USER_COUNT}`,
-        `${TABLE}.${COLS.USERS_SNAPSHOT}`,
-        `${TABLE}.${COLS.LAST_CHECKED}`,
-        `${TABLE}.${COLS.IS_ACTIVE}`,
-        `${TABLE}.${COLS.CREATED_AT}`,
-        `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
-        ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : [])
-      )
-      .orderBy(COLS.ID, "asc");
+    const baseSelect = [
+      `${TABLE}.${COLS.ID}`,
+      `${TABLE}.${COLS.EMAIL}`,
+      `${TABLE}.${COLS.PASSWORD_ENC}`,
+      `${TABLE}.${COLS.ORG_NAME}`,
+      `${TABLE}.${COLS.LICENSE_STATUS}`,
+      `${TABLE}.${COLS.USER_COUNT}`,
+      `${TABLE}.${COLS.USERS_SNAPSHOT}`,
+      `${TABLE}.${COLS.LAST_CHECKED}`,
+      `${TABLE}.${COLS.IS_ACTIVE}`,
+      `${TABLE}.${COLS.CREATED_AT}`,
+      `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
+      ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
+    ];
+
+    let qb = db(TABLE);
+    if (MAIL_BACKUP_TABLE && MB_COLS.ALIAS_PREFIX) {
+      qb = qb
+        .leftJoin(
+          MAIL_BACKUP_TABLE,
+          `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
+          `${MAIL_BACKUP_TABLE}.${MB_COLS.ID}`
+        )
+        .select(
+          ...baseSelect,
+          `${MAIL_BACKUP_TABLE}.${MB_COLS.ALIAS_PREFIX} as alias`
+        );
+    } else {
+      qb = qb.select(...baseSelect, db.raw("NULL::text as alias"));
+    }
+
+    const rows = await qb.orderBy(`${TABLE}.${COLS.ID}`, "asc");
 
     const withEmptyCheck = rows.map((row) => ({
       ...row,

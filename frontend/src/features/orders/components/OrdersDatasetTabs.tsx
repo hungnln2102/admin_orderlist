@@ -17,7 +17,7 @@ export function OrdersDatasetTabs({
 }: OrdersDatasetTabsProps) {
   return (
     <div className="rounded-[32px] glass-panel-dark p-4 shadow-2xl border border-white/5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {ORDER_DATASET_SEQUENCE.map((key) => {
           const datasetKeyValue = key as OrderDatasetKey;
           const config = ORDER_DATASET_CONFIG[datasetKeyValue];

@@ -5,6 +5,7 @@
  */
 
 const logger = require("../../utils/logger");
+const { dismissBlockingOverlays } = require("./dismissBlockingOverlays");
 
 const STEP_TIMEOUT = 15000;
 
@@ -42,6 +43,7 @@ async function runB15RemoveProductFromAdmin(page, adminEmail, options = {}) {
         logger.info("[adobe-v2] B15: Đang không ở trang Users (sau B14) → vào trang Users trước");
         await page.goto(usersUrl, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
         await page.waitForTimeout(2000);
+        await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
         url = page.url();
       }
     }
@@ -60,15 +62,19 @@ async function runB15RemoveProductFromAdmin(page, adminEmail, options = {}) {
       }
     }
 
+    await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
+
     const adminLink = page.locator('a[href*="/users/administrators"]').first();
     let linkVisible = await adminLink.isVisible().catch(() => false);
     if (!linkVisible) {
       const linkByText = page.getByRole("link", { name: /Quản trị viên/i });
       linkVisible = await linkByText.first().isVisible().catch(() => false);
       if (linkVisible) {
+        await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
         await linkByText.first().click({ timeout: STEP_TIMEOUT });
       }
     } else {
+      await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
       await adminLink.click({ timeout: STEP_TIMEOUT });
     }
     if (!linkVisible) {

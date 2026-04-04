@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
   unknown: "Chờ gia hạn",
 };
 
-/** User có product === false → hết quyền (không dùng license_status của account) */
+/** User chưa có product gán trên Adobe (hoặc scrape không báo rõ) → hết quyền, không kế thừa license account */
 const DISPLAY_LABELS: Record<DisplayStatus, string> = {
   ...STATUS_LABELS,
   no_product: "Hết quyền",

@@ -52,7 +52,7 @@ export function RenewAdobeAccountsTable({
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300/70 pointer-events-none" />
           <input
             type="text"
-            placeholder="Tìm theo email, org_name..."
+            placeholder="Tìm theo email, alias, org_name..."
             className="w-full pl-11 pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
@@ -106,6 +106,9 @@ export function RenewAdobeAccountsTable({
                         <p className="text-xs text-white/60">
                           Mật khẩu: {maskPassword(account.password_enc)}
                         </p>
+                        <p className="text-xs text-white/70 break-all">
+                          Alias: {account.alias ?? "—"}
+                        </p>
                         <p className="text-xs text-white/70">
                           Org: {account.org_name ?? "—"}
                         </p>
@@ -137,6 +140,7 @@ export function RenewAdobeAccountsTable({
                 <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
                   <th className="min-w-[180px]">EMAIL</th>
                   <th className="min-w-[100px]">PASSWORD_ENC</th>
+                  <th className="min-w-[120px]">ALIAS</th>
                   <th className="min-w-[140px]">ORG_NAME</th>
                   <th className="w-24 text-center">USER_COUNT</th>
                   <th className="w-36">LICENSE_STATUS</th>
@@ -148,7 +152,7 @@ export function RenewAdobeAccountsTable({
                 {currentRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-12 text-center text-white/70"
                     >
                       <p className="text-lg mb-2">
@@ -178,6 +182,9 @@ export function RenewAdobeAccountsTable({
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/60 font-mono">
                           {maskPassword(account.password_enc)}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-white/80 break-all max-w-[200px]">
+                          {account.alias ?? "—"}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
                           {account.org_name ?? "—"}

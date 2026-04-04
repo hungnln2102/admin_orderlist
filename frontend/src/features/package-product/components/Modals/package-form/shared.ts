@@ -49,6 +49,11 @@ export const MANUAL_FIELDS: Array<{
     label: "Ghi chú",
     placeholder: "Ghi chú thêm...",
   },
+  {
+    key: "expires_at",
+    label: "Ngày hết hạn",
+    placeholder: "DD/MM/YYYY (tuỳ chọn)",
+  },
 ];
 
 export type EditableWarehouseFields = {
@@ -57,10 +62,11 @@ export type EditableWarehouseFields = {
   backup_email: string;
   two_fa: string;
   note: string;
+  expires_at: string;
 };
 
 type InfoEntry = {
-  key: keyof EditableWarehouseFields | "expires_at";
+  key: keyof EditableWarehouseFields;
   label: string;
   value?: string | null;
   placeholder: string;
@@ -98,6 +104,11 @@ const INLINE_EDIT_FIELDS: Array<{
     label: "Ghi chú",
     placeholder: "Ghi chú thêm...",
   },
+  {
+    key: "expires_at",
+    label: "Ngày hết hạn",
+    placeholder: "DD/MM/YYYY",
+  },
 ];
 
 export const normalizeWarehouseId = (value: unknown): number | null => {
@@ -109,30 +120,29 @@ export const normalizeWarehouseId = (value: unknown): number | null => {
 export const buildInfoEntries = (
   item: WarehouseItem | AccountDisplayInfo
 ): InfoEntry[] => {
-  const editableEntries: InfoEntry[] = INLINE_EDIT_FIELDS.map((field) => ({
-    key: field.key,
-    label: field.label,
-    placeholder: field.placeholder,
-    value:
-      ((item as WarehouseItem)[field.key] as string | null | undefined) ??
-      ((item as AccountDisplayInfo)[field.key] as string | null | undefined) ??
-      "",
-  }));
-
-  const expiryValue =
-    (item as WarehouseItem).expires_at ??
-    (item as AccountDisplayInfo).expires_at ??
-    null;
-
-  return [
-    ...editableEntries,
-    {
-      key: "expires_at",
-      label: "Ngày hết hạn",
-      placeholder: "",
-      value: formatDisplayDate(expiryValue),
-    },
-  ];
+  return INLINE_EDIT_FIELDS.map((field) => {
+    if (field.key === "expires_at") {
+      const expiryValue =
+        (item as WarehouseItem).expires_at ??
+        (item as AccountDisplayInfo).expires_at ??
+        null;
+      return {
+        key: field.key,
+        label: field.label,
+        placeholder: field.placeholder,
+        value: formatDisplayDate(expiryValue),
+      };
+    }
+    return {
+      key: field.key,
+      label: field.label,
+      placeholder: field.placeholder,
+      value:
+        ((item as WarehouseItem)[field.key] as string | null | undefined) ??
+        ((item as AccountDisplayInfo)[field.key] as string | null | undefined) ??
+        "",
+    };
+  });
 };
 
 export const toEditableWarehouseFields = (
@@ -143,6 +153,9 @@ export const toEditableWarehouseFields = (
   backup_email: item?.backup_email ? String(item.backup_email) : "",
   two_fa: item?.two_fa ? String(item.two_fa) : "",
   note: item?.note ? String(item.note) : "",
+  expires_at: formatDisplayDate(
+    (item as WarehouseItem | null | undefined)?.expires_at ?? null
+  ),
 });
 
 export const mergeDisplayInfo = (

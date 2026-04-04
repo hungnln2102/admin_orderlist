@@ -17,11 +17,21 @@ const parseFlexibleDate = (
     return new Date(y, m - 1, d);
   }
 
-  const isoMatch = stringValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) {
-    const [, y, m, d] = isoMatch.map(Number);
+  // Chỉ YYYY-MM-DD thuần (không có giờ) = ngày lịch theo local, tránh lệch 1 ngày với ISO Z
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stringValue)) {
+    const [y, m, d] = stringValue.split("-").map(Number);
     if (!d || !m || !y) return null;
     return new Date(y, m - 1, d);
+  }
+
+  // ISO có T hoặc timezone — dùng instant rồi lấy ngày theo múi giờ trình duyệt
+  if (
+    /^\d{4}-\d{2}-\d{2}T/.test(stringValue) ||
+    /[zZ]|[+-]\d{2}:?\d{2}$/.test(stringValue)
+  ) {
+    const parsed = new Date(stringValue);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
   }
 
   const parsed = new Date(stringValue);
@@ -103,12 +113,17 @@ export const formatDateToDMY = (
   value: string | number | Date | null | undefined
 ): string => {
   if (typeof value === "string") {
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) {
-      const [, y, mo, d] = m;
-      return `${d}/${mo}/${y}`;
+    const s = value.trim();
+    if (!s) return "";
+    // Chỉ tối ưu chuỗi date-only; chuỗi có giờ (…T…Z) phải qua parseFlexibleDate
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) {
+        const [, y, mo, d] = m;
+        return `${d}/${mo}/${y}`;
+      }
     }
-    const m2 = value.match(/^(\d{4})\/(\d{2})\/(\d{2})/);
+    const m2 = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
     if (m2) {
       const [, y, mo, d] = m2;
       return `${d}/${mo}/${y}`;

@@ -11,6 +11,7 @@ const LOOKUP_COLUMNS = [
   `${TABLE}.${COLS.LAST_CHECKED}`,
   `${TABLE}.${COLS.IS_ACTIVE}`,
   `${TABLE}.${COLS.CREATED_AT}`,
+  ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
 ];
 
 function normalizeEmail(value) {

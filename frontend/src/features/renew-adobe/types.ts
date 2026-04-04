@@ -4,6 +4,8 @@ export type AdobeAdminAccount = {
   id: number;
   email: string;
   password_enc: string;
+  /** mail_backup.alias_prefix (OTP / Gmail +alias) */
+  alias?: string | null;
   org_name: string | null;
   user_count: number;
   license_status: LicenseStatus;
@@ -18,5 +20,5 @@ export type SnapshotUser = {
   email: string;
   role?: string;
   access?: string | boolean;
-  product?: boolean | string;
+  product?: boolean | string | number;
 };

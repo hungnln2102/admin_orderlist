@@ -70,18 +70,21 @@ const formatDateOutput = (value) => {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) return null;
-    let match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    // Ngày lịch thuần YYYY-MM-DD — không đụng múi giờ
+    let match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (match) return `${match[1]}-${match[2]}-${match[3]}`;
     match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+    // ISO có giờ — map sang ngày theo lịch Việt Nam (UTC+7)
+    const asInstant = Date.parse(trimmed);
+    if (!Number.isNaN(asInstant)) {
+      return ymdInVietnamFromInstant(asInstant);
+    }
     return trimmed;
   }
   const dateValue = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(dateValue.getTime())) return null;
-  const year = dateValue.getUTCFullYear();
-  const month = String(dateValue.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(dateValue.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return ymdInVietnamFromInstant(dateValue);
 };
 
 const formatYMDToDMY = (value) => {

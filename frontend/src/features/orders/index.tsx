@@ -18,6 +18,7 @@ export default function Orders() {
     Record<OrderDatasetKey, number>
   >({
     active: 0,
+    import: 0,
     expired: 0,
     canceled: 0,
   });
@@ -80,12 +81,12 @@ export default function Orders() {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
   }, []);
 
-  const isActiveDataset = datasetKey === "active";
+  const isActiveDataset = datasetKey === "active" || datasetKey === "import";
   const showRemainingColumn = datasetKey !== "expired";
   const showActionButtons = true;
   const isCanceled = datasetKey === "canceled";
-  const canEditOrder = datasetKey === "active";
-  const canRenewOrder = datasetKey === "active";
+  const canEditOrder = datasetKey === "active" || datasetKey === "import";
+  const canRenewOrder = datasetKey === "active" || datasetKey === "import";
   const remainingLabel = isCanceled ? "Giá Trị Còn Lại" : "Còn Lại";
   const showSupplierRefundColumn = isCanceled;
   const totalColumns = !showRemainingColumn

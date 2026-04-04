@@ -114,26 +114,40 @@ function buildWebsiteStatusPayload({
   const userHasProduct = resolveUserProductState(matchedUser);
   const orderExpired = order ? isOrderExpired(order.expiry_date, now) : false;
   const hasValidOrder = Boolean(order) && !orderExpired;
-  const hasUsableAccount =
+  const userOnTeam = matchedUser != null;
+  const adminLicenseOk =
     Boolean(account) &&
     accountIsActive &&
-    ACTIVE_LICENSE_STATUSES.has(licenseStatus) &&
-    userHasProduct !== false;
+    ACTIVE_LICENSE_STATUSES.has(licenseStatus);
 
   let status = "needs_activation";
-  if (hasValidOrder && hasUsableAccount) {
-    status = "active";
-  } else if (!order) {
+  if (!order) {
     status = "no_order";
   } else if (orderExpired) {
     status = "order_expired";
+  } else if (adminLicenseOk && userOnTeam) {
+    // Đơn còn hạn + admin còn gói + email đã có trong team (kể cả chưa gán product)
+    status = "active";
+  } else {
+    status = "needs_activation";
   }
+
+  const urlAccessRaw =
+    account && account.url_access != null
+      ? String(account.url_access).trim()
+      : "";
+  const urlAccess = urlAccessRaw || null;
 
   const profileLabel = profileName ? `Profile ${profileName}` : "Profile hiện tại";
   let message = "Không thể xác định trạng thái profile.";
 
   if (status === "active") {
-    message = "Profile đang hoạt động bình thường.";
+    if (userHasProduct === true) {
+      message = "Profile đang hoạt động bình thường.";
+    } else {
+      message =
+        "Đơn còn hiệu lực và tài khoản admin còn gói. Bạn đã có trên profile — mở liên kết bên dưới để hoàn tất nhận sản phẩm Adobe (Team / lời mời).";
+    }
   } else if (status === "no_order") {
     message = "Không tìm thấy đơn Renew Adobe còn hiệu lực cho email này.";
   } else if (status === "order_expired") {
@@ -144,10 +158,11 @@ function buildWebsiteStatusPayload({
   } else if (!account) {
     message =
       "Chưa thấy email này được add vào profile nào. Bấm nút bên dưới để kích hoạt.";
+  } else if (!userOnTeam) {
+    message =
+      "Chưa thấy email này trong team profile. Bấm nút bên dưới để kích hoạt.";
   } else if (!accountIsActive) {
     message = `${profileLabel} hiện đang bị tắt. Bấm nút bên dưới để kích hoạt lại.`;
-  } else if (userHasProduct === false) {
-    message = `${profileLabel} hiện chưa có product sử dụng. Bấm nút bên dưới để kích hoạt lại.`;
   } else if (!ACTIVE_LICENSE_STATUSES.has(licenseStatus)) {
     message = `${profileLabel} hiện không còn gói. Bấm nút bên dưới để kích hoạt lại.`;
   }
@@ -176,6 +191,7 @@ function buildWebsiteStatusPayload({
           userCount: Number(account.user_count) || 0,
           isActive: accountIsActive,
           userHasProduct,
+          urlAccess,
         }
       : null,
   };

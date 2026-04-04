@@ -183,7 +183,7 @@ export const usePackageFormState = ({
         two_fa: fields.two_fa || null,
         note: fields.note || null,
         status: currentItem.status ?? null,
-        expires_at: currentItem.expires_at ?? null,
+        expires_at: fields.expires_at?.trim() || null,
         is_verified: currentItem.is_verified ?? false,
       };
 

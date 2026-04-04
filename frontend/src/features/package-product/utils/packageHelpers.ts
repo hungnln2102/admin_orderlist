@@ -98,6 +98,8 @@ export type ManualWarehouseEntry = {
   backup_email: string;
   two_fa: string;
   note: string;
+  /** DD/MM/YYYY — lưu vào kho `expires_at`, hiển thị trên gói */
+  expires_at: string;
 };
 
 export const EMPTY_MANUAL_ENTRY: ManualWarehouseEntry = {
@@ -107,6 +109,7 @@ export const EMPTY_MANUAL_ENTRY: ManualWarehouseEntry = {
   backup_email: "",
   two_fa: "",
   note: "",
+  expires_at: "",
 };
 
 export type PackageFormValues = {

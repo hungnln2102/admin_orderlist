@@ -54,6 +54,7 @@ export const usePackageMutationActions = ({
             two_fa: entry.two_fa || null,
             note: entry.note || null,
             status: "Tồn",
+            expires_at: entry.expires_at?.trim() || null,
           }),
         });
 

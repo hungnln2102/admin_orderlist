@@ -42,6 +42,7 @@ export default function RenewAdobeAdmin() {
     return accounts.filter(
       (item) =>
         item.email.toLowerCase().includes(q) ||
+        (item.alias ?? "").toLowerCase().includes(q) ||
         (item.org_name ?? "").toLowerCase().includes(q)
     );
   }, [accounts, searchTerm]);

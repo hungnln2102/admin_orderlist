@@ -46,7 +46,7 @@ describe("renew-adobe website status payload", () => {
     expect(payload.canActivate).toBe(true);
   });
 
-  it("returns needs_activation when matched user has no product", () => {
+  it("returns active when matched user has no product but order and admin license ok (url access flow)", () => {
     const payload = buildWebsiteStatusPayload({
       email: "hungnlin2102@gmail.com",
       order: activeOrder,
@@ -57,6 +57,7 @@ describe("renew-adobe website status payload", () => {
         license_status: "Paid",
         user_count: 1,
         is_active: true,
+        url_access: "https://adminconsole.adobe.com/invite/example",
       },
       matchedUser: {
         email: "hungnlin2102@gmail.com",
@@ -65,8 +66,13 @@ describe("renew-adobe website status payload", () => {
       now: new Date("2026-04-02T00:00:00.000Z"),
     });
 
-    expect(payload.status).toBe("needs_activation");
-    expect(payload.canActivate).toBe(true);
+    expect(payload.status).toBe("active");
+    expect(payload.canActivate).toBe(false);
+    expect(payload.account?.userHasProduct).toBe(false);
+    expect(payload.account?.urlAccess).toBe(
+      "https://adminconsole.adobe.com/invite/example",
+    );
+    expect(payload.message).toContain("liên kết");
   });
 
   it("returns order_expired when order is past expiry", () => {

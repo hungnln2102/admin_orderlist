@@ -2,11 +2,27 @@ import * as Helpers from "@/lib/helpers";
 import type { AdobeAdminAccount, LicenseStatus, SnapshotUser } from "../types";
 import type { DisplayStatus, OrderInfo, UserOrderRow } from "./types";
 
+/**
+ * Chỉ true khi scrape báo rõ user đã có product (cột Sản phẩm trên Adobe).
+ * null/undefined/chuỗi rỗng → không kế thừa license của admin (tránh "Còn gói" sai).
+ */
+export function userHasAssignedProduct(
+  userProduct: boolean | string | number | undefined | null
+): boolean {
+  if (userProduct === true) return true;
+  if (typeof userProduct === "number") return userProduct === 1;
+  if (typeof userProduct === "string") {
+    const n = userProduct.trim().toLowerCase();
+    return n === "true" || n === "1" || n === "yes";
+  }
+  return false;
+}
+
 export function resolveDisplayStatus(
-  userProduct: boolean | string | undefined,
+  userProduct: boolean | string | number | undefined | null,
   accountLicenseStatus: LicenseStatus
 ): DisplayStatus {
-  if (userProduct === false || userProduct === "false") {
+  if (!userHasAssignedProduct(userProduct)) {
     return "no_product";
   }
 
@@ -35,7 +51,7 @@ export function flattenToUserRows(
   type SnapshotInfo = {
     accountId: number;
     orgName: string;
-    product: boolean | string | undefined;
+    product: boolean | string | number | undefined;
     licenseStatus: LicenseStatus;
   };
 

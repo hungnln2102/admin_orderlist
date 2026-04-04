@@ -22,10 +22,15 @@ export function normalizeAdobeAdminAccount(
           ? "expired"
           : "unknown";
 
+  const aliasRaw = row.alias;
   return {
     id: Number(row.id) || 0,
     email: String(row.email ?? ""),
     password_enc: String(row.password_enc ?? ""),
+    alias:
+      aliasRaw != null && String(aliasRaw).trim() !== ""
+        ? String(aliasRaw).trim()
+        : null,
     org_name: row.org_name != null ? String(row.org_name) : null,
     user_count: Number(row.user_count) ?? 0,
     license_status: licenseStatus,

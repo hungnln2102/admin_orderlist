@@ -114,8 +114,10 @@ async function runCheckForAccountId(id) {
           savedCookiesFromDb: result.savedCookies || null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
         });
+        // Chỉ cập nhật user_count; giữ users_snapshot (danh sách email trước khi kick) để job
+        // renewAdobeCheckAndNotify → purgeAndDeleteNoLicenseAdobeAdminAccount vẫn có fallback
+        // khi user_account_mapping không có adobe_account_id (tránh mất danh sách reassign).
         await db(TABLE).where(COLS.ID, id).update({
-          [COLS.USERS_SNAPSHOT]: JSON.stringify([]),
           [COLS.USER_COUNT]: 0,
         });
 

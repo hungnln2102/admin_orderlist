@@ -17,7 +17,11 @@ const attachListRoutes = (router) => {
                 normalizeOrderRow(row, today, {
                     // Refund/canceled table should display the stored status from DB (e.g. Chưa Hoàn/Đã Hoàn)
                     // and must not be auto-overridden to Hết Hạn/Còn Gia Hạn based on expiry.
-                    enableAutoStatus: !(scope === "canceled" || scope === "cancelled" || scope === "expired"),
+                    enableAutoStatus: !(
+                        scope === "canceled" ||
+                        scope === "cancelled" ||
+                        scope === "expired"
+                    ),
                 })
             );
             res.json(normalized);
@@ -29,6 +33,7 @@ const attachListRoutes = (router) => {
 
     router.get("/expired", (req, res) => res.redirect("/api/orders?scope=expired"));
     router.get("/canceled", (req, res) => res.redirect("/api/orders?scope=canceled"));
+    router.get("/import", (req, res) => res.redirect("/api/orders?scope=import"));
 };
 
 module.exports = { attachListRoutes };

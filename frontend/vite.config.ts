@@ -78,6 +78,9 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
           secure: false,
+          /** Một số API Playwright (renew/check) có thể chạy lâu — tránh proxy đóng sớm. */
+          timeout: 900_000,
+          proxyTimeout: 900_000,
         },
         "/image": {
           target: apiProxyTarget,
