@@ -23,6 +23,7 @@ const {
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
+const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
 
 const router = express.Router();
@@ -57,9 +58,9 @@ const incrementDashboardSummaryOnProcessing = async (client, orderState) => {
       VALUES ($1, $2, $3, $4, NOW())
       ON CONFLICT (${summaryCols.MONTH_KEY})
       DO UPDATE SET
-        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
-        ${summaryCols.TOTAL_REVENUE} = ${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
-        ${summaryCols.TOTAL_PROFIT} = ${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
+        ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
+        ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
         ${summaryCols.UPDATED_AT} = NOW()
     `,
     [monthKey, 1, price, profit]

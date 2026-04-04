@@ -134,4 +134,5 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 
 module.exports = {
     updateDashboardMonthlySummaryOnStatusChange,
+    qualifiedSummaryCol,
 };
