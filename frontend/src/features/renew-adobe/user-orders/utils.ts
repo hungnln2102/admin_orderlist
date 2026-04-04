@@ -93,7 +93,7 @@ export function flattenToUserRows(
       profile: snapshot?.orgName ?? "—",
       display_status: snapshot
         ? resolveDisplayStatus(snapshot.product, snapshot.licenseStatus)
-        : "unknown",
+        : "not_added",
       expiry: order.expiry_date
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",

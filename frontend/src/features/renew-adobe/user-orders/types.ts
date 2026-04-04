@@ -1,6 +1,7 @@
 import type { LicenseStatus } from "../types";
 
-export type DisplayStatus = LicenseStatus | "no_product";
+/** not_added = email chưa có trong users_snapshot; no_product = đã add nhưng chưa gán product Adobe */
+export type DisplayStatus = LicenseStatus | "no_product" | "not_added";
 
 export type UserOrderRow = {
   id: string;

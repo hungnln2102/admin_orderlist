@@ -32,10 +32,11 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
   unknown: "Chờ gia hạn",
 };
 
-/** User chưa có product gán trên Adobe (hoặc scrape không báo rõ) → hết quyền, không kế thừa license account */
+/** no_product = đã add team nhưng chưa gán product; not_added = chưa có trong users_snapshot */
 const DISPLAY_LABELS: Record<DisplayStatus, string> = {
   ...STATUS_LABELS,
-  no_product: "Hết quyền",
+  no_product: "Chưa cấp quyền",
+  not_added: "Chưa add",
 };
 
 const PAGE_SIZE = 10;
@@ -45,12 +46,16 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
   const colorClasses =
     status === "paid" || status === "active"
       ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/40"
-      : status === "no_product" || status === "expired"
+      : status === "expired"
         ? "bg-rose-500/15 text-rose-300 border-rose-400/40"
+      : status === "no_product"
+        ? "bg-amber-500/15 text-amber-300 border-amber-400/40"
+      : status === "not_added"
+        ? "bg-slate-500/20 text-slate-300 border-slate-400/35"
         : "bg-amber-500/15 text-amber-300 border-amber-400/40";
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${colorClasses}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${colorClasses}`}
     >
       {label}
     </span>
@@ -178,7 +183,7 @@ export function UserOrdersTable({
                 <th className="min-w-[160px]">TÊN KHÁCH HÀNG</th>
                 <th className="min-w-[200px]">EMAIL</th>
                 <th className="min-w-[140px]">PROFILE</th>
-                <th className="w-36">TÌNH TRẠNG GÓI</th>
+                <th className="min-w-[12rem] whitespace-nowrap">TÌNH TRẠNG GÓI</th>
                 <th className="min-w-[110px]">HẠN SỬ DỤNG</th>
                 <th className="w-24 text-center">THAO TÁC</th>
               </tr>

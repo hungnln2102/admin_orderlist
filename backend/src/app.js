@@ -23,6 +23,8 @@ const logger = require("./utils/logger");
 
 const app = express();
 app.set("trust proxy", 1);
+/** API JSON: tắt ETag mặc định của Express để tránh 304 + body rỗng khi client gửi If-None-Match (admin luôn nhận 200 + payload). */
+app.set("etag", false);
 
 app.use(
   helmet({
