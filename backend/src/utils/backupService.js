@@ -1,10 +1,74 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFile } = require("child_process");
+const { execFile, execFileSync } = require("child_process");
 const { google } = require("googleapis");
 
-const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
+/**
+ * Tìm binary pg_dump (Windows thường không có trong PATH).
+ * Có thể ép đường dẫn: PG_DUMP_PATH=C:\Program Files\PostgreSQL\16\bin\pg_dump.exe
+ */
+function resolvePgDumpExecutable() {
+  const explicit = (process.env.PG_DUMP_PATH || "").trim();
+  if (explicit) {
+    const looksLikePath =
+      explicit.includes(path.sep) ||
+      (process.platform === "win32" && /\.exe$/i.test(explicit));
+    if (looksLikePath) {
+      if (!fs.existsSync(explicit)) {
+        throw new Error(
+          `PG_DUMP_PATH trỏ tới file không tồn tại: ${explicit}. Kiểm tra lại .env.`
+        );
+      }
+      return explicit;
+    }
+  }
+
+  const tryNames =
+    process.platform === "win32" ? ["pg_dump.exe", "pg_dump"] : ["pg_dump"];
+  for (const name of tryNames) {
+    try {
+      const whichBin = process.platform === "win32" ? "where.exe" : "which";
+      const out = execFileSync(whichBin, [name], {
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      const line = out
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .find((s) => s && !/^INFO:/i.test(s));
+      if (line && fs.existsSync(line)) return line;
+    } catch {
+      /* continue */
+    }
+  }
+
+  if (process.platform === "win32") {
+    const versions = ["17", "16", "15", "14", "13", "12"];
+    const roots = new Set(
+      [
+        process.env.PGBIN,
+        ...versions.map((v) =>
+          path.join("C:\\Program Files", "PostgreSQL", v, "bin")
+        ),
+        ...versions.map((v) =>
+          path.join("C:\\Program Files (x86)", "PostgreSQL", v, "bin")
+        ),
+      ].filter(Boolean)
+    );
+    for (const root of roots) {
+      const exe = path.join(root, "pg_dump.exe");
+      if (fs.existsSync(exe)) return exe;
+    }
+  }
+
+  if (explicit) return explicit;
+
+  throw new Error(
+    "Không tìm thấy pg_dump. Cài PostgreSQL (hoặc gói chỉ gồm client tools), thêm bin vào PATH, " +
+      "hoặc đặt PG_DUMP_PATH trong .env (Windows: đường dẫn đầy đủ tới pg_dump.exe; Docker/Linux: thường /usr/bin/pg_dump)."
+  );
+}
 const databaseUrl = process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL;
 const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
 const retentionDays = Number.parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 7;
@@ -80,14 +144,30 @@ const createDriveClient = () => {
 
 const execPgDump = (outPath) =>
   new Promise((resolve, reject) => {
+    let pgDumpBin;
+    try {
+      pgDumpBin = resolvePgDumpExecutable();
+    } catch (e) {
+      reject(e);
+      return;
+    }
     const args = [`--dbname=${databaseUrl}`, "--format=custom", `--file=${outPath}`];
-    execFile(pgDumpPath, args, (error, _stdout, stderr) => {
-      if (error) {
-        reject(new Error(`pg_dump failed: ${stderr || error.message}`));
-        return;
+    execFile(
+      pgDumpBin,
+      args,
+      { windowsHide: process.platform === "win32" },
+      (error, _stdout, stderr) => {
+        if (error) {
+          const extra =
+            error.code === "ENOENT"
+              ? " (Không chạy được pg_dump — kiểm tra PG_DUMP_PATH hoặc cài PostgreSQL client.)"
+              : "";
+          reject(new Error(`pg_dump failed: ${stderr || error.message}${extra}`));
+          return;
+        }
+        resolve();
       }
-      resolve();
-    });
+    );
   });
 
 const uploadToDrive = async (filePath, fileName) => {
