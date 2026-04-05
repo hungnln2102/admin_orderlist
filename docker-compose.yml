@@ -42,6 +42,11 @@ services:
     ports:
       - "3001:3001"   # Main API
       - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
+    volumes:
+      # Upload ảnh sản phẩm (/image_product) và ảnh bài viết (/image) — không gắn volume → mỗi lần
+      # rebuild/recreate container là mất file, GET sẽ 404 dù DB còn URL.
+      - backend_product_images:/app/image_product
+      - backend_article_images:/app/image
     networks:
       - app-network
 
@@ -75,3 +80,5 @@ networks:
 
 volumes:
   postgres_data:
+  backend_product_images:
+  backend_article_images:
