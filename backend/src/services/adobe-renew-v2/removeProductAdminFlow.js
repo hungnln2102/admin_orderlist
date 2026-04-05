@@ -7,7 +7,7 @@
 const logger = require("../../utils/logger");
 const { dismissBlockingOverlays } = require("./dismissBlockingOverlays");
 
-const STEP_TIMEOUT = 15000;
+const STEP_TIMEOUT = 25000;
 
 /**
  * B15: Vào trang administrators (bấm link "Quản trị viên" trên sidebar, tránh trang trắng khi goto URL trực tiếp) → tìm admin theo email → Xem chi tiết → More actions → Chỉnh sửa sản phẩm → xóa product card → Lưu.
@@ -64,20 +64,51 @@ async function runB15RemoveProductFromAdmin(page, adminEmail, options = {}) {
 
     await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
 
-    const adminLink = page.locator('a[href*="/users/administrators"]').first();
-    let linkVisible = await adminLink.isVisible().catch(() => false);
-    if (!linkVisible) {
-      const linkByText = page.getByRole("link", { name: /Quản trị viên/i });
-      linkVisible = await linkByText.first().isVisible().catch(() => false);
-      if (linkVisible) {
+    const usersUrlForRetry = orgId
+      ? `https://adminconsole.adobe.com/${orgId}@AdobeOrg/users`
+      : (() => {
+          const m = page.url().match(/^(https:\/\/adminconsole\.adobe\.com\/[^/]+@AdobeOrg)/);
+          return m ? `${m[1]}/users` : null;
+        })();
+
+    const clickAdministratorsLink = async () => {
+      const clickNavLink = async (loc) => {
         await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
-        await linkByText.first().click({ timeout: STEP_TIMEOUT });
+        try {
+          await loc.click({ timeout: STEP_TIMEOUT });
+          return true;
+        } catch {
+          await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
+          try {
+            await loc.click({ timeout: STEP_TIMEOUT, force: true });
+            return true;
+          } catch {
+            await loc.evaluate((el) => el.click());
+            return true;
+          }
+        }
+      };
+
+      const adminLink = page.locator('a[href*="/users/administrators"]').first();
+      if (await adminLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+        return clickNavLink(adminLink);
       }
-    } else {
+      const linkByText = page.getByRole("link", { name: /Quản trị viên|Administrators/i });
+      if (await linkByText.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        return clickNavLink(linkByText.first());
+      }
+      return false;
+    };
+
+    let navigated = await clickAdministratorsLink();
+    if (!navigated && usersUrlForRetry) {
+      logger.info("[adobe-v2] B15: Chưa thấy link Quản trị viên — làm mới /users rồi thử lại");
+      await page.goto(usersUrlForRetry, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
+      await page.waitForTimeout(2000);
       await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] B15" });
-      await adminLink.click({ timeout: STEP_TIMEOUT });
+      navigated = await clickAdministratorsLink();
     }
-    if (!linkVisible) {
+    if (!navigated) {
       logger.warn("[adobe-v2] B15: Không thấy link Quản trị viên (cần ở trang Admin Console có sidebar)");
       return { success: false, error: "Link Quản trị viên not found" };
     }

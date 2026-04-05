@@ -22,6 +22,7 @@ export default function RenewAdobeAdmin() {
     checkError,
     deletingId,
     fixingId,
+    fixAllProgress,
     checkAllProgress,
     autoAssignPhase,
     autoAssignResult,
@@ -32,6 +33,7 @@ export default function RenewAdobeAdmin() {
     handleCancelCheckAll,
     handleDeleteUser,
     handleFixUser,
+    handleFixAllUsers,
     handleSaveUrlAccess,
     handleCheck,
   } = useRenewAdobeAdmin();
@@ -111,6 +113,8 @@ export default function RenewAdobeAdmin() {
           deletingId={deletingId}
           onFixUser={handleFixUser}
           fixingId={fixingId}
+          onFixAllUsers={handleFixAllUsers}
+          fixAllProgress={fixAllProgress}
         />
         <AddUserByEmail onAdded={loadAccounts} />
       </div>

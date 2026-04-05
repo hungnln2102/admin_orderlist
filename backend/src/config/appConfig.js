@@ -25,21 +25,41 @@ const normalizeOrigin = (origin) => {
   }
 };
 
-const allowedOrigins = Array.from(
-  new Set(
-    (process.env.FRONTEND_ORIGINS ||
-      "http://localhost:5173,http://localhost:4001")
-      .split(",")
+const isProd = process.env.NODE_ENV === "production";
+
+/** Origins từ env (hoặc mặc định admin Vite + Website Vite khi chưa set). */
+const rawFrontends =
+  process.env.FRONTEND_ORIGINS ||
+  "http://localhost:5173,http://localhost:4001";
+const fromEnv = rawFrontends
+  .split(",")
+  .map(normalizeOrigin)
+  .filter(Boolean);
+
+/**
+ * LOCAL: storefront Renew Adobe chạy Vite :4001, proxy tới admin — Origin vẫn là :4001.
+ * Nếu FRONTEND_ORIGINS chỉ có production/staging, thiếu 4001 → POST activate báo CORS.
+ * 127.0.0.1 khác origin với localhost nên thêm cả hai.
+ */
+const devOriginExtras = isProd
+  ? []
+  : [
+      "http://localhost:4001",
+      "http://127.0.0.1:4001",
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:4000",
+      "http://127.0.0.1:4000",
+    ]
       .map(normalizeOrigin)
-      .filter(Boolean)
-  )
-);
+      .filter(Boolean);
+
+const allowedOrigins = Array.from(new Set([...fromEnv, ...devOriginExtras]));
 const allowedOriginSet = new Set(allowedOrigins);
 
 const sessionName =
   process.env.SESSION_NAME ||
   `${(process.env.APP_NAME || "session").replace(/[^a-z0-9]/gi, "").toLowerCase() || "session"}.sid`;
-const isProd = process.env.NODE_ENV === "production";
 const cookieSecureEnv = (process.env.COOKIE_SECURE || "").trim().toLowerCase();
 const hasHttpOrigin = allowedOrigins.some((origin) =>
   origin.toLowerCase().startsWith("http://")

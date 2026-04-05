@@ -19,6 +19,11 @@ export function useRenewAdobeAdmin() {
   const [checkError, setCheckError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [fixingId, setFixingId] = useState<string | null>(null);
+  /** Fix lần lượt nhiều user (Fix all); `current` = thứ tự đang chạy (1-based). */
+  const [fixAllProgress, setFixAllProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [checkAllProgress, setCheckAllProgress] =
     useState<CheckAllProgress | null>(null);
   const [autoAssignPhase, setAutoAssignPhase] = useState<
@@ -29,6 +34,7 @@ export function useRenewAdobeAdmin() {
     skipped: number;
   } | null>(null);
   const checkAllAbortRef = useRef<AbortController | null>(null);
+  const fixAllInFlightRef = useRef(false);
 
   const isCheckingAll =
     checkAllProgress !== null &&
@@ -280,6 +286,9 @@ export function useRenewAdobeAdmin() {
 
   const handleFixUser = useCallback(
     (userEmail: string) => {
+      if (fixAllInFlightRef.current) {
+        return;
+      }
       setCheckError(null);
       setFixingId(userEmail);
 
@@ -299,6 +308,62 @@ export function useRenewAdobeAdmin() {
         })
         .catch((err) => setCheckError(err?.message ?? "Lỗi khi fix user."))
         .finally(() => setFixingId(null));
+    },
+    [loadAccounts]
+  );
+
+  const handleFixAllUsers = useCallback(
+    async (emails: string[]) => {
+      const unique = [
+        ...new Set(
+          emails
+            .map((e) => String(e || "").trim().toLowerCase())
+            .filter(Boolean)
+        ),
+      ];
+      if (unique.length === 0 || fixAllInFlightRef.current) {
+        return;
+      }
+
+      fixAllInFlightRef.current = true;
+      setCheckError(null);
+      setFixAllProgress({ current: 0, total: unique.length });
+
+      try {
+        for (let i = 0; i < unique.length; i++) {
+          const email = unique[i];
+          setFixingId(email);
+          setFixAllProgress({ current: i + 1, total: unique.length });
+
+          const res = await fetch(
+            `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USER}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ email }),
+            }
+          );
+          const data = await res.json().catch(() => ({}));
+
+          if (data?.success) {
+            loadAccounts();
+          } else {
+            const msg =
+              typeof data?.error === "string" ? data.error : "Fix thất bại";
+            throw new Error(`${msg} — ${email}`);
+          }
+        }
+      } catch (err) {
+        setCheckError(
+          err instanceof Error ? err.message : "Lỗi khi fix hàng loạt."
+        );
+      } finally {
+        fixAllInFlightRef.current = false;
+        setFixingId(null);
+        setFixAllProgress(null);
+        loadAccounts();
+      }
     },
     [loadAccounts]
   );
@@ -362,6 +427,7 @@ export function useRenewAdobeAdmin() {
     checkError,
     deletingId,
     fixingId,
+    fixAllProgress,
     checkAllProgress,
     autoAssignPhase,
     autoAssignResult,
@@ -372,6 +438,7 @@ export function useRenewAdobeAdmin() {
     handleCancelCheckAll,
     handleDeleteUser,
     handleFixUser,
+    handleFixAllUsers,
     handleSaveUrlAccess,
     handleCheck,
   };

@@ -42,7 +42,7 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 720 },
   });
-  const page = await context.newPage();
+  const sharedSession = { context, page: await context.newPage() };
 
   try {
     logger.info("[adobe-v2] deleteUsersV2: B1–B9 (chỉ login) → xóa %d user...", userList.length);
@@ -50,7 +50,7 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
     const loginResult = await runCheckFlow(email, password, {
       savedCookies,
       mailBackupId,
-      sharedSession: { context, page },
+      sharedSession,
       onlyLogin: true,
     });
 
@@ -64,6 +64,8 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
         error: loginResult.error,
       };
     }
+
+    const page = sharedSession.page;
 
     if (!page.url().includes("@AdobeOrg")) {
       await page.goto(ADMIN_CONSOLE_URL, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});

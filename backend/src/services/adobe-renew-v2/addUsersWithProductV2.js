@@ -36,7 +36,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     viewport: { width: 1280, height: 720 },
   });
-  const page = await context.newPage();
+  const sharedSession = { context, page: await context.newPage() };
 
   try {
     logger.info("[adobe-v2] addUsersWithProductV2: login (B1–B9 onlyLogin) → add=%d", emails.length);
@@ -44,12 +44,14 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     const loginResult = await runCheckFlow(adminEmail, password, {
       savedCookies,
       mailBackupId,
-      sharedSession: { context, page },
+      sharedSession,
       onlyLogin: true,
     });
     if (!loginResult.success) {
       return { success: false, error: loginResult.error || "Login fail", savedCookies: null, snapshot: null };
     }
+
+    const page = sharedSession.page;
 
     if (!page.url().includes("@AdobeOrg")) {
       await page.goto(ADMIN_CONSOLE_URL, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
@@ -61,8 +63,18 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
 
     const addResult = await addUsersToOrgViaUI(page, emails);
     if (!addResult.success) {
-      const cookies = fromPwCookies(await context.cookies());
-      return { success: false, error: addResult.error || "Add user UI fail", savedCookies: { cookies }, snapshot: null };
+      let cookies = [];
+      try {
+        cookies = fromPwCookies(await context.cookies());
+      } catch (e) {
+        logger.warn("[adobe-v2] addUsersWithProductV2: context.cookies sau add fail: %s", e.message);
+      }
+      return {
+        success: false,
+        error: addResult.error || "Add user UI fail",
+        savedCookies: cookies.length ? { cookies } : null,
+        snapshot: null,
+      };
     }
 
     // Product đã được assign inline trong addUsersToOrgViaUI (theo flow docs dòng 326)
@@ -85,7 +97,12 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       .filter((u) => (u.email || "").toLowerCase().trim() !== adminNorm)
       .map((u) => ({ name: u.name || "", email: (u.email || "").trim(), product: u.product === true }));
 
-    const cookies = fromPwCookies(await context.cookies());
+    let cookies = [];
+    try {
+      cookies = fromPwCookies(await context.cookies());
+    } catch (e) {
+      logger.warn("[adobe-v2] addUsersWithProductV2: context.cookies trước return: %s", e.message);
+    }
     return {
       success: true,
       addResult: { success: true, added: addResult.added || emails, failed: addResult.failed || [] },
@@ -93,7 +110,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       manageTeamMembers,
       userCount: manageTeamMembers.length,
       licenseStatus: "unknown",
-      savedCookies: { cookies },
+      savedCookies: cookies.length ? { cookies } : null,
     };
   } catch (err) {
     logger.error("[adobe-v2] addUsersWithProductV2 error: %s", err.message);

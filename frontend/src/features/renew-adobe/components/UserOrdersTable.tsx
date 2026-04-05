@@ -68,6 +68,9 @@ export type UserOrdersTableProps = {
   deletingId?: string | null;
   onFixUser?: (userEmail: string) => void;
   fixingId?: string | null;
+  /** Fix tuần tự các user đang hiển thị (theo ô tìm kiếm) có accountId === 0 */
+  onFixAllUsers?: (emails: string[]) => void;
+  fixAllProgress?: { current: number; total: number } | null;
 };
 
 export function UserOrdersTable({
@@ -76,6 +79,8 @@ export function UserOrdersTable({
   deletingId,
   onFixUser,
   fixingId,
+  onFixAllUsers,
+  fixAllProgress,
 }: UserOrdersTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(1);
@@ -101,6 +106,13 @@ export function UserOrdersTable({
     );
   }, [allRows, searchTerm]);
 
+  /** Cùng điều kiện với nút Fix từng dòng: chưa khớp admin trong snapshot */
+  const fixableEmailsInView = useMemo(
+    () =>
+      filtered.filter((r) => r.accountId === 0).map((r) => r.email),
+    [filtered]
+  );
+
   const totalItems = filtered.length;
   const start = (page - 1) * PAGE_SIZE;
   const currentRows = filtered.slice(start, start + PAGE_SIZE);
@@ -114,7 +126,7 @@ export function UserOrdersTable({
         Mã đơn hàng, Tên Khách Hàng, Email, Profile, Tình trạng Gói, Hạn Sử Dụng
       </p>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <input
           type="text"
           placeholder="Tìm theo mã đơn, tên, email..."
@@ -125,6 +137,20 @@ export function UserOrdersTable({
             setPage(1);
           }}
         />
+        {onFixAllUsers && fixableEmailsInView.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => onFixAllUsers(fixableEmailsInView)}
+            disabled={
+              !!fixingId || !!deletingId || !!fixAllProgress
+            }
+            className="shrink-0 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/40 px-4 py-2 text-sm font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {fixAllProgress
+              ? `Đang fix ${fixAllProgress.current}/${fixAllProgress.total}...`
+              : `Fix all (${fixableEmailsInView.length})`}
+          </button>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-white/10 overflow-hidden">
@@ -152,7 +178,7 @@ export function UserOrdersTable({
                         <button
                           type="button"
                           onClick={() => onDeleteUser(row.accountId, row.email)}
-                          disabled={!!deletingId || !!fixingId}
+                          disabled={!!deletingId || !!fixingId || !!fixAllProgress}
                           className="mt-2 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold"
                         >
                           Xóa
@@ -162,7 +188,7 @@ export function UserOrdersTable({
                         <button
                           type="button"
                           onClick={() => onFixUser(row.email)}
-                          disabled={!!fixingId || !!deletingId}
+                          disabled={!!fixingId || !!deletingId || !!fixAllProgress}
                           className="mt-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold"
                         >
                           {fixingId === row.email ? "Đang fix..." : "Fix"}
@@ -221,7 +247,7 @@ export function UserOrdersTable({
                         <button
                           type="button"
                           onClick={() => onDeleteUser(row.accountId, row.email)}
-                          disabled={!!deletingId || !!fixingId}
+                          disabled={!!deletingId || !!fixingId || !!fixAllProgress}
                           className="rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Xóa
@@ -231,7 +257,7 @@ export function UserOrdersTable({
                         <button
                           type="button"
                           onClick={() => onFixUser(row.email)}
-                          disabled={!!fixingId || !!deletingId}
+                          disabled={!!fixingId || !!deletingId || !!fixAllProgress}
                           className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {fixingId === row.email ? "Đang fix..." : "Fix"}

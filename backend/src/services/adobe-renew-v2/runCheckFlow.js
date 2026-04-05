@@ -14,6 +14,56 @@ const { runB10ToB13 } = require("./checkInfoFlow");
 // Admin Console entry ổn định hơn và vẫn dẫn về auth.services khi cần login.
 const ADOBE_ENTRY = ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
 
+/** Lỗi CDP kiểu "Object with guid response@... was not bound" — thường hết sau khi đóng tab và mở tab mới trong cùng context. */
+function isNavigationRecoverablePlaywrightError(message) {
+  const m = (message || "").toString();
+  return (
+    m.includes("was not bound") ||
+    m.includes("Target page, context or browser has been closed") ||
+    m.includes("Target closed") ||
+    m.includes("Execution context was destroyed") ||
+    m.includes("Protocol error")
+  );
+}
+
+/**
+ * B1: goto admin console entry, có retry khi Playwright mất sync CDP với Response/navigation.
+ * @param {import('playwright').Page} initialPage
+ * @param {import('playwright').BrowserContext} context
+ * @param {{ page: import('playwright').Page, context?: import('playwright').BrowserContext }|null} sharedSession - mutate .page nếu tạo tab mới
+ * @returns {Promise<import('playwright').Page>}
+ */
+async function gotoAdobeAdminConsoleB1(initialPage, context, sharedSession) {
+  const maxAttempts = 3;
+  let current = initialPage;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      logger.info("[adobe-v2] B1: goto ADMIN_CONSOLE entry (attempt %d)", attempt);
+      await current.goto(ADOBE_ENTRY, { waitUntil: "domcontentloaded", timeout: 60000 });
+      return current;
+    } catch (e) {
+      const msg = e.message || String(e);
+      logger.warn("[adobe-v2] B1 goto error (attempt %d): %s", attempt, msg);
+
+      const canRetry =
+        attempt < maxAttempts && context && isNavigationRecoverablePlaywrightError(msg);
+      if (!canRetry) {
+        throw e;
+      }
+
+      const newPage = await context.newPage();
+      await current.close().catch(() => {});
+      current = newPage;
+      if (sharedSession) {
+        sharedSession.page = newPage;
+      }
+    }
+  }
+
+  throw new Error("B1: goto ADMIN_CONSOLE failed after retries");
+}
+
 /** Cookie session khi export được gán expiry mặc định để tái sử dụng 2–3 ngày (tránh chết sau 1h). */
 const DEFAULT_COOKIE_EXPIRY_DAYS = 3;
 
@@ -116,11 +166,7 @@ async function runCheckFlow(email, password, options = {}) {
 
     // ─── B1: Đi thẳng vào Admin Console entry ───
     // Adobe tự redirect adminconsole.adobe.com → auth.services.adobe.com khi chưa login.
-    // Không cần fallback thủ công — Adobe handle redirect natively.
-    logger.info("[adobe-v2] B1: goto ADMIN_CONSOLE entry");
-    await page
-      .goto(ADOBE_ENTRY, { waitUntil: "domcontentloaded", timeout: 45000 })
-      .catch((e) => logger.warn("[adobe-v2] B1 goto error: %s", e.message));
+    page = await gotoAdobeAdminConsoleB1(page, context, sharedSession || null);
     // Sau khi goto, Adobe có thể redirect sang auth mất vài giây.
     // Đợi tối đa ~5s để lấy đúng "trang hiện tại" trước khi quyết định bỏ qua login.
     await page.waitForTimeout(5000);

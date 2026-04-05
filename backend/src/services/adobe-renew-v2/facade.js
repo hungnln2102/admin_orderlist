@@ -70,13 +70,13 @@ async function checkAccount(email, password, options = {}) {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 720 },
     });
-    const page = await context.newPage();
+    const sharedSession = { context, page: await context.newPage() };
 
     logger.info("[adobe-v2] facade.checkAccount: chạy runCheckFlow (B1-B13)...");
     const result = await runCheckFlow(email, password, {
       savedCookies: cookiesToUse,
       mailBackupId,
-      sharedSession: { context, page },
+      sharedSession,
       existingOrgName,
     });
 
@@ -84,6 +84,7 @@ async function checkAccount(email, password, options = {}) {
       return { success: false, scrapedData: null, savedCookies: null, error: result.error };
     }
 
+    const page = sharedSession.page;
     const adminEmail = email.toLowerCase().trim();
     const users = (result.users || []).map((u) => ({
       name: u.name || "",

@@ -1,11 +1,88 @@
 /**
- * Đóng dialog/overlay (thư viện vex) còn sót trên Adobe Admin Console — tránh Playwright báo
+ * Đóng dialog/overlay (vex + Adobe React Spectrum) còn sót trên Admin Console — tránh
  * "intercepts pointer events" khi click sidebar (vd. B15 → /users/administrators).
  */
 
 const logger = require("../../utils/logger");
 
 const MAX_ATTEMPTS = 6;
+const SPECTRUM_MAX = 12;
+
+/**
+ * Dialog Spectrum (class chứa spectrum-Dialog-grid) không phải vex — phải Escape / nút Close / OK.
+ * Chỉ đóng dialog CHẶN thật sự; bỏ qua grid nằm trong modal thêm người dùng / chọn sản phẩm.
+ */
+async function dismissSpectrumDialogs(page, logPrefix) {
+  for (let attempt = 0; attempt < SPECTRUM_MAX; attempt++) {
+    const grids = page.locator("div[class*='spectrum-Dialog-grid']");
+    const n = await grids.count().catch(() => 0);
+    /** @type {import('playwright').Locator | null} */
+    let dialog = null;
+
+    for (let i = 0; i < n; i++) {
+      const g = grids.nth(i);
+      if (!(await g.isVisible({ timeout: 400 }).catch(() => false))) continue;
+
+      const skip = await g.evaluate((node) => {
+        let p = node.parentElement;
+        while (p) {
+          if (p.id === "add-users-to-org-modal") return true;
+          if (p.getAttribute && p.getAttribute("data-testid") === "product-assignment-modal") {
+            return true;
+          }
+          p = p.parentElement;
+        }
+        return false;
+      });
+      if (skip) continue;
+
+      const dlg = page.getByRole("dialog").filter({ has: g });
+      if (await dlg.isVisible({ timeout: 350 }).catch(() => false)) {
+        dialog = dlg;
+        break;
+      }
+    }
+
+    if (!dialog) {
+      return;
+    }
+
+    logger.info(
+      "%s dismissSpectrumDialogs: Spectrum dialog chặn UI, lần %s/%s",
+      logPrefix,
+      attempt + 1,
+      SPECTRUM_MAX
+    );
+    const tryClick = async (loc) => {
+      const el = loc.first();
+      if (await el.isVisible({ timeout: 400 }).catch(() => false)) {
+        await el.click({ timeout: 6000, force: true }).catch(() => {});
+        return true;
+      }
+      return false;
+    };
+
+    const closed =
+      (await tryClick(dialog.locator('button[aria-label*="Close" i]'))) ||
+      (await tryClick(dialog.locator('button[aria-label*="close" i]'))) ||
+      (await tryClick(dialog.locator('[class*="spectrum-CloseButton"]'))) ||
+      (await tryClick(dialog.getByRole("button", { name: /^Close$/i }))) ||
+      (await tryClick(dialog.getByRole("button", { name: /^OK$/i }))) ||
+      (await tryClick(dialog.getByRole("button", { name: /^Done$/i }))) ||
+      (await tryClick(dialog.getByRole("button", { name: /got it/i }))) ||
+      (await tryClick(
+        dialog.locator('[data-testid="cta-button"]').filter({ hasText: /^(OK|Done|Close|Đóng)$/i })
+      ));
+
+    if (!closed) {
+      await page.keyboard.press("Escape");
+    }
+    await page.waitForTimeout(900);
+    // Vòng lặp tiếp: chỉ còn modal add-user / product-assignment → dialog=null → return
+  }
+
+  logger.warn("%s dismissSpectrumDialogs: vẫn còn Spectrum dialog sau %s lần", logPrefix, SPECTRUM_MAX);
+}
 
 /**
  * @param {import('playwright').Page} page
@@ -13,6 +90,7 @@ const MAX_ATTEMPTS = 6;
  */
 async function dismissBlockingOverlays(page, opts = {}) {
   const logPrefix = opts.logPrefix || "[adobe-v2]";
+  await dismissSpectrumDialogs(page, logPrefix);
 
   async function overlayBlocking() {
     return page

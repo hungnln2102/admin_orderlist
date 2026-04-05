@@ -10,6 +10,7 @@
  */
 
 const logger = require("../../utils/logger");
+const { dismissBlockingOverlays } = require("./dismissBlockingOverlays");
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -53,6 +54,68 @@ async function waitForAssignButtonEnabled(modal, slotIndex, timeoutMs = 6000) {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
+/** Base URL …/{orgId}@AdobeOrg/users — dùng khi reload không ổn hoặc cần làm mới grid. */
+function getUsersListUrlFromPage(page) {
+  const url = page.url();
+  const m = url.match(/^(https:\/\/adminconsole\.adobe\.com\/[^/]+@AdobeOrg)/);
+  return m ? `${m[1]}/users` : null;
+}
+
+/**
+ * Toast lỗi Spectrum sau Lưu (batch add) — vd. "already completed a free trial for teams".
+ * User khác trong batch có thể đã được add; cần reload /users để scrape đúng.
+ */
+async function dismissAddUsersPostSaveErrorToast(page, logPrefix) {
+  for (let i = 0; i < 12; i++) {
+    const toastRoot = page.locator('[data-testid="modal-error"]').first();
+    if (await toastRoot.isVisible({ timeout: 500 }).catch(() => false)) {
+      const msg = await toastRoot.locator(".spectrum-Toast-content").first().innerText().catch(() => "");
+      logger.warn(
+        "%s: toast lỗi sau Lưu (partial save có thể đã thành công): %s",
+        logPrefix,
+        (msg || "").trim().slice(0, 500)
+      );
+      const closeBtn = toastRoot.locator('button[aria-label="Close"]').first();
+      if (await closeBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+        await closeBtn.click({ timeout: 6000, force: true }).catch(() => {});
+      } else {
+        await toastRoot.locator(".spectrum-ClearButton").first().click({ timeout: 6000, force: true }).catch(() => {});
+      }
+      await page.waitForTimeout(600);
+      return true;
+    }
+    await page.waitForTimeout(350);
+  }
+  return false;
+}
+
+/** Reload trang Users sau add (hoặc sau khi đóng toast lỗi) để grid đồng bộ với server. */
+async function reloadUsersListPageAfterAdd(page, logPrefix) {
+  const usersUrl = getUsersListUrlFromPage(page);
+  const reloaded = await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => false);
+  if (!reloaded && usersUrl) {
+    await page.goto(usersUrl, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+  }
+  await page.waitForTimeout(1500);
+  await dismissBlockingOverlays(page, { logPrefix });
+  await page
+    .locator('button[data-testid="add-users-btn"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 25000 })
+    .catch(() => {});
+}
+
+/** Chờ modal add-user biến mất sau Lưu (tránh batch sau DOM/overlay lỗi). */
+async function waitForAddUserModalGone(page, timeoutMs = 20000) {
+  const modal = page.locator("#add-users-to-org-modal").first();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const v = await modal.isVisible().catch(() => false);
+    if (!v) return;
+    await page.waitForTimeout(400);
+  }
+}
+
 /**
  * Bấm nút "Thêm người dùng" trên trang /users để mở modal.
  */
@@ -67,11 +130,12 @@ async function clickAddUserButton(page) {
   for (const getLocator of candidates) {
     try {
       const btn = getLocator();
-      if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await btn.scrollIntoViewIfNeeded().catch(() => {});
-        await btn.click({ timeout: 8000 });
-        await page.waitForTimeout(1200);
-        return true;
+      if (await btn.isVisible({ timeout: 3500 }).catch(() => false)) {
+        const ok = await clickBestEffort(btn, 10000);
+        if (ok) {
+          await page.waitForTimeout(1200);
+          return true;
+        }
       }
     } catch (_) {}
   }
@@ -257,9 +321,12 @@ async function fillEmailInSlotV2(page, modal, email, slotIndex) {
   });
   await page.waitForTimeout(1000);
 
-  const allChevrons = modal.locator('button[aria-label="Show suggestions"]');
+  const allChevrons = modal.locator(
+    'button[aria-label="Show suggestions"]:not([disabled]), button[aria-label="Hiển thị đề xuất"]:not([disabled]), button[aria-label*="suggestion" i]:not([disabled])'
+  );
   const chevronCount = await allChevrons.count().catch(() => 0);
-  const optionRegex = /add as a new user|new user/i;
+  const optionRegex =
+    /add as a new user|new user|thêm làm người dùng mới|người dùng mới|làm người dùng mới/i;
 
   const getOptionCandidates = () => [
     page.locator('[data-testid="new-user-row"]').filter({ hasText: optionRegex }).first(),
@@ -308,7 +375,7 @@ async function fillEmailInSlotV2(page, modal, email, slotIndex) {
 
       picked = await clickBestEffort(option, 4000);
       if (picked) {
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(1400);
         break;
       }
     }
@@ -318,10 +385,13 @@ async function fillEmailInSlotV2(page, modal, email, slotIndex) {
       await page.keyboard.press("ArrowDown").catch(() => {});
       await page.waitForTimeout(150);
       await page.keyboard.press("Enter").catch(() => {});
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(1200);
     }
 
-    const slotReady = await waitForAssignButtonEnabled(modal, slotIndex, 4000);
+    await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] fillEmailInSlotV2" });
+
+    // Adobe bật nút "+" assign sau khi pipeline validate email — cần chờ > 4s ở một số org/locale
+    const slotReady = await waitForAssignButtonEnabled(modal, slotIndex, 18_000);
     if (slotReady) {
       logger.info(
         "[adobe-v2] fillEmailInSlotV2: selected new user for %s (attempt %d)",
@@ -336,6 +406,7 @@ async function fillEmailInSlotV2(page, modal, email, slotIndex) {
       emailNorm,
       attempt + 1
     );
+    await page.waitForTimeout(900);
   }
 
   return false;
@@ -469,8 +540,22 @@ async function addUsersToOrgViaUI(page, userEmails) {
     const batch = emails.slice(batchStart, batchStart + BATCH_SIZE);
     logger.info("[adobe-v2] AddUsers: batch %d–%d / %d", batchStart + 1, batchStart + batch.length, emails.length);
 
+    await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
+
     // 1. Bấm nút "Thêm người dùng"
-    const clicked = await clickAddUserButton(page);
+    let clicked = await clickAddUserButton(page);
+    if (!clicked) {
+      const usersUrl = getUsersListUrlFromPage(page);
+      if (usersUrl) {
+        logger.info("[adobe-v2] AddUsers: không bấm được Thêm người dùng → goto %s rồi thử lại", usersUrl);
+        await page.goto(usersUrl, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+        await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
+        const addBtn = page.locator('button[data-testid="add-users-btn"]').first();
+        await addBtn.waitFor({ state: "visible", timeout: 25000 }).catch(() => {});
+        clicked = await clickAddUserButton(page);
+      }
+    }
     if (!clicked) {
       batch.forEach((e) => failed.push(e));
       logger.warn("[adobe-v2] AddUsers: không bấm được nút Thêm người dùng");
@@ -546,13 +631,32 @@ async function addUsersToOrgViaUI(page, userEmails) {
       }
     }
 
-    // Chờ modal đóng và SPA sync
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1200);
+    const hadPostSaveErrorToast = await dismissAddUsersPostSaveErrorToast(page, "[adobe-v2] AddUsers");
+    if (hadPostSaveErrorToast) {
+      logger.info("[adobe-v2] AddUsers: có toast lỗi sau Lưu → reload /users để đồng bộ danh sách");
+      await reloadUsersListPageAfterAdd(page, "[adobe-v2] AddUsers");
+    } else {
+      await waitForAddUserModalGone(page);
+    }
+    await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
+    await page.waitForTimeout(800);
 
-    // Nếu còn batch tiếp → reload trang users
+    // Nếu còn batch tiếp → làm mới trang Users và chờ UI sẵn sàng (batch 4 sau batch 1–3)
     if (batchStart + BATCH_SIZE < emails.length) {
-      await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(3000);
+      await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
+      const reloaded = await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => false);
+      if (!reloaded) {
+        const usersUrl = getUsersListUrlFromPage(page);
+        if (usersUrl) {
+          await page.goto(usersUrl, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+        }
+      }
+      await page.waitForTimeout(2000);
+      await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
+      const addBtn = page.locator('button[data-testid="add-users-btn"]').first();
+      await addBtn.waitFor({ state: "visible", timeout: 25000 }).catch(() => {});
+      await page.waitForTimeout(500);
     }
   }
 
