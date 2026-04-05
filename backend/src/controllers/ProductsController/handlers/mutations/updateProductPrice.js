@@ -42,7 +42,11 @@ const updateProductPrice = async (req, res) => {
     pct_stu,
     is_active,
     imageUrl,
+    variantImageUrl,
+    variant_image_url,
   } = req.body || {};
+  const variantImageInput =
+    variantImageUrl !== undefined ? variantImageUrl : variant_image_url;
   const normalizedCategoryIds = normalizeCategoryIds(categoryIds);
   const colorOverrides = normalizeCategoryColors(categoryColors);
 
@@ -139,10 +143,18 @@ const updateProductPrice = async (req, res) => {
       addVariantUpdate(variantCols.pctStu, toNullableNumber(pctStuInput));
     }
 
+    if (variantImageInput !== undefined) {
+      addVariantUpdate(
+        variantCols.imageUrl,
+        normalizeTextInput(variantImageInput) || null
+      );
+    }
+
     if (
       !variantUpdates.length &&
       packageName === undefined &&
       imageUrl === undefined &&
+      variantImageInput === undefined &&
       !Array.isArray(normalizedCategoryIds)
     ) {
       return res.status(400).json({ error: "Không có trường nào để cập nhật." });

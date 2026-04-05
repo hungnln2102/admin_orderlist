@@ -11,7 +11,10 @@ export type ProductPriceUpdatePayload = {
   packageProduct?: string | null;
   categoryIds?: number[];
   categoryColors?: Record<number, string> | Array<{ id: number; color?: string | null }>;
+  /** Ảnh gói (product.image_url) — upload qua /api/product-images */
   imageUrl?: string | null;
+  /** Ảnh biến thể (variant.image_url) — upload qua /api/variant-images */
+  variantImageUrl?: string | null;
 };
 
 export const updateProductPrice = async (

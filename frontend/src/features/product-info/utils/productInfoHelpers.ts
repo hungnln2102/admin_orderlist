@@ -15,7 +15,10 @@ export type ProductPriceItem = {
   package?: string | null;
   category?: string | null;
   categories?: CategoryItem[] | null;
+  /** Ảnh biến thể (chỉ variant.image_url) */
   image_url?: string | null;
+  /** Ảnh gói (chỉ product.image_url) */
+  package_image_url?: string | null;
 };
 
 export type MergedProduct = ProductDescription & {
@@ -563,7 +566,7 @@ export const mergeProducts = (
       category: priceRow?.category ?? null,
       categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
       imageUrl: item.imageUrl || null,
-      packageImageUrl: priceRow?.image_url || null,
+      packageImageUrl: priceRow?.package_image_url ?? null,
       shortDescription: item.shortDescription || null,
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
@@ -594,7 +597,7 @@ export const mergeProducts = (
       descriptionHtml: "",
       shortDescription: null,
       imageUrl: null,
-      packageImageUrl: priceItem.image_url || null,
+      packageImageUrl: priceItem.package_image_url ?? null,
     });
   }
 

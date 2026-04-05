@@ -847,6 +847,9 @@ const saveProductDescription = async (req, res) => {
       if (!updated.rows?.[0]) {
         return res.status(404).json({ error: "Không cập nhật được desc_variant." });
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "imageUrl")) {
       await db.raw(
         `
         UPDATE ${TABLES.variant}

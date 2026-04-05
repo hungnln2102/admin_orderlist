@@ -76,7 +76,7 @@ export const useProductEdit = ({
           await updateProductPrice(priceId, {
             packageName: form.packageName.trim() || null,
             packageProduct: form.productName.trim() || null,
-            imageUrl: form.imageUrl.trim() || null,
+            variantImageUrl: form.imageUrl.trim() || null,
           });
         }
 

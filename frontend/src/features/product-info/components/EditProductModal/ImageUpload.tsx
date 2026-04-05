@@ -1,11 +1,11 @@
 import React, { useRef, useState } from "react";
 import { PhotoIcon } from "@heroicons/react/24/outline";
+import type { VariantImageItem } from "@/lib/variantImagesApi";
 import {
-  ProductImageItem,
-  deleteProductImage,
-  fetchProductImages,
-  uploadProductImage,
-} from "@/lib/productImagesApi";
+  deleteVariantImage,
+  fetchVariantImages,
+  uploadVariantImage,
+} from "@/lib/variantImagesApi";
 
 interface ImageUploadProps {
   imageUrl?: string;
@@ -15,15 +15,15 @@ interface ImageUploadProps {
 
 interface ImagePickerModalProps {
   open: boolean;
-  images: ProductImageItem[];
-  selectedImage: ProductImageItem | null;
+  images: VariantImageItem[];
+  selectedImage: VariantImageItem | null;
   loading: boolean;
   uploading: boolean;
   deleting: boolean;
   error: string | null;
   uploadError: string | null;
   onClose: () => void;
-  onSelect: (item: ProductImageItem) => void;
+  onSelect: (item: VariantImageItem) => void;
   onUseSelected: () => void;
   onUploadClick: () => void;
   onDeleteSelected: () => void;
@@ -151,22 +151,22 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [images, setImages] = useState<ProductImageItem[]>([]);
+  const [images, setImages] = useState<VariantImageItem[]>([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imagesError, setImagesError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<ProductImageItem | null>(
+  const [selectedImage, setSelectedImage] = useState<VariantImageItem | null>(
     null
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadImages = async (preferred?: ProductImageItem | null) => {
+  const loadImages = async (preferred?: VariantImageItem | null) => {
     setImagesLoading(true);
     setImagesError(null);
 
     try {
-      const data = await fetchProductImages();
+      const data = await fetchVariantImages();
       const items = Array.isArray(data.items) ? data.items : [];
       setImages(items);
 
@@ -243,7 +243,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     setUploadError(null);
 
     try {
-      const result = await uploadProductImage(file);
+      const result = await uploadVariantImage(file);
       onImageChange(result.url);
       const preferred = result.fileName
         ? { fileName: result.fileName, url: result.url }
@@ -271,7 +271,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     setImagesError(null);
 
     try {
-      await deleteProductImage(selectedImage.fileName);
+      await deleteVariantImage(selectedImage.fileName);
       if (imageUrl === selectedImage.url) {
         onImageRemove();
       }

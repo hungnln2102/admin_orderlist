@@ -19,7 +19,8 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.displayName)} AS san_pham,
       v.${quoteIdent(variantCols.variantName)} AS package_product,
       p.${quoteIdent(productSchemaCols.packageName)} AS package,
-      COALESCE(v.${quoteIdent(variantCols.imageUrl)}, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+      v.${quoteIdent(variantCols.imageUrl)} AS image_url,
+      p.${quoteIdent(productSchemaCols.imageUrl)} AS package_image_url,
       v.${quoteIdent(variantCols.basePrice)} AS base_price,
       COALESCE(
         json_agg(

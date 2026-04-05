@@ -66,6 +66,10 @@ app.use(
   "/image_product",
   express.static(path.join(__dirname, "../image_product"))
 );
+app.use(
+  "/image_variant",
+  express.static(path.join(__dirname, "../image_variant"))
+);
 
 app.use(
   session({
