@@ -1,14 +1,25 @@
 import { useState, useCallback, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { PencilSquareIcon, ArrowLeftIcon, PhotoIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
 import { ArticleRichEditor } from "../components/ArticleRichEditor";
 import { ArticleImageInsertModal } from "../components/ArticleImageInsertModal";
 import { ArticleSeoReview } from "../components/ArticleSeoReview";
 import { slugifyLatin } from "../utils/slugify";
-import { createArticle, fetchCategories } from "../api/contentApi";
+import { createArticle, fetchArticle, fetchCategories, updateArticle } from "../api/contentApi";
 import type { ArticleCategory } from "../types";
 
 export default function CreateArticlePage() {
+  const { id: editIdParam } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const editId =
+    editIdParam != null && editIdParam !== "" && Number.isFinite(Number(editIdParam))
+      ? Number(editIdParam)
+      : null;
+  const invalidEditId =
+    editIdParam != null && editIdParam !== "" && editId == null;
+  const isEditMode = editId != null;
+
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
@@ -17,12 +28,46 @@ export default function CreateArticlePage() {
   const [imageUrl, setImageUrl] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [saving, setSaving] = useState(false);
+  const [loadingArticle, setLoadingArticle] = useState(isEditMode);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [coverModalOpen, setCoverModalOpen] = useState(false);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
 
   useEffect(() => {
     fetchCategories().then(setCategories).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode || editId == null) {
+      setLoadingArticle(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingArticle(true);
+    setLoadError(null);
+    fetchArticle(editId)
+      .then((a) => {
+        if (cancelled) return;
+        setTitle(a.title || "");
+        setSlug(a.slug || "");
+        setSummary(a.summary || "");
+        setContent(a.content || "");
+        setImageUrl(a.image_url || "");
+        setStatus(a.status === "published" ? "published" : "draft");
+        setCategoryId(a.category_id ?? "");
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : "Không tải được bài viết.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingArticle(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, editId]);
 
   const handleTitleChange = useCallback((nextTitle: string) => {
     setTitle(nextTitle);
@@ -33,11 +78,15 @@ export default function CreateArticlePage() {
     });
   }, [title]);
 
+  const goBackToList = () => {
+    navigate("/content/articles");
+  };
+
   const handleSave = async () => {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      await createArticle({
+      const payload = {
         title: title.trim(),
         slug: slug || undefined,
         summary: summary.trim(),
@@ -45,8 +94,13 @@ export default function CreateArticlePage() {
         image_url: imageUrl.trim(),
         category_id: categoryId || null,
         status,
-      });
-      window.location.href = "/content/articles";
+      };
+      if (isEditMode && editId != null) {
+        await updateArticle(editId, payload);
+      } else {
+        await createArticle(payload);
+      }
+      navigate("/content/articles");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Lưu bài viết thất bại.");
     } finally {
@@ -58,13 +112,51 @@ export default function CreateArticlePage() {
     "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none backdrop-blur-md focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/30";
   const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-400";
 
+  if (invalidEditId) {
+    return (
+      <div className="space-y-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+        <p>Đường dẫn sửa bài không hợp lệ (ID không phải số).</p>
+        <button
+          type="button"
+          onClick={goBackToList}
+          className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/10"
+        >
+          Quay lại danh sách
+        </button>
+      </div>
+    );
+  }
+
+  if (isEditMode && loadingArticle) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-slate-400">
+        Đang tải bài viết...
+      </div>
+    );
+  }
+
+  if (isEditMode && loadError) {
+    return (
+      <div className="space-y-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200">
+        <p>{loadError}</p>
+        <button
+          type="button"
+          onClick={goBackToList}
+          className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white hover:bg-white/10"
+        >
+          Quay lại danh sách
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => (window.location.href = "/content/articles")}
+            onClick={goBackToList}
             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -72,13 +164,15 @@ export default function CreateArticlePage() {
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-bold text-white">
               <PencilSquareIcon className="h-7 w-7 text-sky-400" />
-              Viết bài mới
+              {isEditMode ? "Sửa bài viết" : "Viết bài mới"}
             </h1>
-            <p className="mt-1 text-sm text-slate-400">Soạn nội dung bài viết cho trang tin tức.</p>
+            <p className="mt-1 text-sm text-slate-400">
+              {isEditMode ? "Cập nhật nội dung bài đã có." : "Soạn nội dung bài viết cho trang tin tức."}
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <GradientButton onClick={handleSave} disabled={saving || !title.trim()}>
+          <GradientButton onClick={() => void handleSave()} disabled={saving || !title.trim()}>
             {saving ? "Đang lưu..." : status === "published" ? "Đăng bài" : "Lưu nháp"}
           </GradientButton>
         </div>

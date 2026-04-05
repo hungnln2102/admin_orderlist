@@ -3,7 +3,7 @@
 --   Tạo schema "content" với 3 bảng:
 --     1. article_categories – danh mục bài viết
 --     2. articles           – bài viết / tin tức
---     3. banners            – banner trang chủ (chỉ ảnh; xem 021 nếu DB cũ còn title/link)
+--     3. banners            – banner hero trang chủ (ảnh + tiêu đề, mô tả, CTA tùy chọn)
 
 BEGIN;
 
@@ -56,12 +56,18 @@ CREATE INDEX IF NOT EXISTS idx_articles_published_at
 -- 3. Banner trang chủ
 -- =============================================
 CREATE TABLE IF NOT EXISTS content.banners (
-  id            SERIAL PRIMARY KEY,
-  image_url     TEXT NOT NULL DEFAULT '',
-  sort_order    INTEGER NOT NULL DEFAULT 0,
-  active        BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  image_url       TEXT NOT NULL DEFAULT '',
+  title           VARCHAR(500) NOT NULL DEFAULT '',
+  description     TEXT NOT NULL DEFAULT '',
+  tag_text        VARCHAR(120) NOT NULL DEFAULT '',
+  image_alt       VARCHAR(500) NOT NULL DEFAULT '',
+  button_label    VARCHAR(200),
+  button_href     TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  active          BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_banners_active_order

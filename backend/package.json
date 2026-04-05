@@ -16,6 +16,8 @@
         "migrate:028": "node scripts/migrations/run-migration-028.js",
         "migrate:029": "node scripts/migrations/run-migration-029.js",
         "migrate:030": "node scripts/migrations/run-migration-030.js",
+        "migrate:031": "node scripts/migrations/run-migration-031.js",
+        "seed:hero-banners": "node scripts/seeds/run-seed-hero-banners.js",
         "proxy:local": "node scripts/local-proxy.js",
         "sync:dashboard-summary": "node scripts/rebuild-dashboard-monthly-summary.js",
         "start": "node index.js",

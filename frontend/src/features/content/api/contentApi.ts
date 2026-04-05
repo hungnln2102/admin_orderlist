@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import type { Article, ArticleCategory, Banner } from "../types";
+import type { Article, ArticleCategory, Banner, BannerPayload } from "../types";
 
 const json = (res: Response) => res.json();
 
@@ -120,7 +120,7 @@ export async function fetchBanners(): Promise<Banner[]> {
   return json(res);
 }
 
-export async function createBanner(data: { image_url: string }): Promise<Banner> {
+export async function createBanner(data: BannerPayload): Promise<Banner> {
   const res = await apiFetch("/api/content/banners", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -130,7 +130,10 @@ export async function createBanner(data: { image_url: string }): Promise<Banner>
   return json(res);
 }
 
-export async function updateBanner(id: number | string, data: { image_url?: string }): Promise<Banner> {
+export async function updateBanner(
+  id: number | string,
+  data: Partial<BannerPayload>
+): Promise<Banner> {
   const res = await apiFetch(`/api/content/banners/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

@@ -46,6 +46,8 @@ export function AppRoutes() {
       <Route path="/product-system" element={<ProductSystem />} />
       <Route path="/content/articles" element={<ArticlesPage />} />
       <Route path="/content/create" element={<CreateArticlePage />} />
+      <Route path="/content/edit/:id" element={<CreateArticlePage />} />
+
       <Route path="/content/categories" element={<ArticleCategoriesPage />} />
       <Route path="/content/banners" element={<BannersPage />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

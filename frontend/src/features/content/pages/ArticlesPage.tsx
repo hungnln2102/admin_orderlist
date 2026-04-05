@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   NewspaperIcon,
   PencilSquareIcon,
@@ -9,16 +10,22 @@ import {
 import GradientButton from "@/components/ui/GradientButton";
 import Pagination from "@/components/ui/Pagination";
 import type { Article } from "../types";
-import { fetchArticles, deleteArticle } from "../api/contentApi";
+import { fetchArticles, fetchArticle, deleteArticle } from "../api/contentApi";
+import { ArticlePreviewModal } from "../components/ArticlePreviewModal";
 
 const PAGE_SIZE = 10;
 
 export default function ArticlesPage() {
+  const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewArticle, setPreviewArticle] = useState<Article | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const loadArticles = useCallback(async (page: number, q: string) => {
     setLoading(true);
@@ -52,9 +59,26 @@ export default function ArticlesPage() {
     [currentPage, search, loadArticles]
   );
 
-  const navigateTo = (path: string) => {
-    window.location.href = path;
-  };
+  const openPreview = useCallback(async (id: number) => {
+    setPreviewOpen(true);
+    setPreviewArticle(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const full = await fetchArticle(id);
+      setPreviewArticle(full);
+    } catch {
+      setPreviewError("Không tải được nội dung bài viết.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
+
+  const closePreview = useCallback(() => {
+    setPreviewOpen(false);
+    setPreviewArticle(null);
+    setPreviewError(null);
+  }, []);
 
   const formatDate = (d: string | null) => {
     if (!d) return "—";
@@ -73,7 +97,7 @@ export default function ArticlesPage() {
             Quản lý toàn bộ bài viết trên website tin tức.
           </p>
         </div>
-        <GradientButton icon={PencilSquareIcon} onClick={() => navigateTo("/content/create")}>
+        <GradientButton icon={PencilSquareIcon} onClick={() => navigate("/content/create")}>
           Viết bài mới
         </GradientButton>
       </div>
@@ -152,7 +176,8 @@ export default function ArticlesPage() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         type="button"
-                        title="Xem"
+                        title="Xem trước trong admin"
+                        onClick={() => void openPreview(article.id)}
                         className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
                       >
                         <EyeIcon className="h-4 w-4" />
@@ -160,7 +185,7 @@ export default function ArticlesPage() {
                       <button
                         type="button"
                         title="Sửa"
-                        onClick={() => navigateTo(`/content/edit/${article.id}`)}
+                        onClick={() => navigate(`/content/edit/${article.id}`)}
                         className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-sky-400"
                       >
                         <PencilSquareIcon className="h-4 w-4" />
@@ -189,6 +214,14 @@ export default function ArticlesPage() {
           onPageChange={setCurrentPage}
         />
       )}
+
+      <ArticlePreviewModal
+        open={previewOpen}
+        article={previewArticle}
+        loading={previewLoading}
+        error={previewError}
+        onClose={closePreview}
+      />
     </div>
   );
 }

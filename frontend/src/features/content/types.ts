@@ -27,8 +27,25 @@ export type ArticleCategory = {
 export type Banner = {
   id: number;
   image_url: string;
+  title: string;
+  description: string;
+  tag_text: string;
+  image_alt: string;
+  button_label: string | null;
+  button_href: string | null;
   sort_order: number;
   active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type BannerPayload = {
+  image_url: string;
+  title: string;
+  description?: string;
+  tag_text?: string;
+  image_alt?: string;
+  /** Cả hai đều có giá trị (sau trim) thì hiện nút; thiếu một trong hai thì coi như không có CTA. */
+  button_label?: string;
+  button_href?: string;
 };
