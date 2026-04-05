@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 # BuildKit: npm run docker:build (repo root), hoặc ./deploy.sh (server), hoặc DOCKER_BUILDKIT=1 docker compose build
-# → cache apt + cache Playwright, bước Chromium không tải lại full mỗi khi layer npm đổi (nếu cache builder còn).
+# → cache apt; Chromium ghi vào image (không dùng cache mount cho ms-playwright).
 
 FROM node:20-bookworm-slim
 
@@ -22,9 +22,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # `--with-deps`: cài gói hệ thống (apt) + Chromium.
-# Mount: tái dùng tarball/browser giữa các lần build; mount apt giảm thời gian install-deps.
+# Chỉ cache apt: cache /root/.cache/ms-playwright làm binary KHÔNG nằm trong image layer → runtime thiếu Chrome.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/root/.cache/ms-playwright,sharing=locked \
     npx playwright install --with-deps chromium
 
 COPY . .

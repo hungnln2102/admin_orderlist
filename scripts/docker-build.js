@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Gọi `docker compose build` với BuildKit bật (cache Playwright/apt trong backend/Dockerfile).
+ * Gọi `docker compose build` với BuildKit bật (cache apt trong backend/Dockerfile; Chromium nằm trong image).
  * Mọi tham số thừa được chuyển vào build: npm run docker:build -- --no-cache backend
  */
 process.env.DOCKER_BUILDKIT = "1";

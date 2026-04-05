@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deploy trên server — bật BuildKit để Dockerfile cache Playwright/apt hoạt động.
+# Deploy trên server — bật BuildKit (cache apt trong Dockerfile; Chromium baked vào image backend).
 # Rebuild có cache (nhanh). Buộc sạch: ./deploy.sh --no-cache
 # Usage: ./deploy.sh | ./deploy.sh --no-cache
 

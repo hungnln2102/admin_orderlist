@@ -1,4 +1,4 @@
-# Build images với BuildKit (cache Playwright trong backend/Dockerfile).
+# Build images với BuildKit (cache apt trong backend/Dockerfile).
 # Từ thư mục repo:
 #   .\scripts\docker-build.ps1
 #   .\scripts\docker-build.ps1 --no-cache
