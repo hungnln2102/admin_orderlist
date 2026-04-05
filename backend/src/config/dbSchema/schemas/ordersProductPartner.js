@@ -73,6 +73,17 @@ const PRODUCT_SCHEMA = {
       IS_ACTIVE: "is_active",
     },
   },
+  DESC_VARIANT: {
+    TABLE: "desc_variant",
+    COLS: {
+      ID: "id",
+      RULES: "rules",
+      DESCRIPTION: "description",
+      SHORT_DESC: "short_desc",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
   VARIANT: {
     TABLE: "variant",
     COLS: {
@@ -84,25 +95,26 @@ const PRODUCT_SCHEMA = {
       CREATED_AT: "created_at",
       FORM_ID: "form_id",
       UPDATED_AT: "updated_at",
-      SHORT_DESC: "short_desc",
-      DESCRIPTION: "description",
-      RULES: "rules",
+      /** FK → product.desc_variant.id */
+      DESC_VARIANT_ID: "id_desc",
+      /** Ảnh hiển thị gói (ưu tiên trước ảnh product). */
       IMAGE_URL: "image_url",
       BASE_PRICE: "base_price",
       PCT_CTV: "pct_ctv",
       PCT_KHACH: "pct_khach",
       PCT_PROMO: "pct_promo",
+      PCT_STU: "pct_stu",
     },
   },
+  /** Alias bảng product.desc_variant (nội dung mô tả dùng chung). */
   PRODUCT_DESC: {
-    TABLE: "variant",
+    TABLE: "desc_variant",
     COLS: {
       ID: "id",
-      VARIANT_ID: "id",
       RULES: "rules",
       DESCRIPTION: "description",
-      IMAGE_URL: "image_url",
       SHORT_DESC: "short_desc",
+      CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
     },
   },

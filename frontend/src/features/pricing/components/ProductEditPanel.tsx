@@ -10,9 +10,12 @@ type ProductEditPanelProps = {
   highestSupplyPriceDisplay: string;
   previewWholesalePrice: number | null;
   previewRetailPrice: number | null;
+  previewStudentPrice: number | null;
+  previewStudentBlendHint: string | null;
   previewPromoPrice: number | null;
   previewPromoPercentLabel: string | null;
   showPreviewPromo: boolean;
+  showPreviewStudent: boolean;
   productEditError: string | null;
   isSavingProductEdit: boolean;
   onProductEditChange: (
@@ -30,9 +33,12 @@ export function ProductEditPanel({
   highestSupplyPriceDisplay,
   previewWholesalePrice,
   previewRetailPrice,
+  previewStudentPrice,
+  previewStudentBlendHint,
   previewPromoPrice,
   previewPromoPercentLabel,
   showPreviewPromo,
+  showPreviewStudent,
   productEditError,
   isSavingProductEdit,
   onProductEditChange,
@@ -213,7 +219,7 @@ export function ProductEditPanel({
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Tỷ giá CTV
+                Giá CTV
               </label>
               <input
                 type="number"
@@ -227,7 +233,7 @@ export function ProductEditPanel({
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Tỷ giá khách
+                Giá Khách
               </label>
               <input
                 type="number"
@@ -241,7 +247,7 @@ export function ProductEditPanel({
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Tỷ giá khuyến mãi
+                Giá Khuyến mãi
               </label>
               <input
                 type="number"
@@ -252,6 +258,25 @@ export function ProductEditPanel({
                   onProductEditChange("pctPromo", event.target.value)
                 }
               />
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                Giá Sinh Viên → cột{" "}
+                <span className="font-mono text-white/80">pct_stu</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                placeholder="Cùng định dạng Giá Khách"
+                value={currentEditForm.pctStu}
+                onChange={(event) =>
+                  onProductEditChange("pctStu", event.target.value)
+                }
+              />
+              <p className="mt-1 text-[10px] text-white/45">
+                Lưu vào DB khi bấm Lưu; để trống = ghi NULL. Định dạng như Giá Khách (vd. 0,28).
+              </p>
             </div>
           </div>
         </div>
@@ -267,7 +292,11 @@ export function ProductEditPanel({
         </div>
         <div
           className={`mt-3 md:mt-4 grid gap-2 md:gap-3 text-center text-sm grid-cols-2 ${
-            showPreviewPromo ? "md:grid-cols-3" : "md:grid-cols-2"
+            showPreviewPromo && showPreviewStudent
+              ? "md:grid-cols-4"
+              : showPreviewPromo || showPreviewStudent
+                ? "md:grid-cols-3"
+                : "md:grid-cols-2"
           }`}
         >
           <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
@@ -296,6 +325,19 @@ export function ProductEditPanel({
                 : "Nhập cấu hình khách"}
             </p>
           </div>
+          {showPreviewStudent && (
+            <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
+              <p className="text-[10px] md:text-xs uppercase text-white/70">
+                Giá SV (MAVS) dự kiến
+              </p>
+              <p className="mt-1 text-base md:text-lg font-semibold text-cyan-100">
+                {formatCurrencyValue(previewStudentPrice)}
+              </p>
+              <p className="text-[11px] text-white/70">
+                {previewStudentBlendHint ?? "Nhập tỷ lệ SV hoặc dùng mặc định"}
+              </p>
+            </div>
+          )}
           {showPreviewPromo && (
             <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
               <p className="text-[10px] md:text-xs uppercase text-white/70">

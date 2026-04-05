@@ -23,7 +23,8 @@ const fetchVariantPricing = async (productNameOrId) => {
       `${TABLES.variant}.${COLS.VARIANT.ID} as variant_id`,
       `${TABLES.variant}.${COLS.VARIANT.PCT_CTV} as pct_ctv`,
       `${TABLES.variant}.${COLS.VARIANT.PCT_KHACH} as pct_khach`,
-      `${TABLES.variant}.${COLS.VARIANT.PCT_PROMO} as pct_promo`
+      `${TABLES.variant}.${COLS.VARIANT.PCT_PROMO} as pct_promo`,
+      `${TABLES.variant}.${COLS.VARIANT.PCT_STU} as pct_stu`
     )
     .orderBy(`${TABLES.variant}.${COLS.VARIANT.ID}`, "asc")
     .limit(1);
@@ -47,6 +48,7 @@ const fetchVariantPricing = async (productNameOrId) => {
     pctCtv: row.pct_ctv,
     pctKhach: row.pct_khach,
     pctPromo: row.pct_promo,
+    pctStu: row.pct_stu,
   };
 };
 

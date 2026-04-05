@@ -2,6 +2,7 @@ const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/d
 const { STATUS } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const { quoteIdent } = require("../../../utils/sql");
+const { isMavnImportOrder } = require("../../../utils/orderHelpers");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
@@ -70,6 +71,21 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 
     // Order entered the "counted" lifecycle ONLY via PROCESSING (UNPAID/CANCELLED → PROCESSING)
     if (!isOrderCounted(prevStatus) && nextStatus === STATUS.PROCESSING) {
+        const price = toNullableNumber(afterRow?.price) || 0;
+        const cost = toNullableNumber(afterRow?.cost) || 0;
+        const profit = price - cost;
+        updates.total_orders = (updates.total_orders || 0) + 1;
+        updates.total_revenue = (updates.total_revenue || 0) + price;
+        updates.total_profit = (updates.total_profit || 0) + profit;
+    }
+
+    // Đơn nhập hàng MAVN: UNPAID → PAID (bỏ bước PROCESSING, không NCC) — vẫn cộng dashboard.
+    if (
+        !isOrderCounted(prevStatus) &&
+        nextStatus === STATUS.PAID &&
+        prevStatus === STATUS.UNPAID &&
+        isMavnImportOrder(afterRow)
+    ) {
         const price = toNullableNumber(afterRow?.price) || 0;
         const cost = toNullableNumber(afterRow?.cost) || 0;
         const profit = price - cost;

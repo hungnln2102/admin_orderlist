@@ -14,10 +14,10 @@ export const BasicInfoPanel: React.FC<BasicInfoPanelProps> = ({
   inputBase,
   labelBase,
 }) => (
-  <section className="product-edit-modal__panel product-edit-modal__panel--basic p-5">
-    <h3 className="product-edit-modal__panel-title mb-5">Thông Tin Cơ Bản</h3>
+  <section className="product-edit-modal__panel product-edit-modal__panel--basic p-3 sm:p-4">
+    <h3 className="product-edit-modal__panel-title mb-3 text-base">Thông Tin Cơ Bản</h3>
 
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <div>
         <label className={labelBase}>Mã sản phẩm</label>
         <input
@@ -60,22 +60,6 @@ export const BasicInfoPanel: React.FC<BasicInfoPanelProps> = ({
           }
           placeholder="Nhập gói sản phẩm..."
           className={inputBase}
-        />
-      </div>
-
-      <div>
-        <label className={labelBase}>Mô tả ngắn</label>
-        <textarea
-          value={form.shortDescription}
-          onChange={(e) =>
-            setForm((prev) => ({
-              ...prev,
-              shortDescription: e.target.value,
-            }))
-          }
-          rows={4}
-          placeholder="Nhập mô tả ngắn về sản phẩm..."
-          className={`${inputBase} product-edit-modal__textarea resize-none`}
         />
       </div>
     </div>

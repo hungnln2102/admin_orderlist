@@ -54,7 +54,7 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        COALESCE(v.${quoteIdent(variantCols.imageUrl)}, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         v.${quoteIdent(variantCols.basePrice)} AS base_price,
         COALESCE(
           json_agg(
@@ -69,13 +69,8 @@ const listProducts = async (_req, res) => {
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
-      LEFT JOIN LATERAL (
-        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
-        FROM ${TABLES.productDesc} pd2
-        WHERE pd2.${quoteIdent(productDescCols.variantId)} = v.${quoteIdent(variantCols.id)}
-        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
-        LIMIT 1
-      ) pd ON TRUE
+      LEFT JOIN ${TABLES.productDesc} d
+        ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
       LEFT JOIN ${TABLES.productCategory} pc
         ON pc.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productSchemaCols.id)}
       LEFT JOIN ${TABLES.category} c
@@ -86,7 +81,7 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.variantName)},
         p.${quoteIdent(productSchemaCols.packageName)},
         p.${quoteIdent(productSchemaCols.imageUrl)},
-        pd.desc_image_url
+        v.${quoteIdent(variantCols.imageUrl)}
       ORDER BY v.${quoteIdent(variantCols.displayName)};
     `;
     const result = await db.raw(query);
@@ -107,24 +102,20 @@ const listProductPrices = async (_req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        COALESCE(v.${quoteIdent(variantCols.imageUrl)}, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         v.${quoteIdent(variantCols.basePrice)} AS base_price,
         v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
         v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
+        v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
         v.${quoteIdent(variantCols.isActive)} AS is_active,
         v.${quoteIdent(variantCols.updatedAt)} AS update,
         spagg.max_supply_price AS max_supply_price
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
-      LEFT JOIN LATERAL (
-        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
-        FROM ${TABLES.productDesc} pd2
-        WHERE pd2.${quoteIdent(productDescCols.variantId)} = v.${quoteIdent(variantCols.id)}
-        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
-        LIMIT 1
-      ) pd ON TRUE
+      LEFT JOIN ${TABLES.productDesc} d
+        ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
       LEFT JOIN LATERAL (
         SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
         FROM ${TABLES.supplyPrice} sp
@@ -155,24 +146,20 @@ const getProductPriceById = async (req, res) => {
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
         p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+        COALESCE(v.${quoteIdent(variantCols.imageUrl)}, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
         v.${quoteIdent(variantCols.basePrice)} AS base_price,
         v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
         v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
+        v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
         v.${quoteIdent(variantCols.isActive)} AS is_active,
         v.${quoteIdent(variantCols.updatedAt)} AS update,
         spagg.max_supply_price AS max_supply_price
       FROM ${TABLES.variant} v
       LEFT JOIN ${TABLES.product} p
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
-      LEFT JOIN LATERAL (
-        SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
-        FROM ${TABLES.productDesc} pd2
-        WHERE pd2.${quoteIdent(productDescCols.variantId)} = v.${quoteIdent(variantCols.id)}
-        ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
-        LIMIT 1
-      ) pd ON TRUE
+      LEFT JOIN ${TABLES.productDesc} d
+        ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
       LEFT JOIN LATERAL (
         SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
         FROM ${TABLES.supplyPrice} sp

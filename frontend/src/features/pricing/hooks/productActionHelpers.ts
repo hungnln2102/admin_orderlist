@@ -33,6 +33,7 @@ type ProductEditValidationResult =
       nextPctCtv: number;
       nextPctKhach: number;
       nextPctPromo: number | null;
+      nextPctStu: number | null;
     }
   | {
       ok: false;
@@ -50,6 +51,7 @@ type CreateProductValidationResult =
         pctCtv?: number;
         pctKhach?: number;
         pctPromo?: number;
+        pctStu: number | null;
         suppliers: SupplierPayload[];
       };
     }
@@ -91,6 +93,10 @@ export function buildProductEditForm(
       product.pctPromo !== null && product.pctPromo !== undefined
         ? String(product.pctPromo)
         : "",
+    pctStu:
+      product.pctStu !== null && product.pctStu !== undefined
+        ? String(product.pctStu)
+        : "",
   };
 }
 
@@ -103,6 +109,7 @@ export function createEmptyCreateForm(): CreateProductFormState {
     pctCtv: "",
     pctKhach: "",
     pctPromo: "",
+    pctStu: "",
   };
 }
 
@@ -258,6 +265,26 @@ export function validateProductEditForm(
   const nextPctCtv = parseRatioInput(form.pctCtv);
   const nextPctKhach = parseRatioInput(form.pctKhach);
   const nextPctPromo = parseRatioInput(form.pctPromo);
+  const nextPctStuRaw = parseRatioInput(form.pctStu);
+  let nextPctStu: number | null = null;
+  const pctStuTrimmed = (form.pctStu ?? "").trim();
+  if (pctStuTrimmed) {
+    if (nextPctStuRaw === null || nextPctStuRaw < 0) {
+      return {
+        ok: false,
+        error: "Giá Sinh Viên không hợp lệ (cùng định dạng với Giá Khách).",
+      };
+    }
+    const stuMargin = getMarginRatioInput(nextPctStuRaw);
+    if (stuMargin === null) {
+      return {
+        ok: false,
+        error:
+          "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
+      };
+    }
+    nextPctStu = stuMargin;
+  }
   const nextPctCtvMargin = getMarginRatioInput(nextPctCtv);
   const nextPctKhachMargin = getMarginRatioInput(nextPctKhach);
   const nextPctPromoRatio =
@@ -333,6 +360,7 @@ export function validateProductEditForm(
     nextPctCtv,
     nextPctKhach,
     nextPctPromo,
+    nextPctStu,
   };
 }
 
@@ -348,6 +376,26 @@ export function validateCreateProductForm(
   const pctCtvValue = parseRatioInput(form.pctCtv);
   const pctKhachValue = parseRatioInput(form.pctKhach);
   const pctPromoValue = parseRatioInput(form.pctPromo);
+  const pctStuRaw = parseRatioInput(form.pctStu);
+  let pctStuValue: number | null = null;
+  const pctStuTrimmedCreate = form.pctStu.trim();
+  if (pctStuTrimmedCreate) {
+    if (pctStuRaw === null || pctStuRaw < 0) {
+      return {
+        ok: false,
+        error: "Giá Sinh Viên không hợp lệ (cùng định dạng với Giá Khách).",
+      };
+    }
+    const stuMarginCreate = getMarginRatioInput(pctStuRaw);
+    if (stuMarginCreate === null) {
+      return {
+        ok: false,
+        error:
+          "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
+      };
+    }
+    pctStuValue = stuMarginCreate;
+  }
   const pctCtvMargin =
     pctCtvValue !== null ? getMarginRatioInput(pctCtvValue) : null;
   const pctKhachMargin =
@@ -483,6 +531,7 @@ export function validateCreateProductForm(
         pctCtv: pctCtvValue ?? undefined,
         pctKhach: pctKhachValue ?? undefined,
         pctPromo: pctPromoValue ?? undefined,
+        pctStu: pctStuValue,
       suppliers: normalizedSuppliers,
     },
   };

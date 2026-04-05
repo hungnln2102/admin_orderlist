@@ -204,6 +204,7 @@ const calcGiaBan = ({
   pctKhach,
   giaBanFallback,
   pctPromo,
+  pctStu = null,
   forceKhachLe = false,
 }) => {
   try {
@@ -216,6 +217,7 @@ const calcGiaBan = ({
       pctCtv,
       pctKhach,
       pctPromo,
+      pctStu,
       forceKhachLe,
       roundCostToThousands: false,
     });
@@ -329,7 +331,14 @@ const resolveOrderByPayment = async (client, { amount, transactionContent }) => 
 
 const fetchProductPricing = async (client, productNameOrVariantId) => {
   if (productNameOrVariantId == null || productNameOrVariantId === "") {
-    return { productId: null, variantId: null, pctCtv: 1, pctKhach: 1, pctPromo: 0 };
+    return {
+      productId: null,
+      variantId: null,
+      pctCtv: 1,
+      pctKhach: 1,
+      pctPromo: 0,
+      pctStu: null,
+    };
   }
 
   const byVariantId = Number.isFinite(Number(productNameOrVariantId)) && Number(productNameOrVariantId) > 0;
@@ -339,7 +348,8 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
       v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
       v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
-      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo
+      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo,
+      v.${safeIdent(VARIANT_COLS.pctStu)} AS pct_stu
     FROM ${VARIANT_TABLE} AS v
     WHERE v.${safeIdent(VARIANT_COLS.id)} = $1
     LIMIT 1
@@ -349,7 +359,8 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
       v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
       v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
-      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo
+      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo,
+      v.${safeIdent(VARIANT_COLS.pctStu)} AS pct_stu
     FROM ${VARIANT_TABLE} AS v
     WHERE v.${safeIdent(VARIANT_COLS.displayName)} = $1
     LIMIT 1
@@ -364,6 +375,7 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
     pctCtv: variantRow.pct_ctv ?? 1,
     pctKhach: variantRow.pct_khach ?? 1,
     pctPromo: variantRow.pct_promo ?? 0,
+    pctStu: variantRow.pct_stu ?? null,
   };
 };
 

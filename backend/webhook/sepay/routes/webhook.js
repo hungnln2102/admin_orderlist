@@ -22,6 +22,7 @@ const {
   isEligibleForRenewal,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
+const { isMavnImportOrder } = require("../../../src/utils/orderHelpers");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
@@ -200,6 +201,13 @@ router.post("/", async (req, res) => {
             continue;
           }
 
+          if (isMavnImportOrder({ id_order: code })) {
+            logger.info("[Webhook] Skip supplier import for MAVN (nhập hàng)", {
+              orderCode: code,
+            });
+            continue;
+          }
+
           // Avoid double supplier import updates for renewal flows:
           // - Renewal path already calls updatePaymentSupplyBalance() inside runRenewal().
           // - Non-renewal path should add import once per unique receipt.
@@ -231,20 +239,29 @@ router.post("/", async (req, res) => {
 
           const statusValue = state[ORDER_COLS.status];
           if (statusValue === ORDER_STATUS.UNPAID) {
+            const nextStatus = isMavnImportOrder({ id_order: code })
+              ? ORDER_STATUS.PAID
+              : ORDER_STATUS.PROCESSING;
             const statusUpdateResult = await client.query(
               `UPDATE ${ORDER_TABLE}
                SET ${ORDER_COLS.status} = $2
                WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
                  AND ${ORDER_COLS.status} = $3`,
-              [code, ORDER_STATUS.PROCESSING, ORDER_STATUS.UNPAID]
+              [code, nextStatus, ORDER_STATUS.UNPAID]
             );
             if (statusUpdateResult.rowCount > 0) {
               await incrementDashboardSummaryOnProcessing(client, state);
             }
-            logger.debug("[Webhook] Order status → Đang Xử Lý", {
-              orderCode: code,
-              previousStatus: statusValue,
-            });
+            logger.debug(
+              nextStatus === ORDER_STATUS.PAID
+                ? "[Webhook] Order status → Đã Thanh Toán (MAVN)"
+                : "[Webhook] Order status → Đang Xử Lý",
+              {
+                orderCode: code,
+                previousStatus: statusValue,
+                nextStatus,
+              }
+            );
           }
         }
       }

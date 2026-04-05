@@ -8,8 +8,6 @@ import { normalizeErrorMessage } from "@/lib/textUtils";
 import { SavePayload } from "../components/EditProductModal";
 import {
   MergedProduct,
-  normalizeRichHtmlForSave,
-  normalizeShortDescriptionForSave,
   normalizeProductKey,
 } from "../utils/productInfoHelpers";
 
@@ -56,112 +54,100 @@ export const useProductEdit = ({
       if (!editingProduct) return;
       setEditSaving(true);
 
-      const normalizedRulesHtml = normalizeRichHtmlForSave(
-        form.rulesHtml || form.rules
-      );
-      const normalizedDescriptionHtml = normalizeRichHtmlForSave(
-        form.descriptionHtml || form.description
-      );
-      const normalizedShortDescription = normalizeShortDescriptionForSave(
-        form.shortDescription
-      );
-
-      // Payload for product_desc table
-      const descPayload = {
-        productId: form.productId.trim() || editingProduct.productId || "",
-        rules: normalizedRulesHtml,
-        description: normalizedDescriptionHtml,
-        shortDesc: normalizedShortDescription,
-        imageUrl: form.imageUrl || null,
-      };
+      const pid = form.productId.trim() || editingProduct.productId || "";
+      const descId =
+        form.descVariantId != null &&
+        Number.isFinite(form.descVariantId) &&
+        form.descVariantId > 0
+          ? form.descVariantId
+          : null;
 
       try {
-        // Save product description
-        const saved = await saveProductDescription(descPayload);
-        
-        // Also update variant/product info if we have a priceId
+        let saved: ProductDescription | null = null;
+        if (descId != null && pid) {
+          saved = await saveProductDescription({
+            productId: pid,
+            descVariantId: descId,
+          });
+        }
+
         const priceId = form.priceId ?? editingProduct.priceId;
         if (priceId && Number.isFinite(priceId)) {
           await updateProductPrice(priceId, {
             packageName: form.packageName.trim() || null,
             packageProduct: form.productName.trim() || null,
+            imageUrl: form.imageUrl.trim() || null,
           });
         }
-        
-        const rulesHtml =
-          saved.rulesHtml ||
-          saved.rules ||
-          normalizedRulesHtml ||
-          form.rulesHtml ||
-          form.rules ||
-          "";
-        const descriptionHtml =
-          saved.descriptionHtml ||
-          saved.description ||
-          normalizedDescriptionHtml ||
-          form.descriptionHtml ||
-          form.description ||
-          "";
-        const updated: MergedProduct = {
-          ...editingProduct,
-          id: saved.id || editingProduct.id,
-          productId: saved.productId,
-          productName:
-            form.productName || editingProduct.productName || editingProduct.productName,
-          packageName: form.packageName || editingProduct.packageName,
-          rules: saved.rules || "",
-          rulesHtml,
-          description: saved.description || "",
-          descriptionHtml,
-          shortDescription:
-            saved.shortDescription || normalizedShortDescription || null,
-          imageUrl: saved.imageUrl || form.imageUrl || null,
-        };
 
-        setProductDescs((prev) => {
-          const targetKey = normalizeProductKey(
-            saved.productId || editingProduct.productId || ""
-          );
-          const idx = prev.findIndex(
-            (p) => normalizeProductKey(p.productId || "") === targetKey
-          );
-          if (idx === -1) {
-            return [
-              ...prev,
-              {
-                id: saved.id || editingProduct.id,
-                productId: saved.productId,
-                productName: updated.productName || null,
-                rules: saved.rules || "",
-                rulesHtml,
-                description: saved.description || "",
-                descriptionHtml,
-                shortDescription:
-                  saved.shortDescription || normalizedShortDescription || null,
-                imageUrl: saved.imageUrl || null,
-              },
-            ];
-          }
-          const next = [...prev];
-          next[idx] = {
-            ...next[idx],
-            id: saved.id || next[idx].id,
+        if (saved) {
+          const rulesHtml =
+            saved.rulesHtml || saved.rules || "";
+          const descriptionHtml =
+            saved.descriptionHtml || saved.description || "";
+          const updated: MergedProduct = {
+            ...editingProduct,
+            id: saved.id || editingProduct.id,
+            descVariantId: saved.descVariantId ?? descId,
             productId: saved.productId,
-            productName: updated.productName || next[idx].productName || null,
+            productName:
+              form.productName ||
+              editingProduct.productName ||
+              null,
+            packageName: form.packageName || editingProduct.packageName,
             rules: saved.rules || "",
             rulesHtml,
             description: saved.description || "",
             descriptionHtml,
             shortDescription:
-              saved.shortDescription || normalizedShortDescription || null,
-            imageUrl: saved.imageUrl || null,
+              saved.shortDescription ?? editingProduct.shortDescription ?? null,
+            imageUrl: saved.imageUrl || form.imageUrl || null,
           };
-          return next;
-        });
+
+          setProductDescs((prev) => {
+            const targetKey = normalizeProductKey(
+              saved.productId || editingProduct.productId || ""
+            );
+            const idx = prev.findIndex(
+              (p) => normalizeProductKey(p.productId || "") === targetKey
+            );
+            if (idx === -1) {
+              return [
+                ...prev,
+                {
+                  id: saved.id || editingProduct.id,
+                  descVariantId: saved.descVariantId ?? descId,
+                  productId: saved.productId,
+                  productName: updated.productName || null,
+                  rules: saved.rules || "",
+                  rulesHtml,
+                  description: saved.description || "",
+                  descriptionHtml,
+                  shortDescription: saved.shortDescription ?? null,
+                  imageUrl: saved.imageUrl || null,
+                },
+              ];
+            }
+            const next = [...prev];
+            next[idx] = {
+              ...next[idx],
+              id: saved.id || next[idx].id,
+              descVariantId: saved.descVariantId ?? descId,
+              productId: saved.productId,
+              productName: updated.productName || next[idx].productName || null,
+              rules: saved.rules || "",
+              rulesHtml,
+              description: saved.description || "",
+              descriptionHtml,
+              shortDescription: saved.shortDescription ?? null,
+              imageUrl: saved.imageUrl || null,
+            };
+            return next;
+          });
+        }
 
         setEditingProduct(null);
-        
-        // Reload to get fresh data from server
+
         await reloadProducts();
       } catch (err) {
         setError(

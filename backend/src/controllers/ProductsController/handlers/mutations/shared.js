@@ -19,7 +19,7 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.displayName)} AS san_pham,
       v.${quoteIdent(variantCols.variantName)} AS package_product,
       p.${quoteIdent(productSchemaCols.packageName)} AS package,
-      COALESCE(pd.desc_image_url, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
+      COALESCE(v.${quoteIdent(variantCols.imageUrl)}, p.${quoteIdent(productSchemaCols.imageUrl)}) AS image_url,
       v.${quoteIdent(variantCols.basePrice)} AS base_price,
       COALESCE(
         json_agg(
@@ -34,19 +34,15 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
       v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
       v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
+      v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
       v.${quoteIdent(variantCols.isActive)} AS is_active,
       v.${quoteIdent(variantCols.updatedAt)} AS update,
       spagg.max_supply_price AS max_supply_price
     FROM ${TABLES.variant} v
     LEFT JOIN ${TABLES.product} p
       ON p.${quoteIdent(productCols.id)} = v.${quoteIdent(variantCols.productId)}
-    LEFT JOIN LATERAL (
-      SELECT pd2.${quoteIdent(productDescCols.imageUrl)} AS desc_image_url
-      FROM ${TABLES.productDesc} pd2
-      WHERE pd2.${quoteIdent(productDescCols.variantId)} = v.${quoteIdent(variantCols.id)}
-      ORDER BY pd2.${quoteIdent(productDescCols.id)} DESC
-      LIMIT 1
-    ) pd ON TRUE
+    LEFT JOIN ${TABLES.productDesc} d
+      ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
     LEFT JOIN ${TABLES.productCategory} pcj
       ON pcj.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productCols.id)}
     LEFT JOIN ${TABLES.category} c
@@ -64,10 +60,11 @@ const fetchVariantView = async (variantId) => {
       v.${quoteIdent(variantCols.basePrice)},
       p.${quoteIdent(productSchemaCols.packageName)},
       p.${quoteIdent(productSchemaCols.imageUrl)},
-      pd.desc_image_url,
+      v.${quoteIdent(variantCols.imageUrl)},
       v.${quoteIdent(variantCols.pctCtv)},
       v.${quoteIdent(variantCols.pctKhach)},
       v.${quoteIdent(variantCols.pctPromo)},
+      v.${quoteIdent(variantCols.pctStu)},
       v.${quoteIdent(variantCols.isActive)},
       v.${quoteIdent(variantCols.updatedAt)},
       spagg.max_supply_price

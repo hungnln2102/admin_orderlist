@@ -4,11 +4,8 @@ export type EditFormState = {
   productId: string;
   productName: string;
   packageName: string;
-  shortDescription: string;
-  rules: string;
-  rulesHtml: string;
-  description: string;
-  descriptionHtml: string;
+  /** id bản ghi product.desc_variant — lưu vào variant.id_desc khi bấm Lưu. */
+  descVariantId: number | null;
   imageUrl: string;
   priceId: number | null;
 };

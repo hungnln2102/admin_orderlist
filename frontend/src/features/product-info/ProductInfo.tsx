@@ -3,6 +3,7 @@ import { ProductInfoHeader } from "./components/ProductInfoHeader";
 import { ViewModeToggle } from "./components/ViewModeToggle";
 import { ProductView } from "./views/ProductView";
 import { CategoryView } from "./views/CategoryView";
+import { VariantContentView } from "./views/VariantContentView";
 import { CreateCategoryModal } from "./components/CreateCategoryModal";
 import { EditCategoryModal } from "./components/EditCategoryModal";
 import { EditProductModal } from "./components/EditProductModal";
@@ -42,7 +43,9 @@ const ProductInfo: React.FC = () => {
     },
   } = useProductInfo();
 
-  const [viewMode, setViewMode] = useState<"products" | "categories">("products");
+  const [viewMode, setViewMode] = useState<
+    "products" | "categories" | "variantContent"
+  >("products");
 
   const {
     categoryOptions,
@@ -104,7 +107,8 @@ const ProductInfo: React.FC = () => {
           Thông Tin Sản Phẩm
         </h1>
         <p className="product-info-page__description text-sm text-white/70">
-          Đồng bộ với bảng `product_desc` trong database.
+          Đồng bộ mô tả với bảng <code className="text-indigo-200/90">desc_variant</code>{" "}
+          và dữ liệu gói từ giá / danh mục.
         </p>
       </div>
 
@@ -134,12 +138,19 @@ const ProductInfo: React.FC = () => {
           onToggleExpand={setExpandedId}
           onEdit={openEditForm}
         />
-      ) : (
+      ) : viewMode === "categories" ? (
         <CategoryView
           categoryRows={categoryRows}
           loading={loading}
           onEditCategory={openCategoryEdit}
           getCategoryColor={getCategoryColor}
+        />
+      ) : (
+        <VariantContentView
+          searchTerm={searchTerm}
+          active={viewMode === "variantContent"}
+          onReloadProductList={reload}
+          onOpenEditor={clearEditingProduct}
         />
       )}
 

@@ -160,6 +160,7 @@ export const useProductActions = ({
             pctCtv: validation.nextPctCtv,
             pctKhach: validation.nextPctKhach,
             pctPromo: validation.nextPctPromo,
+            pctStu: validation.nextPctStu,
           }),
           credentials: "include",
         }

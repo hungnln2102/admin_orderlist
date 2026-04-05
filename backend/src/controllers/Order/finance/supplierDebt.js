@@ -3,6 +3,7 @@ const { resolveSupplierNameColumn } = require("../../SuppliesController/helpers"
 const { STATUS, TABLES } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const logger = require("../../../utils/logger");
+const { isMavnImportOrder } = require("../../../utils/orderHelpers");
 const { calcRemainingImport, ceilToThousands } = require("./refunds");
 
 const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
@@ -121,6 +122,10 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
 };
 
 const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
+    if (isMavnImportOrder(orderRow) || isMavnImportOrder(normalized)) {
+        return;
+    }
+
     const statusValue =
         orderRow?.status ??
         normalized?.status ??
@@ -181,6 +186,10 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
 };
 
 const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
+    if (isMavnImportOrder(beforeRow) || isMavnImportOrder(afterRow)) {
+        return;
+    }
+
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 
@@ -222,6 +231,10 @@ const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
 };
 
 const addSupplierImportOnProcessing = async(trx, beforeRow, afterRow) => {
+    if (isMavnImportOrder(beforeRow) || isMavnImportOrder(afterRow)) {
+        return;
+    }
+
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 

@@ -3,6 +3,8 @@ import { normalizeErrorMessage } from "./textUtils";
 
 export interface ProductDescription {
   id: number;
+  /** id bản ghi product.desc_variant (dùng chung khi nhiều variant trỏ cùng id). */
+  descVariantId?: number | null;
   productId: string;
   productName?: string | null;
   rules: string;
@@ -25,15 +27,31 @@ export interface ProductDescriptionQuery {
   search?: string;
   limit?: number;
   offset?: number;
+  /**
+   * `desc_variant`: chỉ lấy variant đã có bản ghi mô tả (INNER JOIN desc_variant).
+   * Mặc định rỗng — dùng cho tab gội / merge toàn bộ variant.
+   */
+  scope?: "desc_variant";
 }
 
 export interface ProductDescriptionSavePayload {
-  productId: string;
+  /** Mã hiển thị variant; bỏ trống khi chỉ cập nhật theo descVariantId (chưa gắn variant). */
+  productId?: string;
+  /** Gán variant sang desc_variant có sẵn (dùng chung nội dung); bỏ qua cập nhật text trong request này. */
+  descVariantId?: number | null;
   rules?: string;
   description?: string;
   shortDesc?: string;
   imageUrl?: string | null;
 }
+
+/** Tạo bản ghi desc_variant; không truyền productId => chỉ INSERT, nối variant sau. */
+export type CreateProductDescriptionPayload = {
+  productId?: string;
+  rules?: string;
+  description?: string;
+  shortDesc?: string;
+};
 
 export interface ProductSeoAuditPayload {
   shortDesc?: string;
@@ -80,6 +98,65 @@ export interface ProductImageListResponse {
   count: number;
 }
 
+const normalizeSavedProductDescription = (
+  data: Record<string, unknown>
+): ProductDescription => ({
+  id: Number((data as any).id) || 0,
+  descVariantId: (() => {
+    const v =
+      (data as any).descVariantId ?? (data as any).desc_variant_id ?? null;
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })(),
+  productId: (data as any).productId || (data as any).product_id || "",
+  productName:
+    (data as any).productName ?? (data as any).product_name ?? null,
+  rules: (data as any).rules || "",
+  rulesHtml: (data as any).rulesHtml || (data as any).rules || "",
+  description: (data as any).description || "",
+  descriptionHtml:
+    (data as any).descriptionHtml || (data as any).description || "",
+  shortDescription:
+    (data as any).shortDescription ??
+    (data as any).shortDesc ??
+    (data as any).short_desc ??
+    null,
+  imageUrl: (data as any).imageUrl ?? (data as any).image_url ?? null,
+});
+
+export const createProductDescription = async (
+  payload: CreateProductDescriptionPayload
+): Promise<ProductDescription> => {
+  const trimmedPid = payload.productId?.trim();
+  const response = await apiFetch("/api/product-descriptions/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...(trimmedPid ? { productId: trimmedPid } : {}),
+      rules: payload.rules ?? "",
+      description: payload.description ?? "",
+      shortDesc: payload.shortDesc ?? "",
+    }),
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Không thể tạo desc_variant.",
+      })
+    );
+  }
+  const data = (await response.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
+  if (!data || typeof data !== "object") {
+    throw new Error("Phản hồi không hợp lệ từ server.");
+  }
+  return normalizeSavedProductDescription(data);
+};
+
 export const saveProductDescription = async (
   payload: ProductDescriptionSavePayload
 ): Promise<ProductDescription> => {
@@ -102,21 +179,7 @@ export const saveProductDescription = async (
   if (!data || typeof data !== "object") {
     throw new Error("Phản hồi không hợp lệ từ server.");
   }
-  return {
-    id: Number((data as any).id) || 0,
-    productId: (data as any).productId || "",
-    productName: (data as any).productName ?? null,
-    rules: (data as any).rules || "",
-    rulesHtml: (data as any).rulesHtml || (data as any).rules || "",
-    description: (data as any).description || "",
-    descriptionHtml:
-      (data as any).descriptionHtml || (data as any).description || "",
-    shortDescription:
-      (data as any).shortDescription ??
-      (data as any).shortDesc ??
-      null,
-    imageUrl: (data as any).imageUrl ?? null,
-  };
+  return normalizeSavedProductDescription(data as Record<string, unknown>);
 };
 
 export const auditProductSeo = async (
@@ -239,6 +302,9 @@ export const fetchProductDescriptions = async (
   if (params.offset !== undefined) {
     searchParams.set("offset", String(params.offset));
   }
+  if (params.scope === "desc_variant") {
+    searchParams.set("scope", "desc_variant");
+  }
   const qs = searchParams.toString();
   const response = await apiFetch(
     `/api/product-descriptions${qs ? `?${qs}` : ""}`
@@ -273,6 +339,14 @@ export const fetchProductDescriptions = async (
       : normalizedCount;
   const normalizedItems = data.items.map((item: any) => ({
     id: Number(item?.id) || 0,
+    descVariantId: (() => {
+      const raw =
+        item?.descVariantId ?? item?.desc_variant_id ?? null;
+      if (raw === null || raw === "") return null;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return n;
+    })(),
     productId: item?.productId || item?.product_id || "",
     productName: item?.productName ?? item?.product_name ?? null,
     rules: item?.rules || "",

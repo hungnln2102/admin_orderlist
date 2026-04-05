@@ -125,6 +125,13 @@ function calculatePeriods() {
   };
 }
 
+/** Đơn mã MAVN (nhập hàng): không ghi nhận công nợ / thanh toán NCC (payment_supply). */
+function isMavnImportOrder(row) {
+  const prefix = String(ORDER_PREFIXES.nhap || "MAVN").toUpperCase();
+  const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
+  return Boolean(prefix && code.startsWith(prefix));
+}
+
 module.exports = {
   ORDER_PREFIXES,
   monthsFromString,
@@ -132,4 +139,5 @@ module.exports = {
   roundGiaBanValue,
   convertDMYToYMD,
   calculatePeriods,
+  isMavnImportOrder,
 };

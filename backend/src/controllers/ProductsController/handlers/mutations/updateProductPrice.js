@@ -38,6 +38,8 @@ const updateProductPrice = async (req, res) => {
     pctCtv,
     pctKhach,
     pctPromo,
+    pctStu,
+    pct_stu,
     is_active,
     imageUrl,
   } = req.body || {};
@@ -130,6 +132,11 @@ const updateProductPrice = async (req, res) => {
     }
     if (pctPromo !== undefined) {
       addVariantUpdate(variantCols.pctPromo, toNullableNumber(pctPromo));
+    }
+    const pctStuInput =
+      pctStu !== undefined ? pctStu : pct_stu;
+    if (pctStuInput !== undefined) {
+      addVariantUpdate(variantCols.pctStu, toNullableNumber(pctStuInput));
     }
 
     if (

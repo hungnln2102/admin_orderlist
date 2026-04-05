@@ -3,6 +3,7 @@ const { db } = require("../../../db");
 const { TABLES, COLS } = require("../constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../../config/dbSchema");
 const { findProductIdByName } = require("../../ProductsController/finders");
+const { deriveVariantMarginsFromCostAndSalePrice } = require("../../../services/pricing/core");
 
 const resolveProductToVariantId = async(productNameOrId) => {
     if (productNameOrId == null) return null;
@@ -80,10 +81,10 @@ const ensureSupplierCost = async(variantId, supplierId, cost) => {
     });
 };
 
-const ensureVariantRecord = async(productName) => {
-    if (!productName) return null;
+const ensureVariantRecord = async(productName, options = {}) => {
+    if (!productName) return { variantId: null, created: false };
     const name = String(productName).trim();
-    if (!name) return null;
+    if (!name) return { variantId: null, created: false };
 
     const displayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
     const variantNameCol = PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME;
@@ -95,10 +96,10 @@ const ensureVariantRecord = async(productName) => {
         .select(variantIdCol)
         .first();
     if (existing && Number.isFinite(Number(existing[variantIdCol]))) {
-        return Number(existing[variantIdCol]);
+        return { variantId: Number(existing[variantIdCol]), created: false };
     }
 
-    return db.transaction(async(trx) => {
+    const variantId = await db.transaction(async(trx) => {
         const productIdCol = PRODUCT_SCHEMA.PRODUCT.COLS.ID;
         const packageNameCol = PRODUCT_SCHEMA.PRODUCT.COLS.PACKAGE_NAME;
         const isActiveCol = PRODUCT_SCHEMA.PRODUCT.COLS.IS_ACTIVE;
@@ -110,17 +111,39 @@ const ensureVariantRecord = async(productName) => {
             [isActiveCol]: true,
         });
 
-        const variantId = await nextId(TABLES.variant, variantIdCol, trx);
+        const descCols = PRODUCT_SCHEMA.PRODUCT_DESC.COLS;
+        const descTable = `${SCHEMA_PRODUCT}.${PRODUCT_SCHEMA.PRODUCT_DESC.TABLE}`;
+        const descRes = await trx.raw(
+            `INSERT INTO ${descTable} (${descCols.RULES}, ${descCols.DESCRIPTION}, ${descCols.SHORT_DESC}) VALUES (NULL, NULL, NULL) RETURNING ${descCols.ID} AS id`
+        );
+        const descVariantId = descRes.rows?.[0]?.id;
+        if (!Number.isFinite(Number(descVariantId))) {
+            throw new Error("Unable to create desc_variant for new variant.");
+        }
+
+        const newVariantId = await nextId(TABLES.variant, variantIdCol, trx);
+        const { pctCtv, pctKhach } = deriveVariantMarginsFromCostAndSalePrice({
+            cost: options.cost,
+            salePrice: options.salePrice,
+            orderPrefix: options.orderPrefix,
+            customerType: options.customerType,
+        });
+
         await trx(TABLES.variant).insert({
-            [variantIdCol]: variantId,
+            [variantIdCol]: newVariantId,
             [PRODUCT_SCHEMA.VARIANT.COLS.PRODUCT_ID]: productId,
             [variantNameCol]: name,
             [displayNameCol]: name,
             [PRODUCT_SCHEMA.VARIANT.COLS.IS_ACTIVE]: true,
+            [PRODUCT_SCHEMA.VARIANT.COLS.DESC_VARIANT_ID]: Number(descVariantId),
+            [PRODUCT_SCHEMA.VARIANT.COLS.PCT_CTV]: pctCtv,
+            [PRODUCT_SCHEMA.VARIANT.COLS.PCT_KHACH]: pctKhach,
         });
 
-        return variantId;
+        return newVariantId;
     });
+
+    return { variantId, created: true };
 };
 
 module.exports = {

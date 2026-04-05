@@ -49,7 +49,7 @@ const calculateRenewalPricing = async (
   client,
   { sanPham, supplierId, orderCode, fallbackCost, fallbackPrice, forceKhachLe }
 ) => {
-  const { productId, variantId, pctCtv, pctKhach, pctPromo } =
+  const { productId, variantId, pctCtv, pctKhach, pctPromo, pctStu } =
     await fetchProductPricing(client, sanPham);
   const giaNhapSource = await fetchSupplyPrice(
     client,
@@ -86,6 +86,7 @@ const calculateRenewalPricing = async (
     pctCtv,
     pctKhach,
     pctPromo,
+    pctStu,
     forceKhachLe,
     roundCostToThousands: false,
   });
@@ -97,6 +98,7 @@ const calculateRenewalPricing = async (
     pctCtv,
     pctKhach,
     pctPromo,
+    pctStu,
     giaNhapSource,
     maxPriceRow,
     normalizedNhap,
@@ -315,9 +317,9 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (${summaryCols.MONTH_KEY})
             DO UPDATE SET
-              ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
-              ${summaryCols.TOTAL_REVENUE} = ${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
-              ${summaryCols.TOTAL_PROFIT} = ${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+              ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${summaryTable}.${summaryCols.TOTAL_ORDERS} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
+              ${summaryCols.TOTAL_REVENUE} = ${summaryTable}.${summaryCols.TOTAL_REVENUE} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
+              ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
               ${summaryCols.UPDATED_AT} = NOW()
           `,
           [monthKey, 1, revenue, profit]

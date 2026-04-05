@@ -1,4 +1,33 @@
 const { ORDER_PREFIXES, roundGiaBanValue } = require("../../utils/orderHelpers");
+const { defaultPctStu: APP_DEFAULT_PCT_STU } = require("../../config/appConfig");
+
+const clampUnitRatio = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+};
+
+/** pct_stu trên variant (0–1 hoặc 0–100); null/undefined → defaultPctStu hoặc DEFAULT_PCT_STU env. */
+const resolvePctStuBlend = (pctStuRaw, explicitDefault) => {
+  const fallback = clampUnitRatio(
+    explicitDefault !== undefined &&
+      explicitDefault !== null &&
+      Number.isFinite(Number(explicitDefault))
+      ? Number(explicitDefault)
+      : APP_DEFAULT_PCT_STU
+  );
+  if (pctStuRaw === null || pctStuRaw === undefined || pctStuRaw === "") {
+    return fallback;
+  }
+  const n = Number(pctStuRaw);
+  if (!Number.isFinite(n) || n < 0) {
+    return fallback;
+  }
+  if (n > 1 && n <= 100) {
+    return clampUnitRatio(n / 100);
+  }
+  return clampUnitRatio(n);
+};
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -177,12 +206,17 @@ const calculateOrderPricingFromResolvedValues = ({
       : 0;
   const promoPrice = Math.max(0, customerPrice - promoAmount);
 
+  /** MAVS (Sinh viên): cùng công thức và mức giá với MAVL (khách lẻ) — customerPrice. */
+  const studentPrice = customerPrice;
+
   const orderKind = resolveOrderKind({ orderId, customerType });
   let price = customerPrice;
 
   if (forceKhachLe) {
     price = customerPrice;
-  } else if (orderKind.isCtv || orderKind.isSinhVien) {
+  } else if (orderKind.isSinhVien) {
+    price = studentPrice;
+  } else if (orderKind.isCtv) {
     price = resellPrice;
   } else if (orderKind.isLe) {
     price = customerPrice;
@@ -212,13 +246,65 @@ const calculateOrderPricingFromResolvedValues = ({
       pctCtv: pctCtvNormalized,
       pctKhach: pctKhachNormalized,
       pctPromo: pctPromoNormalized,
+      studentPrice,
       orderKind,
       forceKhachLe,
     },
   };
 };
 
+/**
+ * Khi tạo variant mới từ đơn: suy pct_ctv / pct_khach (0–1) từ giá nhập (cost) và giá bán (sale),
+ * căn theo prefix MAVC (CTV) vs MAVL (khách lẻ).
+ * MAVL: cố định một pct_ctv mặc định nhỏ rồi suy pct_khach từ chuỗi margin; nếu giá bán không đủ “đậm”
+ * so với cost+%CTV thì coi như chỉ còn một lớp margin (chỉ pct_ctv).
+ */
+const deriveVariantMarginsFromCostAndSalePrice = ({
+  cost,
+  salePrice,
+  orderPrefix,
+  customerType,
+} = {}) => {
+  const B = normalizeMoney(cost);
+  const P = normalizeMoney(salePrice);
+  const head = String(orderPrefix || customerType || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 4);
+  const isMavl = head === (ORDER_PREFIXES?.le || "MAVL");
+  const isMavc = head === (ORDER_PREFIXES?.ctv || "MAVC");
+
+  if (!Number.isFinite(B) || B <= 0 || !Number.isFinite(P) || P <= 0) {
+    return { pctCtv: 0, pctKhach: 0 };
+  }
+
+  const defaultCtvFromEnv = Number(process.env.NEW_VARIANT_DEFAULT_PCT_CTV);
+  const defaultCtv = normalizeMarginRatio(
+    Number.isFinite(defaultCtvFromEnv) ? defaultCtvFromEnv : 0.04,
+    0.04
+  );
+
+  if (isMavl) {
+    const resellRaw = calculateMarginBasedPrice(B, defaultCtv);
+    if (P > resellRaw * 0.999) {
+      const pctKhach = normalizeMarginRatio(1 - resellRaw / P, 0);
+      return { pctCtv: defaultCtv, pctKhach };
+    }
+    const pctCtv = normalizeMarginRatio(1 - B / P, 0);
+    return { pctCtv, pctKhach: 0 };
+  }
+
+  if (isMavc) {
+    const pctCtv = normalizeMarginRatio(1 - B / P, 0);
+    return { pctCtv, pctKhach: 0 };
+  }
+
+  const pctCtv = normalizeMarginRatio(1 - B / P, 0);
+  return { pctCtv, pctKhach: 0 };
+};
+
 module.exports = {
+  resolvePctStuBlend,
   normalizeMoney,
   normalizeImportValue,
   roundToThousands,
@@ -228,4 +314,5 @@ module.exports = {
   normalizePromoRatio,
   calculateMarginBasedPrice,
   calculateOrderPricingFromResolvedValues,
+  deriveVariantMarginsFromCostAndSalePrice,
 };

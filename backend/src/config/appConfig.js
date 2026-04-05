@@ -91,6 +91,17 @@ const dashboardMonthlyTaxRatePercent = Number.isFinite(parsedDashboardTax)
   ? Math.min(100, Math.max(0, parsedDashboardTax))
   : 0;
 
+/** 0–1: blend giá sinh viên (MAVS) giữa MAVC và MAVL khi variant.pct_stu NULL. */
+const rawDefaultPctStu = process.env.DEFAULT_PCT_STU;
+const parsedDefaultPctStu =
+  rawDefaultPctStu === undefined || String(rawDefaultPctStu).trim() === ""
+    ? 0.35
+    : Number(rawDefaultPctStu);
+const defaultPctStu =
+  Number.isFinite(parsedDefaultPctStu) && parsedDefaultPctStu >= 0 && parsedDefaultPctStu <= 1
+    ? parsedDefaultPctStu
+    : 0.35;
+
 // Validate SESSION_SECRET in production
 const sessionSecret = process.env.SESSION_SECRET || "change_this_secret";
 if (isProd && (!process.env.SESSION_SECRET || sessionSecret === "change_this_secret")) {
@@ -112,6 +123,7 @@ module.exports = {
   allowedOriginSet,
   normalizeOrigin,
   dashboardMonthlyTaxRatePercent,
+  defaultPctStu,
   sepay: {
     host: SEPAY_HOST,
     port: SEPAY_PORT,

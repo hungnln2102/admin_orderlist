@@ -66,17 +66,17 @@ export const VARIANT_PRICING_COLS = {
   pctCtv: "pct_ctv",
   pctKhach: "pct_khach",
   pctPromo: "pct_promo",
+  pctStu: "pct_stu",
   isActive: "is_active",
   updatedAt: "update",
   maxSupplyPrice: "max_supply_price",
 };
 
-// 8. PRODUCT_DESC (Backend: PRODUCT_DESC)
+// 8. PRODUCT_DESC / desc_variant (Backend: product.desc_variant; API vẫn trả productId = display_name)
 export const PRODUCT_DESC_COLS = {
   id: "id",
-  // Sau khi gộp bảng product_desc vào variant, productId
-  // trên giao diện sẽ dùng display_name của variant.
   productId: "display_name",
+  descVariantId: "id_desc",
   rules: "rules",
   description: "description",
   imageUrl: "image_url",

@@ -429,6 +429,7 @@ const calculateSalePrice = ({
   pctCtv,
   pctKhach,
   pctPromo,
+  pctStu = null,
   forceKhachLe = false,
 }) =>
   calculateOrderPricingFromResolvedValues({
@@ -440,6 +441,7 @@ const calculateSalePrice = ({
     pctCtv,
     pctKhach,
     pctPromo,
+    pctStu,
     forceKhachLe,
     roundCostToThousands: false,
   }).price;

@@ -10,6 +10,7 @@ const {
   productSchemaCols,
   productCategoryCols,
   variantCols,
+  productDescCols,
   TABLES,
 } = require("../../constants");
 const {
@@ -34,6 +35,8 @@ const createProductPrice = async (req, res) => {
     pctCtv,
     pctKhach,
     pctPromo,
+    pctStu,
+    pct_stu,
     is_active,
     suppliers,
   } = req.body || {};
@@ -53,6 +56,9 @@ const createProductPrice = async (req, res) => {
   const pctCtvVal = toNullableNumber(pctCtv);
   const pctKhachVal = toNullableNumber(pctKhach);
   const pctPromoVal = toNullableNumber(pctPromo);
+  const pctStuVal = toNullableNumber(
+    pctStu !== undefined ? pctStu : pct_stu
+  );
   const basePriceVal = toNullableNumber(basePrice ?? base_price);
   const isActive =
     typeof is_active === "boolean"
@@ -109,16 +115,31 @@ const createProductPrice = async (req, res) => {
               .ignore();
           }
 
+          const descRows = await trx(TABLES.productDesc)
+            .insert({
+              [productDescCols.rules]: null,
+              [productDescCols.description]: null,
+              [productDescCols.shortDesc]: null,
+            })
+            .returning("id");
+          const descVariantId =
+            descRows?.[0]?.id ?? descRows?.[0]?.ID ?? null;
+          if (!descVariantId) {
+            throw new Error("Unable to create desc_variant row.");
+          }
+
           const variantInsert = await trx(TABLES.variant)
             .insert({
               [variantCols.productId]: productId,
               [variantCols.displayName]: productCode,
               [variantCols.variantName]: normalizeTextInput(packageProduct) || null,
               [variantCols.isActive]: isActive,
+              [variantCols.descVariantId]: descVariantId,
               [variantCols.basePrice]: basePriceVal,
               [variantCols.pctCtv]: pctCtvVal,
               [variantCols.pctKhach]: pctKhachVal,
               [variantCols.pctPromo]: pctPromoVal,
+              [variantCols.pctStu]: pctStuVal,
             })
             .returning("id");
           const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;

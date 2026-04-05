@@ -74,17 +74,13 @@ export const DB_DEFINITIONS = {
     },
   },
   productDesc: {
-    // Bảng product_desc đã được gộp vào bảng variant (schema product.variant).
-    // Để giữ tương thích cho các màn hình cũ, mapping này trỏ sang bảng variant
-    // với productId = display_name (mã hiển thị của từng gói).
-    tableName: "variant",
+    // Bảng product.desc_variant; variant.id_desc → desc_variant.id. Nội dung có thể dùng chung.
+    tableName: "desc_variant",
     columns: {
       id: "id",
-      productId: "display_name",
       shortDesc: "short_desc",
       rules: "rules",
       description: "description",
-      imageUrl: "image_url",
       updatedAt: "updated_at",
     },
   },

@@ -112,6 +112,22 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       previewRatios?.pctKhach ?? null,
       previewRatios?.pctCtv ?? null
     ) && Number.isFinite(previewPromoPrice ?? NaN);
+  const previewStudentPriceVal =
+    previewRatios &&
+    typeof previewWholesalePrice === "number" &&
+    Number.isFinite(previewWholesalePrice) &&
+    previewWholesalePrice > 0 &&
+    typeof previewRetailPrice === "number" &&
+    Number.isFinite(previewRetailPrice) &&
+    previewRetailPrice > 0
+      ? previewRetailPrice
+      : null;
+  const showPreviewStudent =
+    Boolean(previewRatios) &&
+    typeof previewStudentPriceVal === "number" &&
+    Number.isFinite(previewStudentPriceVal) &&
+    previewStudentPriceVal > 0;
+  const previewStudentBlendHint = "Cùng giá bán lẻ (MAVL)";
   const highestSupplyPriceDisplay =
     typeof highestSupplyPrice === "number" &&
     Number.isFinite(highestSupplyPrice) &&
@@ -242,9 +258,12 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
               highestSupplyPriceDisplay={highestSupplyPriceDisplay}
               previewWholesalePrice={previewWholesalePrice}
               previewRetailPrice={previewRetailPrice}
+              previewStudentPrice={previewStudentPriceVal}
+              previewStudentBlendHint={previewStudentBlendHint}
               previewPromoPrice={previewPromoPrice}
               previewPromoPercentLabel={previewPromoPercentLabel}
               showPreviewPromo={showPreviewPromo}
+              showPreviewStudent={showPreviewStudent}
               productEditError={editControls.productEditError}
               isSavingProductEdit={editControls.isSavingProductEdit}
               onProductEditChange={editControls.onProductEditChange}

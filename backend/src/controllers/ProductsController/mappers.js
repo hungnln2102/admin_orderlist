@@ -39,6 +39,7 @@ const mapProductPriceRow = (row = {}) => {
     row.pct_khach ?? row[variantCols.pctKhach]
   );
   const pctPromo = toNullableNumber(row.pct_promo ?? row[variantCols.pctPromo]);
+  const pctStu = toNullableNumber(row.pct_stu ?? row[variantCols.pctStu]);
   const isActiveRaw = row.is_active ?? row[variantCols.isActive];
   const isActive =
     typeof isActiveRaw === "boolean"
@@ -67,6 +68,7 @@ const mapProductPriceRow = (row = {}) => {
     pct_ctv: pctCtv,
     pct_khach: pctKhach,
     pct_promo: pctPromo,
+    pct_stu: pctStu,
     is_active: isActive,
     update: row.update ?? row[variantCols.updatedAt] ?? null,
     max_supply_price: toNullableNumber(row.max_supply_price),

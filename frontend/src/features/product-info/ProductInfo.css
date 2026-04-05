@@ -497,6 +497,37 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
+.product-edit-modal--compact {
+  max-height: min(90vh, 860px);
+}
+
+.product-edit-modal--compact .product-edit-modal__header {
+  margin-bottom: 0.85rem;
+}
+
+.product-edit-modal--compact .product-edit-modal__layout {
+  gap: 0.65rem;
+}
+
+.product-edit-modal--compact .product-edit-modal__sidebar {
+  gap: 0.65rem;
+}
+
+.product-edit-modal--compact .product-edit-modal__image-frame {
+  aspect-ratio: 1;
+  max-height: 200px;
+  min-height: 0;
+  align-self: start;
+}
+
+.product-edit-modal--compact .product-edit-modal__panel-title {
+  font-size: 0.95rem;
+}
+
+.product-edit-modal--compact .product-edit-modal__editor-stack {
+  gap: 0.5rem;
+}
+
 .product-edit-modal::before,
 .product-edit-modal__panel::before,
 .product-image-picker::before {

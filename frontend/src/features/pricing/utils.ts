@@ -379,6 +379,7 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
     pctCtv: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctCtv]),
     pctKhach: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctKhach]),
     pctPromo: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctPromo]),
+    pctStu: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctStu] ?? row?.pct_stu),
     isActive: parseBoolean(row?.[VARIANT_PRICING_COLS.isActive]),
     basePrice: toNumberOrNull(
       row?.[VARIANT_PRICING_COLS.basePrice] ?? row?.base_price

@@ -15,7 +15,7 @@ export function PricingRatiosSection({
       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300 mb-4">
         Tỷ Giá
       </p>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <div>
           <label className={labelBase}>Giá Gốc</label>
           <div className="relative">
@@ -67,6 +67,22 @@ export function PricingRatiosSection({
             value={createForm.pctPromo}
             onChange={(event) => onFormChange("pctPromo", event.target.value)}
           />
+        </div>
+        <div>
+          <label className={labelBase}>Giá Sinh Viên → pct_stu</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+            placeholder="Để trống = mặc định server"
+            value={createForm.pctStu}
+            onChange={(event) => onFormChange("pctStu", event.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-slate-400">
+            Cùng định dạng Giá Khách; để trống = NULL trong DB.
+          </p>
         </div>
       </div>
     </div>

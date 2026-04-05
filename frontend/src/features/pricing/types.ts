@@ -14,6 +14,8 @@ export interface ProductPricingRow {
   pctCtv: number | null;
   pctKhach: number | null;
   pctPromo: number | null;
+  /** 0–1, lưu trên variant; giá đơn MAVS dùng cùng công thức MAVL (không blend). */
+  pctStu: number | null;
   isActive: boolean;
   basePrice: number | null;
   baseSupplyPrice: number | null;
@@ -61,6 +63,7 @@ export interface ProductEditFormState {
   pctCtv: string;
   pctKhach: string;
   pctPromo: string;
+  pctStu: string;
 }
 
 export interface BankOption {
@@ -83,6 +86,7 @@ export interface CreateProductFormState {
   pctCtv: string;
   pctKhach: string;
   pctPromo: string;
+  pctStu: string;
 }
 
 export interface CreateSupplierEntry {
