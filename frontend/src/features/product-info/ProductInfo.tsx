@@ -12,7 +12,6 @@ import { useCategoryEdit } from "./hooks/useCategoryEdit";
 import { useCategoryOptions } from "./hooks/useCategoryOptions";
 import { useProductEdit } from "./hooks/useProductEdit";
 import { useProductInfo } from "./hooks/useProductInfo";
-import { getCategoryColor } from "./utils/categoryColors";
 import { buildCategoryRows } from "./utils/buildCategoryRows";
 import { PAGE_SIZE } from "./utils/productInfoHelpers";
 import "./ProductInfo.css";
@@ -54,6 +53,14 @@ const ProductInfo: React.FC = () => {
     reload: loadCategories,
   } = useCategoryOptions();
 
+  const existingCategoryColors = useMemo(
+    () =>
+      categoryOptions
+        .map((c) => (c.color || "").trim())
+        .filter((c) => c.length > 0),
+    [categoryOptions]
+  );
+
   const {
     editingProduct,
     editSaving,
@@ -87,13 +94,16 @@ const ProductInfo: React.FC = () => {
     newCategoryName,
     setNewCategoryName,
     newCategoryColor,
-    setNewCategoryColor,
     creatingCategory,
     createCategoryError,
     openCreateCategory,
     closeCreateCategory,
+    shuffleNewCategoryColor,
     handleCreateCategory,
-  } = useCategoryCreate({ reloadCategories: loadCategories });
+  } = useCategoryCreate({
+    reloadCategories: loadCategories,
+    existingCategoryColors,
+  });
 
   const categoryRows = useMemo(
     () => buildCategoryRows(mergedProducts),
@@ -143,7 +153,6 @@ const ProductInfo: React.FC = () => {
           categoryRows={categoryRows}
           loading={loading}
           onEditCategory={openCategoryEdit}
-          getCategoryColor={getCategoryColor}
         />
       ) : (
         <VariantContentView
@@ -162,7 +171,7 @@ const ProductInfo: React.FC = () => {
           saving={creatingCategory}
           error={createCategoryError}
           onNameChange={setNewCategoryName}
-          onColorChange={setNewCategoryColor}
+          onShuffleColor={shuffleNewCategoryColor}
           onClose={closeCreateCategory}
           onSave={handleCreateCategory}
         />

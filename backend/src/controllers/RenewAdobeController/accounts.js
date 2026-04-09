@@ -7,6 +7,7 @@ const {
 } = require("../../config/dbSchema");
 const { TABLE, COLS } = require("./accountTable");
 const { findAccountMatchByEmail, normalizeEmail } = require("./accountLookup");
+const { removeMappingsForAccount } = require("../../services/userAccountMappingService");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP
@@ -408,6 +409,41 @@ const createAccount = async (req, res) => {
   }
 };
 
+const deleteAccount = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id) || id < 1) {
+    return res.status(400).json({ error: "ID không hợp lệ." });
+  }
+
+  try {
+    const row = await db(TABLE).where(COLS.ID, id).first();
+    if (!row) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
+    }
+
+    await removeMappingsForAccount(id);
+    const deleted = await db(TABLE).where(COLS.ID, id).del();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
+    }
+
+    logger.info("[renew-adobe] Deleted admin account", {
+      id,
+      email: trimStr(row[COLS.EMAIL]),
+    });
+    return res.json({ success: true, id });
+  } catch (err) {
+    logger.error("[renew-adobe] deleteAccount failed", {
+      id,
+      error: err.message,
+    });
+    return res.status(500).json({
+      error: "Không xóa được tài khoản.",
+    });
+  }
+};
+
 const updateUrlAccess = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id)) {
@@ -437,5 +473,6 @@ module.exports = {
   listAccounts,
   lookupAccountByEmail,
   createAccount,
+  deleteAccount,
   updateUrlAccess,
 };

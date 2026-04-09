@@ -6,9 +6,12 @@ import {
 } from "@heroicons/react/24/outline";
 import {
   MergedProduct,
+  htmlToPlainText,
+  resolveVariantDisplayImageUrl,
   sanitizeHtmlForDisplay,
   splitCombinedContent,
   toHtmlFromPlain,
+  variantHasDescVariantLinked,
 } from "../utils/productInfoHelpers";
 
 type ProductRowProps = {
@@ -25,11 +28,12 @@ const ProductAvatar: React.FC<{
   const displayName = item.productName || item.productId || "--";
   const dimensions =
     size === "large" ? "h-32 w-32 text-2xl" : "h-12 w-12 text-xs";
+  const thumbUrl = resolveVariantDisplayImageUrl(item);
 
-  if (item.imageUrl) {
+  if (thumbUrl) {
     return (
       <img
-        src={item.imageUrl}
+        src={thumbUrl}
         alt={displayName}
         className={`${dimensions} rounded-md object-cover`}
         onError={(event) => {
@@ -64,19 +68,40 @@ export const ProductRow: React.FC<ProductRowProps> = ({
     sanitizeHtmlForDisplay(
       displayDescriptionHtml || toHtmlFromPlain(item.description || "")
     ) || "Không có thông tin sản phẩm";
+  /** Ô bảng chỉ hiển thị text thuần (không in đậm/HTML). Chi tiết mở rộng vẫn dùng HTML. */
+  const previewRulesPlain =
+    htmlToPlainText(safeRulesHtml).replace(/\s+/g, " ").trim() ||
+    "Không có thông tin bán hàng";
+  const previewDescriptionPlain =
+    htmlToPlainText(safeDescriptionHtml).replace(/\s+/g, " ").trim() ||
+    "Không có thông tin sản phẩm";
+  const rowThumbUrl = resolveVariantDisplayImageUrl(item);
+  /** Màu nền: gắn desc_variant (id_desc) vs chưa gắn — lấy từ bảng variant qua /api/products. */
+  const hasDescLinked = variantHasDescVariantLinked(item);
+  const isInactive = item.isActive === false;
+  const rowStateClass = isInactive
+    ? "product-row--inactive"
+    : hasDescLinked
+      ? "product-row--has-desc"
+      : "product-row--no-desc";
+  const expandedStateClass = isInactive
+    ? "product-info-surface__expanded-row--inactive"
+    : hasDescLinked
+      ? "product-info-surface__expanded-row--has-desc"
+      : "product-info-surface__expanded-row--no-desc";
 
   return (
     <React.Fragment key={`${item.id}-${item.productId}`}>
       <tr
-        className={`product-row product-info-surface__row ${
-          isExpanded ? "product-row--expanded bg-white/5" : ""
-        } cursor-pointer hover:bg-white/5`}
+        className={`product-row product-info-surface__row ${rowStateClass} ${
+          isExpanded ? "product-row--expanded" : ""
+        } cursor-pointer`}
         onClick={() => onToggle(isExpanded ? null : Number(item.id))}
       >
         <td className="product-row__cell px-4 py-3">
-          {item.imageUrl ? (
+          {rowThumbUrl ? (
             <img
-              src={item.imageUrl}
+              src={rowThumbUrl}
               alt={displayName}
               className="h-12 w-12 rounded-lg object-cover"
               onError={(e) => {
@@ -104,34 +129,32 @@ export const ProductRow: React.FC<ProductRowProps> = ({
 
         <td className="min-w-[240px] border-r border-white/10 px-5 py-3 pr-5 align-top text-white/80">
           <span
-            className="rich-display block break-words whitespace-pre-line"
+            className="block break-words"
             style={{
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
-            title={item.rulesHtml ? undefined : item.rules || ""}
-            dangerouslySetInnerHTML={{
-              __html: safeRulesHtml,
-            }}
-          />
+            title={previewRulesPlain}
+          >
+            {previewRulesPlain}
+          </span>
         </td>
 
         <td className="min-w-[240px] border-r border-white/10 px-5 py-3 pl-5 align-top text-white/80">
           <span
-            className="rich-display block break-words whitespace-pre-line"
+            className="block break-words"
             style={{
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
             }}
-            title={item.descriptionHtml ? undefined : item.description || ""}
-            dangerouslySetInnerHTML={{
-              __html: safeDescriptionHtml,
-            }}
-          />
+            title={previewDescriptionPlain}
+          >
+            {previewDescriptionPlain}
+          </span>
         </td>
 
         <td className="product-row__actions px-4 py-3 text-center align-top whitespace-nowrap">
@@ -173,7 +196,9 @@ export const ProductRow: React.FC<ProductRowProps> = ({
       </tr>
 
       {isExpanded && (
-        <tr className="product-info-surface__expanded-row bg-white/5">
+        <tr
+          className={`product-info-surface__expanded-row ${expandedStateClass}`}
+        >
           <td colSpan={7} className="px-6 py-4">
             <div className="mb-3 flex flex-col items-center rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-center">
               <p className="text-sm font-semibold text-white">Thông tin chi tiết</p>

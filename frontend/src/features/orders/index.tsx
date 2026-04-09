@@ -11,6 +11,7 @@ import { OrdersDatasetTabs } from "./components/OrdersDatasetTabs";
 import { OrdersStatsSection } from "./components/OrdersStatsSection";
 import { OrdersFiltersBar } from "./components/OrdersFiltersBar";
 import { OrdersTableSection } from "./components/OrdersTableSection";
+import type { DashboardDateRangeValue } from "@/features/dashboard/components/DashboardDateRangeFilter";
 
 export default function Orders() {
   const [datasetKey, setDatasetKey] = useState<OrderDatasetKey>("active");
@@ -22,6 +23,8 @@ export default function Orders() {
     expired: 0,
     canceled: 0,
   });
+  const [orderDurationRange, setOrderDurationRange] =
+    useState<DashboardDateRangeValue | null>(null);
   const {
     currentOrders,
     totalPages,
@@ -64,7 +67,7 @@ export default function Orders() {
     reloadOrders,
     totalRecords,
     renewingOrderCode,
-  } = useOrdersData(datasetKey);
+  } = useOrdersData(datasetKey, { durationRange: orderDurationRange });
 
   useEffect(() => {
     setDatasetCounts((prev) => {
@@ -125,6 +128,8 @@ export default function Orders() {
         setSearchField={setSearchField}
         isActiveDataset={isActiveDataset}
         openCreateModal={openCreateModal}
+        durationRange={orderDurationRange}
+        onDurationRangeChange={setOrderDurationRange}
       />
 
       <OrdersTableSection

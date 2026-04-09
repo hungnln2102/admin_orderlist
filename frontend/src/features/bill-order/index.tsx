@@ -3,6 +3,7 @@ import {
   API_ENDPOINTS,
   ORDER_CODE_PREFIXES,
 } from "@/constants";
+import { multiplyValue } from "@/features/pricing/utils";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
@@ -132,8 +133,27 @@ export default function BillOrder() {
         toPositiveNumber(product?.computed_retail_price) || wholesalePrice;
 
       let unitPrice = retailPrice;
-      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR || orderType === ORDER_CODE_PREFIXES.STUDENT) {
+      if (orderType === ORDER_CODE_PREFIXES.COLLABORATOR) {
         unitPrice = wholesalePrice;
+      } else if (orderType === ORDER_CODE_PREFIXES.STUDENT) {
+        const pctStuRaw =
+          product?.[VARIANT_PRICING_COLS.pctStu] ?? product?.pct_stu ?? null;
+        const pctStuProvided =
+          pctStuRaw !== null &&
+          pctStuRaw !== undefined &&
+          !(typeof pctStuRaw === "string" && String(pctStuRaw).trim() === "");
+        const marginForStudent = pctStuProvided
+          ? pctStuRaw
+          : product?.[VARIANT_PRICING_COLS.pctKhach] ??
+            product?.pct_khach ??
+            null;
+        const studentUnit = multiplyValue(wholesalePrice, marginForStudent);
+        unitPrice =
+          typeof studentUnit === "number" &&
+          Number.isFinite(studentUnit) &&
+          studentUnit > 0
+            ? studentUnit
+            : wholesalePrice;
       } else if (orderType === ORDER_CODE_PREFIXES.GIFT) {
         unitPrice = 0;
       } else if (
@@ -176,6 +196,19 @@ export default function BillOrder() {
     if (Number.isNaN(date.getTime())) return "..... tháng ..... năm 20..";
     return new Intl.DateTimeFormat("vi-VN").format(date);
   }, [form.invoiceDate]);
+
+  const invoiceCodesDisplay = useMemo(
+    () => invoiceCodes.map((e) => e.code.trim()).filter(Boolean).join(", ") || "—",
+    [invoiceCodes]
+  );
+
+  const orderStatusDisplay = useMemo(() => {
+    const first = invoiceCodes[0];
+    if (!first) return "—";
+    const row = orderMap.get(normalizeKey(first.code));
+    const s = row?.[ORDER_COLS.status] ?? row?.status;
+    return s != null && String(s).trim() !== "" ? String(s) : "—";
+  }, [invoiceCodes, orderMap]);
 
   const handleChange = (field: keyof InvoiceForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -220,6 +253,8 @@ export default function BillOrder() {
         invoiceLines={invoiceLines}
         totals={totals}
         dateDisplay={dateDisplay}
+        invoiceCodesDisplay={invoiceCodesDisplay}
+        orderStatusDisplay={orderStatusDisplay}
         onDownload={handleDownload}
       />
     </div>

@@ -10,6 +10,7 @@ const deleteOrderWithArchive = async ({
         adjustSupplierDebtIfNeeded,
         calcRemainingRefund,
     } = require("./orderFinanceHelpers");
+    const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
     const logger = require("../../utils/logger");
 
@@ -77,6 +78,16 @@ const deleteOrderWithArchive = async ({
         }
 
         await trx(TABLES.orderList).where({ id: orderId }).update(updatePayload);
+
+        const afterOrder = {
+            ...order,
+            [statusCol]: STATUS.PENDING_REFUND,
+            [refundCol]: refundValue,
+        };
+        if (updatePayload[canceledAtCol] !== undefined) {
+            afterOrder[canceledAtCol] = updatePayload[canceledAtCol];
+        }
+        await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder);
     } else {
         await trx(TABLES.orderList).where({ id: orderId }).update({
             [statusCol]: STATUS.EXPIRED,

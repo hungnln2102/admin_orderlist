@@ -7,10 +7,11 @@ import {
   ReceiptPercentIcon,
   ShoppingBagIcon,
 } from "@heroicons/react/24/outline";
-import { apiFetch } from "@/shared/api/client";
 import {
   fetchAvailableYears,
   fetchChartData,
+  fetchChartDataRange,
+  fetchDashboardStats,
   type ChartsApiResponse,
   type OrderStatusData,
   type RevenueData,
@@ -107,6 +108,8 @@ const buildStats = (stats: StatsApiResponse): OverviewStat[] => {
 ];
 };
 
+export type DashboardDateRange = { from: string; to: string };
+
 export const useDashboardStats = () => {
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const currentMonth = useMemo(() => new Date().getMonth() + 1, []); // 1-based
@@ -119,40 +122,38 @@ export const useDashboardStats = () => {
   const [taxChartData, setTaxChartData] = useState<TaxData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [dashboardRange, setDashboardRange] = useState<DashboardDateRange | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchDashboardData = useCallback(
-    async (year: number) => {
-      setLoading(true);
-      setErrorMessage(null);
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
 
-      try {
-        const statsResponse = await apiFetch("/api/dashboard/stats");
-        if (!statsResponse.ok) {
-          const message = await statsResponse.text();
-          throw new Error(
-            normalizeErrorMessage(message, {
-              fallback: "Không thể tải thống kê tổng quan.",
-            })
-          );
-        }
-        const stats: StatsApiResponse = await statsResponse.json();
-        setStatsData(buildStats(stats));
+    try {
+      const stats: StatsApiResponse = await fetchDashboardStats(dashboardRange);
+      setStatsData(buildStats(stats));
 
-        const charts: ChartsApiResponse = await fetchChartData(year);
-        setRevenueChartData(charts.revenueData);
-        setOrderChartData(charts.orderStatusData);
-        setProfitChartData(charts.profitData);
-        setRefundChartData(charts.refundData);
-        setTaxChartData(charts.taxData ?? []);
+      const charts: ChartsApiResponse = dashboardRange
+        ? await fetchChartDataRange(dashboardRange.from, dashboardRange.to)
+        : await fetchChartData(selectedYear);
+      setRevenueChartData(charts.revenueData);
+      setOrderChartData(charts.orderStatusData);
+      setProfitChartData(charts.profitData);
+      setRefundChartData(charts.refundData);
+      setTaxChartData(charts.taxData ?? []);
 
-        const monthLimit = year === currentYear ? currentMonth : 12;
+      if (!dashboardRange) {
+        const monthLimit = selectedYear === currentYear ? currentMonth : 12;
         const orderPoints = charts.orderStatusData
           .filter((p, idx) => idx < monthLimit && Number.isFinite(Number(p.total_orders)));
         if (orderPoints.length >= 2) {
-          const currentOrders = Number(orderPoints[orderPoints.length - 1].total_orders) || 0;
-          const previousOrders = Number(orderPoints[orderPoints.length - 2].total_orders) || 0;
+          const currentOrders =
+            Number(orderPoints[orderPoints.length - 1].total_orders) || 0;
+          const previousOrders =
+            Number(orderPoints[orderPoints.length - 2].total_orders) || 0;
           const fallbackDiff = percentChange(currentOrders, previousOrders);
 
           setStatsData((prev) =>
@@ -167,21 +168,20 @@ export const useDashboardStats = () => {
             )
           );
         }
-      } catch (err) {
-        console.error("Lỗi khi lấy dữ liệu dashboard:", err);
-        setErrorMessage(
-          err instanceof Error
-            ? normalizeErrorMessage(err.message, {
-                fallback: "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau.",
-              })
-            : "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau."
-        );
-      } finally {
-        setLoading(false);
       }
-    },
-    []
-  );
+    } catch (err) {
+      console.error("Lỗi khi lấy dữ liệu dashboard:", err);
+      setErrorMessage(
+        err instanceof Error
+          ? normalizeErrorMessage(err.message, {
+              fallback: "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau.",
+            })
+          : "Đã có lỗi khi tải dữ liệu dashboard. Vui lòng thử lại sau."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [currentMonth, currentYear, dashboardRange, selectedYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,8 +217,8 @@ export const useDashboardStats = () => {
   }, [currentYear]);
 
   useEffect(() => {
-    void fetchDashboardData(selectedYear);
-  }, [selectedYear, fetchDashboardData]);
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return {
     statsData,
@@ -230,6 +230,8 @@ export const useDashboardStats = () => {
     availableYears,
     selectedYear,
     setSelectedYear,
+    dashboardRange,
+    setDashboardRange,
     loading,
     errorMessage,
   };

@@ -1,157 +1,178 @@
-/* RetroLogin Component Styles */
-@import url('https://fonts.googleapis.com/css2?family=Vast+Shadow&display=swap');
-@import './retro-theme.css';
-@import './retro-animations.css';
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import "./retro-theme.css";
+@import "./retro-animations.css";
 
 .retro-login {
   min-height: 100vh;
-  background: radial-gradient(circle at 20% 20%, rgba(255, 110, 199, 0.12), transparent 30%),
-              radial-gradient(circle at 80% 0%, rgba(77, 225, 236, 0.12), transparent 32%),
-              var(--retro-bg);
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--retro-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: clamp(20px, 4vw, 56px);
   position: relative;
-  overflow: hidden;
-  font-family: "Inter", "Space Grotesk", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 }
 
 .retro-shell {
   position: relative;
-  width: min(1100px, 100%);
-  min-height: 620px;
-  border: 1px solid var(--retro-border);
-  border-radius: 24px;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgba(255, 110, 199, 0.06), rgba(77, 225, 236, 0.05));
-  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.45);
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
 }
 
 .retro-bg {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  z-index: 0;
 }
 
 .retro-grid {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 80px 80px;
-  transform: perspective(600px) rotateX(70deg) translateY(-20%);
-  transform-origin: center;
-  filter: blur(0.3px);
+  opacity: 0.35;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 70%);
+  animation: gridFade 10s ease-in-out infinite;
 }
 
 .retro-sun {
   position: absolute;
-  width: 340px;
-  height: 340px;
+  width: min(520px, 90vw);
+  height: min(520px, 90vw);
   border-radius: 50%;
-  background: conic-gradient(from 120deg, rgba(255, 110, 199, 0.3), rgba(124, 92, 255, 0.35), rgba(77, 225, 236, 0.3));
-  top: -80px;
+  background: radial-gradient(
+    circle at 40% 40%,
+    rgba(255, 105, 180, 0.22) 0%,
+    rgba(147, 112, 219, 0.18) 38%,
+    transparent 65%
+  );
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  filter: blur(10px);
-  opacity: 0.9;
+  transform: translate(-50%, -50%);
+  filter: blur(32px);
+  animation: sunPulse 12s ease-in-out infinite;
 }
 
 .retro-planet {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: clamp(100px, 14vw, 160px);
+  height: clamp(100px, 14vw, 160px);
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #fff, #7c5cff 45%, #0b0b14 75%);
-  top: 60px;
-  right: 140px;
-  box-shadow: 0 0 40px rgba(124, 92, 255, 0.7);
-  opacity: 0.7;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.45), #b894ff 36%, #5b3d9e 62%, #1a1230 88%);
+  top: 18%;
+  right: clamp(16px, 8vw, 72px);
+  box-shadow: 0 0 50px rgba(147, 112, 219, 0.65), inset -8px -12px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0.88;
+  animation: planetFloat 9s ease-in-out infinite;
 }
 
 .retro-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 70%, rgba(255, 110, 199, 0.1), transparent 45%);
+  background: radial-gradient(ellipse 55% 45% at 50% 52%, rgba(0, 255, 255, 0.09), transparent 55%),
+    radial-gradient(ellipse 40% 40% at 78% 28%, rgba(147, 112, 219, 0.16), transparent 50%);
   mix-blend-mode: screen;
+  animation: auroraPulse 8s ease-in-out infinite;
 }
 
 .retro-card {
   position: relative;
   z-index: 1;
-  margin: 48px;
-  padding: 36px;
+  margin: 0;
+  padding: clamp(28px, 5vw, 40px);
   border-radius: 18px;
-  background: var(--retro-card);
-  border: 1px solid var(--retro-border);
-  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   box-shadow: var(--retro-glow);
   color: var(--retro-text);
   display: grid;
   gap: 24px;
-  max-width: 640px;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
+  isolation: isolate;
 }
 
+/* Quầng sáng xoay phía sau kính */
 .retro-card::before {
   content: "";
   position: absolute;
-  inset: -60px;
-  background: conic-gradient(#ff6ec7, #7c5cff, #4de1ec, #ff6ec7);
-  filter: blur(40px);
-  opacity: 0.45;
-  animation: spinGlow 12s linear infinite;
+  inset: -55%;
   z-index: 0;
+  background: conic-gradient(from 0deg, #ff69b4, #9370db, #00ffff, #e8a0ff, #ff69b4);
+  opacity: 0.42;
+  filter: blur(42px);
+  animation: spinGlow 16s linear infinite;
   pointer-events: none;
+}
+
+/* Viền gradient mảnh */
+.retro-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  z-index: 1;
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.4), rgba(147, 112, 219, 0.25), rgba(0, 255, 255, 0.2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 .retro-card > * {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .card-top {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.badge {
-  align-self: flex-start;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 110, 199, 0.2), rgba(77, 225, 236, 0.2));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  color: var(--retro-text);
+  gap: 10px;
 }
 
 .title h1 {
-  font-size: 36px;
+  font-size: clamp(1.65rem, 4vw, 2.125rem);
   line-height: 1.2;
-  margin: 6px 0 6px;
-  letter-spacing: -0.01em;
+  margin: 4px 0 4px;
+  letter-spacing: -0.02em;
+  font-weight: 700;
 }
 
 .gradient-title {
-  background: linear-gradient(120deg, #ff6ec7, #7c5cff, #4de1ec, #ff6ec7);
+  background: linear-gradient(90deg, #ff69b4, #e8a0ff, #00ffff, #ff69b4);
   background-size: 200% 200%;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: gradientShift 4s ease-in-out infinite;
-  font-family: "Vast Shadow", "Cinzel Decorative", "Inter", system-ui, -apple-system, sans-serif;
-  letter-spacing: 0.5px;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.02em;
+  animation: gradientShift 6s ease-in-out infinite;
 }
 
 .title .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 12px;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--retro-muted);
   margin: 0;
 }
@@ -160,140 +181,183 @@
   margin: 0;
   color: var(--retro-muted);
   font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
 }
 
 .form {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   font-size: 14px;
-  color: var(--retro-text);
+  font-weight: 500;
+  color: rgba(245, 245, 250, 0.92);
 }
 
 .field input {
   width: 100%;
-  border-radius: 12px;
-  border: 1px solid var(--retro-border);
-  background: var(--glass);
-  padding: 12px 14px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--glass-input);
+  padding: 13px 14px;
   color: var(--retro-text);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+  font-size: 15px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input::placeholder {
+  color: rgba(160, 160, 160, 0.75);
 }
 
 .field input:focus {
   outline: none;
-  border-color: rgba(255, 110, 199, 0.6);
-  box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25);
+  border-color: rgba(255, 105, 180, 0.65);
+  box-shadow: 0 0 0 3px rgba(147, 112, 219, 0.28), 0 0 24px rgba(255, 105, 180, 0.12);
 }
 
 .controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
   font-size: 13px;
   color: var(--retro-muted);
-}
-
-.remember {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.remember input {
-  accent-color: #7c5cff;
 }
 
 .ghost {
   background: transparent;
   border: none;
-  color: var(--retro-text);
+  color: #7ee8ff;
   font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px 4px 4px 8px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ghost:hover {
+  color: #ff9ecf;
 }
 
 .cta {
   width: 100%;
   border: none;
-  border-radius: 14px;
-  padding: 14px;
+  border-radius: 12px;
+  padding: 15px 16px;
   font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #0b0b14;
-  background: linear-gradient(90deg, #ff6ec7, #7c5cff, #4de1ec);
-  box-shadow: 0 15px 40px rgba(124, 92, 255, 0.45);
+  font-size: 16px;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  color: #0b0b15;
+  background: linear-gradient(90deg, #ff69b4, #9370db, #00ffff);
+  background-size: 100% 100%;
+  box-shadow: 0 12px 36px rgba(147, 112, 219, 0.4);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
 
-.cta:hover {
+.cta:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 50px rgba(124, 92, 255, 0.55);
+  box-shadow: 0 16px 44px rgba(147, 112, 219, 0.5);
+  filter: brightness(1.03);
 }
 
-.cta:active {
+.cta:active:not(:disabled) {
   transform: translateY(0);
 }
 
 .cta:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
+  filter: grayscale(0.08);
 }
 
 .error-msg {
-  margin-top: 8px;
+  margin-top: 4px;
   color: #ff9b9b;
   font-size: 13px;
 }
 
-.divider {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
-  color: var(--retro-muted);
-  font-size: 12px;
-}
-
-.divider span {
-  height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255,255,255,0.25), rgba(255,255,255,0));
-}
-
-.social {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.social button {
-  border: 1px solid var(--retro-border);
-  background: var(--glass);
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: var(--retro-text);
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.2s, transform 0.2s;
-}
-
-.social button:hover {
-  border-color: rgba(255, 110, 199, 0.5);
-  transform: translateY(-1px);
-}
-
-@media (max-width: 768px) {
-  .retro-shell {
-    margin: 16px;
+@media (max-width: 640px) {
+  .retro-login {
+    padding: clamp(16px, 5vw, 24px);
   }
-  .retro-card {
-    margin: 32px 20px;
-    padding: 28px;
+
+  .retro-shell {
+    max-width: min(420px, 90vw);
+  }
+
+  .retro-grid {
+    opacity: 0.15;
+    mask-image: none;
+  }
+
+  .retro-sun {
+    opacity: 0.45;
+    left: 50%;
+    transform: translate(-50%, -45%);
+    width: min(380px, 120vw);
+    height: min(380px, 120vw);
+    animation: none;
+  }
+
+  .retro-planet {
+    width: 72px;
+    height: 72px;
+    top: 8%;
+    right: 6%;
+    opacity: 0.35;
+    animation: none;
+  }
+
+  .retro-glow,
+  .retro-grid {
+    animation: none;
+  }
+
+  .retro-card::before {
+    animation: none;
+    opacity: 0.28;
+  }
+
+  .gradient-title {
+    animation: none;
+    background-size: 100% 100%;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .ghost {
+    padding-left: 0;
+    align-self: flex-end;
+    margin-top: -8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retro-grid,
+  .retro-sun,
+  .retro-glow,
+  .retro-planet,
+  .retro-card::before,
+  .gradient-title {
+    animation: none;
+  }
+
+  .retro-card::before {
+    opacity: 0.3;
   }
 }

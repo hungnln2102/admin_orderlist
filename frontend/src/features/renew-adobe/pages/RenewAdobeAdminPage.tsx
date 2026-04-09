@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { RenewAdobeAccountsTable } from "@/features/renew-adobe/components/RenewAdobeAccountsTable";
 import { AddUserByEmail } from "@/features/renew-adobe/components/AddUserByEmail";
 import { AddAdminAccountModal } from "@/features/renew-adobe/components/AddAdminAccountModal";
@@ -20,6 +21,10 @@ export default function RenewAdobeAdmin() {
     error,
     checkingId,
     checkError,
+    deletingAdminAccountId,
+    adminAccountPendingDelete,
+    closeDeleteAdminModal,
+    confirmDeleteAdminAccount,
     deletingId,
     fixingId,
     fixAllProgress,
@@ -36,6 +41,7 @@ export default function RenewAdobeAdmin() {
     handleFixAllUsers,
     handleSaveUrlAccess,
     handleCheck,
+    openDeleteAdminModal,
   } = useRenewAdobeAdmin();
 
   const filtered = useMemo(() => {
@@ -95,6 +101,7 @@ export default function RenewAdobeAdmin() {
         error={error}
         checkError={checkError}
         checkingId={checkingId}
+        deletingAdminAccountId={deletingAdminAccountId}
         isCheckingAll={isCheckingAll}
         checkingIds={checkAllProgress?.checkingIds}
         onSearchTermChange={(value) => {
@@ -103,6 +110,7 @@ export default function RenewAdobeAdmin() {
         }}
         onPageChange={setCurrentPage}
         onCheck={handleCheck}
+        onDeleteAdmin={openDeleteAdminModal}
         onSaveUrlAccess={handleSaveUrlAccess}
       />
 
@@ -118,6 +126,22 @@ export default function RenewAdobeAdmin() {
         />
         <AddUserByEmail onAdded={loadAccounts} />
       </div>
+
+      <ConfirmModal
+        isOpen={adminAccountPendingDelete !== null}
+        onClose={closeDeleteAdminModal}
+        onConfirm={confirmDeleteAdminAccount}
+        title="Xóa tài khoản admin?"
+        message={
+          adminAccountPendingDelete
+            ? `Xóa tài khoản ${adminAccountPendingDelete.email} khỏi danh sách?`
+            : ""
+        }
+        secondaryMessage="Gán user ↔ đơn hàng với account này sẽ được gỡ. (Không tự xóa user trên Adobe.)"
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={deletingAdminAccountId !== null}
+      />
     </div>
   );
 }

@@ -64,8 +64,6 @@ export const useSavingGoalsActions = ({
 
   const handleDelete = useCallback(
     async (goalId: number) => {
-      if (!confirm("Bạn có chắc muốn xóa mục tiêu này?")) return;
-
       try {
         const response = await fetch(`/api/saving-goals/${goalId}`, {
           method: "DELETE",

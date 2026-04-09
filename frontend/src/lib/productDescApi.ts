@@ -13,6 +13,8 @@ export interface ProductDescription {
   descriptionHtml?: string | null;
   shortDescription?: string | null;
   imageUrl?: string | null;
+  /** Ảnh gói (product) — API trả về để so với ảnh biến thể */
+  packageImageUrl?: string | null;
 }
 
 export interface ProductDescriptionResponse {
@@ -123,6 +125,8 @@ const normalizeSavedProductDescription = (
     (data as any).short_desc ??
     null,
   imageUrl: (data as any).imageUrl ?? (data as any).image_url ?? null,
+  packageImageUrl:
+    (data as any).packageImageUrl ?? (data as any).package_image_url ?? null,
 });
 
 export const createProductDescription = async (
@@ -180,6 +184,27 @@ export const saveProductDescription = async (
     throw new Error("Phản hồi không hợp lệ từ server.");
   }
   return normalizeSavedProductDescription(data as Record<string, unknown>);
+};
+
+export const deleteProductDescriptionRecord = async (
+  descVariantId: number
+): Promise<void> => {
+  const id = Number(descVariantId);
+  if (!Number.isFinite(id) || id <= 0) {
+    throw new Error("ID desc_variant không hợp lệ.");
+  }
+  const response = await apiFetch(
+    `/api/product-descriptions/desc-variant/${encodeURIComponent(String(id))}`,
+    { method: "DELETE" }
+  );
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(
+      normalizeErrorMessage(message, {
+        fallback: "Không thể xóa desc_variant.",
+      })
+    );
+  }
 };
 
 export const auditProductSeo = async (
@@ -363,6 +388,8 @@ export const fetchProductDescriptions = async (
       item?.short_desc ??
       null,
     imageUrl: item?.imageUrl ?? item?.image_url ?? null,
+    packageImageUrl:
+      item?.packageImageUrl ?? item?.package_image_url ?? null,
   }));
   return {
     ...data,

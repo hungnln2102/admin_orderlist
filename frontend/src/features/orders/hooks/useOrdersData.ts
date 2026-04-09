@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { OrderDatasetKey } from "@/constants";
 import { useOrdersFetch } from "./useOrdersFetch";
-import { useOrdersList } from "./useOrdersList";
+import { useOrdersList, type OrdersDurationRange } from "./useOrdersList";
 import { useOrdersModals } from "./useOrdersModals";
 import { useOrderActions } from "./useOrderActions";
 
 export type { EditableOrder } from "../types";
 
-export function useOrdersData(dataset: OrderDatasetKey) {
+export type UseOrdersDataOptions = {
+  durationRange: OrdersDurationRange | null;
+};
+
+export function useOrdersData(
+  dataset: OrderDatasetKey,
+  { durationRange }: UseOrdersDataOptions
+) {
   const { orders, setOrders, fetchError, fetchOrders } = useOrdersFetch(dataset);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,6 +34,7 @@ export function useOrdersData(dataset: OrderDatasetKey) {
     currentPage,
     setCurrentPage,
     dataset,
+    durationRange,
   });
 
   const actions = useOrderActions({

@@ -14,7 +14,7 @@ export interface ProductPricingRow {
   pctCtv: number | null;
   pctKhach: number | null;
   pctPromo: number | null;
-  /** 0–1, lưu trên variant; giá đơn MAVS dùng cùng công thức MAVL (không blend). */
+  /** Biên lớp 2 cho MAVS; null/để trống → backend dùng pct_khách (giá khách lẻ). */
   pctStu: number | null;
   isActive: boolean;
   basePrice: number | null;

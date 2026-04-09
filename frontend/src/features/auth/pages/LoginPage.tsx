@@ -11,7 +11,15 @@ import "../styles/login.css";
  * Refactored into smaller, maintainable components
  */
 const LoginPage: React.FC = () => {
-  const { email, password, error, loading, setEmail, setPassword, handleSubmit } = useLogin();
+  const {
+    email,
+    password,
+    error,
+    loading,
+    setEmail,
+    setPassword,
+    handleSubmit,
+  } = useLogin();
 
   return (
     <div className="login-page retro-login">

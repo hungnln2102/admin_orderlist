@@ -58,6 +58,7 @@ export const API_ENDPOINTS = {
   WAREHOUSE: "/api/warehouse",
 
   RENEW_ADOBE_ACCOUNTS: "/api/renew-adobe/accounts",
+  RENEW_ADOBE_ACCOUNT_DELETE: (id: number) => `/api/renew-adobe/accounts/${id}`,
   RENEW_ADOBE_MAIL_BACKUP_MAILBOXES: "/api/renew-adobe/mail-backup-mailboxes",
   RENEW_ADOBE_ACCOUNT_LOOKUP: "/api/renew-adobe/accounts/lookup",
   RENEW_ADOBE_ACCOUNT_CHECK: (id: number) =>
@@ -68,6 +69,8 @@ export const API_ENDPOINTS = {
   RENEW_ADOBE_CHECK_ALL: "/api/renew-adobe/accounts/check-all",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
+  /** Một vòng Fix All: batch theo slot tài khoản gần đầy nhất (lặp cho tới hết emails). */
+  RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
   RENEW_ADOBE_VARIANTS: "/api/renew-adobe/variants",
@@ -205,6 +208,8 @@ export interface Order {
   price: string;
   note: string;
   status: string;
+  /** Ngày/giờ chuyển sang hoàn tiền (API / DB `canceled_at`). */
+  canceled_at?: string | null;
   can_hoan?: number | string;
   so_ngay_con_lai: number | null;
 

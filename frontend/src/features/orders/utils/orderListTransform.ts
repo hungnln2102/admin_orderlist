@@ -7,8 +7,10 @@ import {
 } from "@/constants";
 import * as Helpers from "@/lib/helpers";
 import {
+  isGiftOrderCode,
   normalizeOrderCode,
   normalizeSearchText,
+  parseCanceledAtToMs,
   parseExpiryTime,
   parseNumeric,
   resolveDateDisplay,
@@ -60,9 +62,12 @@ export function enrichOrdersWithVirtualFields(
       ORDER_STATUSES.CHUA_THANH_TOAN;
     const trangThaiText = String(rawStatus || "").trim();
 
-    const giaBan = Helpers.roundGiaBanValue(
+    const giaBanRaw = Helpers.roundGiaBanValue(
       Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
     );
+    const giftOrder = isGiftOrderCode(order[ORDER_FIELDS.ID_ORDER]);
+    /** Quà tặng: không có giá bán với khách — giá trị còn lại theo doanh thu = 0 (vẫn giữ giá gốc trong DB cho suy luận hoàn tiền). */
+    const giaBan = giftOrder ? 0 : giaBanRaw;
     const giaVon = Helpers.roundGiaBanValue(
       Number.parseFloat(String(order[ORDER_FIELDS.COST] ?? 0)) || 0
     );
@@ -94,14 +99,14 @@ export function enrichOrdersWithVirtualFields(
     if (
       dataset === "canceled" &&
       totalDaysNcc > 0 &&
-      giaBan > 0 &&
+      giaBanRaw > 0 &&
       remainingDaysForNcc === 0 &&
       refundFromDb !== null &&
       refundFromDb > 0
     ) {
       remainingDaysForNcc = Math.min(
         totalDaysNcc,
-        Math.max(0, Math.round((refundFromDb * totalDaysNcc) / giaBan))
+        Math.max(0, Math.round((refundFromDb * totalDaysNcc) / giaBanRaw))
       );
     }
 
@@ -226,6 +231,14 @@ export function filterAndSortOrders(
   });
 
   const sorted = [...filtered].sort((a, b) => {
+    if (dataset === "canceled") {
+      const canceledA = parseCanceledAtToMs(a.canceled_at);
+      const canceledB = parseCanceledAtToMs(b.canceled_at);
+      if (canceledA !== canceledB) {
+        return canceledB - canceledA;
+      }
+    }
+
     const statusA = String(a[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
     const statusB = String(b[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
     const unpaidA = isUnpaidStatus(statusA);

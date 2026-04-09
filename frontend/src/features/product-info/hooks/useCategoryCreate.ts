@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { normalizeErrorMessage } from "@/lib/textUtils";
-import { CATEGORY_COLORS } from "../utils/categoryColors";
+import { generateUniqueCategoryGradient } from "../utils/categoryColors";
 
 type UseCategoryCreateParams = {
   reloadCategories: () => Promise<void>;
+  existingCategoryColors: string[];
 };
 
 type UseCategoryCreateResult = {
@@ -17,17 +18,17 @@ type UseCategoryCreateResult = {
   createCategoryError: string | null;
   openCreateCategory: () => void;
   closeCreateCategory: () => void;
+  shuffleNewCategoryColor: () => void;
   handleCreateCategory: () => Promise<void>;
 };
 
 export const useCategoryCreate = ({
   reloadCategories,
+  existingCategoryColors,
 }: UseCategoryCreateParams): UseCategoryCreateResult => {
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryColor, setNewCategoryColor] = useState(
-    CATEGORY_COLORS[0]
-  );
+  const [newCategoryColor, setNewCategoryColor] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [createCategoryError, setCreateCategoryError] = useState<string | null>(
     null
@@ -37,20 +38,31 @@ export const useCategoryCreate = ({
     setCreateCategoryOpen(true);
     setCreateCategoryError(null);
     setNewCategoryName("");
-    setNewCategoryColor(CATEGORY_COLORS[0]);
-  }, []);
+    setNewCategoryColor(
+      generateUniqueCategoryGradient(existingCategoryColors)
+    );
+  }, [existingCategoryColors]);
 
   const closeCreateCategory = useCallback(() => {
     setCreateCategoryOpen(false);
     setCreatingCategory(false);
     setCreateCategoryError(null);
     setNewCategoryName("");
+    setNewCategoryColor("");
   }, []);
+
+  const shuffleNewCategoryColor = useCallback(() => {
+    setNewCategoryColor((current) =>
+      generateUniqueCategoryGradient(
+        [...existingCategoryColors, current].filter((c) => c.length > 0)
+      )
+    );
+  }, [existingCategoryColors]);
 
   const handleCreateCategory = useCallback(async () => {
     const trimmedName = newCategoryName.trim();
     if (!trimmedName) {
-      setCreateCategoryError("Category name is required.");
+      setCreateCategoryError("Vui lòng nhập tên danh mục.");
       return;
     }
     setCreatingCategory(true);
@@ -74,6 +86,7 @@ export const useCategoryCreate = ({
       await reloadCategories();
       setCreateCategoryOpen(false);
       setNewCategoryName("");
+      setNewCategoryColor("");
     } catch (err) {
       setCreateCategoryError(
         normalizeErrorMessage(
@@ -96,6 +109,7 @@ export const useCategoryCreate = ({
     createCategoryError,
     openCreateCategory,
     closeCreateCategory,
+    shuffleNewCategoryColor,
     handleCreateCategory,
   };
 };

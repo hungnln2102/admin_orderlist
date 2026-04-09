@@ -41,18 +41,44 @@ const mapProductPriceRow = (row = {}) => {
   const pctPromo = toNullableNumber(row.pct_promo ?? row[variantCols.pctPromo]);
   const pctStu = toNullableNumber(row.pct_stu ?? row[variantCols.pctStu]);
   const isActiveRaw = row.is_active ?? row[variantCols.isActive];
-  const isActive =
-    typeof isActiveRaw === "boolean"
-      ? isActiveRaw
-      : String(isActiveRaw || "")
-          .trim()
-          .toLowerCase()
-          .startsWith("t") ||
-        String(isActiveRaw || "").trim() === "1";
+  /** Thiếu cột / NULL → coi là đang bật (tránh API cũ không SELECT is_active trả toàn false). */
+  let isActive = true;
+  if (isActiveRaw !== undefined && isActiveRaw !== null) {
+    if (typeof isActiveRaw === "boolean") {
+      isActive = isActiveRaw;
+    } else {
+      const s = String(isActiveRaw).trim().toLowerCase();
+      if (
+        s === "false" ||
+        s === "f" ||
+        s === "0" ||
+        s === "no" ||
+        s === "off"
+      ) {
+        isActive = false;
+      } else if (
+        s === "true" ||
+        s === "t" ||
+        s === "1" ||
+        s === "yes" ||
+        s === "on"
+      ) {
+        isActive = true;
+      }
+    }
+  }
 
   const categories = parseCategories(row.categories);
   const categoryFallback =
     row.category ?? row[categoryCols.name] ?? null;
+
+  const rawDescId =
+    row.desc_variant_id ?? row.id_desc ?? row[variantCols.descVariantId];
+  let desc_variant_id = null;
+  if (rawDescId != null && rawDescId !== "") {
+    const n = Number(rawDescId);
+    if (Number.isFinite(n) && n > 0) desc_variant_id = n;
+  }
 
   return {
     id,
@@ -72,6 +98,7 @@ const mapProductPriceRow = (row = {}) => {
     pct_promo: pctPromo,
     pct_stu: pctStu,
     is_active: isActive,
+    desc_variant_id,
     update: row.update ?? row[variantCols.updatedAt] ?? null,
     max_supply_price: toNullableNumber(row.max_supply_price),
   };

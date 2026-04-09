@@ -1,33 +1,4 @@
 const { ORDER_PREFIXES, roundGiaBanValue } = require("../../utils/orderHelpers");
-const { defaultPctStu: APP_DEFAULT_PCT_STU } = require("../../config/appConfig");
-
-const clampUnitRatio = (value) => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.min(1, Math.max(0, n));
-};
-
-/** pct_stu trên variant (0–1 hoặc 0–100); null/undefined → defaultPctStu hoặc DEFAULT_PCT_STU env. */
-const resolvePctStuBlend = (pctStuRaw, explicitDefault) => {
-  const fallback = clampUnitRatio(
-    explicitDefault !== undefined &&
-      explicitDefault !== null &&
-      Number.isFinite(Number(explicitDefault))
-      ? Number(explicitDefault)
-      : APP_DEFAULT_PCT_STU
-  );
-  if (pctStuRaw === null || pctStuRaw === undefined || pctStuRaw === "") {
-    return fallback;
-  }
-  const n = Number(pctStuRaw);
-  if (!Number.isFinite(n) || n < 0) {
-    return fallback;
-  }
-  if (n > 1 && n <= 100) {
-    return clampUnitRatio(n / 100);
-  }
-  return clampUnitRatio(n);
-};
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -168,6 +139,8 @@ const calculateOrderPricingFromResolvedValues = ({
   pctCtv,
   pctKhach,
   pctPromo,
+  /** Cùng vai trò pct_khach (bậc 2 từ resellRaw); áp cho đơn MAVS */
+  pctStu,
   forceKhachLe = false,
   roundCostToThousands = false,
   days = 30,
@@ -194,6 +167,14 @@ const calculateOrderPricingFromResolvedValues = ({
     pctCtvNormalized
   );
   const customerRaw = calculateMarginBasedPrice(resellRaw, pctKhachNormalized);
+  const pctStuProvided =
+    pctStu !== null &&
+    pctStu !== undefined &&
+    !(typeof pctStu === "string" && String(pctStu).trim() === "");
+  const pctStuNormalized = pctStuProvided
+    ? normalizeMarginRatio(pctStu, 0)
+    : pctKhachNormalized;
+  const studentRaw = calculateMarginBasedPrice(resellRaw, pctStuNormalized);
   const resellPrice = roundPricingValue(resellRaw);
   const customerPrice = roundPricingValue(customerRaw);
   const baseCost = roundCostToThousands
@@ -206,8 +187,8 @@ const calculateOrderPricingFromResolvedValues = ({
       : 0;
   const promoPrice = Math.max(0, customerPrice - promoAmount);
 
-  /** MAVS (Sinh viên): cùng công thức và mức giá với MAVL (khách lẻ) — customerPrice. */
-  const studentPrice = customerPrice;
+  /** MAVS: bậc 2 = pct_stu nếu có; không có thì dùng pct_khach (như khách lẻ) */
+  const studentPrice = roundPricingValue(studentRaw);
 
   const orderKind = resolveOrderKind({ orderId, customerType });
   let price = customerPrice;
@@ -245,6 +226,7 @@ const calculateOrderPricingFromResolvedValues = ({
       importPrice: normalizedImportPrice,
       pctCtv: pctCtvNormalized,
       pctKhach: pctKhachNormalized,
+      pctStu: pctStuNormalized,
       pctPromo: pctPromoNormalized,
       studentPrice,
       orderKind,
@@ -304,7 +286,6 @@ const deriveVariantMarginsFromCostAndSalePrice = ({
 };
 
 module.exports = {
-  resolvePctStuBlend,
   normalizeMoney,
   normalizeImportValue,
   roundToThousands,

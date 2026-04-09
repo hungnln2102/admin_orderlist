@@ -57,6 +57,8 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.imageUrl)} AS image_url,
         p.${quoteIdent(productSchemaCols.imageUrl)} AS package_image_url,
         v.${quoteIdent(variantCols.basePrice)} AS base_price,
+        v.${quoteIdent(variantCols.isActive)} AS is_active,
+        v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
         COALESCE(
           json_agg(
             DISTINCT jsonb_build_object(
@@ -82,7 +84,9 @@ const listProducts = async (_req, res) => {
         v.${quoteIdent(variantCols.variantName)},
         p.${quoteIdent(productSchemaCols.packageName)},
         p.${quoteIdent(productSchemaCols.imageUrl)},
-        v.${quoteIdent(variantCols.imageUrl)}
+        v.${quoteIdent(variantCols.imageUrl)},
+        v.${quoteIdent(variantCols.isActive)},
+        v.${quoteIdent(variantCols.descVariantId)}
       ORDER BY v.${quoteIdent(variantCols.displayName)};
     `;
     const result = await db.raw(query);
@@ -111,6 +115,7 @@ const listProductPrices = async (_req, res) => {
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
         v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
         v.${quoteIdent(variantCols.isActive)} AS is_active,
+        v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
         v.${quoteIdent(variantCols.updatedAt)} AS update,
         spagg.max_supply_price AS max_supply_price
       FROM ${TABLES.variant} v
@@ -156,6 +161,7 @@ const getProductPriceById = async (req, res) => {
         v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
         v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
         v.${quoteIdent(variantCols.isActive)} AS is_active,
+        v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
         v.${quoteIdent(variantCols.updatedAt)} AS update,
         spagg.max_supply_price AS max_supply_price
       FROM ${TABLES.variant} v

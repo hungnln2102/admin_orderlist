@@ -272,9 +272,16 @@ export function IpWhitelistPage() {
       />
 
       <div className="rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm lg:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
-          <div className="relative">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-indigo-300/70" />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px] lg:items-start">
+          {/*
+            self-start: cột search không stretch theo chiều cao hàng grid.
+            flex + shrink-0 icon: tránh absolute đè lên placeholder.
+          */}
+          <div className="flex w-full min-w-0 items-center gap-3 self-start rounded-2xl border border-white/10 bg-slate-950/40 py-2.5 pl-4 pr-4 transition focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/50">
+            <MagnifyingGlassIcon
+              className="pointer-events-none h-5 w-5 shrink-0 text-indigo-300/70"
+              aria-hidden
+            />
             <input
               type="text"
               value={searchTerm}
@@ -283,7 +290,7 @@ export function IpWhitelistPage() {
                 setCurrentPage(1);
               }}
               placeholder="Tìm theo IP hoặc mô tả..."
-              className="w-full rounded-2xl border border-white/10 bg-slate-950/40 py-2.5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-400/70 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50"
+              className="min-w-0 flex-1 border-0 bg-transparent text-sm text-white outline-none ring-0 placeholder:text-slate-400/70"
             />
           </div>
 

@@ -15,6 +15,11 @@ const {
 const { nextId } = require("./idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
 const { todayYMDInVietnam } = require("../utils/normalizers");
+const { ORDER_PREFIXES } = require("../utils/orderHelpers");
+const {
+  addSupplierImportOnProcessing,
+  updateDashboardMonthlySummaryOnStatusChange,
+} = require("../controllers/Order/orderFinanceHelpers");
 
 /**
  * Create a new order
@@ -42,20 +47,30 @@ const createOrder = async (orderData, trx = null) => {
       throw new Error("Empty payload");
     }
 
-    // Set default status
-    payload.status = STATUS.UNPAID;
+    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+    const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
+    const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+    const giftPrefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+    const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
+    if (isGiftOrderCreate) {
+      payload[priceCol] = 0;
+      payload.status = STATUS.PROCESSING;
+    } else {
+      payload.status = STATUS.UNPAID;
+    }
 
-    // Ensure we have a numeric PK
     payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, transaction);
 
-    // Server-side order code: detect prefix from client id_order, then generate unique code
-    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
     const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
     const detectedPrefix = VALID_PREFIXES.find((p) => clientIdOrder.startsWith(p)) || "MAVC";
     payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, transaction);
 
-    // Insert order
     const [newOrder] = await transaction(TABLES.orderList).insert(payload).returning("*");
+
+    if (isGiftOrderCreate) {
+      await addSupplierImportOnProcessing(transaction, { status: STATUS.UNPAID }, newOrder);
+      await updateDashboardMonthlySummaryOnStatusChange(transaction, { status: STATUS.UNPAID }, newOrder);
+    }
 
     if (shouldCommit) {
       await transaction.commit();

@@ -1,5 +1,6 @@
 const { db } = require("../../db");
 const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
+const { isGiftOrder } = require("../../utils/orderHelpers");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -65,6 +66,11 @@ const updateOrderWithFinance = async ({
     const beforeOrder = await trx(TABLES.orderList).where({ id }).first();
     if (!beforeOrder) {
         return { notFound: true };
+    }
+
+    const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
+    if (isGiftOrder(beforeOrder)) {
+        sanitized[priceCol] = 0;
     }
 
     const [updatedOrder] = await trx(TABLES.orderList)

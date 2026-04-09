@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
@@ -13,6 +14,8 @@ export default function Storage() {
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
   const [draft, setDraft] = useState<WarehouseItem | null>(null);
+  const [warehouseIdPendingDelete, setWarehouseIdPendingDelete] = useState<number | null>(null);
+  const [warehouseDeleteSubmitting, setWarehouseDeleteSubmitting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -104,9 +107,15 @@ export default function Storage() {
     }
   };
 
-  const deleteRow = async (id?: number) => {
+  const requestDeleteRow = (id?: number) => {
     if (!id) return;
-    if (!confirm("Bạn có chắc muốn xóa bản ghi này?")) return;
+    setWarehouseIdPendingDelete(id);
+  };
+
+  const confirmDeleteRow = async () => {
+    const id = warehouseIdPendingDelete;
+    if (!id) return;
+    setWarehouseDeleteSubmitting(true);
     setLoading(true);
     setError(null);
     try {
@@ -118,10 +127,12 @@ export default function Storage() {
       }
       setItems((prev) => prev.filter((it) => it.id !== id));
       if (editingId === id) cancelEdit();
+      setWarehouseIdPendingDelete(null);
     } catch (err: any) {
       setError(err?.message || "Lỗi khi xóa");
     } finally {
       setLoading(false);
+      setWarehouseDeleteSubmitting(false);
     }
   };
 
@@ -181,10 +192,23 @@ export default function Storage() {
         loading={loading}
         onDraftChange={updateDraft}
         onSave={saveEdit}
-        onDelete={deleteRow}
+        onDelete={requestDeleteRow}
         onCancel={cancelEdit}
         onStartEdit={startEdit}
         onStartCreate={startCreate}
+      />
+
+      <ConfirmModal
+        isOpen={warehouseIdPendingDelete !== null}
+        onClose={() => {
+          if (!warehouseDeleteSubmitting) setWarehouseIdPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDeleteRow()}
+        title="Xóa bản ghi?"
+        message="Bạn có chắc muốn xóa bản ghi kho này? Hành động không thể hoàn tác."
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={warehouseDeleteSubmitting}
       />
     </div>
   );

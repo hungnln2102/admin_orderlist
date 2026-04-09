@@ -116,7 +116,143 @@ async function assignUserToAvailableAccount(userEmail) {
   };
 }
 
+/**
+ * Một vòng Fix All: đọc lại DB → chọn tài khoản **gần đầy nhất** (ít slot trống nhất,
+ * sort giống buildAvailableAccounts) → lấy tối đa min(slot_trống, số email) user →
+ * một lần gọi addUsersWithProductV2 (batch).
+ */
+async function fixUsersOneRoundTightest(userEmailsRaw) {
+  const remainingDistinct = [
+    ...new Set(
+      (Array.isArray(userEmailsRaw) ? userEmailsRaw : [])
+        .map((e) => String(e || "").trim().toLowerCase())
+        .filter(Boolean)
+    ),
+  ];
+
+  if (remainingDistinct.length === 0) {
+    return {
+      success: true,
+      added_count: 0,
+      remaining_emails: [],
+      round: null,
+    };
+  }
+
+  const accounts = await db(TABLE)
+    .select(
+      COLS.ID,
+      COLS.EMAIL,
+      COLS.PASSWORD_ENC,
+      COLS.ORG_NAME,
+      COLS.LICENSE_STATUS,
+      COLS.USER_COUNT,
+      COLS.ALERT_CONFIG,
+      COLS.MAIL_BACKUP_ID,
+      COLS.IS_ACTIVE
+    )
+    .orderBy(COLS.ID, "asc");
+
+  const available = buildAvailableAccounts(accounts);
+  if (available.length === 0) {
+    return {
+      success: false,
+      error: "Không có tài khoản nào còn gói và còn slot.",
+      added_count: 0,
+      remaining_emails: remainingDistinct,
+      round: null,
+    };
+  }
+
+  const target = available[0];
+  const accountId = target[COLS.ID];
+  const accountEmail = target[COLS.EMAIL];
+  const accountPassword = target[COLS.PASSWORD_ENC] || "";
+  const slotsLeft = MAX_USERS_PER_ACCOUNT - target.currentCount;
+  const take = Math.min(slotsLeft, remainingDistinct.length);
+  const chunk = remainingDistinct.slice(0, take);
+  const stillRemaining = remainingDistinct.slice(take);
+
+  const mailBackupId =
+    target[COLS.MAIL_BACKUP_ID] != null
+      ? Number(target[COLS.MAIL_BACKUP_ID])
+      : null;
+  const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+
+  logger.info(
+    "[renew-adobe] fixUsersOneRoundTightest: account=%s slotsLeft=%s batchSize=%s still=%s",
+    accountId,
+    slotsLeft,
+    chunk.length,
+    stillRemaining.length
+  );
+
+  try {
+    const v2 = await adobeRenewV2.addUsersWithProductV2(
+      accountEmail,
+      accountPassword,
+      chunk,
+      {
+        savedCookies,
+        mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+      }
+    );
+
+    if (!v2.success) {
+      return {
+        success: false,
+        error: v2.error || "addUsersWithProductV2 thất bại",
+        added_count: 0,
+        remaining_emails: remainingDistinct,
+        round: null,
+      };
+    }
+
+    const updatePayload = {
+      [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
+      [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+    };
+    if (v2.savedCookies) {
+      updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+    }
+    await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
+
+    const addedEmails =
+      v2.addResult?.added?.length > 0 ? v2.addResult.added : chunk;
+    await lookupAndRecordIfNeeded(addedEmails, accountId).catch((error) => {
+      logger.warn("[renew-adobe] fixUsersOneRoundTightest mapping failed", {
+        accountId,
+        error: error.message,
+      });
+    });
+
+    return {
+      success: true,
+      added_count: addedEmails.length,
+      remaining_emails: stillRemaining,
+      round: {
+        accountId,
+        accountEmail,
+        emails: chunk,
+      },
+    };
+  } catch (err) {
+    logger.error("[renew-adobe] fixUsersOneRoundTightest failed", {
+      accountId,
+      error: err.message,
+    });
+    return {
+      success: false,
+      error: err.message || "Lỗi khi thêm user batch.",
+      added_count: 0,
+      remaining_emails: remainingDistinct,
+      round: null,
+    };
+  }
+}
+
 module.exports = {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
+  fixUsersOneRoundTightest,
 };

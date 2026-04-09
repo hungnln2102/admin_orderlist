@@ -1,5 +1,6 @@
 import React from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { getCategoryVisualStyle } from "../utils/categoryColors";
 
 type CreateCategoryModalProps = {
   open: boolean;
@@ -8,7 +9,7 @@ type CreateCategoryModalProps = {
   saving: boolean;
   error?: string | null;
   onNameChange: (value: string) => void;
-  onColorChange: (value: string) => void;
+  onShuffleColor: () => void;
   onClose: () => void;
   onSave: () => void;
 };
@@ -20,13 +21,16 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
   saving,
   error,
   onNameChange,
-  onColorChange,
+  onShuffleColor,
   onClose,
   onSave,
 }) => {
   if (!open) return null;
   const trimmedName = (name || "").trim();
   const disableSave = saving || !trimmedName;
+  const previewStyle = color
+    ? getCategoryVisualStyle(color)
+    : { backgroundColor: "rgba(148, 163, 184, 0.25)" };
 
   return (
     <div className="fixed inset-0 z-70 flex items-start justify-center bg-black/50 px-4 py-8">
@@ -60,24 +64,27 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
             <label className="block text-xs uppercase tracking-wide text-white/60 mb-2">
               Màu sắc
             </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={color}
-                onChange={(event) => onColorChange(event.target.value)}
-                className="h-10 w-14 rounded border border-white/10 bg-white/10"
-              />
-              <input
-                type="text"
-                value={color}
-                onChange={(event) => onColorChange(event.target.value)}
-                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                placeholder="#facc15"
-              />
+            <p className="text-xs text-white/45 mb-3">
+              Hệ thống gán gradient ngẫu nhiên, không trùng với danh mục hiện có.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
               <div
-                className="h-10 w-10 rounded-lg border border-white/10"
-                style={{ backgroundColor: color || "#facc15" }}
+                className="h-12 w-20 shrink-0 rounded-lg border border-white/10 shadow-inner"
+                style={previewStyle}
+                aria-hidden
               />
+              <div className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white/80 break-all max-h-20 overflow-y-auto">
+                {color || "—"}
+              </div>
+              <button
+                type="button"
+                onClick={onShuffleColor}
+                disabled={saving}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                <ArrowPathIcon className="h-4 w-4" />
+                Màu khác
+              </button>
             </div>
           </div>
 

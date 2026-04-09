@@ -1,4 +1,4 @@
-/* Retro Animations */
+/* Login motion — nền sáng + glow */
 
 @keyframes gradientShift {
   0% {
@@ -12,7 +12,7 @@
   }
 }
 
-@keyframes spinBorder {
+@keyframes spinGlow {
   from {
     transform: rotate(0deg);
   }
@@ -21,11 +21,44 @@
   }
 }
 
-@keyframes spinGlow {
-  from {
-    transform: rotate(0deg);
+@keyframes sunPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
   }
-  to {
-    transform: rotate(360deg);
+  50% {
+    opacity: 0.82;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+@keyframes auroraPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes gridFade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes planetFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
   }
 }

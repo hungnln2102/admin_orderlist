@@ -1,5 +1,9 @@
 import { useCallback } from "react";
-import { ORDER_FIELDS, Order as ApiOrder } from "../../../../constants";
+import {
+  ORDER_CODE_PREFIXES,
+  ORDER_FIELDS,
+  Order as ApiOrder,
+} from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { showAppNotification } from "@/lib/notifications";
 import { calculateExpirationDate, convertDMYToYMD } from "../helpers";
@@ -73,10 +77,16 @@ export const useOrderSubmit = ({
         );
         const variantId = matchedProduct?.id;
 
+        const orderTypePrefix = String(formData[ORDER_FIELDS.ID_ORDER] || "");
+        const sellingPrice =
+          orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
+            ? 0
+            : Number(formData[ORDER_FIELDS.PRICE]);
+
         const dataToSave: Partial<ApiOrder> = {
           ...formData,
           [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
-          [ORDER_FIELDS.PRICE]: Number(formData[ORDER_FIELDS.PRICE]),
+          [ORDER_FIELDS.PRICE]: sellingPrice,
           [ORDER_FIELDS.ORDER_DATE]: normalizedRegister,
           [ORDER_FIELDS.EXPIRY_DATE]: normalizedExpiry,
           [ORDER_FIELDS.CONTACT]: formData[ORDER_FIELDS.CONTACT] || null,

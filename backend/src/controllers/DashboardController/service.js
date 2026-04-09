@@ -2,6 +2,8 @@ const { db } = require("../../db");
 const {
   buildChartsQuery,
   buildYearsQuery,
+  buildRangeCompareStatsQuery,
+  buildRangeMonthlyChartQuery,
 } = require("./queries");
 const { tableName, SCHEMA_FINANCE, FINANCE_SCHEMA } = require("../../config/dbSchema");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
@@ -11,6 +13,33 @@ const summaryTableName = tableName(
   SCHEMA_FINANCE
 );
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+
+const MS_PER_DAY = 86400000;
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+const toYMDDate = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const parseYMDLocal = (ymd) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const computePreviousRange = (fromStr, toStr) => {
+  const from = parseYMDLocal(fromStr);
+  const to = parseYMDLocal(toStr);
+  const inclusiveDays =
+    Math.round((to.getTime() - from.getTime()) / MS_PER_DAY) + 1;
+  const prevEnd = new Date(from.getTime() - MS_PER_DAY);
+  const prevStart = new Date(
+    prevEnd.getTime() - (inclusiveDays - 1) * MS_PER_DAY
+  );
+  return { p0: toYMDDate(prevStart), p1: toYMDDate(prevEnd) };
+};
+
+const taxFromRevenueValue = (revenue) =>
+  Math.round((Number(revenue) || 0) * (dashboardMonthlyTaxRatePercent / 100));
 
 const fetchDashboardStats = async () => {
   const now = new Date();
@@ -38,8 +67,7 @@ const fetchDashboardStats = async () => {
     total_refund: Number(previousRow.total_refund || 0),
   };
 
-  const taxFromRevenue = (revenue) =>
-    Math.round((Number(revenue) || 0) * (dashboardMonthlyTaxRatePercent / 100));
+  const taxFromRevenue = (revenue) => taxFromRevenueValue(revenue);
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
@@ -54,6 +82,70 @@ const fetchDashboardStats = async () => {
       current: taxFromRevenue(curr.total_revenue),
       previous: taxFromRevenue(prev.total_revenue),
     },
+  };
+};
+
+const fetchDashboardStatsForDateRange = async ({ from, to }) => {
+  const { p0, p1 } = computePreviousRange(from, to);
+  const result = await db.raw(buildRangeCompareStatsQuery(), [
+    from,
+    to,
+    p0,
+    p1,
+  ]);
+  const row = (result.rows && result.rows[0]) || {};
+
+  const currRev = Number(row.net_revenue_curr || 0);
+  const prevRev = Number(row.net_revenue_prev || 0);
+  const currProfit = Number(row.net_profit_curr || 0);
+  const prevProfit = Number(row.net_profit_prev || 0);
+
+  return {
+    totalOrders: {
+      current: Number(row.total_orders_curr || 0),
+      previous: Number(row.total_orders_prev || 0),
+    },
+    totalRevenue: { current: currRev, previous: prevRev },
+    totalImports: {
+      current: currRev - currProfit,
+      previous: prevRev - prevProfit,
+    },
+    totalRefund: {
+      current: Number(row.total_refund_curr || 0),
+      previous: Number(row.total_refund_prev || 0),
+    },
+    monthlyProfit: { current: currProfit, previous: prevProfit },
+    monthlyTax: {
+      current: taxFromRevenueValue(currRev),
+      previous: taxFromRevenueValue(prevRev),
+    },
+    range: { from, to, previousFrom: p0, previousTo: p1 },
+  };
+};
+
+const fetchDashboardChartsForDateRange = async ({ from, to }) => {
+  const result = await db.raw(buildRangeMonthlyChartQuery(), [from, to]);
+  const rows = result.rows || [];
+  const startYear = parseInt(String(from).slice(0, 4), 10);
+
+  const months = rows.map((row) => {
+    const revenue = Number(row.total_revenue) || 0;
+    return {
+      month: `T${row.month_num}/${row.year_num}`,
+      month_num: Number(row.month_num),
+      total_orders: Number(row.total_orders) || 0,
+      total_canceled: Number(row.total_canceled) || 0,
+      total_revenue: revenue,
+      total_profit: Number(row.total_profit) || 0,
+      total_refund: Number(row.total_refund) || 0,
+      total_tax: taxFromRevenueValue(revenue),
+    };
+  });
+
+  return {
+    year: Number.isFinite(startYear) ? startYear : null,
+    months,
+    range: { from, to },
   };
 };
 
@@ -144,7 +236,7 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       total_revenue: revenue,
       total_profit: row ? Number(row.total_profit || 0) : 0,
       total_refund: row ? Number(row.total_refund || 0) : 0,
-      total_tax: Math.round(revenue * (dashboardMonthlyTaxRatePercent / 100)),
+      total_tax: taxFromRevenueValue(revenue),
     });
   }
 
@@ -153,8 +245,10 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
 
 module.exports = {
   fetchDashboardStats,
+  fetchDashboardStatsForDateRange,
   fetchDashboardYears,
   fetchDashboardCharts,
   fetchDashboardMonthlySummary,
   fetchDashboardChartsFromSummary,
+  fetchDashboardChartsForDateRange,
 };

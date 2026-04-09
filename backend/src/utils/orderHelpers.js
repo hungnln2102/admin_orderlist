@@ -132,6 +132,13 @@ function isMavnImportOrder(row) {
   return Boolean(prefix && code.startsWith(prefix));
 }
 
+/** Đơn quà tặng (MAVT): giá bán = 0, vào thẳng Đang xử lý + cộng nhập NCC khi tạo. */
+function isGiftOrder(row) {
+  const prefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+  const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
+  return Boolean(prefix && code.startsWith(prefix));
+}
+
 module.exports = {
   ORDER_PREFIXES,
   monthsFromString,
@@ -140,4 +147,5 @@ module.exports = {
   convertDMYToYMD,
   calculatePeriods,
   isMavnImportOrder,
+  isGiftOrder,
 };

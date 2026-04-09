@@ -1,5 +1,5 @@
 import { CategoryRow } from "../types";
-import { MergedProduct } from "./productInfoHelpers";
+import { MergedProduct, variantListSortRank } from "./productInfoHelpers";
 
 export const buildCategoryRows = (
   mergedProducts: MergedProduct[]
@@ -44,8 +44,12 @@ export const buildCategoryRows = (
           })
         ),
         items: [...group.items].sort((left, right) => {
-          const leftKey = left.productId || left.packageProduct || left.productName || "";
-          const rightKey = right.productId || right.packageProduct || right.productName || "";
+          const wr = variantListSortRank(left) - variantListSortRank(right);
+          if (wr !== 0) return wr;
+          const leftKey =
+            left.productId || left.packageProduct || left.productName || "";
+          const rightKey =
+            right.productId || right.packageProduct || right.productName || "";
           return leftKey.localeCompare(rightKey, "vi", { sensitivity: "base" });
         }),
       };

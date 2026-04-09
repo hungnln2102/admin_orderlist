@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hóa đơn bán hàng</title>
+</head>
+<body style="margin:0; padding:0; background-color:#050a14; font-family:Arial, Helvetica, sans-serif; color:#e8eaef;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#050a14; margin:0; padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:980px; background-color:#0c1220; border:1px solid #1e293b;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="padding:36px 44px 20px; text-align:center;">
+              <h1 style="margin:0; font-size:26px; line-height:34px; font-weight:700; color:#f8fafc; text-transform:uppercase; letter-spacing:0.04em;">
+                {{company_name}}
+              </h1>
+
+              <p style="margin:14px 0 0; font-size:14px; line-height:24px; color:#cbd5e1;">
+                Địa chỉ: {{company_address}}
+              </p>
+              <p style="margin:4px 0 0; font-size:14px; line-height:24px; color:#cbd5e1;">
+                Điện thoại: {{company_phone}}
+              </p>
+              <p style="margin:4px 0 0; font-size:14px; line-height:24px; color:#cbd5e1;">
+                Ngân hàng: {{bank_name}}
+              </p>
+              <p style="margin:4px 0 0; font-size:14px; line-height:24px; color:#cbd5e1;">
+                STK: {{bank_account}}
+              </p>
+              <p style="margin:4px 0 0; font-size:14px; line-height:24px; color:#cbd5e1;">
+                Tên người nhận: {{account_holder}}
+              </p>
+            </td>
+          </tr>
+
+          <!-- DIVIDER + TITLE -->
+          <tr>
+            <td style="padding:0 44px;">
+              <div style="border-top:1px solid #64748b;"></div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:20px 44px 22px; text-align:center;">
+              <h2 style="margin:0; font-size:22px; line-height:30px; font-weight:700; color:#f8fafc; text-transform:uppercase;">
+                Hóa đơn bán hàng
+              </h2>
+              <p style="margin:10px 0 0; font-size:15px; line-height:22px; color:#cbd5e1;">
+                Ngày: {{quote_date}}
+              </p>
+            </td>
+          </tr>
+
+          <!-- CUSTOMER -->
+          <tr>
+            <td style="padding:0 44px 22px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td valign="top" style="font-size:15px; line-height:28px; color:#e2e8f0;">
+                    <strong>Khách hàng:</strong> {{customer_name}}<br />
+                    <strong>Địa chỉ:</strong> {{customer_address}}<br />
+                    <strong>SDT:</strong> {{customer_phone}} &nbsp;&nbsp;&nbsp;&nbsp;
+                    <strong>Fax:</strong> {{customer_fax}}<br />
+                    <strong>Mã số Thuế:</strong> {{customer_tax_code}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- TABLE -->
+          <tr>
+            <td style="padding:0 44px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; border:1px solid #334155;">
+                <tr style="background-color:#111827;">
+                  <th align="left" style="padding:13px 12px; border:1px solid #334155; font-size:14px; color:#f1f5f9; font-weight:600;">Tên hàng hóa / Dịch vụ</th>
+                  <th align="center" style="padding:13px 12px; border:1px solid #334155; font-size:14px; color:#f1f5f9; font-weight:600;">Đơn giá</th>
+                  <th align="center" style="padding:13px 12px; border:1px solid #334155; font-size:14px; color:#f1f5f9; font-weight:600;">SL</th>
+                  <th align="center" style="padding:13px 12px; border:1px solid #334155; font-size:14px; color:#f1f5f9; font-weight:600;">Chiết khấu</th>
+                  <th align="right" style="padding:13px 12px; border:1px solid #334155; font-size:14px; color:#f1f5f9; font-weight:600;">Thành tiền</th>
+                </tr>
+
+                <tr>
+                  <td style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{product_name_1}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{unit_price_1}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{qty_1}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{discount_1}}</td>
+                  <td align="right" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{amount_1}}</td>
+                </tr>
+
+                <tr>
+                  <td style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{product_name_2}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{unit_price_2}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{qty_2}}</td>
+                  <td align="center" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{discount_2}}</td>
+                  <td align="right" style="padding:14px 12px; border:1px solid #334155; font-size:14px; color:#e2e8f0;">{{amount_2}}</td>
+                </tr>
+
+                <tr>
+                  <td colspan="5" align="center" style="padding:16px 12px; border:1px solid #334155; font-size:14px; color:#94a3b8;">
+                    {{note_empty_or_more_products}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- TỔNG TIỀN (một dòng, giống mẫu in) -->
+          <tr>
+            <td style="padding:20px 44px 8px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="right" style="font-size:17px; color:#f8fafc; font-weight:700;">
+                    Tổng tiền hàng: {{grand_total}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CẢM ƠN (căn giữa) -->
+          <tr>
+            <td style="padding:16px 44px 8px; text-align:center;">
+              <p style="margin:0; font-size:15px; line-height:24px; color:#cbd5e1; font-style:italic;">
+                {{thank_you_note}}
+              </p>
+            </td>
+          </tr>
+
+          <!-- CHỮ KÝ -->
+          <tr>
+            <td style="padding:32px 44px 44px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="55%"></td>
+                  <td width="45%" align="center" style="font-size:14px; color:#e2e8f0;">
+                    <strong>Người lập hóa đơn</strong>
+                    <div style="margin:12px 0 8px; min-height:56px;">
+                      <img src="{{signature_url}}" alt="" width="160" style="display:block; margin:0 auto; max-width:180px; height:auto;" />
+                    </div>
+                    <div style="color:#93c5fd; font-style:italic;">{{prepared_by}}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

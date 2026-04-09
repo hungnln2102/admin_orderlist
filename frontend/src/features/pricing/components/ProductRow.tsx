@@ -112,22 +112,30 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       previewRatios?.pctKhach ?? null,
       previewRatios?.pctCtv ?? null
     ) && Number.isFinite(previewPromoPrice ?? NaN);
+  const pctStuProvided = (v: unknown) =>
+    v !== null &&
+    v !== undefined &&
+    !(typeof v === "string" && v.trim() === "");
+  const pctStuForStudentPreview =
+    isEditingProduct && currentEditForm && (currentEditForm.pctStu ?? "").trim() !== ""
+      ? currentEditForm.pctStu
+      : pctStuProvided(item.pctStu)
+        ? item.pctStu
+        : previewRatios?.pctKhach ?? null;
   const previewStudentPriceVal =
     previewRatios &&
-    typeof previewWholesalePrice === "number" &&
-    Number.isFinite(previewWholesalePrice) &&
-    previewWholesalePrice > 0 &&
-    typeof previewRetailPrice === "number" &&
-    Number.isFinite(previewRetailPrice) &&
-    previewRetailPrice > 0
-      ? previewRetailPrice
+    typeof resolvedWholesaleBase === "number" &&
+    Number.isFinite(resolvedWholesaleBase) &&
+    resolvedWholesaleBase > 0
+      ? multiplyValue(resolvedWholesaleBase, pctStuForStudentPreview)
       : null;
   const showPreviewStudent =
     Boolean(previewRatios) &&
     typeof previewStudentPriceVal === "number" &&
     Number.isFinite(previewStudentPriceVal) &&
     previewStudentPriceVal > 0;
-  const previewStudentBlendHint = "Cùng giá bán lẻ (MAVL)";
+  const previewStudentBlendHint =
+    "pct_stu có giá trị → biên riêng; trống → giống khách lẻ (pct_khách)";
   const highestSupplyPriceDisplay =
     typeof highestSupplyPrice === "number" &&
     Number.isFinite(highestSupplyPrice) &&

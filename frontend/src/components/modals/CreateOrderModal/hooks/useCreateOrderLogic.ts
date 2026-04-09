@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
+  ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
 import { API_BASE_URL } from "../../../../lib/api";
@@ -144,6 +145,8 @@ export const useCreateOrderLogic = (
     setFormData((prev) => ({
       ...prev,
       [ORDER_FIELDS.ID_ORDER]: newType,
+      [ORDER_FIELDS.PRICE]:
+        newType === ORDER_CODE_PREFIXES.GIFT ? 0 : prev[ORDER_FIELDS.PRICE],
     }));
   };
 

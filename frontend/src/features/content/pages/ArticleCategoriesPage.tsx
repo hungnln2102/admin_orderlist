@@ -8,6 +8,7 @@ import {
   CheckIcon,
 } from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import type { ArticleCategory } from "../types";
 import {
   fetchCategories,
@@ -26,6 +27,8 @@ export default function ArticleCategoriesPage() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [categoryIdPendingDelete, setCategoryIdPendingDelete] = useState<number | null>(null);
+  const [categoryDeleteSubmitting, setCategoryDeleteSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,15 +55,23 @@ export default function ArticleCategoriesPage() {
     }
   }, [newName, load]);
 
-  const handleDelete = useCallback(async (id: number) => {
-    if (!window.confirm("Xóa danh mục này?")) return;
+  const requestDeleteCategory = useCallback((id: number) => {
+    setCategoryIdPendingDelete(id);
+  }, []);
+
+  const confirmDeleteCategory = useCallback(async () => {
+    if (categoryIdPendingDelete == null) return;
+    setCategoryDeleteSubmitting(true);
     try {
-      await deleteCategory(id);
+      await deleteCategory(categoryIdPendingDelete);
       load();
+      setCategoryIdPendingDelete(null);
     } catch {
       alert("Xóa thất bại.");
+    } finally {
+      setCategoryDeleteSubmitting(false);
     }
-  }, [load]);
+  }, [categoryIdPendingDelete, load]);
 
   const startEdit = (cat: ArticleCategory) => {
     setEditingId(cat.id);
@@ -198,7 +209,7 @@ export default function ArticleCategoriesPage() {
                       <button
                         type="button"
                         title="Xóa"
-                        onClick={() => handleDelete(cat.id)}
+                        onClick={() => requestDeleteCategory(cat.id)}
                         className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-rose-400"
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -211,6 +222,19 @@ export default function ArticleCategoriesPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal
+        isOpen={categoryIdPendingDelete !== null}
+        onClose={() => {
+          if (!categoryDeleteSubmitting) setCategoryIdPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDeleteCategory()}
+        title="Xóa danh mục?"
+        message="Bạn có chắc muốn xóa danh mục này? Hành động không thể hoàn tác."
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={categoryDeleteSubmitting}
+      />
     </div>
   );
 }

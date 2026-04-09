@@ -1,8 +1,8 @@
--- Giá sinh viên (MAVS): nội suy giữa MAVC (CTV) và MAVL (khách lẻ).
--- pct_stu = 0 → giá MAVC; = 1 → giá MAVL; NULL → dùng DEFAULT_PCT_STU trên backend (.env).
+-- Giá sinh viên (MAVS): cùng công thức 2 bậc như khách lẻ; bậc 2 dùng pct_stu thay pct_khách
+-- (sau giá CTV/sỉ = bậc 1 từ giá nguồn + %CTV).
 
 ALTER TABLE product.variant
   ADD COLUMN IF NOT EXISTS pct_stu numeric(12,6);
 
 COMMENT ON COLUMN product.variant.pct_stu IS
-  'Tỷ lệ 0–1: giá_MAVS = round(MAVC + pct_stu × (MAVL − MAVC)). NULL = dùng DEFAULT_PCT_STU.';
+  'Biên lớp 2 cho MAVS (cùng nghĩa pct_khách). NULL/ trống: dùng pct_khách như khách lẻ.';

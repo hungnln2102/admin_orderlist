@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { CategoryItem } from "../utils/productInfoHelpers";
+import {
+  getCategoryColor,
+  isGradientCssValue,
+} from "../utils/categoryColors";
 import { ProductImagePicker } from "./ProductImagePicker";
 import CategoryTagManager from "./CategoryTagManager";
 
@@ -21,20 +25,6 @@ type EditCategoryModalProps = {
 };
 
 type TabType = "edit" | "manage";
-
-const FALLBACK_COLORS = [
-  "#facc15",
-  "#f97316",
-  "#22c55e",
-  "#38bdf8",
-  "#a855f7",
-  "#f43f5e",
-  "#14b8a6",
-  "#eab308",
-];
-
-const getCategoryColor = (category: CategoryItem, index: number): string =>
-  category.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 
 export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   open,
@@ -170,7 +160,8 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                     {categoryOptions.map((category, index) => {
                       const selected = selectedCategoryIds.includes(category.id);
                       const baseColor = getCategoryColor(category, index);
-                      
+                      const isGrad = isGradientCssValue(baseColor);
+
                       return (
                         <button
                           key={category.id}
@@ -182,14 +173,18 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                               : "opacity-70 hover:opacity-90 shadow-sm hover:shadow-md hover:scale-102"
                           }`}
                           style={{
-                            background: `linear-gradient(135deg, ${baseColor} 0%, ${baseColor}dd 100%)`,
-                            color: '#ffffff',
-                            textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
-                            border: selected 
-                              ? '2px solid rgba(255, 255, 255, 0.8)' 
-                              : '1px solid rgba(255, 255, 255, 0.15)',
-                            boxShadow: selected 
-                              ? `0 0 0 3px ${baseColor}40, 0 4px 12px rgba(0, 0, 0, 0.3)` 
+                            background: isGrad
+                              ? baseColor
+                              : `linear-gradient(135deg, ${baseColor} 0%, ${baseColor}dd 100%)`,
+                            color: "#ffffff",
+                            textShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
+                            border: selected
+                              ? "2px solid rgba(255, 255, 255, 0.8)"
+                              : "1px solid rgba(255, 255, 255, 0.15)",
+                            boxShadow: selected
+                              ? isGrad
+                                ? "0 0 0 3px rgba(255, 255, 255, 0.35), 0 4px 12px rgba(0, 0, 0, 0.3)"
+                                : `0 0 0 3px ${baseColor}40, 0 4px 12px rgba(0, 0, 0, 0.3)`
                               : undefined,
                           }}
                         >

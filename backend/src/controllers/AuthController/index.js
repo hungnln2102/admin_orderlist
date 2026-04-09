@@ -12,6 +12,12 @@ const logger = require("../../utils/logger");
 const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
 const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);
 
+const SESSION_COOKIE_MS = 1000 * 60 * 60 * 1; // 1 giờ — phiên ngắn
+
+function applySessionDuration(req) {
+  req.session.cookie.maxAge = SESSION_COOKIE_MS;
+}
+
 const login = async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
@@ -32,6 +38,7 @@ const login = async (req, res) => {
     normalizedUsername === fallbackUser &&
     password === fallbackPass
   ) {
+    applySessionDuration(req);
     req.session.user = { id: -1, username, role: "admin" };
     return res.json({ user: req.session.user, fallback: true });
   }
@@ -67,6 +74,7 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
     }
 
+    applySessionDuration(req);
     req.session.user = {
       id: user.userid,
       username: user.username,

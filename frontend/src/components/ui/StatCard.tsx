@@ -103,6 +103,8 @@ export interface StatCardProps {
   iconClassName?: string;
   isActive?: boolean;
   onClick?: () => void;
+  /** Kiểu hiển thị dành cho dashboard tổng quan: bố cục và typographic rõ hơn */
+  variant?: "default" | "premium";
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -114,8 +116,10 @@ const StatCard: React.FC<StatCardProps> = ({
   children,
   isActive,
   onClick,
+  variant = "default",
 }) => {
   const isInteractive = typeof onClick === "function";
+  const isPremium = variant === "premium";
   const panelClass = isActive
     ? "backdrop-blur-[16px]"
     : "glass-panel";
@@ -126,25 +130,41 @@ const StatCard: React.FC<StatCardProps> = ({
     : `${accent.border} ${isInteractive ? "hover:scale-[1.02] cursor-pointer" : ""}`;
   const glowStateClass = isActive
     ? `${accent.activeGlow} opacity-30`
-    : `${accent.glow} opacity-10 transition-opacity group-hover:opacity-25`;
+    : `${accent.glow} ${isPremium ? "opacity-15 group-hover:opacity-28" : "opacity-10 group-hover:opacity-25"} transition-opacity`;
   const Component = isInteractive ? "button" : "div";
+
+  const radiusClass = isPremium ? "rounded-[26px] sm:rounded-[28px]" : "rounded-[24px]";
+  const padClass = isPremium ? "p-5 sm:p-6" : "p-4 sm:p-5";
+  const ringClass = isPremium ? "ring-1 ring-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]" : "";
 
   return (
     <Component
       {...(isInteractive ? { type: "button", onClick } : {})}
-      className={`stat-card group relative isolate overflow-hidden rounded-[24px] p-4 sm:p-5 transition-all duration-300 z-10 ${hoverEffectClass} ${panelClass} ${containerStateClass} ${
+      className={`stat-card group relative isolate overflow-hidden ${radiusClass} ${padClass} transition-all duration-300 z-10 ${ringClass} ${hoverEffectClass} ${panelClass} ${containerStateClass} ${
         isInteractive ? "w-full text-left" : ""
       }`}
     >
-      <div className={`stat-card__glow absolute -right-12 -top-12 h-32 w-32 rounded-full blur-[60px] ${glowStateClass}`}></div>
-      
-      <div className="stat-card__content flex items-start justify-between gap-4">
-        <div className="stat-card__text relative z-10">
-          <p className="stat-card__title text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/80 leading-none mb-1.5">
+      <div className={`stat-card__glow absolute -right-14 -top-14 h-36 w-36 rounded-full blur-[68px] ${glowStateClass}`}></div>
+
+      <div className={`stat-card__content flex items-start justify-between gap-4 ${isPremium ? "gap-5" : ""}`}>
+        <div className="stat-card__text relative z-10 min-w-0 flex-1">
+          <p
+            className={`stat-card__title font-bold uppercase text-indigo-200/70 leading-tight ${
+              isPremium
+                ? "text-[11px] tracking-[0.22em] mb-2.5"
+                : "text-[10px] sm:text-[11px] tracking-[0.2em] text-indigo-300/80 mb-1.5"
+            }`}
+          >
             {title}
           </p>
           <div className="flex flex-col gap-1">
-            <h3 className="stat-card__value text-xl sm:text-2xl font-bold text-white tracking-tight leading-none">
+            <h3
+              className={`stat-card__value text-white tracking-tight text-balance ${
+                isPremium
+                  ? "text-[1.35rem] sm:text-[1.7rem] font-semibold tabular-nums [font-feature-settings:'tnum']"
+                  : "text-xl sm:text-2xl font-bold leading-none"
+              }`}
+            >
               {value}
             </h3>
             {subtitle && (
@@ -156,16 +176,26 @@ const StatCard: React.FC<StatCardProps> = ({
         </div>
 
         <div
-          className={`stat-card__icon relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 ${accent.iconBg}`}
+          className={`stat-card__icon relative shrink-0 items-center justify-center border border-white/10 overflow-hidden transform transition-all duration-500 group-hover:rotate-[8deg] group-hover:scale-105 ${accent.iconBg} ${
+            isPremium
+              ? "flex h-12 w-12 rounded-2xl shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]"
+              : "flex h-11 w-11 rounded-xl group-hover:rotate-[10deg] group-hover:scale-110"
+          }`}
         >
           {/* Internal reflection */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
-          <Icon className="h-5 w-5 relative z-10" />
+          <div className="absolute inset-0 bg-gradient-to-br from-white/25 via-white/5 to-transparent pointer-events-none"></div>
+          <Icon className={`relative z-10 ${isPremium ? "h-5 w-5 sm:h-6 sm:w-6" : "h-5 w-5"}`} />
         </div>
       </div>
-      
+
       {children && (
-        <div className="mt-6 relative z-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
+        <div
+          className={`relative z-10 animate-in fade-in slide-in-from-bottom-2 duration-700 ${
+            isPremium
+              ? "mt-5 border-t border-white/[0.08] pt-4"
+              : "mt-6"
+          }`}
+        >
           {children}
         </div>
       )}

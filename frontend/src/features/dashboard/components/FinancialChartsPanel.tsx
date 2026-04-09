@@ -25,6 +25,8 @@ type FinancialChartsPanelProps = {
   availableYears: number[];
   selectedYear: number;
   onYearChange: (year: number) => void;
+  /** Khi true, ẩn chọn năm vì biểu đồ đang theo khoảng ngày tùy chọn */
+  isRangeMode?: boolean;
 };
 
 type FinancialChartRow = {
@@ -172,6 +174,7 @@ export const FinancialChartsPanel: React.FC<FinancialChartsPanelProps> = ({
   availableYears,
   selectedYear,
   onYearChange,
+  isRangeMode = false,
 }) => {
   const chartData: FinancialChartRow[] = revenueData.map((item, index) => ({
     month: item.month,
@@ -195,21 +198,27 @@ export const FinancialChartsPanel: React.FC<FinancialChartsPanelProps> = ({
 
           </div>
 
-          <select
-            className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-white shadow-lg outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
-            value={selectedYear}
-            onChange={(event) => onYearChange(Number(event.target.value))}
-          >
-            {availableYears.length === 0 ? (
-              <option value={selectedYear}>{selectedYear}</option>
-            ) : (
-              availableYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))
-            )}
-          </select>
+          {isRangeMode ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-white/75 shadow-lg">
+              Theo chu kỳ đã chọn
+            </div>
+          ) : (
+            <select
+              className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-white shadow-lg outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/30"
+              value={selectedYear}
+              onChange={(event) => onYearChange(Number(event.target.value))}
+            >
+              {availableYears.length === 0 ? (
+                <option value={selectedYear}>{selectedYear}</option>
+              ) : (
+                availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))
+              )}
+            </select>
+          )}
         </div>
 
         {renderLegend()}

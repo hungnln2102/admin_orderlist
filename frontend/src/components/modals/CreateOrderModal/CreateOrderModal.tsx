@@ -341,6 +341,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
               <CreateOrderPricingSection
                 customMode={customMode}
+                customerType={customerType}
                 formData={formData}
                 registerDateDMY={registerDateDMY}
                 costValue={costValue}

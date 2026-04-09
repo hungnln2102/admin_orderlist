@@ -9,7 +9,14 @@ import {
   EyeIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { MergedProduct, sanitizeHtmlForDisplay, toHtmlFromPlain } from "../utils/productInfoHelpers";
+import {
+  MergedProduct,
+  htmlToPlainText,
+  resolveVariantDisplayImageUrl,
+  sanitizeHtmlForDisplay,
+  toHtmlFromPlain,
+  variantHasDescVariantLinked,
+} from "../utils/productInfoHelpers";
 
 type ProductCardProps = {
   item: MergedProduct;
@@ -30,13 +37,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const safeDescriptionHtml = sanitizeHtmlForDisplay(
     item.descriptionHtml || toHtmlFromPlain(item.description || "")
   ) || "Không có thông tin sản phẩm";
+  const previewRulesPlain =
+    htmlToPlainText(safeRulesHtml).replace(/\s+/g, " ").trim() ||
+    "Không có thông tin bán hàng";
+  const previewDescriptionPlain =
+    htmlToPlainText(safeDescriptionHtml).replace(/\s+/g, " ").trim() ||
+    "Không có thông tin sản phẩm";
+  const cardThumbUrl = resolveVariantDisplayImageUrl(item);
+  const hasDescLinked = variantHasDescVariantLinked(item);
+  const isInactive = item.isActive === false;
+  const cardStateClass = isInactive
+    ? "product-card--inactive"
+    : hasDescLinked
+      ? "product-card--has-desc"
+      : "product-card--no-desc";
 
   return (
-    <div className="product-card glass-panel-dark rounded-2xl p-4 border border-white/5 space-y-4 shadow-xl">
+    <div
+      className={`product-card glass-panel-dark rounded-2xl border border-white/5 p-4 space-y-4 shadow-xl ${cardStateClass}`}
+    >
       <div className="product-card__header flex items-start gap-3">
-        {item.imageUrl ? (
+        {cardThumbUrl ? (
           <img
-            src={item.imageUrl}
+            src={cardThumbUrl}
             alt={displayName}
             className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
             onError={(e) => {
@@ -64,10 +87,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">
           Quy tắc bán hàng
         </p>
-        <div
-          className="text-sm text-white/70 line-clamp-2 rich-display"
-          dangerouslySetInnerHTML={{ __html: safeRulesHtml }}
-        />
+        <p className="text-sm text-white/70 line-clamp-2" title={previewRulesPlain}>
+          {previewRulesPlain}
+        </p>
       </div>
 
       {/* Description */}
@@ -75,10 +97,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <p className="text-xs font-semibold text-white/80 uppercase tracking-wide">
           Mô tả
         </p>
-        <div
-          className="text-sm text-white/70 line-clamp-2 rich-display"
-          dangerouslySetInnerHTML={{ __html: safeDescriptionHtml }}
-        />
+        <p className="text-sm text-white/70 line-clamp-2" title={previewDescriptionPlain}>
+          {previewDescriptionPlain}
+        </p>
       </div>
 
       {/* Actions */}

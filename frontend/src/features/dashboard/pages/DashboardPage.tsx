@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
+import { DashboardDateRangeFilter } from "../components/DashboardDateRangeFilter";
 import { DashboardHero } from "../components/DashboardHero";
 import { budgets, currencyFormatter, financeSummary } from "../constants";
 import { useDashboardStats } from "../hooks/useDashboardStats";
@@ -21,6 +22,8 @@ const Dashboard: React.FC = () => {
     availableYears,
     selectedYear,
     setSelectedYear,
+    dashboardRange,
+    setDashboardRange,
     loading,
     errorMessage,
   } = useDashboardStats();
@@ -47,9 +50,21 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="dashboard space-y-6 sm:space-y-7 p-3 sm:p-4 lg:p-6">
-      <DashboardHero />
+      <DashboardHero
+        rightSlot={
+          activeSection === "overview" ? (
+            <DashboardDateRangeFilter
+              value={dashboardRange}
+              onChange={setDashboardRange}
+              className="w-full shrink-0"
+            />
+          ) : undefined
+        }
+      />
 
-      <SectionTabs activeSection={activeSection} onChange={setActiveSection} />
+      <div className="rounded-2xl border border-indigo-500/30 bg-[linear-gradient(135deg,rgba(30,27,75,0.42)_0%,rgba(15,23,42,0.55)_45%,rgba(15,23,42,0.35)_100%)] shadow-[0_20px_56px_-16px_rgba(79,70,229,0.25),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl p-2 sm:p-2.5">
+        <SectionTabs embedded activeSection={activeSection} onChange={setActiveSection} />
+      </div>
 
       {errorMessage && (
         <div className="rounded-xl border border-red-300 bg-red-950/30 p-4 text-red-300 backdrop-blur">{errorMessage}</div>
@@ -67,6 +82,7 @@ const Dashboard: React.FC = () => {
             availableYears={availableYears}
             selectedYear={selectedYear}
             onYearChange={setSelectedYear}
+            isRangeMode={dashboardRange !== null}
           />
           {/* Monthly summary table intentionally hidden by UI request */}
         </>

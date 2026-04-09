@@ -146,6 +146,7 @@ const calculateOrderPricing = async ({
     pctCtv: variantPricing.pctCtv,
     pctKhach: variantPricing.pctKhach,
     pctPromo: variantPricing.pctPromo,
+    pctStu: variantPricing.pctStu,
     roundCostToThousands: true,
     days: 30,
     expiryDate: "",

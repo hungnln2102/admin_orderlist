@@ -48,10 +48,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       </label>
 
       <div className="controls">
-        <label className="remember">
-          <input type="checkbox" defaultChecked />
-          <span>Ghi nhớ đăng nhập</span>
-        </label>
         <button type="button" className="ghost">
           Quên mật khẩu?
         </button>

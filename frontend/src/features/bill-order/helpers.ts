@@ -8,6 +8,9 @@ export type InvoiceForm = {
   phone: string;
   fax: string;
   taxCode: string;
+  customerEmail: string;
+  paymentMethod: string;
+  note: string;
 };
 
 export type InvoiceEntry = {
@@ -110,6 +113,9 @@ export const DEFAULT_FORM: InvoiceForm = {
   phone: "",
   fax: "",
   taxCode: "",
+  customerEmail: "",
+  paymentMethod: "",
+  note: "",
 };
 
 export const INVOICE_FONT_STACK =

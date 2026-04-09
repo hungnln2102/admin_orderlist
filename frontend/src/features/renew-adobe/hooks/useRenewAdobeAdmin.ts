@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { API_BASE_URL } from "@/shared/api/client";
-import { fetchAdobeAdminAccounts } from "../api/renewAdobeApi";
+import { deleteAdobeAdminAccount, fetchAdobeAdminAccounts } from "../api/renewAdobeApi";
 import type { AdobeAdminAccount, LicenseStatus } from "../types";
 
 type CheckAllProgress = {
@@ -24,6 +24,9 @@ export function useRenewAdobeAdmin() {
     current: number;
     total: number;
   } | null>(null);
+  const [deletingAdminAccountId, setDeletingAdminAccountId] = useState<number | null>(null);
+  const [adminAccountPendingDelete, setAdminAccountPendingDelete] =
+    useState<AdobeAdminAccount | null>(null);
   const [checkAllProgress, setCheckAllProgress] =
     useState<CheckAllProgress | null>(null);
   const [autoAssignPhase, setAutoAssignPhase] = useState<
@@ -329,29 +332,62 @@ export function useRenewAdobeAdmin() {
       setCheckError(null);
       setFixAllProgress({ current: 0, total: unique.length });
 
-      try {
-        for (let i = 0; i < unique.length; i++) {
-          const email = unique[i];
-          setFixingId(email);
-          setFixAllProgress({ current: i + 1, total: unique.length });
+      let remaining = [...unique];
+      let processed = 0;
 
+      try {
+        while (remaining.length > 0) {
           const res = await fetch(
-            `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USER}`,
+            `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USERS_ROUND}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ email }),
+              body: JSON.stringify({ emails: remaining }),
             }
           );
-          const data = await res.json().catch(() => ({}));
+          const data = (await res.json().catch(() => ({}))) as {
+            success?: boolean;
+            error?: string;
+            added_count?: number;
+            remaining_emails?: string[];
+            round?: { emails?: string[]; accountEmail?: string };
+          };
 
-          if (data?.success) {
-            loadAccounts();
-          } else {
+          if (!data?.success) {
             const msg =
               typeof data?.error === "string" ? data.error : "Fix thất bại";
-            throw new Error(`${msg} — ${email}`);
+            throw new Error(msg);
+          }
+
+          const added = Number(data.added_count) || 0;
+          remaining = Array.isArray(data.remaining_emails)
+            ? data.remaining_emails
+            : [];
+
+          if (added === 0) {
+            if (remaining.length > 0) {
+              throw new Error(
+                data?.error || "Không thêm được user trong vòng này."
+              );
+            }
+            break;
+          }
+
+          processed += added;
+
+          setFixAllProgress({
+            current: Math.min(processed, unique.length),
+            total: unique.length,
+          });
+
+          const lastEmail = data.round?.emails?.[data.round.emails.length - 1];
+          if (lastEmail) setFixingId(lastEmail);
+
+          loadAccounts();
+
+          if (remaining.length === 0) {
+            break;
           }
         }
       } catch (err) {
@@ -390,6 +426,32 @@ export function useRenewAdobeAdmin() {
       .catch(() => {});
   }, []);
 
+  const openDeleteAdminModal = useCallback((account: AdobeAdminAccount) => {
+    setCheckError(null);
+    setAdminAccountPendingDelete(account);
+  }, []);
+
+  const closeDeleteAdminModal = useCallback(() => {
+    if (deletingAdminAccountId !== null) return;
+    setAdminAccountPendingDelete(null);
+  }, [deletingAdminAccountId]);
+
+  const confirmDeleteAdminAccount = useCallback(() => {
+    const account = adminAccountPendingDelete;
+    if (!account) return;
+    setCheckError(null);
+    setDeletingAdminAccountId(account.id);
+    deleteAdobeAdminAccount(account.id)
+      .then(() => {
+        loadAccounts();
+        setAdminAccountPendingDelete(null);
+      })
+      .catch((err) =>
+        setCheckError(err?.message ?? "Lỗi khi xóa tài khoản admin.")
+      )
+      .finally(() => setDeletingAdminAccountId(null));
+  }, [adminAccountPendingDelete, loadAccounts]);
+
   const handleCheck = useCallback(
     (account: AdobeAdminAccount) => {
       setCheckError(null);
@@ -425,6 +487,11 @@ export function useRenewAdobeAdmin() {
     error,
     checkingId,
     checkError,
+    deletingAdminAccountId,
+    adminAccountPendingDelete,
+    openDeleteAdminModal,
+    closeDeleteAdminModal,
+    confirmDeleteAdminAccount,
     deletingId,
     fixingId,
     fixAllProgress,

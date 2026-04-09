@@ -17,23 +17,24 @@ type OverviewStatsProps = {
 
 export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 lg:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),0_10px_30px_-15px_rgba(99,102,241,0.2)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6),0_15px_40px_-15px_rgba(99,102,241,0.3)] transition-shadow duration-300">
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="rounded-[28px] border border-indigo-400/25 bg-[linear-gradient(155deg,rgba(49,46,129,0.35)_0%,rgba(15,23,42,0.62)_42%,rgba(2,6,23,0.55)_100%)] p-4 shadow-[0_28px_64px_-20px_rgba(0,0,0,0.55),0_12px_36px_-18px_rgba(99,102,241,0.22),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-[box-shadow] duration-300 hover:shadow-[0_32px_70px_-20px_rgba(0,0,0,0.6),0_16px_42px_-18px_rgba(129,140,248,0.18),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5 lg:p-6">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
         {stats.map((item, index) => (
           <StatCard
             key={`${item.name}-${index}`}
+            variant="premium"
             title={item.name}
             value={item.value}
             icon={item.icon}
             accent={STAT_CARD_ACCENTS[item.accent]}
           >
             <div
-              className={`flex items-center text-sm font-semibold ${
+              className={`inline-flex w-full max-w-full flex-wrap items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold tabular-nums ring-1 ring-white/[0.06] sm:text-[13px] ${
                 item.changeType === "increase"
-                  ? "text-emerald-300"
+                  ? "bg-emerald-500/[0.12] text-emerald-200/95 ring-emerald-400/15"
                   : item.changeType === "decrease"
-                  ? "text-rose-300"
-                  : "text-amber-300"
+                    ? "bg-rose-500/[0.12] text-rose-200/95 ring-rose-400/12"
+                    : "bg-amber-500/[0.12] text-amber-200/95 ring-amber-400/15"
               }`}
             >
               {item.changeType === "alert" ? (

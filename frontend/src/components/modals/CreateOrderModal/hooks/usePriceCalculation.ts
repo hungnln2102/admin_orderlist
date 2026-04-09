@@ -198,6 +198,9 @@ export const usePriceCalculation = ({
         if (customerType === ORDER_CODE_PREFIXES.PROMO) {
           giaBan = giaBanFromResult ?? giaNhap ?? prevGiaBan ?? 0;
         }
+        if (customerType === ORDER_CODE_PREFIXES.GIFT) {
+          giaBan = 0;
+        }
 
         return {
           ...prev,

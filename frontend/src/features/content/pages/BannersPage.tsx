@@ -10,6 +10,7 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { ArticleImageInsertModal } from "../components/ArticleImageInsertModal";
 import type { Banner } from "../types";
 import {
@@ -189,6 +190,8 @@ export default function BannersPage() {
   const [editForm, setEditForm] = useState<HeroForm>(emptyForm);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalMode, setImageModalMode] = useState<"create" | "edit" | null>(null);
+  const [bannerIdPendingDelete, setBannerIdPendingDelete] = useState<number | null>(null);
+  const [bannerDeleteSubmitting, setBannerDeleteSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -263,19 +266,24 @@ export default function BannersPage() {
     }
   }, [editingId, editForm, load]);
 
-  const handleDelete = useCallback(
-    async (id: number) => {
-      if (!window.confirm("Xóa banner này?")) return;
-      try {
-        await deleteBanner(id);
-        if (editingId === id) setEditingId(null);
-        load();
-      } catch {
-        alert("Xóa thất bại.");
-      }
-    },
-    [load, editingId]
-  );
+  const requestDeleteBanner = useCallback((id: number) => {
+    setBannerIdPendingDelete(id);
+  }, []);
+
+  const confirmDeleteBanner = useCallback(async () => {
+    if (bannerIdPendingDelete == null) return;
+    setBannerDeleteSubmitting(true);
+    try {
+      await deleteBanner(bannerIdPendingDelete);
+      if (editingId === bannerIdPendingDelete) setEditingId(null);
+      load();
+      setBannerIdPendingDelete(null);
+    } catch {
+      alert("Xóa thất bại.");
+    } finally {
+      setBannerDeleteSubmitting(false);
+    }
+  }, [bannerIdPendingDelete, editingId, load]);
 
   const handleToggle = useCallback(
     async (id: number) => {
@@ -473,7 +481,7 @@ export default function BannersPage() {
                     <button
                       type="button"
                       title="Xóa"
-                      onClick={() => handleDelete(banner.id)}
+                      onClick={() => requestDeleteBanner(banner.id)}
                       className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-rose-400"
                     >
                       <TrashIcon className="h-4 w-4" />
@@ -485,6 +493,19 @@ export default function BannersPage() {
           ))
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={bannerIdPendingDelete !== null}
+        onClose={() => {
+          if (!bannerDeleteSubmitting) setBannerIdPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDeleteBanner()}
+        title="Xóa banner?"
+        message="Bạn có chắc muốn xóa banner này? Hành động không thể hoàn tác."
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={bannerDeleteSubmitting}
+      />
     </div>
   );
 }

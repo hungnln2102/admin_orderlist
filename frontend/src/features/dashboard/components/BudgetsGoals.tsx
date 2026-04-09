@@ -6,6 +6,7 @@ import {
   ScaleIcon,
   WalletIcon,
 } from "@heroicons/react/24/outline";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { AddGoalModal } from "./AddGoalModal";
 import { ExpenseBreakdownChart } from "./budgets-goals/ExpenseBreakdownChart";
 import { SavingGoalsPanel } from "./budgets-goals/SavingGoalsPanel";
@@ -25,6 +26,8 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   onRefetchGoals,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [goalIdPendingDelete, setGoalIdPendingDelete] = useState<number | null>(null);
+  const [goalDeleteSubmitting, setGoalDeleteSubmitting] = useState(false);
 
   const { handleReorder, handleDelete } = useSavingGoalsActions({
     savingGoals,
@@ -136,7 +139,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
         currencyFormatter={currencyFormatter}
         onAddGoal={() => setIsAddModalOpen(true)}
         onReorderGoal={handleReorder}
-        onDeleteGoal={handleDelete}
+        onDeleteGoal={(id) => setGoalIdPendingDelete(id)}
       />
 
       <AddGoalModal
@@ -145,6 +148,26 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
         onSuccess={() => {
           onRefetchGoals?.();
         }}
+      />
+
+      <ConfirmModal
+        isOpen={goalIdPendingDelete !== null}
+        onClose={() => {
+          if (!goalDeleteSubmitting) setGoalIdPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (goalIdPendingDelete == null) return;
+          const id = goalIdPendingDelete;
+          setGoalDeleteSubmitting(true);
+          void handleDelete(id)
+            .then(() => setGoalIdPendingDelete(null))
+            .finally(() => setGoalDeleteSubmitting(false));
+        }}
+        title="Xóa mục tiêu?"
+        message="Bạn có chắc muốn xóa mục tiêu tiết kiệm này?"
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={goalDeleteSubmitting}
       />
     </div>
   );

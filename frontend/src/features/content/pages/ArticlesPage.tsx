@@ -8,6 +8,7 @@ import {
   EyeIcon,
 } from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
+import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import Pagination from "@/components/ui/Pagination";
 import type { Article } from "../types";
 import { fetchArticles, fetchArticle, deleteArticle } from "../api/contentApi";
@@ -26,6 +27,8 @@ export default function ArticlesPage() {
   const [previewArticle, setPreviewArticle] = useState<Article | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [articleIdPendingDelete, setArticleIdPendingDelete] = useState<number | null>(null);
+  const [articleDeleteSubmitting, setArticleDeleteSubmitting] = useState(false);
 
   const loadArticles = useCallback(async (page: number, q: string) => {
     setLoading(true);
@@ -46,18 +49,23 @@ export default function ArticlesPage() {
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
-  const handleDelete = useCallback(
-    async (id: number) => {
-      if (!window.confirm("Bạn có chắc muốn xóa bài viết này?")) return;
-      try {
-        await deleteArticle(id);
-        loadArticles(currentPage, search);
-      } catch {
-        alert("Xóa thất bại.");
-      }
-    },
-    [currentPage, search, loadArticles]
-  );
+  const requestDeleteArticle = useCallback((id: number) => {
+    setArticleIdPendingDelete(id);
+  }, []);
+
+  const confirmDeleteArticle = useCallback(async () => {
+    if (articleIdPendingDelete == null) return;
+    setArticleDeleteSubmitting(true);
+    try {
+      await deleteArticle(articleIdPendingDelete);
+      loadArticles(currentPage, search);
+      setArticleIdPendingDelete(null);
+    } catch {
+      alert("Xóa thất bại.");
+    } finally {
+      setArticleDeleteSubmitting(false);
+    }
+  }, [articleIdPendingDelete, currentPage, search, loadArticles]);
 
   const openPreview = useCallback(async (id: number) => {
     setPreviewOpen(true);
@@ -193,7 +201,7 @@ export default function ArticlesPage() {
                       <button
                         type="button"
                         title="Xóa"
-                        onClick={() => handleDelete(article.id)}
+                        onClick={() => requestDeleteArticle(article.id)}
                         className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-rose-400"
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -221,6 +229,19 @@ export default function ArticlesPage() {
         loading={previewLoading}
         error={previewError}
         onClose={closePreview}
+      />
+
+      <ConfirmModal
+        isOpen={articleIdPendingDelete !== null}
+        onClose={() => {
+          if (!articleDeleteSubmitting) setArticleIdPendingDelete(null);
+        }}
+        onConfirm={() => void confirmDeleteArticle()}
+        title="Xóa bài viết?"
+        message="Bạn có chắc muốn xóa bài viết này? Hành động không thể hoàn tác."
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isSubmitting={articleDeleteSubmitting}
       />
     </div>
   );

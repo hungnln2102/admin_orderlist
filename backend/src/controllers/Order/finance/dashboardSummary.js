@@ -38,70 +38,32 @@ const REFUND_COUNTED_STATUSES = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
 const isOrderCounted = (status) => ORDER_COUNTED_STATUSES.includes(status);
 const isRefundCounted = (status) => REFUND_COUNTED_STATUSES.includes(status);
 
-const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
-    const prevStatus = beforeRow?.status || STATUS.UNPAID;
-    const nextStatus = afterRow?.status || STATUS.UNPAID;
+const hasMeaningfulDate = (value) =>
+    value !== undefined &&
+    value !== null &&
+    String(value).trim() !== "" &&
+    String(value).trim().toLowerCase() !== "null";
 
-    if (prevStatus === nextStatus) return;
-
+/**
+ * Hoàn tiền / đếm hủy gắn với tháng của canceled_at (giống rebuild-dashboard-monthly-summary.js).
+ * Doanh thu & đơn vẫn theo order_date.
+ */
+const monthKeyFromOrderRow = (beforeRow, afterRow) => {
     const orderDate = afterRow?.order_date || beforeRow?.order_date;
-    if (!orderDate) return;
+    return orderDate ? getMonthKey(orderDate) : null;
+};
 
-    const monthKey = getMonthKey(orderDate);
-    if (!monthKey) return;
+const monthKeyFromRefundRow = (beforeRow, afterRow) => {
+    const canceledRaw =
+        (afterRow && hasMeaningfulDate(afterRow.canceled_at) ? afterRow.canceled_at : null) ||
+        (beforeRow && hasMeaningfulDate(beforeRow.canceled_at) ? beforeRow.canceled_at : null);
+    const fallback = afterRow?.order_date || beforeRow?.order_date;
+    const anchor = canceledRaw || fallback;
+    return anchor ? getMonthKey(anchor) : null;
+};
 
-    const updates = {};
-
-    // Order left the "counted" lifecycle → -1 order, -revenue, -profit
-    if (isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
-        const price = toNullableNumber(beforeRow?.price) || 0;
-        const cost = toNullableNumber(beforeRow?.cost) || 0;
-        const profit = price - cost;
-        updates.total_orders = (updates.total_orders || 0) - 1;
-        updates.total_revenue = (updates.total_revenue || 0) - price;
-        updates.total_profit = (updates.total_profit || 0) - profit;
-    }
-
-    // Order left refund lifecycle → -1 canceled, -refund
-    if (isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
-        const refund = toNullableNumber(beforeRow?.refund) || 0;
-        updates.canceled_orders = (updates.canceled_orders || 0) - 1;
-        updates.total_refund = (updates.total_refund || 0) - refund;
-    }
-
-    // Order entered the "counted" lifecycle ONLY via PROCESSING (UNPAID/CANCELLED → PROCESSING)
-    if (!isOrderCounted(prevStatus) && nextStatus === STATUS.PROCESSING) {
-        const price = toNullableNumber(afterRow?.price) || 0;
-        const cost = toNullableNumber(afterRow?.cost) || 0;
-        const profit = price - cost;
-        updates.total_orders = (updates.total_orders || 0) + 1;
-        updates.total_revenue = (updates.total_revenue || 0) + price;
-        updates.total_profit = (updates.total_profit || 0) + profit;
-    }
-
-    // Đơn nhập hàng MAVN: UNPAID → PAID (bỏ bước PROCESSING, không NCC) — vẫn cộng dashboard.
-    if (
-        !isOrderCounted(prevStatus) &&
-        nextStatus === STATUS.PAID &&
-        prevStatus === STATUS.UNPAID &&
-        isMavnImportOrder(afterRow)
-    ) {
-        const price = toNullableNumber(afterRow?.price) || 0;
-        const cost = toNullableNumber(afterRow?.cost) || 0;
-        const profit = price - cost;
-        updates.total_orders = (updates.total_orders || 0) + 1;
-        updates.total_revenue = (updates.total_revenue || 0) + price;
-        updates.total_profit = (updates.total_profit || 0) + profit;
-    }
-
-    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund
-    if (!isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
-        const refund = toNullableNumber(afterRow?.refund) || 0;
-        updates.canceled_orders = (updates.canceled_orders || 0) + 1;
-        updates.total_refund = (updates.total_refund || 0) + refund;
-    }
-
-    if (Object.keys(updates).length === 0) return;
+const mergeSummaryUpdates = async (trx, monthKey, updates) => {
+    if (!monthKey || Object.keys(updates).length === 0) return;
 
     const insertData = {
         [summaryCols.MONTH_KEY]: monthKey,
@@ -146,6 +108,80 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         .insert(insertData)
         .onConflict(summaryCols.MONTH_KEY)
         .merge(mergeData);
+};
+
+const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
+    const prevStatus = beforeRow?.status || STATUS.UNPAID;
+    const nextStatus = afterRow?.status || STATUS.UNPAID;
+
+    if (prevStatus === nextStatus) return;
+
+    const orderMonthKey = monthKeyFromOrderRow(beforeRow, afterRow);
+    const refundMonthKey = monthKeyFromRefundRow(beforeRow, afterRow) || orderMonthKey;
+
+    if (!orderMonthKey && !refundMonthKey) return;
+
+    const revenueUpdates = {};
+    const refundUpdates = {};
+
+    // Order left the "counted" lifecycle → -1 order, -revenue, -profit
+    if (isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
+        const price = toNullableNumber(beforeRow?.price) || 0;
+        const cost = toNullableNumber(beforeRow?.cost) || 0;
+        const profit = price - cost;
+        revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) - 1;
+        revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) - price;
+        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - profit;
+    }
+
+    // Order left refund lifecycle → -1 canceled, -refund
+    if (isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
+        const refund = toNullableNumber(beforeRow?.refund) || 0;
+        refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) - 1;
+        refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
+    }
+
+    // Order entered the "counted" lifecycle ONLY via PROCESSING (UNPAID/CANCELLED → PROCESSING)
+    if (!isOrderCounted(prevStatus) && nextStatus === STATUS.PROCESSING) {
+        const price = toNullableNumber(afterRow?.price) || 0;
+        const cost = toNullableNumber(afterRow?.cost) || 0;
+        const profit = price - cost;
+        revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
+        revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
+        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
+    }
+
+    // Đơn nhập hàng MAVN: UNPAID → PAID (bỏ bước PROCESSING, không NCC) — vẫn cộng dashboard.
+    if (
+        !isOrderCounted(prevStatus) &&
+        nextStatus === STATUS.PAID &&
+        prevStatus === STATUS.UNPAID &&
+        isMavnImportOrder(afterRow)
+    ) {
+        const price = toNullableNumber(afterRow?.price) || 0;
+        const cost = toNullableNumber(afterRow?.cost) || 0;
+        const profit = price - cost;
+        revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
+        revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
+        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
+    }
+
+    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund
+    if (!isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
+        const refund = toNullableNumber(afterRow?.refund) || 0;
+        refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
+        refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
+    }
+
+    const revenueKey = orderMonthKey;
+    const refundKey = refundMonthKey;
+
+    if (Object.keys(revenueUpdates).length > 0 && revenueKey) {
+        await mergeSummaryUpdates(trx, revenueKey, revenueUpdates);
+    }
+    if (Object.keys(refundUpdates).length > 0 && refundKey) {
+        await mergeSummaryUpdates(trx, refundKey, refundUpdates);
+    }
 };
 
 module.exports = {

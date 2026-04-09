@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { EyeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { CategoryRow } from "../types";
 import { CategoryItem } from "../utils/productInfoHelpers";
+import { getCategoryPillVisualStyle } from "../utils/categoryColors";
 import Pagination from "@/components/ui/Pagination";
 
 type CategoryTableProps = {
@@ -12,7 +13,6 @@ type CategoryTableProps = {
   pageSize: number;
   onPageChange: (page: number) => void;
   onEditCategory: (group: CategoryRow) => void;
-  getCategoryColor: (category: CategoryItem, index: number) => string;
 };
 
 export const CategoryTable: React.FC<CategoryTableProps> = ({
@@ -23,7 +23,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   pageSize,
   onPageChange,
   onEditCategory,
-  getCategoryColor,
 }) => {
   const [expandedPackageKey, setExpandedPackageKey] = useState<string | null>(
     null
@@ -110,9 +109,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
                         <span
                           key={`${group.key}-${category.id || category.name}`}
                           className="category-pill"
-                          style={{
-                            backgroundColor: getCategoryColor(category, index),
-                          }}
+                          style={getCategoryPillVisualStyle(category, index)}
                         >
                           {category.name}
                         </span>

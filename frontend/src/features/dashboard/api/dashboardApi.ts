@@ -78,25 +78,33 @@ type DashboardChartsResponse = Partial<{
   year: number;
 }>;
 
-export async function fetchDashboardStats(): Promise<DashboardStatsResponse> {
-  const response = await apiFetch("/api/dashboard/stats");
+export type DashboardStatsQueryRange = { from: string; to: string };
+
+export async function fetchDashboardStats(
+  range?: DashboardStatsQueryRange | null
+): Promise<DashboardStatsResponse> {
+  const qs =
+    range?.from && range?.to
+      ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+      : "";
+  const response = await apiFetch(`/api/dashboard/stats${qs}`);
   if (!response.ok) {
-    const message = await response.text().catch(() => "");
+    const raw = await response.text().catch(() => "");
+    let message = raw;
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed?.error) message = parsed.error;
+    } catch {
+      /* use raw text */
+    }
     throw new Error(message || "Không thể tải thống kê tổng quan.");
   }
   return response.json();
 }
 
-export async function fetchChartData(
-  year: number = new Date().getFullYear()
-): Promise<ChartsApiResponse> {
-  const response = await apiFetch(`/api/dashboard/charts?year=${year}`);
-  if (!response.ok) {
-    throw new Error("Không thể tải dữ liệu biểu đồ dashboard.");
-  }
-
-  const payload: DashboardChartsResponse =
-    (await response.json().catch(() => ({}))) || {};
+const normalizeChartsPayload = (
+  payload: DashboardChartsResponse
+): ChartsApiResponse => {
   const months = Array.isArray(payload.months) ? payload.months : [];
 
   const normalizeMonthLabel = (row: DashboardMonthRow): string => {
@@ -131,6 +139,42 @@ export async function fetchChartData(
     })),
     year: Number.isFinite(payload.year) ? Number(payload.year) : undefined,
   };
+};
+
+export async function fetchChartData(
+  year: number = new Date().getFullYear()
+): Promise<ChartsApiResponse> {
+  const response = await apiFetch(`/api/dashboard/charts?year=${year}`);
+  if (!response.ok) {
+    throw new Error("Không thể tải dữ liệu biểu đồ dashboard.");
+  }
+
+  const payload: DashboardChartsResponse =
+    (await response.json().catch(() => ({}))) || {};
+  return normalizeChartsPayload(payload);
+}
+
+export async function fetchChartDataRange(
+  from: string,
+  to: string
+): Promise<ChartsApiResponse> {
+  const response = await apiFetch(
+    `/api/dashboard/charts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+  );
+  if (!response.ok) {
+    const raw = await response.text().catch(() => "");
+    let message = "Không thể tải dữ liệu biểu đồ dashboard.";
+    try {
+      const parsed = JSON.parse(raw) as { error?: string };
+      if (parsed?.error) message = parsed.error;
+    } catch {
+      /* keep default */
+    }
+    throw new Error(message);
+  }
+  const payload: DashboardChartsResponse =
+    (await response.json().catch(() => ({}))) || {};
+  return normalizeChartsPayload(payload);
 }
 
 export async function fetchAvailableYears(): Promise<number[]> {

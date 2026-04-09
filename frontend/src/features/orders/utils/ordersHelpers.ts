@@ -1,4 +1,9 @@
-import { ORDER_FIELDS, VIRTUAL_FIELDS, Order } from "@/constants";
+import {
+  ORDER_CODE_PREFIXES,
+  ORDER_FIELDS,
+  VIRTUAL_FIELDS,
+  Order,
+} from "@/constants";
 import * as Helpers from "@/lib/helpers";
 
 
@@ -39,6 +44,32 @@ export const normalizeSearchText = (value: unknown): string => {
 
 export const normalizeOrderCode = (value: unknown): string =>
   normalizeSearchText(value).replace(/[^a-z0-9]/g, "");
+
+/** Đơn quà tặng: mã bắt đầu bằng MAVT (ORDER_CODE_PREFIXES.GIFT). */
+export const isGiftOrderCode = (orderCode: unknown): boolean => {
+  const code = String(orderCode ?? "").trim().toUpperCase();
+  const prefix = String(ORDER_CODE_PREFIXES.GIFT).toUpperCase();
+  return code.startsWith(prefix);
+};
+
+/** Chuẩn hóa canceled_at để sort: mới nhất = timestamp lớn nhất; thiếu → đẩy xuống cuối. */
+export const parseCanceledAtToMs = (value: unknown): number => {
+  if (value === null || value === undefined) return Number.NEGATIVE_INFINITY;
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+  }
+  const s = String(value).trim();
+  if (!s) return Number.NEGATIVE_INFINITY;
+  const fromIso = Date.parse(s);
+  if (Number.isFinite(fromIso)) return fromIso;
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    const t = Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+    return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+  }
+  return Number.NEGATIVE_INFINITY;
+};
 
 export const formatOrderCodeShort = (
   value: unknown,
@@ -155,4 +186,72 @@ export const parseExpiryTime = (order: Order): number => {
   }
   const fallback = new Date(String(raw || ""));
   return Number.isFinite(fallback.getTime()) ? fallback.getTime() : 0;
+};
+
+const DMY_DISPLAY_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+
+const dmyDisplayToLocalStartMs = (dmy: string): number | null => {
+  const m = String(dmy).trim().match(DMY_DISPLAY_RE);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  const y = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) {
+    return null;
+  }
+  dt.setHours(0, 0, 0, 0);
+  return dt.getTime();
+};
+
+const ymdIsoToLocalStartMs = (ymd: string): number | null => {
+  const t = String(ymd).trim();
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) {
+    return null;
+  }
+  dt.setHours(0, 0, 0, 0);
+  return dt.getTime();
+};
+
+/** Đầu ngày đăng ký / cuối ngày hết hạn (local), sau enrich; thiếu ngày hiển thị thì đọc từ cột gốc. */
+export const getOrderDurationDayBoundsMs = (
+  order: Order
+): { startMs: number; endMs: number } | null => {
+  let reg = String(order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ?? "").trim();
+  let exp = String(order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ?? "").trim();
+  if (!reg) {
+    const raw = sanitizeDateLike(
+      order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE]
+    );
+    reg = Helpers.formatDateToDMY(raw) || "";
+  }
+  if (!exp) {
+    const raw = sanitizeDateLike(order.expiry_date ?? order[ORDER_FIELDS.EXPIRY_DATE]);
+    exp = Helpers.formatDateToDMY(raw) || "";
+  }
+  const startMs = dmyDisplayToLocalStartMs(reg);
+  if (startMs === null) return null;
+  const endParsed = exp ? dmyDisplayToLocalStartMs(exp) : null;
+  const endMs = endParsed !== null ? Math.max(startMs, endParsed) : startMs;
+  return { startMs, endMs };
+};
+
+/** Khoảng lọc yyyy-mm-dd; giữ đơn nếu [đăng ký, hết hạn] giao với [from, to] (gồm cả biên). */
+export const orderDurationOverlapsIsoRange = (
+  order: Order,
+  fromYmd: string,
+  toYmd: string
+): boolean => {
+  const bounds = getOrderDurationDayBoundsMs(order);
+  if (!bounds) return false;
+  const filterStart = ymdIsoToLocalStartMs(fromYmd);
+  const filterEnd = ymdIsoToLocalStartMs(toYmd);
+  if (filterStart === null || filterEnd === null) return false;
+  return bounds.startMs <= filterEnd && bounds.endMs >= filterStart;
 };

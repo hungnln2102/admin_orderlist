@@ -3,6 +3,7 @@ import { PencilIcon, TrashIcon, PlusIcon, XMarkIcon, CheckIcon } from "@heroicon
 import ColorPicker from "@/components/ui/ColorPicker";
 import { CategoryItem } from "@/lib/categoryApi";
 import { useCategoryManagement } from "../hooks/useCategoryManagement";
+import { getCategoryVisualStyle } from "../utils/categoryColors";
 
 interface CategoryTagManagerProps {
   onCategoriesChange?: () => void;
@@ -237,13 +238,15 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
                 {/* Color Preview */}
                 <div
                   className="h-14 w-14 rounded-xl border-2 border-white/20 flex-shrink-0 shadow-md"
-                  style={{ backgroundColor: category.color || "#facc15" }}
+                  style={getCategoryVisualStyle(category.color)}
                 />
 
                 {/* Category Info */}
                 <div className="flex-1 min-w-0">
                   <h4 className="text-base font-semibold text-white truncate">{category.name}</h4>
-                  <p className="text-xs text-slate-400 mt-1 font-mono">{category.color || "#facc15"}</p>
+                  <p className="text-xs text-slate-400 mt-1 font-mono break-all line-clamp-3">
+                    {category.color || "#facc15"}
+                  </p>
                 </div>
 
                 {/* Actions */}

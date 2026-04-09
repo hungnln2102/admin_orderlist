@@ -15,6 +15,11 @@ const { nextId } = require("../../../services/idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../services/orderCodeService");
 const { sendOrderCreatedNotification } = require("../../../services/telegramOrderNotification");
 const logger = require("../../../utils/logger");
+const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+const {
+    addSupplierImportOnProcessing,
+    updateDashboardMonthlySummaryOnStatusChange,
+} = require("../orderFinanceHelpers");
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -24,9 +29,10 @@ const attachCreateOrderRoute = (router) => {
 
         if (Object.keys(payload).length === 0) return res.status(400).json({ error: "Empty payload" });
 
-        payload.status = STATUS.UNPAID;
         const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
         const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
+        const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+        const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
 
         if (payload[productIdCol] == null && req.body?.variant_id != null) {
             const numericVariant = Number(req.body.variant_id);
@@ -75,16 +81,30 @@ const attachCreateOrderRoute = (router) => {
             }
         }
 
+        const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+        const giftPrefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+        const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
+        if (isGiftOrderCreate) {
+            payload[priceCol] = 0;
+            payload.status = STATUS.PROCESSING;
+        } else {
+            payload.status = STATUS.UNPAID;
+        }
+
         const trx = await db.transaction();
         try {
             payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, trx);
 
-            const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
             const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
             const detectedPrefix = VALID_PREFIXES.find((prefix) => clientIdOrder.startsWith(prefix)) || "MAVC";
             payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
+
+            if (isGiftOrderCreate) {
+                await addSupplierImportOnProcessing(trx, { status: STATUS.UNPAID }, newOrder);
+                await updateDashboardMonthlySummaryOnStatusChange(trx, { status: STATUS.UNPAID }, newOrder);
+            }
 
             await trx.commit();
 

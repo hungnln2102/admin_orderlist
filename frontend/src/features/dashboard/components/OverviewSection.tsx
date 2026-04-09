@@ -20,6 +20,7 @@ type OverviewSectionProps = {
   availableYears: number[];
   selectedYear: number;
   onYearChange: (year: number) => void;
+  isRangeMode?: boolean;
 };
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({
@@ -32,6 +33,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   availableYears,
   selectedYear,
   onYearChange,
+  isRangeMode = false,
 }) => {
   return (
     <div className="overview-section">
@@ -46,6 +48,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           availableYears={availableYears}
           selectedYear={selectedYear}
           onYearChange={onYearChange}
+          isRangeMode={isRangeMode}
         />
         <OrderChartCard data={orderData} />
       </div>

@@ -5,7 +5,6 @@ interface CategoryViewProps {
   categoryRows: any[];
   loading: boolean;
   onEditCategory: (group: string) => void;
-  getCategoryColor: (category: string) => string;
 }
 
 const CATEGORY_PAGE_SIZE = 8; // 5-10 items per page, default 8
@@ -18,7 +17,6 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
   categoryRows,
   loading,
   onEditCategory,
-  getCategoryColor,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -42,7 +40,6 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       pageSize={CATEGORY_PAGE_SIZE}
       onPageChange={setCurrentPage}
       onEditCategory={onEditCategory}
-      getCategoryColor={getCategoryColor}
     />
   );
 };

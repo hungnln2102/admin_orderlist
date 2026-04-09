@@ -17,11 +17,13 @@ export type RenewAdobeAccountsTableProps = {
   error: string | null;
   checkError: string | null;
   checkingId: number | null;
+  deletingAdminAccountId: number | null;
   isCheckingAll: boolean;
   checkingIds?: Set<number>;
   onSearchTermChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onCheck: (account: AdobeAdminAccount) => void;
+  onDeleteAdmin: (account: AdobeAdminAccount) => void;
   onSaveUrlAccess: (accountId: number, url: string) => void;
 };
 
@@ -36,11 +38,13 @@ export function RenewAdobeAccountsTable({
   error,
   checkError,
   checkingId,
+  deletingAdminAccountId,
   isCheckingAll,
   checkingIds,
   onSearchTermChange,
   onPageChange,
   onCheck,
+  onDeleteAdmin,
   onSaveUrlAccess,
 }: RenewAdobeAccountsTableProps) {
   const start = (currentPage - 1) * pageSize;
@@ -119,14 +123,32 @@ export function RenewAdobeAccountsTable({
                           status={account.license_status}
                           account={account}
                         />
-                        <button
-                          type="button"
-                          onClick={() => onCheck(account)}
-                          disabled={checkingId !== null}
-                          className="mt-2 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold"
-                        >
-                          {checkingId === account.id ? "Đang check..." : "Check"}
-                        </button>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onCheck(account)}
+                            disabled={
+                              checkingId !== null ||
+                              isCheckingAll ||
+                              deletingAdminAccountId !== null
+                            }
+                            className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                          >
+                            {checkingId === account.id ? "Đang check..." : "Check"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteAdmin(account)}
+                            disabled={
+                              checkingId !== null ||
+                              isCheckingAll ||
+                              deletingAdminAccountId !== null
+                            }
+                            className="rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                          >
+                            {deletingAdminAccountId === account.id ? "Đang xóa..." : "Xóa"}
+                          </button>
+                        </div>
                       </div>
                     );
                   }}
@@ -205,18 +227,38 @@ export function RenewAdobeAccountsTable({
                           />
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => onCheck(account)}
-                            disabled={checkingId !== null || isCheckingAll}
-                            className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {checkingId === account.id
-                              ? "Đang check..."
-                              : isBeingChecked
-                                ? "Checking..."
-                                : "Check"}
-                          </button>
+                          <div className="inline-flex flex-wrap items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => onCheck(account)}
+                              disabled={
+                                checkingId !== null ||
+                                isCheckingAll ||
+                                deletingAdminAccountId !== null
+                              }
+                              className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {checkingId === account.id
+                                ? "Đang check..."
+                                : isBeingChecked
+                                  ? "Checking..."
+                                  : "Check"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteAdmin(account)}
+                              disabled={
+                                checkingId !== null ||
+                                isCheckingAll ||
+                                deletingAdminAccountId !== null
+                              }
+                              className="rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 px-2.5 py-1.5 text-xs font-semibold hover:bg-rose-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {deletingAdminAccountId === account.id
+                                ? "Đang xóa..."
+                                : "Xóa"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

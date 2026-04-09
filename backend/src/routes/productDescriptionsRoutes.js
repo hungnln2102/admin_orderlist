@@ -6,6 +6,7 @@ const {
   listProductDescriptions,
   createProductDescription,
   saveProductDescription,
+  deleteProductDescriptionRecord,
   uploadProductImage,
   listProductImages,
   deleteProductImage,
@@ -45,6 +46,7 @@ const upload = multer({
 });
 
 router.get("/", listProductDescriptions);
+router.delete("/desc-variant/:id", deleteProductDescriptionRecord);
 router.get("/images", listProductImages);
 router.post("/seo-audit", auditProductSeoProxy);
 router.post("/create", createProductDescription);

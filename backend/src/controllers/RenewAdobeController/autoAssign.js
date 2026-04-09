@@ -5,6 +5,7 @@ const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
+  fixUsersOneRoundTightest,
 } = require("./assignmentService");
 const {
   TBL_ORDER,
@@ -233,6 +234,32 @@ const fixSingleUser = async (req, res) => {
   }
 };
 
+/** Một vòng Fix All: batch user theo slot tài khoản gần đầy nhất (gọi lặp từ frontend cho tới hết danh sách). */
+const fixUsersRound = async (req, res) => {
+  const emailsRaw = req.body?.emails;
+  if (!Array.isArray(emailsRaw)) {
+    return res.status(400).json({
+      success: false,
+      error: "Thiếu emails (mảng).",
+      remaining_emails: [],
+    });
+  }
+
+  try {
+    const result = await fixUsersOneRoundTightest(emailsRaw);
+    return res.json(result);
+  } catch (err) {
+    logger.error("[renew-adobe] fixUsersRound failed", { error: err.message });
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+      added_count: 0,
+      remaining_emails: emailsRaw,
+      round: null,
+    });
+  }
+};
+
 const adobeQueueStatus = (_req, res) => {
   return res.json({
     running: 0,
@@ -391,4 +418,5 @@ module.exports = {
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,
+  fixUsersRound,
 };

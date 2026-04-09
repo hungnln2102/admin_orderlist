@@ -1,5 +1,5 @@
 import type React from "react";
-import { ORDER_FIELDS } from "../../../../constants";
+import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import {
   inputClass,
@@ -9,10 +9,11 @@ import {
   panelTitleClass,
   readOnlyClass,
 } from "../helpers";
-import type { Order } from "../types";
+import type { CustomerType, Order } from "../types";
 
 type CreateOrderPricingSectionProps = {
   customMode: boolean;
+  customerType: CustomerType;
   formData: Partial<Order>;
   registerDateDMY: string;
   costValue: string | number | undefined;
@@ -27,6 +28,7 @@ type CreateOrderPricingSectionProps = {
 
 export const CreateOrderPricingSection = ({
   customMode,
+  customerType,
   formData,
   registerDateDMY,
   costValue,
@@ -38,6 +40,8 @@ export const CreateOrderPricingSection = ({
   onCostChange,
   onPriceChange,
 }: CreateOrderPricingSectionProps) => {
+  const isGift = customerType === ORDER_CODE_PREFIXES.GIFT;
+
   return (
     <section className={`${panelClass} lg:col-span-2`}>
       <div className="mb-4">
@@ -113,16 +117,27 @@ export const CreateOrderPricingSection = ({
               type="text"
               inputMode="numeric"
               name={ORDER_FIELDS.PRICE}
-              value={Helpers.formatCurrencyPlain(Number(priceValue ?? 0))}
-              onChange={onPriceChange}
-              className={`${inputClass} font-black text-emerald-300`}
+              value={
+                isGift
+                  ? "0"
+                  : Helpers.formatCurrencyPlain(Number(priceValue ?? 0))
+              }
+              onChange={isGift ? undefined : onPriceChange}
+              readOnly={isGift}
+              className={`${inputClass} font-black text-emerald-300 ${
+                isGift ? readOnlyClass : ""
+              }`}
             />
           ) : (
             <input
               type="text"
               name={ORDER_FIELDS.PRICE}
-              value={Helpers.formatCurrency(priceValue ?? 0)}
+              inputMode={isGift ? "numeric" : undefined}
+              value={
+                isGift ? "0" : Helpers.formatCurrency(priceValue ?? 0)
+              }
               readOnly
+              title={isGift ? "Đơn quà tặng, giá bán lưu trong hệ thống là 0" : undefined}
               className={`${inputClass} font-black text-emerald-300 ${readOnlyClass}`}
             />
           )}

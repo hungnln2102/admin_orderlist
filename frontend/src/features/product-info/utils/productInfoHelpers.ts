@@ -19,6 +19,10 @@ export type ProductPriceItem = {
   image_url?: string | null;
   /** Ảnh gói (chỉ product.image_url) */
   package_image_url?: string | null;
+  /** Variant đang bật trên bảng giá (API: `is_active`). */
+  is_active?: boolean;
+  /** FK `variant.id_desc` → `desc_variant.id` (API: `desc_variant_id`). */
+  desc_variant_id?: number | null;
 };
 
 export type MergedProduct = ProductDescription & {
@@ -32,12 +36,28 @@ export type MergedProduct = ProductDescription & {
   shortDescription?: string | null;
   rulesHtml?: string | null;
   descriptionHtml?: string | null;
+  /** false = không active (ẩn / không bán), lấy từ bảng giá. */
+  isActive?: boolean;
 };
 
 export const getInitials = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) return "--";
   return trimmed.slice(0, 2).toUpperCase();
+};
+
+/**
+ * Ảnh cột biến thể: chỉ hiển thị khi URL khác ảnh gói.
+ * Tránh lặp logo gói khi API/DB từng COALESCE(variant → product) hoặc copy cùng URL.
+ */
+export const resolveVariantDisplayImageUrl = (
+  item: Pick<MergedProduct, "imageUrl" | "packageImageUrl">
+): string | null => {
+  const variant = (item.imageUrl || "").trim();
+  if (!variant) return null;
+  const pkg = (item.packageImageUrl || "").trim();
+  if (pkg && variant === pkg) return null;
+  return item.imageUrl ?? null;
 };
 
 export const stripDurationSuffix = (value: string): string => {
@@ -51,6 +71,19 @@ export const toHtmlFromPlain = (value: string): string =>
 /** Chuẩn hóa key để so khớp (không split/bỏ suffix, lấy đúng display_name). */
 export const normalizeProductKey = (value: string): string =>
   (value || "").trim().toLowerCase();
+
+/** Chuẩn hóa cờ active từ API (`is_active`). Mặc định true nếu không có dữ liệu. */
+export const normalizeVariantActive = (
+  raw: unknown,
+  defaultActive = true
+): boolean => {
+  if (raw === undefined || raw === null) return defaultActive;
+  if (typeof raw === "boolean") return raw;
+  const s = String(raw).trim().toLowerCase();
+  if (s === "false" || s === "0" || s === "no" || s === "off") return false;
+  if (s === "true" || s === "1" || s === "yes" || s === "on") return true;
+  return defaultActive;
+};
 
 export const escapeHtml = (value: string): string =>
   value
@@ -428,41 +461,93 @@ export const sanitizeHtmlForDisplay = (
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(value, "text/html");
-    const blockTags = new Set([
-      "DIV",
-      "P",
-      "H1",
-      "H2",
-      "H3",
-      "H4",
-      "H5",
-      "H6",
-      "UL",
-      "OL",
-      "LI",
-      "SECTION",
-    ]);
+
     const walk = (node: ChildNode): string => {
       if (node.nodeType === Node.TEXT_NODE) {
         return escapeHtml(node.textContent || "");
       }
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement;
-        if (el.tagName === "BR") return "<br/>";
-        if (el.tagName === "A") {
-          const href = el.getAttribute("href") || "#";
-          const safeHref = escapeHtml(href);
-          const content = Array.from(el.childNodes).map(walk).join("");
-          return `<a href="${safeHref}" title="${safeHref}" target="_blank" rel="noopener noreferrer">${content}</a>`;
-        }
-        const inner = Array.from(el.childNodes).map(walk).join("");
-        if (blockTags.has(el.tagName)) {
-          return `${inner}<br/>`;
-        }
-        return inner;
+      if (node.nodeType !== Node.ELEMENT_NODE) return "";
+      const el = node as HTMLElement;
+      const tag = el.tagName.toUpperCase();
+
+      if (
+        tag === "SCRIPT" ||
+        tag === "STYLE" ||
+        tag === "IFRAME" ||
+        tag === "OBJECT" ||
+        tag === "EMBED" ||
+        tag === "NOSCRIPT"
+      ) {
+        return "";
       }
-      return "";
+
+      if (tag === "BR") return "<br/>";
+
+      if (tag === "A") {
+        const href = sanitizeHref(el.getAttribute("href"));
+        if (!href) {
+          return Array.from(el.childNodes).map(walk).join("");
+        }
+        const safeHref = escapeHtml(href);
+        const content = Array.from(el.childNodes).map(walk).join("");
+        return `<a href="${safeHref}" title="${safeHref}" target="_blank" rel="noopener noreferrer">${content}</a>`;
+      }
+
+      const inner = Array.from(el.childNodes).map(walk).join("");
+
+      if (tag === "STRONG" || tag === "B") {
+        return inner ? `<strong>${inner}</strong>` : "";
+      }
+      if (tag === "EM" || tag === "I") {
+        return inner ? `<em>${inner}</em>` : "";
+      }
+      if (tag === "UL") return inner ? `<ul>${inner}</ul>` : "";
+      if (tag === "OL") return inner ? `<ol>${inner}</ol>` : "";
+      if (tag === "LI") return inner ? `<li>${inner}</li>` : "";
+
+      const semanticBlock = [
+        "P",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H5",
+        "H6",
+        "DIV",
+        "SECTION",
+        "BLOCKQUOTE",
+        "ARTICLE",
+        "HEADER",
+        "FOOTER",
+        "MAIN",
+        "ASIDE",
+        "NAV",
+      ];
+      if (semanticBlock.includes(tag)) {
+        if (!hasMeaningfulText(el.textContent)) return "";
+        const tagLower = tag.toLowerCase();
+        if (
+          tag === "DIV" ||
+          tag === "SECTION" ||
+          tag === "ARTICLE" ||
+          tag === "HEADER" ||
+          tag === "FOOTER" ||
+          tag === "MAIN" ||
+          tag === "ASIDE" ||
+          tag === "NAV"
+        ) {
+          return `<div class="rich-display__block">${inner}</div>`;
+        }
+        if (tag === "BLOCKQUOTE") {
+          return `<blockquote class="rich-display__quote">${inner}</blockquote>`;
+        }
+        return `<${tagLower}>${inner}</${tagLower}>`;
+      }
+
+      // span, font, và thẻ lạ: chỉ giữ nội dung con đã được walk
+      return inner;
     };
+
     const raw = Array.from(doc.body.childNodes).map(walk).join("");
     return raw.replace(/(?:<br\/>\s*){3,}/g, "<br/><br/>");
   } catch {
@@ -524,6 +609,61 @@ export const splitCombinedContent = (
   };
 };
 
+/** Có ít nhất quy tắc hoặc mô tả thật (không rỗng sau tách + sanitize), giống logic cột bảng sản phẩm. */
+export const variantHasDescContent = (
+  item: Pick<
+    ProductDescription,
+    "rules" | "rulesHtml" | "description" | "descriptionHtml"
+  >
+): boolean => {
+  const rawRulesHtml = item.rulesHtml || toHtmlFromPlain(item.rules || "");
+  const rawDescriptionHtml =
+    item.descriptionHtml || toHtmlFromPlain(item.description || "");
+  const { rulesHtml: displayRulesHtml, descriptionHtml: displayDescriptionHtml } =
+    splitCombinedContent(rawRulesHtml, rawDescriptionHtml);
+  const safeRules = sanitizeHtmlForDisplay(displayRulesHtml);
+  const safeDesc = sanitizeHtmlForDisplay(
+    displayDescriptionHtml || toHtmlFromPlain(item.description || "")
+  );
+  const rulesText = htmlToPlainText(safeRules).replace(/\u00a0/g, " ").trim();
+  const descText = htmlToPlainText(safeDesc).replace(/\u00a0/g, " ").trim();
+  return Boolean(rulesText || descText);
+};
+
+/** Đã gắn bản ghi desc_variant trên variant (`id_desc` > 0). Ưu tiên dữ liệu từ /api/products. */
+export const variantHasDescVariantLinked = (
+  item: Pick<MergedProduct, "descVariantId">
+): boolean => {
+  const id = item.descVariantId;
+  return id != null && Number(id) > 0;
+};
+
+/**
+ * Thứ tự danh sách (nhỏ → lớn):
+ * 0 chưa có nội dung (bật nhưng chưa đủ: chưa gắn desc_variant hoặc chưa có text)
+ * → 1 inactive (unactive)
+ * → 2 có nội dung (đã gắn + có quy tắc/mô tả).
+ */
+export const variantListSortRank = (item: MergedProduct): number => {
+  if (item.isActive === false) return 1;
+  const hasFull =
+    variantHasDescVariantLinked(item) && variantHasDescContent(item);
+  if (hasFull) return 2;
+  return 0;
+};
+
+const pickDescVariantId = (
+  fromVariantTable: unknown,
+  fromDescApi: unknown
+): number | null => {
+  const n = (v: unknown) => {
+    if (v == null || v === "") return null;
+    const x = Number(v);
+    return Number.isFinite(x) && x > 0 ? x : null;
+  };
+  return n(fromVariantTable) ?? n(fromDescApi);
+};
+
 /**
  * Gộp dữ liệu: nguồn từ product_desc + bảng giá.
  * Không lọc trùng: mọi dòng từ product_desc đều giữ nguyên, bổ sung thêm dòng chỉ có ở bảng giá.
@@ -565,12 +705,24 @@ export const mergeProducts = (
       packageName: priceRow ? (priceRow.package || priceRow.san_pham || "") : null,
       category: priceRow?.category ?? null,
       categories: Array.isArray(priceRow?.categories) ? priceRow?.categories ?? [] : [],
-      imageUrl: item.imageUrl || null,
-      packageImageUrl: priceRow?.package_image_url ?? null,
+      imageUrl:
+        (item.imageUrl && String(item.imageUrl).trim()) ||
+        (priceRow?.image_url && String(priceRow.image_url).trim()) ||
+        null,
+      packageImageUrl:
+        item.packageImageUrl ??
+        (item as { package_image_url?: string | null }).package_image_url ??
+        priceRow?.package_image_url ??
+        null,
       shortDescription: item.shortDescription || null,
       rulesHtml: item.rulesHtml || toHtmlFromPlain(item.rules || ""),
       descriptionHtml:
         item.descriptionHtml || toHtmlFromPlain(item.description || ""),
+      descVariantId: pickDescVariantId(
+        priceRow?.desc_variant_id,
+        item.descVariantId
+      ),
+      isActive: normalizeVariantActive(priceRow?.is_active, true),
     });
   }
 
@@ -598,6 +750,8 @@ export const mergeProducts = (
       shortDescription: null,
       imageUrl: null,
       packageImageUrl: priceItem.package_image_url ?? null,
+      descVariantId: pickDescVariantId(priceItem.desc_variant_id, null),
+      isActive: normalizeVariantActive(priceItem.is_active, true),
     });
   }
 
@@ -614,5 +768,17 @@ export const mergeProducts = (
     });
   }
 
-  return result;
+  // Chưa có nội dung → inactive → có nội dung.
+  const ranked = result.map((item) => ({ item }));
+  ranked.sort((a, b) => {
+    const wa = variantListSortRank(a.item);
+    const wb = variantListSortRank(b.item);
+    if (wa !== wb) return wa - wb;
+    return String(a.item.productId || "").localeCompare(
+      String(b.item.productId || ""),
+      "vi",
+      { sensitivity: "base" }
+    );
+  });
+  return ranked.map((r) => r.item);
 };

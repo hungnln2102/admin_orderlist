@@ -92,6 +92,23 @@ export function fetchAdobeAdminAccounts() {
     );
 }
 
+export function deleteAdobeAdminAccount(id: number): Promise<{ success: boolean; id: number }> {
+  return fetch(
+    `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE(id)}`,
+    { method: "DELETE", credentials: "include" }
+  ).then(async (res) => {
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      success?: boolean;
+      id?: number;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || res.statusText || "Không xóa được tài khoản.");
+    }
+    return data as { success: boolean; id: number };
+  });
+}
+
 export function createAdobeAdminAccount(payload: {
   email: string;
   password: string;

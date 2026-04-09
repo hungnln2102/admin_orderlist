@@ -10,6 +10,8 @@ const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
 const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
 const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
 const expiryCol = ORDERS_SCHEMA.ORDER_LIST.COLS.EXPIRY_DATE;
+const canceledAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CANCELED_AT;
+const idCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID;
 const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name";
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
@@ -41,7 +43,7 @@ const buildOrdersListQuery = (scope = "") => {
             .whereRaw(`NOT (${table}.${idOrderCol}::text ILIKE ?)`, [importPattern]);
     }
 
-    return query.select(
+    const selectQuery = query.select(
         `${table}.*`,
         db.raw(`${table}.order_date::text as order_date_raw`),
         db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
@@ -54,6 +56,14 @@ const buildOrdersListQuery = (scope = "") => {
         ),
         db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
     );
+
+    if (normalizedScope === "canceled" || normalizedScope === "cancelled") {
+        return selectQuery
+            .orderByRaw(`${table}.${canceledAtCol} DESC NULLS LAST`)
+            .orderBy(`${table}.${idCol}`, "desc");
+    }
+
+    return selectQuery;
 };
 
 module.exports = {

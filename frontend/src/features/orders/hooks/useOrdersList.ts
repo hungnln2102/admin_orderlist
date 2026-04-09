@@ -8,6 +8,9 @@ import {
   getPaginated,
   buildPaginationPages,
 } from "../utils/orderListTransform";
+import { orderDurationOverlapsIsoRange } from "../utils/ordersHelpers";
+
+export type OrdersDurationRange = { from: string; to: string };
 
 export type UseOrdersListParams = {
   orders: Order[];
@@ -18,6 +21,7 @@ export type UseOrdersListParams = {
   currentPage: number;
   setCurrentPage: (page: number | ((prev: number) => number)) => void;
   dataset: OrderDatasetKey;
+  durationRange: OrdersDurationRange | null;
 };
 
 export function useOrdersList({
@@ -29,19 +33,26 @@ export function useOrdersList({
   currentPage,
   setCurrentPage,
   dataset,
+  durationRange,
 }: UseOrdersListParams) {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const listData = useMemo(() => {
     const ordersWithVirtual = enrichOrdersWithVirtualFields(orders, dataset);
-    const filteredOrders = filterAndSortOrders(ordersWithVirtual, {
+    const narrowed =
+      durationRange?.from && durationRange?.to
+        ? ordersWithVirtual.filter((o) =>
+            orderDurationOverlapsIsoRange(o, durationRange.from, durationRange.to)
+          )
+        : ordersWithVirtual;
+
+    const filteredOrders = filterAndSortOrders(narrowed, {
       searchTerm: debouncedSearchTerm,
       searchField,
       statusFilter,
       dataset,
     });
-    const { updatedStats, totalRecords } =
-      computeOrderStats(ordersWithVirtual, dataset);
+    const { updatedStats, totalRecords } = computeOrderStats(narrowed, dataset);
     const { currentOrders, totalPages } = getPaginated(
       filteredOrders,
       currentPage,
@@ -63,11 +74,19 @@ export function useOrdersList({
     statusFilter,
     rowsPerPage,
     currentPage,
+    durationRange,
   ]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, searchField, statusFilter, rowsPerPage, setCurrentPage]);
+  }, [
+    debouncedSearchTerm,
+    searchField,
+    statusFilter,
+    rowsPerPage,
+    durationRange,
+    setCurrentPage,
+  ]);
 
   const paginationPages = useMemo(
     () => buildPaginationPages(currentPage, listData.totalPages),

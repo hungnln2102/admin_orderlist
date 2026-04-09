@@ -12,7 +12,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { Order, ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "@/constants";
 import * as Helpers from "@/lib/helpers";
-import { formatCurrency, formatOrderCodeShort } from "../utils/ordersHelpers";
+import {
+  formatCurrency,
+  formatOrderCodeShort,
+} from "../utils/ordersHelpers";
 import { getOrderCodeTheme } from "../utils/orderCodeTheme";
 
 type OrderCardProps = {

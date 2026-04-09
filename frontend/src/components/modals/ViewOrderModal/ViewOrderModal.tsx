@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
+import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
 import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
 import { ViewOrderModalProps } from "./types";
@@ -17,9 +18,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   keepOrderPrice = false,
 }) => {
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
+  const isGift = isGiftOrderCode(orderId);
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
   const variantId = order?.variant_id;
-  const basePrice = Number(order?.[ORDER_FIELDS.PRICE]) || 0;
+  const basePrice = isGift
+    ? 0
+    : Number(order?.[ORDER_FIELDS.PRICE]) || 0;
   const supplyName = (order?.[ORDER_FIELDS.SUPPLY] as string) || "";
   const customerType = order?.customer_type || supplyName || "";
   const orderDateRaw =
@@ -39,19 +43,21 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     customerType,
     basePrice,
     normalizedOrderDate,
-    skipRecalc: keepOrderPrice,
+    skipRecalc: keepOrderPrice || isGift,
   });
 
   // QR luôn dùng giá đơn hàng (số tiền lưu trong đơn)
-  const orderAmount = useMemo(
-    () => Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0),
-    [order]
-  );
+  const orderAmount = useMemo(() => {
+    if (isGiftOrderCode(order?.[ORDER_FIELDS.ID_ORDER])) return 0;
+    return Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0);
+  }, [order]);
 
   // Giá bán hiển thị: sau khi tạo đơn = giữ theo form; bấm icon xem = giá tính lại
-  const displayAmount = keepOrderPrice
-    ? orderAmount
-    : (calculatedPrice ?? orderAmount);
+  const displayAmount = isGift
+    ? 0
+    : keepOrderPrice
+      ? orderAmount
+      : (calculatedPrice ?? orderAmount);
   const effectiveQrAmount = Helpers.roundGiaBanValue(displayAmount);
 
   if (!isOpen || !order) return null;

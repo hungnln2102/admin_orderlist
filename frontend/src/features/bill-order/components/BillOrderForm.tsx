@@ -141,6 +141,29 @@ export const BillOrderForm: React.FC<BillOrderFormProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="space-y-1">
+            <span className="text-sm font-medium text-slate-100">Email</span>
+            <input
+              type="email"
+              value={form.customerEmail}
+              onChange={(e) => onChange("customerEmail", e.target.value)}
+              className={inputClass}
+              placeholder="Không bắt buộc"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium text-slate-100">Phương thức thanh toán</span>
+            <input
+              type="text"
+              value={form.paymentMethod}
+              onChange={(e) => onChange("paymentMethod", e.target.value)}
+              className={inputClass}
+              placeholder="Ví dụ: Chuyển khoản / Momo"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="space-y-1">
             <span className="text-sm font-medium text-slate-100">Địa chỉ</span>
             <textarea
               value={form.address}
@@ -159,6 +182,17 @@ export const BillOrderForm: React.FC<BillOrderFormProps> = ({
             />
           </label>
         </div>
+
+        <label className="space-y-1 block">
+          <span className="text-sm font-medium text-slate-100">Ghi chú (hiển thị trên hóa đơn)</span>
+          <textarea
+            value={form.note}
+            onChange={(e) => onChange("note", e.target.value)}
+            rows={2}
+            className={`${inputClass} resize-none`}
+            placeholder="Ghi chú cho khách / nội bộ"
+          />
+        </label>
 
         <div className="pt-2">
           <button

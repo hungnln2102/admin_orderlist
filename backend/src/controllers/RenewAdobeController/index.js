@@ -4,6 +4,7 @@ const {
   listAccounts,
   lookupAccountByEmail,
   createAccount,
+  deleteAccount,
   updateUrlAccess,
 } = require("./accounts");
 const {
@@ -21,6 +22,7 @@ const {
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,
+  fixUsersRound,
 } = require("./autoAssign");
 const {
   listVariants,
@@ -53,6 +55,7 @@ module.exports = {
   listAccounts,
   lookupAccountByEmail,
   createAccount,
+  deleteAccount,
   runCheck,
   runCheckForAccountId,
   runCheckWithCookies,
@@ -64,6 +67,7 @@ module.exports = {
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,
+  fixUsersRound,
   updateUrlAccess,
   listVariants,
   listProductSystem,
