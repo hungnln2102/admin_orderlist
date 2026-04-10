@@ -353,6 +353,8 @@ export const useProductActions = ({
     productNameOptions,
     supplierOptions: referenceOptions.supplierOptions,
     isLoadingSuppliers: referenceOptions.isLoadingSuppliers,
+    refreshSupplierOptions: () =>
+      referenceOptions.loadSupplierOptions({ force: true }),
     bankOptions: referenceOptions.bankOptions,
     isLoadingBanks: referenceOptions.isLoadingBanks,
     deleteProductState: deleteActions.deleteProductState,

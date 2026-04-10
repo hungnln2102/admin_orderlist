@@ -80,7 +80,9 @@ async function autoAssignUsers({ onProgress = null } = {}) {
           existingEmails.add(user.email.toLowerCase().trim());
         }
       }
-    } catch (_) {}
+    } catch (parseErr) {
+      logger.warn("[AutoAssign] Parse users_snapshot thất bại", { accountId: account[COLS.ID], error: parseErr.message });
+    }
   }
 
   const emailsToAdd = [...activeEmails].filter((email) => !existingEmails.has(email));

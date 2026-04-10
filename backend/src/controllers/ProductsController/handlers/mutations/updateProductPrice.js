@@ -6,12 +6,14 @@ const {
 } = require("../../../../utils/normalizers");
 const logger = require("../../../../utils/logger");
 const { mapProductPriceRow } = require("../../mappers");
+const { pricingCache } = require("../../../../utils/cache");
 const {
   variantCols,
   productSchemaCols,
   productCategoryCols,
   TABLES,
 } = require("../../constants");
+const { getTiers } = require("../../../../services/pricing/tierCache");
 const {
   fetchVariantView,
   hasProductCategoryColor,
@@ -128,20 +130,13 @@ const updateProductPrice = async (req, res) => {
           : !(String(is_active || "").trim().toLowerCase() === "false");
       addVariantUpdate(variantCols.isActive, isActive);
     }
-    if (pctCtv !== undefined) {
-      addVariantUpdate(variantCols.pctCtv, toNullableNumber(pctCtv));
-    }
-    if (pctKhach !== undefined) {
-      addVariantUpdate(variantCols.pctKhach, toNullableNumber(pctKhach));
-    }
-    if (pctPromo !== undefined) {
-      addVariantUpdate(variantCols.pctPromo, toNullableNumber(pctPromo));
-    }
-    const pctStuInput =
-      pctStu !== undefined ? pctStu : pct_stu;
-    if (pctStuInput !== undefined) {
-      addVariantUpdate(variantCols.pctStu, toNullableNumber(pctStuInput));
-    }
+    const pctStuInput = pctStu !== undefined ? pctStu : pct_stu;
+    const marginUpdates = [
+      { key: "ctv", value: pctCtv },
+      { key: "customer", value: pctKhach },
+      { key: "promo", value: pctPromo },
+      { key: "student", value: pctStuInput },
+    ].filter((m) => m.value !== undefined);
 
     if (variantImageInput !== undefined) {
       addVariantUpdate(
@@ -152,6 +147,7 @@ const updateProductPrice = async (req, res) => {
 
     if (
       !variantUpdates.length &&
+      !marginUpdates.length &&
       packageName === undefined &&
       imageUrl === undefined &&
       variantImageInput === undefined &&
@@ -170,6 +166,22 @@ const updateProductPrice = async (req, res) => {
       `,
         [...variantValues, parsedId]
       );
+    }
+
+    if (marginUpdates.length) {
+      const tiers = await getTiers();
+      for (const { key, value } of marginUpdates) {
+        const tier = tiers.find((t) => t.key === key);
+        if (!tier) continue;
+        const ratio = toNullableNumber(value);
+        await db.raw(
+          `INSERT INTO ${TABLES.variantMargin} (variant_id, tier_id, margin_ratio)
+           VALUES (?, ?, ?)
+           ON CONFLICT (variant_id, tier_id)
+           DO UPDATE SET margin_ratio = EXCLUDED.margin_ratio`,
+          [parsedId, tier.id, ratio]
+        );
+      }
     }
 
     if (targetProductId && imageUrl !== undefined) {
@@ -242,6 +254,7 @@ const updateProductPrice = async (req, res) => {
       }
     }
 
+    pricingCache.clear();
     const viewRow = await fetchVariantView(parsedId);
     res.json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {

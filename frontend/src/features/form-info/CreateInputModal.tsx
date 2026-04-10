@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { createInput, type InputDto } from "@/lib/formsApi";
 
@@ -67,8 +68,9 @@ export default function CreateInputModal({
   };
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -156,5 +158,6 @@ export default function CreateInputModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

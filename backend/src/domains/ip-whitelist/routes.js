@@ -5,11 +5,12 @@ const {
   updateIpWhitelist,
   removeIpWhitelist,
 } = require("./controller");
+const { createIpWhitelistRules } = require("../../validators/ipWhitelistValidator");
 
 const router = express.Router();
 
 router.get("/", listIpWhitelists);
-router.post("/", createIpWhitelist);
+router.post("/", ...createIpWhitelistRules, createIpWhitelist);
 router.put("/:id", updateIpWhitelist);
 router.delete("/:id", removeIpWhitelist);
 

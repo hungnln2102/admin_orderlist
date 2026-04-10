@@ -2,10 +2,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
-  ORDER_CODE_OPTIONS,
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../constants";
+import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
 import * as Helpers from "../../../lib/helpers";
 import {
   calculateExpirationDate,
@@ -15,6 +15,7 @@ import { CreateOrderModalProps, Order } from "./types";
 import { CreateOrderCustomerSection } from "./components/CreateOrderCustomerSection";
 import { CreateOrderPricingSection } from "./components/CreateOrderPricingSection";
 import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 /** Chỉ coi là đủ khi đúng dd/mm/yyyy (tránh parse lệch khi đang gõ). */
 const isCompleteDMY = (value: string): boolean =>
@@ -26,6 +27,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onSave,
 }) => {
   const [customMode, setCustomMode] = useState(false);
+  const { orderCodeOptions } = usePricingTiers();
   const {
     formData,
     updateForm,
@@ -107,17 +109,17 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   }, [currentProductPctPromo]);
 
   const filteredCustomerTypeOptions = useMemo(() => {
-    return ORDER_CODE_OPTIONS.filter((option) => {
+    return orderCodeOptions.filter((option) => {
       const value = option.value;
       if (hasPromoPrice) {
-        return value !== ORDER_CODE_PREFIXES.RETAIL;
+        return value !== ORDER_CODE_PREFIXES.CUSTOMER;
       }
       return value !== ORDER_CODE_PREFIXES.PROMO;
     });
   }, [hasPromoPrice]);
 
   useEffect(() => {
-    if (hasPromoPrice && customerType === ORDER_CODE_PREFIXES.RETAIL) {
+    if (hasPromoPrice && customerType === ORDER_CODE_PREFIXES.CUSTOMER) {
       handleCustomerTypeChange({
         target: { value: ORDER_CODE_PREFIXES.PROMO },
       } as unknown as React.ChangeEvent<HTMLSelectElement>);
@@ -126,7 +128,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     if (!hasPromoPrice && customerType === ORDER_CODE_PREFIXES.PROMO) {
       handleCustomerTypeChange({
-        target: { value: ORDER_CODE_PREFIXES.RETAIL },
+        target: { value: ORDER_CODE_PREFIXES.CUSTOMER },
       } as unknown as React.ChangeEvent<HTMLSelectElement>);
       return;
     }
@@ -279,7 +281,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/92 backdrop-blur-sm p-3 sm:p-4">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/92 backdrop-blur-sm p-3 sm:p-4">
       <div className="relative w-full max-w-5xl max-h-[84vh] overflow-hidden rounded-[24px] border border-slate-600/70 bg-slate-900 text-slate-100 shadow-[0_28px_70px_-25px_rgba(2,6,23,0.95)] flex flex-col">
         <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-slate-700/70 bg-slate-900 flex items-start justify-between gap-4">
           <div>
@@ -380,6 +383,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

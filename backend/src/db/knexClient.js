@@ -63,15 +63,26 @@ const searchPath = Array.from(
   )
 );
 
+const KNEX_POOL_MAX = Number(process.env.DB_KNEX_POOL_MAX) || 10;
+
 const db = knex({
   client: "pg",
   connection: DATABASE_URL,
-  // Keep small pool to avoid exhausting server limits; tweak as needed.
   pool: {
     min: 0,
-    max: Number(process.env.DB_POOL_MAX || 10),
+    max: KNEX_POOL_MAX,
+    idleTimeoutMillis: 30_000,
   },
   searchPath,
 });
+
+db.raw("SELECT 1")
+  .then(() =>
+    console.log(`✅ Knex pool sẵn sàng (max=${KNEX_POOL_MAX})`)
+  )
+  .catch((err) => {
+    console.error("❌ Knex kết nối thất bại:", err.message);
+    if (process.env.NODE_ENV === "production") process.exit(1);
+  });
 
 module.exports = db;

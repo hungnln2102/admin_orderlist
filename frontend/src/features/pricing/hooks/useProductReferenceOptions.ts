@@ -11,6 +11,10 @@ interface UseProductReferenceOptionsParams {
   isCreateModalOpen: boolean;
 }
 
+type LoadSupplierOptionsParams = {
+  force?: boolean;
+};
+
 export function useProductReferenceOptions({
   apiBase,
   isCreateModalOpen,
@@ -41,26 +45,36 @@ export function useProductReferenceOptions({
     }
   }, [apiBase, bankOptions.length, isLoadingBanks]);
 
-  const loadSupplierOptions = useCallback(async () => {
-    if (isLoadingSuppliers || supplierOptions.length > 0) return;
-    setIsLoadingSuppliers(true);
-
-    try {
-      const response = await fetch(`${apiBase}${API_ENDPOINTS.SUPPLIES}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Không thể tải danh sách NCC.");
+  const loadSupplierOptions = useCallback(
+    async (options: LoadSupplierOptionsParams = {}) => {
+      const shouldForceReload = Boolean(options.force);
+      if (
+        isLoadingSuppliers ||
+        (!shouldForceReload && supplierOptions.length > 0)
+      ) {
+        return;
       }
 
-      const payload = await response.json().catch(() => null);
-      setSupplierOptions(normalizeSupplierOptions(payload));
-    } catch (err) {
-      console.error("Lỗi khi tải danh sách NCC:", err);
-    } finally {
-      setIsLoadingSuppliers(false);
-    }
-  }, [apiBase, isLoadingSuppliers, supplierOptions.length]);
+      setIsLoadingSuppliers(true);
+
+      try {
+        const response = await fetch(`${apiBase}${API_ENDPOINTS.SUPPLIES}`, {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          throw new Error("Không thể tải danh sách NCC.");
+        }
+
+        const payload = await response.json().catch(() => null);
+        setSupplierOptions(normalizeSupplierOptions(payload));
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách NCC:", err);
+      } finally {
+        setIsLoadingSuppliers(false);
+      }
+    },
+    [apiBase, isLoadingSuppliers, supplierOptions.length]
+  );
 
   useEffect(() => {
     if (!isLoadingSuppliers && supplierOptions.length === 0) {

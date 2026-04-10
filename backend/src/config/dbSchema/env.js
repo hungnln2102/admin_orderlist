@@ -91,9 +91,8 @@ const SCHEMA_SUPPLIER_COST = pickSchema(
   SCHEMA_PARTNER
 );
 
-const NOTIFICATION_GROUP_ID =
-  process.env.TELEGRAM_CHAT_ID || "-1002934465528";
-const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID || 2);
+const NOTIFICATION_GROUP_ID = process.env.TELEGRAM_CHAT_ID || "";
+const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID) || 0;
 
 module.exports = {
   pickSchema,

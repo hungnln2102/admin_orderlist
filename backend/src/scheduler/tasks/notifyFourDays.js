@@ -6,6 +6,7 @@ const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 const { STATUS } = require("../../utils/statuses");
+const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 
 function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
   return async function notifyFourDaysRemainingTask(trigger = "cron") {
@@ -45,14 +46,28 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
       ORDER BY ${COL.idOrder}
     `);
 
-      logger.info(`Tìm thấy ${result.rowCount} đơn cần gia hạn (còn 4 ngày)`);
+      const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT")
+        .trim()
+        .toUpperCase();
+      const notifyRows = result.rows.filter((row) => {
+        const code = String(row.id_order || row.idOrder || "")
+          .trim()
+          .toUpperCase();
+        return !(giftPrefix && code.startsWith(giftPrefix));
+      });
+      const skippedGiftCount = result.rows.length - notifyRows.length;
 
-      if (result.rows.length > 0) {
+      logger.info(
+        `Tìm thấy ${result.rowCount} đơn cần gia hạn (còn 4 ngày), gửi ${notifyRows.length} đơn`,
+        { skippedGiftCount, giftPrefix }
+      );
+
+      if (notifyRows.length > 0) {
         const today = todayYMDInVietnam();
-        const variantIds = result.rows.map((r) => r.id_product).filter((id) => id != null);
+        const variantIds = notifyRows.map((r) => r.id_product).filter((id) => id != null);
         const nameMap = await fetchVariantDisplayNames(client, variantIds);
         const normalizedOrders = [];
-        for (const row of result.rows) {
+        for (const row of notifyRows) {
           const normalized = normalizeOrderRow(row, today);
           const computed = await computeOrderCurrentPrice(client, row);
           const rawIdProduct = row.id_product ?? normalized.id_product ?? normalized.idProduct;
@@ -88,7 +103,9 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
 
         await sendFourDaysRemainingNotification(normalizedOrders);
       } else {
-        logger.info("[CRON] Không có đơn nào cần gia hạn (còn 4 ngày)");
+        logger.info(
+          "[CRON] Không có đơn nào cần gia hạn để gửi thông báo (còn 4 ngày, bỏ qua MAVT)"
+        );
       }
     } catch (err) {
       logger.error("[CRON] Lỗi khi thông báo đơn cần gia hạn (còn 4 ngày)", {

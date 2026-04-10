@@ -60,16 +60,30 @@ if (process.env.NODE_ENV === "production") {
   app.use(morgan("dev", { stream: logger.stream }));
 }
 
-app.use(express.json());
-app.use("/image", express.static(path.join(__dirname, "../image")));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+const staticOpts = { maxAge: "30d", etag: true };
+app.use("/image", express.static(path.join(__dirname, "../image"), staticOpts));
 app.use(
   "/image_product",
-  express.static(path.join(__dirname, "../image_product"))
+  express.static(path.join(__dirname, "../image_product"), staticOpts)
 );
 app.use(
   "/image_variant",
-  express.static(path.join(__dirname, "../image_variant"))
+  express.static(path.join(__dirname, "../image_variant"), staticOpts)
 );
+
+const { pool: dbPool } = require("./config/database");
+
+app.get("/api/health", async (_req, res) => {
+  const uptime = process.uptime();
+  try {
+    await dbPool.query("SELECT 1");
+    return res.json({ status: "ok", uptime, dbConnected: true });
+  } catch {
+    return res.status(503).json({ status: "degraded", uptime, dbConnected: false });
+  }
+});
 
 app.use(
   session({
@@ -96,7 +110,7 @@ app.get("/api", (_req, res) => {
     ok: true,
     authOpen: Array.from(AUTH_OPEN_PATHS),
     csrfEnabled:
-      process.env.ENABLE_CSRF === "true" || process.env.ENABLE_CSRF === "1",
+      !(process.env.DISABLE_CSRF === "true" || process.env.DISABLE_CSRF === "1"),
   });
 });
 

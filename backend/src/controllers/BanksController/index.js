@@ -1,6 +1,6 @@
 const https = require("https");
 const logger = require("../../utils/logger");
-// No DB cache: always fetch external bank list
+const { bankCache } = require("../../utils/cache");
 
 const BANK_SOURCE_URL =
   process.env.BANK_LIST_SOURCE_URL || "https://api.vietqr.io/v2/banks";
@@ -102,7 +102,7 @@ const fetchBanksFromSource = async () => {
 
 const listBanks = async (_req, res) => {
   try {
-    const banks = await fetchBanksFromSource();
+    const banks = await bankCache.getOrSet("all", fetchBanksFromSource);
     return res.json(banks);
   } catch (error) {
     logger.error("[banks] External source fetch failed", { error: error.message, stack: error.stack });

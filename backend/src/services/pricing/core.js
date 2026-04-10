@@ -1,4 +1,5 @@
-const { ORDER_PREFIXES, roundGiaBanValue } = require("../../utils/orderHelpers");
+const { roundGiaBanValue } = require("../../utils/orderHelpers");
+const { getTiers, getPrefixMap } = require("./tierCache");
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -110,24 +111,122 @@ const calculateMarginBasedPrice = (basePrice, marginRatio) => {
   return numericBase / denominator;
 };
 
-const resolveOrderKind = ({ orderId, customerType }) => {
+/* ------------------------------------------------------------------ */
+/*  resolveOrderKind — async, đọc tiers từ cache/DB                   */
+/* ------------------------------------------------------------------ */
+
+const resolveOrderKind = async ({ orderId, customerType }) => {
   const normalizedOrderId = String(orderId || "").trim().toUpperCase();
-  const normalizedCustomerType = String(customerType || "")
-    .trim()
-    .toUpperCase();
+  const normalizedCustomerType = String(customerType || "").trim().toUpperCase();
+
+  const matchPrefix = (prefix) =>
+    Boolean(prefix) &&
+    (normalizedOrderId.startsWith(prefix) || normalizedCustomerType === prefix);
+
+  const tiers = await getTiers();
+  const result = { matchedTier: null };
+
+  for (const tier of tiers) {
+    const flag = `is${tier.key.charAt(0).toUpperCase()}${tier.key.slice(1)}`;
+    const matched = matchPrefix(tier.prefix.toUpperCase());
+    result[flag] = matched;
+    if (matched && !result.matchedTier) {
+      result.matchedTier = tier;
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Synchronous fallback — dùng khi caller chưa migrate sang async.
+ * Đọc từ prefixMap (đã await sẵn) hoặc hardcode.
+ */
+const resolveOrderKindSync = (prefixMap, { orderId, customerType }) => {
+  const normalizedOrderId = String(orderId || "").trim().toUpperCase();
+  const normalizedCustomerType = String(customerType || "").trim().toUpperCase();
+
   const matchPrefix = (prefix) =>
     Boolean(prefix) &&
     (normalizedOrderId.startsWith(prefix) || normalizedCustomerType === prefix);
 
   return {
-    isCtv: matchPrefix((ORDER_PREFIXES?.ctv || "MAVC").toUpperCase()),
-    isLe: matchPrefix((ORDER_PREFIXES?.le || "MAVL").toUpperCase()),
-    isKhuyen: matchPrefix((ORDER_PREFIXES?.khuyen || "MAVK").toUpperCase()),
-    isTang: matchPrefix((ORDER_PREFIXES?.tang || "MAVT").toUpperCase()),
-    isNhap: matchPrefix((ORDER_PREFIXES?.nhap || "MAVN").toUpperCase()),
-    isSinhVien: matchPrefix((ORDER_PREFIXES?.sinhvien || "MAVS").toUpperCase()),
+    isCtv: matchPrefix((prefixMap?.ctv || "MAVC").toUpperCase()),
+    isCustomer: matchPrefix((prefixMap?.customer || "MAVL").toUpperCase()),
+    isPromo: matchPrefix((prefixMap?.promo || "MAVK").toUpperCase()),
+    isGift: matchPrefix((prefixMap?.gift || "MAVT").toUpperCase()),
+    isImport: matchPrefix((prefixMap?.import || "MAVN").toUpperCase()),
+    isStudent: matchPrefix((prefixMap?.student || "MAVS").toUpperCase()),
   };
 };
+
+/* ------------------------------------------------------------------ */
+/*  Generic tier-chain pricing                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tính giá cho 1 tier dựa trên pricing_rule và chuỗi base_tier_key.
+ * @param {Object} params
+ * @param {Object} tier           - tier object từ pricing_tier
+ * @param {Object} tiersByKey     - { key: tier } lookup map
+ * @param {Object} marginsByKey   - { tierKey: marginRatio } cho variant này
+ * @param {number} baseCost       - giá nhập / base_price
+ * @param {Object} priceCache     - { tierKey: rawPrice } memo
+ */
+/**
+ * @param {number} pricingBase   - giá gốc (base_price) cho chuỗi markup
+ * @param {number} importCost    - giá nhập thực tế cho pricing_rule "cost"
+ */
+const resolveTierPrice = (tier, tiersByKey, marginsByKey, pricingBase, priceCache, importCost) => {
+  if (priceCache[tier.key] !== undefined) return priceCache[tier.key];
+
+  if (tier.pricing_rule === "fixed_zero") {
+    priceCache[tier.key] = 0;
+    return 0;
+  }
+  if (tier.pricing_rule === "cost") {
+    const cost = importCost !== undefined ? importCost : pricingBase;
+    priceCache[tier.key] = cost;
+    return cost;
+  }
+
+  let basePrice = pricingBase;
+  if (tier.base_tier_key && tiersByKey[tier.base_tier_key]) {
+    basePrice = resolveTierPrice(
+      tiersByKey[tier.base_tier_key],
+      tiersByKey,
+      marginsByKey,
+      pricingBase,
+      priceCache,
+      importCost
+    );
+  }
+
+  const margin = marginsByKey[tier.key] || 0;
+
+  if (tier.pricing_rule === "markup") {
+    const price = margin > 0 && margin < 1
+      ? calculateMarginBasedPrice(basePrice, margin)
+      : basePrice;
+    priceCache[tier.key] = price;
+    return price;
+  }
+
+  if (tier.pricing_rule === "discount") {
+    const normalizedDiscount = normalizePromoRatio(margin);
+    const factor = Math.max(0, 1 - normalizedDiscount);
+    const price = basePrice * factor;
+    priceCache[tier.key] = price;
+    return price;
+  }
+
+  priceCache[tier.key] = basePrice;
+  return basePrice;
+};
+
+/* ------------------------------------------------------------------ */
+/*  calculateOrderPricingFromResolvedValues — backward compat          */
+/* ------------------------------------------------------------------ */
 
 const calculateOrderPricingFromResolvedValues = ({
   orderId = "",
@@ -139,12 +238,15 @@ const calculateOrderPricingFromResolvedValues = ({
   pctCtv,
   pctKhach,
   pctPromo,
-  /** Cùng vai trò pct_khach (bậc 2 từ resellRaw); áp cho đơn MAVS */
   pctStu,
   forceKhachLe = false,
   roundCostToThousands = false,
   days = 30,
   expiryDate = "",
+  /** Nếu caller đã await getPrefixMap() sẵn, truyền vào để tránh gọi lại. */
+  _prefixMap = null,
+  /** Nếu caller đã await getTiers() sẵn, truyền vào. */
+  _tiers = null,
 } = {}) => {
   const normalizedPricingBase = resolveMoney(
     pricingBase,
@@ -187,27 +289,71 @@ const calculateOrderPricingFromResolvedValues = ({
       : 0;
   const promoPrice = Math.max(0, customerPrice - promoAmount);
 
-  /** MAVS: bậc 2 = pct_stu nếu có; không có thì dùng pct_khach (như khách lẻ) */
   const studentPrice = roundPricingValue(studentRaw);
 
-  const orderKind = resolveOrderKind({ orderId, customerType });
+  /* --- Generic tier-based price resolution --- */
   let price = customerPrice;
 
-  if (forceKhachLe) {
-    price = customerPrice;
-  } else if (orderKind.isSinhVien) {
-    price = studentPrice;
-  } else if (orderKind.isCtv) {
-    price = resellPrice;
-  } else if (orderKind.isLe) {
-    price = customerPrice;
-  } else if (orderKind.isKhuyen) {
-    const factor = Math.max(0, 1 - pctPromoNormalized);
-    price = roundPricingValue(customerRaw * factor);
-  } else if (orderKind.isTang) {
-    price = 0;
-  } else if (orderKind.isNhap) {
-    price = baseCost;
+  if (_tiers && _tiers.length > 0) {
+    const tiersByKey = {};
+    for (const t of _tiers) tiersByKey[t.key] = t;
+
+    const marginsByKey = {
+      ctv: pctCtvNormalized,
+      customer: pctKhachNormalized,
+      promo: pctPromoNormalized,
+      student: pctStuNormalized,
+    };
+
+    const prefixMap = _prefixMap || {};
+    const orderKindSync = resolveOrderKindSync(prefixMap, { orderId, customerType });
+
+    if (forceKhachLe) {
+      price = customerPrice;
+    } else {
+      const matchedTier = _tiers.find((t) => {
+        const upper = t.prefix.toUpperCase();
+        const oid = String(orderId || "").trim().toUpperCase();
+        const ct = String(customerType || "").trim().toUpperCase();
+        return oid.startsWith(upper) || ct === upper;
+      });
+
+      if (matchedTier) {
+        const priceCache = {};
+        const rawPrice = resolveTierPrice(
+          matchedTier,
+          tiersByKey,
+          marginsByKey,
+          normalizedPricingBase,
+          priceCache,
+          baseCost
+        );
+        price = roundPricingValue(rawPrice);
+      }
+    }
+  } else {
+    const prefixMap = _prefixMap || {
+      ctv: "MAVC", customer: "MAVL", promo: "MAVK",
+      gift: "MAVT", import: "MAVN", student: "MAVS",
+    };
+    const orderKind = resolveOrderKindSync(prefixMap, { orderId, customerType });
+
+    if (forceKhachLe) {
+      price = customerPrice;
+    } else if (orderKind.isStudent) {
+      price = studentPrice;
+    } else if (orderKind.isCtv) {
+      price = resellPrice;
+    } else if (orderKind.isCustomer) {
+      price = customerPrice;
+    } else if (orderKind.isPromo) {
+      const factor = Math.max(0, 1 - pctPromoNormalized);
+      price = roundPricingValue(customerRaw * factor);
+    } else if (orderKind.isGift) {
+      price = 0;
+    } else if (orderKind.isImport) {
+      price = baseCost;
+    }
   }
 
   return {
@@ -229,23 +375,17 @@ const calculateOrderPricingFromResolvedValues = ({
       pctStu: pctStuNormalized,
       pctPromo: pctPromoNormalized,
       studentPrice,
-      orderKind,
       forceKhachLe,
     },
   };
 };
 
-/**
- * Khi tạo variant mới từ đơn: suy pct_ctv / pct_khach (0–1) từ giá nhập (cost) và giá bán (sale),
- * căn theo prefix MAVC (CTV) vs MAVL (khách lẻ).
- * MAVL: cố định một pct_ctv mặc định nhỏ rồi suy pct_khach từ chuỗi margin; nếu giá bán không đủ “đậm”
- * so với cost+%CTV thì coi như chỉ còn một lớp margin (chỉ pct_ctv).
- */
 const deriveVariantMarginsFromCostAndSalePrice = ({
   cost,
   salePrice,
   orderPrefix,
   customerType,
+  _prefixMap = null,
 } = {}) => {
   const B = normalizeMoney(cost);
   const P = normalizeMoney(salePrice);
@@ -253,8 +393,12 @@ const deriveVariantMarginsFromCostAndSalePrice = ({
     .trim()
     .toUpperCase()
     .slice(0, 4);
-  const isMavl = head === (ORDER_PREFIXES?.le || "MAVL");
-  const isMavc = head === (ORDER_PREFIXES?.ctv || "MAVC");
+
+  const prefixMap = _prefixMap || {
+    ctv: "MAVC", customer: "MAVL",
+  };
+  const isMavl = head === (prefixMap.customer || "MAVL");
+  const isMavc = head === (prefixMap.ctv || "MAVC");
 
   if (!Number.isFinite(B) || B <= 0 || !Number.isFinite(P) || P <= 0) {
     return { pctCtv: 0, pctKhach: 0 };
@@ -296,4 +440,7 @@ module.exports = {
   calculateMarginBasedPrice,
   calculateOrderPricingFromResolvedValues,
   deriveVariantMarginsFromCostAndSalePrice,
+  resolveOrderKind,
+  resolveOrderKindSync,
+  resolveTierPrice,
 };

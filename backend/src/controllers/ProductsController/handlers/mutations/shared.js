@@ -9,6 +9,7 @@ const {
   categoryCols,
   productCategoryCols,
   TABLES,
+  MARGIN_PIVOT_SQL,
 } = require("../../constants");
 
 const fetchVariantView = async (variantId) => {
@@ -32,10 +33,10 @@ const fetchVariantView = async (variantId) => {
         ) FILTER (WHERE c.${quoteIdent(categoryCols.id)} IS NOT NULL),
         '[]'::json
       ) AS categories,
-      v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
-      v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
-      v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
-      v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
+      margins.pct_ctv,
+      margins.pct_khach,
+      margins.pct_promo,
+      margins.pct_stu,
       v.${quoteIdent(variantCols.isActive)} AS is_active,
       v.${quoteIdent(variantCols.updatedAt)} AS update,
       spagg.max_supply_price AS max_supply_price
@@ -48,6 +49,7 @@ const fetchVariantView = async (variantId) => {
       ON pcj.${quoteIdent(productCategoryCols.productId)} = p.${quoteIdent(productCols.id)}
     LEFT JOIN ${TABLES.category} c
       ON c.${quoteIdent(categoryCols.id)} = pcj.${quoteIdent(productCategoryCols.categoryId)}
+    LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE
     LEFT JOIN LATERAL (
       SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
       FROM ${TABLES.supplyPrice} sp
@@ -62,10 +64,10 @@ const fetchVariantView = async (variantId) => {
       p.${quoteIdent(productSchemaCols.packageName)},
       p.${quoteIdent(productSchemaCols.imageUrl)},
       v.${quoteIdent(variantCols.imageUrl)},
-      v.${quoteIdent(variantCols.pctCtv)},
-      v.${quoteIdent(variantCols.pctKhach)},
-      v.${quoteIdent(variantCols.pctPromo)},
-      v.${quoteIdent(variantCols.pctStu)},
+      margins.pct_ctv,
+      margins.pct_khach,
+      margins.pct_promo,
+      margins.pct_stu,
       v.${quoteIdent(variantCols.isActive)},
       v.${quoteIdent(variantCols.updatedAt)},
       spagg.max_supply_price

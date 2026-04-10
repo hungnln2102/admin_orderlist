@@ -82,6 +82,7 @@ export const API_ENDPOINTS = {
   IP_WHITELISTS: "/api/ip-whitelists",
   IP_WHITELIST_BY_ID: (id: number) => `/api/ip-whitelists/${id}`,
   SITE_MAINTENANCE: "/api/site-maintenance",
+  PRICING_TIERS: "/api/pricing-tiers",
 };
 
 // Keep UI aliases stable; values now sourced từ tableSql qua fieldMapper.
@@ -119,7 +120,7 @@ export const CALCULATED_FIELDS = {
 
 export const ORDER_CODE_PREFIXES = {
   COLLABORATOR: "MAVC",
-  RETAIL: "MAVL",
+  CUSTOMER: "MAVL",
   PROMO: "MAVK",
   GIFT: "MAVT",
   IMPORT: "MAVN",
@@ -134,7 +135,7 @@ export const ORDER_CODE_OPTIONS = [
     label: "Cộng Tác Viên",
   },
   { value: ORDER_CODE_PREFIXES.STUDENT, label: "Sinh Viên" },
-  { value: ORDER_CODE_PREFIXES.RETAIL, label: "Khách Lẻ" },
+  { value: ORDER_CODE_PREFIXES.CUSTOMER, label: "Khách Lẻ" },
   { value: ORDER_CODE_PREFIXES.PROMO, label: "Khuyến Mãi" },
   { value: ORDER_CODE_PREFIXES.GIFT, label: "Quà Tặng" },
   { value: ORDER_CODE_PREFIXES.IMPORT, label: "Nhập Hàng" },
@@ -161,12 +162,12 @@ export const STAT_CARD_ACCENTS = {
 export const ORDER_DATASET_CONFIG = {
   active: {
     label: "Đơn Hàng",
-    description: "Danh sách đơn đang hoạt động",
+    description: "Danh sách đơn hàng",
     endpoint: API_ENDPOINTS.ORDERS,
   },
   expired: {
     label: "Hết Hạn",
-    description: "Danh sách các đơn hàng đã hết hạn",
+    description: "Danh sách hết hạn",
     endpoint: API_ENDPOINTS.ORDERS_EXPIRED,
   },
   import: {
@@ -176,7 +177,7 @@ export const ORDER_DATASET_CONFIG = {
   },
   canceled: {
     label: "Hoàn Tiền",
-    description: "Đơn đã hủy/hoàn tiền",
+    description: "Đơn đã hoàn tiền",
     endpoint: API_ENDPOINTS.ORDERS_CANCELED,
   },
 };
@@ -200,7 +201,6 @@ export interface Order {
   days: string;
   expiry_date: string;
   registration_date?: string;
-  expiry_date?: string;
   registration_date_display?: string;
   expiry_date_display?: string;
   supply: string;

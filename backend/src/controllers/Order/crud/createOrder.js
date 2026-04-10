@@ -82,7 +82,7 @@ const attachCreateOrderRoute = (router) => {
         }
 
         const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
-        const giftPrefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+        const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
         const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
         if (isGiftOrderCreate) {
             payload[priceCol] = 0;

@@ -102,27 +102,49 @@ if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
   );
 }
 
-// Telegram error notification transport
+// Telegram notification transport (error + warn)
 try {
-  const { notifyError } = require("./telegramErrorNotifier");
-  const TelegramTransport = class extends winston.Transport {
+  const { notifyError, notifyWarn } = require("./telegramErrorNotifier");
+  const splatKey = Symbol.for("splat");
+
+  const extractPayload = (info) => {
+    const splat = info[splatKey]?.[0] || {};
+    return {
+      message: info.message,
+      source: "backend",
+      url: info.url || splat.url,
+      method: info.method || splat.method,
+      stack: info.stack || splat.stack,
+      extra: info.statusCode
+        ? `Status: ${info.statusCode}`
+        : splat.error
+          ? String(splat.error)
+          : undefined,
+    };
+  };
+
+  const TelegramErrorTransport = class extends winston.Transport {
     log(info, callback) {
       setImmediate(() => {
-        // Skip errors from the notifier itself to avoid loops
         if (String(info.message || "").includes("[ErrorNotifier]")) return;
-        notifyError({
-          message: info.message,
-          source: "backend",
-          url: info.url,
-          method: info.method,
-          stack: info.stack || info[Symbol.for("splat")]?.[0]?.stack,
-          extra: info.statusCode ? `Status: ${info.statusCode}` : undefined,
-        });
+        notifyError(extractPayload(info));
       });
       callback();
     }
   };
-  transports.push(new TelegramTransport({ level: "error" }));
+
+  const TelegramWarnTransport = class extends winston.Transport {
+    log(info, callback) {
+      setImmediate(() => {
+        if (String(info.message || "").includes("[ErrorNotifier]")) return;
+        notifyWarn(extractPayload(info));
+      });
+      callback();
+    }
+  };
+
+  transports.push(new TelegramErrorTransport({ level: "error" }));
+  transports.push(new TelegramWarnTransport({ level: "warn" }));
 } catch (err) {
   console.warn("[Logger] Could not load Telegram error notifier:", err.message);
 }

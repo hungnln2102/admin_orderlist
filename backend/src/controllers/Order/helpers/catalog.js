@@ -4,6 +4,7 @@ const { TABLES, COLS } = require("../constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../../config/dbSchema");
 const { findProductIdByName } = require("../../ProductsController/finders");
 const { deriveVariantMarginsFromCostAndSalePrice } = require("../../../services/pricing/core");
+const { getTiers } = require("../../../services/pricing/tierCache");
 
 const resolveProductToVariantId = async(productNameOrId) => {
     if (productNameOrId == null) return null;
@@ -136,9 +137,23 @@ const ensureVariantRecord = async(productName, options = {}) => {
             [displayNameCol]: name,
             [PRODUCT_SCHEMA.VARIANT.COLS.IS_ACTIVE]: true,
             [PRODUCT_SCHEMA.VARIANT.COLS.DESC_VARIANT_ID]: Number(descVariantId),
-            [PRODUCT_SCHEMA.VARIANT.COLS.PCT_CTV]: pctCtv,
-            [PRODUCT_SCHEMA.VARIANT.COLS.PCT_KHACH]: pctKhach,
         });
+
+        const tiers = await getTiers();
+        const marginEntries = [
+            { key: "ctv", value: pctCtv },
+            { key: "customer", value: pctKhach },
+        ];
+        for (const { key, value } of marginEntries) {
+            if (value == null || value === 0) continue;
+            const tier = tiers.find((t) => t.key === key);
+            if (!tier) continue;
+            await trx(TABLES.variantMargin).insert({
+                variant_id: newVariantId,
+                tier_id: tier.id,
+                margin_ratio: value,
+            });
+        }
 
         return newVariantId;
     });

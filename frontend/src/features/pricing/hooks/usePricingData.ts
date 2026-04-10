@@ -51,13 +51,6 @@ export const usePricingData = () => {
     filteredPricing,
   } = useProductData(API_BASE);
 
-  const supplyActions = useSupplyActions({
-    apiBase: API_BASE,
-    setProductPrices,
-    fetchProductPrices,
-  });
-  const { supplyPriceMap, fetchSupplyPricesForProduct } = supplyActions;
-
   const productActions = useProductActions({
     apiBase: API_BASE,
     productPrices,
@@ -68,6 +61,13 @@ export const usePricingData = () => {
     updatedTimestampMap,
     setUpdatedTimestampMap,
   });
+  const supplyActions = useSupplyActions({
+    apiBase: API_BASE,
+    setProductPrices,
+    fetchProductPrices,
+    refreshSupplierOptions: productActions.refreshSupplierOptions,
+  });
+  const { supplyPriceMap, fetchSupplyPricesForProduct } = supplyActions;
 
   useEffect(() => {
     fetchProductPrices();

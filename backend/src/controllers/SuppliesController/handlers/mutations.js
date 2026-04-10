@@ -8,6 +8,7 @@ const {
   resolveSupplierNameColumn,
 } = require("../helpers");
 const logger = require("../../../utils/logger");
+const { supplierCache } = require("../../../utils/cache");
 
 const createSupply = async (req, res) => {
   logger.debug("[POST] /api/supplies", { body: req.body });
@@ -48,6 +49,7 @@ const createSupply = async (req, res) => {
     `,
       values
     );
+    supplierCache.clear();
     const newId = result.rows?.[0]?.id;
     res.status(201).json({
       id: newId,
@@ -146,6 +148,7 @@ const updateSupply = async (req, res) => {
     if (!result.rows?.length) {
       return res.status(404).json({ error: "Không tìm thấy nguồn cung cấp" });
     }
+    supplierCache.clear();
     const row = result.rows[0];
     const normalizedStatus = normalizeSupplyStatus(row.raw_status);
     res.json({
@@ -194,6 +197,7 @@ const toggleSupplyActive = async (req, res) => {
       });
     }
 
+    supplierCache.clear();
     const normalizedStatus = normalizeSupplyStatus(result.rows[0].raw_status);
     res.json({
       id: parsedSupplyId,
@@ -223,6 +227,7 @@ const deleteSupply = async (req, res) => {
     if (!result.rowCount) {
       return res.status(404).json({ error: "Không tìm thấy nguồn cung cấp." });
     }
+    supplierCache.clear();
     res.json({ success: true });
   } catch (error) {
     logger.error("Mutation failed (DELETE /api/supplies/:id)", { supplyId: parsedSupplyId, error: error.message, stack: error.stack });

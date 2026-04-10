@@ -9,6 +9,7 @@ import { ViewOrderModalProps } from "./types";
 import { normalizeDateLike, parseNumberLike } from "./utils";
 import { OrderDetailsSection } from "./components/OrderDetailsSection";
 import { OrderPaymentQrSection } from "./components/OrderPaymentQrSection";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
@@ -122,8 +123,9 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   });
 
   return (
+    <ModalPortal>
     <div
-      className="view-order-modal fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4 md:p-6"
+      className="view-order-modal fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-300 p-2 sm:p-4 md:p-6"
       onClick={onClose}
     >
       <div
@@ -168,6 +170,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

@@ -19,13 +19,7 @@ const fetchVariantPricing = async (productNameOrId) => {
 
   const numericId = Number(raw);
   const baseQuery = db(TABLES.variant)
-    .select(
-      `${TABLES.variant}.${COLS.VARIANT.ID} as variant_id`,
-      `${TABLES.variant}.${COLS.VARIANT.PCT_CTV} as pct_ctv`,
-      `${TABLES.variant}.${COLS.VARIANT.PCT_KHACH} as pct_khach`,
-      `${TABLES.variant}.${COLS.VARIANT.PCT_PROMO} as pct_promo`,
-      `${TABLES.variant}.${COLS.VARIANT.PCT_STU} as pct_stu`
-    )
+    .select(`${TABLES.variant}.${COLS.VARIANT.ID} as variant_id`)
     .orderBy(`${TABLES.variant}.${COLS.VARIANT.ID}`, "asc")
     .limit(1);
 
@@ -43,12 +37,20 @@ const fetchVariantPricing = async (productNameOrId) => {
   const row = await baseQuery.first();
   if (!row) return null;
 
+  const margins = await db(TABLES.variantMargin)
+    .join(TABLES.pricingTier, `${TABLES.pricingTier}.id`, `${TABLES.variantMargin}.tier_id`)
+    .where(`${TABLES.variantMargin}.variant_id`, row.variant_id)
+    .select(`${TABLES.pricingTier}.key as tier_key`, `${TABLES.variantMargin}.margin_ratio`);
+
+  const marginMap = {};
+  for (const m of margins) marginMap[m.tier_key] = m.margin_ratio;
+
   return {
     variantId: row.variant_id,
-    pctCtv: row.pct_ctv,
-    pctKhach: row.pct_khach,
-    pctPromo: row.pct_promo,
-    pctStu: row.pct_stu,
+    pctCtv: marginMap.ctv ?? null,
+    pctKhach: marginMap.customer ?? null,
+    pctPromo: marginMap.promo ?? null,
+    pctStu: marginMap.student ?? null,
   };
 };
 

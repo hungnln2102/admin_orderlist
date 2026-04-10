@@ -1,5 +1,6 @@
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { ProductPricingRow } from "../../types";
 
 interface DeleteProductModalProps {
@@ -20,6 +21,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
   if (!product) return null;
 
   return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4 py-6"
       style={{ zIndex: 9999 }}
@@ -91,6 +93,7 @@ const DeleteProductModal: React.FC<DeleteProductModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { createForm, type InputDto, type CreateFormResponse } from "@/lib/formsApi";
 
@@ -81,8 +82,9 @@ export default function CreateFormModal({
   };
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto"
       onClick={onClose}
       role="presentation"
     >
@@ -207,5 +209,6 @@ export default function CreateFormModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

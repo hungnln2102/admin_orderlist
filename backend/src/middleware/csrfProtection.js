@@ -6,9 +6,9 @@
  * 
  * @description
  * This middleware provides CSRF protection for state-changing HTTP methods
- * (POST, PUT, PATCH, DELETE). CSRF protection is optional and disabled by default.
+ * (POST, PUT, PATCH, DELETE). CSRF protection is ON by default.
  * 
- * To enable: Set ENABLE_CSRF=true in environment variables
+ * To disable (dev only): Set DISABLE_CSRF=true in environment variables
  * 
  * Token can be sent via:
  * - Header: X-CSRF-Token
@@ -62,7 +62,7 @@ const generateToken = (req, res, next) => {
  * - GET, HEAD, OPTIONS methods
  * - /auth/* endpoints (have their own security)
  * - /api/payment/* endpoints (have signature verification)
- * - When ENABLE_CSRF is not set to "true"
+ * - When DISABLE_CSRF is set to "true" (dev only)
  */
 const verifyToken = (req, res, next) => {
   // Skip CSRF for GET, HEAD, OPTIONS
@@ -80,9 +80,8 @@ const verifyToken = (req, res, next) => {
     return next();
   }
 
-  // Check if CSRF is enabled
-  const csrfEnabled = process.env.ENABLE_CSRF === "true" || process.env.ENABLE_CSRF === "1";
-  if (!csrfEnabled) {
+  const csrfDisabled = process.env.DISABLE_CSRF === "true" || process.env.DISABLE_CSRF === "1";
+  if (csrfDisabled) {
     return next();
   }
 
@@ -135,3 +134,5 @@ module.exports = {
   verifyToken,
   addTokenToResponse,
 };
+
+

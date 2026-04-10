@@ -9,16 +9,7 @@ const router = express.Router();
 const IMAGE_DIR = path.join(__dirname, "../../image_variant");
 fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
-const ALLOWED_IMAGE_EXTS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".svg",
-  ".bmp",
-  ".avif",
-]);
+const ALLOWED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".webp"]);
 
 const isImageFile = (filename) => {
   const ext = path.extname(filename || "").toLowerCase();
@@ -41,10 +32,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype || !file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files are allowed."));
+    const allowed = ["image/jpeg", "image/webp"];
+    if (!file.mimetype || !allowed.includes(file.mimetype)) {
+      return cb(new Error("Chỉ cho phép ảnh JPEG hoặc WebP (tối đa 2 MB)."));
     }
     return cb(null, true);
   },

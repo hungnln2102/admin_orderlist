@@ -10,11 +10,11 @@ const {
 const { todayYMDInVietnam } = require("../../../utils/normalizers");
 const { updateOrderWithFinance } = require("../orderUpdateService");
 const logger = require("../../../utils/logger");
+const { orderIdParam } = require("../../../validators/orderValidator");
 
 const attachUpdateOrderRoute = (router) => {
-    router.put("/:id", async (req, res) => {
+    router.put("/:id", ...orderIdParam, async (req, res) => {
         const id = Number(req.params.id);
-        if (!id) return res.status(400).json({ error: "ID không hợp lệ." });
 
         const trx = await db.transaction();
         try {

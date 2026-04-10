@@ -1,6 +1,7 @@
 /**
  * Centralized Error Handling Middleware
- * Provides consistent error responses across the application
+ * Provides consistent error responses across the application.
+ * Lỗi 5xx tự động gửi Telegram qua logger.error() → Winston transport.
  */
 
 const logger = require("../utils/logger");

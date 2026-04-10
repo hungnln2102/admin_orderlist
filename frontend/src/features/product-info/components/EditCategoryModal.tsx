@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { CategoryItem } from "../utils/productInfoHelpers";
 import {
@@ -56,6 +57,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     "text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2 block";
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="relative flex w-full max-w-6xl flex-col rounded-[32px] border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl max-h-[95vh] overflow-hidden">
         {/* Close Button */}
@@ -281,5 +283,6 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
         )}
       </div>
     </div>
+    </ModalPortal>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ProductDescription } from "@/lib/productDescApi";
 import {
@@ -42,8 +43,9 @@ export const DescVariantViewModal: React.FC<DescVariantViewModalProps> = ({
   if (!item) return null;
 
   return (
+    <ModalPortal>
     <div
-      className="product-edit-modal__overlay fixed inset-0 z-[9998] flex items-center justify-center p-4"
+      className="product-edit-modal__overlay fixed inset-0 z-[9999] flex items-center justify-center p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -185,5 +187,6 @@ export const DescVariantViewModal: React.FC<DescVariantViewModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };

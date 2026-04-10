@@ -31,8 +31,16 @@ const renewAdobeRoutes = require("./renewAdobeRoutes");
 const renewAdobePublicRoutes = require("./renewAdobePublicRoutes");
 const customerStatusRoutes = require("./customerStatusRoutes");
 const ipWhitelistRoutes = require("./ipWhitelistRoutes");
+const pricingTierRoutes = require("./pricingTierRoutes");
 const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
 const publicContentRoutes = require("./publicContentRoutes");
+
+const longTimeout = (ms) => (req, res, next) => {
+  req.setTimeout(ms);
+  res.setTimeout(ms);
+  next();
+};
+
 const router = express.Router();
 
 router.use("/auth", authRoutes);
@@ -47,7 +55,7 @@ router.use(authGuard);
 
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
-router.use("/renew-adobe", renewAdobeRoutes);
+router.use("/renew-adobe", longTimeout(900_000), renewAdobeRoutes);
 router.use("/ip-whitelists", ipWhitelistRoutes);
 router.use("/site-maintenance", siteMaintenanceRoutes);
 router.use("/", customerStatusRoutes);
@@ -74,5 +82,6 @@ router.use("/scheduler", schedulerRoutes);
 router.get("/run-scheduler", runSchedulerNow);
 router.get("/supply-insights", suppliesController.getSupplyInsights);
 router.use("/saving-goals", savingGoalsController);
+router.use("/pricing-tiers", pricingTierRoutes);
 
 module.exports = router;

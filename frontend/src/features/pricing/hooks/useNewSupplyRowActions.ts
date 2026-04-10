@@ -26,6 +26,7 @@ interface UseNewSupplyRowActionsParams {
     nextHighestPrice: number | null
   ) => void;
   refreshProductPricing: () => Promise<void>;
+  refreshSupplierOptions?: () => Promise<void> | void;
 }
 
 export function useNewSupplyRowActions({
@@ -34,6 +35,7 @@ export function useNewSupplyRowActions({
   fetchSupplyPricesForProduct,
   recomputeProductBasePrice,
   refreshProductPricing,
+  refreshSupplierOptions,
 }: UseNewSupplyRowActionsParams) {
   const [newSupplyRows, setNewSupplyRows] = useState<
     Record<number, NewSupplyRowState>
@@ -152,6 +154,7 @@ export function useNewSupplyRowActions({
       }
 
       await fetchSupplyPricesForProduct(product.sanPhamRaw);
+      await Promise.resolve(refreshSupplierOptions?.());
       handleCancelAddSupplierRow(product.id);
 
       if (shouldRecomputeBase) {

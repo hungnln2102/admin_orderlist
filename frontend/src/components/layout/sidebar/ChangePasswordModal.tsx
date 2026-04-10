@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { apiFetch } from "../../../lib/api";
 
 type ChangePasswordModalProps = {
@@ -94,8 +95,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   if (!isOpen) return null;
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4"
       onClick={handleClose}
     >
       <div
@@ -195,6 +197,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

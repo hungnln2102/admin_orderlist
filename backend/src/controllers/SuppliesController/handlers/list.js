@@ -3,22 +3,22 @@ const { QUOTED_COLS, TABLES, variantCols, supplyPriceCols } = require("../consta
 const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
 const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
 const logger = require("../../../utils/logger");
+const { supplierCache } = require("../../../utils/cache");
 
 const listSupplies = async (_req, res) => {
   try {
-    const supplierTable = await resolveSupplierTableName();
-    const supplierNameCol = await resolveSupplierNameColumn();
-    
-    // Use Knex query builder for better maintainability
-    const rows = await db(supplierTable)
-      .select({
-        id: "id",
-        source_name: supplierNameCol,
-        number_bank: "number_bank",
-        bin_bank: "bin_bank",
-      })
-      .orderBy(supplierNameCol, "asc");
-    
+    const rows = await supplierCache.getOrSet("all", async () => {
+      const supplierTable = await resolveSupplierTableName();
+      const supplierNameCol = await resolveSupplierNameColumn();
+      return db(supplierTable)
+        .select({
+          id: "id",
+          source_name: supplierNameCol,
+          number_bank: "number_bank",
+          bin_bank: "bin_bank",
+        })
+        .orderBy(supplierNameCol, "asc");
+    });
     res.json(rows || []);
   } catch (error) {
     logger.error("Query failed (GET /api/supplies)", { error: error.message, stack: error.stack });

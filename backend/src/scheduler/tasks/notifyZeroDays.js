@@ -20,7 +20,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
 
     const client = await pool.connect();
     try {
-      // 0 <= x <= 4 là Cần Gia Hạn; job này thông báo đơn đúng 0 ngày (đúng ngày hết hạn), không lọc status
+      // Chỉ check đúng điều kiện: số ngày còn lại = 0 VÀ status = Cần Gia Hạn.
       const result = await client.query(`
       SELECT
         ${COL.idOrder},
@@ -39,12 +39,12 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         ${COL.status}
       FROM ${TABLES.orderList}
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) = 0
-        AND ${COL.status} = '${STATUS.EXPIRED}'
+        AND ${COL.status} = '${STATUS.RENEWAL}'
       ORDER BY ${COL.idOrder}
     `);
 
       logger.info(
-        `Tìm thấy ${result.rowCount} đơn đúng ngày hết hạn (0 ngày còn lại)`
+        `Tìm thấy ${result.rowCount} đơn đúng ngày hết hạn (0 ngày còn lại, trạng thái = Cần Gia Hạn)`
       );
 
       if (result.rows.length > 0) {
@@ -85,7 +85,7 @@ function createNotifyZeroDaysTask(pool, getSqlCurrentDate) {
         await sendZeroDaysRemainingNotification(normalizedOrders);
       } else {
         logger.info(
-          "[CRON] Không có đơn nào hết hạn (ngày còn lại = 0, trạng thái = Hết Hạn)"
+          "[CRON] Không có đơn nào cần thông báo (ngày còn lại = 0, trạng thái = Cần Gia Hạn)"
         );
       }
     } catch (err) {

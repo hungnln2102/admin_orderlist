@@ -13,6 +13,7 @@ import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";
 import { showAppNotification } from "@/lib/notifications";
 import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../ViewOrderModal/constants";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 export default function ViewSupplierModal({
   isOpen,
@@ -89,7 +90,8 @@ export default function ViewSupplierModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 px-4 py-6" onClick={onClose}>
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 py-6" onClick={onClose}>
       <div className="w-full max-w-6xl bg-[#0f132c] border border-white/10 rounded-3xl shadow-2xl max-h-[95vh] flex flex-col overflow-hidden text-white" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
           <div>
@@ -169,5 +171,6 @@ export default function ViewSupplierModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

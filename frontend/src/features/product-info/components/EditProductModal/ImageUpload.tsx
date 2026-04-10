@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { PhotoIcon } from "@heroicons/react/24/outline";
 import type { VariantImageItem } from "@/lib/variantImagesApi";
 import {
@@ -47,6 +48,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div className="product-image-picker__overlay fixed inset-0 z-[10000] flex items-center justify-center px-4 py-6">
       <div className="product-image-picker w-full max-w-4xl overflow-hidden rounded-[28px] border">
         <div className="product-image-picker__header flex items-center justify-between border-b px-5 py-4">
@@ -140,6 +142,7 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 
@@ -288,7 +291,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/webp"
         onChange={handleServerUpload}
         className="hidden"
       />

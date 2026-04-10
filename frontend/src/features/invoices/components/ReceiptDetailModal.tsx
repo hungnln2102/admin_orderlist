@@ -1,5 +1,6 @@
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import * as Helpers from "@/lib/helpers";
 import { PaymentReceipt, formatCurrencyVnd, resolveSender } from "../helpers";
 
@@ -17,7 +18,8 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
   if (!open || !receipt) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl relative z-[100]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Chi tiết biên nhận</h2>
@@ -79,5 +81,6 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };

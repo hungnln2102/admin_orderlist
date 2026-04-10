@@ -3,6 +3,7 @@ const router = express.Router();
 const { db } = require('../../db');
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require('../../config/dbSchema');
 const logger = require('../../utils/logger');
+const { goalIdParam, createGoalRules, updatePriorityRules } = require('../../validators/savingGoalValidator');
 
 const SAVING_GOALS_TABLE = tableName(FINANCE_SCHEMA.SAVING_GOALS.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.SAVING_GOALS.COLS;
@@ -43,19 +44,10 @@ router.get('/', async (req, res) => {
  * POST /api/saving-goals
  * Create a new saving goal
  */
-router.post('/', async (req, res) => {
+router.post('/', ...createGoalRules, async (req, res) => {
   try {
     const { goal_name, target_amount } = req.body;
-
-    // Validation
-    if (!goal_name || !goal_name.trim()) {
-      return res.status(400).json({ error: 'Tên mục tiêu không được để trống.' });
-    }
-
     const amount = Number(target_amount);
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Số tiền mục tiêu phải lớn hơn 0.' });
-    }
 
     // Get max priority to assign new goal
     const maxPriorityResult = await db(SAVING_GOALS_TABLE)
@@ -90,15 +82,11 @@ router.post('/', async (req, res) => {
  * PUT /api/saving-goals/:id
  * Update an existing saving goal
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', ...goalIdParam, async (req, res) => {
   try {
     const { id } = req.params;
     const { goal_name, target_amount } = req.body;
-
     const goalId = Number(id);
-    if (!goalId) {
-      return res.status(400).json({ error: 'ID không hợp lệ.' });
-    }
 
     const updateData = {};
 
@@ -146,14 +134,10 @@ router.put('/:id', async (req, res) => {
  * DELETE /api/saving-goals/:id
  * Delete a saving goal and adjust priorities
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ...goalIdParam, async (req, res) => {
   try {
     const { id } = req.params;
-
     const goalId = Number(id);
-    if (!goalId) {
-      return res.status(400).json({ error: 'ID không hợp lệ.' });
-    }
 
     // Get the goal to be deleted
     const goalToDelete = await db(SAVING_GOALS_TABLE)
@@ -188,24 +172,12 @@ router.delete('/:id', async (req, res) => {
  * PUT /api/saving-goals/:id/priority
  * Update goal priority for reordering
  */
-router.put('/:id/priority', async (req, res) => {
+router.put('/:id/priority', ...updatePriorityRules, async (req, res) => {
   try {
     const { id } = req.params;
     const { priority } = req.body;
-
     const goalId = Number(id);
-    if (!goalId) {
-      return res.status(400).json({ error: 'ID không hợp lệ.' });
-    }
-
-    if (priority === undefined || priority === null) {
-      return res.status(400).json({ error: 'Priority không được để trống.' });
-    }
-
     const priorityValue = Number(priority);
-    if (isNaN(priorityValue)) {
-      return res.status(400).json({ error: 'Priority phải là số.' });
-    }
 
     const [updatedGoal] = await db(SAVING_GOALS_TABLE)
       .where(COLS.ID, goalId)

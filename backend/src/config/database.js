@@ -1,26 +1,34 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-// Cấu hình pool kết nối
+const isProd = process.env.NODE_ENV === "production";
+
+const RAW_POOL_MAX = Number(process.env.DB_RAW_POOL_MAX) || 5;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Các cấu hình tối ưu cho production sau này
-  max: 20, // Tối đa 20 kết nối cùng lúc
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: RAW_POOL_MAX,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
-// Kiểm tra kết nối khi khởi động
 pool.connect((err, client, release) => {
   if (err) {
-    return console.error("❌ Lỗi kết nối Database:", err.stack);
+    console.error("❌ Lỗi kết nối Database:", err.stack);
+    if (isProd) process.exit(1);
+    return;
   }
-  client.query("SELECT NOW()", (err, result) => {
+  client.query("SELECT NOW()", (queryErr, result) => {
     release();
-    if (err) {
-      return console.error("❌ Lỗi chạy query test:", err.stack);
+    if (queryErr) {
+      console.error("❌ Lỗi chạy query test:", queryErr.stack);
+      if (isProd) process.exit(1);
+      return;
     }
-    console.log("✅ Kết nối Database thành công:", result.rows[0].now);
+    console.log(
+      `✅ Kết nối Database thành công (raw pool max=${RAW_POOL_MAX}):`,
+      result.rows[0].now
+    );
   });
 });
 

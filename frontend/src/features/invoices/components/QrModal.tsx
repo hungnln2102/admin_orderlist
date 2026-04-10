@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import * as Helpers from "@/lib/helpers";
 import { QR_BANK_INFO } from "../helpers";
 
@@ -90,7 +91,8 @@ export const QrModal: React.FC<QrModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
       <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative z-[100]">
         <button
           className="absolute right-6 top-6 text-slate-400 hover:text-indigo-100 transition"
@@ -246,5 +248,6 @@ export const QrModal: React.FC<QrModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };

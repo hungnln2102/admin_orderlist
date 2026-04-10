@@ -1,8 +1,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
-const { Pool } = require("pg");
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const { pool } = require("../config/database");
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";
 const schedulerTimezone =

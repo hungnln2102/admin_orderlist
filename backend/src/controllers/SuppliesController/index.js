@@ -15,25 +15,27 @@ const {
   deleteSupply,
 } = require("./handlers/mutations");
 const { getSupplyOverview } = require("./handlers/overview");
+const {
+  supplyIdParam,
+  createSupplyRules,
+  createPaymentRules,
+  updatePaymentRules,
+} = require("../../validators/supplyValidator");
 
-// Insights
 router.get("/insights", getSupplyInsights);
 
-// Basic list and related data
 router.get("/", listSupplies);
-router.get("/:supplyId/products", getProductsBySupply);
-router.get("/:supplyId/payments", listPaymentsBySupply);
-router.get("/:supplyId/overview", getSupplyOverview);
+router.get("/:supplyId/products", ...supplyIdParam, getProductsBySupply);
+router.get("/:supplyId/payments", ...supplyIdParam, listPaymentsBySupply);
+router.get("/:supplyId/overview", ...supplyIdParam, getSupplyOverview);
 
-// Payments mutations
-router.post("/:supplyId/payments", createPayment);
-router.patch("/:supplyId/payments/:paymentId", updatePaymentImport);
+router.post("/:supplyId/payments", ...createPaymentRules, createPayment);
+router.patch("/:supplyId/payments/:paymentId", ...updatePaymentRules, updatePaymentImport);
 
-// Supply mutations
-router.post("/", createSupply);
-router.patch("/:supplyId", updateSupply);
-router.patch("/:supplyId/active", toggleSupplyActive);
-router.delete("/:supplyId", deleteSupply);
+router.post("/", ...createSupplyRules, createSupply);
+router.patch("/:supplyId", ...supplyIdParam, updateSupply);
+router.patch("/:supplyId/active", ...supplyIdParam, toggleSupplyActive);
+router.delete("/:supplyId", ...supplyIdParam, deleteSupply);
 
 module.exports = router;
 module.exports.getSupplyInsights = getSupplyInsights;

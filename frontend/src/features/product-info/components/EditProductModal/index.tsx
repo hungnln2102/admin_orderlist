@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
   fetchProductDescriptions,
@@ -97,6 +98,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   if (!product) return null;
 
   return (
+    <ModalPortal>
     <div className="product-edit-modal__overlay fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div className="product-edit-modal product-edit-modal--compact relative flex w-full max-w-[1240px] flex-col overflow-hidden rounded-[34px] border">
         <button
@@ -237,6 +239,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

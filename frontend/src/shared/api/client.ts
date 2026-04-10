@@ -32,6 +32,8 @@ function normalizeBaseUrl(value: string): string {
 
 export const API_BASE_URL: string = normalizeBaseUrl(RAW_API_BASE);
 
+let _csrfToken: string | null = null;
+
 const buildUrl = (input: string): string => {
   if (input.startsWith("http")) return input;
   const base = API_BASE_URL.replace(/\/+$/, "");
@@ -39,26 +41,51 @@ const buildUrl = (input: string): string => {
   return `${base}/${path}`;
 };
 
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function injectCsrfHeader(init: RequestInit): RequestInit {
+  const method = (init.method || "GET").toUpperCase();
+  if (!_csrfToken || !MUTATING_METHODS.has(method)) return init;
+
+  const headers = new Headers(init.headers);
+  if (!headers.has("X-CSRF-Token")) {
+    headers.set("X-CSRF-Token", _csrfToken);
+  }
+  return { ...init, headers };
+}
+
+function captureCsrfToken(res: Response): void {
+  const token = res.headers.get("X-CSRF-Token");
+  if (token) _csrfToken = token;
+}
+
 export async function apiFetch(
   input: string,
   init?: RequestInit
 ): Promise<Response> {
   const url = buildUrl(input);
-  const finalInit: RequestInit = {
+  const baseInit: RequestInit = {
     credentials: init?.credentials ?? "include",
     ...init,
   };
+  const finalInit = injectCsrfHeader(baseInit);
 
   try {
-    return await fetch(url, finalInit);
+    const res = await fetch(url, finalInit);
+    captureCsrfToken(res);
+    return res;
   } catch (error) {
     if (!input.startsWith("http")) {
       try {
-        return await fetch(`http://127.0.0.1:3001${input}`, finalInit);
+        const res = await fetch(`http://127.0.0.1:3001${input}`, finalInit);
+        captureCsrfToken(res);
+        return res;
       } catch {}
 
       try {
-        return await fetch(input, finalInit);
+        const res = await fetch(input, finalInit);
+        captureCsrfToken(res);
+        return res;
       } catch {}
     }
 

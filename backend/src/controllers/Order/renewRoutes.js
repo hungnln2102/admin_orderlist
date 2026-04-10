@@ -2,14 +2,12 @@ const sepayWebhookApp = require("../../../webhook/sepay_webhook");
 const { db } = require("../../db");
 const { TABLES, STATUS } = require("./constants");
 const logger = require("../../utils/logger");
+const { orderCodeParam, orderIdParam } = require("../../validators/orderValidator");
 
 const attachRenewRoutes = (router) => {
-    // POST /renew
-    router.post("/:orderCode/renew", async(req, res) => {
+    router.post("/:orderCode/renew", ...orderCodeParam, async(req, res) => {
         const { orderCode } = req.params;
         const forceRenewal = req.body?.forceRenewal ?? req.body?.force ?? true;
-
-        if (!orderCode) return res.status(400).json({ error: "Thiếu mã đơn hàng." });
 
         try {
             const result = await sepayWebhookApp.runRenewal(orderCode, { forceRenewal });
@@ -27,10 +25,8 @@ const attachRenewRoutes = (router) => {
         }
     });
 
-    // PATCH /refund — đánh dấu đơn đã hoàn tiền (order_list, không còn bảng order_canceled)
-    router.patch("/canceled/:id/refund", async(req, res) => {
+    router.patch("/canceled/:id/refund", ...orderIdParam, async(req, res) => {
         const id = Number(req.params.id);
-        if (!id) return res.status(400).json({ error: "ID không hợp lệ" });
 
         const { ORDERS_SCHEMA } = require("../../config/dbSchema");
         const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;

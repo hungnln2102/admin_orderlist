@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { apiFetch } from "@/lib/api";
 import type { BankOption, Supply } from "../types";
@@ -66,8 +67,9 @@ export function EditSupplierModal({
   };
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in"
       onClick={onClose}
     >
       <div
@@ -140,5 +142,6 @@ export function EditSupplierModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

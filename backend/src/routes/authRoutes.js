@@ -7,14 +7,14 @@ const {
   changePassword,
 } = require("../controllers/AuthController");
 const { authLimiter, sensitiveLimiter, apiLimiter } = require("../middleware/rateLimiter");
+const { loginRules, changePasswordRules } = require("../validators/authValidator");
 
 const router = express.Router();
 
-// Apply rate limiting to authentication endpoints
-router.post("/login", authLimiter, login);
-router.post("/logout", logout); // Logout doesn't need strict rate limiting
-router.get("/me", apiLimiter, me); // Apply general API limiter (more lenient)
+router.post("/login", authLimiter, ...loginRules, login);
+router.post("/logout", logout);
+router.get("/me", apiLimiter, me);
 router.get("/csrf-token", apiLimiter, getCsrfToken);
-router.post("/change-password", sensitiveLimiter, changePassword);
+router.post("/change-password", sensitiveLimiter, ...changePasswordRules, changePassword);
 
 module.exports = router;

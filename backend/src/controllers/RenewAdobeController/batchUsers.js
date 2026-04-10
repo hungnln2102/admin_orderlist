@@ -269,7 +269,9 @@ const runAutoDeleteUsers = async ({
 
     try {
       await runCheckForAccountId(id);
-    } catch (_) {}
+    } catch (checkErr) {
+      logger.warn("[BatchUsers] runCheckForAccountId thất bại", { id, error: checkErr.message });
+    }
 
     return res.json({
       success: true,

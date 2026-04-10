@@ -7,6 +7,7 @@ const {
   updateSupplyPriceForProduct,
   deleteSupplyPriceForProduct,
 } = require("../controllers/ProductsController");
+const { sourceIdParam } = require("../validators/productValidator");
 
 const router = express.Router();
 
@@ -16,11 +17,13 @@ router.get("/supplies-by-name/:productName", getSuppliesByProductName);
 router.get("/all-prices-by-name/:productName", getSupplyPricesByProductName);
 router.patch(
   "/:productId/suppliers/:sourceId/price",
-  updateSupplyPriceForProduct
+  ...sourceIdParam,
+  updateSupplyPriceForProduct,
 );
 router.delete(
   "/:productId/suppliers/:sourceId",
-  deleteSupplyPriceForProduct
+  ...sourceIdParam,
+  deleteSupplyPriceForProduct,
 );
 
 module.exports = router;

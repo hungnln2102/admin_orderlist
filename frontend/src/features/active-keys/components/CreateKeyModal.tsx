@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { fetchAccounts, type AccountDto } from "@/lib/accountsApi";
 import type { ActiveKeyItem, CreateKeyFormValues } from "../types";
 
@@ -93,8 +94,9 @@ export function CreateKeyModal({
   if (!isOpen) return null;
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4"
       onClick={handleClose}
     >
       <div
@@ -203,5 +205,6 @@ export function CreateKeyModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

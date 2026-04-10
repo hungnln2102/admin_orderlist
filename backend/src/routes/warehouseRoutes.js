@@ -5,12 +5,13 @@ const {
   updateWarehouse,
   deleteWarehouse,
 } = require("../controllers/WarehouseController");
+const { warehouseIdParam } = require("../validators/warehouseValidator");
 
 const router = express.Router();
 
 router.get("/", listWarehouse);
 router.post("/", createWarehouse);
-router.put("/:id", updateWarehouse);
-router.delete("/:id", deleteWarehouse);
+router.put("/:id", ...warehouseIdParam, updateWarehouse);
+router.delete("/:id", ...warehouseIdParam, deleteWarehouse);
 
 module.exports = router;

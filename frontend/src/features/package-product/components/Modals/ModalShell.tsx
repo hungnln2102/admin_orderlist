@@ -1,6 +1,6 @@
 import React from "react";
-import { createPortal } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 export type ModalShellProps = {
   open: boolean;
@@ -19,7 +19,8 @@ export const ModalShell: React.FC<ModalShellProps> = ({
 }) => {
   if (!open) return null;
 
-  return createPortal(
+  return (
+    <ModalPortal>
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
       <div
         className="rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden border border-white/[0.08]"
@@ -42,7 +43,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
           {footer}
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
+    </ModalPortal>
   );
 };

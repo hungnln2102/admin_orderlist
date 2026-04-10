@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import * as Helpers from "@/lib/helpers";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
@@ -90,8 +91,8 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   ];
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-2" onClick={handleClose}>
         <div
           className="glass-panel-dark border border-white/5 p-5 md:p-6 rounded-[32px] text-white w-full max-w-4xl max-h-[95vh] shadow-2xl overflow-y-auto custom-scroll"
           onClick={(e) => e.stopPropagation()}
@@ -269,7 +270,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
           )}
         </div>
       </div>
-    </>
+    </ModalPortal>
   );
 };
 

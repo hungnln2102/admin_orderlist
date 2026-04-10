@@ -1,39 +1,23 @@
+/**
+ * Scheduler entry — đăng ký cron jobs.
+ * File này có side-effect: khi require() sẽ tự động schedule cron.
+ * Chỉ nên import bởi scheduler process (scheduler.js / scheduler-server.js).
+ * API server dùng SchedulerController → import taskInstances.js trực tiếp.
+ */
 const cron = require("node-cron");
 const logger = require("../utils/logger");
-const config = require("./config");
-const {
-  createUpdateDatabaseTask,
-  getLastRunAt,
-} = require("./tasks/updateDatabaseTask");
-const { createNotifyZeroDaysTask } = require("./tasks/notifyZeroDays");
-const { createNotifyFourDaysTask } = require("./tasks/notifyFourDays");
-const { createRenewAdobeCheckAndNotifyTask } = require("./tasks/renewAdobeCheckAndNotify");
-const { createCleanupExpiredAdobeUsersTask } = require("./tasks/cleanupExpiredAdobeUsers");
 
 const {
-  pool,
+  updateDatabaseTask,
+  notifyZeroDaysRemainingTask,
+  notifyFourDaysRemainingTask,
+  renewAdobeCheckAndNotifyTask,
+  cleanupExpiredAdobeUsersTask,
+  getSchedulerStatus,
   schedulerTimezone,
   cronExpression,
   runOnStart,
-  enableDbBackup,
-  getSqlCurrentDate,
-} = config;
-
-const updateDatabaseTask = createUpdateDatabaseTask(
-  pool,
-  getSqlCurrentDate,
-  enableDbBackup
-);
-const notifyZeroDaysRemainingTask = createNotifyZeroDaysTask(
-  pool,
-  getSqlCurrentDate
-);
-const notifyFourDaysRemainingTask = createNotifyFourDaysTask(
-  pool,
-  getSqlCurrentDate
-);
-const renewAdobeCheckAndNotifyTask = createRenewAdobeCheckAndNotifyTask();
-const cleanupExpiredAdobeUsersTask = createCleanupExpiredAdobeUsersTask();
+} = require("./taskInstances");
 
 const runCronSafe = (source) =>
   updateDatabaseTask(source).catch((err) =>
@@ -113,7 +97,6 @@ cron.schedule(
   { scheduled: true, timezone: schedulerTimezone }
 );
 
-// Check toàn bộ tài khoản Renew Adobe + notify: mỗi giờ (phút 0), theo schedulerTimezone
 cron.schedule(
   "0 * * * *",
   () => {
@@ -130,15 +113,6 @@ logger.info(`[Scheduler] Đã khởi động`, {
   schedulerTimezone,
   runOnStart,
 });
-
-function getSchedulerStatus() {
-  return {
-    timezone: schedulerTimezone,
-    cronExpression,
-    runOnStart,
-    lastRunAt: getLastRunAt(),
-  };
-}
 
 module.exports = {
   updateDatabaseTask,

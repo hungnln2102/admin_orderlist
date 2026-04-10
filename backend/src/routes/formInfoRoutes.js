@@ -12,13 +12,14 @@ const {
   createInput,
   createForm,
 } = require("../controllers/FormDescController");
+const { formIdParam, createFormRules, createInputRules } = require("../validators/formDescValidator");
 
 const router = express.Router();
 
 router.get("/forms", listForms);
 router.get("/inputs", listInputs);
-router.get("/forms/:formId", getFormDetail);
-router.post("/forms", createForm);
-router.post("/inputs", createInput);
+router.get("/forms/:formId", ...formIdParam, getFormDetail);
+router.post("/forms", ...createFormRules, createForm);
+router.post("/inputs", ...createInputRules, createInput);
 
 module.exports = router;

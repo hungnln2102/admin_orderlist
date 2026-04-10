@@ -41,7 +41,6 @@ services:
       - ./backend/.env.docker
     ports:
       - "3001:3001"   # Main API
-      - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
     volumes:
       # Upload ảnh gói (/image_product), ảnh biến thể (/image_variant), ảnh bài viết (/image)
       - backend_product_images:/app/image_product
@@ -49,9 +48,57 @@ services:
       - backend_article_images:/app/image
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   # ==========================================
-  # 3. FRONTEND SERVICE (React + Vite)
+  # 3. WEBHOOK SERVICE (Sepay — tách riêng khỏi API)
+  # ==========================================
+  webhook:
+    container_name: admin_orderlist-webhook
+    build:
+      context: ./backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env.docker
+    command: ["node", "webhook-server.js"]
+    ports:
+      - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================
+  # 4. SCHEDULER SERVICE (Cron jobs — tách riêng khỏi API)
+  # ==========================================
+  scheduler:
+    container_name: admin_orderlist-scheduler
+    build:
+      context: ./backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env.docker
+    command: ["node", "scheduler.js"]
+    networks:
+      - app-network
+
+  # ==========================================
+  # 5. FRONTEND SERVICE (React + Vite)
   # ==========================================
   frontend:
     container_name: admin_orderlist-frontend

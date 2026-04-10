@@ -25,7 +25,7 @@ const buildOrdersListQuery = (scope = "") => {
         .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
         .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`);
 
-    const importPattern = `${ORDER_PREFIXES.nhap}%`;
+    const importPattern = `${ORDER_PREFIXES.import}%`;
 
     if (normalizedScope === "expired") {
         query = query.where(statusCol, STATUS.EXPIRED);

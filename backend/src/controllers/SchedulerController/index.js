@@ -1,4 +1,4 @@
-const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask, renewAdobeCheckAndNotifyTask } = require("../../../scheduler");
+const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask, renewAdobeCheckAndNotifyTask } = require("../../scheduler/taskInstances");
 const logger = require("../../utils/logger");
 const { syncOrdersToMapping } = require("../../services/userAccountMappingService");
 

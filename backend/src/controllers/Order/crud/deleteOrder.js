@@ -8,10 +8,11 @@ const { nextId } = require("../../../services/idService");
 const { deleteOrderWithArchive } = require("../orderDeletionService");
 const logger = require("../../../utils/logger");
 
+const { orderIdParam } = require("../../../validators/orderValidator");
+
 const attachDeleteOrderRoute = (router) => {
-    router.delete("/:id", async (req, res) => {
+    router.delete("/:id", ...orderIdParam, async (req, res) => {
         const id = Number(req.params.id);
-        if (!id) return res.status(400).json({ error: "ID không hợp lệ." });
 
         const trx = await db.transaction();
         try {

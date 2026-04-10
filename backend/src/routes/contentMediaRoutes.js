@@ -30,13 +30,11 @@ const buildArticleImageUrl = (req, fileName) => {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype || !file.mimetype.startsWith("image/")) {
-      return cb(new Error("Chỉ cho phép file ảnh."));
-    }
-    if (file.mimetype === "image/svg+xml") {
-      return cb(new Error("Không hỗ trợ SVG; vui lòng dùng JPG, PNG hoặc WebP."));
+    const allowed = ["image/jpeg", "image/webp"];
+    if (!file.mimetype || !allowed.includes(file.mimetype)) {
+      return cb(new Error("Chỉ cho phép ảnh JPEG hoặc WebP (tối đa 2 MB)."));
     }
     return cb(null, true);
   },

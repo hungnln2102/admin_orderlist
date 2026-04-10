@@ -1,6 +1,7 @@
 const { db } = require("../../../../db");
 const { quoteIdent } = require("../../../../utils/sql");
 const logger = require("../../../../utils/logger");
+const { pricingCache } = require("../../../../utils/cache");
 const { isVariantReferencedByOrders } = require("../../../../services/orderReferenceCheck");
 const { supplyPriceCols, TABLES } = require("../../constants");
 
@@ -34,6 +35,7 @@ const deleteProductPrice = async (req, res) => {
     if (!result.rowCount && (!result.rows || !result.rows.length)) {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
+    pricingCache.clear();
     res.json({ success: true, id: parsedId });
   } catch (error) {
     logger.error("Delete failed (DELETE /api/product-prices/:productId)", {

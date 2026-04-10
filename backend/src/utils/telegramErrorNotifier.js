@@ -1,7 +1,12 @@
 /**
- * Telegram Error Notifier
- * Sends error-level logs to a Telegram topic for real-time monitoring.
- * Each error = 1 concise message.
+ * Telegram Error / Warning Notifier
+ * Gửi error + warn đến Telegram topic để theo dõi real-time.
+ *
+ * Env vars:
+ *   TELEGRAM_BOT_TOKEN          — bot token
+ *   TELEGRAM_CHAT_ID            — group chat id
+ *   ERROR_TOPIC_ID              — topic id cho lỗi (default 6)
+ *   SEND_ERROR_NOTIFICATION     — "false" để tắt (default "true")
  */
 
 const https = require("https");
@@ -9,19 +14,17 @@ const os = require("os");
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
-const ERROR_TOPIC_ID = Number.parseInt(
-  process.env.ERROR_TOPIC_ID || "6",
-  10
-);
+const ERROR_TOPIC_ID = Number.parseInt(process.env.ERROR_TOPIC_ID || "6", 10);
 const ENABLED =
   String(process.env.SEND_ERROR_NOTIFICATION || "true").toLowerCase() !== "false";
 
-// Rate limiting: max 1 message per 2 seconds, queue up to 20
 const RATE_LIMIT_MS = 2000;
-const MAX_QUEUE = 20;
+const MAX_QUEUE = 30;
 let queue = [];
 let sending = false;
 let lastSentAt = 0;
+
+const agent = new https.Agent({ keepAlive: true });
 
 const postToTelegram = (payload) =>
   new Promise((resolve, reject) => {
@@ -36,7 +39,7 @@ const postToTelegram = (payload) =>
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
         },
-        agent: new https.Agent({ keepAlive: true }),
+        agent,
       },
       (res) => {
         let data = "";
@@ -52,23 +55,27 @@ const postToTelegram = (payload) =>
     req.end();
   });
 
-/**
- * Build a concise error message for Telegram
- */
-const buildErrorMessage = ({ message, source, url, method, stack, extra }) => {
+const LEVEL_META = {
+  critical: { icon: "🔴", label: "CRITICAL" },
+  error:    { icon: "🚨", label: "Error" },
+  warn:     { icon: "⚠️", label: "Warning" },
+};
+
+const buildMessage = ({ level = "error", message, source, url, method, stack, extra }) => {
+  const meta = LEVEL_META[level] || LEVEL_META.error;
   const timestamp = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   const hostname = os.hostname();
+  const srcLabel = source === "frontend" ? "Frontend" : "Backend";
 
   const lines = [
-    `🚨 <b>${source === "frontend" ? "Frontend" : "Backend"} Error</b>`,
-    `⏰ ${timestamp}`,
-    `🖥 ${hostname}`,
+    `${meta.icon} <b>${srcLabel} ${meta.label}</b>`,
+    `⏰ ${timestamp}  🖥 ${hostname}`,
   ];
 
   if (url) lines.push(`📍 ${method ? `${method} ` : ""}${url}`);
-  if (message) lines.push(`💬 <code>${escapeHtml(truncate(message, 200))}</code>`);
-  if (stack) lines.push(`📋 <pre>${escapeHtml(truncate(stack, 300))}</pre>`);
-  if (extra) lines.push(`📎 ${escapeHtml(truncate(String(extra), 150))}`);
+  if (message) lines.push(`💬 <code>${escapeHtml(truncate(message, 300))}</code>`);
+  if (stack) lines.push(`📋 <pre>${escapeHtml(truncate(stack, 400))}</pre>`);
+  if (extra) lines.push(`📎 ${escapeHtml(truncate(String(extra), 200))}`);
 
   return lines.join("\n");
 };
@@ -81,7 +88,7 @@ const escapeHtml = (str) =>
 
 const truncate = (str, max) => {
   const s = String(str || "");
-  return s.length > max ? `${s.slice(0, max)}...` : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 };
 
 const processQueue = async () => {
@@ -91,9 +98,7 @@ const processQueue = async () => {
   while (queue.length > 0) {
     const now = Date.now();
     const wait = RATE_LIMIT_MS - (now - lastSentAt);
-    if (wait > 0) {
-      await new Promise((r) => setTimeout(r, wait));
-    }
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 
     const text = queue.shift();
     try {
@@ -109,7 +114,6 @@ const processQueue = async () => {
       await postToTelegram(payload);
       lastSentAt = Date.now();
     } catch (err) {
-      // Silently fail - we don't want error reporting to cause more errors
       console.error("[ErrorNotifier] Failed to send:", err?.message);
     }
   }
@@ -118,27 +122,27 @@ const processQueue = async () => {
 };
 
 /**
- * Send an error notification to Telegram.
- * Non-blocking, fire-and-forget with rate limiting.
+ * Gửi thông báo đến Telegram. Non-blocking, fire-and-forget.
  *
  * @param {Object} opts
- * @param {string} opts.message - Error message
- * @param {string} [opts.source="backend"] - "backend" or "frontend"
- * @param {string} [opts.url] - Request URL (if applicable)
- * @param {string} [opts.method] - HTTP method (if applicable)
- * @param {string} [opts.stack] - Error stack trace
- * @param {string} [opts.extra] - Any additional info
+ * @param {"critical"|"error"|"warn"} [opts.level="error"]
+ * @param {string} opts.message
+ * @param {string} [opts.source="backend"]
+ * @param {string} [opts.url]
+ * @param {string} [opts.method]
+ * @param {string} [opts.stack]
+ * @param {string} [opts.extra]
  */
-const notifyError = (opts = {}) => {
+const notify = (opts = {}) => {
   if (!ENABLED || !BOT_TOKEN || !CHAT_ID) return;
-
-  const text = buildErrorMessage(opts);
-
-  if (queue.length >= MAX_QUEUE) {
-    queue.shift(); // Drop oldest if queue is full
-  }
+  const text = buildMessage(opts);
+  if (queue.length >= MAX_QUEUE) queue.shift();
   queue.push(text);
   processQueue();
 };
 
-module.exports = { notifyError };
+const notifyError = (opts = {}) => notify({ level: "error", ...opts });
+const notifyWarn  = (opts = {}) => notify({ level: "warn", ...opts });
+const notifyCritical = (opts = {}) => notify({ level: "critical", ...opts });
+
+module.exports = { notify, notifyError, notifyWarn, notifyCritical };

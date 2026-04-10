@@ -39,6 +39,7 @@ const {
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
+  PRICING_TIER_SCHEMA,
 } = require("./dbSchema/schemas/ordersProductPartner");
 const {
   RENEW_ADOBE_SCHEMA,
@@ -81,4 +82,5 @@ module.exports = {
   PARTNER_SCHEMA,
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
+  PRICING_TIER_SCHEMA,
 };

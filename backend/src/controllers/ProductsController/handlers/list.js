@@ -7,10 +7,12 @@ const {
   productDescCols,
   supplyPriceCols,
   TABLES,
+  MARGIN_PIVOT_SQL,
 } = require("../constants");
 const { quoteIdent } = require("../../../utils/sql");
 const { mapProductPriceRow } = require("../mappers");
 const logger = require("../../../utils/logger");
+const { pricingCache } = require("../../../utils/cache");
 
 /**
  * GET /api/products/packages
@@ -100,38 +102,41 @@ const listProducts = async (_req, res) => {
 
 const listProductPrices = async (_req, res) => {
   try {
-    const query = `
-      SELECT
-        v.id AS id,
-        v.${quoteIdent(variantCols.displayName)} AS id_product,
-        v.${quoteIdent(variantCols.displayName)} AS san_pham,
-        v.${quoteIdent(variantCols.variantName)} AS package_product,
-        p.${quoteIdent(productSchemaCols.packageName)} AS package,
-        v.${quoteIdent(variantCols.imageUrl)} AS image_url,
-        p.${quoteIdent(productSchemaCols.imageUrl)} AS package_image_url,
-        v.${quoteIdent(variantCols.basePrice)} AS base_price,
-        v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
-        v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
-        v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
-        v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
-        v.${quoteIdent(variantCols.isActive)} AS is_active,
-        v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
-        v.${quoteIdent(variantCols.updatedAt)} AS update,
-        spagg.max_supply_price AS max_supply_price
-      FROM ${TABLES.variant} v
-      LEFT JOIN ${TABLES.product} p
-        ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
-      LEFT JOIN ${TABLES.productDesc} d
-        ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
-      LEFT JOIN LATERAL (
-        SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
-        FROM ${TABLES.supplyPrice} sp
-        WHERE sp.${quoteIdent(supplyPriceCols.variantId)} = v.id
-      ) spagg ON TRUE
-      ORDER BY v.${quoteIdent(variantCols.displayName)} ASC;
-    `;
-    const result = await db.raw(query);
-    const rows = (result.rows || []).map(mapProductPriceRow);
+    const rows = await pricingCache.getOrSet("all", async () => {
+      const query = `
+        SELECT
+          v.id AS id,
+          v.${quoteIdent(variantCols.displayName)} AS id_product,
+          v.${quoteIdent(variantCols.displayName)} AS san_pham,
+          v.${quoteIdent(variantCols.variantName)} AS package_product,
+          p.${quoteIdent(productSchemaCols.packageName)} AS package,
+          v.${quoteIdent(variantCols.imageUrl)} AS image_url,
+          p.${quoteIdent(productSchemaCols.imageUrl)} AS package_image_url,
+          v.${quoteIdent(variantCols.basePrice)} AS base_price,
+          margins.pct_ctv,
+          margins.pct_khach,
+          margins.pct_promo,
+          margins.pct_stu,
+          v.${quoteIdent(variantCols.isActive)} AS is_active,
+          v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
+          v.${quoteIdent(variantCols.updatedAt)} AS update,
+          spagg.max_supply_price AS max_supply_price
+        FROM ${TABLES.variant} v
+        LEFT JOIN ${TABLES.product} p
+          ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
+        LEFT JOIN ${TABLES.productDesc} d
+          ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
+        LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
+          FROM ${TABLES.supplyPrice} sp
+          WHERE sp.${quoteIdent(supplyPriceCols.variantId)} = v.id
+        ) spagg ON TRUE
+        ORDER BY v.${quoteIdent(variantCols.displayName)} ASC;
+      `;
+      const result = await db.raw(query);
+      return (result.rows || []).map(mapProductPriceRow);
+    });
     res.json(rows);
   } catch (error) {
     logger.error("Query failed (GET /api/product-prices)", { error: error.message, stack: error.stack });
@@ -156,10 +161,10 @@ const getProductPriceById = async (req, res) => {
         v.${quoteIdent(variantCols.imageUrl)} AS image_url,
         p.${quoteIdent(productSchemaCols.imageUrl)} AS package_image_url,
         v.${quoteIdent(variantCols.basePrice)} AS base_price,
-        v.${quoteIdent(variantCols.pctCtv)} AS pct_ctv,
-        v.${quoteIdent(variantCols.pctKhach)} AS pct_khach,
-        v.${quoteIdent(variantCols.pctPromo)} AS pct_promo,
-        v.${quoteIdent(variantCols.pctStu)} AS pct_stu,
+        margins.pct_ctv,
+        margins.pct_khach,
+        margins.pct_promo,
+        margins.pct_stu,
         v.${quoteIdent(variantCols.isActive)} AS is_active,
         v.${quoteIdent(variantCols.descVariantId)} AS desc_variant_id,
         v.${quoteIdent(variantCols.updatedAt)} AS update,
@@ -169,6 +174,7 @@ const getProductPriceById = async (req, res) => {
         ON p.${quoteIdent(productSchemaCols.id)} = v.${quoteIdent(variantCols.productId)}
       LEFT JOIN ${TABLES.productDesc} d
         ON d.${quoteIdent(productDescCols.id)} = v.${quoteIdent(variantCols.descVariantId)}
+      LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE
       LEFT JOIN LATERAL (
         SELECT MAX(sp.${quoteIdent(supplyPriceCols.price)}) AS max_supply_price
         FROM ${TABLES.supplyPrice} sp

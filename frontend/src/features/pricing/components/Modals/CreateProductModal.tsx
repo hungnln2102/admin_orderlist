@@ -1,5 +1,6 @@
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import type {
   BankOption,
   CreateProductFormState,
@@ -59,6 +60,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
   if (!isOpen) return null;
 
   return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/50 px-2 py-4 sm:px-4 sm:py-6"
       style={{ zIndex: 9999 }}
@@ -121,6 +123,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

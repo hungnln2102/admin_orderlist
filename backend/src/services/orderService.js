@@ -50,7 +50,7 @@ const createOrder = async (orderData, trx = null) => {
     const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
     const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
     const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
-    const giftPrefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+    const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
     const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
     if (isGiftOrderCreate) {
       payload[priceCol] = 0;

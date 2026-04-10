@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { db } = require("../../db");
 const {
@@ -11,6 +12,48 @@ const logger = require("../../utils/logger");
 
 const USERS_DEF = getDefinition("USERS", ADMIN_SCHEMA);
 const USERS_TABLE = tableName(USERS_DEF.tableName, SCHEMA_ADMIN);
+
+/**
+ * So sánh mật khẩu với hash đã lưu.
+ * - Bcrypt hash ($2a/$2b): dùng bcrypt.compare (timing-safe).
+ * - Legacy plaintext: dùng crypto.timingSafeEqual để tránh timing attack.
+ *   Trả thêm flag `needsUpgrade` để caller tự upgrade lên bcrypt.
+ */
+const verifyPassword = async (inputPassword, storedValue) => {
+  const hashString =
+    storedValue instanceof Buffer
+      ? storedValue.toString()
+      : String(storedValue || "");
+
+  if (hashString.startsWith("$2")) {
+    return { match: await bcrypt.compare(inputPassword, hashString), needsUpgrade: false };
+  }
+
+  if (!hashString) {
+    return { match: false, needsUpgrade: false };
+  }
+
+  const inputBuf = Buffer.from(String(inputPassword));
+  const storedBuf = Buffer.from(hashString);
+  if (inputBuf.length !== storedBuf.length) {
+    return { match: false, needsUpgrade: true };
+  }
+  const match = crypto.timingSafeEqual(inputBuf, storedBuf);
+  return { match, needsUpgrade: match };
+};
+
+const upgradePasswordHash = async (userId, plainPassword) => {
+  try {
+    const userCols = USERS_DEF.columns;
+    const newHash = await bcrypt.hash(String(plainPassword), 10);
+    await db(USERS_TABLE)
+      .where(userCols.id, userId)
+      .update({ [userCols.password]: newHash });
+    logger.warn("[AUTH] Đã tự động upgrade mật khẩu plaintext lên bcrypt", { userId });
+  } catch (err) {
+    logger.error("[AUTH] Không thể upgrade mật khẩu", { userId, error: err.message });
+  }
+};
 
 const SESSION_COOKIE_MS = 1000 * 60 * 60 * 1; // 1 giờ — phiên ngắn
 
@@ -26,22 +69,6 @@ const login = async (req, res) => {
     });
   }
   const normalizedUsername = String(username).trim().toLowerCase();
-
-  // Env-based fallback login
-  const fallbackUser = (process.env.DEFAULT_ADMIN_USER || "")
-    .trim()
-    .toLowerCase();
-  const fallbackPass = (process.env.DEFAULT_ADMIN_PASS || "").trim();
-  if (
-    fallbackUser &&
-    fallbackPass &&
-    normalizedUsername === fallbackUser &&
-    password === fallbackPass
-  ) {
-    applySessionDuration(req);
-    req.session.user = { id: -1, username, role: "admin" };
-    return res.json({ user: req.session.user, fallback: true });
-  }
 
   try {
     const userCols = USERS_DEF.columns;
@@ -59,19 +86,13 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
     }
 
-    const storedHash = user.passwordhash;
-    const hashString =
-      storedHash instanceof Buffer
-        ? storedHash.toString()
-        : String(storedHash || "");
-    let isMatch = false;
-    if (hashString.startsWith("$2")) {
-      isMatch = await bcrypt.compare(password, hashString);
-    } else {
-      isMatch = password === hashString || password === hashString.trim();
-    }
+    const { match: isMatch, needsUpgrade } = await verifyPassword(password, user.passwordhash);
     if (!isMatch) {
       return res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu" });
+    }
+
+    if (needsUpgrade) {
+      await upgradePasswordHash(user.userid, password);
     }
 
     applySessionDuration(req);
@@ -159,19 +180,7 @@ const changePassword = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy tài khoản" });
     }
 
-    const storedHash = user.passwordhash;
-    const hashString =
-      storedHash instanceof Buffer
-        ? storedHash.toString()
-        : String(storedHash || "");
-    let isMatch = false;
-    if (hashString.startsWith("$2")) {
-      isMatch = await bcrypt.compare(currentPassword, hashString);
-    } else {
-      isMatch =
-        currentPassword === hashString || currentPassword === hashString.trim();
-    }
-
+    const { match: isMatch } = await verifyPassword(currentPassword, user.passwordhash);
     if (!isMatch) {
       return res.status(401).json({ error: "Mật khẩu hiện tại không đúng" });
     }

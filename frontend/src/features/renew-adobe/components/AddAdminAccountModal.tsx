@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
   createAdobeAdminAccount,
@@ -126,7 +127,8 @@ export function AddAdminAccountModal({
     "w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30 outline-none";
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
@@ -292,5 +294,6 @@ export function AddAdminAccountModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

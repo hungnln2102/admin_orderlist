@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
   APP_NOTIFICATION_EVENT,
   AppNotificationPayload,
@@ -36,7 +37,8 @@ const AppNotification: React.FC = () => {
       : "from-slate-800/95 via-indigo-900/95 to-slate-950/95 border-white/20";
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 transition-opacity duration-300">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 transition-opacity duration-300">
       <div
         className={`w-full max-w-md mx-4 transform transition-all duration-300 rounded-2xl border ${colorClasses} p-6 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
       >
@@ -57,6 +59,7 @@ const AppNotification: React.FC = () => {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

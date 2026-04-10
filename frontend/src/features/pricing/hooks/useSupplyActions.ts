@@ -10,12 +10,14 @@ interface UseSupplyActionsParams {
   apiBase: string;
   setProductPrices: React.Dispatch<React.SetStateAction<ProductPricingRow[]>>;
   fetchProductPrices: () => Promise<void>;
+  refreshSupplierOptions?: () => Promise<void> | void;
 }
 
 export const useSupplyActions = ({
   apiBase,
   setProductPrices,
   fetchProductPrices,
+  refreshSupplierOptions,
 }: UseSupplyActionsParams) => {
   const priceMapActions = useSupplyPriceMap({
     apiBase,
@@ -57,6 +59,7 @@ export const useSupplyActions = ({
     fetchSupplyPricesForProduct: priceMapActions.fetchSupplyPricesForProduct,
     recomputeProductBasePrice,
     refreshProductPricing,
+    refreshSupplierOptions,
   });
 
   return {

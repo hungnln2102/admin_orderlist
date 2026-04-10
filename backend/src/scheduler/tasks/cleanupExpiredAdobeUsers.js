@@ -148,7 +148,9 @@ function createCleanupExpiredAdobeUsersTask() {
               await db(ACCT_TABLE).where(ACCT.ID, acc[ACCT.ID]).update({
                 [ACCT.ALERT_CONFIG]: result.savedCookies,
               });
-            } catch (_) {}
+            } catch (cookieErr) {
+              logger.warn("[CRON] Account %s: lưu cookies thất bại", acc[ACCT.ID], { error: cookieErr.message });
+            }
           }
           if (result.snapshot && Array.isArray(result.snapshot.manageTeamMembers)) {
             try {
@@ -158,11 +160,15 @@ function createCleanupExpiredAdobeUsersTask() {
                 ...(result.snapshot.licenseStatus != null && { [ACCT.LICENSE_STATUS]: result.snapshot.licenseStatus }),
                 [ACCT.USER_COUNT]: result.snapshot.manageTeamMembers.length,
               });
-            } catch (_) {}
+            } catch (snapErr) {
+              logger.warn("[CRON] Account %s: lưu snapshot thất bại", acc[ACCT.ID], { error: snapErr.message });
+            }
           } else {
             try {
               await runCheckForAccountId(acc[ACCT.ID]);
-            } catch (_) {}
+            } catch (checkErr) {
+              logger.warn("[CRON] Account %s: runCheck thất bại", acc[ACCT.ID], { error: checkErr.message });
+            }
           }
 
           // Delay giữa các account để tránh rate limit

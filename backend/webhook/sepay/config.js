@@ -1,7 +1,6 @@
 /* Shared Sepay webhook configuration and DB handles */
 require("dotenv").config();
 
-const { Pool } = require("pg");
 const {
   tableName,
   getDefinition,
@@ -42,12 +41,7 @@ const TELEGRAM_TOPIC_ID = Number.parseInt(
 const SEND_RENEWAL_TO_TOPIC =
   String(process.env.SEND_RENEWAL_TO_TOPIC || "true").toLowerCase() !== "false";
 
-// Postgres pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 5,
-  idleTimeoutMillis: 30_000,
-});
+const { pool } = require("../../src/config/database");
 
 // --------------------------------
 // GET table and column definitions

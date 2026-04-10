@@ -1,3 +1,4 @@
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import type { Supply } from "../types";
 
 type DeleteSupplyModalProps = {
@@ -18,7 +19,8 @@ export function DeleteSupplyModal({
   }
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-in fade-in">
       <div className="glass-panel-dark rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-rose-500/20 animate-in zoom-in-95 duration-300">
         <h3 className="text-2xl font-bold text-rose-500 mb-2 tracking-tight">
           Xóa Nhà Cung Cấp?
@@ -43,5 +45,6 @@ export function DeleteSupplyModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

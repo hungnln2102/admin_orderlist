@@ -1,4 +1,5 @@
 import React from "react";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import { getCategoryVisualStyle } from "../utils/categoryColors";
 
@@ -33,7 +34,8 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
     : { backgroundColor: "rgba(148, 163, 184, 0.25)" };
 
   return (
-    <div className="fixed inset-0 z-70 flex items-start justify-center bg-black/50 px-4 py-8">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/50 px-4 py-8">
       <div className="w-full max-w-xl rounded-2xl bg-[#0b1220] border border-white/10 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <h2 className="text-lg font-semibold text-white">Tạo danh mục mới</h2>
@@ -114,5 +116,6 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 };

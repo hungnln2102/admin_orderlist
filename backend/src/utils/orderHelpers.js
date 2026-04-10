@@ -3,15 +3,32 @@
  * Used by Order controller, Dashboard, webhook/sepay.
  */
 
+const { getPrefixMap } = require("../services/pricing/tierCache");
+
+/**
+ * Hardcode fallback — dùng khi tierCache chưa load xong (module init time).
+ * Sau khi DB sẵn sàng, tất cả callers nên dùng getPrefixMap() async.
+ */
 const ORDER_PREFIXES = {
   ctv: "MAVC",
-  le: "MAVL",
-  khuyen: "MAVK",
-  tang: "MAVT",
-  nhap: "MAVN",
-  sinhvien: "MAVS",
-  thuong: "MAVT",
+  customer: "MAVL",
+  promo: "MAVK",
+  gift: "MAVT",
+  import: "MAVN",
+  student: "MAVS",
 };
+
+/**
+ * Async version — đọc từ DB pricing_tier (cached 10 phút).
+ * Caller nên dùng hàm này thay vì ORDER_PREFIXES trực tiếp.
+ */
+async function getOrderPrefixes() {
+  try {
+    return await getPrefixMap();
+  } catch {
+    return ORDER_PREFIXES;
+  }
+}
 
 function monthsFromString(text) {
   if (!text || typeof text !== "string") return 0;
@@ -127,20 +144,21 @@ function calculatePeriods() {
 
 /** Đơn mã MAVN (nhập hàng): không ghi nhận công nợ / thanh toán NCC (payment_supply). */
 function isMavnImportOrder(row) {
-  const prefix = String(ORDER_PREFIXES.nhap || "MAVN").toUpperCase();
+  const prefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
   const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
   return Boolean(prefix && code.startsWith(prefix));
 }
 
 /** Đơn quà tặng (MAVT): giá bán = 0, vào thẳng Đang xử lý + cộng nhập NCC khi tạo. */
 function isGiftOrder(row) {
-  const prefix = String(ORDER_PREFIXES.tang || "MAVT").toUpperCase();
+  const prefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
   const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
   return Boolean(prefix && code.startsWith(prefix));
 }
 
 module.exports = {
   ORDER_PREFIXES,
+  getOrderPrefixes,
   monthsFromString,
   daysFromMonths,
   roundGiaBanValue,

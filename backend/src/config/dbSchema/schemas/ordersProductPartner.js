@@ -100,10 +100,6 @@ const PRODUCT_SCHEMA = {
       /** Ảnh hiển thị gói (ưu tiên trước ảnh product). */
       IMAGE_URL: "image_url",
       BASE_PRICE: "base_price",
-      PCT_CTV: "pct_ctv",
-      PCT_KHACH: "pct_khach",
-      PCT_PROMO: "pct_promo",
-      PCT_STU: "pct_stu",
     },
   },
   /** Alias bảng product.desc_variant (nội dung mô tả dùng chung). */
@@ -177,8 +173,34 @@ const PARTNER_SCHEMA = {
   SUPPLIER_COST: SUPPLIER_COST_DEF,
 };
 
+const PRICING_TIER_SCHEMA = {
+  PRICING_TIER: {
+    TABLE: "pricing_tier",
+    COLS: {
+      ID: "id",
+      KEY: "key",
+      PREFIX: "prefix",
+      LABEL: "label",
+      PRICING_RULE: "pricing_rule",
+      BASE_TIER_KEY: "base_tier_key",
+      SORT_ORDER: "sort_order",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+    },
+  },
+  VARIANT_MARGIN: {
+    TABLE: "variant_margin",
+    COLS: {
+      VARIANT_ID: "variant_id",
+      TIER_ID: "tier_id",
+      MARGIN_RATIO: "margin_ratio",
+    },
+  },
+};
+
 module.exports = {
   ORDERS_SCHEMA,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
+  PRICING_TIER_SCHEMA,
 };

@@ -229,8 +229,8 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       fallbackCost: giaNhapCu,
       fallbackPrice: giaBanCu,
       forceKhachLe:
-        Boolean(ORDER_PREFIXES?.khuyen) &&
-        orderCode.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase()),
+        Boolean(ORDER_PREFIXES?.promo) &&
+        orderCode.toUpperCase().startsWith(ORDER_PREFIXES.promo.toUpperCase()),
     });
     const pricingMeta = pricing.meta;
     const pctCtvNormalized = pricingMeta?.pctCtv ?? 0;
@@ -591,17 +591,16 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
       return { price: fallbackPrice, cost: fallbackCost };
     }
 
+    // Luồng thông báo đơn đến hạn (4 ngày):
+    // - Đơn MAVK: pct_promo có giá trị -> báo giá promo; pct_promo trống -> báo giá khách lẻ.
+    // => Không force khách lẻ ở đây, để pricing core tự quyết theo pct_promo.
     const { pricing } = await calculateRenewalPricing(client, {
       sanPham,
       supplierId,
       orderCode: String(orderRow?.[ORDER_COLS.idOrder] || ""),
       fallbackCost: giaNhapCu,
       fallbackPrice: giaBanCu,
-      forceKhachLe:
-        Boolean(ORDER_PREFIXES?.khuyen) &&
-        String(orderRow?.[ORDER_COLS.idOrder] || "")
-          .toUpperCase()
-          .startsWith(ORDER_PREFIXES.khuyen.toUpperCase()),
+      forceKhachLe: false,
     });
     return { price: pricing.price, cost: pricing.cost };
     /* legacy pricing path removed
@@ -625,8 +624,8 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
     // Gói khuyến mãi (MAVK) hết hạn → thông báo theo giá khách lẻ
     const idOrderForPrice = String(orderRow?.[ORDER_COLS.idOrder] || "");
     const isPromoOrderForPrice =
-      Boolean(ORDER_PREFIXES?.khuyen) &&
-      idOrderForPrice.toUpperCase().startsWith(ORDER_PREFIXES.khuyen.toUpperCase());
+      Boolean(ORDER_PREFIXES?.promo) &&
+      idOrderForPrice.toUpperCase().startsWith(ORDER_PREFIXES.promo.toUpperCase());
     const finalGiaBanRaw = calcGiaBan({
       orderId: idOrderForPrice,
       giaNhap: latestGiaNhap,

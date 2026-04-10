@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import GradientButton from "@/components/ui/GradientButton";
@@ -72,8 +73,9 @@ function AddCoinModal({
   };
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -141,6 +143,7 @@ function AddCoinModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

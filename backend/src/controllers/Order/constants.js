@@ -7,6 +7,7 @@ const {
     SCHEMA_SUPPLIER_COST,
     PRODUCT_SCHEMA,
     PARTNER_SCHEMA,
+    PRICING_TIER_SCHEMA,
 } = require("../../config/dbSchema");
 const { STATUS } = require("../../utils/statuses");
 
@@ -17,6 +18,8 @@ const TABLES = {
     supplierCost: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_SUPPLIER_COST),
     variant: tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT),
     product: tableName(PRODUCT_SCHEMA.PRODUCT.TABLE, SCHEMA_PRODUCT),
+    variantMargin: tableName(PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE, SCHEMA_PRODUCT),
+    pricingTier: tableName(PRICING_TIER_SCHEMA.PRICING_TIER.TABLE, SCHEMA_PRODUCT),
 };
 
 const COLS = {

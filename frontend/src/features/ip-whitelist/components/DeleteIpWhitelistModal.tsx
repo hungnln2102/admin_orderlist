@@ -1,3 +1,4 @@
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import type { IpWhitelistItem } from "../types";
 
@@ -21,8 +22,9 @@ export function DeleteIpWhitelistModal({
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -70,5 +72,6 @@ export function DeleteIpWhitelistModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import ReactDOM from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 import * as Helpers from '@/lib/helpers';
 
 interface AddGoalModalProps {
@@ -75,8 +75,9 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
 
   if (!isOpen) return null;
 
-  const modalContent = (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  return (
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="relative w-full max-w-md mx-4 rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 p-6 shadow-2xl">
         {/* Close button */}
         <button
@@ -151,7 +152,6 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
-
-  return ReactDOM.createPortal(modalContent, document.body);
 };

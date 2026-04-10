@@ -5,6 +5,7 @@ const {
 } = require("../../../../utils/normalizers");
 const logger = require("../../../../utils/logger");
 const { mapProductPriceRow } = require("../../mappers");
+const { pricingCache, supplierCache } = require("../../../../utils/cache");
 const { ensureSupplyRecord, upsertSupplyPrice } = require("../../finders");
 const {
   productSchemaCols,
@@ -13,6 +14,7 @@ const {
   productDescCols,
   TABLES,
 } = require("../../constants");
+const { getTiers } = require("../../../../services/pricing/tierCache");
 const {
   fetchVariantView,
   hasProductCategoryColor,
@@ -136,13 +138,27 @@ const createProductPrice = async (req, res) => {
               [variantCols.isActive]: isActive,
               [variantCols.descVariantId]: descVariantId,
               [variantCols.basePrice]: basePriceVal,
-              [variantCols.pctCtv]: pctCtvVal,
-              [variantCols.pctKhach]: pctKhachVal,
-              [variantCols.pctPromo]: pctPromoVal,
-              [variantCols.pctStu]: pctStuVal,
             })
             .returning("id");
           const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;
+
+          const tiers = await getTiers();
+          const marginEntries = [
+            { key: "ctv", value: pctCtvVal },
+            { key: "customer", value: pctKhachVal },
+            { key: "promo", value: pctPromoVal },
+            { key: "student", value: pctStuVal },
+          ];
+          for (const { key, value } of marginEntries) {
+            if (value == null) continue;
+            const tier = tiers.find((t) => t.key === key);
+            if (!tier) continue;
+            await trx(TABLES.variantMargin).insert({
+              variant_id: variantId,
+              tier_id: tier.id,
+              margin_ratio: value,
+            });
+          }
 
           if (Array.isArray(suppliers) && suppliers.length) {
             for (const supplier of suppliers) {
@@ -182,6 +198,8 @@ const createProductPrice = async (req, res) => {
       throw lastError;
     }
 
+    pricingCache.clear();
+    supplierCache.clear();
     const viewRow = await fetchVariantView(inserted);
     res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
   } catch (error) {

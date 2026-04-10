@@ -9,6 +9,7 @@ const {
 } = require("../../SuppliesController/helpers");
 const { updateOrderCostsOnSupplyPriceChange } = require("../../../services/updateOrderCostsOnSupplyPriceChange");
 const logger = require("../../../utils/logger");
+const { pricingCache, supplierCache } = require("../../../utils/cache");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;
@@ -86,8 +87,8 @@ const updateSupplyPriceForProduct = async (req, res) => {
   const { price } = req.body || {};
   try {
     const result = await upsertSupplyPrice({ productId }, sourceId, price);
-    
-    // Auto-update order costs for PROCESSING and UNPAID orders
+    pricingCache.clear();
+
     try {
       const updateResult = await updateOrderCostsOnSupplyPriceChange(
         Number(productId),
@@ -131,13 +132,18 @@ const createSupplyPriceForProduct = async (req, res) => {
     if (!Number.isFinite(parsedProductId) || parsedProductId <= 0) {
       return res.status(400).json({ error: "ID sản phẩm không hợp lệ." });
     }
-    const resolvedSourceId = Number.isFinite(Number(sourceId))
-      ? Number(sourceId)
+    const parsedSourceId = Number(sourceId);
+    const hasValidSourceId =
+      Number.isFinite(parsedSourceId) && parsedSourceId > 0;
+    const resolvedSourceId = hasValidSourceId
+      ? parsedSourceId
       : await ensureSupplyRecord(sourceName, numberBank, binBank);
-    if (!resolvedSourceId) {
+    if (!Number.isFinite(Number(resolvedSourceId)) || Number(resolvedSourceId) <= 0) {
       return res.status(400).json({ error: "Nhà cung cấp bị thiếu hoặc không hợp lệ." });
     }
     const result = await upsertSupplyPrice({ productId: parsedProductId }, resolvedSourceId, price);
+    pricingCache.clear();
+    supplierCache.clear();
     res.status(201).json({
       productId: result.productId,
       sourceId: result.supplierId,
@@ -168,6 +174,7 @@ const deleteSupplyPriceForProduct = async (req, res) => {
     `,
       [parsedProductId, parsedSourceId]
     );
+    pricingCache.clear();
     res.json({ success: true });
   } catch (error) {
     logger.error("Delete failed (DELETE /api/products/:productId/suppliers/:sourceId)", { productId, sourceId, error: error.message, stack: error.stack });

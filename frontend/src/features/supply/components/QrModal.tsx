@@ -1,5 +1,6 @@
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { QrPayment } from "../hooks/usePayments";
 
 interface Props {
@@ -11,7 +12,8 @@ const QrModal: React.FC<Props> = ({ payment, onClose }) => {
   if (!payment) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md px-4 animate-in fade-in" onClick={onClose}>
+    <ModalPortal>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md px-4 animate-in fade-in" onClick={onClose}>
       <div
         className="glass-panel-dark text-white rounded-[32px] border border-white/10 shadow-2xl p-8 w-full max-w-sm animate-in zoom-in-95 duration-300"
         onClick={(e) => e.stopPropagation()}
@@ -41,6 +43,7 @@ const QrModal: React.FC<Props> = ({ payment, onClose }) => {
         </p>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

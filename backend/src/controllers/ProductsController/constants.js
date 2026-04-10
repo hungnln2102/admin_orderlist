@@ -6,6 +6,7 @@ const {
   SCHEMA_SUPPLIER_COST,
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
+  PRICING_TIER_SCHEMA,
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 
@@ -35,7 +36,25 @@ const TABLES = {
   productDesc: tableName(PRODUCT_DESC_DEF.tableName, SCHEMA_PRODUCT),
   supplyPrice: tableName(SUPPLIER_COST_DEF.tableName, SCHEMA_SUPPLIER_COST),
   supply: tableName(SUPPLIER_DEF.tableName, SCHEMA_SUPPLIER),
+  pricingTier: tableName(PRICING_TIER_SCHEMA.PRICING_TIER.TABLE, SCHEMA_PRODUCT),
+  variantMargin: tableName(PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE, SCHEMA_PRODUCT),
 };
+
+/**
+ * SQL fragment: pivot variant_margin rows into pct_ctv / pct_khach / pct_promo / pct_stu columns.
+ * Usage: `LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE`
+ * Produces: margins.pct_ctv, margins.pct_khach, margins.pct_promo, margins.pct_stu
+ */
+const MARGIN_PIVOT_SQL = `
+  SELECT
+    MAX(CASE WHEN pt.key = 'ctv'      THEN vm.margin_ratio END) AS pct_ctv,
+    MAX(CASE WHEN pt.key = 'customer'  THEN vm.margin_ratio END) AS pct_khach,
+    MAX(CASE WHEN pt.key = 'promo'     THEN vm.margin_ratio END) AS pct_promo,
+    MAX(CASE WHEN pt.key = 'student'   THEN vm.margin_ratio END) AS pct_stu
+  FROM ${tableName(PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE, SCHEMA_PRODUCT)} vm
+  JOIN ${tableName(PRICING_TIER_SCHEMA.PRICING_TIER.TABLE, SCHEMA_PRODUCT)} pt ON pt.id = vm.tier_id
+  WHERE vm.variant_id = v.id
+`;
 
 module.exports = {
   PRODUCT_DEF,
@@ -55,4 +74,5 @@ module.exports = {
   supplyCols,
   TABLES,
   QUOTED_COLS,
+  MARGIN_PIVOT_SQL,
 };

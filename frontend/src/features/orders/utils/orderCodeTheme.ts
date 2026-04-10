@@ -62,7 +62,7 @@ const ORDER_CODE_THEMES: Record<OrderCodePrefix, OrderCodeTheme> = {
       "bg-sky-500/[0.07] border-sky-300/10 group-hover:bg-sky-500/[0.1]",
     priceTextClass: "text-sky-100",
   },
-  [ORDER_CODE_PREFIXES.RETAIL]: {
+  [ORDER_CODE_PREFIXES.CUSTOMER]: {
     rowSurfaceClass:
       "!border-fuchsia-300/18 !bg-fuchsia-500/[0.12] group-hover/row:!border-fuchsia-200/35 group-hover/row:!bg-fuchsia-500/[0.17]",
     expandablePanelClass: "!border-fuchsia-300/24 !bg-fuchsia-500/[0.1]",

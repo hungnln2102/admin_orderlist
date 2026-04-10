@@ -157,7 +157,7 @@ export default function BillOrder() {
       } else if (orderType === ORDER_CODE_PREFIXES.GIFT) {
         unitPrice = 0;
       } else if (
-        orderType === ORDER_CODE_PREFIXES.RETAIL ||
+        orderType === ORDER_CODE_PREFIXES.CUSTOMER ||
         orderType === ORDER_CODE_PREFIXES.PROMO
       ) {
         unitPrice = retailPrice;

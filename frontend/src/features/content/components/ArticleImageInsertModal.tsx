@@ -6,7 +6,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { createPortal } from "react-dom";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { uploadArticleImage } from "@/features/content/api/contentMediaApi";
 
@@ -75,9 +75,10 @@ export function ArticleImageInsertModal({ isOpen, onClose, onInsert }: ArticleIm
 
   if (!isOpen) return null;
 
-  return createPortal(
+  return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/65 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/65 backdrop-blur-sm px-4"
       role="presentation"
       onClick={onClose}
     >
@@ -109,7 +110,7 @@ export function ArticleImageInsertModal({ isOpen, onClose, onInsert }: ArticleIm
         <input
           ref={fileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif"
+          accept="image/jpeg,image/webp"
           className="sr-only"
           onChange={handleFileChange}
           disabled={uploading}
@@ -163,7 +164,7 @@ export function ArticleImageInsertModal({ isOpen, onClose, onInsert }: ArticleIm
           </div>
         </form>
       </div>
-    </div>,
-    document.body
+    </div>
+    </ModalPortal>
   );
 }
