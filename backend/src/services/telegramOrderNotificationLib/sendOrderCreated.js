@@ -73,12 +73,17 @@ async function sendOrderCreatedNotification(order) {
 
   if (!caption) return;
 
-  const makePayload = (includeTopic = true, includeButtons = true) => {
+  const makePayload = ({
+    includeTopic,
+    includeButtons,
+    includePhoto = true,
+  }) => {
+    const usePhoto = includePhoto !== false && !!qrUrl;
     const payload = {
       chat_id: TELEGRAM_CHAT_ID,
       parse_mode: "HTML",
     };
-    if (qrUrl) {
+    if (usePhoto) {
       payload.photo = qrUrl;
       payload.caption = caption;
     } else {
@@ -101,24 +106,26 @@ async function sendOrderCreatedNotification(order) {
   };
 
   await sendWithRetry({
-    buildPayload: ({ includeTopic, includeButtons }) =>
-      makePayload(includeTopic, includeButtons),
+    buildPayload: ({ includeTopic, includeButtons, includePhoto }) =>
+      makePayload({ includeTopic, includeButtons, includePhoto }),
     sendFn: async (payload) => {
-      if (qrUrl) {
+      if (payload.photo) {
         await sendTelegramPhoto(payload);
       } else {
         await sendTelegramMessage(payload);
       }
     },
-    maxAttempts: 3,
+    maxAttempts: 5,
     enableCopyButtonRetry: true,
+    enablePhotoRetry: Boolean(qrUrl),
     log: {
-      sending: ({ attempt, includeTopic, includeButtons }) =>
+      sending: ({ attempt, includeTopic, includeButtons, includePhoto }) =>
         logger.info("[Order][Telegram] Sending notification", {
           attempt,
           hasQrUrl: !!qrUrl,
           includeTopic,
           includeButtons,
+          includePhoto,
           orderCode,
         }),
       success: ({ attempt }) =>
@@ -126,6 +133,8 @@ async function sendOrderCreatedNotification(order) {
           orderCode,
           attempt,
         }),
+      retryNoPhoto: () =>
+        logger.info("[Order][Telegram] Retrying as text (QR photo URL failed)"),
       attemptFailed: ({ attempt, error, status, body }) =>
         logger.warn("[Order][Telegram] Send attempt failed", {
           attempt,

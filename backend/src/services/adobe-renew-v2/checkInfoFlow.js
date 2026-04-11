@@ -8,22 +8,54 @@ const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = requir
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
+/** Giống add/delete users flow: trang users thật thường là /{orgId}@AdobeOrg/users */
+function buildAdminUsersUrl(orgId) {
+  const id = orgId && String(orgId).trim();
+  if (id) return `https://adminconsole.adobe.com/${id}@AdobeOrg/users`;
+  return ADMIN_USERS;
+}
+
+function isAdminConsoleUsersPath(url) {
+  if (!url || typeof url !== "string") return false;
+  if (!/adminconsole\.adobe\.com/i.test(url)) return false;
+  return (
+    url.includes("@AdobeOrg/users") ||
+    /\/users(?:\/|$|\?|#)/i.test(url)
+  );
+}
+
+const USERS_READY_SELECTOR = [
+  '[data-testid^="member-email-"]',
+  '[data-testid="table"]',
+  '[role="grid"] [role="row"][data-key]',
+  '[role="rowgroup"] [role="row"]',
+  '[aria-label="Người dùng"]',
+  '[aria-label="Users"]',
+  '[role="grid"] [role="row"]',
+  "table tbody tr",
+].join(", ");
+
 /** Chờ trang users adminconsole load xong (bảng hoặc member-email xuất hiện) trước khi scrape. */
-async function waitForUsersPageReady(page, timeoutMs = 20000) {
+async function waitForUsersPageReady(page, timeoutMs = 40000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const url = page.url();
-    if (!url.includes("adminconsole.adobe.com") || !url.includes("/users")) {
-      await page.waitForTimeout(1500);
+    if (!isAdminConsoleUsersPath(url)) {
+      await page.waitForTimeout(1200);
       continue;
     }
-    const ready = await page.locator('[data-testid="table"], [data-testid^="member-email-"]').first().waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+    const ready = await page
+      .locator(USERS_READY_SELECTOR)
+      .first()
+      .waitFor({ state: "visible", timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
     if (ready) {
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1800);
       logger.info("[adobe-v2] B13: Trang users đã load xong");
       return;
     }
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1200);
   }
   logger.warn("[adobe-v2] B13: Timeout chờ trang users (vẫn scrape thử)");
 }
@@ -83,12 +115,25 @@ async function runB10ToB13(page, options = {}) {
   products = productResult.products || [];
   license_status = productResult.license_status || "unknown";
 
-  logger.info("[adobe-v2] B13: adminconsole/users");
-  await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
-  await page.waitForLoadState("networkidle", { timeout: 12000 }).catch(() => {});
-  await waitForUsersPageReady(page, 20000);
-  const usersUrl = page.url();
-  if (!usersUrl.includes("adminconsole.adobe.com") || !usersUrl.includes("/users")) {
+  const usersUrlPrimary = buildAdminUsersUrl(orgId);
+  logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
+
+  await page
+    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: 35000 })
+    .catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 18000 }).catch(() => {});
+  await waitForUsersPageReady(page, 40000);
+
+  let usersUrl = page.url();
+  if (orgId && !isAdminConsoleUsersPath(usersUrl)) {
+    logger.info("[adobe-v2] B13: Không ở route users sau goto org — thử /users gốc (redirect Adobe)");
+    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 35000 }).catch(() => {});
+    await page.waitForLoadState("networkidle", { timeout: 18000 }).catch(() => {});
+    await waitForUsersPageReady(page, 25000);
+    usersUrl = page.url();
+  }
+
+  if (!isAdminConsoleUsersPath(usersUrl)) {
     logger.warn("[adobe-v2] B13: URL đã đổi sau khi load (redirect?), url=%s", usersUrl.slice(0, 100));
   }
   if (!orgId) orgId = extractOrgIdFromUrl(page.url());

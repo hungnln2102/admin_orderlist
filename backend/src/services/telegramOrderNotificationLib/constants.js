@@ -12,8 +12,9 @@ const TELEGRAM_ORDER_TOPIC_ID = Number.parseInt(
 );
 const SEND_ORDER_NOTIFICATION =
   String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
+/** Gửi đơn mới vào topic forum (message_thread_id). Tách khỏi SEND_ORDER_NOTIFICATION. */
 const SEND_ORDER_TO_TOPIC =
-  String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
+  String(process.env.SEND_ORDER_TO_TOPIC ?? "true").toLowerCase() !== "false";
 
 const QR_ACCOUNT_NUMBER = process.env.ORDER_QR_ACCOUNT_NUMBER || "9183400998";
 const QR_BANK_CODE = process.env.ORDER_QR_BANK_CODE || "VPB";

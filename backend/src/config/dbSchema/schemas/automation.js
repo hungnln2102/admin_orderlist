@@ -52,6 +52,22 @@ const KEY_ACTIVE_SCHEMA = {
       SYSTEM_CODE: "system_code",
     },
   },
+  /** Key kích hoạt ánh xạ orders.order_list (FK order_list_id); expires_at đồng bộ expired_at. */
+  ORDER_LIST_KEYS: {
+    TABLE: "order_list_keys",
+    COLS: {
+      ID: "id",
+      ORDER_LIST_ID: "order_list_id",
+      ID_ORDER: "id_order",
+      KEY_HASH: "key_hash",
+      KEY_HINT: "key_hint",
+      EXPIRES_AT: "expires_at",
+      SYSTEM_CODE: "system_code",
+      STATUS: "status",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
   SYSTEMS: {
     TABLE: "systems",
     COLS: {

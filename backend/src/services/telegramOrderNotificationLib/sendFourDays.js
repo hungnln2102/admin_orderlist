@@ -93,18 +93,21 @@ async function sendFourDaysRemainingNotification(orders = []) {
     };
 
     await sendWithRetry({
-      buildPayload: ({ includeTopic }) =>
-        qrUrl ? buildPhotoPayload(includeTopic) : buildTextPayload(includeTopic),
+      buildPayload: ({ includeTopic, includePhoto = true }) =>
+        qrUrl && includePhoto
+          ? buildPhotoPayload(includeTopic)
+          : buildTextPayload(includeTopic),
       sendFn: async (payload) => {
-        if (qrUrl) {
+        if (payload.photo) {
           await sendTelegramPhoto(payload);
         } else {
           await sendTelegramMessage(payload);
         }
       },
-      maxAttempts: 3,
+      maxAttempts: 5,
+      enablePhotoRetry: Boolean(qrUrl),
       log: {
-        sending: ({ attempt, includeTopic }) =>
+        sending: ({ attempt, includeTopic, includePhoto }) =>
           logger.info("[Order][Telegram] Sending due order notification", {
             attempt,
             orderIndex: index,
@@ -112,6 +115,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
             orderCode,
             hasQrUrl: !!qrUrl,
             includeTopic,
+            includePhoto,
           }),
         success: ({ attempt }) =>
           logger.info("[Order][Telegram] Due order notification sent successfully", {
@@ -131,6 +135,8 @@ async function sendFourDaysRemainingNotification(orders = []) {
           }),
         retryNoTopic: () =>
           logger.info("[Order][Telegram] Retrying without topic ID"),
+        retryNoPhoto: () =>
+          logger.info("[Order][Telegram] Retrying due order as text (QR photo failed)"),
         permanentFailure: ({ error, stack, status, body }) =>
           logger.error("[Order][Telegram] Send failed permanently for order", {
             orderIndex: index,

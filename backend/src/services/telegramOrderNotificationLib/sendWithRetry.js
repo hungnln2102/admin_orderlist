@@ -3,7 +3,11 @@
  * optional copy-button errors → retry without buttons.
  */
 
-const { isThreadError, isCopyButtonError } = require("./errorHelpers");
+const {
+  isThreadError,
+  isCopyButtonError,
+  isPhotoSourceError,
+} = require("./errorHelpers");
 
 /**
  * @param {object} options
@@ -12,12 +16,14 @@ const { isThreadError, isCopyButtonError } = require("./errorHelpers");
  * @param {object} [options.context] Reserved for call sites (closures carry per-send data; this is unused by the helper).
  * @param {number} [options.maxAttempts=3]
  * @param {boolean} [options.enableCopyButtonRetry=false] When true, isCopyButtonError clears reply_markup path.
+ * @param {boolean} [options.enablePhotoRetry=false] When true, isPhotoSourceError → gửi lại dạng text (không photo URL).
  * @param {object} [options.log]
  * @param {(fields: { attempt: number, includeTopic: boolean, includeButtons: boolean }) => void} [options.log.sending]
  * @param {(fields: { attempt: number, includeTopic: boolean, includeButtons: boolean }) => void} [options.log.success]
  * @param {(fields: { attempt: number, error?: string, status?: number, body?: unknown }) => void} [options.log.attemptFailed]
  * @param {() => void} [options.log.retryNoTopic]
  * @param {() => void} [options.log.retryNoButtons]
+ * @param {() => void} [options.log.retryNoPhoto]
  * @param {(fields: { error?: string, stack?: string, status?: number, body?: unknown }) => void} [options.log.permanentFailure]
  * @param {() => void} [options.log.finalNotSent] Called once if sent is still false after the loop.
  * @returns {Promise<{ sent: boolean }>}
@@ -28,12 +34,14 @@ async function sendWithRetry({
   context,
   maxAttempts = 3,
   enableCopyButtonRetry = false,
+  enablePhotoRetry = false,
   log = {},
 }) {
   void context;
 
   let includeTopic = true;
   let includeButtons = true;
+  let includePhoto = true;
   let sent = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -42,13 +50,19 @@ async function sendWithRetry({
         attempt: attempt + 1,
         includeTopic,
         includeButtons,
+        includePhoto,
       });
-      const payload = buildPayload({ includeTopic, includeButtons });
+      const payload = buildPayload({
+        includeTopic,
+        includeButtons,
+        includePhoto,
+      });
       await sendFn(payload);
       log.success?.({
         attempt: attempt + 1,
         includeTopic,
         includeButtons,
+        includePhoto,
       });
       sent = true;
       break;
@@ -69,6 +83,11 @@ async function sendWithRetry({
       if (enableCopyButtonRetry && includeButtons && isCopyButtonError(err)) {
         log.retryNoButtons?.();
         includeButtons = false;
+        adjusted = true;
+      }
+      if (enablePhotoRetry && includePhoto && isPhotoSourceError(err)) {
+        log.retryNoPhoto?.();
+        includePhoto = false;
         adjusted = true;
       }
 

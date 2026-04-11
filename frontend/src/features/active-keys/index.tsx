@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
-import type { ActiveKeyItem } from "./types";
+import type { ActiveKeyItem, CreateKeySuccessPayload } from "./types";
 import { ActiveKeyRow } from "./components/ActiveKeyRow";
 import { ActiveKeyCard } from "./components/ActiveKeyCard";
 import { CreateKeyModal } from "./components/CreateKeyModal";
@@ -17,6 +17,7 @@ export default function ActiveKeys() {
   const [productPage, setProductPage] = useState(1);
   const [keys, setKeys] = useState<ActiveKeyItem[]>([]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [plainKeyBanner, setPlainKeyBanner] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,13 +52,18 @@ export default function ActiveKeys() {
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return keys;
     const q = searchTerm.trim().toLowerCase();
-    return keys.filter(
-      (item) =>
+    return keys.filter((item) => {
+      const st = (item.status || "").toLowerCase();
+      const sys = (item.systemName || "").toLowerCase();
+      return (
         item.account.toLowerCase().includes(q) ||
         item.product.toLowerCase().includes(q) ||
         item.key.toLowerCase().includes(q) ||
-        item.expiry.toLowerCase().includes(q)
-    );
+        item.expiry.toLowerCase().includes(q) ||
+        st.includes(q) ||
+        sys.includes(q)
+      );
+    });
   }, [searchTerm, keys]);
 
   const totalKeyItems = filtered.length;
@@ -97,9 +103,13 @@ export default function ActiveKeys() {
     console.log("Edit", item);
   };
 
-  const handleCreateSuccess = (item: ActiveKeyItem) => {
+  const handleCreateSuccess = ({
+    item,
+    plainKey,
+  }: CreateKeySuccessPayload) => {
     setKeys((prev) => [item, ...prev]);
     setCreateModalOpen(false);
+    setPlainKeyBanner(plainKey);
   };
 
   return (
@@ -128,6 +138,40 @@ export default function ActiveKeys() {
         onClose={() => setCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
       />
+
+      {plainKeyBanner && (
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p>
+            <span className="font-semibold text-emerald-300">Key vừa tạo</span>{" "}
+            (chỉ hiện một lần — hãy lưu hoặc sao chép):
+            <span className="ml-2 font-mono text-white break-all">
+              {plainKeyBanner}
+            </span>
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(plainKeyBanner);
+                } catch {
+                  /* ignore */
+                }
+              }}
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/90 hover:bg-white/10"
+              onClick={() => setPlainKeyBanner(null)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
         <div className="relative w-full max-w-md">

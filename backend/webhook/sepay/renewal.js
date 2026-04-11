@@ -1,4 +1,8 @@
-const { monthsFromString, ORDER_PREFIXES } = require("../../helpers");
+const {
+  monthsFromString,
+  ORDER_PREFIXES,
+  isMavnImportOrder,
+} = require("../../helpers");
 const {
   pool,
   ORDER_TABLE,
@@ -264,12 +268,19 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       }
     }
 
-    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0) {
+    const isMavn = isMavnImportOrder({ id_order: orderCode });
+    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0 && !isMavn) {
       try {
         await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {
         logger.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp", { orderCode, error: balanceErr.message, stack: balanceErr.stack });
       }
+    } else if (isMavn && supplierId && finalGiaNhap > 0) {
+      logger.info("[Renewal] Bỏ cộng công nợ NCC (đơn MAVN nhập hàng)", {
+        orderCode,
+        supplierId,
+        finalGiaNhap,
+      });
     }
 
     const details = {

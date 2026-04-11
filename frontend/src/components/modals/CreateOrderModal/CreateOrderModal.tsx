@@ -116,7 +116,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       }
       return value !== ORDER_CODE_PREFIXES.PROMO;
     });
-  }, [hasPromoPrice]);
+  }, [hasPromoPrice, orderCodeOptions]);
 
   useEffect(() => {
     if (hasPromoPrice && customerType === ORDER_CODE_PREFIXES.CUSTOMER) {

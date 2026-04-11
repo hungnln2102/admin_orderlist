@@ -109,17 +109,22 @@ try {
 
   const extractPayload = (info) => {
     const splat = info[splatKey]?.[0] || {};
+    const status = info.status ?? info.statusCode ?? splat.status;
+    const body = info.body ?? splat.body;
+    const extraParts = [];
+    if (status != null) extraParts.push(`HTTP ${status}`);
+    if (body != null && String(body).trim()) {
+      const b = String(body).replace(/\s+/g, " ").trim();
+      extraParts.push(b.length > 320 ? `${b.slice(0, 320)}…` : b);
+    }
+    if (!extraParts.length && splat.error) extraParts.push(String(splat.error));
     return {
       message: info.message,
       source: "backend",
       url: info.url || splat.url,
       method: info.method || splat.method,
       stack: info.stack || splat.stack,
-      extra: info.statusCode
-        ? `Status: ${info.statusCode}`
-        : splat.error
-          ? String(splat.error)
-          : undefined,
+      extra: extraParts.length ? extraParts.join(" — ") : undefined,
     };
   };
 
