@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type React from "react";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type {
   CreateProductFormState,
@@ -23,7 +24,6 @@ import { useProductReferenceOptions } from "./useProductReferenceOptions";
 import { useProductStatusActions } from "./useProductStatusActions";
 
 interface UseProductActionsParams {
-  apiBase: string;
   productPrices: ProductPricingRow[];
   setProductPrices: React.Dispatch<React.SetStateAction<ProductPricingRow[]>>;
   fetchProductPrices: () => Promise<void>;
@@ -38,7 +38,6 @@ interface UseProductActionsParams {
 }
 
 export const useProductActions = ({
-  apiBase,
   productPrices,
   setProductPrices,
   fetchProductPrices,
@@ -79,7 +78,6 @@ export const useProductActions = ({
   }, [productPrices]);
 
   const referenceOptions = useProductReferenceOptions({
-    apiBase,
     isCreateModalOpen,
   });
   const deleteActions = useDeleteProductActions({
@@ -88,7 +86,6 @@ export const useProductActions = ({
     setUpdatedTimestampMap,
   });
   const statusActions = useProductStatusActions({
-    apiBase,
     statusOverrides,
     setStatusOverrides,
     updatedTimestampMap,
@@ -145,8 +142,8 @@ export const useProductActions = ({
     setProductEditError(null);
 
     try {
-      const response = await fetch(
-        `${apiBase}${API_ENDPOINTS.PRODUCT_PRICE_DETAIL(editingProductId)}`,
+      const response = await apiFetch(
+        API_ENDPOINTS.PRODUCT_PRICE_DETAIL(editingProductId),
         {
           method: "PATCH",
           headers: {
@@ -162,7 +159,6 @@ export const useProductActions = ({
             pctPromo: validation.nextPctPromo,
             pctStu: validation.nextPctStu,
           }),
-          credentials: "include",
         }
       );
       const rawBody = await response.text();
@@ -311,13 +307,12 @@ export const useProductActions = ({
     setCreateError(null);
 
     try {
-      const response = await fetch(`${apiBase}${API_ENDPOINTS.PRODUCT_PRICES}`, {
+      const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(validation.payload),
-        credentials: "include",
       });
       const rawBody = await response.text();
       const payload = parseJsonResponseText(rawBody);

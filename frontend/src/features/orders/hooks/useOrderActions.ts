@@ -7,13 +7,11 @@ import {
   VIRTUAL_FIELDS,
   Order,
 } from "@/constants";
-import { API_BASE_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
 import { parseErrorResponse } from "../utils/ordersHelpers";
 import type { EditableOrder } from "../types";
-
-const API_BASE = API_BASE_URL;
 
 export type OrderActionsDeps = {
   fetchOrders: () => Promise<void>;
@@ -53,10 +51,9 @@ export function useOrderActions(deps: OrderActionsDeps) {
       closeCreateModal();
 
       try {
-        const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`, {
+        const response = await apiFetch(API_ENDPOINTS.ORDERS, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify(newOrderData),
         });
         if (!response.ok) {
@@ -110,12 +107,11 @@ export function useOrderActions(deps: OrderActionsDeps) {
 
       if (!payload) return;
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(order.id)}`,
+        const response = await apiFetch(
+          API_ENDPOINTS.ORDER_BY_ID(order.id),
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify(payload),
           }
         );
@@ -151,12 +147,11 @@ export function useOrderActions(deps: OrderActionsDeps) {
       setRenewingOrderCode(orderCode);
 
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.ORDER_RENEW(orderCode)}`,
+        const response = await apiFetch(
+          API_ENDPOINTS.ORDER_RENEW(orderCode),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ forceRenewal: true }),
           }
         );
@@ -196,12 +191,11 @@ export function useOrderActions(deps: OrderActionsDeps) {
     async (order: Order) => {
       if (!order || !order.id) return;
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.ORDER_CANCELED_REFUND(order.id)}`,
+        const response = await apiFetch(
+          API_ENDPOINTS.ORDER_CANCELED_REFUND(order.id),
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
           }
         );
         if (!response.ok) {
@@ -245,12 +239,11 @@ export function useOrderActions(deps: OrderActionsDeps) {
       };
 
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(Number(updatedOrder.id))}`,
+        const response = await apiFetch(
+          API_ENDPOINTS.ORDER_BY_ID(Number(updatedOrder.id)),
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify(dbFields),
           }
         );
@@ -280,12 +273,11 @@ export function useOrderActions(deps: OrderActionsDeps) {
     closeModal();
 
     try {
-      const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id)}`,
+      const response = await apiFetch(
+        API_ENDPOINTS.ORDER_BY_ID(orderToDelete.id),
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({
             can_hoan: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],
             gia_tri_con_lai: orderToDelete[VIRTUAL_FIELDS.GIA_TRI_CON_LAI],

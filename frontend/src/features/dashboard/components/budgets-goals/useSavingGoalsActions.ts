@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { apiFetch } from "@/lib/api";
 import { showAppNotification } from "@/lib/notifications";
 import type { Goal } from "./types";
 
@@ -25,7 +26,7 @@ export const useSavingGoalsActions = ({
 
       try {
         const updates = [
-          fetch(`/api/saving-goals/${currentGoal.id}/priority`, {
+          apiFetch(`/api/saving-goals/${currentGoal.id}/priority`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ priority: newPriority }),
@@ -39,7 +40,7 @@ export const useSavingGoalsActions = ({
               : conflictingGoal.priority + 1;
 
           updates.push(
-            fetch(`/api/saving-goals/${conflictingGoal.id}/priority`, {
+            apiFetch(`/api/saving-goals/${conflictingGoal.id}/priority`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ priority: conflictingNewPriority }),
@@ -65,7 +66,7 @@ export const useSavingGoalsActions = ({
   const handleDelete = useCallback(
     async (goalId: number) => {
       try {
-        const response = await fetch(`/api/saving-goals/${goalId}`, {
+        const response = await apiFetch(`/api/saving-goals/${goalId}`, {
           method: "DELETE",
         });
 

@@ -4,7 +4,6 @@ import {
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import { API_BASE_URL } from "../../../../lib/api";
 import * as Helpers from "../../../../lib/helpers";
 import { CustomerType, Order, UseCreateOrderLogicResult } from "../types";
 import { useOrderFormState } from "./useOrderFormState";
@@ -15,8 +14,6 @@ import { usePriceCalculation } from "./usePriceCalculation";
 import { useProductSelection } from "./useProductSelection";
 import { useSuppliesData } from "./useSuppliesData";
 import { useSupplySelection } from "./useSupplySelection";
-
-const API_BASE = API_BASE_URL;
 
 export const useCreateOrderLogic = (
   isOpen: boolean,
@@ -46,7 +43,7 @@ export const useCreateOrderLogic = (
     fetchAllSupplies,
     fetchSuppliesByProduct,
     fetchAllSupplyPrices,
-  } = useSuppliesData(API_BASE);
+  } = useSuppliesData();
 
   const productName = formData[ORDER_FIELDS.ID_PRODUCT] as string;
   const orderPrefix = formData[ORDER_FIELDS.ID_ORDER] as string;

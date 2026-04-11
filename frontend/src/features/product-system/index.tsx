@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
-import { API_BASE_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 
 export type ProductSystemRow = {
@@ -24,9 +24,7 @@ const SYSTEM_CODES = [
 ] as const;
 
 function fetchProductSystem(): Promise<ProductSystemRow[]> {
-  return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM}`, {
-    credentials: "include",
-  })
+  return apiFetch(API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM)
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText || "Lỗi tải danh sách");
       return res.json();
@@ -35,9 +33,7 @@ function fetchProductSystem(): Promise<ProductSystemRow[]> {
 }
 
 function fetchVariants(): Promise<VariantOption[]> {
-  return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_VARIANTS}`, {
-    credentials: "include",
-  })
+  return apiFetch(API_ENDPOINTS.RENEW_ADOBE_VARIANTS)
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText || "Lỗi tải danh sách variant");
       return res.json();
@@ -82,9 +78,8 @@ export default function ProductSystem() {
     setFormError(null);
     setAdding(true);
     try {
-      const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM}`, {
+      const res = await apiFetch(API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ variant_id: variantId, system_code: formSystemCode.trim() }),
       });
@@ -114,9 +109,9 @@ export default function ProductSystem() {
     if (deleteId !== null) return;
     setDeleteId(id);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM_DELETE(id)}`,
-        { method: "DELETE", credentials: "include" }
+      const res = await apiFetch(
+        API_ENDPOINTS.RENEW_ADOBE_PRODUCT_SYSTEM_DELETE(id),
+        { method: "DELETE" }
       );
       if (res.ok) {
         setRows((prev) => prev.filter((r) => r.id !== id));

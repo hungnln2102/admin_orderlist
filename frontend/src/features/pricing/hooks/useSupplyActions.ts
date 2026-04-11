@@ -7,20 +7,17 @@ import { useNewSupplyRowActions } from "./useNewSupplyRowActions";
 import { useSupplyPriceMap } from "./useSupplyPriceMap";
 
 interface UseSupplyActionsParams {
-  apiBase: string;
   setProductPrices: React.Dispatch<React.SetStateAction<ProductPricingRow[]>>;
   fetchProductPrices: () => Promise<void>;
   refreshSupplierOptions?: () => Promise<void> | void;
 }
 
 export const useSupplyActions = ({
-  apiBase,
   setProductPrices,
   fetchProductPrices,
   refreshSupplierOptions,
 }: UseSupplyActionsParams) => {
   const priceMapActions = useSupplyPriceMap({
-    apiBase,
     setProductPrices,
   });
 
@@ -46,7 +43,6 @@ export const useSupplyActions = ({
   }, [fetchProductPrices]);
 
   const existingSupplyActions = useExistingSupplyRowActions({
-    apiBase,
     setSupplyPriceMap: priceMapActions.setSupplyPriceMap,
     fetchSupplyPricesForProduct: priceMapActions.fetchSupplyPricesForProduct,
     recomputeProductBasePrice,
@@ -54,7 +50,6 @@ export const useSupplyActions = ({
   });
 
   const newSupplyActions = useNewSupplyRowActions({
-    apiBase,
     setSupplyPriceMap: priceMapActions.setSupplyPriceMap,
     fetchSupplyPricesForProduct: priceMapActions.fetchSupplyPricesForProduct,
     recomputeProductBasePrice,

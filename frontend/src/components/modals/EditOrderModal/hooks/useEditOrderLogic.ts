@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_ENDPOINTS, ORDER_FIELDS } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
-import { API_BASE_URL } from "../../../../lib/api";
+import { apiFetch } from "@/lib/api";
 import { Order, Supply, SupplyPrice } from "../types";
 import { getSupplyName } from "../utils";
-
-const API_BASE = API_BASE_URL;
 
 export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<Order | null>(null);
@@ -49,9 +47,8 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       return merged;
     }
     try {
-      const response = await fetch(
-        `${API_BASE}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)}`,
-        { credentials: "include" }
+      const response = await apiFetch(
+        API_ENDPOINTS.SUPPLIES_BY_PRODUCT(productName)
       );
       if (!response.ok) throw new Error("Lỗi tải danh sách nguồn.");
       const data: Supply[] = await response.json();
@@ -73,11 +70,8 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         return [];
       }
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(
-            productName
-          )}`,
-          { credentials: "include" }
+        const response = await apiFetch(
+          API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(productName)
         );
         if (!response.ok) throw new Error("Lỗi tải danh sách giá nguồn.");
         const data: SupplyPrice[] = await response.json();

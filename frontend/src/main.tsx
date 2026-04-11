@@ -1,12 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { apiFetch } from "@/lib/api";
 
-// Global error reporting to Telegram
 const reportError = (message: string, stack?: string) => {
   try {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001';
-    fetch(`${apiBase}/api/error-report`, {
+    apiFetch('/api/error-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, stack, url: window.location.href }),

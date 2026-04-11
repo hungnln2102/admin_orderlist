@@ -358,20 +358,23 @@
 
 ---
 
-### TASK-020: Centralize frontend API client
+### TASK-020: Centralize frontend API client [DONE]
 
 - **Mức độ:** 🟡 Trung bình
-- **Files:** `frontend/src/lib/api.ts`, `frontend/src/shared/api/client.ts`
-- **Vấn đề:** Một số feature dùng `apiFetch`, số khác dùng `axios` trực tiếp.
-- **Cách sửa:**
-  - [ ] 1 instance `axios` duy nhất với interceptors (auth, error, CSRF token)
-  - [ ] Interceptor response: nếu 401 → redirect login
-  - [ ] Interceptor response: nếu 500 → toast notification
-  - [ ] Thay tất cả `fetch` / `axios.create()` riêng lẻ
-- **Ước lượng:** 4 giờ
-- **Test:**
-  - [ ] Tất cả API calls hoạt động qua client mới
-  - [ ] Session hết hạn → tự redirect về login
+- **Vấn đề:** ~25 file dùng raw `fetch()` với manual URL, credentials, 401 check riêng lẻ.
+- **Giải pháp:** Nâng cấp `apiFetch` thành client tập trung duy nhất, migrate toàn bộ raw `fetch`.
+- **Chi tiết thay đổi:**
+  - [x] `shared/api/client.ts` — thêm 401 auto-redirect (trừ `/auth/*`), thêm `apiRequest`, `apiGet/Post/Put/Patch/Delete` helpers
+  - [x] `lib/api.ts` — re-export helpers mới
+  - [x] `lib/errorHandler.ts` — xóa `apiFetchWithErrorHandling` (unused, dùng raw fetch thay vì apiFetch)
+  - [x] **Pricing hooks (9 files):** `useProductData`, `useProductActions`, `useProductReferenceOptions`, `useProductStatusActions`, `useSupplyPriceMap`, `useNewSupplyRowActions`, `useExistingSupplyRowActions`, `useSupplyActions`, `usePricingData` — xóa `apiBase` param, dùng `apiFetch`
+  - [x] **Orders hooks (4 files):** `useOrdersFetch`, `useOrderActions`, `useSuppliesData`, `useEditOrderLogic` — migrate sang `apiFetch`, xóa `API_BASE` variable
+  - [x] **Orders caller:** `useCreateOrderLogic` — xóa `API_BASE`, cập nhật `useSuppliesData()` call
+  - [x] **Renew Adobe (5 files):** `renewAdobeApi`, `useRenewAdobeAdmin`, `DeleteUserByEmail`, `AddUserByEmail`, `user-orders/api` — migrate sang `apiFetch`
+  - [x] **Dashboard (2 files):** `AddGoalModal`, `useSavingGoalsActions` — migrate sang `apiFetch`
+  - [x] **Product (2 files):** `productPriceApi` (xóa `resolveApiBase()`), `product-system/index` — migrate sang `apiFetch`
+  - [x] **Misc (5 files):** `bill-order/index` (xóa local `API_BASE`), `ctv-list/index`, `Sidebar` (logout), `main.tsx`, `ErrorBoundary` — migrate sang `apiFetch`
+- **Kết quả:** 0 raw `fetch()` còn lại (trừ internal `apiFetch`), 0 `credentials: "include"` trùng lặp, TypeScript build pass
 
 ---
 

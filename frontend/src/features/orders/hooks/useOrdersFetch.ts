@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ORDER_DATASET_CONFIG, Order, OrderDatasetKey } from "@/constants";
-import { API_BASE_URL } from "@/lib/api";
-
-const API_BASE = API_BASE_URL;
+import { apiFetch } from "@/lib/api";
 
 export function useOrdersFetch(dataset: OrderDatasetKey) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -12,13 +10,7 @@ export function useOrdersFetch(dataset: OrderDatasetKey) {
     try {
       setFetchError(null);
       const endpoint = ORDER_DATASET_CONFIG[dataset].endpoint;
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        credentials: "include",
-      });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
+      const response = await apiFetch(endpoint);
       if (!response.ok) {
         throw new Error(`Lỗi máy chủ: ${response.status}`);
       }

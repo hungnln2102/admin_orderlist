@@ -12,6 +12,7 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
+  PRICING_TIER_SCHEMA,
 } = require("../../src/config/dbSchema");
 
 const SEPAY_WEBHOOK_PATH = "/api/payment/notify";
@@ -79,6 +80,14 @@ const PAYMENT_SUPPLY_TABLE = tableName(
   PAYMENT_SUPPLY_DEF.tableName,
   SCHEMA_PARTNER
 );
+const VARIANT_MARGIN_TABLE = tableName(
+  PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE,
+  SCHEMA_PRODUCT
+);
+const PRICING_TIER_TABLE = tableName(
+  PRICING_TIER_SCHEMA.PRICING_TIER.TABLE,
+  SCHEMA_PRODUCT
+);
 
 module.exports = {
   // Env/config
@@ -105,4 +114,6 @@ module.exports = {
   SUPPLIER_TABLE,
   SUPPLIER_COST_TABLE,
   PAYMENT_SUPPLY_TABLE,
+  VARIANT_MARGIN_TABLE,
+  PRICING_TIER_TABLE,
 };

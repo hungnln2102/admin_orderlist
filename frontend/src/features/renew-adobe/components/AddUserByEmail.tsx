@@ -4,8 +4,8 @@
  */
 
 import { useMemo, useState } from "react";
-import { API_BASE_URL } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
+import { apiFetch } from "@/lib/api";
 
 export type AddUserByEmailProps = {
   onAdded?: () => void;
@@ -45,12 +45,10 @@ export function AddUserByEmail({ onAdded }: AddUserByEmailProps) {
     setLastExceeded(null);
     setLoading(true);
 
-    const url = `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS_ADD_USERS_BATCH}`;
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS_ADD_USERS_BATCH, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ userEmails: emails }),
       });
       const data = await res.json();

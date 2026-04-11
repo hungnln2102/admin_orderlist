@@ -13,6 +13,8 @@ const {
   VARIANT_TABLE,
   SUPPLIER_TABLE,
   SUPPLIER_COST_TABLE,
+  VARIANT_MARGIN_TABLE,
+  PRICING_TIER_TABLE,
 } = require("./config");
 
 const stripAccents = (value) =>
@@ -70,7 +72,11 @@ const normalizeAmount = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const safeIdent = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
+const safeIdent = (value) => {
+  const ident = String(value ?? "").trim();
+  if (!ident) throw new Error(`safeIdent: received empty/undefined column name`);
+  return `"${ident.replace(/"/g, '""')}"`;
+};
 
 const normalizeProductDuration = (text = "") =>
   String(text || "")
@@ -341,27 +347,40 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
     };
   }
 
+  const marginPivot = `
+    SELECT
+      MAX(CASE WHEN pt.${safeIdent("key")} = 'ctv'      THEN vm.${safeIdent("margin_ratio")} END) AS pct_ctv,
+      MAX(CASE WHEN pt.${safeIdent("key")} = 'customer'  THEN vm.${safeIdent("margin_ratio")} END) AS pct_khach,
+      MAX(CASE WHEN pt.${safeIdent("key")} = 'promo'     THEN vm.${safeIdent("margin_ratio")} END) AS pct_promo,
+      MAX(CASE WHEN pt.${safeIdent("key")} = 'student'   THEN vm.${safeIdent("margin_ratio")} END) AS pct_stu
+    FROM ${VARIANT_MARGIN_TABLE} vm
+    JOIN ${PRICING_TIER_TABLE} pt ON pt.${safeIdent("id")} = vm.${safeIdent("tier_id")}
+    WHERE vm.${safeIdent("variant_id")} = v.${safeIdent(VARIANT_COLS.id)}
+  `;
+
   const byVariantId = Number.isFinite(Number(productNameOrVariantId)) && Number(productNameOrVariantId) > 0;
   const variantSql = byVariantId
     ? `
     SELECT
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
-      v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
-      v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
-      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo,
-      v.${safeIdent(VARIANT_COLS.pctStu)} AS pct_stu
+      margins.pct_ctv,
+      margins.pct_khach,
+      margins.pct_promo,
+      margins.pct_stu
     FROM ${VARIANT_TABLE} AS v
+    LEFT JOIN LATERAL (${marginPivot}) margins ON TRUE
     WHERE v.${safeIdent(VARIANT_COLS.id)} = $1
     LIMIT 1
   `
     : `
     SELECT
       v.${safeIdent(VARIANT_COLS.id)} AS variant_id,
-      v.${safeIdent(VARIANT_COLS.pctCtv)} AS pct_ctv,
-      v.${safeIdent(VARIANT_COLS.pctKhach)} AS pct_khach,
-      v.${safeIdent(VARIANT_COLS.pctPromo)} AS pct_promo,
-      v.${safeIdent(VARIANT_COLS.pctStu)} AS pct_stu
+      margins.pct_ctv,
+      margins.pct_khach,
+      margins.pct_promo,
+      margins.pct_stu
     FROM ${VARIANT_TABLE} AS v
+    LEFT JOIN LATERAL (${marginPivot}) margins ON TRUE
     WHERE v.${safeIdent(VARIANT_COLS.displayName)} = $1
     LIMIT 1
   `;

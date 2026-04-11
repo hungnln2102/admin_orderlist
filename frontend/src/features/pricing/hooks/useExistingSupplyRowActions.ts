@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type React from "react";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type { ProductPricingRow, SupplyPriceState } from "../types";
 import {
@@ -15,7 +16,6 @@ import {
 } from "./supplyActionHelpers";
 
 interface UseExistingSupplyRowActionsParams {
-  apiBase: string;
   setSupplyPriceMap: React.Dispatch<
     React.SetStateAction<Record<string, SupplyPriceState>>
   >;
@@ -28,7 +28,6 @@ interface UseExistingSupplyRowActionsParams {
 }
 
 export function useExistingSupplyRowActions({
-  apiBase,
   setSupplyPriceMap,
   fetchSupplyPricesForProduct,
   recomputeProductBasePrice,
@@ -109,15 +108,14 @@ export function useExistingSupplyRowActions({
     setSavingSupplyRows((prev) => ({ ...prev, [rowKey]: true }));
 
     try {
-      const response = await fetch(
-        `${apiBase}${API_ENDPOINTS.UPDATE_SUPPLY_PRICE(productId, sourceId)}`,
+      const response = await apiFetch(
+        API_ENDPOINTS.UPDATE_SUPPLY_PRICE(productId, sourceId),
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ price: validation.parsedPrice }),
-          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);
@@ -185,11 +183,10 @@ export function useExistingSupplyRowActions({
     let shouldRecomputeBase = false;
 
     try {
-      const response = await fetch(
-        `${apiBase}${API_ENDPOINTS.DELETE_SUPPLY_PRICE(productId, sourceId)}`,
+      const response = await apiFetch(
+        API_ENDPOINTS.DELETE_SUPPLY_PRICE(productId, sourceId),
         {
           method: "DELETE",
-          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);

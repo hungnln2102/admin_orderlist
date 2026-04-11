@@ -10,20 +10,6 @@ import { useProductData } from "./useProductData";
 import { useProductActions } from "./useProductActions";
 import { useSupplyActions } from "./useSupplyActions";
 
-type ImportMetaEnv = {
-  env?: {
-    VITE_API_BASE_URL?: string;
-  };
-};
-
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as unknown as ImportMetaEnv).env?.VITE_API_BASE_URL) ||
-  (typeof process !== "undefined"
-    ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
-    : "") ||
-  "http://localhost:3001";
-
 export const usePricingData = () => {
   const {
     searchTerm,
@@ -49,10 +35,9 @@ export const usePricingData = () => {
     setIsRefreshing,
     fetchProductPrices,
     filteredPricing,
-  } = useProductData(API_BASE);
+  } = useProductData();
 
   const productActions = useProductActions({
-    apiBase: API_BASE,
     productPrices,
     setProductPrices,
     fetchProductPrices,
@@ -62,7 +47,6 @@ export const usePricingData = () => {
     setUpdatedTimestampMap,
   });
   const supplyActions = useSupplyActions({
-    apiBase: API_BASE,
     setProductPrices,
     fetchProductPrices,
     refreshSupplierOptions: productActions.refreshSupplierOptions,

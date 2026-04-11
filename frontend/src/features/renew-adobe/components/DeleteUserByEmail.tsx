@@ -4,8 +4,8 @@
  */
 
 import { useState } from "react";
-import { API_BASE_URL } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
+import { apiFetch } from "@/lib/api";
 
 export type DeleteUserByEmailProps = {
   /** Gọi lại sau khi xóa thành công (vd. refresh danh sách account) */
@@ -29,9 +29,7 @@ export function DeleteUserByEmail({ onDeleted }: DeleteUserByEmailProps) {
     setLoading(true);
 
     const params = new URLSearchParams({ email: trimmed });
-    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_LOOKUP}?${params}`, {
-      credentials: "include",
-    })
+    apiFetch(`${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_LOOKUP}?${params}`)
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
         if (!ok || !data.account) {
@@ -45,12 +43,11 @@ export function DeleteUserByEmail({ onDeleted }: DeleteUserByEmailProps) {
           setLoading(false);
           return;
         }
-        return fetch(
-          `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId)}`,
+        return apiFetch(
+          API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ userEmails: [trimmed] }),
           }
         )

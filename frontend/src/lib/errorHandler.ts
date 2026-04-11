@@ -90,32 +90,3 @@ export function handleNetworkError(error: unknown): string {
   return "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.";
 }
 
-/**
- * Enhanced apiFetch with better error handling
- * Wraps the original apiFetch and provides error parsing
- */
-export async function apiFetchWithErrorHandling(
-  input: string,
-  init?: RequestInit
-): Promise<Response> {
-  try {
-    const response = await fetch(input, {
-      ...init,
-      credentials: init?.credentials ?? "include",
-    });
-    
-    // Handle non-OK responses
-    if (!response.ok) {
-      const errorMessage = await parseApiError(response);
-      throw new Error(errorMessage);
-    }
-    
-    return response;
-  } catch (error) {
-    // Re-throw with better error message if it's a network error
-    if (error instanceof TypeError || (error instanceof Error && error.message.includes("fetch"))) {
-      throw new Error(handleNetworkError(error));
-    }
-    throw error;
-  }
-}

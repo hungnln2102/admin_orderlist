@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import { ProductPricingRow, StatusFilter } from "../types";
 import {
@@ -44,7 +45,7 @@ interface UseProductDataResult {
   filteredPricing: ProductPricingRow[];
 }
 
-export const useProductData = (apiBase: string): UseProductDataResult => {
+export const useProductData = (): UseProductDataResult => {
   const [searchTerm, setSearchTermState] = useState("");
   const [statusFilter, setStatusFilterState] = useState<StatusFilter>("active");
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,13 +78,7 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${apiBase}${API_ENDPOINTS.PRODUCT_PRICES}`, {
-        credentials: "include",
-      });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
+      const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
       if (!response.ok) {
         throw new Error("Không thể tải dữ liệu sản phẩm.");
       }
@@ -122,7 +117,7 @@ export const useProductData = (apiBase: string): UseProductDataResult => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiBase]);
+  }, []);
 
   const searchTokens = useMemo(
     () =>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { apiFetch } from '@/lib/api';
 import * as Helpers from '@/lib/helpers';
 
 interface AddGoalModalProps {
@@ -38,7 +39,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
     setLoading(true);
 
     try {
-      const response = await fetch('/api/saving-goals', {
+      const response = await apiFetch('/api/saving-goals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

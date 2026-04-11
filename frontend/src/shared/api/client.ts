@@ -2,8 +2,6 @@ const isDev =
   typeof import.meta !== "undefined" && (import.meta as any).env?.DEV === true;
 
 const RAW_API_BASE: string = (() => {
-  // Dev: always use same-origin /api via Vite proxy to avoid stale or mismatched
-  // direct backend targets between shells, env files, and browser sessions.
   if (isDev) return "";
 
   const metaBase =
@@ -59,9 +57,17 @@ function captureCsrfToken(res: Response): void {
   if (token) _csrfToken = token;
 }
 
+function handleUnauthorized(input: string, res: Response): void {
+  if (res.status !== 401) return;
+  if (/\/auth\/(login|me|csrf-token)/i.test(input)) return;
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 export async function apiFetch(
   input: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response> {
   const url = buildUrl(input);
   const baseInit: RequestInit = {
@@ -73,18 +79,21 @@ export async function apiFetch(
   try {
     const res = await fetch(url, finalInit);
     captureCsrfToken(res);
+    handleUnauthorized(input, res);
     return res;
   } catch (error) {
     if (!input.startsWith("http")) {
       try {
         const res = await fetch(`http://127.0.0.1:3001${input}`, finalInit);
         captureCsrfToken(res);
+        handleUnauthorized(input, res);
         return res;
       } catch {}
 
       try {
         const res = await fetch(input, finalInit);
         captureCsrfToken(res);
+        handleUnauthorized(input, res);
         return res;
       } catch {}
     }
@@ -92,3 +101,46 @@ export async function apiFetch(
     throw error as Error;
   }
 }
+
+export async function apiRequest<T = unknown>(
+  input: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await apiFetch(input, init);
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = body.error || body.message || message;
+    } catch {}
+    throw Object.assign(new Error(message), { status: res.status });
+  }
+  return res.json();
+}
+
+export const apiGet = <T = unknown>(url: string): Promise<T> =>
+  apiRequest<T>(url);
+
+export const apiPost = <T = unknown>(url: string, data?: unknown): Promise<T> =>
+  apiRequest<T>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: data != null ? JSON.stringify(data) : undefined,
+  });
+
+export const apiPut = <T = unknown>(url: string, data?: unknown): Promise<T> =>
+  apiRequest<T>(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: data != null ? JSON.stringify(data) : undefined,
+  });
+
+export const apiPatch = <T = unknown>(url: string, data?: unknown): Promise<T> =>
+  apiRequest<T>(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: data != null ? JSON.stringify(data) : undefined,
+  });
+
+export const apiDelete = <T = unknown>(url: string): Promise<T> =>
+  apiRequest<T>(url, { method: "DELETE" });

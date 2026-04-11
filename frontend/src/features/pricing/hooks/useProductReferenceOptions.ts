@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type { BankOption, SupplierOption } from "../types";
 import {
@@ -7,7 +8,6 @@ import {
 } from "./productActionHelpers";
 
 interface UseProductReferenceOptionsParams {
-  apiBase: string;
   isCreateModalOpen: boolean;
 }
 
@@ -16,7 +16,6 @@ type LoadSupplierOptionsParams = {
 };
 
 export function useProductReferenceOptions({
-  apiBase,
   isCreateModalOpen,
 }: UseProductReferenceOptionsParams) {
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
@@ -29,9 +28,7 @@ export function useProductReferenceOptions({
     setIsLoadingBanks(true);
 
     try {
-      const response = await fetch(`${apiBase}${API_ENDPOINTS.BANK_LIST}`, {
-        credentials: "include",
-      });
+      const response = await apiFetch(API_ENDPOINTS.BANK_LIST);
       if (!response.ok) {
         throw new Error("Không thể tải danh sách ngân hàng.");
       }
@@ -43,7 +40,7 @@ export function useProductReferenceOptions({
     } finally {
       setIsLoadingBanks(false);
     }
-  }, [apiBase, bankOptions.length, isLoadingBanks]);
+  }, [bankOptions.length, isLoadingBanks]);
 
   const loadSupplierOptions = useCallback(
     async (options: LoadSupplierOptionsParams = {}) => {
@@ -58,9 +55,7 @@ export function useProductReferenceOptions({
       setIsLoadingSuppliers(true);
 
       try {
-        const response = await fetch(`${apiBase}${API_ENDPOINTS.SUPPLIES}`, {
-          credentials: "include",
-        });
+        const response = await apiFetch(API_ENDPOINTS.SUPPLIES);
         if (!response.ok) {
           throw new Error("Không thể tải danh sách NCC.");
         }
@@ -73,7 +68,7 @@ export function useProductReferenceOptions({
         setIsLoadingSuppliers(false);
       }
     },
-    [apiBase, isLoadingSuppliers, supplierOptions.length]
+    [isLoadingSuppliers, supplierOptions.length]
   );
 
   useEffect(() => {

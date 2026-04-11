@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "../../../AuthContext";
 import SidebarAccount from "./SidebarAccount";
 import ChangePasswordModal from "./ChangePasswordModal";
@@ -55,9 +56,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await apiFetch("/api/auth/logout", {
         method: "POST",
-        credentials: "include",
       });
     } catch {
       /* ignore */

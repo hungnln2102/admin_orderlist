@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type React from "react";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type {
   NewSupplyRowState,
@@ -16,7 +17,6 @@ import {
 } from "./supplyActionHelpers";
 
 interface UseNewSupplyRowActionsParams {
-  apiBase: string;
   setSupplyPriceMap: React.Dispatch<
     React.SetStateAction<Record<string, SupplyPriceState>>
   >;
@@ -30,7 +30,6 @@ interface UseNewSupplyRowActionsParams {
 }
 
 export function useNewSupplyRowActions({
-  apiBase,
   setSupplyPriceMap,
   fetchSupplyPricesForProduct,
   recomputeProductBasePrice,
@@ -93,8 +92,8 @@ export function useNewSupplyRowActions({
     }));
 
     try {
-      const response = await fetch(
-        `${apiBase}${API_ENDPOINTS.CREATE_SUPPLY_PRICE(product.id)}`,
+      const response = await apiFetch(
+        API_ENDPOINTS.CREATE_SUPPLY_PRICE(product.id),
         {
           method: "POST",
           headers: {
@@ -105,7 +104,6 @@ export function useNewSupplyRowActions({
             sourceId: validation.resolvedSourceId,
             price: validation.parsedPrice,
           }),
-          credentials: "include",
         }
       );
       const payload = await response.json().catch(() => null);

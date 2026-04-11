@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
-import { API_BASE_URL } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type { CtvItem, CtvStatus } from "./types";
 import { CTV_STATUS_OPTIONS } from "./types";
@@ -54,12 +54,11 @@ export default function CtvList() {
 
   useEffect(() => {
     let cancelled = false;
-    const url = `${API_BASE_URL}${API_ENDPOINTS.CUSTOMER_STATUS}`;
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(url, { credentials: "include" });
+        const res = await apiFetch(API_ENDPOINTS.CUSTOMER_STATUS);
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) {

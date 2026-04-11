@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
-import { API_BASE_URL } from "@/shared/api/client";
+import { apiFetch } from "@/lib/api";
 import { deleteAdobeAdminAccount, fetchAdobeAdminAccounts } from "../api/renewAdobeApi";
 import type { AdobeAdminAccount, LicenseStatus } from "../types";
 
@@ -84,8 +84,8 @@ export function useRenewAdobeAdmin() {
       checkingIds: new Set(),
     });
 
-    const url = `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_CHECK_ALL}`;
-    fetch(url, { credentials: "include", signal: abort.signal })
+    const url = API_ENDPOINTS.RENEW_ADOBE_CHECK_ALL;
+    apiFetch(url, { signal: abort.signal })
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(res.statusText || "Check All thất bại");
@@ -261,12 +261,11 @@ export function useRenewAdobeAdmin() {
       const key = `acc-${accountId}-${userEmail}`;
       setDeletingId(key);
 
-      fetch(
-        `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId)}`,
+      apiFetch(
+        API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_AUTO_DELETE_USERS(accountId),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
           body: JSON.stringify({ userEmails: [userEmail] }),
         }
       )
@@ -295,10 +294,9 @@ export function useRenewAdobeAdmin() {
       setCheckError(null);
       setFixingId(userEmail);
 
-      fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USER}`, {
+      apiFetch(API_ENDPOINTS.RENEW_ADOBE_FIX_USER, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email: userEmail }),
       })
         .then((res) => res.json())
@@ -337,12 +335,11 @@ export function useRenewAdobeAdmin() {
 
       try {
         while (remaining.length > 0) {
-          const res = await fetch(
-            `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_FIX_USERS_ROUND}`,
+          const res = await apiFetch(
+            API_ENDPOINTS.RENEW_ADOBE_FIX_USERS_ROUND,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              credentials: "include",
               body: JSON.stringify({ emails: remaining }),
             }
           );
@@ -405,10 +402,9 @@ export function useRenewAdobeAdmin() {
   );
 
   const handleSaveUrlAccess = useCallback((accountId: number, url: string) => {
-    fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_URL_ACCESS(accountId)}`, {
+    apiFetch(API_ENDPOINTS.RENEW_ADOBE_URL_ACCESS(accountId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ url_access: url }),
     })
       .then((res) => res.json())
@@ -457,10 +453,9 @@ export function useRenewAdobeAdmin() {
       setCheckError(null);
       setCheckingId(account.id);
 
-      fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_CHECK(account.id)}`, {
+      apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_CHECK(account.id), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
       })
         .then((res) => {
           if (!res.ok) {

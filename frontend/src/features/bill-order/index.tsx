@@ -4,6 +4,7 @@ import {
   ORDER_CODE_PREFIXES,
 } from "@/constants";
 import { multiplyValue } from "@/features/pricing/utils";
+import { apiFetch } from "@/lib/api";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
@@ -21,14 +22,6 @@ import {
   resolveOrderType,
   toPositiveNumber,
 } from "./helpers";
-
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as any).env?.VITE_API_BASE_URL) ||
-  (typeof process !== "undefined"
-    ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
-    : "") ||
-  "http://localhost:3001";
 
 export default function BillOrder() {
   useEffect(() => {
@@ -49,9 +42,7 @@ export default function BillOrder() {
 
     const fetchOrders = async () => {
       try {
-        const response = await fetch(`${API_BASE}${API_ENDPOINTS.ORDERS}`, {
-          credentials: "include",
-        });
+        const response = await apiFetch(API_ENDPOINTS.ORDERS);
         if (!response.ok) throw new Error("Failed to load orders");
         const data = await response.json();
         if (isMounted && Array.isArray(data)) {
@@ -64,10 +55,7 @@ export default function BillOrder() {
 
     const fetchProductPrices = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE}${API_ENDPOINTS.PRODUCT_PRICES}`,
-          { credentials: "include" }
-        );
+        const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
         if (!response.ok) throw new Error("Failed to load product pricing");
         const data = await response.json();
         if (isMounted && data?.items && Array.isArray(data.items)) {

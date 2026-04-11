@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { API_BASE_URL } from "@/shared/api/client";
+import { apiFetch } from "@/lib/api";
 import { normalizeAdobeAdminAccount } from "../utils/accountUtils";
 
 export type MailBackupMailboxOption = {
@@ -16,10 +16,10 @@ export function fetchRenewAdobeMailBackupMailboxes(options?: {
   const params = new URLSearchParams();
   if (options?.excludeAssigned) params.set("exclude_assigned", "1");
   const qs = params.toString();
-  const url = `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES}${
+  const url = `${API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES}${
     qs ? `?${qs}` : ""
   }`;
-  return fetch(url, { credentials: "include" }).then(async (res) => {
+  return apiFetch(url).then(async (res) => {
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       const msg =
@@ -43,12 +43,11 @@ export function createRenewAdobeMailBackupMailbox(payload: {
   provider?: string;
   note?: string;
 }): Promise<{ success: boolean; id: number; alias_prefix: string }> {
-  return fetch(
-    `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES}`,
+  return apiFetch(
+    API_ENDPOINTS.RENEW_ADOBE_MAIL_BACKUP_MAILBOXES,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({
         alias_prefix: payload.alias_prefix.trim(),
         ...(payload.email?.trim() ? { email: payload.email.trim() } : {}),
@@ -78,9 +77,7 @@ export function createRenewAdobeMailBackupMailbox(payload: {
 }
 
 export function fetchAdobeAdminAccounts() {
-  return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`, {
-    credentials: "include",
-  })
+  return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS)
     .then((res) => {
       if (!res.ok) {
         throw new Error(res.statusText || "Lỗi tải danh sách");
@@ -93,9 +90,9 @@ export function fetchAdobeAdminAccounts() {
 }
 
 export function deleteAdobeAdminAccount(id: number): Promise<{ success: boolean; id: number }> {
-  return fetch(
-    `${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE(id)}`,
-    { method: "DELETE", credentials: "include" }
+  return apiFetch(
+    API_ENDPOINTS.RENEW_ADOBE_ACCOUNT_DELETE(id),
+    { method: "DELETE" }
   ).then(async (res) => {
     const data = (await res.json().catch(() => ({}))) as {
       error?: string;
@@ -114,10 +111,9 @@ export function createAdobeAdminAccount(payload: {
   password: string;
   mail_backup_id?: number | null;
 }) {
-  return fetch(`${API_BASE_URL}${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}`, {
+  return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
     body: JSON.stringify({
       email: payload.email.trim(),
       password: payload.password,

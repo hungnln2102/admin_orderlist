@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { API_ENDPOINTS } from "../../../../constants";
+import { apiFetch } from "@/lib/api";
 import { Product, Supply, SupplyPrice } from "../types";
 
 type CacheEntry<T> = {
@@ -51,7 +52,7 @@ const fetchCached = async <T,>(
 
 const normalizeKey = (value: string) => value.trim();
 
-export const useSuppliesData = (apiBase: string) => {
+export const useSuppliesData = () => {
   const [allSupplies, setAllSupplies] = useState<Supply[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -60,14 +61,9 @@ export const useSuppliesData = (apiBase: string) => {
   const fetchProducts = useCallback(async (force = false) => {
     try {
       const data = await fetchCached<Product[]>(
-        `products:${apiBase}`,
+        "products",
         async () => {
-          const response = await fetch(
-            `${apiBase}${API_ENDPOINTS.PRODUCT_PRICES}`,
-            {
-              credentials: "include",
-            }
-          );
+          const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
           if (!response.ok) {
             throw new Error("Lỗi tải danh sách sản phẩm.");
           }
@@ -79,19 +75,14 @@ export const useSuppliesData = (apiBase: string) => {
     } catch (error) {
       console.error("Lỗi khi fetch products:", error);
     }
-  }, [apiBase]);
+  }, []);
 
   const fetchAllSupplies = useCallback(async (force = false) => {
     try {
       const data = await fetchCached<Supply[]>(
-        `supplies:${apiBase}`,
+        "supplies",
         async () => {
-          const response = await fetch(
-            `${apiBase}${API_ENDPOINTS.SUPPLIES}`,
-            {
-              credentials: "include",
-            }
-          );
+          const response = await apiFetch(API_ENDPOINTS.SUPPLIES);
           if (!response.ok) {
             throw new Error("Lỗi tải danh sách nguồn.");
           }
@@ -105,7 +96,7 @@ export const useSuppliesData = (apiBase: string) => {
       console.error("Lỗi khi fetch all supplies:", error);
       setAllSupplies([]);
     }
-  }, [apiBase]);
+  }, []);
 
   const fetchSuppliesByProduct = useCallback(
     async (product: string, force = false) => {
@@ -116,11 +107,10 @@ export const useSuppliesData = (apiBase: string) => {
       }
       try {
         const data = await fetchCached<Supply[]>(
-          `suppliesByProduct:${apiBase}:${key}`,
+          `suppliesByProduct:${key}`,
           async () => {
-            const response = await fetch(
-              `${apiBase}${API_ENDPOINTS.SUPPLIES_BY_PRODUCT(key)}`,
-              { credentials: "include" }
+            const response = await apiFetch(
+              API_ENDPOINTS.SUPPLIES_BY_PRODUCT(key)
             );
             if (!response.ok) {
               throw new Error("Lỗi tải danh sách nguồn.");
@@ -135,7 +125,7 @@ export const useSuppliesData = (apiBase: string) => {
         setSupplies(allSupplies);
       }
     },
-    [apiBase, allSupplies]
+    [allSupplies]
   );
 
   const fetchAllSupplyPrices = useCallback(
@@ -147,11 +137,10 @@ export const useSuppliesData = (apiBase: string) => {
       }
       try {
         const data = await fetchCached<SupplyPrice[]>(
-          `supplyPricesByProduct:${apiBase}:${key}`,
+          `supplyPricesByProduct:${key}`,
           async () => {
-            const response = await fetch(
-              `${apiBase}${API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(key)}`,
-              { credentials: "include" }
+            const response = await apiFetch(
+              API_ENDPOINTS.SUPPLY_PRICES_BY_PRODUCT_NAME(key)
             );
             if (!response.ok) {
               throw new Error("Lỗi tính giá nhập của nguồn.");
@@ -166,7 +155,7 @@ export const useSuppliesData = (apiBase: string) => {
         setSupplyPrices([]);
       }
     },
-    [apiBase]
+    []
   );
 
   return {

@@ -1,10 +1,10 @@
 import type React from "react";
 import { showAppNotification } from "@/lib/notifications";
+import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type { ProductPricingRow } from "../types";
 
 interface UseProductStatusActionsParams {
-  apiBase: string;
   statusOverrides: Record<number, boolean>;
   setStatusOverrides: React.Dispatch<
     React.SetStateAction<Record<number, boolean>>
@@ -17,7 +17,6 @@ interface UseProductStatusActionsParams {
 }
 
 export function useProductStatusActions({
-  apiBase,
   statusOverrides,
   setStatusOverrides,
   updatedTimestampMap,
@@ -48,8 +47,8 @@ export function useProductStatusActions({
     }));
 
     try {
-      const response = await fetch(
-        `${apiBase}${API_ENDPOINTS.PRODUCT_PRICES}/${item.id}/status`,
+      const response = await apiFetch(
+        `${API_ENDPOINTS.PRODUCT_PRICES}/${item.id}/status`,
         {
           method: "PATCH",
           headers: {
@@ -58,7 +57,6 @@ export function useProductStatusActions({
           body: JSON.stringify({
             is_active: nextStatus,
           }),
-          credentials: "include",
         }
       );
 
