@@ -1,6 +1,6 @@
 # Renew Adobe — Tài liệu toàn bộ Flow
 
-**Lưu ý:** Luồng V1 (Puppeteer, `services/adobe/`) đã được dọn; toàn bộ check/login/auto-assign dùng V2 (`adobe-http` + `adobe-renew-v2`, Playwright B1–B15).
+**Lưu ý:** Luồng V1 (Puppeteer, `services/adobe/`) đã được dọn; toàn bộ check/login/auto-assign dùng một luồng duy nhất V2 tại `services/adobe-renew-v2` (Playwright B1–B15).
 
 ## Tổng quan
 
@@ -11,17 +11,20 @@ Hệ thống Renew Adobe quản lý tài khoản Adobe Creative Cloud Admin Cons
 
 **Kiến trúc:**
 ```
-Playwright headless login (~15-30s, chỉ khi cần)
+runCheckFlow (orchestrator)
         ↓
-  Save session (cookies + access token → DB)
+flows/login (credentials + otp + session lifecycle)
         ↓
-  HTTP checker (Axios + tough-cookie, mọi operations)
+flows/check (org_name + products)
+        ↓
+flows/users (goto users + add/delete + snapshot sync)
+        ↓
+flows/autoAssign (create/get auto-assign URL)
 ```
 
-- **Playwright** (Chromium headless) — chỉ dùng cho login (CAPTCHA, 2FA, OTP)
-- **HTTP** (Axios + tough-cookie) — tất cả operations sau login
-- RAM ~120-200MB khi login, ~0 khi chỉ dùng HTTP
-- Cookies saved → lần check tiếp theo không cần mở browser
+- Runtime dùng một luồng duy nhất `adobe-renew-v2` theo mô hình flow modules.
+- Browser vẫn là Playwright Chromium, nhưng logic được tách theo từng flow con.
+- Session/cookie được tái sử dụng; hết hạn mới chạy lại login.
 
 ---
 
@@ -52,7 +55,7 @@ Playwright headless login (~15-30s, chỉ khi cần)
 | POST | `/api/renew-adobe/accounts/add-users-batch` | Thêm user vào nhiều tài khoản |
 | POST | `/api/renew-adobe/accounts/:id/auto-delete-users` | Xóa 1 hoặc nhiều user |
 
-**Files:** `routes/renewAdobeRoutes.js` → `controllers/RenewAdobeController/index.js` → `services/adobe-http/`
+**Files:** `routes/renewAdobeRoutes.js` → `controllers/RenewAdobeController/index.js` → `services/adobe-renew-v2/`
 
 ---
 
@@ -65,39 +68,32 @@ Controller: runCheck → runCheckForAccountId(id)
 │
 ├── 1. Load account từ DB (email, password_enc, alert_config, mail_backup_id)
 │
-├── 2. loginViaHttp(email, password, { savedCookies, mailBackupId })
-│     ├── Fast path: có saved cookies → test HTTP session
-│     │   ├── GET adminconsole.adobe.com → redirect check
-│     │   ├── Hợp lệ → dùng luôn (KHÔNG mở browser)
-│     │   └── Hết hạn → chuyển sang Playwright
-│     │
-│     └── Slow path: Playwright headless login (~15-30s)
-│         ├── Launch Chromium → goto Adobe login
-│         ├── Nhập email → 2FA/OTP → nhập password
-│         ├── Skip progressive profile (backup email, phone)
-│         ├── Chờ redirect thành công
-│         ├── Navigate Admin Console → lấy thêm cookies
-│         ├── Extract access token từ URL hash / localStorage
-│         ├── ĐÓNG browser ngay
-│         └── Import cookies vào HTTP client
-│
-├── 3. HTTP operations (Axios + cookies/token)
-│     ├── getOrgId → GET adminconsole.adobe.com → parse @AdobeOrg
-│     ├── getProducts → GET JIL API → { hasPlan, licenseStatus }
-│     ├── getUsers → GET users endpoint → [{ name, email, product }]
-│     └── exportCookies → save cho lần sau
+├── 2. runCheckFlow(email, password, { savedCookies, mailBackupId, otpSource })
+│     ├── B1: vào adminconsole
+│     ├── Session lifecycle:
+│     │   ├── có cookie dùng được → reuse session
+│     │   └── hết hạn/chưa có → login lại
+│     ├── Login flow cố định:
+│     │   ├── email → Enter
+│     │   ├── OTP nếu có
+│     │   ├── password → Enter
+│     │   └── OTP nếu có
+│     ├── Check flows:
+│     │   ├── check org_name
+│     │   └── check product + license_status
+│     └── Users snapshot + export cookies
 │
 └── 4. DB update:
       - org_name, user_count, license_status, last_checked
       - users_snapshot (JSON array)
-      - alert_config (cookies → session cho lần sau)
+      - cookie_config (cookies → session cho lần sau)
 ```
 
 ---
 
 ## 3. Flow: Login (Playwright → Session)
 
-**File:** `services/adobe-http/loginBrowser.js`
+**File:** `services/adobe-renew-v2/loginFlow.js`
 
 ### Cookie login (fast, ~3s)
 ```
@@ -132,7 +128,7 @@ waitForOtpAndFill:
 ├── Loop 60 lần (2 phút), mỗi 2s:
 │   ├── URL chứa @AdobeOrg? → done
 │   ├── Có ô password? → done
-│   ├── Gọi mailOtpService.fetchOtpFromEmail({ mailBackupId })
+│   ├── Gọi otpProviderService theo otp_source (imap/tinyhost/hdsd)
 │   └── Có OTP? → điền vào form → submit
 └── Hết 2 phút → throw error
 ```
@@ -146,7 +142,7 @@ waitForOtpAndFill:
 
 ```
 1. Login (Playwright nếu cần)
-2. adobeHttp.addUserToAccount → gọi User Management API
+2. adobeRenewV2.addUsersWithProductV2 → thêm user + gắn product theo flow V2
 3. runCheckForAccountId → check lại
 4. Return: { success, user_emails, user_count, users_snapshot }
 ```
@@ -197,20 +193,27 @@ waitForOtpAndFill:
 ## 8. Module Structure
 
 ```
-services/adobe-http/
-├── constants.js        URLs, Client ID, headers
-├── httpClient.js       Axios + tough-cookie jar
-├── loginBrowser.js     Playwright headless login
-├── login.js            Session test + login orchestrator
-├── adminConsole.js     HTTP: getOrgId, getProducts, getUsers, addUsers, removeUser
-└── index.js            Entry point: checkAccount, addUser, removeUser, autoDelete
+services/adobe-renew-v2/
+├── flows/
+│   ├── login/
+│   ├── check/
+│   ├── users/
+│   └── autoAssign/
+├── loginFlow.js
+├── runCheckFlow.js
+├── checkInfoFlow.js
+├── autoAssignFlow.js
+├── addUsersWithProductV2.js
+├── deleteUsersV2.js
+├── facade.js
+└── index.js
 ```
 
 | Layer | Công nghệ | Khi nào dùng |
 |-------|-----------|-------------|
-| Login | Playwright Chromium | Chỉ khi cookies hết hạn (~15-30s) |
-| Session test | HTTP (Axios) | Mỗi lần check (kiểm tra cookies còn sống) |
-| Operations | HTTP (Axios) | Luôn luôn (products, users, add, remove) |
+| Login | Playwright Chromium | Khi cookie/session không còn hợp lệ |
+| Session lifecycle | Playwright + cookie store | Mỗi lần check trước khi login |
+| Operations | Playwright flows | Check org/products/users, add/delete, auto-assign |
 
 ---
 
@@ -222,18 +225,19 @@ services/adobe-http/
 |-----|------|-------|
 | `id` | int | Primary key |
 | `email` | text | Email đăng nhập Admin |
-| `password_enc` | text | Mật khẩu |
+| `password_encrypted` | text | Mật khẩu |
 | `org_name` | text | Tên tổ chức |
 | `license_status` | text | "Paid" / "Expired" / "unknown" |
 | `license_detail` | text | Chi tiết license |
 | `user_count` | int | Số user hiện tại |
 | `users_snapshot` | text (JSON) | `[{ name, email, product }]` |
-| `alert_config` | jsonb | Session cookies `{ cookies: [], savedAt }` |
-| `last_checked` | timestamp | Lần check cuối |
+| `cookie_config` | jsonb | Session cookies `{ cookies: [], savedAt }` |
+| `last_checked_at` | timestamp | Lần check cuối |
 | `is_active` | boolean | Dùng trong CRON |
 | `created_at` | timestamp | Ngày tạo |
 | `mail_backup_id` | int | FK đến bảng mail_backup (cho OTP) |
-| `url_access` | text | URL truy cập sản phẩm |
+| `access_url` | text | URL truy cập sản phẩm |
+| `otp_source` | text | Nguồn OTP (`imap`, `tinyhost`, `hdsd`) |
 
 ---
 

@@ -28,6 +28,10 @@ async function purgeAndDeleteNoLicenseAdobeAdminAccount(
   const savedCookiesRaw = COLS.ALERT_CONFIG
     ? accountRow[COLS.ALERT_CONFIG]
     : null;
+  const otpSource =
+    COLS.OTP_SOURCE && accountRow[COLS.OTP_SOURCE]
+      ? String(accountRow[COLS.OTP_SOURCE]).trim().toLowerCase()
+      : "imap";
 
   const removedRows = await removeMappingsForAccount(id);
   let userEmails = removedRows.map((r) => r.user_email).filter(Boolean);
@@ -62,6 +66,7 @@ async function purgeAndDeleteNoLicenseAdobeAdminAccount(
       await adobeRenewV2.autoDeleteUsers(email, password, userEmails, {
         savedCookiesFromDb: savedCookiesRaw,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+        otpSource,
       });
     } catch (err) {
       logger.error(

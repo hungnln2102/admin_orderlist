@@ -66,6 +66,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
       COLS.USER_COUNT,
       COLS.USERS_SNAPSHOT,
       COLS.ALERT_CONFIG,
+      ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID
     )
     .where(COLS.IS_ACTIVE, true)
@@ -147,6 +148,10 @@ async function autoAssignUsers({ onProgress = null } = {}) {
           ? Number(account[COLS.MAIL_BACKUP_ID])
           : null;
       const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+      const otpSource =
+        COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
+          ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+          : "imap";
       const v2 = await adobeRenewV2.addUsersWithProductV2(
         accountEmail,
         accountPassword,
@@ -154,6 +159,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
         {
           savedCookies,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+          otpSource,
           orgId: account[COLS.ORG_ID] || null,
         }
       );

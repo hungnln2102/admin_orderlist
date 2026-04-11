@@ -12,7 +12,7 @@ const schedulerTimezone =
 
 const cronExpression = process.env.CRON_SCHEDULE || "1 0 * * *";
 const runOnStart = process.env.RUN_CRON_ON_START === "true";
-const enableDbBackup = process.env.ENABLE_DB_BACKUP !== "false";
+const enableDbBackup = process.env.ENABLE_DB_BACKUP === "true";
 
 function getSqlCurrentDate() {
   if (process.env.MOCK_DATE) {

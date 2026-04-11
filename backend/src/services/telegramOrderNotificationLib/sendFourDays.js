@@ -13,7 +13,7 @@ const { toSafeString } = require("./formatters");
 const { buildDueOrderMessage } = require("./messageBuilders");
 const { buildVietQrUrl } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
-const { isThreadError } = require("./errorHelpers");
+const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendFourDaysRemainingNotification(orders = []) {
 
@@ -92,67 +92,61 @@ async function sendFourDaysRemainingNotification(orders = []) {
       return payload;
     };
 
-    let includeTopic = true;
-    let sent = false;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        logger.info("[Order][Telegram] Sending due order notification", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          total,
-          orderCode,
-          hasQrUrl: !!qrUrl,
-          includeTopic,
-        });
-
+    await sendWithRetry({
+      buildPayload: ({ includeTopic }) =>
+        qrUrl ? buildPhotoPayload(includeTopic) : buildTextPayload(includeTopic),
+      sendFn: async (payload) => {
         if (qrUrl) {
-          await sendTelegramPhoto(buildPhotoPayload(includeTopic));
+          await sendTelegramPhoto(payload);
         } else {
-          await sendTelegramMessage(buildTextPayload(includeTopic));
+          await sendTelegramMessage(payload);
         }
-
-        logger.info("[Order][Telegram] Due order notification sent successfully", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          total,
-          orderCode,
-        });
-        sent = true;
-        break;
-      } catch (err) {
-        logger.warn("[Order][Telegram] Send attempt failed", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          orderCode,
-          error: err?.message,
-          status: err?.status,
-          body: err?.body,
-        });
-
-        if (includeTopic && isThreadError(err)) {
-          logger.info("[Order][Telegram] Retrying without topic ID");
-          includeTopic = false;
-        } else {
+      },
+      maxAttempts: 3,
+      log: {
+        sending: ({ attempt, includeTopic }) =>
+          logger.info("[Order][Telegram] Sending due order notification", {
+            attempt,
+            orderIndex: index,
+            total,
+            orderCode,
+            hasQrUrl: !!qrUrl,
+            includeTopic,
+          }),
+        success: ({ attempt }) =>
+          logger.info("[Order][Telegram] Due order notification sent successfully", {
+            attempt,
+            orderIndex: index,
+            total,
+            orderCode,
+          }),
+        attemptFailed: ({ attempt, error, status, body }) =>
+          logger.warn("[Order][Telegram] Send attempt failed", {
+            attempt,
+            orderIndex: index,
+            orderCode,
+            error,
+            status,
+            body,
+          }),
+        retryNoTopic: () =>
+          logger.info("[Order][Telegram] Retrying without topic ID"),
+        permanentFailure: ({ error, stack, status, body }) =>
           logger.error("[Order][Telegram] Send failed permanently for order", {
             orderIndex: index,
             orderCode,
-            error: err?.message,
-            stack: err?.stack,
-            status: err?.status,
-            body: err?.body,
-          });
-          break;
-        }
-      }
-    }
-
-    if (!sent) {
-      logger.error("[Order][Telegram] Failed to send notification for order", {
-        orderIndex: index,
-        orderCode: order.id_order || order.idOrder,
-      });
-    }
+            error,
+            stack,
+            status,
+            body,
+          }),
+        finalNotSent: () =>
+          logger.error("[Order][Telegram] Failed to send notification for order", {
+            orderIndex: index,
+            orderCode: order.id_order || order.idOrder,
+          }),
+      },
+    });
 
     if (i < orders.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));

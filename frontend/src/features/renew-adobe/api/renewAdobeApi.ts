@@ -109,6 +109,7 @@ export function deleteAdobeAdminAccount(id: number): Promise<{ success: boolean;
 export function createAdobeAdminAccount(payload: {
   email: string;
   password: string;
+  otp_source?: "imap" | "tinyhost" | "hdsd";
   mail_backup_id?: number | null;
 }) {
   return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS, {
@@ -117,6 +118,7 @@ export function createAdobeAdminAccount(payload: {
     body: JSON.stringify({
       email: payload.email.trim(),
       password: payload.password,
+      ...(payload.otp_source ? { otp_source: payload.otp_source } : {}),
       ...(payload.mail_backup_id != null && payload.mail_backup_id > 0
         ? { mail_backup_id: payload.mail_backup_id }
         : {}),
@@ -130,6 +132,26 @@ export function createAdobeAdminAccount(payload: {
     if (!res.ok) {
       throw new Error(data.error || res.statusText || "Không thêm được tài khoản.");
     }
+    return data;
+  });
+}
+
+export function updateAdobeAccount(
+  id: number,
+  payload: {
+    email?: string;
+    password_encrypted?: string;
+    org_name?: string;
+    otp_source?: "imap" | "tinyhost" | "hdsd";
+  }
+): Promise<{ success: boolean; account?: Record<string, unknown>; error?: string }> {
+  return apiFetch(`${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(async (res) => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Cập nhật thất bại.");
     return data;
   });
 }

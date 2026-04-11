@@ -405,7 +405,7 @@ export function useRenewAdobeAdmin() {
     apiFetch(API_ENDPOINTS.RENEW_ADOBE_URL_ACCESS(accountId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url_access: url }),
+      body: JSON.stringify({ access_url: url }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -413,7 +413,7 @@ export function useRenewAdobeAdmin() {
           setAccounts((prev) =>
             prev.map((account) =>
               account.id === accountId
-                ? { ...account, url_access: url || null }
+                ? { ...account, access_url: url || null }
                 : account
             )
           );

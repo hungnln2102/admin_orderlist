@@ -522,7 +522,7 @@ CREATE SCHEMA IF NOT EXISTS system_automation;
 CREATE TABLE IF NOT EXISTS system_automation.accounts_admin (
   id              SERIAL PRIMARY KEY,
   email           TEXT NOT NULL UNIQUE,
-  password_enc    TEXT NOT NULL,
+  password_encrypted TEXT NOT NULL,
   access_token    TEXT,
   token_expires   TIMESTAMPTZ,
   adobe_org_id    TEXT,
@@ -532,12 +532,13 @@ CREATE TABLE IF NOT EXISTS system_automation.accounts_admin (
   license_detail  TEXT,
   user_count      INTEGER DEFAULT 0,
   users_snapshot  TEXT,
-  alert_config    TEXT,
-  last_checked    TIMESTAMPTZ,
+  cookie_config   TEXT,
+  otp_source      TEXT DEFAULT 'imap',
+  last_checked_at TIMESTAMPTZ,
   is_active       BOOLEAN DEFAULT TRUE,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   mail_backup_id  INTEGER,
-  url_access      TEXT
+  access_url      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS system_automation.product_system (

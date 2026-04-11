@@ -13,7 +13,7 @@ const { fromPwCookies } = require("./runCheckFlow");
  * @param {string} orgId
  * @param {string} email
  * @param {string} password
- * @param {{ mailBackupId?: number }} options
+ * @param {{ mailBackupId?: number, otpSource?: string }} options
  * @returns {Promise<{ url: string|null, savedCookies: object[]|null }>}
  */
 async function getOrCreateAutoAssignUrlWithPage(page, orgId, email, password, options = {}) {
@@ -22,6 +22,7 @@ async function getOrCreateAutoAssignUrlWithPage(page, orgId, email, password, op
     return { url: null, savedCookies: null };
   }
   const mailBackupId = options.mailBackupId ?? null;
+  const otpSource = options.otpSource ?? "imap";
   const autoAssignUrl = `https://adminconsole.adobe.com/${orgId}@AdobeOrg/products/auto-assign`;
   let freshCookies = null;
 
@@ -36,7 +37,11 @@ async function getOrCreateAutoAssignUrlWithPage(page, orgId, email, password, op
     let currentUrl = page.url();
     if (currentUrl.includes("auth.services") || currentUrl.includes("adobelogin.com")) {
       logger.info("[adobe-v2] B14: Bị redirect login → form login...");
-      const loginOk = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+      const loginOk = await doFormLoginOnAuthPage(page, email, password, {
+        mailBackupId,
+        otpSource,
+        accountEmail: email,
+      });
       if (!loginOk) return { url: null, savedCookies: null };
       await page.goto(autoAssignUrl, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
       await page.waitForTimeout(2500);

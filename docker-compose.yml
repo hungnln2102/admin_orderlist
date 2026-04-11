@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==========================================
   # 1. DATABASE SERVICE (PostgreSQL)
@@ -25,9 +23,40 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
 
   # ==========================================
-  # 2. BACKEND SERVICE (Node.js)
+  # 2. REDIS SERVICE (Session + Queue)
+  # ==========================================
+  redis:
+    container_name: admin_orderlist-redis
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+
+  # ==========================================
+  # 3. BACKEND SERVICE (Node.js)
   # ==========================================
   backend:
     container_name: admin_orderlist-backend
@@ -36,6 +65,8 @@ services:
     restart: always
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
@@ -54,9 +85,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
   # ==========================================
-  # 3. WEBHOOK SERVICE (Sepay — tách riêng khỏi API)
+  # 4. WEBHOOK SERVICE (Sepay — tách riêng khỏi API)
   # ==========================================
   webhook:
     container_name: admin_orderlist-webhook
@@ -65,6 +101,8 @@ services:
     restart: always
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
@@ -79,9 +117,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
 
   # ==========================================
-  # 4. SCHEDULER SERVICE (Cron jobs — tách riêng khỏi API)
+  # 5. SCHEDULER SERVICE (Cron jobs — tách riêng khỏi API)
   # ==========================================
   scheduler:
     container_name: admin_orderlist-scheduler
@@ -96,9 +139,14 @@ services:
     command: ["node", "scheduler.js"]
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   # ==========================================
-  # 5. FRONTEND SERVICE (React + Vite)
+  # 6. FRONTEND SERVICE (React + Vite)
   # ==========================================
   frontend:
     container_name: admin_orderlist-frontend
@@ -106,12 +154,17 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_BASE_URL: https://admin.mavrykpremium.store
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.store}
     restart: always
     ports:
       - "8081:80"
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
 
 # ==========================================
 # NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
@@ -127,6 +180,7 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
   backend_product_images:
   backend_variant_images:
   backend_article_images:

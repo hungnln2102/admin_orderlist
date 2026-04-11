@@ -255,3 +255,51 @@ export const orderDurationOverlapsIsoRange = (
   if (filterStart === null || filterEnd === null) return false;
   return bounds.startMs <= filterEnd && bounds.endMs >= filterStart;
 };
+
+const parseDateLikeToLocalStartMs = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) {
+    const t = value.getTime();
+    if (!Number.isFinite(t)) return null;
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const fromDmy = dmyDisplayToLocalStartMs(raw);
+  if (fromDmy !== null) return fromDmy;
+
+  const fromYmd = ymdIsoToLocalStartMs(raw);
+  if (fromYmd !== null) return fromYmd;
+
+  const parsed = Date.parse(raw);
+  if (!Number.isFinite(parsed)) return null;
+  const d = new Date(parsed);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+
+/** Khoảng lọc yyyy-mm-dd; giữ đơn khi ngày tạo `order_date` nằm trong [from, to] (gồm cả biên). */
+export const orderCreatedWithinIsoRange = (
+  order: Order,
+  fromYmd: string,
+  toYmd: string
+): boolean => {
+  const filterStart = ymdIsoToLocalStartMs(fromYmd);
+  const filterEnd = ymdIsoToLocalStartMs(toYmd);
+  if (filterStart === null || filterEnd === null) return false;
+
+  const source =
+    sanitizeDateLike(order[ORDER_FIELDS.ORDER_DATE]) ??
+    sanitizeDateLike(order.registration_date) ??
+    sanitizeDateLike(order.registration_date_display) ??
+    sanitizeDateLike(order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY]);
+
+  const createdDay = parseDateLikeToLocalStartMs(source);
+  if (createdDay === null) return false;
+
+  return createdDay >= filterStart && createdDay <= filterEnd;
+};

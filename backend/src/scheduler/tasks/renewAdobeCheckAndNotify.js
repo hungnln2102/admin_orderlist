@@ -47,6 +47,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign) {
     .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.USER_COUNT,
       COLS.LICENSE_STATUS, COLS.USERS_SNAPSHOT,
       ...(COLS.MAIL_BACKUP_ID ? [COLS.MAIL_BACKUP_ID] : []),
+      ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       ...(COLS.ALERT_CONFIG ? [COLS.ALERT_CONFIG] : []),
     )
     .where(COLS.IS_ACTIVE, true)
@@ -86,9 +87,14 @@ async function reassignUsersToAvailableAccounts(emailsToReassign) {
     try {
       const mailBackupId = account[COLS.MAIL_BACKUP_ID] != null ? Number(account[COLS.MAIL_BACKUP_ID]) : null;
       const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+      const otpSource =
+        COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
+          ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+          : "imap";
       const v2 = await adobeRenewV2.addUsersWithProductV2(accEmail, accPwd, chunk, {
         savedCookies,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+        otpSource,
       });
       if (!v2.success) throw new Error(v2.error || "addUsersWithProductV2 thất bại");
 
@@ -202,6 +208,7 @@ function createRenewAdobeCheckAndNotifyTask() {
       COLS.USERS_SNAPSHOT, COLS.LICENSE_STATUS, COLS.USER_COUNT,
     ];
     if (COLS.MAIL_BACKUP_ID) selectCols.push(COLS.MAIL_BACKUP_ID);
+    if (COLS.OTP_SOURCE) selectCols.push(COLS.OTP_SOURCE);
     if (COLS.ALERT_CONFIG) selectCols.push(COLS.ALERT_CONFIG);
 
     const expiredAccounts = await db(TABLE)

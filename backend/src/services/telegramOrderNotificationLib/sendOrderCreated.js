@@ -18,7 +18,7 @@ const { toSafeString, roundGiaBanValue } = require("./formatters");
 const { buildOrderCreatedMessage, buildCopyKeyboard } = require("./messageBuilders");
 const { buildSepayQrUrl } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
-const { isThreadError, isCopyButtonError } = require("./errorHelpers");
+const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendOrderCreatedNotification(order) {
 
@@ -73,7 +73,7 @@ async function sendOrderCreatedNotification(order) {
 
   if (!caption) return;
 
-  const buildPayload = (includeTopic = true, includeButtons = true) => {
+  const makePayload = (includeTopic = true, includeButtons = true) => {
     const payload = {
       chat_id: TELEGRAM_CHAT_ID,
       parse_mode: "HTML",
@@ -100,59 +100,52 @@ async function sendOrderCreatedNotification(order) {
     return payload;
   };
 
-  let includeTopic = true;
-  let includeButtons = true;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      logger.info("[Order][Telegram] Sending notification", {
-        attempt: attempt + 1,
-        hasQrUrl: !!qrUrl,
-        includeTopic,
-        includeButtons,
-        orderCode,
-      });
-
+  await sendWithRetry({
+    buildPayload: ({ includeTopic, includeButtons }) =>
+      makePayload(includeTopic, includeButtons),
+    sendFn: async (payload) => {
       if (qrUrl) {
-        await sendTelegramPhoto(buildPayload(includeTopic, includeButtons));
+        await sendTelegramPhoto(payload);
       } else {
-        await sendTelegramMessage(buildPayload(includeTopic, includeButtons));
+        await sendTelegramMessage(payload);
       }
-
-      logger.info("[Order][Telegram] Notification sent successfully", {
-        orderCode,
-        attempt: attempt + 1,
-      });
-      return;
-    } catch (err) {
-      logger.warn("[Order][Telegram] Send attempt failed", {
-        attempt: attempt + 1,
-        error: err?.message,
-        status: err?.status,
-        body: err?.body,
-      });
-
-      let adjusted = false;
-      if (includeTopic && isThreadError(err)) {
-        logger.info("[Order][Telegram] Retrying without topic ID");
-        includeTopic = false;
-        adjusted = true;
-      }
-      if (includeButtons && isCopyButtonError(err)) {
-        logger.info("[Order][Telegram] Retrying without copy buttons");
-        includeButtons = false;
-        adjusted = true;
-      }
-      if (!adjusted) {
+    },
+    maxAttempts: 3,
+    enableCopyButtonRetry: true,
+    log: {
+      sending: ({ attempt, includeTopic, includeButtons }) =>
+        logger.info("[Order][Telegram] Sending notification", {
+          attempt,
+          hasQrUrl: !!qrUrl,
+          includeTopic,
+          includeButtons,
+          orderCode,
+        }),
+      success: ({ attempt }) =>
+        logger.info("[Order][Telegram] Notification sent successfully", {
+          orderCode,
+          attempt,
+        }),
+      attemptFailed: ({ attempt, error, status, body }) =>
+        logger.warn("[Order][Telegram] Send attempt failed", {
+          attempt,
+          error,
+          status,
+          body,
+        }),
+      retryNoTopic: () =>
+        logger.info("[Order][Telegram] Retrying without topic ID"),
+      retryNoButtons: () =>
+        logger.info("[Order][Telegram] Retrying without copy buttons"),
+      permanentFailure: ({ error, stack, status, body }) =>
         logger.error("[Order][Telegram] Send failed permanently", {
-          error: err?.message,
-          stack: err?.stack,
-          status: err?.status,
-          body: err?.body,
-        });
-        return;
-      }
-    }
-  }
+          error,
+          stack,
+          status,
+          body,
+        }),
+    },
+  });
 }
 
 module.exports = {

@@ -93,6 +93,8 @@ function buildDueOrderMessage(order, index, total) {
   const slot = toSafeString(order.slot).trim();
   const customer =
     toSafeString(order.customer || order.customer_name).trim() || "---";
+  const contact =
+    toSafeString(order.contact || order.customer_link).trim();
   const registerDate =
     toSafeString(
       order.registration_date_display || order.registration_date_str
@@ -120,6 +122,7 @@ function buildDueOrderMessage(order, index, total) {
     `💰 Giá bán: ${priceDisplay}`,
     `——— 🤝 THÔNG TIN KHÁCH HÀNG ———`,
     `👤 Tên: ${customer}`,
+    contact ? `📞 Liên hệ: ${contact}` : null,
     `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
     `🏦 Ngân hàng: VP Bank`,
     `🏧 STK: 9183400998`,

@@ -4,10 +4,9 @@
  */
 
 const logger = require("../../utils/logger");
-const mailOtpService = require("../mailOtpService");
 const { LOGIN_PAGE_URL, AUTH_SERVICES_BASE } = require("./shared/constants");
+const { LOGIN_TIMEOUTS, runOtpIfPresent, runCredentialsFixedOnce, handleOtpChallenge } = require("./flows/login");
 
-const PASSWORD_SELECTORS = ['input[name="password"]', 'input[type="password"]', 'input#password'];
 const SKIP_RE = /^\s*(not now|skip|bỏ qua|later|skip for now)\s*$/i;
 
 /** True nếu URL là trang đã đăng nhập (account, adminconsole, home...), không phải form login. */
@@ -25,94 +24,111 @@ function isOnAdobeSite(url) {
   return false;
 }
 
-async function detectScreen(page, timeoutMs) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (isOnAdobeSite(page.url())) return "done";
-    const screen = await page.evaluate(() => {
-      for (const el of document.querySelectorAll("h1, h2, h3, [class*='Heading']")) {
-        const r = el.getBoundingClientRect();
-        if (r.width <= 0 || r.height <= 0) continue;
-        const t = el.textContent.trim().toLowerCase();
-        if (/verify|identity|verification|xác minh/.test(t)) return "2fa";
-        if (/password|mật khẩu/.test(t)) return "password";
-        if (/enter your email|sign in|đăng nhập/.test(t)) return "email";
-      }
-      return null;
-    }).catch(() => null);
-    if (screen === "2fa" || screen === "password") return screen;
-    const pwVisible = await page.locator('input[type="password"]:visible').first().isVisible().catch(() => false);
-    if (pwVisible) return "password";
-    await page.waitForTimeout(1000);
+async function runLoginStep(stepName, handler) {
+  logger.info("[adobe-v2] Login step start: %s", stepName);
+  try {
+    await handler();
+    logger.info("[adobe-v2] Login step done: %s", stepName);
+  } catch (error) {
+    logger.error("[adobe-v2] Login step failed (%s): %s", stepName, error.message);
+    throw error;
   }
-  return "unknown";
-}
-
-async function enterPassword(page, password) {
-  const passwordInput = page.locator(PASSWORD_SELECTORS.join(", ")).first();
-  await passwordInput.waitFor({ state: "visible", timeout: 10000 });
-  await passwordInput.fill(password);
-  await page.waitForTimeout(200);
-  await page.keyboard.press("Enter");
-  await page.waitForURL(
-    (url) => url.includes("@AdobeOrg") || (url.includes("adminconsole.adobe.com") && !url.includes("auth.")) || (url.includes("account.adobe.com") && !url.includes("auth.")),
-    { timeout: 45000 }
-  ).catch(() => {});
-  await page.waitForTimeout(2500);
-}
-
-async function handle2FA(page, mailBackupId) {
-  await page.waitForTimeout(1500);
-  await page.locator('[data-id="Page-PrimaryButton"], button:has-text("Continue")').first().click({ timeout: 6000 }).catch(() => {});
-  await page.waitForTimeout(2000);
-  const otpInput = page.locator('input[autocomplete="one-time-code"], input[inputmode="numeric"], input[maxlength="1"]').first();
-  await otpInput.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
-  for (let t = 0; t < 60; t++) {
-    await page.waitForTimeout(2000);
-    if (page.url().includes("@AdobeOrg")) return;
-    const code = mailBackupId
-      ? await mailOtpService.fetchOtpFromEmail(mailBackupId, { useEnvFallback: false, senderFilter: "adobe" })
-      : await mailOtpService.fetchOtpFromEmail(null, { useEnvFallback: true, senderFilter: "adobe" });
-    if (code) {
-      const codeStr = String(code).replace(/\D/g, "").slice(0, 8);
-      const multi = await page.locator('input[maxlength="1"]').count() >= 4;
-      if (multi) {
-        const digits = codeStr.split("").slice(0, 8);
-        const inputs = await page.locator('input[maxlength="1"], input[inputmode="numeric"]').all();
-        for (let i = 0; i < digits.length && i < inputs.length; i++) {
-          await inputs[i].fill(digits[i]);
-        }
-      } else {
-        await otpInput.fill(codeStr);
-      }
-      await page.waitForTimeout(500);
-      await page.locator('[data-id="Page-PrimaryButton"], button[type="submit"]').first().click({ timeout: 3000 }).catch(() => {});
-      await page.waitForTimeout(3000);
-      return;
-    }
-  }
-  throw new Error("Hết thời gian chờ OTP.");
 }
 
 async function maybeSkipSecurityPrompt(page) {
   if (!/progressive-profile|user-security/i.test(page.url())) return;
-  await page.getByRole("button", { name: /skip/i }).click({ timeout: 8000 }).catch(() => {});
-  await page.waitForTimeout(2000);
+  await page
+    .getByRole("button", { name: /skip/i })
+    .click({ timeout: LOGIN_TIMEOUTS.SECURITY_SKIP_CLICK_TIMEOUT_MS })
+    .catch(() => {});
+  await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
 }
 
-async function handleProgressiveProfile(page, mailBackupId) {
+async function chooseNonPersonalProfileIfPresent(page, otpOptions = {}) {
+  const chosenOrgName = await page
+    .evaluate(() => {
+      const text = (document.body?.innerText || "").toLowerCase();
+      const hasChooser =
+        /select a profile to sign in/.test(text) ||
+        !!document.querySelector(".PP-ProfileChooser, [data-id*='PP-ProfileChooser']");
+      if (!hasChooser) return null;
+
+      const readName = (btn) => {
+        const fromType =
+          btn.querySelector(".Profile-Type--text-big")?.textContent ||
+          btn.querySelector('[data-id="Profile-Type"]')?.textContent ||
+          "";
+        const fromEmail =
+          btn.querySelector('[data-id="Profile-Email"]')?.textContent || "";
+        const name = (fromType || fromEmail || btn.textContent || "")
+          .replace(/\s+/g, " ")
+          .trim();
+        return name || null;
+      };
+
+      const isPersonal = (name, dataId) =>
+        /personal profile/i.test(name || "") ||
+        /authaccount/i.test(dataId || "");
+
+      const buttons = Array.from(
+        document.querySelectorAll("button.ActionList-Item, button[data-id*='PP-ProfileChooser']")
+      );
+      if (buttons.length === 0) return null;
+
+      for (const btn of buttons) {
+        const dataId = btn.getAttribute("data-id") || "";
+        const name = readName(btn);
+        if (isPersonal(name, dataId)) continue;
+        btn.click();
+        return name;
+      }
+      return null;
+    })
+    .catch(() => null);
+
+  if (!chosenOrgName) return null;
+
+  otpOptions.selectedOrgName = String(chosenOrgName).trim();
+  logger.info(
+    "[adobe-v2] progressive-profile: selected non-personal profile = %s",
+    otpOptions.selectedOrgName
+  );
+  await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
+  return otpOptions.selectedOrgName;
+}
+
+async function clickNotNowIfPresent(page) {
+  const candidates = [
+    () => page.getByRole("button", { name: /not now|skip|later|bỏ qua/i }).first().click({ timeout: 2500 }),
+    () => page.locator('button:has-text("Not now"), button:has-text("Skip"), button:has-text("Later")').first().click({ timeout: 2500 }),
+    () => page.locator('[data-id*="skip"], [data-id*="not-now"], [data-id*="later"]').first().click({ timeout: 2500 }),
+  ];
+  for (const attempt of candidates) {
+    try {
+      await attempt();
+      await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
+      return true;
+    } catch {
+      // try next selector
+    }
+  }
+  return false;
+}
+
+async function handleProgressiveProfile(page, otpOptions = {}) {
   for (let r = 0; r < 6; r++) {
     if (isOnAdobeSite(page.url())) return;
+    if (await chooseNonPersonalProfileIfPresent(page, otpOptions)) continue;
+    if (await clickNotNowIfPresent(page)) continue;
     const isVerify = await page.evaluate(() => /verify|identity|verification|xác minh/i.test(document.body?.innerText || "")).catch(() => false);
     if (isVerify) {
-      await handle2FA(page, mailBackupId);
-      await page.waitForTimeout(3000);
+      await handleOtpChallenge(page, otpOptions, { stage: "progressive-profile" });
+      await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_OTP_WAIT_MS);
       continue;
     }
     const isPhone = await page.evaluate(() => /phone|số điện thoại|mobile/i.test(document.body?.innerText || "") && /verify|add/i.test(document.body?.innerText || "")).catch(() => false);
     if (isPhone) {
-      await page.getByRole("button", { name: SKIP_RE }).click({ timeout: 6000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await clickNotNowIfPresent(page);
       continue;
     }
     break;
@@ -123,38 +139,37 @@ async function handleProgressiveProfile(page, mailBackupId) {
  * Form login khi đã ở trang auth (auth.services / adobelogin). Dùng cho B14 hoặc flow standalone.
  * Nhập email → detectScreen → 2FA/password → skip/progressive → chờ redirect tới Admin Console.
  */
-async function doFormLoginOnAuthPage(page, email, password, mailBackupId) {
+async function doFormLoginOnAuthPage(page, email, password, otpOptions = {}) {
   try {
-    await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, { timeout: 30000 }).catch(() => {});
-    const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
-    await emailInput.waitFor({ state: "visible", timeout: 45000 });
-    await emailInput.fill(email);
-    await page.waitForTimeout(300);
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(3000);
-
-    const screen = await detectScreen(page, 15000);
-    if (screen === "2fa") {
-      await handle2FA(page, mailBackupId);
-      const after2fa = await detectScreen(page, 10000);
-      if (after2fa === "password") await enterPassword(page, password);
-    } else if (screen === "password") {
-      await enterPassword(page, password);
-      const afterPw = await detectScreen(page, 10000);
-      if (afterPw === "2fa") await handle2FA(page, mailBackupId);
-    }
-
-    await maybeSkipSecurityPrompt(page);
-    await handleProgressiveProfile(page, mailBackupId);
+    await page
+      .waitForURL(/auth\.services\.adobe\.com|adobelogin\.com/, {
+        timeout: LOGIN_TIMEOUTS.AUTH_PAGE_WAIT_MS,
+      })
+      .catch(() => {});
+    await runLoginStep("credentials-fixed-once", async () => {
+      await runCredentialsFixedOnce(page, email, password, otpOptions, {
+        isOnAdobeSite,
+      });
+    });
+    await runLoginStep("otp-after-password", async () => {
+      await runOtpIfPresent(page, otpOptions, {
+        stage: "after-password",
+        isOnAdobeSite,
+      });
+    });
+    await runLoginStep("progressive-profile", async () => {
+      await maybeSkipSecurityPrompt(page);
+      await handleProgressiveProfile(page, otpOptions);
+    });
 
     await page.waitForFunction(
       () => {
         const h = window.location.href;
         return h.includes("@AdobeOrg") || (/^https?:\/\/([a-z0-9-]+\.)*adobe\.com/i.test(h) && !h.includes("auth.services"));
       },
-      { timeout: 90000 }
+      { timeout: LOGIN_TIMEOUTS.FINAL_REDIRECT_WAIT_MS }
     ).catch(() => {});
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(LOGIN_TIMEOUTS.LARGE_WAIT_MS);
     const ok = isOnAdobeSite(page.url());
     if (!ok) {
       const u = page.url() || "";
@@ -175,10 +190,11 @@ async function doFormLoginOnAuthPage(page, email, password, mailBackupId) {
  * Chạy luồng đăng nhập B2→B9. Giả định: đang ở adobe.com, chưa đăng nhập, có nút Sign in.
  * Sau khi gọi xong, page sẽ ở trang đích (account/adminconsole).
  * @param {import('playwright').Page} page
- * @param {{ email: string, password: string, mailBackupId?: number }} opts
+ * @param {{ email: string, password: string, mailBackupId?: number, otpSource?: string }} opts
  */
 async function runLoginFlow(page, opts) {
-  const { email, password, mailBackupId = null } = opts;
+  const { email, password, mailBackupId = null, otpSource = "imap" } = opts;
+  const otpOptions = { mailBackupId, otpSource, accountEmail: email };
 
   // Nếu đã ở trang auth (fallback từ B1 khi adobe.com lỗi HTTP2), login trực tiếp không cần click Sign in.
   const currentUrl = page.url() || "";
@@ -187,10 +203,13 @@ async function runLoginFlow(page, opts) {
   // Nếu rơi vào chrome error page (thường do network/proxy), retry điều hướng về auth page.
   if (/^chrome-error:\/\//i.test(currentUrl)) {
     logger.warn("[adobe-v2] Đang ở chrome-error page → retry goto LOGIN_PAGE_URL");
-    await page.goto(LOGIN_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 60000 }).catch((e) => {
+    await page.goto(LOGIN_PAGE_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: LOGIN_TIMEOUTS.RETRY_GOTO_TIMEOUT_MS,
+    }).catch((e) => {
       logger.warn("[adobe-v2] retry goto LOGIN_PAGE_URL failed: %s", e.message);
     });
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(LOGIN_TIMEOUTS.MEDIUM_WAIT_MS);
   }
 
   const urlAfterRetry = page.url() || "";
@@ -200,15 +219,15 @@ async function runLoginFlow(page, opts) {
 
   if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(urlAfterRetry)) {
     logger.info("[adobe-v2] B2: Đang ở auth page (%s) → login trực tiếp", urlAfterRetry.slice(0, 90));
-    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
     if (!ok) throw new Error("Login thất bại trên trang auth (fallback).");
-    return;
+    return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
   // Admin Console là SPA — session hết hạn có thể chậm render form hoặc nút Sign in.
   if (/adminconsole\.adobe\.com/i.test(urlAfterRetry) && !urlAfterRetry.includes("@AdobeOrg")) {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    for (let w = 0; w < 15; w++) {
+    for (let w = 0; w < 8; w++) {
       const u = page.url() || "";
       if (/auth\.services|adobelogin/i.test(u)) break;
       const hasEmail = await page
@@ -217,16 +236,16 @@ async function runLoginFlow(page, opts) {
         .isVisible()
         .catch(() => false);
       if (hasEmail) break;
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(LOGIN_TIMEOUTS.SPA_DETECT_INTERVAL_MS);
     }
   }
 
   const urlAfterWait = page.url() || "";
   if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(urlAfterWait)) {
     logger.info("[adobe-v2] B2: Sau chờ SPA → auth page (%s) → login trực tiếp", urlAfterWait.slice(0, 90));
-    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
     if (!ok) throw new Error("Login thất bại trên trang auth (sau chờ SPA).");
-    return;
+    return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
   // Fallback: một số môi trường headless redirect ra trang có form login nhưng URL chưa match auth.* (hoặc bị custom domain).
@@ -238,28 +257,28 @@ async function runLoginFlow(page, opts) {
     .catch(() => false);
   if (emailInputVisible) {
     logger.info("[adobe-v2] B2: Thấy form login (email input) → login trực tiếp, url=%s", (page.url() || "").slice(0, 90));
-    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
     if (!ok) throw new Error("Login thất bại trên trang form login (fallback).");
-    return;
+    return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
   // ─── B2: Sign in (nhiều biến thể UI Adobe / locale) ───
   logger.info("[adobe-v2] B2: Click Sign in");
   const signInAttempts = [
-    () => page.locator("button.profile-comp.secondary-button").first().click({ timeout: 6000 }),
-    () => page.getByRole("link", { name: /sign\s*in/i }).first().click({ timeout: 6000 }),
-    () => page.getByRole("button", { name: /sign\s*in/i }).first().click({ timeout: 6000 }),
-    () => page.getByRole("button", { name: /đăng nhập/i }).first().click({ timeout: 6000 }),
-    () => page.getByRole("link", { name: /đăng nhập/i }).first().click({ timeout: 6000 }),
-    () => page.locator('a[href*="adobelogin.com"], a[href*="ims-na1.adobelogin"]').first().click({ timeout: 6000 }),
-    () => page.locator('a[href*="auth.services.adobe"]').first().click({ timeout: 6000 }),
-    () => page.locator('button:has-text("Sign in")').first().click({ timeout: 6000 }),
-    () => page.locator('a:has-text("Sign in")').first().click({ timeout: 6000 }),
+    () => page.locator("button.profile-comp.secondary-button").first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.getByRole("link", { name: /sign\s*in/i }).first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.getByRole("button", { name: /sign\s*in/i }).first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.getByRole("button", { name: /đăng nhập/i }).first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.getByRole("link", { name: /đăng nhập/i }).first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.locator('a[href*="adobelogin.com"], a[href*="ims-na1.adobelogin"]').first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.locator('a[href*="auth.services.adobe"]').first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.locator('button:has-text("Sign in")').first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
+    () => page.locator('a:has-text("Sign in")').first().click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
     () =>
       page
         .locator('[data-testid*="sign"][role="button"], [aria-label*="Sign in"], [aria-label*="sign in"]')
         .first()
-        .click({ timeout: 6000 }),
+        .click({ timeout: LOGIN_TIMEOUTS.SIGN_IN_CLICK_TIMEOUT_MS }),
   ];
 
   let signInClicked = false;
@@ -280,50 +299,45 @@ async function runLoginFlow(page, opts) {
     await page
       .goto(`${AUTH_SERVICES_BASE}/en_US/index.html`, {
         waitUntil: "domcontentloaded",
-        timeout: 60000,
+        timeout: LOGIN_TIMEOUTS.RETRY_GOTO_TIMEOUT_MS,
       })
       .catch((e) => logger.warn("[adobe-v2] B2 goto auth.services: %s", e.message));
-    await page.waitForTimeout(2000);
-    const ok = await doFormLoginOnAuthPage(page, email, password, mailBackupId);
+    await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
+    const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
     if (ok) return;
   }
 
   if (!signInClicked) {
     throw new Error(`Không tìm thấy nút Sign in. URL hiện tại: ${(page.url() || "").slice(0, 140)}`);
   }
-  await page.waitForURL(/auth\.services\.adobe\.com|adobelogin\.com|account\.adobe\.com|adminconsole\.adobe\.com/, { timeout: 20000 }).catch(() => {});
+  await page
+    .waitForURL(/auth\.services\.adobe\.com|adobelogin\.com|account\.adobe\.com|adminconsole\.adobe\.com/, {
+      timeout: LOGIN_TIMEOUTS.AUTH_REDIRECT_WAIT_MS,
+    })
+    .catch(() => {});
 
   const urlAfterSignIn = page.url();
   if (!urlAfterSignIn.includes("auth.services") && !urlAfterSignIn.includes("adobelogin")) {
     logger.info("[adobe-v2] Sau B2 đã đăng nhập (cookie còn hiệu lực), url=%s", urlAfterSignIn.slice(0, 80));
-    await page.waitForTimeout(2000);
-    return;
+    await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
+    return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
-  // ─── B3–B4: Email + Continue ───
-  logger.info("[adobe-v2] B3–B4: Email + Continue");
-  const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
-  await emailInput.waitFor({ state: "visible", timeout: 45000 });
-  await emailInput.fill(email);
-  await page.waitForTimeout(300);
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(3000);
-
-  const screen = await detectScreen(page, 15000);
-  logger.info("[adobe-v2] Sau email → screen: %s", screen);
-
-  if (screen === "2fa") {
-    await handle2FA(page, mailBackupId);
-    const after2fa = await detectScreen(page, 10000);
-    if (after2fa === "password") await enterPassword(page, password);
-  } else if (screen === "password") {
-    await enterPassword(page, password);
-    const afterPw = await detectScreen(page, 10000);
-    if (afterPw === "2fa") await handle2FA(page, mailBackupId);
-  }
-
-  await maybeSkipSecurityPrompt(page);
-  await handleProgressiveProfile(page, mailBackupId);
+  await runLoginStep("credentials-fixed-once", async () => {
+    await runCredentialsFixedOnce(page, email, password, otpOptions, {
+      isOnAdobeSite,
+    });
+  });
+  await runLoginStep("otp-after-password", async () => {
+    await runOtpIfPresent(page, otpOptions, {
+      stage: "after-password",
+      isOnAdobeSite,
+    });
+  });
+  await runLoginStep("progressive-profile", async () => {
+    await maybeSkipSecurityPrompt(page);
+    await handleProgressiveProfile(page, otpOptions);
+  });
 
   // ─── B9: Xác nhận đã tới adminconsole ───
   // Adobe tự redirect sau login — enterPassword() đã waitForURL(adminconsole) rồi.
@@ -334,7 +348,8 @@ async function runLoginFlow(page, opts) {
   if (!isOnAdobeSite(finalUrl)) {
     throw new Error(`Login chưa hoàn tất sau B9. URL hiện tại: ${finalUrl.slice(0, 120)}`);
   }
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(LOGIN_TIMEOUTS.FINAL_STABILIZE_WAIT_MS);
+  return { selectedOrgName: otpOptions.selectedOrgName || null };
 }
 
 module.exports = {

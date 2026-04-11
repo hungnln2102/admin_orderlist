@@ -6,6 +6,7 @@ const {
   createAccount,
   deleteAccount,
   updateUrlAccess,
+  updateAccount,
 } = require("./accounts");
 const {
   runCheckForAccountId,
@@ -69,6 +70,7 @@ module.exports = {
   fixSingleUser,
   fixUsersRound,
   updateUrlAccess,
+  updateAccount,
   listVariants,
   listProductSystem,
   createProductSystem,

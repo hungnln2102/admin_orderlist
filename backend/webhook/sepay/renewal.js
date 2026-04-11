@@ -5,9 +5,6 @@ const {
   ORDER_COLS,
   VARIANT_TABLE,
   VARIANT_COLS,
-  TELEGRAM_BOT_TOKEN,
-  TELEGRAM_CHAT_ID,
-  SEND_RENEWAL_TO_TOPIC,
 } = require("./config");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
 const { STATUS: ORDER_STATUS } = require("../../src/controllers/Order/constants");
@@ -15,25 +12,27 @@ const {
   parseFlexibleDate,
   normalizeProductDuration,
   normalizeMoney,
-  normalizeImportValue,
   formatDateDMY,
   formatDateDB,
   addMonthsClamped,
   addDays,
-  fetchProductPricing,
-  fetchSupplyPrice,
-  fetchMaxSupplyPrice,
-  daysUntil,
 } = require("./utils");
 const { updatePaymentSupplyBalance } = require("./payments");
-const { sendRenewalNotification } = require("./notifications");
 const logger = require("../../src/utils/logger");
-const {
-  calculateOrderPricingFromResolvedValues,
-  resolveMoney,
-} = require("../../src/services/pricing/core");
 
-const pendingRenewalTasks = new Map(); // orderCode -> task state
+const { calculateRenewalPricing, computeOrderCurrentPrice } = require("./renewalPricing");
+const {
+  fetchOrderState,
+  isEligibleForRenewal,
+  fetchRenewalCandidates,
+} = require("./renewalEligibility");
+const {
+  pendingRenewalTasks,
+  queueRenewalTask,
+  processRenewalTask,
+  runRenewalBatch,
+} = require("./renewalQueue");
+
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
@@ -43,68 +42,6 @@ const toMonthKey = (value) => {
   const year = parsedDate.getFullYear();
   const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
-};
-
-const calculateRenewalPricing = async (
-  client,
-  { sanPham, supplierId, orderCode, fallbackCost, fallbackPrice, forceKhachLe }
-) => {
-  const { productId, variantId, pctCtv, pctKhach, pctPromo, pctStu } =
-    await fetchProductPricing(client, sanPham);
-  const giaNhapSource = await fetchSupplyPrice(
-    client,
-    { variantId, productId },
-    supplierId
-  );
-  const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
-
-  const normalizedNhap = normalizeImportValue(giaNhapSource, fallbackCost || undefined);
-  const latestGiaNhap = resolveMoney(
-    normalizedNhap?.value,
-    giaNhapSource,
-    fallbackCost
-  );
-
-  const normalizedPriceMax = normalizeImportValue(
-    maxPriceRow,
-    latestGiaNhap || fallbackCost || undefined
-  );
-  const priceMax = resolveMoney(
-    normalizedPriceMax?.value,
-    maxPriceRow,
-    fallbackPrice,
-    latestGiaNhap
-  );
-  const effectivePriceMax = resolveMoney(priceMax, fallbackPrice, latestGiaNhap);
-
-  const pricing = calculateOrderPricingFromResolvedValues({
-    orderId: orderCode,
-    pricingBase: effectivePriceMax,
-    importPrice: latestGiaNhap,
-    fallbackPrice,
-    fallbackCost,
-    pctCtv,
-    pctKhach,
-    pctPromo,
-    pctStu,
-    forceKhachLe,
-    roundCostToThousands: false,
-  });
-
-  return {
-    pricing,
-    productId,
-    variantId,
-    pctCtv,
-    pctKhach,
-    pctPromo,
-    pctStu,
-    giaNhapSource,
-    maxPriceRow,
-    normalizedNhap,
-    normalizedPriceMax,
-    effectivePriceMax,
-  };
 };
 
 const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
@@ -357,303 +294,6 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
   }
 };
 
-const fetchOrderState = async (orderCode) => {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(
-      `SELECT
-        ${ORDER_COLS.status},
-        ${ORDER_COLS.expiryDate}
-      FROM ${ORDER_TABLE}
-      WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-      LIMIT 1`,
-      [orderCode]
-    );
-    return res.rows[0] || null;
-  } finally {
-    client.release();
-  }
-};
-
-const isEligibleForRenewal = (statusValue, expiryDate) => {
-  const statusText = String(statusValue || "");
-  const daysLeft = daysUntil(expiryDate);
-
-  // Chỉ trạng thái Cần Gia Hạn (RENEWAL) mới được phép gia hạn tự động.
-  // PROCESSING là trạng thái SAU KHI renewal, không phải điều kiện để renewal.
-  // Hết Hạn (EXPIRED) không còn eligible trong rule mới.
-  const readyForRenew = daysLeft <= 4 && statusText === ORDER_STATUS.RENEWAL;
-
-  return {
-    eligible: readyForRenew,
-    forceRenewal: false,
-    daysLeft,
-    statusNorm: statusText,
-  };
-};
-
-const queueRenewalTask = (orderCode, options = {}) => {
-  if (!orderCode) return null;
-  const key = orderCode.trim();
-  if (!key) return null;
-  const existing = pendingRenewalTasks.get(key) || {};
-  const task = {
-    orderCode: key,
-    renewalDone: existing.renewalDone || false,
-    telegramDone: existing.telegramDone || false,
-    lastRenewalResult: existing.lastRenewalResult || null,
-    renewalAttempts: existing.renewalAttempts || 0,
-    telegramAttempts: existing.telegramAttempts || 0,
-    lastError: existing.lastError || null,
-    forceRenewal: existing.forceRenewal || options.forceRenewal || false,
-  };
-  pendingRenewalTasks.set(key, task);
-  return task;
-};
-
-const processRenewalTask = async (orderCode) => {
-  const task = pendingRenewalTasks.get(orderCode);
-  if (!task) return null;
-
-  const state = await fetchOrderState(orderCode);
-  if (!state) {
-    pendingRenewalTasks.delete(orderCode);
-    return { orderCode, skipped: true, reason: "not found" };
-  }
-
-  const { eligible, forceRenewal } = isEligibleForRenewal(
-    state[ORDER_COLS.status],
-    state[ORDER_COLS.expiryDate]
-  );
-
-  if (!eligible) {
-    pendingRenewalTasks.delete(orderCode);
-    return { orderCode, skipped: true, reason: "not eligible" };
-  }
-
-  if (!task.renewalDone) {
-    try {
-      const renewalResult = await runRenewal(orderCode, {
-        forceRenewal: task.forceRenewal || forceRenewal,
-      });
-      task.renewalAttempts += 1;
-      task.lastRenewalResult = renewalResult;
-      task.renewalDone = !!renewalResult?.success;
-      task.lastError = task.renewalDone ? null : renewalResult?.details || "Renewal failed";
-    } catch (err) {
-      task.renewalAttempts += 1;
-      task.lastError = err?.message || String(err);
-      return {
-        orderCode,
-        success: false,
-        error: task.lastError,
-        renewalDone: false,
-        telegramDone: task.telegramDone,
-      };
-    }
-  }
-
-  if (task.renewalDone && !task.telegramDone) {
-    if (!isTelegramEnabled()) {
-      task.telegramDone = true;
-    } else {
-      try {
-        await sendRenewalNotification(orderCode, task.lastRenewalResult);
-        task.telegramAttempts += 1;
-        task.telegramDone = true;
-        task.lastError = null;
-      } catch (err) {
-        task.telegramAttempts += 1;
-        task.lastError = err?.message || String(err);
-        return {
-          orderCode,
-          success: false,
-          error: task.lastError,
-          renewalDone: true,
-          telegramDone: false,
-        };
-      }
-    }
-  }
-
-  const success = task.renewalDone && task.telegramDone;
-  if (success) {
-    pendingRenewalTasks.delete(orderCode);
-  } else {
-    pendingRenewalTasks.set(orderCode, task);
-  }
-
-  return {
-    orderCode,
-    success,
-    renewalDone: task.renewalDone,
-    telegramDone: task.telegramDone,
-    lastError: task.lastError,
-  };
-};
-
-const fetchRenewalCandidates = async () => {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(
-      `SELECT
-        ${ORDER_COLS.idOrder} AS order_code,
-        ${ORDER_COLS.status} AS status_value,
-        ${ORDER_COLS.expiryDate} AS expiry_date_value
-      FROM ${ORDER_TABLE}
-      WHERE TRIM(${ORDER_COLS.idOrder}::text) <> ''`
-    );
-
-    const candidates = [];
-    for (const row of res.rows) {
-      const orderCode = (row.order_code || "").trim();
-      if (!orderCode) continue;
-      const eligibility = isEligibleForRenewal(
-        row.status_value,
-        row.expiry_date_value
-      );
-
-      if (eligibility.eligible) {
-        candidates.push({
-          orderCode,
-          forceRenewal: eligibility.forceRenewal,
-          daysLeft: eligibility.daysLeft,
-          status: eligibility.statusNorm,
-        });
-      }
-    }
-    return candidates;
-  } finally {
-    client.release();
-  }
-};
-
-const runRenewalBatch = async ({ orderCodes, forceRenewal = false } = {}) => {
-  const targets =
-    Array.isArray(orderCodes) && orderCodes.length
-      ? orderCodes
-          .map((code) => ({
-            orderCode: String(code || "").trim(),
-            forceRenewal,
-          }))
-          .filter((c) => c.orderCode)
-      : await fetchRenewalCandidates();
-
-  for (const target of targets) {
-    queueRenewalTask(target.orderCode, {
-      forceRenewal: target.forceRenewal,
-    });
-  }
-
-  const results = [];
-  for (const target of targets) {
-    const code = target.orderCode;
-    if (!code) continue;
-    const outcome = await processRenewalTask(code);
-    if (outcome) {
-      results.push(outcome);
-    }
-  }
-
-  const succeeded = results.filter((r) => r?.success).length;
-  return {
-    total: targets.length,
-    succeeded,
-    failed: results.length - succeeded,
-    results,
-  };
-};
-
-const isTelegramEnabled = () =>
-  Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID && SEND_RENEWAL_TO_TOPIC !== false);
-
-/**
- * Tính lại giá bán và giá nhập theo giá hiện tại (product/supplier cost).
- * Dùng trước khi gửi thông báo Telegram "đơn cần gia hạn" để caption và QR dùng đúng giá mới.
- * Không ghi DB.
- * @param {object} client - pg client (từ pool.connect())
- * @param {object} orderRow - 1 row đơn hàng (có id_product, supply, cost, price)
- * @returns {{ price: number, cost: number }} - Giá bán và giá nhập đã tính (fallback về giá cũ nếu lỗi)
- */
-const computeOrderCurrentPrice = async (client, orderRow) => {
-  const fallbackPrice = normalizeMoney(orderRow?.[ORDER_COLS.price] ?? 0);
-  const fallbackCost = normalizeMoney(orderRow?.[ORDER_COLS.cost] ?? 0);
-
-  try {
-    const sanPham = orderRow?.[ORDER_COLS.idProduct];
-    const idSupplyRaw = orderRow?.[ORDER_COLS.idSupply];
-    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
-      ? Number(idSupplyRaw) : null;
-    const giaNhapCu = normalizeMoney(orderRow?.[ORDER_COLS.cost]);
-    const giaBanCu = normalizeMoney(orderRow?.[ORDER_COLS.price]);
-
-    if (!sanPham) {
-      return { price: fallbackPrice, cost: fallbackCost };
-    }
-
-    // Luồng thông báo đơn đến hạn (4 ngày):
-    // - Đơn MAVK: pct_promo có giá trị -> báo giá promo; pct_promo trống -> báo giá khách lẻ.
-    // => Không force khách lẻ ở đây, để pricing core tự quyết theo pct_promo.
-    const { pricing } = await calculateRenewalPricing(client, {
-      sanPham,
-      supplierId,
-      orderCode: String(orderRow?.[ORDER_COLS.idOrder] || ""),
-      fallbackCost: giaNhapCu,
-      fallbackPrice: giaBanCu,
-      forceKhachLe: false,
-    });
-    return { price: pricing.price, cost: pricing.cost };
-    /* legacy pricing path removed
-    const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
-
-    const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
-    const latestGiaNhap = resolveMoney(normalizedNhap?.value, giaNhapSource, giaNhapCu);
-
-    const normalizedPriceMax = normalizeImportValue(
-      maxPriceRow,
-      latestGiaNhap || giaNhapCu || undefined
-    );
-    const priceMax = resolveMoney(
-      normalizedPriceMax?.value,
-      maxPriceRow,
-      giaBanCu,
-      latestGiaNhap
-    );
-    const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
-
-    // Gói khuyến mãi (MAVK) hết hạn → thông báo theo giá khách lẻ
-    const idOrderForPrice = String(orderRow?.[ORDER_COLS.idOrder] || "");
-    const isPromoOrderForPrice =
-      Boolean(ORDER_PREFIXES?.promo) &&
-      idOrderForPrice.toUpperCase().startsWith(ORDER_PREFIXES.promo.toUpperCase());
-    const finalGiaBanRaw = calcGiaBan({
-      orderId: idOrderForPrice,
-      giaNhap: latestGiaNhap,
-      priceMax: effectivePriceMax,
-      pctCtv,
-      pctKhach,
-      giaBanFallback: giaBanCu,
-      forceKhachLe: isPromoOrderForPrice,
-    });
-
-    const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);
-    const finalGiaBan = resolveMoney(
-      roundToThousands(finalGiaBanRaw || 0),
-      effectivePriceMax,
-      giaBanCu,
-      latestGiaNhap
-    );
-
-    */
-  } catch (err) {
-    logger.warn("[Renewal] computeOrderCurrentPrice failed, using stored price", {
-      orderCode: orderRow?.[ORDER_COLS.idOrder],
-      error: err?.message,
-    });
-    return { price: fallbackPrice, cost: fallbackCost };
-  }
-};
-
 module.exports = {
   runRenewal,
   fetchOrderState,
@@ -665,4 +305,3 @@ module.exports = {
   pendingRenewalTasks,
   computeOrderCurrentPrice,
 };
-

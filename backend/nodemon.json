@@ -1,5 +1,5 @@
 {
-  "watch": ["src", "index.js", "scheduler.js"],
+  "watch": ["src", "webhook", "index.js", "scheduler.js"],
   "ext": "js,json",
   "ignore": ["src/**/*.spec.js", "src/**/*.test.js", "node_modules"],
   "exec": "node index.js",

@@ -1,4 +1,3 @@
-import { utils as XLSXUtils } from "xlsx";
 import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
 import * as Helpers from "@/lib/helpers";
 
@@ -107,7 +106,10 @@ export const normalizeReceiptRow = (
   };
 };
 
-export const buildExportWorksheet = (rows: PaymentReceipt[]) => {
+export const buildExportWorksheet = (
+  rows: PaymentReceipt[],
+  xlsxUtils: typeof import("xlsx").utils
+) => {
   const headerRow = [
     "#",
     "Mã đơn",
@@ -134,7 +136,7 @@ export const buildExportWorksheet = (rows: PaymentReceipt[]) => {
       : "Hoàn tiền",
   ]);
 
-  const worksheet = XLSXUtils.aoa_to_sheet([headerRow, ...dataRows]);
+  const worksheet = xlsxUtils.aoa_to_sheet([headerRow, ...dataRows]);
   worksheet["!cols"] = [
     { wch: 5 },
     { wch: 18 },

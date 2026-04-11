@@ -6,111 +6,28 @@
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { LOGIN_PAGE_URL, ADMIN_CONSOLE_BASE } = require("./shared/constants");
-const { runLoginFlow, isOnAdobeSite } = require("./loginFlow");
+const { FLOW_ERROR_CODES } = require("./shared/errorCodes");
+const { runLoginFlow } = require("./loginFlow");
 const { runB10ToB13 } = require("./checkInfoFlow");
+const {
+  DEFAULT_COOKIE_EXPIRY_DAYS,
+  gotoAdobeAdminConsoleB1,
+  toPwCookies,
+  fromPwCookies,
+  buildSuccessResult,
+  detectSessionValid,
+} = require("./runCheckFlow.helpers");
 
-// Tránh hit www.adobe.com (hay lỗi ERR_HTTP2_PROTOCOL_ERROR trên VPS/headless).
-// Admin Console entry ổn định hơn và vẫn dẫn về auth.services khi cần login.
-const ADOBE_ENTRY = ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
-
-/** Lỗi CDP kiểu "Object with guid response@... was not bound" — thường hết sau khi đóng tab và mở tab mới trong cùng context. */
-function isNavigationRecoverablePlaywrightError(message) {
-  const m = (message || "").toString();
-  return (
-    m.includes("was not bound") ||
-    m.includes("Target page, context or browser has been closed") ||
-    m.includes("Target closed") ||
-    m.includes("Execution context was destroyed") ||
-    m.includes("Protocol error")
-  );
-}
-
-/**
- * B1: goto admin console entry, có retry khi Playwright mất sync CDP với Response/navigation.
- * @param {import('playwright').Page} initialPage
- * @param {import('playwright').BrowserContext} context
- * @param {{ page: import('playwright').Page, context?: import('playwright').BrowserContext }|null} sharedSession - mutate .page nếu tạo tab mới
- * @returns {Promise<import('playwright').Page>}
- */
-async function gotoAdobeAdminConsoleB1(initialPage, context, sharedSession) {
-  const maxAttempts = 3;
-  let current = initialPage;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      logger.info("[adobe-v2] B1: goto ADMIN_CONSOLE entry (attempt %d)", attempt);
-      await current.goto(ADOBE_ENTRY, { waitUntil: "domcontentloaded", timeout: 60000 });
-      return current;
-    } catch (e) {
-      const msg = e.message || String(e);
-      logger.warn("[adobe-v2] B1 goto error (attempt %d): %s", attempt, msg);
-
-      const canRetry =
-        attempt < maxAttempts && context && isNavigationRecoverablePlaywrightError(msg);
-      if (!canRetry) {
-        throw e;
-      }
-
-      const newPage = await context.newPage();
-      await current.close().catch(() => {});
-      current = newPage;
-      if (sharedSession) {
-        sharedSession.page = newPage;
-      }
-    }
+function mapRunCheckErrorCode(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  if (msg.includes("timeout")) return FLOW_ERROR_CODES.TIMEOUT;
+  if (msg.includes("otp")) return FLOW_ERROR_CODES.OTP_NOT_FOUND;
+  if (msg.includes("redirect")) return FLOW_ERROR_CODES.REDIRECT_INVALID;
+  if (msg.includes("session")) return FLOW_ERROR_CODES.SESSION_EXPIRED;
+  if (msg.includes("navigation") || msg.includes("target closed")) {
+    return FLOW_ERROR_CODES.NAVIGATION_FAILED;
   }
-
-  throw new Error("B1: goto ADMIN_CONSOLE failed after retries");
-}
-
-/** Cookie session khi export được gán expiry mặc định để tái sử dụng 2–3 ngày (tránh chết sau 1h). */
-const DEFAULT_COOKIE_EXPIRY_DAYS = 3;
-
-/** Cookie format: DB/API → Playwright. Cookie không có expirationDate (lưu cũ) được gán expiry 3 ngày khi inject. */
-function toPwCookies(cookies) {
-  const now = Math.floor(Date.now() / 1000);
-  const defaultExpiry = now + DEFAULT_COOKIE_EXPIRY_DAYS * 24 * 3600;
-  return (cookies || [])
-    .filter((c) => c.name && c.domain)
-    .filter((c) => {
-      const exp = c.expirationDate ?? defaultExpiry;
-      return exp > now;
-    })
-    .map((c) => {
-      const expires = c.expirationDate && c.expirationDate > 0 ? c.expirationDate : defaultExpiry;
-      return {
-        name: c.name,
-        value: c.value || "",
-        domain: c.domain,
-        path: c.path || "/",
-        expires,
-        httpOnly: !!c.httpOnly,
-        secure: c.secure !== false,
-        sameSite: (c.sameSite || "Lax").toString() === "None" ? "None" : "Lax",
-      };
-    });
-}
-
-/** Playwright → DB/API. Cookie session (expires <= 0) được gán expiry mặc định 3 ngày để tái dùng. */
-function fromPwCookies(cookies) {
-  const now = Math.floor(Date.now() / 1000);
-  const defaultExpiry = now + DEFAULT_COOKIE_EXPIRY_DAYS * 24 * 3600;
-  return (cookies || []).map((c) => {
-    const isSession = !c.expires || c.expires <= 0;
-    const expirationDate = c.expires > 0 ? c.expires : defaultExpiry;
-    return {
-      name: c.name,
-      value: c.value || "",
-      domain: c.domain,
-      path: c.path || "/",
-      httpOnly: !!c.httpOnly,
-      secure: !!c.secure,
-      sameSite: c.sameSite || "Lax",
-      expirationDate,
-      session: isSession,
-    };
-  });
+  return FLOW_ERROR_CODES.UNKNOWN;
 }
 
 /**
@@ -118,12 +35,12 @@ function fromPwCookies(cookies) {
  * Nếu options.sharedSession = { context, page } thì dùng browser có sẵn (B14 có thể dùng tiếp), không đóng browser.
  * @param {string} email - Email đăng nhập Adobe
  * @param {string} password - Mật khẩu
- * @param {{ savedCookies?: any[], mailBackupId?: number, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, onlyLogin?: boolean }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users).
+ * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, onlyLogin?: boolean }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users).
  * @returns {Promise<{ success: boolean, error?: string, org_name?: string, license_status?: string, products?: any[], users?: any[], cookies?: any[] }>}
  */
 async function runCheckFlow(email, password, options = {}) {
   logger.info("[adobe-v2] runCheckFlow BẮT ĐẦU (cookie expiry=%d ngày) — adobe-renew-v2", DEFAULT_COOKIE_EXPIRY_DAYS);
-  const { savedCookies = [], mailBackupId = null, sharedSession = null, existingOrgName = null, onlyLogin = false } = options;
+  const { savedCookies = [], mailBackupId = null, otpSource = "imap", sharedSession = null, existingOrgName = null, onlyLogin = false } = options;
   let browser = null;
   let context;
   let page;
@@ -158,10 +75,22 @@ async function runCheckFlow(email, password, options = {}) {
   }
 
   try {
+    const hasSavedCookies = savedCookies.length > 0;
+    const pwCookies = hasSavedCookies ? toPwCookies(savedCookies) : [];
+    const hasUsableCookies = pwCookies.length > 0;
 
-    if (savedCookies.length > 0) {
-      const pwCookies = toPwCookies(savedCookies);
-      if (pwCookies.length > 0) await context.addCookies(pwCookies);
+    if (hasSavedCookies && hasUsableCookies) {
+      await context.addCookies(pwCookies);
+      logger.info(
+        "[adobe-v2] Cookie lifecycle: có %d cookie còn hạn, thử reuse session",
+        pwCookies.length
+      );
+    } else if (hasSavedCookies && !hasUsableCookies) {
+      logger.info(
+        "[adobe-v2] Cookie lifecycle: có cookie nhưng đã hết hạn/không dùng được → login lại"
+      );
+    } else {
+      logger.info("[adobe-v2] Cookie lifecycle: chưa có cookie → gọi luồng login");
     }
 
     // ─── B1: Đi thẳng vào Admin Console entry ───
@@ -172,61 +101,36 @@ async function runCheckFlow(email, password, options = {}) {
     await page.waitForTimeout(5000);
     await page.locator('button[aria-label="Close"], button[aria-label="close"], .dialog-close').first().click({ timeout: 3000 }).then(() => true).catch(() => false);
 
+    if (!hasUsableCookies) {
+      const loginMeta = await runLoginFlow(page, {
+        email,
+        password,
+        mailBackupId,
+        otpSource,
+      });
+      const resolvedOrgName =
+        existingOrgName || loginMeta?.selectedOrgName || null;
+      return buildSuccessResult({
+        context,
+        page,
+        runB10ToB13,
+        onlyLogin,
+        existingOrgName: resolvedOrgName,
+        cookieLogLabel: "Lưu cookies sau login mới",
+        includeWithExpiry: false,
+        onlyLoginLogLabel: "onlyLogin: login xong do thiếu/expired cookie",
+      });
+    }
+
     // ─── B2: Session check — tránh false positive ───
     // Adobe có thể show adminconsole shell trước rồi mới redirect sang auth.
     // Vì vậy không chỉ dựa vào URL; cần dựa thêm vào việc thấy màn login hay thấy org-switch.
     const urlAfterB1 = page.url();
 
-    const isLoginUiVisible = async () => {
-      const emailInputVisible = await page
-        .locator('input[name="username"], input[type="email"], input[name="email"]')
-        .first()
-        .isVisible()
-        .catch(() => false);
-
-      const passwordInputVisible = await page
-        .locator('input[type="password"], input#password')
-        .first()
-        .isVisible()
-        .catch(() => false);
-
-      return emailInputVisible || passwordInputVisible;
-    };
-
-    const isOrgSwitchVisible = async () => {
-      return await page
-        .locator('button[data-testid="org-switch-button"]')
-        .first()
-        .isVisible()
-        .catch(() => false);
-    };
-
     // Không dùng URL làm tiêu chí duy nhất.
     // Adobe có thể show shell adminconsole trước, rồi mới chuyển sang auth,
     // nên nếu check quá sớm sẽ bị false positive.
-    const deadline = Date.now() + 5000;
-    let sessionValid = false;
-
-    while (Date.now() < deadline) {
-      const urlNow = page.url() || "";
-      const onAuthUrl =
-        urlNow.includes("auth.services") ||
-        urlNow.includes("adobelogin.com") ||
-        urlNow.includes("auth.");
-
-      if (onAuthUrl) break;
-
-      // Nếu đang thấy form login thì chắc chắn chưa login thật.
-      if (await isLoginUiVisible()) break;
-
-      // Nếu thấy org switch thì coi như đã vào admin console (logged-in).
-      if (await isOrgSwitchVisible()) {
-        sessionValid = true;
-        break;
-      }
-
-      await page.waitForTimeout(250);
-    }
+    const sessionValid = await detectSessionValid(page, 5000);
 
     logger.info(
       "[adobe-v2] B2: url=%s → session %s",
@@ -235,37 +139,47 @@ async function runCheckFlow(email, password, options = {}) {
     );
 
     if (sessionValid) {
-      if (onlyLogin) {
-        const rawCookies = await context.cookies();
-        const cookies = fromPwCookies(rawCookies);
-        logger.info("[adobe-v2] onlyLogin: session còn hiệu lực, dừng trước B10–B13");
-        return { success: true, cookies };
-      }
-      const result = await runB10ToB13(page, { existingOrgName });
-      const rawCookies = await context.cookies();
-      const cookies = fromPwCookies(rawCookies);
-      logger.info("[adobe-v2] Lưu cookies: %d (expiry %d ngày)", cookies.length, DEFAULT_COOKIE_EXPIRY_DAYS);
-      return { success: true, ...result, cookies };
+      return buildSuccessResult({
+        context,
+        page,
+        runB10ToB13,
+        onlyLogin,
+        existingOrgName,
+        cookieLogLabel: "Lưu cookies",
+        includeWithExpiry: false,
+        onlyLoginLogLabel:
+          "onlyLogin: session còn hiệu lực, dừng trước B10–B13",
+      });
     }
 
     // Session hết hạn → B3–B9 (loginFlow) rồi B10–B13
-    await runLoginFlow(page, { email, password, mailBackupId });
-    if (onlyLogin) {
-      const rawCookies = await context.cookies();
-      const cookies = fromPwCookies(rawCookies);
-      logger.info("[adobe-v2] onlyLogin: dừng sau B9 (login xong), không chạy B10–B13");
-      return { success: true, cookies };
-    }
-    const result = await runB10ToB13(page, { existingOrgName });
-    const rawCookies = await context.cookies();
-    const cookies = fromPwCookies(rawCookies);
-    const withExpiry = cookies.filter((c) => c.expirationDate && c.expirationDate > Math.floor(Date.now() / 1000)).length;
-    logger.info("[adobe-v2] Lưu cookies: %d (expiry %d ngày, %d có expirationDate)", cookies.length, DEFAULT_COOKIE_EXPIRY_DAYS, withExpiry);
-    return { success: true, ...result, cookies };
+    const loginMeta = await runLoginFlow(page, {
+      email,
+      password,
+      mailBackupId,
+      otpSource,
+    });
+    const resolvedOrgName =
+      existingOrgName || loginMeta?.selectedOrgName || null;
+    return buildSuccessResult({
+      context,
+      page,
+      runB10ToB13,
+      onlyLogin,
+      existingOrgName: resolvedOrgName,
+      cookieLogLabel: "Lưu cookies",
+      includeWithExpiry: true,
+      onlyLoginLogLabel:
+        "onlyLogin: dừng sau B9 (login xong), không chạy B10–B13",
+    });
 
   } catch (err) {
     logger.error("[adobe-v2] runCheckFlow error: %s", err.message);
-    return { success: false, error: err.message };
+    return {
+      success: false,
+      error: err.message,
+      errorCode: mapRunCheckErrorCode(err),
+    };
   } finally {
     if (browser) await browser.close().catch(() => {});
   }

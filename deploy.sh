@@ -35,7 +35,6 @@ else
   echo "[2/3] Rebuilding Docker containers (BuildKit + layer cache)..."
 fi
 "${DC[@]}" -f docker-compose.yml down
-docker volume prune -f 2>/dev/null || true
 "${DC[@]}" -f docker-compose.yml build $NO_CACHE
 "${DC[@]}" -f docker-compose.yml up -d
 

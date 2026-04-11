@@ -29,6 +29,7 @@ const runAddUsersBatch = async (req, res) => {
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
           COLS.ALERT_CONFIG,
+          ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
           COLS.LICENSE_STATUS
         );
@@ -45,6 +46,7 @@ const runAddUsersBatch = async (req, res) => {
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
           COLS.ALERT_CONFIG,
+          ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
           COLS.LICENSE_STATUS
         )
@@ -135,6 +137,10 @@ const runAddUsersBatch = async (req, res) => {
             ? Number(account[COLS.MAIL_BACKUP_ID])
             : null;
         const savedCookies = account[COLS.ALERT_CONFIG]?.cookies || [];
+        const otpSource =
+          COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
+            ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+            : "imap";
         const v2 = await adobeRenewV2.addUsersWithProductV2(
           account[COLS.EMAIL],
           account[COLS.PASSWORD_ENC],
@@ -144,6 +150,7 @@ const runAddUsersBatch = async (req, res) => {
             mailBackupId: Number.isFinite(batchMailBackupId)
               ? batchMailBackupId
               : null,
+            otpSource,
             orgId: account[COLS.ORG_ID] || null,
           }
         );
@@ -250,6 +257,10 @@ const runAutoDeleteUsers = async ({
       account[COLS.MAIL_BACKUP_ID] != null
         ? Number(account[COLS.MAIL_BACKUP_ID])
         : null;
+    const otpSource =
+      COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
+        ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+        : "imap";
 
     logger.info("[renew-adobe] Auto-delete users bắt đầu", {
       id,
@@ -259,6 +270,7 @@ const runAutoDeleteUsers = async ({
     const result = await adobeRenewV2.autoDeleteUsers(email, password, normalized, {
       savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+      otpSource,
     });
 
     if (result.savedCookies && COLS.ALERT_CONFIG) {

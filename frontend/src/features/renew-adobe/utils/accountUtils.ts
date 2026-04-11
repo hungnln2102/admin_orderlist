@@ -23,10 +23,16 @@ export function normalizeAdobeAdminAccount(
           : "unknown";
 
   const aliasRaw = row.alias;
+  const rawOtpSource = String(row.otp_source ?? "imap").trim().toLowerCase();
+  const otpSource: "imap" | "tinyhost" | "hdsd" =
+    rawOtpSource === "tinyhost" || rawOtpSource === "hdsd"
+      ? rawOtpSource
+      : "imap";
   return {
     id: Number(row.id) || 0,
     email: String(row.email ?? ""),
-    password_enc: String(row.password_enc ?? ""),
+    password_encrypted: String(row.password_encrypted ?? row.password_enc ?? ""),
+    otp_source: otpSource,
     alias:
       aliasRaw != null && String(aliasRaw).trim() !== ""
         ? String(aliasRaw).trim()
@@ -37,7 +43,7 @@ export function normalizeAdobeAdminAccount(
     users_snapshot:
       row.users_snapshot != null ? String(row.users_snapshot) : null,
     order_code: row.order_code != null ? String(row.order_code) : null,
-    last_checked: row.last_checked != null ? String(row.last_checked) : null,
-    url_access: row.url_access != null ? String(row.url_access) : null,
+    last_checked_at: row.last_checked_at != null ? String(row.last_checked_at) : null,
+    access_url: row.access_url != null ? String(row.access_url) : null,
   };
 }

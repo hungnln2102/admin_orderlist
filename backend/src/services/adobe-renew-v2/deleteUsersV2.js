@@ -5,9 +5,14 @@
 
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
-const { runCheckFlow, fromPwCookies } = require("./runCheckFlow");
+const { runCheckFlow } = require("./runCheckFlow");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { gotoUsersPageWithCurrentSession, deleteUsersWithExistingPage, scrapeUsersSnapshot } = require("./userDeleteActions");
+const {
+  runGotoUsersFlow,
+  runDeleteUsersFlow,
+  runUsersSnapshotFlow,
+  runPersistUsersSessionFlow,
+} = require("./flows/users");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 
@@ -16,12 +21,13 @@ const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
  * @param {string} email - Admin email
  * @param {string} password - Mật khẩu
  * @param {string[]} userEmails - Danh sách email cần xóa
- * @param {{ savedCookies?: any[], mailBackupId?: number }} options
+ * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string }} options
  * @returns {{ deleted: string[], failed: string[], snapshot: object|null, savedCookies: object|null, error?: string }}
  */
 async function deleteUsersV2(email, password, userEmails, options = {}) {
   const savedCookies = options.savedCookies || [];
   const mailBackupId = options.mailBackupId || null;
+  const otpSource = options.otpSource || "imap";
   const userList = Array.isArray(userEmails) ? userEmails.filter((e) => (e || "").trim()) : [];
 
   if (userList.length === 0) {
@@ -50,6 +56,7 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
     const loginResult = await runCheckFlow(email, password, {
       savedCookies,
       mailBackupId,
+      otpSource,
       sharedSession,
       onlyLogin: true,
     });
@@ -73,31 +80,35 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
       await page.waitForTimeout(2000);
     }
 
-    await gotoUsersPageWithCurrentSession(page);
-    const { deleted, failed } = await deleteUsersWithExistingPage(page, userList);
+    await runGotoUsersFlow(page);
+    const deleteResult = await runDeleteUsersFlow(page, userList, {
+      stopOnError: false,
+    });
 
-    await gotoUsersPageWithCurrentSession(page);
-    const usersAfter = await scrapeUsersSnapshot(page);
-    logger.info("[adobe-v2] Check users (scrape bảng) xong → kết thúc. users=%d", usersAfter.length);
+    const deleted = deleteResult.done || [];
+    const failed = (deleteResult.failed || []).map((f) => f.email);
 
-    const adminEmail = (email || "").toLowerCase().trim();
+    await runGotoUsersFlow(page);
+    const snapshotResult = await runUsersSnapshotFlow(page, { adminEmail: email });
+    logger.info(
+      "[adobe-v2] Check users (scrape bảng) xong → kết thúc. users=%d",
+      (snapshotResult.users || []).length
+    );
     const snapshot = {
       orgName: null,
       licenseStatus: "unknown",
       products: [],
-      manageTeamMembers: usersAfter.filter((u) => (u.email || "").toLowerCase() !== adminEmail),
-      adminConsoleUsers: usersAfter,
+      manageTeamMembers: snapshotResult.manageTeamMembers,
+      adminConsoleUsers: snapshotResult.users,
     };
-
-    const rawCookies = await context.cookies();
-    const cookies = fromPwCookies(rawCookies);
+    const sessionResult = await runPersistUsersSessionFlow(context);
 
     logger.info("[adobe-v2] deleteUsersV2 done: deleted=%d, failed=%d", deleted.length, failed.length);
     return {
       deleted,
       failed,
       snapshot,
-      savedCookies: { cookies },
+      savedCookies: sessionResult.savedCookies,
     };
   } catch (err) {
     logger.error("[adobe-v2] deleteUsersV2 error: %s", err.message);

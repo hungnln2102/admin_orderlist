@@ -6,17 +6,23 @@
 
 const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
-const { runCheckFlow, fromPwCookies } = require("./runCheckFlow");
+const { runCheckFlow } = require("./runCheckFlow");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
-const { gotoUsersPageWithCurrentSession, scrapeUsersSnapshot } = require("./userDeleteActions");
-const { addUsersToOrgViaUI } = require("./userAddActions");
-const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
+const {
+  runGotoUsersFlow,
+  runCheckAdminProductFlow,
+  runRemoveAdminProductFlow,
+  runAddUsersFlow,
+  runUsersSnapshotFlow,
+  runPersistUsersSessionFlow,
+} = require("./flows/users");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 
 async function addUsersWithProductV2(adminEmail, password, userEmails, options = {}) {
   const savedCookies = options.savedCookies || [];
   const mailBackupId = options.mailBackupId || null;
+  const otpSource = options.otpSource || "imap";
   const emails = Array.isArray(userEmails) ? userEmails.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean) : [];
   if (emails.length === 0) {
     return { success: false, error: "Danh sách userEmails rỗng", savedCookies: null, snapshot: null };
@@ -44,6 +50,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     const loginResult = await runCheckFlow(adminEmail, password, {
       savedCookies,
       mailBackupId,
+      otpSource,
       sharedSession,
       onlyLogin: true,
     });
@@ -59,20 +66,17 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       await page.waitForTimeout(2000);
     }
 
-    await gotoUsersPageWithCurrentSession(page);
+    await runGotoUsersFlow(page);
 
-    const addResult = await addUsersToOrgViaUI(page, emails);
+    const addResult = await runAddUsersFlow(page, emails);
     if (!addResult.success) {
-      let cookies = [];
-      try {
-        cookies = fromPwCookies(await context.cookies());
-      } catch (e) {
-        logger.warn("[adobe-v2] addUsersWithProductV2: context.cookies sau add fail: %s", e.message);
-      }
+      const sessionResult = await runPersistUsersSessionFlow(context).catch(() => ({
+        savedCookies: null,
+      }));
       return {
         success: false,
-        error: addResult.error || "Add user UI fail",
-        savedCookies: cookies.length ? { cookies } : null,
+        error: "Add user UI fail",
+        savedCookies: sessionResult.savedCookies,
         snapshot: null,
       };
     }
@@ -82,35 +86,35 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
 
     // Remove product from admin if needed (B15)
     try {
+      const checkAdminProduct = await runCheckAdminProductFlow(page, adminEmail);
       const url = page.url();
-      const orgId = (url.match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/) || [])[1] || options.orgId || null;
-      if (orgId) await runB15RemoveProductFromAdmin(page, adminEmail, { orgId });
+      const orgId =
+        (url.match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/) || [])[1] ||
+        options.orgId ||
+        null;
+      if (checkAdminProduct.hasAdminProduct && orgId) {
+        await runRemoveAdminProductFlow(page, adminEmail, { orgId });
+      }
     } catch (e) {
       logger.warn("[adobe-v2] B15 remove admin product error: %s", e.message);
     }
 
-    await gotoUsersPageWithCurrentSession(page);
-    const usersAfter = await scrapeUsersSnapshot(page);
+    await runGotoUsersFlow(page);
+    const snapshotResult = await runUsersSnapshotFlow(page, { adminEmail });
+    const sessionResult = await runPersistUsersSessionFlow(context);
 
-    const adminNorm = (adminEmail || "").toLowerCase().trim();
-    const manageTeamMembers = usersAfter
-      .filter((u) => (u.email || "").toLowerCase().trim() !== adminNorm)
-      .map((u) => ({ name: u.name || "", email: (u.email || "").trim(), product: u.product === true }));
-
-    let cookies = [];
-    try {
-      cookies = fromPwCookies(await context.cookies());
-    } catch (e) {
-      logger.warn("[adobe-v2] addUsersWithProductV2: context.cookies trước return: %s", e.message);
-    }
     return {
       success: true,
-      addResult: { success: true, added: addResult.added || emails, failed: addResult.failed || [] },
+      addResult: {
+        success: true,
+        added: addResult.done || emails,
+        failed: (addResult.failed || []).map((f) => f.email),
+      },
       assignResult: { success: true },
-      manageTeamMembers,
-      userCount: manageTeamMembers.length,
+      manageTeamMembers: snapshotResult.manageTeamMembers,
+      userCount: snapshotResult.userCount,
       licenseStatus: "unknown",
-      savedCookies: cookies.length ? { cookies } : null,
+      savedCookies: sessionResult.savedCookies,
     };
   } catch (err) {
     logger.error("[adobe-v2] addUsersWithProductV2 error: %s", err.message);

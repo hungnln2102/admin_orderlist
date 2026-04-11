@@ -340,8 +340,8 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
     return {
       productId: null,
       variantId: null,
-      pctCtv: 1,
-      pctKhach: 1,
+      pctCtv: null,
+      pctKhach: null,
       pctPromo: 0,
       pctStu: null,
     };
@@ -391,8 +391,8 @@ const fetchProductPricing = async (client, productNameOrVariantId) => {
   return {
     productId: variantRow.variant_id ?? null,
     variantId: variantRow.variant_id ?? null,
-    pctCtv: variantRow.pct_ctv ?? 1,
-    pctKhach: variantRow.pct_khach ?? 1,
+    pctCtv: variantRow.pct_ctv ?? null,
+    pctKhach: variantRow.pct_khach ?? null,
     pctPromo: variantRow.pct_promo ?? 0,
     pctStu: variantRow.pct_stu ?? null,
   };

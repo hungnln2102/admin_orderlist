@@ -93,7 +93,13 @@ const errorHandler = (err, req, res, next) => {
  * 404 Not Found handler
  * Must be registered BEFORE error handler but AFTER all routes
  */
+const SILENT_404_PATTERN = /^\/($|_next|favicon\.ico|robots\.txt|\.well-known)/;
+
 const notFoundHandler = (req, res, next) => {
+  if (SILENT_404_PATTERN.test(req.originalUrl)) {
+    return res.status(404).json({ error: "Not Found" });
+  }
+
   const error = new AppError(
     `Không tìm thấy đường dẫn: ${req.originalUrl}`,
     404,

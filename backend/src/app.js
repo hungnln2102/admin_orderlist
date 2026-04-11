@@ -10,7 +10,8 @@ const {
   normalizeOrigin,
   session: sessionConfig,
 } = require("./config/appConfig");
-const routes = require("./routes");
+const { redisClient, isRedisAvailable } = require("./config/redisClient");
+const v1Routes = require("./routes/v1");
 const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { apiLimiter } = require("./middleware/rateLimiter");
@@ -77,29 +78,42 @@ const { pool: dbPool } = require("./config/database");
 
 app.get("/api/health", async (_req, res) => {
   const uptime = process.uptime();
+  const redisOk = isRedisAvailable();
   try {
     await dbPool.query("SELECT 1");
-    return res.json({ status: "ok", uptime, dbConnected: true });
+    return res.json({ status: "ok", uptime, dbConnected: true, redisConnected: redisOk });
   } catch {
-    return res.status(503).json({ status: "degraded", uptime, dbConnected: false });
+    return res.status(503).json({ status: "degraded", uptime, dbConnected: false, redisConnected: redisOk });
   }
 });
 
-app.use(
-  session({
-    name: sessionConfig.name,
-    secret: sessionConfig.secret,
-    resave: false,
-    saveUninitialized: false,
-    rolling: true,
-    cookie: {
-      httpOnly: true,
-      sameSite: sessionConfig.cookieSameSite,
-      secure: sessionConfig.cookieSecure,
-      maxAge: 1000 * 60 * 60 * 1,
-    },
-  })
-);
+const sessionOpts = {
+  name: sessionConfig.name,
+  secret: sessionConfig.secret,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true,
+  cookie: {
+    httpOnly: true,
+    sameSite: sessionConfig.cookieSameSite,
+    secure: sessionConfig.cookieSecure,
+    maxAge: 1000 * 60 * 60 * 1,
+  },
+};
+
+if (isRedisAvailable()) {
+  try {
+    const RedisStore = require("connect-redis").default;
+    sessionOpts.store = new RedisStore({ client: redisClient, prefix: "sess:" });
+    logger.info("[Session] Using Redis store");
+  } catch {
+    logger.warn("[Session] connect-redis not installed — using in-memory store");
+  }
+} else {
+  logger.info("[Session] Using in-memory store (no Redis)");
+}
+
+app.use(session(sessionOpts));
 
 app.use("/api", generateToken);
 app.use("/api", addTokenToResponse);
@@ -115,7 +129,8 @@ app.get("/api", (_req, res) => {
 });
 
 app.use("/api", apiLimiter);
-app.use("/api", routes);
+app.use("/api/v1", v1Routes);
+app.use("/api", v1Routes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

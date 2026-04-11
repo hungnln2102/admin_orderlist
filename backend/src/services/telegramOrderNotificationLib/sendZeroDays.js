@@ -11,7 +11,7 @@ const {
 } = require("./constants");
 const { buildExpiredOrderMessage } = require("./messageBuilders");
 const { sendTelegramMessage } = require("./telegramApi");
-const { isThreadError } = require("./errorHelpers");
+const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendZeroDaysRemainingNotification(orders = []) {
 
@@ -47,7 +47,7 @@ async function sendZeroDaysRemainingNotification(orders = []) {
     const index = i + 1;
     const message = buildExpiredOrderMessage(order, index, total);
 
-    const buildPayload = (includeTopic = true) => {
+    const buildTextPayload = (includeTopic = true) => {
       const payload = {
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
@@ -59,62 +59,55 @@ async function sendZeroDaysRemainingNotification(orders = []) {
       return payload;
     };
 
-    let includeTopic = true;
-    let sent = false;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        logger.info("[Order][Telegram] Sending expired order notification", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          total,
-          orderCode: order.id_order || order.idOrder,
-          includeTopic,
-        });
-
-        await sendTelegramMessage(buildPayload(includeTopic));
-
-        logger.info("[Order][Telegram] Expired order notification sent successfully", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          total,
-          orderCode: order.id_order || order.idOrder,
-        });
-        sent = true;
-        break;
-      } catch (err) {
-        logger.warn("[Order][Telegram] Send attempt failed", {
-          attempt: attempt + 1,
-          orderIndex: index,
-          orderCode: order.id_order || order.idOrder,
-          error: err?.message,
-          status: err?.status,
-          body: err?.body,
-        });
-
-        if (includeTopic && isThreadError(err)) {
-          logger.info("[Order][Telegram] Retrying without topic ID");
-          includeTopic = false;
-        } else {
+    await sendWithRetry({
+      buildPayload: ({ includeTopic }) => buildTextPayload(includeTopic),
+      sendFn: async (payload) => {
+        await sendTelegramMessage(payload);
+      },
+      maxAttempts: 3,
+      log: {
+        sending: ({ attempt, includeTopic }) =>
+          logger.info("[Order][Telegram] Sending expired order notification", {
+            attempt,
+            orderIndex: index,
+            total,
+            orderCode: order.id_order || order.idOrder,
+            includeTopic,
+          }),
+        success: ({ attempt }) =>
+          logger.info("[Order][Telegram] Expired order notification sent successfully", {
+            attempt,
+            orderIndex: index,
+            total,
+            orderCode: order.id_order || order.idOrder,
+          }),
+        attemptFailed: ({ attempt, error, status, body }) =>
+          logger.warn("[Order][Telegram] Send attempt failed", {
+            attempt,
+            orderIndex: index,
+            orderCode: order.id_order || order.idOrder,
+            error,
+            status,
+            body,
+          }),
+        retryNoTopic: () =>
+          logger.info("[Order][Telegram] Retrying without topic ID"),
+        permanentFailure: ({ error, stack, status, body }) =>
           logger.error("[Order][Telegram] Send failed permanently for order", {
             orderIndex: index,
             orderCode: order.id_order || order.idOrder,
-            error: err?.message,
-            stack: err?.stack,
-            status: err?.status,
-            body: err?.body,
-          });
-          break;
-        }
-      }
-    }
-
-    if (!sent) {
-      logger.error("[Order][Telegram] Failed to send notification for order", {
-        orderIndex: index,
-        orderCode: order.id_order || order.idOrder,
-      });
-    }
+            error,
+            stack,
+            status,
+            body,
+          }),
+        finalNotSent: () =>
+          logger.error("[Order][Telegram] Failed to send notification for order", {
+            orderIndex: index,
+            orderCode: order.id_order || order.idOrder,
+          }),
+      },
+    });
 
     if (i < orders.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));

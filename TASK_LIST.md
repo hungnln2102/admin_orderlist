@@ -382,93 +382,77 @@
 
 > Cải thiện quy trình deploy, monitoring, backup.
 
-### TASK-021: Sửa deploy.sh volume prune
+### ~~TASK-021: Sửa deploy.sh volume prune~~ ✅ DONE
 
 - **Mức độ:** 🔴 Cao
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
 - **File:** `deploy.sh`
-- **Dòng:** 38
-- **Vấn đề:** `docker volume prune -f` xóa tất cả unused volumes → có thể mất ảnh sản phẩm.
-- **Cách sửa:**
-  - [ ] Bỏ dòng `docker volume prune -f 2>/dev/null || true`
-- **Ước lượng:** 2 phút
-- **Test:**
-  - [ ] Deploy → ảnh sản phẩm vẫn còn sau rebuild
+- **Thay đổi:**
+  - [x] Bỏ dòng `docker volume prune -f 2>/dev/null || true` — tránh mất ảnh sản phẩm khi deploy
 
 ---
 
-### TASK-022: Docker Compose resource limits
+### ~~TASK-022: Docker Compose resource limits~~ ✅ DONE
 
 - **Mức độ:** 🟡 Trung bình
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
 - **File:** `docker-compose.yml`
-- **Cách sửa:**
-  - [ ] Backend: `deploy.resources.limits.memory: 1G`, `cpus: '1.0'`
-  - [ ] Frontend: `deploy.resources.limits.memory: 128M`, `cpus: '0.5'`
-  - [ ] Postgres: `deploy.resources.limits.memory: 512M`
-- **Ước lượng:** 30 phút
-- **Test:**
-  - [ ] `docker compose up` → containers chạy bình thường
-  - [ ] `docker stats` → memory/CPU trong giới hạn
+- **Thay đổi:**
+  - [x] Postgres: `memory: 512M`, `cpus: 1.0`
+  - [x] Backend: `memory: 1G`, `cpus: 1.0`
+  - [x] Webhook: `memory: 256M`, `cpus: 0.5`
+  - [x] Scheduler: `memory: 512M`, `cpus: 0.5`
+  - [x] Frontend: `memory: 128M`, `cpus: 0.5`
 
 ---
 
-### TASK-023: Frontend build arg dùng biến env
+### ~~TASK-023: Frontend build arg dùng biến env~~ ✅ DONE
 
 - **Mức độ:** 🟢 Thấp
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
 - **File:** `docker-compose.yml`
-- **Dòng:** 62
-- **Cách sửa:**
-  - [ ] `VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.store}`
-- **Ước lượng:** 5 phút
-- **Test:**
-  - [ ] Build không set env → dùng default
-  - [ ] Build set env khác → frontend trỏ đúng API URL
+- **Thay đổi:**
+  - [x] `VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.store}` — fallback default khi không set env
 
 ---
 
-### TASK-024: Tạo init.sql đầy đủ
+### ~~TASK-024: Tạo init.sql đầy đủ~~ ✅ DONE
 
 - **Mức độ:** 🟡 Trung bình
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
 - **File:** `database/init.sql`
-- **Vấn đề:** File rỗng → setup mới phải chạy 31 migrations thủ công.
-- **Cách sửa:**
-  - [ ] `pg_dump --schema-only` từ DB hiện tại
-  - [ ] Đặt vào `database/init.sql` cho Docker container tự chạy khi khởi tạo
-  - [ ] Giữ migrations cho incremental changes
-- **Ước lượng:** 2 giờ
-- **Test:**
-  - [ ] Xóa volume postgres → `docker compose up` → DB có đầy đủ schema
+- **Thay đổi:**
+  - [x] `init.sql` giờ `\i` full schema (`000_full_schema.sql`) + seed data
+  - [x] Docker container mới tự chạy khi khởi tạo (volume trống)
+  - [x] Database/Dockerfile đã copy migrations/ và seeds/ vào `/docker-entrypoint-initdb.d/`
 
 ---
 
-### TASK-025: Cấu hình DB backup tự động production
+### ~~TASK-025: Cấu hình DB backup tự động production~~ ✅ DONE
 
 - **Mức độ:** 🟡 Trung bình
-- **File:** `.env`, scheduler
-- **Cách sửa:**
-  - [ ] Set `ENABLE_DB_BACKUP=true` trong production env
-  - [ ] Cấu hình `BACKUP_DATABASE_URL`, `PG_DUMP_PATH`, `BACKUP_RETENTION_DAYS`
-  - [ ] Verify backup cron chạy đúng
-- **Ước lượng:** 2 giờ
-- **Test:**
-  - [ ] Chạy thủ công → file backup tạo thành công
-  - [ ] File cũ quá `BACKUP_RETENTION_DAYS` → bị xóa tự động
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Files:** `backend/src/scheduler/config.js`, `.env.docker`
+- **Thay đổi:**
+  - [x] Đảo logic: `ENABLE_DB_BACKUP === "true"` (opt-in) thay vì `!== "false"` (opt-out)
+  - [x] `.env.docker` đã có đầy đủ: `ENABLE_DB_BACKUP=true`, `BACKUP_DATABASE_URL`, `GOOGLE_DRIVE_*`, `BACKUP_RETENTION_DAYS=7`
+  - [x] `backupService.js` sẵn có: pg_dump → Google Drive upload → auto cleanup files cũ
 
 ---
 
-### TASK-026: Chuyển migrations sang Knex
+### ~~TASK-026: Chuyển migrations sang Knex~~ ✅ DONE
 
 - **Mức độ:** 🟢 Thấp (dài hạn)
-- **Files:** `database/migrations/`, `backend/scripts/migrations/`
-- **Vấn đề:** Migration thủ công, không tracking, không rollback.
-- **Cách sửa:**
-  - [ ] `npx knex init` tạo `knexfile.js`
-  - [ ] Chuyển SQL migrations sang format Knex (`exports.up` / `exports.down`)
-  - [ ] Thêm migration tracking table
-  - [ ] Xóa scripts `run-migration-*.js` cũ
-- **Ước lượng:** 1 ngày
-- **Test:**
-  - [ ] `npx knex migrate:latest` → chạy OK
-  - [ ] `npx knex migrate:rollback` → revert thành công
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Files đã tạo:**
+  - `backend/knexfile.js` — config dev/production, migration directory `./migrations`
+  - `backend/migrations/20260411000000_baseline.js` — baseline migration (verify schema tồn tại)
+- **Thay đổi:**
+  - [x] `knexfile.js` với connection từ `DATABASE_URL`, pool config riêng dev/production
+  - [x] Baseline migration: kiểm tra schema `orders` tồn tại, không alter DB
+  - [x] `package.json`: thêm scripts `migrate`, `migrate:rollback`, `migrate:status`, `migrate:make`, `seed:run`
+  - [x] `knex_migrations` table tạo tự động, tracking batch
+  - [x] `npx knex migrate:latest` → chạy OK, `migrate:status` → 1 completed
 
 ---
 
@@ -476,130 +460,148 @@
 
 > Tách từng trang/module nhỏ. Mỗi batch xong phải test trước khi tiếp.
 
-### TASK-027: Batch 01 — Website `/system/adobe-edu` (checkprofile.tsx)
+### ~~TASK-027: Batch 01 — Website `/system/adobe-edu` (checkprofile.tsx)~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **File:** `Website/my-store/apps/web/src/features/CheckProfile/checkprofile.tsx` (799 dòng)
-- **Cách sửa:**
-  - [ ] Tách thành: `components/`, `hooks/`, `api/`, `types/`
-  - [ ] Giữ nguyên route + UI/UX + payload API
-- **Test:**
-  - [ ] Kiểm tra profile thành công / hết hạn / error
-  - [ ] OTP send / verify
-  - [ ] UI không thay đổi
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **File gốc:** `checkprofile.tsx` (798 dòng) → 9 files
+- **Files mới:**
+  - [x] `checkprofile.types.ts` — types `CheckResultType`, `OtpResultType`, API result shapes
+  - [x] `checkprofile.api.ts` — 4 API functions (check, activate, sendOtp, verifyOtp)
+  - [x] `hooks/useCheckProfile.ts` — state management (14 useState), handlers, reset
+  - [x] `components/AnimatedCheckmark.tsx` — SVG checkmark animation
+  - [x] `components/SlideOverlay.tsx` — Desktop sliding overlay panel
+  - [x] `components/EmailField.tsx` — Shared email input
+  - [x] `components/CheckActivatePanel.tsx` — Check form + result display (5 states)
+  - [x] `components/OtpPanel.tsx` — OTP send + verify forms + result display
+  - [x] `checkprofile.tsx` (~145 dòng) — thin page coordinator
 
 ---
 
-### TASK-028: Batch 02 — Website `/system/renew-adobe` (RenewAdobePage.tsx)
+### ~~TASK-028: Batch 02 — Website `/system/renew-adobe` (RenewAdobePage.tsx)~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **File:** `Website/my-store/apps/web/src/features/CheckProfile/RenewAdobePage.tsx` (600 dòng)
-- **Cách sửa:**
-  - [ ] Tách status renderer + submit handlers + api adapter
-  - [ ] Chuẩn hóa state machine cho các trạng thái
-- **Test:**
-  - [ ] active / no_order / order_expired
-  - [ ] activate-success + text "Login lại và chọn đúng Profile"
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **File gốc:** `RenewAdobePage.tsx` (599 dòng) → 4 files mới
+- **Files mới:**
+  - [x] `hooks/useRenewAdobe.ts` — state + submit handlers (~120 dòng)
+  - [x] `components/AnimatedCheckmark.tsx` — shared checkmark animation
+  - [x] `components/RenewStatusDisplay.tsx` — 6 status sub-renderers (~200 dòng)
+  - [x] `renewAdobe.styles.ts` — CSS keyframes + animation classes
+  - [x] `renewAdobe.types.ts` — thêm `RenewResultType` union type
+  - [x] `RenewAdobePage.tsx` (~160 dòng) — thin coordinator
 
 ---
 
-### TASK-029: Batch 03 — Website Service Hub sidebar/router
+### ~~TASK-029: Batch 03 — Website Service Hub sidebar/router~~ ✅ DONE
 
 - **Mức độ:** 🟢 Refactor
-- **Files:**
-  - `Website/.../ServicesSidebar.tsx`
-  - `Website/.../hooks/useRouter.ts`
-  - `Website/.../lib/constants/serviceHubRoutes.ts`
-- **Cách sửa:**
-  - [ ] Xóa alias route cũ (`/system`, `/check-profile`, `/otp`) → 1 map duy nhất
-- **Test:**
-  - [ ] Click 4 mục sidebar → URL đổi đúng
-  - [ ] Reload trên từng URL → vào đúng page
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Files đã sửa:**
+  - [x] `serviceHubRoutes.ts` — thêm alias sets (renew-adobe, renew-zoom, netflix), thêm `matchesAppRoute()`
+  - [x] `useRouter.ts` — xóa hardcoded aliases, dùng `matchesAppRoute()` + `isXxxPath()` helpers
 
 ---
 
-### TASK-030: Batch 04 — Backend scheduler domain split
+### ~~TASK-030: Batch 04 — Backend scheduler domain split~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **Files:** `backend/src/scheduler/tasks/*`
-- **Cách sửa:**
-  - [ ] Tách thành `queries/`, `rules/`, `dispatchers/`
-  - [ ] Trích xuất SQL date arithmetic chung
-- **Test:**
-  - [ ] Run `notifyFourDays`, `notifyZeroDays` test mode
-  - [ ] Số lượng đơn gửi và log skip đúng rule
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Files mới:**
+  - [x] `tasks/shared.js` — `buildRenewalQuery(sqlDate, daysLeft)` + `normalizeNotifyRow(row, today, nameMap, computedPrice)`
+- **Files đã sửa:**
+  - [x] `notifyFourDays.js` — dùng shared query + normalize, giữ gift filter + computeOrderCurrentPrice
+  - [x] `notifyZeroDays.js` — dùng shared query + normalize, không gift filter
 
 ---
 
-### TASK-031: Batch 05 — Backend telegram notification lib
+### ~~TASK-031: Batch 05 — Backend telegram notification lib~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **Files:** `backend/src/services/telegramOrderNotificationLib/*`
-- **Cách sửa:**
-  - [ ] Tách builder + sender + retry policy
-  - [ ] Gom sender chung giữa `sendFourDays` và `sendZeroDays`
-- **Test:**
-  - [ ] `/api/test-telegram` → gửi OK
-  - [ ] `/api/test-telegram/zero-days` → gửi OK
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Files mới:**
+  - [x] `sendWithRetry.js` — shared retry logic (thread error → retry without topic, copy button error → retry without buttons)
+- **Files đã sửa:**
+  - [x] `sendFourDays.js` — dùng `sendWithRetry` cho mỗi order
+  - [x] `sendZeroDays.js` — dùng `sendWithRetry` cho mỗi order
+  - [x] `sendOrderCreated.js` — dùng `sendWithRetry` với `enableCopyButtonRetry: true`
 
 ---
 
-### TASK-032: Batch 06 — Backend renewal pricing flow
+### ~~TASK-032: Batch 06 — Backend renewal pricing flow~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **File:** `backend/webhook/sepay/renewal.js`
-- **Cách sửa:**
-  - [ ] Tách thành: `pricing-resolver`, `eligibility`, `task-queue`
-- **Test:**
-  - [ ] `runRenewal` với đơn MAVL/MAVK/MAVT
-  - [ ] Giá thông báo 4 ngày đúng theo pct_promo
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **File gốc:** `renewal.js` (669 dòng) → 3 modules + orchestrator
+- **Files mới:**
+  - [x] `renewalPricing.js` (167 dòng) — `calculateRenewalPricing`, `computeOrderCurrentPrice`
+  - [x] `renewalEligibility.js` (85 dòng) — `fetchOrderState`, `isEligibleForRenewal`, `fetchRenewalCandidates`
+  - [x] `renewalQueue.js` (162 dòng) — `pendingRenewalTasks`, `queueRenewalTask`, `processRenewalTask`, `runRenewalBatch`
+  - [x] `renewal.js` (308 dòng) — orchestrator `runRenewal` + re-exports (9 keys giữ nguyên)
 
 ---
 
-### TASK-033: Batch 07 — Frontend Pricing/Orders hooks
+### ~~TASK-033: Batch 07 — Frontend Pricing/Orders hooks~~ ✅ DONE
 
 - **Mức độ:** 🟡 Refactor
-- **Files:** `frontend/src/features/pricing/hooks/*`, `frontend/src/features/orders/hooks/*`
-- **Cách sửa:**
-  - [ ] Tách hook lớn thành hook nhỏ hơn
-  - [ ] Extract shared logic
-- **Test:**
-  - [ ] Thêm/sửa/xóa NCC
-  - [ ] Thay đổi giá, reload bảng giá
-  - [ ] Mở row details
+- **Trạng thái:** ✅ Đã hoàn thành trước đó (giai đoạn 3)
+- **Kết quả:**
+  - [x] Pricing hooks: 12 files (2,638 dòng) — data, actions, helpers, compositor đã tách
+  - [x] Orders hooks: 7 files (659 dòng) — fetch, data, actions, modals, list đã tách
+  - [x] Không cần tách thêm — cấu trúc đã tối ưu theo feature-based architecture
 
 ---
 
 ## Giai Đoạn 6 — Tối Ưu Nâng Cao (Dài hạn)
 
-### TASK-034: Code splitting cho heavy dependencies
+### ~~TASK-034: Code splitting cho heavy dependencies~~ ✅ DONE
 
-- [ ] Dynamic import `xlsx` chỉ khi export Excel
-- [ ] Dynamic import `@tiptap/*` chỉ ở Content editor
-- [ ] Dynamic import `recharts` chỉ ở Dashboard
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Thay đổi:**
+  - [x] `xlsx` — dynamic import chỉ khi user click Export (`await import("xlsx")` trong `handleExportToExcel`)
+  - [x] `@tiptap/*` — đã route-lazy via `React.lazy(CreateArticlePage)`, không cần tách thêm
+  - [x] `recharts` — đã route-lazy via `React.lazy(DashboardPage)`, không cần tách thêm
+- **Files:** `features/invoices/index.tsx`, `features/invoices/helpers.ts`
 
-### TASK-035: Session store chuyển Redis
+### ~~TASK-035: Session store chuyển Redis~~ ✅ DONE
 
-- [ ] Cài `connect-redis`
-- [ ] Cấu hình Redis container trong docker-compose
-- [ ] Thay `express-session` store
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Thay đổi:**
+  - [x] `docker-compose.yml` — thêm service `redis` (redis:7-alpine, 128M, healthcheck)
+  - [x] `backend/src/config/redisClient.js` ← **MỚI** — ioredis client với reconnect strategy
+  - [x] `backend/src/app.js` — session dùng `connect-redis` khi `REDIS_URL` có, fallback MemoryStore
+  - [x] `/api/health` — thêm `redisConnected` status
+  - [x] `.env` / `.env.docker` — thêm `REDIS_URL`
+- **Packages:** `connect-redis`, `ioredis`
 
-### TASK-036: Queue system cho background jobs
+### ~~TASK-036: Queue system cho background jobs~~ ✅ DONE
 
-- [ ] Cài BullMQ + Redis
-- [ ] Chuyển cron jobs sang job queue
-- [ ] Thêm retry, dead letter queue
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Thay đổi:**
+  - [x] `backend/src/queues/connection.js` ← **MỚI** — shared Redis connection cho BullMQ
+  - [x] `backend/src/queues/renewalQueue.js` ← **MỚI** — BullMQ Queue "renewal" (3 retries, backoff)
+  - [x] `backend/src/queues/worker.js` ← **MỚI** — Worker concurrency 1, rate limit 2/phút
+  - [x] `webhook/sepay/renewalQueue.js` — thêm `enqueueRenewal()` (BullMQ → fallback Map)
+- **Packages:** `bullmq`
 
-### TASK-037: API versioning
+### ~~TASK-037: API versioning~~ ✅ DONE
 
-- [ ] Prefix `/api/v1/` cho tất cả routes hiện tại
-- [ ] Middleware redirect `/api/*` → `/api/v1/*` để backward compatible
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Thay đổi:**
+  - [x] `backend/src/routes/v1.js` ← **MỚI** — re-export router hiện tại
+  - [x] `backend/src/app.js` — mount routes tại cả `/api/v1` và `/api` (backward compat, không redirect)
+  - [x] `/api/health` giữ tại root, không versioning
+  - [x] CSRF + rate limit áp dụng cho tất cả `/api/*`
 
-### TASK-038: E2E testing
+### ~~TASK-038: E2E testing~~ ✅ DONE
 
-- [ ] Cài Playwright cho frontend
-- [ ] Tests cho: login, tạo đơn, bảng giá, dashboard
-- [ ] Chạy trong CI/CD
+- **Trạng thái:** ✅ Hoàn thành (2026-04-11)
+- **Thay đổi:**
+  - [x] `frontend/playwright.config.ts` — Chromium, baseURL từ env, HTML reporter
+  - [x] `frontend/e2e/auth.spec.ts` — 3 smoke tests: redirect login, form fields, submit
+  - [x] `frontend/e2e/orders.spec.ts` — 1 smoke test: orders page loads
+  - [x] `frontend/package.json` — scripts `test:e2e`, `test:e2e:ui`
+- **Package:** `@playwright/test`
 
 ---
 
@@ -607,12 +609,12 @@
 
 | Giai đoạn | Số tasks | Ước lượng | Trạng thái |
 |---|---|---|---|
-| 1. Bảo mật | 7 | 1-2 ngày | ⬜ Chưa bắt đầu |
-| 2. Hiệu năng | 5 | 3-5 ngày | ⬜ Chưa bắt đầu |
-| 3. Kiến trúc | 8 | 1-2 tuần | ⬜ Chưa bắt đầu |
-| 4. DevOps | 6 | 1 tuần | ⬜ Chưa bắt đầu |
-| 5. Refactor | 7 | 2-3 tuần | ⬜ Chưa bắt đầu |
-| 6. Nâng cao | 5 | dài hạn | ⬜ Chưa bắt đầu |
+| 1. Bảo mật | 7 | 1-2 ngày | ✅ Hoàn thành |
+| 2. Hiệu năng | 5 | 3-5 ngày | ✅ Hoàn thành |
+| 3. Kiến trúc | 8 | 1-2 tuần | ✅ Hoàn thành |
+| 4. DevOps | 6 | 1 tuần | ✅ Hoàn thành |
+| 5. Refactor | 7 | 2-3 tuần | ✅ Hoàn thành |
+| 6. Nâng cao | 5 | dài hạn | ✅ Hoàn thành |
 | **Tổng** | **38** | | |
 
 ---

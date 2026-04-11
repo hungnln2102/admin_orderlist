@@ -1,10 +1,18 @@
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
+import {
+  MagnifyingGlassIcon,
+  EyeIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import { maskPassword } from "../utils/accountUtils";
 import type { AdobeAdminAccount } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { UrlAccessCell } from "./UrlAccessCell";
+import { EditAccountModal } from "./EditAccountModal";
 
 export type RenewAdobeAccountsTableProps = {
   accounts: AdobeAdminAccount[];
@@ -25,6 +33,7 @@ export type RenewAdobeAccountsTableProps = {
   onCheck: (account: AdobeAdminAccount) => void;
   onDeleteAdmin: (account: AdobeAdminAccount) => void;
   onSaveUrlAccess: (accountId: number, url: string) => void;
+  onRefresh?: () => void;
 };
 
 export function RenewAdobeAccountsTable({
@@ -46,8 +55,15 @@ export function RenewAdobeAccountsTable({
   onCheck,
   onDeleteAdmin,
   onSaveUrlAccess,
+  onRefresh,
 }: RenewAdobeAccountsTableProps) {
   const start = (currentPage - 1) * pageSize;
+  const [editingAccount, setEditingAccount] = useState<AdobeAdminAccount | null>(null);
+  const otpSourceLabel = (source?: AdobeAdminAccount["otp_source"]) => {
+    if (source === "tinyhost") return "TinyHost";
+    if (source === "hdsd") return "otp.hdsd.net";
+    return "IMAP";
+  };
 
   return (
     <div className="space-y-6">
@@ -108,7 +124,11 @@ export function RenewAdobeAccountsTable({
                           {account.email}
                         </p>
                         <p className="text-xs text-white/60">
-                          Mật khẩu: {maskPassword(account.password_enc)}
+                          Mật khẩu: {maskPassword(account.password_encrypted)}
+                        </p>
+                        <p className="text-xs text-white/70 break-all">OTP</p>
+                        <p className="text-xs text-white/70 break-all">
+                          Nguồn OTP: {otpSourceLabel(account.otp_source)}
                         </p>
                         <p className="text-xs text-white/70 break-all">
                           Alias: {account.alias ?? "—"}
@@ -123,7 +143,7 @@ export function RenewAdobeAccountsTable({
                           status={account.license_status}
                           account={account}
                         />
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-nowrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => onCheck(account)}
@@ -132,9 +152,24 @@ export function RenewAdobeAccountsTable({
                               isCheckingAll ||
                               deletingAdminAccountId !== null
                             }
-                            className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                            title="Check"
+                            aria-label="Check account"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 disabled:opacity-50"
                           >
-                            {checkingId === account.id ? "Đang check..." : "Check"}
+                            {checkingId === account.id ? (
+                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <EyeIcon className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingAccount(account)}
+                            title="Sửa"
+                            aria-label="Sửa account"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-400/35"
+                          >
+                            <PencilSquareIcon className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -144,9 +179,15 @@ export function RenewAdobeAccountsTable({
                               isCheckingAll ||
                               deletingAdminAccountId !== null
                             }
-                            className="rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                            title="Xóa"
+                            aria-label="Xóa account"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 disabled:opacity-50"
                           >
-                            {deletingAdminAccountId === account.id ? "Đang xóa..." : "Xóa"}
+                            {deletingAdminAccountId === account.id ? (
+                              <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <TrashIcon className="h-4 w-4" />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -161,12 +202,13 @@ export function RenewAdobeAccountsTable({
               <thead>
                 <tr className="[&>th]:px-2 [&>th]:sm:px-4 [&>th]:py-3 [&>th]:text-[10px] [&>th]:sm:text-[11px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 [&>th]:text-left [&>th]:bg-white/[0.03] [&>th]:whitespace-nowrap">
                   <th className="min-w-[180px]">EMAIL</th>
-                  <th className="min-w-[100px]">PASSWORD_ENC</th>
-                  <th className="min-w-[120px]">ALIAS</th>
-                  <th className="min-w-[140px]">ORG_NAME</th>
-                  <th className="w-24 text-center">USER_COUNT</th>
-                  <th className="w-36">LICENSE_STATUS</th>
-                  <th className="w-20 text-center">PRODUCT</th>
+                  <th className="min-w-[100px]">PASSWORD</th>
+                  <th className="min-w-[120px]">OTP</th>
+                  <th className="min-w-[120px]">OTP SOURCE</th>
+                  <th className="min-w-[140px]">TEAM</th>
+                  <th className="w-24 text-center">USER</th>
+                  <th className="w-36">LICENSE</th>
+                  <th className="w-20 text-center">LINK PRODUCT</th>
                   <th className="w-28 text-center">THAO TÁC</th>
                 </tr>
               </thead>
@@ -174,7 +216,7 @@ export function RenewAdobeAccountsTable({
                 {currentRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-12 text-center text-white/70"
                     >
                       <p className="text-lg mb-2">
@@ -203,10 +245,13 @@ export function RenewAdobeAccountsTable({
                           {account.email}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/60 font-mono">
-                          {maskPassword(account.password_enc)}
+                          {maskPassword(account.password_encrypted)}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/80 break-all max-w-[200px]">
-                          {account.alias ?? "—"}
+                          <p className="text-xs text-white/70">{account.alias ?? "—"}</p>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
+                          {otpSourceLabel(account.otp_source)}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
                           {account.org_name ?? "—"}
@@ -222,12 +267,12 @@ export function RenewAdobeAccountsTable({
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
                           <UrlAccessCell
-                            value={account.url_access ?? ""}
+                            value={account.access_url ?? ""}
                             onSave={(url) => onSaveUrlAccess(account.id, url)}
                           />
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-center">
-                          <div className="inline-flex flex-wrap items-center justify-center gap-1.5">
+                          <div className="inline-flex flex-nowrap items-center justify-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => onCheck(account)}
@@ -236,13 +281,30 @@ export function RenewAdobeAccountsTable({
                                 isCheckingAll ||
                                 deletingAdminAccountId !== null
                               }
-                              className="rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={
+                                checkingId === account.id
+                                  ? "Đang check..."
+                                  : isBeingChecked
+                                    ? "Checking..."
+                                    : "Check"
+                              }
+                              aria-label="Check account"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {checkingId === account.id
-                                ? "Đang check..."
+                                ? <ArrowPathIcon className="h-4 w-4 animate-spin" />
                                 : isBeingChecked
-                                  ? "Checking..."
-                                  : "Check"}
+                                  ? <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                  : <EyeIcon className="h-4 w-4" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingAccount(account)}
+                              title="Sửa"
+                              aria-label="Sửa account"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-400/35 hover:bg-amber-500/25"
+                            >
+                              <PencilSquareIcon className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
@@ -252,11 +314,13 @@ export function RenewAdobeAccountsTable({
                                 isCheckingAll ||
                                 deletingAdminAccountId !== null
                               }
-                              className="rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 px-2.5 py-1.5 text-xs font-semibold hover:bg-rose-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={deletingAdminAccountId === account.id ? "Đang xóa..." : "Xóa"}
+                              aria-label="Xóa account"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15 text-rose-300 border border-rose-400/35 hover:bg-rose-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {deletingAdminAccountId === account.id
-                                ? "Đang xóa..."
-                                : "Xóa"}
+                                ? <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                : <TrashIcon className="h-4 w-4" />}
                             </button>
                           </div>
                         </td>
@@ -280,6 +344,13 @@ export function RenewAdobeAccountsTable({
           </div>
         )}
       </div>
+      {editingAccount && (
+        <EditAccountModal
+          account={editingAccount}
+          onClose={() => setEditingAccount(null)}
+          onSaved={() => onRefresh?.()}
+        />
+      )}
     </div>
   );
 }

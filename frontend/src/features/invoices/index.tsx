@@ -3,7 +3,6 @@ import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { apiFetch } from "@/lib/api";
 import * as Helpers from "@/lib/helpers";
-import { utils as XLSXUtils, writeFile as writeXLSXFile } from "xlsx";
 import {
   PaymentReceipt,
   ReceiptCategory,
@@ -143,13 +142,14 @@ export default function Invoices() {
     );
   }, [receipts]);
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (!filteredReceipts.length) return;
-    const worksheet = buildExportWorksheet(filteredReceipts);
-    const workbook = XLSXUtils.book_new();
-    XLSXUtils.book_append_sheet(workbook, worksheet, "Biên nhận thanh toán");
+    const xlsx = await import("xlsx");
+    const worksheet = buildExportWorksheet(filteredReceipts, xlsx.utils);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Biên nhận thanh toán");
     const isoDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    writeXLSXFile(workbook, `payment_receipts_${isoDate}.xlsx`);
+    xlsx.writeFile(workbook, `payment_receipts_${isoDate}.xlsx`);
   };
 
   const exportDisabled = loading || filteredReceipts.length === 0;

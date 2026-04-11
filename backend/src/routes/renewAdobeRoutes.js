@@ -1,5 +1,5 @@
 const express = require("express");
-const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../controllers/RenewAdobeController");
 
 const router = express.Router();
 
@@ -20,6 +20,7 @@ router.post("/auto-assign", runAutoAssign);
 router.post("/fix-user", fixSingleUser);
 router.post("/fix-users-round", fixUsersRound);
 router.patch("/accounts/:id/url-access", updateUrlAccess);
+router.patch("/accounts/:id", updateAccount);
 
 router.get("/variants", listVariants);
 router.get("/product-system", listProductSystem);

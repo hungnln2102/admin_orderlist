@@ -112,6 +112,7 @@ export default function RenewAdobeAdmin() {
         onCheck={handleCheck}
         onDeleteAdmin={openDeleteAdminModal}
         onSaveUrlAccess={handleSaveUrlAccess}
+        onRefresh={loadAccounts}
       />
 
       <div className="mt-6 space-y-6">

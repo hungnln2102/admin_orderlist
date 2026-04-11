@@ -8,6 +8,7 @@ const {
 const { TABLE, COLS } = require("./accountTable");
 const { findAccountMatchByEmail, normalizeEmail } = require("./accountLookup");
 const { removeMappingsForAccount } = require("../../services/userAccountMappingService");
+const { normalizeOtpSource } = require("../../services/otpProviderService");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP
@@ -256,6 +257,7 @@ const listAccounts = async (_req, res) => {
       `${TABLE}.${COLS.IS_ACTIVE}`,
       `${TABLE}.${COLS.CREATED_AT}`,
       `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
+      ...(COLS.OTP_SOURCE ? [`${TABLE}.${COLS.OTP_SOURCE}`] : []),
       ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
     ];
 
@@ -368,6 +370,16 @@ const createAccount = async (req, res) => {
         .json({ error: "Email này đã có trong danh sách tài khoản admin." });
     }
 
+    const otpSource = normalizeOtpSource(req.body?.otp_source, {
+      hasMailBackupId: Number.isFinite(resolvedMailBackupId),
+    });
+    if (otpSource === "imap" && !Number.isFinite(resolvedMailBackupId)) {
+      return res.status(400).json({
+        error:
+          "Nguồn OTP là IMAP thì bắt buộc phải chọn Alias (mail dự phòng).",
+      });
+    }
+
     const [inserted] = await db(TABLE)
       .insert({
         [COLS.EMAIL]: email,
@@ -381,6 +393,7 @@ const createAccount = async (req, res) => {
         [COLS.IS_ACTIVE]: true,
         [COLS.CREATED_AT]: db.fn.now(),
         [COLS.MAIL_BACKUP_ID]: resolvedMailBackupId,
+        ...(COLS.OTP_SOURCE ? { [COLS.OTP_SOURCE]: otpSource } : {}),
         ...(COLS.URL_ACCESS ? { [COLS.URL_ACCESS]: null } : {}),
       })
       .returning(COLS.ID);
@@ -450,20 +463,71 @@ const updateUrlAccess = async (req, res) => {
     return res.status(400).json({ error: "ID không hợp lệ." });
   }
 
-  const urlAccess = (req.body?.url_access ?? "").toString().trim();
+  const urlAccess = (req.body?.access_url ?? req.body?.url_access ?? "").toString().trim();
 
   try {
     await db(TABLE)
       .where(COLS.ID, id)
       .update({ [COLS.URL_ACCESS]: urlAccess || null });
 
-    return res.json({ success: true, url_access: urlAccess || null });
+    return res.json({ success: true, access_url: urlAccess || null });
   } catch (err) {
     logger.error("[renew-adobe] updateUrlAccess failed", {
       id,
       error: err.message,
     });
     return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const updateAccount = async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: "ID không hợp lệ." });
+  }
+
+  const allowedFields = {
+    email: COLS.EMAIL,
+    password_encrypted: COLS.PASSWORD_ENC,
+    org_name: COLS.ORG_NAME,
+    otp_source: COLS.OTP_SOURCE,
+  };
+
+  const updates = {};
+  for (const [key, col] of Object.entries(allowedFields)) {
+    if (req.body?.[key] !== undefined) {
+      const val = String(req.body[key] ?? "").trim();
+      if (key === "email") {
+        if (!val || !EMAIL_OK.test(val)) {
+          return res.status(400).json({ error: "Email không hợp lệ." });
+        }
+      }
+      if (key === "otp_source") {
+        updates[col] = normalizeOtpSource(val);
+        continue;
+      }
+      updates[col] = val || null;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "Không có trường nào để cập nhật." });
+  }
+
+  try {
+    const [updated] = await db(TABLE)
+      .where(COLS.ID, id)
+      .update(updates)
+      .returning("*");
+
+    if (!updated) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản." });
+    }
+
+    return res.json({ success: true, account: updated });
+  } catch (err) {
+    logger.error("[renew-adobe] updateAccount failed", { id, error: err.message });
+    return res.status(500).json({ error: "Cập nhật thất bại." });
   }
 };
 
@@ -475,4 +539,5 @@ module.exports = {
   createAccount,
   deleteAccount,
   updateUrlAccess,
+  updateAccount,
 };

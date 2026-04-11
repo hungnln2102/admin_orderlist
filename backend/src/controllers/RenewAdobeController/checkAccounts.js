@@ -7,6 +7,7 @@ const {
 const logger = require("../../utils/logger");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { TABLE, COLS } = require("./accountTable");
+const { persistCheckResult } = require("./checkSyncService");
 
 async function runCheckForAccountId(id) {
   logger.info(
@@ -33,6 +34,10 @@ async function runCheckForAccountId(id) {
     account[COLS.MAIL_BACKUP_ID] != null
       ? Number(account[COLS.MAIL_BACKUP_ID])
       : null;
+  const otpSource =
+    COLS.OTP_SOURCE && account[COLS.OTP_SOURCE]
+      ? String(account[COLS.OTP_SOURCE]).trim().toLowerCase()
+      : "imap";
   logger.info("[renew-adobe] Check account", { id, email });
 
   const existingUrlAccess =
@@ -50,6 +55,7 @@ async function runCheckForAccountId(id) {
   const result = await adobeRenewV2.checkAccount(email, password, {
     savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
     mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+    otpSource,
     existingUrlAccess,
     existingOrgName,
   });
@@ -65,31 +71,10 @@ async function runCheckForAccountId(id) {
   }
 
   const scrapedData = result.scrapedData;
-  const updatePayload = {
-    [COLS.ORG_NAME]: scrapedData.orgName ?? null,
-    [COLS.USER_COUNT]: Number.isFinite(scrapedData.userCount)
-      ? scrapedData.userCount
-      : 0,
-    [COLS.LICENSE_STATUS]: scrapedData.licenseStatus ?? "unknown",
-    [COLS.LAST_CHECKED]: new Date(),
-  };
-
-  if (
-    scrapedData.manageTeamMembers &&
-    Array.isArray(scrapedData.manageTeamMembers)
-  ) {
-    updatePayload[COLS.USERS_SNAPSHOT] = JSON.stringify(
-      scrapedData.manageTeamMembers
-    );
-  }
-  if (scrapedData.urlAccess && COLS.URL_ACCESS) {
-    updatePayload[COLS.URL_ACCESS] = scrapedData.urlAccess;
-  }
-  if (COLS.ALERT_CONFIG && result.savedCookies) {
-    updatePayload[COLS.ALERT_CONFIG] = result.savedCookies;
-  }
-
-  await db(TABLE).where(COLS.ID, id).update(updatePayload);
+  await persistCheckResult(id, {
+    scrapedData,
+    savedCookies: result.savedCookies || null,
+  });
   logger.info("[renew-adobe] Check xong — đã cập nhật DB", {
     id,
     license_status: scrapedData.licenseStatus,
@@ -113,6 +98,7 @@ async function runCheckForAccountId(id) {
         await adobeRenewV2.autoDeleteUsers(email, password, userEmails, {
           savedCookiesFromDb: result.savedCookies || null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+          otpSource,
         });
         // Chỉ cập nhật user_count; giữ users_snapshot (danh sách email trước khi kick) để job
         // renewAdobeCheckAndNotify → purgeAndDeleteNoLicenseAdobeAdminAccount vẫn có fallback

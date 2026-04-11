@@ -8,7 +8,7 @@ import {
   getPaginated,
   buildPaginationPages,
 } from "../utils/orderListTransform";
-import { orderDurationOverlapsIsoRange } from "../utils/ordersHelpers";
+import { orderCreatedWithinIsoRange } from "../utils/ordersHelpers";
 
 export type OrdersDurationRange = { from: string; to: string };
 
@@ -42,7 +42,7 @@ export function useOrdersList({
     const narrowed =
       durationRange?.from && durationRange?.to
         ? ordersWithVirtual.filter((o) =>
-            orderDurationOverlapsIsoRange(o, durationRange.from, durationRange.to)
+            orderCreatedWithinIsoRange(o, durationRange.from, durationRange.to)
           )
         : ordersWithVirtual;
 

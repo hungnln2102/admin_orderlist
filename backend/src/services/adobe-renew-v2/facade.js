@@ -1,6 +1,6 @@
 /**
  * Facade Playwright V2 cho Renew Adobe.
- * Mục tiêu: giữ contract API hiện tại nhưng bỏ dependency runtime vào adobe-http.
+ * Mục tiêu: giữ contract API hiện tại trên một luồng runtime duy nhất của adobe-renew-v2.
  */
 
 const { chromium } = require("playwright");
@@ -37,13 +37,14 @@ function normalizeSavedCookiesFromDb(raw) {
  * Check account theo luồng V2 (B1-B13 + B14/B15 nếu cần).
  * @param {string} email
  * @param {string} password
- * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, existingUrlAccess?: string|null, existingOrgName?: string|null }} options
+ * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, otpSource?: string|null, existingUrlAccess?: string|null, existingOrgName?: string|null }} options
  * @returns {Promise<{ success: boolean, scrapedData: any|null, savedCookies: any|null, error?: string }>}
  */
 async function checkAccount(email, password, options = {}) {
   const savedCookiesFromDb = normalizeSavedCookiesFromDb(options.savedCookiesFromDb);
   const cookiesToUse = savedCookiesFromDb?.cookies || [];
   const mailBackupId = options.mailBackupId || null;
+  const otpSource = options.otpSource || "imap";
   const existingOrgName =
     options.existingOrgName && String(options.existingOrgName).trim()
       ? String(options.existingOrgName).trim()
@@ -76,6 +77,7 @@ async function checkAccount(email, password, options = {}) {
     const result = await runCheckFlow(email, password, {
       savedCookies: cookiesToUse,
       mailBackupId,
+      otpSource,
       sharedSession,
       existingOrgName,
     });
@@ -109,6 +111,7 @@ async function checkAccount(email, password, options = {}) {
       try {
         const autoAssign = await getOrCreateAutoAssignUrlWithPage(page, result.orgId, email, password, {
           mailBackupId,
+          otpSource,
         });
         urlAccess = autoAssign.url;
         if (autoAssign.savedCookies && autoAssign.savedCookies.length) {
@@ -167,7 +170,7 @@ async function checkAccount(email, password, options = {}) {
  * @param {string} email
  * @param {string} password
  * @param {string} userEmail
- * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null }} options
+ * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, otpSource?: string|null }} options
  * @returns {Promise<{ success: boolean, deleted?: string[], failed?: string[], snapshot?: any, savedCookies?: any, error?: string }>}
  */
 async function removeUserFromAccount(email, password, userEmail, options = {}) {
@@ -177,6 +180,7 @@ async function removeUserFromAccount(email, password, userEmail, options = {}) {
   const v2 = await deleteUsersV2(email, password, [userEmail], {
     savedCookies,
     mailBackupId: options.mailBackupId || null,
+    otpSource: options.otpSource || "imap",
   });
   return {
     success: (v2.deleted || []).includes(userEmail),
@@ -193,7 +197,7 @@ async function removeUserFromAccount(email, password, userEmail, options = {}) {
  * @param {string} email
  * @param {string} password
  * @param {string[]} userEmails
- * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null }} options
+ * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, otpSource?: string|null }} options
  * @returns {Promise<{ deleted: string[], failed: string[], snapshot: any|null, savedCookies?: any, error?: string }>}
  */
 async function autoDeleteUsers(email, password, userEmails, options = {}) {
@@ -205,6 +209,7 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
   const v2 = await deleteUsersV2(email, password, userEmails, {
     savedCookies,
     mailBackupId: options.mailBackupId || null,
+    otpSource: options.otpSource || "imap",
   });
   return {
     deleted: v2.deleted || [],
@@ -220,7 +225,7 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
  * @param {string} email
  * @param {string} password
  * @param {string[]} userEmails
- * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, orgId?: string|null, _orgName?: string|null }} options
+ * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, otpSource?: string|null, orgId?: string|null, _orgName?: string|null }} options
  */
 async function addUsersWithProduct(email, password, userEmails, options = {}) {
   const savedCookies =
@@ -228,6 +233,7 @@ async function addUsersWithProduct(email, password, userEmails, options = {}) {
   const v2 = await addUsersWithProductV2(email, password, userEmails, {
     savedCookies,
     mailBackupId: options.mailBackupId || null,
+    otpSource: options.otpSource || "imap",
     orgId: options.orgId || null,
   });
   if (!v2.success) throw new Error(v2.error || "V2 addUsersWithProduct fail");

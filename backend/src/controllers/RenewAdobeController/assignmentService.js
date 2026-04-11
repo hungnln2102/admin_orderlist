@@ -48,6 +48,7 @@ async function assignUserToAvailableAccount(userEmail) {
       COLS.LICENSE_STATUS,
       COLS.USER_COUNT,
       COLS.ALERT_CONFIG,
+      ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID,
       COLS.IS_ACTIVE
     )
@@ -67,6 +68,10 @@ async function assignUserToAvailableAccount(userEmail) {
       ? Number(target[COLS.MAIL_BACKUP_ID])
       : null;
   const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+  const otpSource =
+    COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
+      ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
+      : "imap";
 
   logger.info(
     "[renew-adobe] assignUserToAvailableAccount: email=%s → account=%s",
@@ -81,6 +86,7 @@ async function assignUserToAvailableAccount(userEmail) {
     {
       savedCookies,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+      otpSource,
     }
   );
 
@@ -148,6 +154,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       COLS.LICENSE_STATUS,
       COLS.USER_COUNT,
       COLS.ALERT_CONFIG,
+      ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID,
       COLS.IS_ACTIVE
     )
@@ -178,6 +185,10 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       ? Number(target[COLS.MAIL_BACKUP_ID])
       : null;
   const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+  const otpSource =
+    COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
+      ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
+      : "imap";
 
   logger.info(
     "[renew-adobe] fixUsersOneRoundTightest: account=%s slotsLeft=%s batchSize=%s still=%s",
@@ -195,6 +206,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       {
         savedCookies,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+        otpSource,
       }
     );
 
