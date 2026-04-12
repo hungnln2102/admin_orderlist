@@ -41,3 +41,9 @@ export const getImportPriceBySupplyName = (
   const priceValue = priceByName?.[SUPPLY_PRICE_COLS.price];
   return Number.isFinite(priceValue) ? Number(priceValue) : undefined;
 };
+
+/** NCC cửa hàng nội bộ: không dùng giá nhập; giá bán = lợi nhuận (backend cost = 0). */
+export const isMavrykShopSupplierName = (name: string | null | undefined): boolean => {
+  const raw = String(name ?? "").trim().toLowerCase();
+  return raw === "mavryk" || raw === "shop";
+};

@@ -14,6 +14,8 @@ export type CalculatePriceRequest = {
 };
 
 export type CalculatePriceResponse = {
+  /** true khi NCC Mavryk/Shop: cost = 0, giá bán = lợi nhuận */
+  mavryk_profit_mode?: boolean;
   cost?: number;
   price?: number;
   promoPrice?: number;

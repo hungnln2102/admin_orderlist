@@ -3,6 +3,7 @@ const {
   ORDER_PREFIXES,
   isMavnImportOrder,
 } = require("../../helpers");
+const { isMavrykShopSupplierName } = require("../../src/utils/orderHelpers");
 const {
   pool,
   ORDER_TABLE,
@@ -241,6 +242,20 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     const isMavn = isMavnImportOrder({ id_order: orderCode });
 
+    let supplierNameForNcc = "";
+    if (supplierId != null && Number.isFinite(Number(supplierId))) {
+      try {
+        const supRes = await client.query(
+          `SELECT supplier_name FROM supplier WHERE id = $1 LIMIT 1`,
+          [supplierId]
+        );
+        supplierNameForNcc = String(supRes.rows[0]?.supplier_name ?? "").trim();
+      } catch (e) {
+        logger.warn("[Renewal] Không đọc được tên NCC", { supplierId, error: e.message });
+      }
+    }
+    const skipNccLedger = isMavrykShopSupplierName(supplierNameForNcc);
+
     // Renewal flow: Cần Gia Hạn → Đang Xử Lý — ghi nhận vòng gia hạn vào dashboard tháng (trừ đơn MAVN nhập hàng).
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
@@ -273,17 +288,18 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
         orderCode,
       });
     }
-    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0 && !isMavn) {
+    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0 && !skipNccLedger) {
       try {
         await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {
         logger.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp", { orderCode, error: balanceErr.message, stack: balanceErr.stack });
       }
-    } else if (isMavn && supplierId && finalGiaNhap > 0) {
-      logger.info("[Renewal] Bỏ cộng công nợ NCC (đơn MAVN nhập hàng)", {
+    } else if (skipNccLedger && supplierId && finalGiaNhap > 0) {
+      logger.info("[Renewal] Bỏ cộng công nợ NCC (NCC Mavryk/Shop)", {
         orderCode,
         supplierId,
         finalGiaNhap,
+        isMavn,
       });
     }
 

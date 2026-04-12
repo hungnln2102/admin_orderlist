@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { ORDER_FIELDS } from "../../../../constants";
+import { isMavrykShopSupplierName } from "../../../../shared/utils/supply";
 import { CustomerType, Order, Supply, SupplyPrice } from "../types";
 
 type RecalcPrice = (
@@ -106,11 +107,9 @@ export const useSupplySelection = ({
       const fallbackCost = Number(formData[ORDER_FIELDS.COST] || 0);
       const supplyName =
         selectedSupply?.supplier_name ?? selectedSupply?.source_name ?? "";
-      const newBasePrice = getSupplyImportPrice(
-        sourceId,
-        supplyName,
-        fallbackCost
-      );
+      const newBasePrice = isMavrykShopSupplierName(supplyName)
+        ? 0
+        : getSupplyImportPrice(sourceId, supplyName, fallbackCost);
       setSelectedSupplyId(sourceId === 0 ? null : sourceId);
       setFormData((prev) => {
         return {

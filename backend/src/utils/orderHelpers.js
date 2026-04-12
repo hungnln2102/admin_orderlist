@@ -142,7 +142,13 @@ function calculatePeriods() {
   };
 }
 
-/** Đơn mã MAVN (nhập hàng): không ghi nhận công nợ / thanh toán NCC (payment_supply). */
+/** NCC tên Mavryk hoặc Shop — cửa hàng nội bộ, không cộng/trừ payment_supply. */
+function isMavrykShopSupplierName(name) {
+  const raw = String(name ?? "").trim().toLowerCase();
+  return raw === "mavryk" || raw === "shop";
+}
+
+/** Đơn mã MAVN (nhập hàng). */
 function isMavnImportOrder(row) {
   const prefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
   const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
@@ -166,4 +172,5 @@ module.exports = {
   calculatePeriods,
   isMavnImportOrder,
   isGiftOrder,
+  isMavrykShopSupplierName,
 };

@@ -94,17 +94,23 @@ export const usePriceCalculation = ({
         }
         */
 
-        const raw = (data || {}) as RawCalculatedPriceResult;
+        const raw = (data || {}) as RawCalculatedPriceResult & {
+          mavryk_profit_mode?: boolean;
+        };
         const normalizedRegisterDMY =
           Helpers.formatDateToDMY(registerDateStr) ||
           registerDateStr ||
           Helpers.getTodayDMY();
 
+        const mavrykMode = Boolean(raw.mavryk_profit_mode);
         const mapped: CalculatedPriceResult = {
-          cost: Math.max(0, Number(raw.gia_nhap ?? raw.cost ?? 0) || 0),
+          cost: mavrykMode
+            ? 0
+            : Math.max(0, Number(raw.gia_nhap ?? raw.cost ?? 0) || 0),
           price: Math.max(0, Number(raw.gia_ban ?? raw.price ?? 0) || 0),
           days: Number(raw.so_ngay_da_dang_ki ?? raw.days ?? 0) || 0,
           expiry_date: "",
+          mavrykProfitMode: mavrykMode,
         };
 
         const expiryRaw = (raw.expiry_date ?? raw.order_expired ?? raw.het_han ?? "").trim();
@@ -181,9 +187,11 @@ export const usePriceCalculation = ({
       setFormData((prev) => {
         const prevGiaNhap = Number(prev[ORDER_FIELDS.COST] || 0);
         const giaNhapFromResult =
-          Number.isFinite(result.cost) && result.cost > 0
-            ? result.cost
-            : undefined;
+          result.mavrykProfitMode === true
+            ? 0
+            : Number.isFinite(result.cost) && result.cost > 0
+              ? result.cost
+              : undefined;
         const shouldUpdateCost = options?.updateCost ?? true;
         const giaNhap = shouldUpdateCost
           ? giaNhapFromResult ?? Number(fallbackImport ?? prevGiaNhap ?? 0)
@@ -196,7 +204,11 @@ export const usePriceCalculation = ({
             : undefined;
         let giaBan = giaBanFromResult ?? prevGiaBan ?? 0;
         if (customerType === ORDER_CODE_PREFIXES.PROMO) {
-          giaBan = giaBanFromResult ?? giaNhap ?? prevGiaBan ?? 0;
+          const nhap = Number(giaNhap ?? 0);
+          giaBan =
+            giaBanFromResult ??
+            (nhap > 0 ? nhap : prevGiaBan) ??
+            0;
         }
         if (customerType === ORDER_CODE_PREFIXES.GIFT) {
           giaBan = 0;

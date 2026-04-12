@@ -16,6 +16,7 @@ import { CreateOrderCustomerSection } from "./components/CreateOrderCustomerSect
 import { CreateOrderPricingSection } from "./components/CreateOrderPricingSection";
 import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { isMavrykShopSupplierName } from "@/shared/utils/supply";
 
 /** Chỉ coi là đủ khi đúng dd/mm/yyyy (tránh parse lệch khi đang gõ). */
 const isCompleteDMY = (value: string): boolean =>
@@ -81,6 +82,15 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         label: s.supplier_name ?? s.source_name,
       })),
     [supplies]
+  );
+  const selectedSupplyLabel = useMemo(() => {
+    if (selectedSupplyId == null) return "";
+    const opt = supplyOptions.find((o) => o.value === selectedSupplyId);
+    return String(opt?.label ?? "");
+  }, [selectedSupplyId, supplyOptions]);
+  const isMavrykSupply = useMemo(
+    () => isMavrykShopSupplierName(selectedSupplyLabel),
+    [selectedSupplyLabel]
   );
   const canSelectCustomerType = useMemo(() => {
     const hasProduct = Boolean(formData[ORDER_FIELDS.ID_PRODUCT]);
@@ -347,6 +357,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 customerType={customerType}
                 formData={formData}
                 registerDateDMY={registerDateDMY}
+                isMavrykSupply={isMavrykSupply}
                 costValue={costValue}
                 priceValue={priceValue}
                 onRegisterDateChange={handleRegisterDateChange}

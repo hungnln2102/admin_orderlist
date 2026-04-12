@@ -15,7 +15,7 @@ const { nextId } = require("../../../services/idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../services/orderCodeService");
 const { sendOrderCreatedNotification } = require("../../../services/telegramOrderNotification");
 const logger = require("../../../utils/logger");
-const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
 const {
     addSupplierImportOnProcessing,
     updateDashboardMonthlySummaryOnStatusChange,
@@ -34,6 +34,7 @@ const attachCreateOrderRoute = (router) => {
         const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
         const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
+        const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
 
         if (payload[productIdCol] == null && req.body?.variant_id != null) {
             const numericVariant = Number(req.body.variant_id);
@@ -82,11 +83,25 @@ const attachCreateOrderRoute = (router) => {
             }
         }
 
+        if (payload[supplyIdCol] != null) {
+            const supRow = await db(TABLES.supplier)
+                .select(COLS.SUPPLIER.SUPPLIER_NAME)
+                .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
+                .first();
+            if (isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME])) {
+                payload[costCol] = 0;
+            }
+        }
+
         const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
         const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
+        const importPrefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
         const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
+        const isMavnCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
         if (isGiftOrderCreate) {
             payload[priceCol] = 0;
+            payload.status = STATUS.PROCESSING;
+        } else if (isMavnCreate) {
             payload.status = STATUS.PROCESSING;
         } else {
             payload.status = STATUS.UNPAID;
@@ -103,6 +118,9 @@ const attachCreateOrderRoute = (router) => {
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
             if (isGiftOrderCreate) {
+                await addSupplierImportOnProcessing(trx, { status: STATUS.UNPAID }, newOrder);
+                await updateDashboardMonthlySummaryOnStatusChange(trx, { status: STATUS.UNPAID }, newOrder);
+            } else if (isMavnCreate) {
                 await addSupplierImportOnProcessing(trx, { status: STATUS.UNPAID }, newOrder);
                 await updateDashboardMonthlySummaryOnStatusChange(trx, { status: STATUS.UNPAID }, newOrder);
             }

@@ -1,6 +1,8 @@
 import type React from "react";
+import { useMemo } from "react";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
+import { getCreateOrderPricingCopy } from "../createOrderPricingCopy";
 import {
   inputClass,
   labelClass,
@@ -16,6 +18,8 @@ type CreateOrderPricingSectionProps = {
   customerType: CustomerType;
   formData: Partial<Order>;
   registerDateDMY: string;
+  /** NCC Mavryk/Shop: không dùng giá nhập; giá bán = lợi nhuận */
+  isMavrykSupply?: boolean;
   costValue: string | number | undefined;
   priceValue: string | number | undefined;
   onRegisterDateChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -31,6 +35,7 @@ export const CreateOrderPricingSection = ({
   customerType,
   formData,
   registerDateDMY,
+  isMavrykSupply = false,
   costValue,
   priceValue,
   onRegisterDateChange,
@@ -41,14 +46,18 @@ export const CreateOrderPricingSection = ({
   onPriceChange,
 }: CreateOrderPricingSectionProps) => {
   const isGift = customerType === ORDER_CODE_PREFIXES.GIFT;
+  const costDisplay = isMavrykSupply ? 0 : costValue;
+
+  const copy = useMemo(
+    () => getCreateOrderPricingCopy(customerType, isMavrykSupply),
+    [customerType, isMavrykSupply]
+  );
 
   return (
     <section className={`${panelClass} lg:col-span-2`}>
       <div className="mb-4">
         <h4 className={panelTitleClass}>Chi phí & thời hạn đơn hàng</h4>
-        <p className={panelSubtitleClass}>
-          Theo dõi ngày hiệu lực và giá trị tài chính của đơn hàng.
-        </p>
+        <p className={panelSubtitleClass}>{copy.panelSubtitle}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div>
@@ -90,8 +99,8 @@ export const CreateOrderPricingSection = ({
           />
         </div>
         <div>
-          <label className={labelClass}>Giá nhập</label>
-          {customMode ? (
+          <label className={labelClass}>{copy.costLabel}</label>
+          {customMode && !isMavrykSupply ? (
             <input
               type="text"
               inputMode="numeric"
@@ -104,14 +113,15 @@ export const CreateOrderPricingSection = ({
             <input
               type="text"
               name={ORDER_FIELDS.COST}
-              value={Helpers.formatCurrency(costValue ?? 0)}
+              value={Helpers.formatCurrency(costDisplay ?? 0)}
               readOnly
+              title={copy.costFieldTitle}
               className={`${inputClass} font-semibold ${readOnlyClass}`}
             />
           )}
         </div>
         <div>
-          <label className={labelClass}>Giá bán</label>
+          <label className={labelClass}>{copy.priceLabel}</label>
           {customMode ? (
             <input
               type="text"
@@ -124,6 +134,7 @@ export const CreateOrderPricingSection = ({
               }
               onChange={isGift ? undefined : onPriceChange}
               readOnly={isGift}
+              title={copy.priceFieldTitle}
               className={`${inputClass} font-black text-emerald-300 ${
                 isGift ? readOnlyClass : ""
               }`}
@@ -137,7 +148,7 @@ export const CreateOrderPricingSection = ({
                 isGift ? "0" : Helpers.formatCurrency(priceValue ?? 0)
               }
               readOnly
-              title={isGift ? "Đơn quà tặng, giá bán lưu trong hệ thống là 0" : undefined}
+              title={copy.priceFieldTitle}
               className={`${inputClass} font-black text-emerald-300 ${readOnlyClass}`}
             />
           )}

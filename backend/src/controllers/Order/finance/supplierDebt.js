@@ -3,8 +3,30 @@ const { resolveSupplierNameColumn } = require("../../SuppliesController/helpers"
 const { STATUS, TABLES } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const logger = require("../../../utils/logger");
-const { isMavnImportOrder } = require("../../../utils/orderHelpers");
+const { isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
 const { calcRemainingImport, ceilToThousands } = require("./refunds");
+
+const resolveSupplierDisplayName = async(trx, row) => {
+    if (row?.supply != null && String(row.supply).trim() !== "") {
+        return String(row.supply).trim();
+    }
+    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+    const sid = row?.[supplyIdCol];
+    if (sid == null) return null;
+    const supplierNameCol = await resolveSupplierNameColumn();
+    const r = await trx(TABLES.supplier)
+        .select(supplierNameCol)
+        .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, sid)
+        .first();
+    return r ? String(r[supplierNameCol] ?? "").trim() : null;
+};
+
+/** NCC nội bộ Mavryk / Shop: không ghi nhận cộng trừ payment_supply. */
+const shouldSkipNccLedgerForOrder = async(trx, row) => {
+    if (!row) return false;
+    const name = await resolveSupplierDisplayName(trx, row);
+    return isMavrykShopSupplierName(name);
+};
 
 const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
 const PAYMENT_SUPPLY_TABLE = tableName(
@@ -122,7 +144,7 @@ const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date())
 };
 
 const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
-    if (isMavnImportOrder(orderRow) || isMavnImportOrder(normalized)) {
+    if (await shouldSkipNccLedgerForOrder(trx, orderRow) || await shouldSkipNccLedgerForOrder(trx, normalized)) {
         return;
     }
 
@@ -186,7 +208,7 @@ const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
 };
 
 const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
-    if (isMavnImportOrder(beforeRow) || isMavnImportOrder(afterRow)) {
+    if (await shouldSkipNccLedgerForOrder(trx, beforeRow) || await shouldSkipNccLedgerForOrder(trx, afterRow)) {
         return;
     }
 
@@ -231,7 +253,7 @@ const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
 };
 
 const addSupplierImportOnProcessing = async(trx, beforeRow, afterRow) => {
-    if (isMavnImportOrder(beforeRow) || isMavnImportOrder(afterRow)) {
+    if (await shouldSkipNccLedgerForOrder(trx, beforeRow) || await shouldSkipNccLedgerForOrder(trx, afterRow)) {
         return;
     }
 

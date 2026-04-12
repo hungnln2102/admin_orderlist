@@ -32,6 +32,8 @@ export interface CalculatedPriceResult {
   price: number;
   days: number;
   expiry_date: string;
+  /** NCC Mavryk/Shop: không giá nhập; giá bán = lợi nhuận */
+  mavrykProfitMode?: boolean;
 }
 
 export type RawCalculatedPriceResult = Partial<{

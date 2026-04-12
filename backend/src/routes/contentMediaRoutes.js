@@ -11,6 +11,13 @@ const router = express.Router();
 const ARTICLE_IMAGE_DIR = path.join(__dirname, "../../image/articles");
 fs.mkdirSync(ARTICLE_IMAGE_DIR, { recursive: true });
 
+const ARTICLE_IMAGE_EXTS = new Set([".webp", ".jpg", ".jpeg", ".png", ".gif"]);
+
+const isArticleImageFile = (filename) => {
+  const ext = path.extname(filename || "").toLowerCase();
+  return ARTICLE_IMAGE_EXTS.has(ext);
+};
+
 const getForwardedHeader = (req, headerName) => {
   const raw = req.get(headerName);
   if (!raw) return "";
@@ -27,6 +34,24 @@ const buildArticleImageUrl = (req, fileName) => {
   const base = `${protocol}://${host}`;
   return `${base}/image/articles/${encodeURIComponent(fileName)}`;
 };
+
+router.get("/article-images", async (req, res) => {
+  try {
+    const entries = await fs.promises.readdir(ARTICLE_IMAGE_DIR, { withFileTypes: true });
+    const items = entries
+      .filter((entry) => entry.isFile() && isArticleImageFile(entry.name))
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        fileName: name,
+        url: buildArticleImageUrl(req, name),
+      }));
+    return res.json({ items, count: items.length });
+  } catch (e) {
+    logger.error("List article images failed", { error: e.message });
+    return res.status(500).json({ error: "Không đọc được danh sách ảnh." });
+  }
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),

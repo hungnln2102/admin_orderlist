@@ -10,8 +10,10 @@ const deleteOrderWithArchive = async ({
         adjustSupplierDebtIfNeeded,
         calcRemainingRefund,
     } = require("./orderFinanceHelpers");
+    const { calcRemainingImport } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
+    const { isMavnImportOrder } = require("../../utils/orderHelpers");
     const logger = require("../../utils/logger");
 
     const orderId = order?.id;
@@ -54,14 +56,31 @@ const deleteOrderWithArchive = async ({
         normalizedStatus === STATUS.PROCESSING;
 
     if (shouldArchiveToCanceled) {
+        const isMavn = isMavnImportOrder(order);
         const bodyRefund =
             toNullableNumber(reqBody?.can_hoan) ??
             toNullableNumber(reqBody?.gia_tri_con_lai);
-        const refundValue = bodyRefund !== null && bodyRefund !== undefined
-            ? Math.max(0, bodyRefund)
-            : calcRemainingRefund(order, normalized);
 
-        // canceled_at: chỉ ghi một lần lúc chuyển sang Chờ Hoàn (ngày VN, YYYY-MM-DD).
+        let refundValue;
+        if (isMavn) {
+            const importRefund =
+                bodyRefund !== null && bodyRefund !== undefined
+                    ? Math.max(0, bodyRefund)
+                    : calcRemainingImport(order, normalized);
+            refundValue =
+                importRefund != null && Number.isFinite(importRefund)
+                    ? Math.max(0, Math.round(importRefund))
+                    : 0;
+        } else {
+            refundValue =
+                bodyRefund !== null && bodyRefund !== undefined
+                    ? Math.max(0, bodyRefund)
+                    : calcRemainingRefund(order, normalized);
+        }
+
+        const archiveStatus = isMavn ? STATUS.CANCELED : STATUS.PENDING_REFUND;
+
+        // canceled_at: chỉ ghi một lần lúc chuyển sang Chờ Hoàn / Hủy (ngày VN, YYYY-MM-DD).
         const existingCanceledRaw = order?.[canceledAtCol] ?? order?.canceled_at;
         const hasCanceledAt =
             existingCanceledRaw !== undefined &&
@@ -70,7 +89,7 @@ const deleteOrderWithArchive = async ({
             String(existingCanceledRaw).trim().toLowerCase() !== "null";
 
         const updatePayload = {
-            [statusCol]: STATUS.PENDING_REFUND,
+            [statusCol]: archiveStatus,
             [refundCol]: refundValue,
         };
         if (!hasCanceledAt) {
@@ -81,7 +100,7 @@ const deleteOrderWithArchive = async ({
 
         const afterOrder = {
             ...order,
-            [statusCol]: STATUS.PENDING_REFUND,
+            [statusCol]: archiveStatus,
             [refundCol]: refundValue,
         };
         if (updatePayload[canceledAtCol] !== undefined) {

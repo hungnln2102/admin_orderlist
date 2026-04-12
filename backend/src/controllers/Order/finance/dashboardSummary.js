@@ -173,6 +173,19 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
     }
 
+    // MAVN nhập hàng: PAID/PROCESSING → CANCELED (không qua Chờ Hoàn) — vẫn ghi nhận hoàn theo cột refund
+    if (
+        !isRefundCounted(prevStatus) &&
+        nextStatus === STATUS.CANCELED &&
+        isMavnImportOrder(afterRow)
+    ) {
+        const refund = toNullableNumber(afterRow?.refund) || 0;
+        if (refund > 0) {
+            refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
+            refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
+        }
+    }
+
     const revenueKey = orderMonthKey;
     const refundKey = refundMonthKey;
 

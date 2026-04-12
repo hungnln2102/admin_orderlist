@@ -1,4 +1,4 @@
-const { ceilToThousands, calcRemainingRefund } = require("./finance/refunds");
+const { ceilToThousands, calcRemainingRefund, calcRemainingImport } = require("./finance/refunds");
 const {
     findSupplyIdByName,
     increaseSupplierDebt,
@@ -12,6 +12,7 @@ const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashb
 module.exports = {
     ceilToThousands,
     calcRemainingRefund,
+    calcRemainingImport,
     findSupplyIdByName,
     increaseSupplierDebt,
     decreaseSupplierDebt,

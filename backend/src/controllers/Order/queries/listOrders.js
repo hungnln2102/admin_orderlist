@@ -33,7 +33,14 @@ const buildOrdersListQuery = async (scope = "") => {
         query = query.where(statusCol, STATUS.EXPIRED);
     } else if (normalizedScope === "canceled" || normalizedScope === "cancelled") {
         query = query.where((qb) =>
-            qb.whereIn(statusCol, [STATUS.PENDING_REFUND, STATUS.REFUNDED]).orWhereNotNull(refundCol)
+            qb.whereIn(statusCol, [STATUS.PENDING_REFUND, STATUS.REFUNDED]).orWhere((qb2) => {
+                qb2.whereNotNull(refundCol).whereNot((w) => {
+                    w.whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]).andWhere(
+                        statusCol,
+                        STATUS.CANCELED
+                    );
+                });
+            })
         );
     } else if (normalizedScope === "import" || normalizedScope === "nhap") {
         query = query

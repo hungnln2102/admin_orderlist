@@ -5,6 +5,7 @@ const {
   calculateOrderPricingFromResolvedValues,
   normalizeMoney,
 } = require("./core");
+const { isMavrykShopSupplierName } = require("../../utils/orderHelpers");
 
 class PricingHttpError extends Error {
   constructor(statusCode, message) {
@@ -103,13 +104,24 @@ const calculateOrderPricing = async ({
     customerType,
   });
 
+  let isMavrykProfit = false;
+  if (effectiveSupplyId) {
+    const supRow = await db(TABLES.supplier)
+      .select(COLS.SUPPLIER.SUPPLIER_NAME)
+      .where(COLS.SUPPLIER.ID, effectiveSupplyId)
+      .first();
+    isMavrykProfit = isMavrykShopSupplierName(
+      String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] ?? "").trim()
+    );
+  }
+
   const variantPricing = await fetchVariantPricing(normalizedProductKey);
   if (!variantPricing?.variantId) {
     throw new PricingHttpError(400, "Không tìm thấy gói cho sản phẩm.");
   }
 
   let importBySource = 0;
-  if (effectiveSupplyId) {
+  if (effectiveSupplyId && !isMavrykProfit) {
     const latestBySource = await db(TABLES.supplierCost)
       .select(COLS.SUPPLIER_COST.PRICE)
       .where(COLS.SUPPLIER_COST.VARIANT_ID, variantPricing.variantId)
@@ -124,7 +136,7 @@ const calculateOrderPricing = async ({
     }
   }
 
-  if (importBySource <= 0 && orderRow?.cost) {
+  if (!isMavrykProfit && importBySource <= 0 && orderRow?.cost) {
     importBySource = normalizeMoney(orderRow.cost);
   }
 
@@ -135,24 +147,48 @@ const calculateOrderPricing = async ({
   const maxSupplyPrice = normalizeMoney(maxPriceRow?.maxPrice || 0);
 
   if (maxSupplyPrice <= 0 && importBySource <= 0) {
+    if (isMavrykProfit) {
+      throw new PricingHttpError(
+        400,
+        "Chưa có giá tham chiếu (max NCC) cho gói. Thêm giá NCC cho variant hoặc nhập thủ công."
+      );
+    }
     throw new PricingHttpError(400, "Không có giá NCC");
   }
 
-  return calculateOrderPricingFromResolvedValues({
+  const importPriceForFormula = isMavrykProfit
+    ? 0
+    : importBySource > 0
+      ? importBySource
+      : maxSupplyPrice;
+
+  const pricingResult = calculateOrderPricingFromResolvedValues({
     orderId: normalizedOrderId,
     customerType,
     pricingBase: maxSupplyPrice > 0 ? maxSupplyPrice : importBySource,
-    importPrice: importBySource > 0 ? importBySource : maxSupplyPrice,
+    importPrice: importPriceForFormula,
     fallbackPrice: normalizeMoney(orderRow?.price),
-    fallbackCost: normalizeMoney(orderRow?.cost),
+    fallbackCost: isMavrykProfit ? 0 : normalizeMoney(orderRow?.cost),
     pctCtv: variantPricing.pctCtv,
     pctKhach: variantPricing.pctKhach,
     pctPromo: variantPricing.pctPromo,
     pctStu: variantPricing.pctStu,
-    roundCostToThousands: true,
+    roundCostToThousands: !isMavrykProfit,
     days: 30,
     expiryDate: "",
   });
+
+  if (isMavrykProfit) {
+    return {
+      ...pricingResult,
+      cost: 0,
+      totalPrice: pricingResult.price,
+      gia_nhap: 0,
+      mavryk_profit_mode: true,
+    };
+  }
+
+  return pricingResult;
 };
 
 module.exports = {

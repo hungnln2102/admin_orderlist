@@ -9,7 +9,9 @@ const { ORDER_COLS } = require("./config");
 const {
   calculateOrderPricingFromResolvedValues,
   resolveMoney,
+  normalizePromoRatio,
 } = require("../../src/services/pricing/core");
+const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
 const { getTiers, getPrefixMap } = require("../../src/services/pricing/tierCache");
 const logger = require("../../src/utils/logger");
 
@@ -110,7 +112,7 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
     }
 
     const orderCode = String(orderRow?.[ORDER_COLS.idOrder] || "");
-    const { pricing, pctCtv, pctKhach } = await calculateRenewalPricing(client, {
+    let { pricing, pctCtv, pctKhach, pctPromo } = await calculateRenewalPricing(client, {
       sanPham,
       supplierId,
       orderCode,
@@ -118,6 +120,23 @@ const computeOrderCurrentPrice = async (client, orderRow) => {
       fallbackPrice: giaBanCu,
       forceKhachLe: false,
     });
+
+    const promoPrefix = String(ORDER_PREFIXES?.promo || "MAVK").toUpperCase();
+    const isMavk = promoPrefix && orderCode.toUpperCase().startsWith(promoPrefix);
+    const promoRatio = normalizePromoRatio(pctPromo);
+    if (isMavk && promoRatio <= 0) {
+      const khachLe = await calculateRenewalPricing(client, {
+        sanPham,
+        supplierId,
+        orderCode,
+        fallbackCost: giaNhapCu,
+        fallbackPrice: giaBanCu,
+        forceKhachLe: true,
+      });
+      pricing = khachLe.pricing;
+      pctCtv = khachLe.pctCtv;
+      pctKhach = khachLe.pctKhach;
+    }
 
     const marginsLookValid = (pctCtv != null && pctCtv > 0 && pctCtv < 1) ||
                               (pctKhach != null && pctKhach > 0 && pctKhach < 1);
