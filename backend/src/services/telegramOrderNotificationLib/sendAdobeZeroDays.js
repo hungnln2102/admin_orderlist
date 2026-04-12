@@ -11,6 +11,7 @@ const {
   ZERO_DAYS_TOPIC_ID,
 } = require("./constants");
 const { sendTelegramMessage } = require("./telegramApi");
+const { isThreadError } = require("./errorHelpers");
 
 /**
  * Từ users_snapshot (JSON string hoặc mảng) trả về danh sách user dạng text: "- email (name)".
@@ -90,7 +91,17 @@ async function sendAdobeZeroDaysNotification(accounts = []) {
       await sendTelegramMessage(payload);
       logger.info("[Adobe][Telegram] Đã gửi thông báo hết gói", { email, index: i + 1, total: accounts.length });
     } catch (err) {
-      logger.error("[Adobe][Telegram] Gửi thất bại", { email, error: err?.message });
+      if (isThreadError(err) && payload.message_thread_id != null) {
+        const { message_thread_id: _t, ...rest } = payload;
+        try {
+          await sendTelegramMessage(rest);
+          logger.info("[Adobe][Telegram] Đã gửi (fallback không topic)", { email, index: i + 1 });
+        } catch (err2) {
+          logger.error("[Adobe][Telegram] Gửi thất bại", { email, error: err2?.message });
+        }
+      } else {
+        logger.error("[Adobe][Telegram] Gửi thất bại", { email, error: err?.message });
+      }
     }
     if (i < accounts.length - 1) {
       await new Promise((r) => setTimeout(r, 400));

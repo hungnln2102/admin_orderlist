@@ -3,18 +3,23 @@ const { withRecoverableRetry } = require("./retry");
 
 const ADMIN_PRODUCTS = "https://adminconsole.adobe.com/products";
 
+const WAIT_PRODUCTS_MS = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_WAIT_PRODUCTS_MS || "", 10);
+  return Number.isFinite(n) && n >= 20000 ? n : 45000;
+})();
+
 function extractOrgIdFromUrl(url) {
   if (!url || typeof url !== "string") return null;
   const m = url.match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/);
   return m ? m[1] : null;
 }
 
-async function waitForProductsPageReady(page, timeoutMs = 20000) {
+async function waitForProductsPageReady(page, timeoutMs = WAIT_PRODUCTS_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const url = page.url();
     if (!url.includes("adminconsole.adobe.com") || !url.includes("/products")) {
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1200);
       continue;
     }
     const ready = await page
@@ -32,7 +37,7 @@ async function waitForProductsPageReady(page, timeoutMs = 20000) {
         ].join(", ")
       )
       .first()
-      .waitFor({ state: "visible", timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 10000 })
       .then(() => true)
       .catch(() => false);
     if (ready) {
@@ -40,7 +45,7 @@ async function waitForProductsPageReady(page, timeoutMs = 20000) {
       logger.info("[adobe-v2] B12: Trang products đã load xong");
       return;
     }
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1200);
   }
   logger.warn("[adobe-v2] B12: Timeout chờ trang products (vẫn scrape thử)");
 }
@@ -91,9 +96,9 @@ async function runCheckProductFlow(page) {
     "B12-check-product",
     async () => {
       logger.info("[adobe-v2] B12: adminconsole/products");
-      await page.goto(ADMIN_PRODUCTS, { waitUntil: "domcontentloaded", timeout: 25000 }).catch(() => {});
-      await page.waitForLoadState("networkidle", { timeout: 12000 }).catch(() => {});
-      await waitForProductsPageReady(page, 20000);
+      await page.goto(ADMIN_PRODUCTS, { waitUntil: "domcontentloaded", timeout: 35000 }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 18000 }).catch(() => {});
+      await waitForProductsPageReady(page, WAIT_PRODUCTS_MS);
 
       const productsUrl = page.url();
       if (!productsUrl.includes("adminconsole.adobe.com") || !productsUrl.includes("/products")) {

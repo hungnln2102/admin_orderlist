@@ -93,10 +93,13 @@ const errorHandler = (err, req, res, next) => {
  * 404 Not Found handler
  * Must be registered BEFORE error handler but AFTER all routes
  */
-const SILENT_404_PATTERN = /^\/($|_next|favicon\.ico|robots\.txt|\.well-known)/;
+/** 404 không đẩy lên Telegram: bot/crawler thường gọi (SEO, LLM) nhưng API admin không phục vụ. */
+const SILENT_404_PATTERN =
+  /^\/($|_next|favicon\.ico|robots\.txt|sitemap\.xml|sitemap_index\.xml|llms\.txt|ads\.txt|\.well-known)/i;
 
 const notFoundHandler = (req, res, next) => {
-  if (SILENT_404_PATTERN.test(req.originalUrl)) {
+  const pathOnly = String(req.originalUrl || "").split("?")[0];
+  if (SILENT_404_PATTERN.test(pathOnly)) {
     return res.status(404).json({ error: "Not Found" });
   }
 

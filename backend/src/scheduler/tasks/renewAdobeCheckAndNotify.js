@@ -194,7 +194,7 @@ function createRenewAdobeCheckAndNotifyTask() {
       } catch (err) {
         logger.warn("[CRON] Check account Adobe thất bại (bỏ qua)", { id, error: err.message });
       }
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 4000));
     }
 
     if (checkedIds.length === 0) {

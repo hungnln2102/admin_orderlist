@@ -8,6 +8,11 @@ const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = requir
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
+const WAIT_USERS_MS = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_WAIT_USERS_MS || "", 10);
+  return Number.isFinite(n) && n >= 25000 ? n : 55000;
+})();
+
 /** Giống add/delete users flow: trang users thật thường là /{orgId}@AdobeOrg/users */
 function buildAdminUsersUrl(orgId) {
   const id = orgId && String(orgId).trim();
@@ -36,7 +41,7 @@ const USERS_READY_SELECTOR = [
 ].join(", ");
 
 /** Chờ trang users adminconsole load xong (bảng hoặc member-email xuất hiện) trước khi scrape. */
-async function waitForUsersPageReady(page, timeoutMs = 40000) {
+async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const url = page.url();
@@ -47,7 +52,7 @@ async function waitForUsersPageReady(page, timeoutMs = 40000) {
     const ready = await page
       .locator(USERS_READY_SELECTOR)
       .first()
-      .waitFor({ state: "visible", timeout: 8000 })
+      .waitFor({ state: "visible", timeout: 12000 })
       .then(() => true)
       .catch(() => false);
     if (ready) {
@@ -119,17 +124,17 @@ async function runB10ToB13(page, options = {}) {
   logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
 
   await page
-    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: 35000 })
+    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: 40000 })
     .catch(() => {});
-  await page.waitForLoadState("networkidle", { timeout: 18000 }).catch(() => {});
-  await waitForUsersPageReady(page, 40000);
+  await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+  await waitForUsersPageReady(page, WAIT_USERS_MS);
 
   let usersUrl = page.url();
   if (orgId && !isAdminConsoleUsersPath(usersUrl)) {
     logger.info("[adobe-v2] B13: Không ở route users sau goto org — thử /users gốc (redirect Adobe)");
-    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 35000 }).catch(() => {});
-    await page.waitForLoadState("networkidle", { timeout: 18000 }).catch(() => {});
-    await waitForUsersPageReady(page, 25000);
+    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 40000 }).catch(() => {});
+    await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+    await waitForUsersPageReady(page, WAIT_USERS_MS);
     usersUrl = page.url();
   }
 

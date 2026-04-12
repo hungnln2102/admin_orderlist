@@ -7,6 +7,9 @@
  *   TELEGRAM_CHAT_ID            — group chat id
  *   ERROR_TOPIC_ID              — topic id cho lỗi (default 6)
  *   SEND_ERROR_NOTIFICATION     — "false" để tắt (default "true")
+ *
+ * Nếu Telegram trả lỗi topic/thread (ví dụ "message thread not found"), gửi lại một lần
+ * không kèm message_thread_id để tin vẫn vào nhóm.
  */
 
 const https = require("https");
@@ -54,6 +57,34 @@ const postToTelegram = (payload) =>
     req.write(body);
     req.end();
   });
+
+/** Telegram trả HTTP 200 nhưng JSON có ok:false (sai topic, v.v.). */
+function isTelegramThreadApiError(parsed) {
+  if (!parsed || parsed.ok !== false) return false;
+  const d = String(parsed.description || "").toLowerCase();
+  return (
+    d.includes("message_thread_id") ||
+    d.includes("message thread not found") ||
+    (d.includes("thread") && d.includes("not found")) ||
+    (d.includes("topic") && d.includes("not found")) ||
+    d.includes("not a forum") ||
+    d.includes("forum is not enabled")
+  );
+}
+
+async function sendMessageWithTopicFallback(payload) {
+  const raw = await postToTelegram(payload);
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (data && data.ok === true) return;
+  if (!isTelegramThreadApiError(data) || payload.message_thread_id == null) return;
+  const { message_thread_id: _t, ...rest } = payload;
+  await postToTelegram(rest);
+}
 
 const LEVEL_META = {
   critical: { icon: "🔴", label: "CRITICAL" },
@@ -111,7 +142,7 @@ const processQueue = async () => {
       if (Number.isFinite(ERROR_TOPIC_ID)) {
         payload.message_thread_id = ERROR_TOPIC_ID;
       }
-      await postToTelegram(payload);
+      await sendMessageWithTopicFallback(payload);
       lastSentAt = Date.now();
     } catch (err) {
       console.error("[ErrorNotifier] Failed to send:", err?.message);
