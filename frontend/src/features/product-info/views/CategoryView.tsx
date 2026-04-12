@@ -1,10 +1,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { CategoryTable } from "../components/CategoryTable";
+import { CategoryRow } from "../types";
 
 interface CategoryViewProps {
-  categoryRows: any[];
+  categoryRows: CategoryRow[];
   loading: boolean;
-  onEditCategory: (group: string) => void;
+  /** Tăng sau mỗi lần reload API — bust cache ảnh cột Hình ảnh. */
+  listDisplayEpoch: number;
+  onEditCategory: (group: CategoryRow) => void;
 }
 
 const CATEGORY_PAGE_SIZE = 8; // 5-10 items per page, default 8
@@ -16,6 +19,7 @@ const CATEGORY_PAGE_SIZE = 8; // 5-10 items per page, default 8
 export const CategoryView: React.FC<CategoryViewProps> = ({
   categoryRows,
   loading,
+  listDisplayEpoch,
   onEditCategory,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,6 +40,7 @@ export const CategoryView: React.FC<CategoryViewProps> = ({
       categoryRows={pagedCategoryRows}
       allCategoryRows={categoryRows}
       loading={loading}
+      listDisplayEpoch={listDisplayEpoch}
       currentPage={currentPage}
       pageSize={CATEGORY_PAGE_SIZE}
       onPageChange={setCurrentPage}

@@ -13,12 +13,18 @@ export const buildCategoryRows = (
       groups.set(key, {
         key,
         packageName: packageLabel,
-        imageUrl: item.packageImageUrl ?? null,
+        imageUrl: null,
         categories: [],
         items: [],
       });
     }
-    groups.get(key)?.items.push(item);
+    const group = groups.get(key);
+    if (!group) return;
+    group.items.push(item);
+    const pkgImg = (item.packageImageUrl || "").trim();
+    if (pkgImg && !(group.imageUrl || "").trim()) {
+      group.imageUrl = pkgImg;
+    }
   });
 
   return Array.from(groups.entries())

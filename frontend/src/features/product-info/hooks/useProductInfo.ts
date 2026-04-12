@@ -22,6 +22,7 @@ type UseProductInfoResult = {
     totalPages: number;
     expandedId: number | null;
     searchTerm: string;
+    listDisplayEpoch: number;
   };
   actions: {
     handleSearchChange: (value: string) => void;
@@ -45,6 +46,8 @@ export const useProductInfo = (): UseProductInfoResult => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Tăng sau mỗi lần tải lại danh sách — ép ảnh cột danh mục không dùng cache cũ. */
+  const [listDisplayEpoch, setListDisplayEpoch] = useState(0);
 
   const mergedProducts: MergedProduct[] = useMemo(
     () => mergeProducts(productDescs, productPriceList, searchTerm),
@@ -88,6 +91,7 @@ export const useProductInfo = (): UseProductInfoResult => {
       );
     } finally {
       setLoading(false);
+      setListDisplayEpoch((n) => n + 1);
     }
   }, []);
 
@@ -116,6 +120,7 @@ export const useProductInfo = (): UseProductInfoResult => {
       totalPages,
       expandedId,
       searchTerm,
+      listDisplayEpoch,
     },
     actions: {
       handleSearchChange,

@@ -1,14 +1,53 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { EyeIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { CategoryRow } from "../types";
-import { CategoryItem } from "../utils/productInfoHelpers";
 import { getCategoryPillVisualStyle } from "../utils/categoryColors";
 import Pagination from "@/components/ui/Pagination";
+
+function categoryTableImageSrc(url: string, listEpoch: number): string {
+  const u = url.trim();
+  if (!u) return "";
+  const sep = u.includes("?") ? "&" : "?";
+  return `${u}${sep}_cv=${listEpoch}`;
+}
+
+type PackageCellThumbProps = {
+  url: string;
+  listEpoch: number;
+  alt: string;
+};
+
+const PackageCellThumb: React.FC<PackageCellThumbProps> = ({
+  url,
+  listEpoch,
+  alt,
+}) => {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url, listEpoch]);
+
+  if (!url.trim() || failed) {
+    return null;
+  }
+
+  return (
+    <img
+      key={`${url}-${listEpoch}`}
+      src={categoryTableImageSrc(url, listEpoch)}
+      alt={alt}
+      className="h-12 w-12 rounded-lg object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 type CategoryTableProps = {
   categoryRows: CategoryRow[];
   allCategoryRows: CategoryRow[];
   loading: boolean;
+  listDisplayEpoch: number;
   currentPage: number;
   pageSize: number;
   onPageChange: (page: number) => void;
@@ -19,6 +58,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   categoryRows,
   allCategoryRows,
   loading,
+  listDisplayEpoch,
   currentPage,
   pageSize,
   onPageChange,
@@ -87,16 +127,11 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
               <React.Fragment key={group.key}>
                 <tr className="product-info-surface__row hover:bg-white/5">
                   <td className="px-4 py-3">
-                    {group.imageUrl ? (
-                      <img
-                        src={group.imageUrl}
-                        alt={group.packageName}
-                        className="h-12 w-12 rounded-lg object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : null}
+                    <PackageCellThumb
+                      url={group.imageUrl || ""}
+                      listEpoch={listDisplayEpoch}
+                      alt={group.packageName}
+                    />
                   </td>
 
                   <td className="px-4 py-3 font-semibold text-white">

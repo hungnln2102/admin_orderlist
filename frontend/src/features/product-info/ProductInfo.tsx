@@ -31,6 +31,7 @@ const ProductInfo: React.FC = () => {
       currentPage,
       expandedId,
       searchTerm,
+      listDisplayEpoch,
     },
     actions: {
       handleSearchChange,
@@ -152,6 +153,7 @@ const ProductInfo: React.FC = () => {
         <CategoryView
           categoryRows={categoryRows}
           loading={loading}
+          listDisplayEpoch={listDisplayEpoch}
           onEditCategory={openCategoryEdit}
         />
       ) : (
