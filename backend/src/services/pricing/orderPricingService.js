@@ -5,7 +5,7 @@ const {
   calculateOrderPricingFromResolvedValues,
   normalizeMoney,
 } = require("./core");
-const { isMavrykShopSupplierName } = require("../../utils/orderHelpers");
+const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../utils/orderHelpers");
 
 class PricingHttpError extends Error {
   constructor(statusCode, message) {
@@ -113,6 +113,9 @@ const calculateOrderPricing = async ({
     isMavrykProfit = isMavrykShopSupplierName(
       String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] ?? "").trim()
     );
+  }
+  if (isMavnImportOrder({ id_order: normalizedOrderId })) {
+    isMavrykProfit = false;
   }
 
   const variantPricing = await fetchVariantPricing(normalizedProductKey);

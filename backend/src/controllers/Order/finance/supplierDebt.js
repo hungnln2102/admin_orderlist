@@ -3,7 +3,7 @@ const { resolveSupplierNameColumn } = require("../../SuppliesController/helpers"
 const { STATUS, TABLES } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const logger = require("../../../utils/logger");
-const { isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
+const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../../utils/orderHelpers");
 const { calcRemainingImport, ceilToThousands } = require("./refunds");
 
 const resolveSupplierDisplayName = async(trx, row) => {
@@ -21,9 +21,15 @@ const resolveSupplierDisplayName = async(trx, row) => {
     return r ? String(r[supplierNameCol] ?? "").trim() : null;
 };
 
-/** NCC nội bộ Mavryk / Shop: không ghi nhận cộng trừ payment_supply. */
+/**
+ * NCC nội bộ Mavryk / Shop: không ghi nhận cộng trừ payment_supply.
+ * Đơn MAVN nhập hàng không dùng NCC Mavryk — luôn ghi nhận công nợ NCC.
+ */
 const shouldSkipNccLedgerForOrder = async(trx, row) => {
     if (!row) return false;
+    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+    const idOrder = row[idOrderCol] ?? row.id_order;
+    if (isMavnImportOrder({ id_order: idOrder })) return false;
     const name = await resolveSupplierDisplayName(trx, row);
     return isMavrykShopSupplierName(name);
 };

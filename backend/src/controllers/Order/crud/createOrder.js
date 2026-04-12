@@ -83,21 +83,25 @@ const attachCreateOrderRoute = (router) => {
             }
         }
 
-        if (payload[supplyIdCol] != null) {
-            const supRow = await db(TABLES.supplier)
-                .select(COLS.SUPPLIER.SUPPLIER_NAME)
-                .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
-                .first();
-            if (isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME])) {
-                payload[costCol] = 0;
-            }
-        }
-
         const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
         const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
         const importPrefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
         const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
         const isMavnCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
+
+        if (payload[supplyIdCol] != null) {
+            const supRow = await db(TABLES.supplier)
+                .select(COLS.SUPPLIER.SUPPLIER_NAME)
+                .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
+                .first();
+            if (
+                isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]) &&
+                !isMavnCreate
+            ) {
+                payload[costCol] = 0;
+            }
+        }
+
         if (isGiftOrderCreate) {
             payload[priceCol] = 0;
             payload.status = STATUS.PROCESSING;

@@ -235,8 +235,9 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
         logger.warn("[Renewal] Không đọc được tên NCC", { supplierId, error: e.message });
       }
     }
-    const skipNccLedger = isMavrykShopSupplierName(supplierNameForNcc);
     const isMavn = isMavnImportOrder({ id_order: orderCode });
+    // MAVN không dùng NCC Mavryk — luôn cộng NCC khi gia hạn. Đơn khác + NCC Mavryk/Shop: không cộng NCC.
+    const skipNccLedger = !isMavn && isMavrykShopSupplierName(supplierNameForNcc);
     // MAVN nhập hàng: sau gia hạn luôn Đang Xử Lý (+ công nợ NCC khi có); Đã Thanh Toán chỉ qua thanh toán NCC.
     const renewalNextStatus = isMavn
       ? ORDER_STATUS.PROCESSING
