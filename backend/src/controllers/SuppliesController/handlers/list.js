@@ -4,20 +4,25 @@ const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
 const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
 const logger = require("../../../utils/logger");
 const { supplierCache } = require("../../../utils/cache");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 const listSupplies = async (_req, res) => {
   try {
     const rows = await supplierCache.getOrSet("all", async () => {
       const supplierTable = await resolveSupplierTableName();
       const supplierNameCol = await resolveSupplierNameColumn();
+      const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+      const baseSelect = {
+        id: "id",
+        source_name: supplierNameCol,
+        number_bank: "number_bank",
+        bin_bank: "bin_bank",
+      };
+      if (includeAccountHolder) {
+        baseSelect.account_holder = "account_holder";
+      }
       return db(supplierTable)
-        .select({
-          id: "id",
-          source_name: supplierNameCol,
-          number_bank: "number_bank",
-          bin_bank: "bin_bank",
-          account_holder: "account_holder",
-        })
+        .select(baseSelect)
         .orderBy(supplierNameCol, "asc");
     });
     res.json(rows || []);

@@ -20,6 +20,7 @@ const {
     addSupplierImportOnProcessing,
     updateDashboardMonthlySummaryOnStatusChange,
 } = require("../orderFinanceHelpers");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -121,19 +122,25 @@ const attachCreateOrderRoute = (router) => {
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {
                 const sCols = PARTNER_SCHEMA.SUPPLIER.COLS;
+                const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
+                const selectCols = [
+                    sCols.SUPPLIER_NAME,
+                    sCols.NUMBER_BANK,
+                    sCols.BIN_BANK,
+                ];
+                if (includeAccountHolder) {
+                    selectCols.push(sCols.ACCOUNT_HOLDER);
+                }
                 const supplier = await db(TABLES.supplier)
-                    .select(
-                        sCols.SUPPLIER_NAME,
-                        sCols.NUMBER_BANK,
-                        sCols.BIN_BANK,
-                        sCols.ACCOUNT_HOLDER
-                    )
+                    .select(...selectCols)
                     .where(sCols.ID, supplyIdVal)
                     .first();
                 normalized.supply = supplier?.[sCols.SUPPLIER_NAME] ?? "";
                 normalized.supplier_number_bank = supplier?.[sCols.NUMBER_BANK] ?? null;
                 normalized.supplier_bin_bank = supplier?.[sCols.BIN_BANK] ?? null;
-                normalized.supplier_account_holder = supplier?.[sCols.ACCOUNT_HOLDER] ?? null;
+                normalized.supplier_account_holder = includeAccountHolder
+                    ? (supplier?.[sCols.ACCOUNT_HOLDER] ?? null)
+                    : null;
             }
 
             const variantIdVal = newOrder?.[productIdCol];

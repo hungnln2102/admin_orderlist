@@ -16,6 +16,7 @@ const {
 const { normalizeSupplyStatus, formatDateOutput } = require("../../../utils/normalizers");
 const { resolveSupplyStatusColumn } = require("../helpers");
 const logger = require("../../../utils/logger");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 // Explicit supplier tables (prefer configured supplier schema, fallback to product/partner for legacy DBs)
 const { SCHEMA_SUPPLIER, SCHEMA_SUPPLIER_COST } = require("../../../config/dbSchema");
@@ -174,13 +175,18 @@ const getSupplyInsights = async (_req, res) => {
     const supplierTableName = await resolveSupplierTableName();
     const supplierNameCol = await resolveSupplierNameColumn();
     const supplierNameIdent = quoteIdent(supplierNameCol);
-  const supplySql = `
+    const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTableName);
+    const accountHolderSelect = includeAccountHolder
+      ? `s.${QUOTED_COLS.supplier.accountHolder} AS account_holder`
+      : `NULL::text AS account_holder`;
+
+    const supplySql = `
       SELECT
         s.${QUOTED_COLS.supplier.id} AS id,
         s.${supplierNameIdent} AS source_name,
         s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
         s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
-        s.${QUOTED_COLS.supplier.accountHolder} AS account_holder,
+        ${accountHolderSelect},
         ${statusSelect}
       FROM ${supplierTableName} s
       ORDER BY s.${supplierNameIdent};

@@ -9,6 +9,10 @@ const {
 } = require("../helpers");
 const logger = require("../../../utils/logger");
 const { supplierCache } = require("../../../utils/cache");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
+
+const ACCOUNT_HOLDER_MIGRATION_HINT =
+  "Chua co cot account_holder. Chay migration: database/migrations/035_supplier_account_holder.sql";
 
 const createSupply = async (req, res) => {
   logger.debug("[POST] /api/supplies", { body: req.body });
@@ -23,13 +27,25 @@ const createSupply = async (req, res) => {
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
+  const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+  if (
+    !includeAccountHolder &&
+    account_holder != null &&
+    String(account_holder).trim() !== ""
+  ) {
+    return res.status(400).json({ error: ACCOUNT_HOLDER_MIGRATION_HINT });
+  }
+
   const fields = [
     supplierNameIdent,
     QUOTED_COLS.supplier.numberBank,
     QUOTED_COLS.supplier.binBank,
-    QUOTED_COLS.supplier.accountHolder,
   ];
-  const values = [source_name, number_bank ?? null, bin_bank ?? null, account_holder ?? null];
+  const values = [source_name, number_bank ?? null, bin_bank ?? null];
+  if (includeAccountHolder) {
+    fields.push(QUOTED_COLS.supplier.accountHolder);
+    values.push(account_holder ?? null);
+  }
 
   if (statusColumn) {
     fields.push(`"${statusColumn}"`);
@@ -58,7 +74,7 @@ const createSupply = async (req, res) => {
       source_name,
       number_bank: number_bank ?? null,
       bin_bank: bin_bank ?? null,
-      account_holder: account_holder ?? null,
+      account_holder: includeAccountHolder ? (account_holder ?? null) : null,
       status: status ?? active_supply ?? "active",
     });
   } catch (error) {
@@ -101,6 +117,11 @@ const updateSupply = async (req, res) => {
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
+  const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+  if (account_holder !== undefined && !includeAccountHolder) {
+    return res.status(400).json({ error: ACCOUNT_HOLDER_MIGRATION_HINT });
+  }
+
   const fields = [];
   const values = [];
 
@@ -137,18 +158,28 @@ const updateSupply = async (req, res) => {
   }
 
   try {
+    const returningLines = [
+      `${QUOTED_COLS.supplier.id} AS id`,
+      `${supplierNameIdent} AS source_name`,
+      `${QUOTED_COLS.supplier.numberBank} AS number_bank`,
+      `${QUOTED_COLS.supplier.binBank} AS bin_bank`,
+    ];
+    if (includeAccountHolder) {
+      returningLines.push(`${QUOTED_COLS.supplier.accountHolder} AS account_holder`);
+    }
+    returningLines.push(
+      statusColumn
+        ? `"${statusColumn}" AS raw_status`
+        : `${QUOTED_COLS.supplier.activeSupply} AS raw_status`
+    );
+
     const result = await db.raw(
       `
       UPDATE ${supplierTable}
       SET ${fields.join(", ")}
       WHERE ${QUOTED_COLS.supplier.id} = ?
       RETURNING
-        ${QUOTED_COLS.supplier.id} AS id,
-        ${supplierNameIdent} AS source_name,
-        ${QUOTED_COLS.supplier.numberBank} AS number_bank,
-        ${QUOTED_COLS.supplier.binBank} AS bin_bank,
-        ${QUOTED_COLS.supplier.accountHolder} AS account_holder,
-        ${statusColumn ? `"${statusColumn}" AS raw_status` : `${QUOTED_COLS.supplier.activeSupply} AS raw_status`}
+        ${returningLines.join(",\n        ")}
     `,
       [...values, parsedSupplyId]
     );
@@ -165,7 +196,7 @@ const updateSupply = async (req, res) => {
       source_name: row.source_name,
       number_bank: row.number_bank,
       bin_bank: row.bin_bank,
-      account_holder: row.account_holder,
+      account_holder: includeAccountHolder ? row.account_holder : null,
       status: normalizedStatus,
       bank_name: bank_name ?? null,
     });

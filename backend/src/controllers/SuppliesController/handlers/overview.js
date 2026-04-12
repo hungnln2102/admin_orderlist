@@ -17,6 +17,7 @@ const {
   resolveSupplierNameColumn,
 } = require("../helpers");
 const logger = require("../../../utils/logger");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 const getSupplyOverview = async (req, res) => {
   const { supplyId } = req.params;
@@ -35,6 +36,11 @@ const getSupplyOverview = async (req, res) => {
     const statusColumnName = await resolveSupplyStatusColumn();
     const supplyStatusColumn = statusColumnName || null;
 
+    const includeAccountHolder = await supplierHasAccountHolderColumn(client, supplierTable);
+    const accountHolderSelect = includeAccountHolder
+      ? `s.${QUOTED_COLS.supplier.accountHolder} AS account_holder`
+      : `NULL::text AS account_holder`;
+
     const supplyRowResult = await client.raw(
       `
         SELECT
@@ -42,7 +48,7 @@ const getSupplyOverview = async (req, res) => {
           s.${supplierNameIdent} AS source_name,
           s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
           s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
-          s.${QUOTED_COLS.supplier.accountHolder} AS account_holder,
+          ${accountHolderSelect},
           ${supplyStatusColumn ? `s."${supplyStatusColumn}"` : QUOTED_COLS.supplier.activeSupply} AS raw_status,
           COALESCE(s.${QUOTED_COLS.supplier.activeSupply}, TRUE) AS active_supply
         FROM ${supplierTable} s

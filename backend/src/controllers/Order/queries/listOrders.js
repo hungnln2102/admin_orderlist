@@ -3,6 +3,7 @@ const { TABLES, COLS } = require("../constants");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../../config/dbSchema");
 const { STATUS } = require("../../../utils/statuses");
 const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
@@ -17,9 +18,10 @@ const supplierNameCol = "supplier_name";
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
 const variantDisplayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
 
-const buildOrdersListQuery = (scope = "") => {
+const buildOrdersListQuery = async (scope = "") => {
     const normalizedScope = String(scope || "").toLowerCase();
     const table = TABLES.orderList;
+    const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
 
     let query = db(table)
         .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
@@ -59,9 +61,11 @@ const buildOrdersListQuery = (scope = "") => {
             `${TABLES.supplier}.${COLS.SUPPLIER.NUMBER_BANK}::text as supplier_number_bank`
         ),
         db.raw(`${TABLES.supplier}.${COLS.SUPPLIER.BIN_BANK}::text as supplier_bin_bank`),
-        db.raw(
-            `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`
-        )
+        includeAccountHolder
+            ? db.raw(
+                `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`
+            )
+            : db.raw("NULL::text as supplier_account_holder")
     );
 
     if (normalizedScope === "canceled" || normalizedScope === "cancelled") {
