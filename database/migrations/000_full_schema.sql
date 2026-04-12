@@ -240,6 +240,7 @@ CREATE TABLE IF NOT EXISTS partner.supplier (
   supplier_name   VARCHAR(255),
   number_bank     VARCHAR(100),
   bin_bank        VARCHAR(100),
+  account_holder  VARCHAR(255),
   active_supply   VARCHAR(50)
 );
 

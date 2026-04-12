@@ -1,10 +1,10 @@
-import React, { useMemo } from "react";
+import React from "react";
 import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
-import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
+import { buildViewOrderPaymentQrPayload, isImportOrderId } from "./paymentQr";
 import { ViewOrderModalProps } from "./types";
 import { normalizeDateLike, parseNumberLike } from "./utils";
 import { OrderDetailsSection } from "./components/OrderDetailsSection";
@@ -36,6 +36,8 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
     ) || null;
 
+  const importOrder = Boolean(orderId && isImportOrderId(orderId));
+
   const { calculatedPrice, priceLoading, priceError } = useCalculatedPrice({
     isOpen,
     orderId,
@@ -44,22 +46,8 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     customerType,
     basePrice,
     normalizedOrderDate,
-    skipRecalc: keepOrderPrice || isGift,
+    skipRecalc: keepOrderPrice || isGift || importOrder,
   });
-
-  // QR luôn dùng giá đơn hàng (số tiền lưu trong đơn)
-  const orderAmount = useMemo(() => {
-    if (isGiftOrderCode(order?.[ORDER_FIELDS.ID_ORDER])) return 0;
-    return Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0);
-  }, [order]);
-
-  // Giá bán hiển thị: sau khi tạo đơn = giữ theo form; bấm icon xem = giá tính lại
-  const displayAmount = isGift
-    ? 0
-    : keepOrderPrice
-      ? orderAmount
-      : (calculatedPrice ?? orderAmount);
-  const effectiveQrAmount = Helpers.roundGiaBanValue(displayAmount);
 
   if (!isOpen || !order) return null;
 
@@ -113,14 +101,22 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     Helpers.formatDateToDMY(expirySource) ||
     String((order[ORDER_FIELDS.EXPIRY_DATE] as string) || "");
 
-  const qrMessage = String(order[ORDER_FIELDS.ID_ORDER] || "");
-  const qrCodeImageUrl = Helpers.buildSepayQrUrl({
-    accountNumber: ACCOUNT_NO,
-    bankCode: BANK_SHORT_CODE,
-    amount: effectiveQrAmount,
-    description: qrMessage,
-    accountName: ACCOUNT_NAME,
+  const qrPayload = buildViewOrderPaymentQrPayload({
+    order: order as Record<string, unknown>,
+    keepOrderPrice,
+    calculatedPrice,
+    isGift,
   });
+  const {
+    qrCodeImageUrl,
+    effectiveQrAmount,
+    qrMessage,
+    bankDisplay,
+    accountNoDisplay,
+    holderDisplay,
+    isSupplierPayout,
+    missingSupplierBank,
+  } = qrPayload;
 
   return (
     <ModalPortal>
@@ -166,6 +162,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             priceLoading={priceLoading}
             priceError={priceError}
             formatCurrency={formatCurrency}
+            bankDisplay={bankDisplay}
+            accountNoDisplay={accountNoDisplay}
+            holderDisplay={holderDisplay}
+            isSupplierPayout={isSupplierPayout}
+            missingSupplierBank={missingSupplierBank}
           />
         </div>
       </div>

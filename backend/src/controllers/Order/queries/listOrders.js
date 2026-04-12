@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { TABLES } = require("../constants");
+const { TABLES, COLS } = require("../constants");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../../config/dbSchema");
 const { STATUS } = require("../../../utils/statuses");
 const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
@@ -54,7 +54,14 @@ const buildOrdersListQuery = (scope = "") => {
         db.raw(
             `COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`
         ),
-        db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`)
+        db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`),
+        db.raw(
+            `${TABLES.supplier}.${COLS.SUPPLIER.NUMBER_BANK}::text as supplier_number_bank`
+        ),
+        db.raw(`${TABLES.supplier}.${COLS.SUPPLIER.BIN_BANK}::text as supplier_bin_bank`),
+        db.raw(
+            `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`
+        )
     );
 
     if (normalizedScope === "canceled" || normalizedScope === "cancelled") {

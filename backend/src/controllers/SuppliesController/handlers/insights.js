@@ -180,6 +180,7 @@ const getSupplyInsights = async (_req, res) => {
         s.${supplierNameIdent} AS source_name,
         s.${QUOTED_COLS.supplier.numberBank} AS number_bank,
         s.${QUOTED_COLS.supplier.binBank} AS bin_bank,
+        s.${QUOTED_COLS.supplier.accountHolder} AS account_holder,
         ${statusSelect}
       FROM ${supplierTableName} s
       ORDER BY s.${supplierNameIdent};
@@ -247,6 +248,7 @@ const getSupplyInsights = async (_req, res) => {
         sourceName: row.source_name || "",
         numberBank: row.number_bank || null,
         binBank: row.bin_bank || null,
+        nameBank: row.account_holder || null,
         status: normalizedStatus || "inactive",
         rawStatus: row.raw_status || null,
         isActive: normalizedStatus !== "inactive",

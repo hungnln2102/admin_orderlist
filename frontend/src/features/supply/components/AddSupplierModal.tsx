@@ -3,6 +3,15 @@ import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { apiFetch } from "@/lib/api";
 import type { BankOption } from "../types";
+import {
+  supplyModalBackdropClass,
+  supplyModalPanelClass,
+  supplyModalTitleClass,
+  supplyFieldLabelClass,
+  supplyFieldInputClass,
+  supplyModalFooterClass,
+  supplyCancelBtnClass,
+} from "./supplyModalUi";
 
 type AddSupplierModalProps = {
   isOpen: boolean;
@@ -20,6 +29,7 @@ export function AddSupplierModal({
   const [form, setForm] = useState({
     sourceName: "",
     numberBank: "",
+    accountHolder: "",
     bankBin: "",
     status: "active",
   });
@@ -52,6 +62,7 @@ export function AddSupplierModal({
         body: JSON.stringify({
           supplier_name: form.sourceName,
           number_bank: form.numberBank,
+          account_holder: form.accountHolder.trim() || null,
           bin_bank: form.bankBin,
           status: form.status,
         }),
@@ -65,6 +76,7 @@ export function AddSupplierModal({
       setForm({
         sourceName: "",
         numberBank: "",
+        accountHolder: "",
         bankBin: banks[0]?.bin || "",
         status: "active",
       });
@@ -77,82 +89,115 @@ export function AddSupplierModal({
 
   return (
     <ModalPortal>
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in"
-      onClick={onClose}
-    >
       <div
-        className="glass-panel-dark rounded-[32px] shadow-2xl w-full max-w-md p-8 border border-white/10 animate-in zoom-in-95 duration-300"
-        onClick={(event) => event.stopPropagation()}
+        className={supplyModalBackdropClass}
+        onClick={onClose}
+        role="presentation"
       >
-        <h3 className="text-2xl font-bold text-white mb-6 tracking-tight">
-          Thêm Nhà Cung Cấp Mới
-        </h3>
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 mb-2 ml-1">
-              Tên Nhà Cung Cấp
-            </label>
-            <input
-              className="w-full bg-white/5 border border-white/10 rounded-2xl p-3 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-white/20"
-              value={form.sourceName}
-              onChange={(event) =>
-                setForm({ ...form, sourceName: event.target.value })
-              }
-              placeholder="Nhập tên..."
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Số Tài Khoản
-            </label>
-            <input
-              className="w-full border rounded-lg p-2 mt-1"
-              value={form.numberBank}
-              onChange={(event) =>
-                setForm({ ...form, numberBank: event.target.value })
-              }
-              placeholder="STK..."
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Ngân Hàng
-            </label>
-            <select
-              className="w-full border rounded-lg p-2 mt-1"
-              value={form.bankBin}
-              onChange={(event) =>
-                setForm({ ...form, bankBin: event.target.value })
-              }
-            >
-              {banks.map((bank) => (
-                <option key={bank.bin} value={bank.bin}>
-                  {bank.name || bank.bin}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 text-sm font-bold text-white/40 hover:text-white transition-colors"
-            >
-              Hủy
-            </button>
-            <GradientButton
-              type="submit"
-              disabled={loading}
-              className="!py-2.5 !px-8 text-sm"
-            >
-              {loading ? "Đang xử lý..." : "Thêm Mới"}
-            </GradientButton>
-          </div>
-        </form>
+        <div
+          className={supplyModalPanelClass}
+          onClick={(event) => event.stopPropagation()}
+          role="dialog"
+          aria-labelledby="add-supplier-title"
+        >
+          <h3
+            id="add-supplier-title"
+            className={`${supplyModalTitleClass} mb-6`}
+          >
+            Thêm nhà cung cấp mới
+          </h3>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className={supplyFieldLabelClass} htmlFor="add-supply-name">
+                Tên nhà cung cấp
+              </label>
+              <input
+                id="add-supply-name"
+                className={supplyFieldInputClass}
+                value={form.sourceName}
+                onChange={(event) =>
+                  setForm({ ...form, sourceName: event.target.value })
+                }
+                placeholder="Nhập tên…"
+                autoComplete="organization"
+              />
+            </div>
+            <div>
+              <label className={supplyFieldLabelClass} htmlFor="add-supply-stk">
+                Số tài khoản
+              </label>
+              <input
+                id="add-supply-stk"
+                className={supplyFieldInputClass}
+                value={form.numberBank}
+                onChange={(event) =>
+                  setForm({ ...form, numberBank: event.target.value })
+                }
+                placeholder="STK…"
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <label className={supplyFieldLabelClass} htmlFor="add-supply-holder">
+                Chủ tài khoản
+              </label>
+              <input
+                id="add-supply-holder"
+                className={supplyFieldInputClass}
+                value={form.accountHolder}
+                onChange={(event) =>
+                  setForm({ ...form, accountHolder: event.target.value })
+                }
+                placeholder="Họ tên chủ STK (hiển thị VietQR)"
+                autoComplete="name"
+              />
+            </div>
+            <div>
+              <label className={supplyFieldLabelClass} htmlFor="add-supply-bank">
+                Ngân hàng
+              </label>
+              <select
+                id="add-supply-bank"
+                className={`${supplyFieldInputClass} cursor-pointer`}
+                value={form.bankBin}
+                onChange={(event) =>
+                  setForm({ ...form, bankBin: event.target.value })
+                }
+              >
+                {banks.map((bank) => (
+                  <option key={bank.bin} value={bank.bin}>
+                    {bank.name || bank.bin}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {error && (
+              <p className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
+                {error}
+              </p>
+            )}
+
+            <div className={supplyModalFooterClass}>
+              <button
+                type="button"
+                onClick={onClose}
+                className={supplyCancelBtnClass}
+              >
+                Hủy
+              </button>
+              <GradientButton
+                type="submit"
+                disabled={loading}
+                className="w-full min-w-[10rem] !py-2.5 !px-8 text-sm font-semibold sm:w-auto"
+              >
+                {loading ? "Đang xử lý…" : "Thêm mới"}
+              </GradientButton>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
     </ModalPortal>
   );
 }

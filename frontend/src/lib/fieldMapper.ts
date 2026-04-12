@@ -71,6 +71,7 @@ export const SUPPLY_FIELD_MAP = {
   SOURCE_NAME: SUPPLY_COLS.sourceName,
   NUMBER_BANK: SUPPLY_COLS.numberBank,
   BIN_BANK: SUPPLY_COLS.binBank,
+  NAME_BANK: SUPPLY_COLS.nameBank,
   ACTIVE_SUPPLY: SUPPLY_COLS.activeSupply,
 } as const;
 

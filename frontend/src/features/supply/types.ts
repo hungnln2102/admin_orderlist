@@ -3,6 +3,8 @@ export interface Supply {
   sourceName: string;
   numberBank: string | null;
   binBank: string | null;
+  /** Chủ tài khoản (VietQR) — từ DB account_holder */
+  nameBank?: string | null;
   bankName: string | null;
   status: "active" | "inactive";
   isActive: boolean;

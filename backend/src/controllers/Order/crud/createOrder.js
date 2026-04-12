@@ -120,11 +120,20 @@ const attachCreateOrderRoute = (router) => {
             const normalized = normalizeOrderRow(newOrder, todayYMDInVietnam());
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {
+                const sCols = PARTNER_SCHEMA.SUPPLIER.COLS;
                 const supplier = await db(TABLES.supplier)
-                    .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
-                    .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, supplyIdVal)
+                    .select(
+                        sCols.SUPPLIER_NAME,
+                        sCols.NUMBER_BANK,
+                        sCols.BIN_BANK,
+                        sCols.ACCOUNT_HOLDER
+                    )
+                    .where(sCols.ID, supplyIdVal)
                     .first();
-                normalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
+                normalized.supply = supplier?.[sCols.SUPPLIER_NAME] ?? "";
+                normalized.supplier_number_bank = supplier?.[sCols.NUMBER_BANK] ?? null;
+                normalized.supplier_bin_bank = supplier?.[sCols.BIN_BANK] ?? null;
+                normalized.supplier_account_holder = supplier?.[sCols.ACCOUNT_HOLDER] ?? null;
             }
 
             const variantIdVal = newOrder?.[productIdCol];

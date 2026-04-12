@@ -16,6 +16,7 @@ const listSupplies = async (_req, res) => {
           source_name: supplierNameCol,
           number_bank: "number_bank",
           bin_bank: "bin_bank",
+          account_holder: "account_holder",
         })
         .orderBy(supplierNameCol, "asc");
     });

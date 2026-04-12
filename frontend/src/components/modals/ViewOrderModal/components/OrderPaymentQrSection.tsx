@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { ACCOUNT_NAME, ACCOUNT_NO } from "../constants";
 
 type OrderPaymentQrSectionProps = {
   orderId: string;
@@ -10,6 +9,12 @@ type OrderPaymentQrSectionProps = {
   priceLoading: boolean;
   priceError: string | null;
   formatCurrency: (value: number | string) => string;
+  bankDisplay: string;
+  accountNoDisplay: string;
+  holderDisplay: string;
+  /** Đơn nhập hàng: QR tài khoản NCC, số tiền = giá nhập */
+  isSupplierPayout?: boolean;
+  missingSupplierBank?: boolean;
 };
 
 export const OrderPaymentQrSection = ({
@@ -21,6 +26,11 @@ export const OrderPaymentQrSection = ({
   priceLoading,
   priceError,
   formatCurrency,
+  bankDisplay,
+  accountNoDisplay,
+  holderDisplay,
+  isSupplierPayout = false,
+  missingSupplierBank = false,
 }: OrderPaymentQrSectionProps) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -28,9 +38,22 @@ export const OrderPaymentQrSection = ({
 
   return (
     <div className="view-order-modal__qr text-center bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 rounded-xl border border-white/10 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.8)]">
-      <h4 className="text-lg font-semibold text-indigo-100 mb-3">
+      <h4
+        className={`text-lg font-semibold text-indigo-100 ${isSupplierPayout || missingSupplierBank ? "mb-1" : "mb-3"}`}
+      >
         Quét mã QR để thanh toán (VietQR)
       </h4>
+      {isSupplierPayout && (
+        <p className="text-xs text-amber-200/90 mb-3">
+          Thanh toán cho nhà cung cấp — số tiền theo giá nhập
+        </p>
+      )}
+      {missingSupplierBank && (
+        <p className="text-sm text-amber-300/95 mb-3 px-2">
+          Chưa có STK hoặc mã ngân hàng VietQR trên hồ sơ NCC. Vui lòng cập nhật tại mục Nhà cung cấp
+          để tạo mã QR.
+        </p>
+      )}
       {qrCodeImageUrl ? (
         <div className="flex justify-center mb-3 relative">
           {!imgLoaded && (
@@ -48,19 +71,21 @@ export const OrderPaymentQrSection = ({
           />
         </div>
       ) : (
-        <p className="text-red-600 font-medium">
-          Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình
-        </p>
+        !missingSupplierBank && (
+          <p className="text-red-600 font-medium">
+            Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình
+          </p>
+        )
       )}
       <div className="text-sm text-slate-100 space-y-1">
         <p>
-          Ngân hàng: <strong className="text-indigo-100">VP Bank</strong>
+          Ngân hàng: <strong className="text-indigo-100">{bankDisplay}</strong>
         </p>
         <p>
-          Số tài khoản: <strong className="text-indigo-100">{ACCOUNT_NO}</strong>
+          Số tài khoản: <strong className="text-indigo-100">{accountNoDisplay}</strong>
         </p>
         <p>
-          Chủ tài khoản: <strong className="text-indigo-100">{ACCOUNT_NAME}</strong>
+          Chủ tài khoản: <strong className="text-indigo-100">{holderDisplay}</strong>
         </p>
         <p>
           Số tiền:{" "}
@@ -68,10 +93,12 @@ export const OrderPaymentQrSection = ({
             {formatCurrency(effectiveQrAmount)}
           </strong>
         </p>
-        {!keepOrderPrice && priceLoading && (
+        {!isSupplierPayout && !keepOrderPrice && priceLoading && (
           <p className="text-xs text-slate-400">Đang tính lại giá...</p>
         )}
-        {priceError && <p className="text-xs text-red-500">{priceError}</p>}
+        {!isSupplierPayout && priceError && (
+          <p className="text-xs text-red-500">{priceError}</p>
+        )}
         <p>
           Nội dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
           (Vui lòng điền đúng)

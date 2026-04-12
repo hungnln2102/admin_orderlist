@@ -14,7 +14,7 @@ const createSupply = async (req, res) => {
   logger.debug("[POST] /api/supplies", { body: req.body });
   const body = req.body || {};
   const source_name = body.supplier_name ?? body.source_name;
-  const { number_bank, bin_bank, status, active_supply } = body;
+  const { number_bank, bin_bank, account_holder, status, active_supply } = body;
   if (!source_name) {
     return res.status(400).json({ error: "Tên nhà cung cấp là bắt buộc." });
   }
@@ -27,8 +27,9 @@ const createSupply = async (req, res) => {
     supplierNameIdent,
     QUOTED_COLS.supplier.numberBank,
     QUOTED_COLS.supplier.binBank,
+    QUOTED_COLS.supplier.accountHolder,
   ];
-  const values = [source_name, number_bank ?? null, bin_bank ?? null];
+  const values = [source_name, number_bank ?? null, bin_bank ?? null, account_holder ?? null];
 
   if (statusColumn) {
     fields.push(`"${statusColumn}"`);
@@ -57,6 +58,7 @@ const createSupply = async (req, res) => {
       source_name,
       number_bank: number_bank ?? null,
       bin_bank: bin_bank ?? null,
+      account_holder: account_holder ?? null,
       status: status ?? active_supply ?? "active",
     });
   } catch (error) {
@@ -81,12 +83,14 @@ const updateSupply = async (req, res) => {
     status,
     active_supply,
     bank_name,
+    account_holder,
   } = req.body || {};
   const resolvedName = supplierNameRaw ?? source_name;
   if (
     resolvedName === undefined &&
     number_bank === undefined &&
     bin_bank === undefined &&
+    account_holder === undefined &&
     status === undefined &&
     active_supply === undefined
   ) {
@@ -114,6 +118,9 @@ const updateSupply = async (req, res) => {
   if (bin_bank !== undefined) {
     addField(QUOTED_COLS.supplier.binBank, bin_bank);
   }
+  if (account_holder !== undefined) {
+    addField(QUOTED_COLS.supplier.accountHolder, account_holder);
+  }
   if (status !== undefined || active_supply !== undefined) {
     if (statusColumn) {
       addField(`"${statusColumn}"`, status ?? active_supply ?? null);
@@ -140,6 +147,7 @@ const updateSupply = async (req, res) => {
         ${supplierNameIdent} AS source_name,
         ${QUOTED_COLS.supplier.numberBank} AS number_bank,
         ${QUOTED_COLS.supplier.binBank} AS bin_bank,
+        ${QUOTED_COLS.supplier.accountHolder} AS account_holder,
         ${statusColumn ? `"${statusColumn}" AS raw_status` : `${QUOTED_COLS.supplier.activeSupply} AS raw_status`}
     `,
       [...values, parsedSupplyId]
@@ -157,6 +165,7 @@ const updateSupply = async (req, res) => {
       source_name: row.source_name,
       number_bank: row.number_bank,
       bin_bank: row.bin_bank,
+      account_holder: row.account_holder,
       status: normalizedStatus,
       bank_name: bank_name ?? null,
     });

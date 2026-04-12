@@ -7,10 +7,11 @@ import {
 } from "@/constants";
 import * as Helpers from "@/lib/helpers";
 import { prefetchQrImage } from "@/components/modals/ViewOrderModal/components/OrderPaymentQrSection";
-import { buildSepayQrUrl } from "@/shared/utils/sepay";
+import { buildViewOrderPaymentQrPayload } from "@/components/modals/ViewOrderModal/paymentQr";
 import {
   formatCurrency,
   formatOrderCodeShort,
+  isGiftOrderCode,
 } from "../utils/ordersHelpers";
 import { getOrderCodeTheme } from "../utils/orderCodeTheme";
 import {
@@ -227,16 +228,17 @@ export const OrderRow = React.memo(function OrderRow({
             <button
               onClick={stopPropagation(onView)}
               onMouseEnter={() => {
-                const price = Number(order[ORDER_FIELDS.PRICE]) || 0;
                 const code = String(order[ORDER_FIELDS.ID_ORDER] || "");
-                if (price > 0 && code) {
-                  prefetchQrImage(buildSepayQrUrl({
-                    accountNumber: "9183400998",
-                    bankCode: "VPB",
-                    amount: price,
-                    description: code,
-                    accountName: "NGO LE NGOC HUNG",
-                  }));
+                if (!code) return;
+                const { qrCodeImageUrl, effectiveQrAmount } =
+                  buildViewOrderPaymentQrPayload({
+                    order: order as Record<string, unknown>,
+                    keepOrderPrice: false,
+                    calculatedPrice: null,
+                    isGift: isGiftOrderCode(code),
+                  });
+                if (qrCodeImageUrl && effectiveQrAmount > 0) {
+                  prefetchQrImage(qrCodeImageUrl);
                 }
               }}
               className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-indigo-300/60 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/40 transition-all flex-shrink-0"

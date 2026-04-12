@@ -45,6 +45,7 @@ export const SUPPLY_COLS = {
   sourceName: "supplier_name",
   numberBank: "number_bank",
   binBank: "bin_bank",
+  nameBank: "account_holder",
   activeSupply: "active_supply",
 };
 

@@ -239,8 +239,10 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       orderCode,
     ]);
 
-    // Renewal flow: khi đơn từ Cần Gia Hạn -> Đang Xử Lý, ghi nhận vòng gia hạn mới vào dashboard tháng.
-    if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL) {
+    const isMavn = isMavnImportOrder({ id_order: orderCode });
+
+    // Renewal flow: Cần Gia Hạn → Đang Xử Lý — ghi nhận vòng gia hạn vào dashboard tháng (trừ đơn MAVN nhập hàng).
+    if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
       if (monthKey) {
         const revenue = normalizeMoney(finalGiaBan);
@@ -266,9 +268,11 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
           [monthKey, 1, revenue, profit]
         );
       }
+    } else if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && isMavn) {
+      logger.info("[Renewal] Bỏ cộng dashboard_monthly_summary (đơn MAVN nhập hàng)", {
+        orderCode,
+      });
     }
-
-    const isMavn = isMavnImportOrder({ id_order: orderCode });
     if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0 && !isMavn) {
       try {
         await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);

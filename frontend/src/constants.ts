@@ -204,6 +204,10 @@ export interface Order {
   registration_date_display?: string;
   expiry_date_display?: string;
   supply: string;
+  /** JOIN supplier — QR thanh toán NCC cho đơn MAVN */
+  supplier_number_bank?: string | null;
+  supplier_bin_bank?: string | null;
+  supplier_account_holder?: string | null;
   cost: string;
   price: string;
   note: string;
