@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { PhotoIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, PhotoIcon } from "@heroicons/react/24/outline";
 import {
   fetchProductImages,
   uploadProductImage,
@@ -39,23 +39,56 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
   onUploadClick,
   onDeleteSelected,
 }) => {
+  const [nameFilter, setNameFilter] = useState("");
+
+  useEffect(() => {
+    if (open) setNameFilter("");
+  }, [open]);
+
+  const filteredImages = useMemo(() => {
+    const q = nameFilter.trim().toLowerCase();
+    if (!q) return images;
+    return images.filter((item) => item.fileName.toLowerCase().includes(q));
+  }, [images, nameFilter]);
+
   if (!open) return null;
 
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4 py-6">
       <div className="w-full max-w-4xl rounded-2xl border border-white/10 bg-[#0b1220] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
-          <h3 className="text-lg font-semibold text-white">Chọn hình ảnh sản phẩm</h3>
+        <div className="flex flex-col gap-3 border-b border-white/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <h3 className="text-lg font-semibold text-white shrink-0">
+            Chọn hình ảnh sản phẩm
+          </h3>
+          <div className="relative w-full sm:max-w-xs">
+            <MagnifyingGlassIcon
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              placeholder="Lọc theo tên file..."
+              className="w-full rounded-lg border border-white/15 bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/40 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
         </div>
         <div className="p-4 space-y-4">
           {loading ? (
             <p className="text-sm text-white/70">Đang tải hình ảnh...</p>
           ) : images.length === 0 ? (
             <p className="text-sm text-white/70">Chưa có hình ảnh nào.</p>
+          ) : filteredImages.length === 0 ? (
+            <p className="text-sm text-white/70">
+              Không có ảnh khớp &quot;{nameFilter.trim()}&quot;. Thử từ khóa khác.
+            </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto">
-              {images.map((item) => {
+              {filteredImages.map((item) => {
                 const isSelected = selectedImage?.fileName === item.fileName;
                 return (
                   <button
