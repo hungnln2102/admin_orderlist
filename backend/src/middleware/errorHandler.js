@@ -93,9 +93,9 @@ const errorHandler = (err, req, res, next) => {
  * 404 Not Found handler
  * Must be registered BEFORE error handler but AFTER all routes
  */
-/** 404 không đẩy lên Telegram: bot/crawler thường gọi (SEO, LLM) nhưng API admin không phục vụ. */
+/** 404 không đẩy lên Telegram: crawler/SEO; ảnh tĩnh thiếu file (DB còn URL) — không spam cảnh báo. */
 const SILENT_404_PATTERN =
-  /^\/($|_next|favicon\.ico|robots\.txt|sitemap\.xml|sitemap_index\.xml|llms\.txt|ads\.txt|\.well-known)/i;
+  /^\/($|_next|favicon\.ico|robots\.txt|sitemap\.xml|sitemap_index\.xml|llms\.txt|ads\.txt|\.well-known|image(?:_product|_variant)?\/)/i;
 
 const notFoundHandler = (req, res, next) => {
   const pathOnly = String(req.originalUrl || "").split("?")[0];

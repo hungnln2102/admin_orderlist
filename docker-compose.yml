@@ -73,10 +73,10 @@ services:
     ports:
       - "3001:3001"   # Main API
     volumes:
-      # Upload ảnh gói (/image_product), ảnh biến thể (/image_variant), ảnh bài viết (/image)
-      - backend_product_images:/app/image_product
-      - backend_variant_images:/app/image_variant
-      - backend_article_images:/app/image
+      # Bind mount: cùng thư mục trên host với ./backend/... (SFTP/file manager, modal chọn ảnh)
+      - ./backend/image_product:/app/image_product
+      - ./backend/image_variant:/app/image_variant
+      - ./backend/image:/app/image
     networks:
       - app-network
     healthcheck:
@@ -181,6 +181,3 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  backend_product_images:
-  backend_variant_images:
-  backend_article_images:
