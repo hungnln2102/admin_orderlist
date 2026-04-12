@@ -3,6 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const logger = require("../utils/logger");
+const {
+  clearProductImageReferences,
+} = require("../services/clearProductImageReferences");
 
 const router = express.Router();
 
@@ -96,7 +99,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Delete image
+// Delete image — xóa file và gán NULL mọi cột DB đang trỏ tới URL /image_product/<file>
 router.delete("/:fileName", async (req, res) => {
   const rawName = String(req.params.fileName || "").trim();
   const fileName = path.basename(rawName);
@@ -105,12 +108,17 @@ router.delete("/:fileName", async (req, res) => {
   }
   const targetPath = path.join(IMAGE_DIR, fileName);
   try {
-    await fs.promises.unlink(targetPath);
-    res.json({ ok: true });
-  } catch (error) {
-    if (error && error.code === "ENOENT") {
-      return res.status(404).json({ error: "File not found." });
+    try {
+      await fs.promises.unlink(targetPath);
+    } catch (err) {
+      if (!err || err.code !== "ENOENT") {
+        throw err;
+      }
     }
+
+    const cleared = await clearProductImageReferences(fileName);
+    res.json({ ok: true, cleared });
+  } catch (error) {
     logger.error("Delete product image failed", { fileName, error: error.message });
     res.status(500).json({ error: "Failed to delete image." });
   }

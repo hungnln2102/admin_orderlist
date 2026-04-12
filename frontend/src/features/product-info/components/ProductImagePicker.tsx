@@ -8,6 +8,13 @@ import {
   ProductImageItem,
 } from "@/lib/productImagesApi";
 
+/** Tránh cache trình duyệt khi URL không đổi sau upload/ghi đè file cùng đường dẫn. */
+function withPreviewToken(url: string, token: number): string {
+  if (!url || !token) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}_pv=${token}`;
+}
+
 type ImagePickerModalProps = {
   open: boolean;
   images: ProductImageItem[];
@@ -173,11 +180,14 @@ const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
 type ProductImagePickerProps = {
   imageUrl: string | null;
   onImageUrlChange: (url: string) => void;
+  /** Gọi sau khi xóa ảnh trên server (DB đã được gán NULL các tham chiếu) — nên reload danh sách sản phẩm. */
+  onProductImagesChanged?: () => void;
 };
 
 export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
   imageUrl,
   onImageUrlChange,
+  onProductImagesChanged,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -188,6 +198,17 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previewToken, setPreviewToken] = useState(() => Date.now());
+  const [previewLoadError, setPreviewLoadError] = useState(false);
+
+  const bumpPreview = () => {
+    setPreviewToken(Date.now());
+    setPreviewLoadError(false);
+  };
+
+  useEffect(() => {
+    setPreviewLoadError(false);
+  }, [imageUrl]);
 
   const loadImages = async (preferred?: ProductImageItem | null) => {
     setImagesLoading(true);
@@ -246,6 +267,7 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
     try {
       const result = await uploadProductImage(file);
       onImageUrlChange(result.url);
+      bumpPreview();
       const preferred = result.fileName
         ? { fileName: result.fileName, url: result.url }
         : null;
@@ -262,6 +284,7 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
   const handleUseSelected = () => {
     if (!selectedImage) return;
     onImageUrlChange(selectedImage.url);
+    bumpPreview();
     setPickerOpen(false);
   };
 
@@ -273,8 +296,10 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
       await deleteProductImage(selectedImage.fileName);
       if (imageUrl === selectedImage.url) {
         onImageUrlChange("");
+        bumpPreview();
       }
       await loadImages(null);
+      onProductImagesChanged?.();
     } catch (err) {
       setImagesError(err instanceof Error ? err.message : "Delete failed.");
     } finally {
@@ -288,18 +313,22 @@ export const ProductImagePicker: React.FC<ProductImagePickerProps> = ({
         Hình ảnh sản phẩm
       </label>
       <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 shadow-sm backdrop-blur-sm">
-        {imageUrl ? (
+        {imageUrl && !previewLoadError ? (
           <img
-            src={imageUrl}
+            key={`${imageUrl}-${previewToken}`}
+            src={withPreviewToken(imageUrl, previewToken)}
             alt="Product"
             className="h-full w-full object-contain p-3"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
+            onError={() => setPreviewLoadError(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
             <PhotoIcon className="h-16 w-16 text-white/20" />
+            {imageUrl && previewLoadError ? (
+              <p className="text-xs text-rose-300/90">
+                Không tải được ảnh. Kiểm tra URL hoặc thử ảnh khác.
+              </p>
+            ) : null}
           </div>
         )}
         <button

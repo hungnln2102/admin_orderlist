@@ -23,6 +23,7 @@ type EditCategoryModalProps = {
   onClose: () => void;
   onSave: () => void;
   onCategoriesReload?: () => void;
+  onProductImagesChanged?: () => void;
 };
 
 type TabType = "edit" | "manage";
@@ -41,6 +42,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   onClose,
   onSave,
   onCategoriesReload,
+  onProductImagesChanged,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>("edit");
 
@@ -130,6 +132,7 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
                   <ProductImagePicker
                     imageUrl={imageUrl}
                     onImageUrlChange={onImageUrlChange}
+                    onProductImagesChanged={onProductImagesChanged}
                   />
                 </div>
               </div>

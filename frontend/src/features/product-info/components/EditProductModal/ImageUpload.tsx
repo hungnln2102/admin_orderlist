@@ -8,6 +8,12 @@ import {
   uploadVariantImage,
 } from "@/lib/variantImagesApi";
 
+function withPreviewToken(url: string, token: number): string {
+  if (!url || !token) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}_pv=${token}`;
+}
+
 interface ImageUploadProps {
   imageUrl?: string;
   onImageChange: (url: string) => void;
@@ -194,6 +200,17 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previewToken, setPreviewToken] = useState(() => Date.now());
+  const [previewLoadError, setPreviewLoadError] = useState(false);
+
+  const bumpPreview = () => {
+    setPreviewToken(Date.now());
+    setPreviewLoadError(false);
+  };
+
+  useEffect(() => {
+    setPreviewLoadError(false);
+  }, [imageUrl]);
 
   const loadImages = async (preferred?: VariantImageItem | null) => {
     setImagesLoading(true);
@@ -279,6 +296,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     try {
       const result = await uploadVariantImage(file);
       onImageChange(result.url);
+      bumpPreview();
       const preferred = result.fileName
         ? { fileName: result.fileName, url: result.url }
         : null;
@@ -295,6 +313,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const handleUseSelected = () => {
     if (!selectedImage) return;
     onImageChange(selectedImage.url);
+    bumpPreview();
     setPickerOpen(false);
   };
 
@@ -308,6 +327,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       await deleteVariantImage(selectedImage.fileName);
       if (imageUrl === selectedImage.url) {
         onImageRemove();
+        bumpPreview();
       }
       await loadImages(null);
     } catch (err) {
@@ -327,12 +347,14 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         className="hidden"
       />
 
-      {imageUrl ? (
+      {imageUrl && !previewLoadError ? (
         <div className="product-edit-image__preview group relative h-full overflow-hidden rounded-[28px] border">
           <img
-            src={imageUrl}
+            key={`${imageUrl}-${previewToken}`}
+            src={withPreviewToken(imageUrl, previewToken)}
             alt="Product preview"
             className="h-full w-full object-cover"
+            onError={() => setPreviewLoadError(true)}
           />
 
           <div className="product-edit-image__preview-overlay absolute inset-0 flex items-end justify-center gap-3 p-5">
@@ -365,7 +387,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
           <PhotoIcon className="product-edit-image__icon h-16 w-16" />
           <div>
             <p className="product-edit-image__title mb-2 text-sm font-semibold text-white">
-              Chọn hình ảnh sản phẩm
+              {imageUrl && previewLoadError
+                ? "Không tải được ảnh — nhấp để chọn ảnh khác"
+                : "Chọn hình ảnh sản phẩm"}
             </p>
             <p className="product-edit-image__hint text-xs">
               Nhấp để chọn từ server hoặc kéo thả file

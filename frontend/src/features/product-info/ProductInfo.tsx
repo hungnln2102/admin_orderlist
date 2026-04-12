@@ -192,6 +192,7 @@ const ProductInfo: React.FC = () => {
           onClose={closeCategoryEdit}
           onSave={handleSaveCategory}
           onCategoriesReload={loadCategories}
+          onProductImagesChanged={reload}
         />
       )}
 
