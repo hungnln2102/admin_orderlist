@@ -285,6 +285,7 @@ const deriveOrderCode = (transaction) => {
 /**
  * Fallback: khi không extract được mã đơn MAV từ nội dung chuyển khoản,
  * thử match theo số tiền + trạng thái (RENEWAL hoặc UNPAID).
+ * Loại MAVN: nhập hàng không match / không xử lý qua Sepay webhook.
  * Chỉ trả kết quả nếu tìm được đúng 1 đơn duy nhất (tránh nhầm lẫn).
  */
 const resolveOrderByPayment = async (client, { amount, transactionContent }) => {
@@ -302,6 +303,7 @@ const resolveOrderByPayment = async (client, { amount, transactionContent }) => 
     FROM ${ORDER_TABLE}
     WHERE ${safeIdent(ORDER_COLS.status)} = ANY($1)
       AND ${safeIdent(ORDER_COLS.price)} = $2
+      AND UPPER(${safeIdent(ORDER_COLS.idOrder)}::text) NOT LIKE 'MAVN%'
     ORDER BY ${safeIdent(ORDER_COLS.expiryDate)} ASC
     LIMIT 10
   `;

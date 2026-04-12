@@ -20,14 +20,5 @@ export interface BudgetsGoalsProps {
   currencyFormatter: Intl.NumberFormat;
   walletColumns: WalletColumn[];
   walletRows: WalletRow[];
-  goldValue?: number | null;
-  goldCost?: number | null;
   onRefetchGoals?: () => void;
 }
-
-export type AssetStatsValue = {
-  cash: number;
-  gold: number;
-  investment: number;
-  total: number;
-};

@@ -3,11 +3,14 @@
  */
 
 const logger = require("../../utils/logger");
+const { isMavnImportOrder } = require("../../utils/orderHelpers");
 const {
   SEND_ORDER_NOTIFICATION,
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   TELEGRAM_ORDER_TOPIC_ID,
+  TELEGRAM_IMPORT_ORDER_CHAT_ID,
+  TELEGRAM_IMPORT_ORDER_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
   QR_NOTE_PREFIX,
   QR_ACCOUNT_NUMBER,
@@ -15,30 +18,35 @@ const {
   QR_ACCOUNT_NAME,
 } = require("./constants");
 const { toSafeString, roundGiaBanValue } = require("./formatters");
-const { buildOrderCreatedMessage, buildCopyKeyboard } = require("./messageBuilders");
+const {
+  buildOrderCreatedMessage,
+  buildImportOrderCreatedMessage,
+  buildCopyKeyboard,
+} = require("./messageBuilders");
 const { buildSepayQrUrl } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendOrderCreatedNotification(order) {
+  const isImport = isMavnImportOrder(order);
+  const targetChatId = isImport
+    ? TELEGRAM_IMPORT_ORDER_CHAT_ID
+    : TELEGRAM_CHAT_ID;
 
   logger.info("[Order][Telegram] sendOrderCreatedNotification called", {
     hasOrder: !!order,
     orderId: order?.id || order?.id_order || "N/A",
+    isImport,
     SEND_ORDER_NOTIFICATION,
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     botTokenLength: TELEGRAM_BOT_TOKEN?.length || 0,
-    TELEGRAM_CHAT_ID,
+    targetChatId,
     TELEGRAM_ORDER_TOPIC_ID,
+    TELEGRAM_IMPORT_ORDER_TOPIC_ID,
     SEND_ORDER_TO_TOPIC,
   });
 
-  if (
-    !SEND_ORDER_NOTIFICATION ||
-    !order ||
-    !TELEGRAM_BOT_TOKEN ||
-    !TELEGRAM_CHAT_ID
-  ) {
+  if (!SEND_ORDER_NOTIFICATION || !order || !TELEGRAM_BOT_TOKEN || !targetChatId) {
     logger.warn("[Order][Telegram] Notification skipped", {
       reason: !SEND_ORDER_NOTIFICATION
         ? "SEND_ORDER_NOTIFICATION is false"
@@ -46,13 +54,14 @@ async function sendOrderCreatedNotification(order) {
           ? "No order provided"
           : !TELEGRAM_BOT_TOKEN
             ? "No bot token"
-            : !TELEGRAM_CHAT_ID
-              ? "No chat ID"
+            : !targetChatId
+              ? "No chat ID (TELEGRAM_CHAT_ID / TELEGRAM_IMPORT_ORDER_CHAT_ID)"
               : "Unknown",
       SEND_ORDER_NOTIFICATION,
       hasOrder: !!order,
       hasBotToken: !!TELEGRAM_BOT_TOKEN,
-      hasChatId: !!TELEGRAM_CHAT_ID,
+      hasChatId: !!targetChatId,
+      isImport,
     });
     return;
   }
@@ -62,14 +71,18 @@ async function sendOrderCreatedNotification(order) {
   ).trim();
   const paymentNote = `${QR_NOTE_PREFIX} ${orderCode}`.trim();
   const amount = roundGiaBanValue(order.price || 0);
-  const qrUrl = buildSepayQrUrl({
-    accountNumber: QR_ACCOUNT_NUMBER,
-    bankCode: QR_BANK_CODE,
-    amount,
-    description: paymentNote,
-    accountName: QR_ACCOUNT_NAME,
-  });
-  const caption = buildOrderCreatedMessage(order, paymentNote);
+  const qrUrl = isImport
+    ? null
+    : buildSepayQrUrl({
+        accountNumber: QR_ACCOUNT_NUMBER,
+        bankCode: QR_BANK_CODE,
+        amount,
+        description: paymentNote,
+        accountName: QR_ACCOUNT_NAME,
+      });
+  const caption = isImport
+    ? buildImportOrderCreatedMessage(order)
+    : buildOrderCreatedMessage(order, paymentNote);
 
   if (!caption) return;
 
@@ -78,9 +91,9 @@ async function sendOrderCreatedNotification(order) {
     includeButtons,
     includePhoto = true,
   }) => {
-    const usePhoto = includePhoto !== false && !!qrUrl;
+    const usePhoto = !isImport && includePhoto !== false && !!qrUrl;
     const payload = {
-      chat_id: TELEGRAM_CHAT_ID,
+      chat_id: targetChatId,
       parse_mode: "HTML",
     };
     if (usePhoto) {
@@ -95,12 +108,19 @@ async function sendOrderCreatedNotification(order) {
         payload.reply_markup = keyboard;
       }
     }
-    if (
-      includeTopic &&
-      SEND_ORDER_TO_TOPIC &&
-      Number.isFinite(TELEGRAM_ORDER_TOPIC_ID)
-    ) {
-      payload.message_thread_id = TELEGRAM_ORDER_TOPIC_ID;
+    if (includeTopic) {
+      if (
+        isImport &&
+        Number.isFinite(TELEGRAM_IMPORT_ORDER_TOPIC_ID)
+      ) {
+        payload.message_thread_id = TELEGRAM_IMPORT_ORDER_TOPIC_ID;
+      } else if (
+        !isImport &&
+        SEND_ORDER_TO_TOPIC &&
+        Number.isFinite(TELEGRAM_ORDER_TOPIC_ID)
+      ) {
+        payload.message_thread_id = TELEGRAM_ORDER_TOPIC_ID;
+      }
     }
     return payload;
   };
@@ -122,6 +142,7 @@ async function sendOrderCreatedNotification(order) {
       sending: ({ attempt, includeTopic, includeButtons, includePhoto }) =>
         logger.info("[Order][Telegram] Sending notification", {
           attempt,
+          isImport,
           hasQrUrl: !!qrUrl,
           includeTopic,
           includeButtons,
@@ -135,13 +156,14 @@ async function sendOrderCreatedNotification(order) {
         }),
       retryNoPhoto: () =>
         logger.info("[Order][Telegram] Retrying as text (QR photo URL failed)"),
-      attemptFailed: ({ attempt, error, status, body }) =>
-        logger.warn("[Order][Telegram] Send attempt failed", {
-          attempt,
-          error,
-          status,
-          body,
-        }),
+      attemptFailed: ({ attempt, error, status, body, recoverable }) => {
+        const meta = { attempt, error, status, body };
+        if (recoverable) {
+          logger.info("[Order][Telegram] Send attempt failed (will retry)", meta);
+        } else {
+          logger.warn("[Order][Telegram] Send attempt failed", meta);
+        }
+      },
       retryNoTopic: () =>
         logger.info("[Order][Telegram] Retrying without topic ID"),
       retryNoButtons: () =>

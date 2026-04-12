@@ -10,6 +10,8 @@ const {
   ORDER_COLS,
   VARIANT_TABLE,
   VARIANT_COLS,
+  SUPPLIER_TABLE,
+  SUPPLIER_COLS,
 } = require("./config");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
 const { STATUS: ORDER_STATUS } = require("../../src/controllers/Order/constants");
@@ -218,6 +220,30 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       status: order[ORDER_COLS.status],
     });
 
+    let supplierNameForNcc = "";
+    if (supplierId != null && Number.isFinite(Number(supplierId))) {
+      try {
+        const supRes = await client.query(
+          `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
+           WHERE ${SUPPLIER_COLS.ID} = $1 LIMIT 1`,
+          [supplierId]
+        );
+        supplierNameForNcc = String(
+          supRes.rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? ""
+        ).trim();
+      } catch (e) {
+        logger.warn("[Renewal] Không đọc được tên NCC", { supplierId, error: e.message });
+      }
+    }
+    const skipNccLedger = isMavrykShopSupplierName(supplierNameForNcc);
+    const isMavn = isMavnImportOrder({ id_order: orderCode });
+    // MAVN nhập hàng: sau gia hạn luôn Đang Xử Lý (+ công nợ NCC khi có); Đã Thanh Toán chỉ qua thanh toán NCC.
+    const renewalNextStatus = isMavn
+      ? ORDER_STATUS.PROCESSING
+      : skipNccLedger
+        ? ORDER_STATUS.PAID
+        : ORDER_STATUS.PROCESSING;
+
     const updateSql = `
       UPDATE ${ORDER_TABLE}
       SET
@@ -236,27 +262,11 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       formatDateDB(ngayHetHanMoi),
       finalGiaNhap,
       finalGiaBan,
-      ORDER_STATUS.PROCESSING,
+      renewalNextStatus,
       orderCode,
     ]);
 
-    const isMavn = isMavnImportOrder({ id_order: orderCode });
-
-    let supplierNameForNcc = "";
-    if (supplierId != null && Number.isFinite(Number(supplierId))) {
-      try {
-        const supRes = await client.query(
-          `SELECT supplier_name FROM supplier WHERE id = $1 LIMIT 1`,
-          [supplierId]
-        );
-        supplierNameForNcc = String(supRes.rows[0]?.supplier_name ?? "").trim();
-      } catch (e) {
-        logger.warn("[Renewal] Không đọc được tên NCC", { supplierId, error: e.message });
-      }
-    }
-    const skipNccLedger = isMavrykShopSupplierName(supplierNameForNcc);
-
-    // Renewal flow: Cần Gia Hạn → Đang Xử Lý — ghi nhận vòng gia hạn vào dashboard tháng (trừ đơn MAVN nhập hàng).
+    // Renewal: NCC thường → Đang Xử Lý; NCC Mavryk/Shop (không MAVN) → Đã Thanh Toán.
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
       if (monthKey) {
@@ -313,7 +323,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       NGUON: supplierId != null ? String(supplierId) : "",
       GIA_NHAP: finalGiaNhap,
       GIA_BAN: finalGiaBan,
-      TINH_TRANG: ORDER_STATUS.PROCESSING,
+      TINH_TRANG: renewalNextStatus,
     };
 
     return { success: true, details, processType: "renewal" };

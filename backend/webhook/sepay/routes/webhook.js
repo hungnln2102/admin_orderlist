@@ -1,5 +1,11 @@
 const express = require("express");
-const { ORDER_COLS, ORDER_TABLE, pool } = require("../config");
+const {
+  ORDER_COLS,
+  ORDER_TABLE,
+  pool,
+  SUPPLIER_TABLE,
+  SUPPLIER_COLS,
+} = require("../config");
 const { safeStringify, normalizeAmount, extractOrderCodes, resolveOrderByPayment, parseFlexibleDate, normalizeMoney } = require("../utils");
 const {
   normalizeTransactionPayload,
@@ -22,10 +28,32 @@ const {
   isEligibleForRenewal,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
-const { isMavnImportOrder } = require("../../../src/utils/orderHelpers");
+const {
+  isMavnImportOrder,
+  isMavrykShopSupplierName,
+} = require("../../../src/utils/orderHelpers");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
+
+/** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
+const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
+  if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
+  try {
+    const { rows } = await client.query(
+      `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
+       WHERE ${SUPPLIER_COLS.ID} = $1 LIMIT 1`,
+      [Number(supplyIdRaw)]
+    );
+    return String(rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? "").trim();
+  } catch (e) {
+    logger.warn("[Webhook] Không đọc được tên NCC", {
+      supplyIdRaw,
+      error: e.message,
+    });
+    return "";
+  }
+};
 
 const router = express.Router();
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
@@ -160,7 +188,8 @@ router.post("/", async (req, res) => {
             ${ORDER_COLS.expiryDate},
             ${ORDER_COLS.orderDate},
             ${ORDER_COLS.price},
-            ${ORDER_COLS.cost}
+            ${ORDER_COLS.cost},
+            ${ORDER_COLS.idSupply}
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
           LIMIT 1`,
@@ -208,6 +237,17 @@ router.post("/", async (req, res) => {
             continue;
           }
 
+          const loopSupplyName = await fetchSupplierNameBySupplyId(
+            client,
+            state?.[ORDER_COLS.idSupply]
+          );
+          if (isMavrykShopSupplierName(loopSupplyName)) {
+            logger.info("[Webhook] Skip supplier import (NCC Mavryk/Shop)", {
+              orderCode: code,
+            });
+            continue;
+          }
+
           // Avoid double supplier import updates for renewal flows:
           // - Renewal path already calls updatePaymentSupplyBalance() inside runRenewal().
           // - Non-renewal path should add import once per unique receipt.
@@ -229,8 +269,9 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Chỉ đổi trạng thái Chưa Thanh Toán → Đang Xử Lý tại webhook.
-      // Đơn Cần Gia Hạn để renewal tự cập nhật status khi chạy gia hạn.
+      // Chưa Thanh Toán: mặc định → Đang Xử Lý; NCC Mavryk/Shop → Đã Thanh Toán (không cộng NCC ở vòng import phía trên).
+      // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
+      // Cần Gia Hạn (không MAVN): renewal sau COMMIT; NCC Mavryk/Shop → Đã Thanh Toán trong renewal.js.
       if (receiptResult?.inserted || receiptResult?.duplicate) {
         const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
         for (const code of codesToUpdate) {
@@ -239,7 +280,11 @@ router.post("/", async (req, res) => {
 
           const statusValue = state[ORDER_COLS.status];
           if (statusValue === ORDER_STATUS.UNPAID) {
-            const nextStatus = isMavnImportOrder({ id_order: code })
+            const supplierName = await fetchSupplierNameBySupplyId(
+              client,
+              state[ORDER_COLS.idSupply]
+            );
+            const nextStatus = isMavrykShopSupplierName(supplierName)
               ? ORDER_STATUS.PAID
               : ORDER_STATUS.PROCESSING;
             const statusUpdateResult = await client.query(
@@ -254,7 +299,7 @@ router.post("/", async (req, res) => {
             }
             logger.debug(
               nextStatus === ORDER_STATUS.PAID
-                ? "[Webhook] Order status → Đã Thanh Toán (MAVN)"
+                ? "[Webhook] Order status → Đã Thanh Toán (NCC Mavryk/Shop)"
                 : "[Webhook] Order status → Đang Xử Lý",
               {
                 orderCode: code,
@@ -274,9 +319,13 @@ router.post("/", async (req, res) => {
       client.release();
     }
 
-    // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). Renewal tự cập nhật status → Đang Xử Lý.
+    // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). MAVN không xử lý gia hạn qua Sepay — dùng API gia hạn tay.
     try {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        if (isMavnImportOrder({ id_order: code })) {
+          logger.info("[Webhook] Bỏ qua renewal Sepay cho đơn MAVN", { orderCode: code });
+          continue;
+        }
         const precomputedEligibility = eligibilityByOrderCode.get(code);
         if (precomputedEligibility?.eligible) {
           queueRenewalTask(code, {

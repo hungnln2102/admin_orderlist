@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 import { type WalletRow } from "../../hooks/useWalletBalances";
 import WalletBalancesHeader from "./WalletBalancesHeader";
 import WalletBalancesTable from "./WalletBalancesTable";
+import { WalletTypesManagerModal } from "./WalletTypesManagerModal";
 import {
   type DisplayColumn,
   type WalletBalancesCardProps,
@@ -23,6 +24,7 @@ const HEADER_LABELS: WalletBalancesHeaderLabels = {
   totalWallet5Label: "Tổng ID 5:",
   addLabel: "Thêm",
   closeLabel: "Đóng",
+  manageColumnsLabel: "Cột",
 };
 
 const TABLE_LABELS: WalletBalancesTableLabels = {
@@ -50,6 +52,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   );
 
   const [adding, setAdding] = useState(false);
+  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [newDate, setNewDate] = useState<string>("");
   const [newValues, setNewValues] = useState<Record<string, string>>({});
 
@@ -78,8 +81,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   );
 
   const resolveValue = useCallback(
-    (row: WalletRow, col: DisplayColumn) =>
-      resolveValueUtil(row, col, assetCodeByField),
+    (row: WalletRow, col: DisplayColumn) => resolveValueUtil(row, col, assetCodeByField),
     [assetCodeByField]
   );
 
@@ -102,16 +104,24 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   const handleSave = async () => {
     const recordDate = newDate || Helpers.formatDateToDMY(new Date()) || "";
     if (!recordDate) return;
+    const sameDayRow = rows.find((r) => r.recordDate === recordDate);
     const payload: Record<string, number> = {};
     columns.forEach((col) => {
       const raw = newValues[col.field] || "";
       const isVnd = !col.assetCode || col.assetCode.toUpperCase() === "VND";
-      
+
       // For VND, dots are thousand separators -> remove them
       // For others, dots are decimal points -> keep them
       const cleaned = isVnd ? raw.replace(/\./g, "") : raw;
       const num = Number(cleaned || 0);
-      if (cleaned) payload[col.field] = Number.isFinite(num) ? num : 0;
+      if (cleaned) {
+        if (Number.isFinite(num)) payload[col.field] = num;
+        return;
+      }
+      const fromSameDay = sameDayRow?.values[col.field];
+      if (fromSameDay !== undefined && fromSameDay !== null && Number.isFinite(Number(fromSameDay))) {
+        payload[col.field] = Number(fromSameDay);
+      }
     });
     try {
       await apiFetch("/api/wallets/daily-balances", {
@@ -143,6 +153,17 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
         currencyFormatter={currencyFormatter}
         adding={adding}
         onToggleAdd={toggleAdd}
+        onOpenManageColumns={() => setManageColumnsOpen(true)}
+      />
+
+      <WalletTypesManagerModal
+        isOpen={manageColumnsOpen}
+        onClose={() => setManageColumnsOpen(false)}
+        columns={columns}
+        onSuccess={() => {
+          setManageColumnsOpen(false);
+          onRefresh();
+        }}
       />
 
       {error && (

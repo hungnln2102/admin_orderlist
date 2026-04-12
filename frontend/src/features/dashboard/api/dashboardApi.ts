@@ -50,6 +50,8 @@ export interface DashboardStatsResponse {
   totalRevenue: { current: number; previous: number };
   totalImports: { current: number; previous: number };
   totalRefund: { current: number; previous: number };
+  monthlyProfit?: { current: number; previous: number };
+  monthlyTax?: { current: number; previous: number };
 }
 
 interface YearsApiResponse {

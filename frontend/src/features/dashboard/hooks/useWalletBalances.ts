@@ -6,8 +6,10 @@ export type WalletColumn = {
   name: string;
   field: string;
   note?: string;
-  linkedWalletId?: number | null;
   assetCode?: string;
+  isInvestment?: boolean;
+  /** per_row: ô theo ngày; column_total: nhãn loại cột (cùng lưu theo ngày) */
+  balanceScope?: "per_row" | "column_total";
 };
 
 export type WalletRow = { recordDate: string; values: Record<string, number> };

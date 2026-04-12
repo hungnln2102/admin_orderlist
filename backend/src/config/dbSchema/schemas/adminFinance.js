@@ -40,6 +40,7 @@ const FINANCE_SCHEMA = {
       ASSET_CODE: "asset_code",
       IS_INVESTMENT: "is_investment",
       LINKED_WALLET_ID: "linked_wallet_id",
+      BALANCE_SCOPE: "balance_scope",
     },
   },
   TRANS_DAILYBALANCES: {

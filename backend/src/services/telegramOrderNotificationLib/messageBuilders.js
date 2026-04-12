@@ -74,6 +74,74 @@ function buildOrderCreatedMessage(order, paymentNote) {
   return lines.join("\n");
 }
 
+/** MAVN import order: text only (no VietQR / no shop payment lines). */
+function buildImportOrderCreatedMessage(order) {
+  if (!order) return "";
+  const orderCode = toSafeString(
+    order.id_order || order.idOrder || order.order_code || order.orderCode
+  ).trim();
+  const productName = toSafeString(order.id_product || order.idProduct).trim();
+  const info = toSafeString(
+    order.information_order || order.informationOrder
+  ).trim();
+  const slot = toSafeString(order.slot).trim();
+  const customer = toSafeString(order.customer || order.customer_name).trim();
+  const supply = toSafeString(order.supply).trim();
+  const registerDate =
+    toSafeString(
+      order.registration_date_display || order.registration_date_str
+    ).trim() || formatDateDMY(order.order_date);
+  const expiryDate =
+    toSafeString(order.expiry_date_display || order.expiry_date_str).trim() ||
+    formatDateDMY(order.expiry_date);
+  const days = Number(order.days || order.total_days || 0) || 0;
+  const cost = Number(order.cost || 0) || 0;
+  const price = Number(order.price || 0) || 0;
+  const escOrder = orderCode ? escapeHtml(orderCode) : "...";
+  const escProduct = productName ? escapeHtml(productName) : "N/A";
+  const escInfo = info ? escapeHtml(info) : "N/A";
+  const escSlot = slot ? escapeHtml(slot) : "";
+  const escCustomer = customer ? escapeHtml(customer) : "N/A";
+  const escSupply = supply ? escapeHtml(supply) : "";
+  const escRegister = registerDate ? escapeHtml(registerDate) : "";
+  const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
+  const escDays = days > 0 ? escapeHtml(String(days) + " ng\u00e0y") : "";
+  const escCost = escapeHtml(formatCurrency(cost) + " \u0111");
+  const escPrice = escapeHtml(formatCurrency(price) + " \u0111");
+
+  const sep = "\u2501\u2501\u2501\u2501\u2501\u2501";
+  const separator1 = sep + " \ud83d\udce6 " + sep;
+  const separator2 = sep + " \ud83d\udc64 " + sep;
+
+  const lines = [
+    "\ud83d\uded2 <b>\u0110\u01a1n nh\u1eadp h\xe0ng</b> <code>" +
+      escOrder +
+      "</code> \u0111\xe3 \u0111\u01b0\u1ee3c t\u1ea1o.",
+    "",
+    separator1,
+    "\ud83d\udd14 <b>TH\xd4NG TIN S\u1ea2N PH\u1ea8M</b>",
+    "\ud83d\udce6 T\xean s\u1ea3n ph\u1ea9m: <b>" + escProduct + "</b>",
+    escSupply ? "\ud83c\udfe2 NCC: <b>" + escSupply + "</b>" : null,
+    "\ud83d\udccb Th\xf4ng tin \u0111\u01a1n h\xe0ng: <code>" + escInfo + "</code>",
+    escSlot ? "\ud83d\udccc Slot: <code>" + escSlot + "</code>" : null,
+    escRegister
+      ? "\ud83d\udcc5 Ng\xe0y b\u1eaft \u0111\u1ea7u: " + escRegister
+      : null,
+    escDays ? "\u23f3 Th\u1eddi h\u1ea1n: " + escDays : null,
+    escExpiry ? "\ud83d\udcc5 Ng\xe0y h\u1ebft h\u1ea1n: " + escExpiry : null,
+    cost > 0
+      ? "\ud83d\udcb0 Gi\xe1 nh\u1eadp (cost): <b>" + escCost + "</b>"
+      : null,
+    "\ud83d\udcb0 Gi\xe1 b\xe1n: <b>" + escPrice + "</b>",
+    "",
+    separator2,
+    "\ud83d\udd38 <b>TH\xd4NG TIN KH\xc1CH H\xc0NG</b>",
+    "\ud83d\udc64 T\xean kh\xe1ch h\xe0ng: <code>" + escCustomer + "</code>",
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
 function buildCopyKeyboard({ orderCode, paymentNote }) {
   return null;
 }
@@ -169,6 +237,7 @@ function buildExpiredOrderMessage(order, index, total) {
 
 module.exports = {
   buildOrderCreatedMessage,
+  buildImportOrderCreatedMessage,
   buildCopyKeyboard,
   buildDueOrderMessage,
   buildExpiredOrderMessage,

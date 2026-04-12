@@ -328,7 +328,9 @@ CREATE TABLE IF NOT EXISTS finance.master_wallettypes (
   note            TEXT,
   asset_code      VARCHAR(50),
   is_investment   BOOLEAN DEFAULT FALSE,
-  linked_wallet_id INTEGER
+  linked_wallet_id INTEGER,
+  balance_scope   VARCHAR(20) NOT NULL DEFAULT 'per_row'
+                  CHECK (balance_scope IN ('per_row', 'column_total'))
 );
 
 CREATE TABLE IF NOT EXISTS finance.trans_dailybalances (

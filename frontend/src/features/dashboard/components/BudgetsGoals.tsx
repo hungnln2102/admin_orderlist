@@ -2,9 +2,10 @@ import React, { useMemo, useState } from "react";
 import {
   ArrowUpIcon,
   BanknotesIcon,
+  ChartBarSquareIcon,
+  CubeIcon,
   RocketLaunchIcon,
   ScaleIcon,
-  WalletIcon,
 } from "@heroicons/react/24/outline";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { AddGoalModal } from "./AddGoalModal";
@@ -12,8 +13,17 @@ import { ExpenseBreakdownChart } from "./budgets-goals/ExpenseBreakdownChart";
 import { SavingGoalsPanel } from "./budgets-goals/SavingGoalsPanel";
 import { WeeklyStatCard } from "./budgets-goals/WeeklyStatCard";
 import type { BudgetsGoalsProps } from "./budgets-goals/types";
-import { useAssetStats } from "./budgets-goals/useAssetStats";
 import { useSavingGoalsActions } from "./budgets-goals/useSavingGoalsActions";
+import { useWalletColumnStats } from "./budgets-goals/useWalletColumnStats";
+import { formatValue } from "./WalletBalancesCard/utils";
+
+const COLUMN_STAT_ICONS = [
+  BanknotesIcon,
+  ArrowUpIcon,
+  ScaleIcon,
+  ChartBarSquareIcon,
+  CubeIcon,
+] as const;
 
 const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   budgets,
@@ -21,8 +31,6 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   currencyFormatter,
   walletColumns,
   walletRows,
-  goldValue,
-  goldCost,
   onRefetchGoals,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -75,12 +83,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
     });
   }, [savingGoals, totals.totalTarget]);
 
-  const assetStats = useAssetStats({
-    walletRows,
-    walletColumns,
-    goldValue,
-    goldCost,
-  });
+  const columnStats = useWalletColumnStats(walletRows, walletColumns);
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
@@ -101,34 +104,25 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
           walletColumns={walletColumns}
           walletRows={walletRows}
           currencyFormatter={currencyFormatter}
-          goldValue={goldValue}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <WeeklyStatCard
-            title="Tiền Mặt"
-            value={currencyFormatter.format(assetStats.current.cash)}
-            change={assetStats.changes.cash}
-            icon={BanknotesIcon}
-          />
-          <WeeklyStatCard
-            title="Vàng"
-            value={currencyFormatter.format(assetStats.current.gold)}
-            change={assetStats.changes.gold}
-            icon={WalletIcon}
-          />
-          <WeeklyStatCard
-            title="Đầu Tư"
-            value={currencyFormatter.format(assetStats.current.investment)}
-            change={assetStats.changes.investment}
-            icon={ArrowUpIcon}
-          />
-          <WeeklyStatCard
-            title="Tổng Tài Sản"
-            value={currencyFormatter.format(assetStats.current.total)}
-            change={assetStats.changes.total}
-            icon={ScaleIcon}
-          />
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">
+          {columnStats.map((stat, index) => {
+            const Icon = COLUMN_STAT_ICONS[index % COLUMN_STAT_ICONS.length];
+            return (
+              <WeeklyStatCard
+                key={stat.field}
+                title={stat.name}
+                value={formatValue(
+                  stat.current,
+                  stat.assetCode,
+                  currencyFormatter
+                )}
+                change={stat.changePct}
+                icon={Icon}
+              />
+            );
+          })}
         </div>
       </div>
 

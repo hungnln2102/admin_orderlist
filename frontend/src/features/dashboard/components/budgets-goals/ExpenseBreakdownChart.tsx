@@ -19,30 +19,15 @@ export const ExpenseBreakdownChart: React.FC<{
   walletColumns: WalletColumn[];
   walletRows: WalletRow[];
   currencyFormatter: Intl.NumberFormat;
-  goldValue?: number | null;
-}> = ({ budgets, walletColumns, walletRows, currencyFormatter, goldValue }) => {
+}> = ({ budgets, walletColumns, walletRows, currencyFormatter }) => {
   const latestWalletRow = walletRows?.[0];
 
   const data = useMemo(() => {
-    const goldEntry =
-      goldValue && goldValue > 0
-        ? [
-            {
-              name: "Vàng (quy VND)",
-              value: goldValue,
-              color: "#FBBF24",
-            },
-          ]
-        : [];
-
     if (latestWalletRow) {
       const walletData = walletColumns
         .filter((col) => {
           const assetCode = String(col.assetCode || "").trim().toUpperCase();
-          const name = String(col.name || "").toLowerCase();
-          if (name.includes("hana")) return false;
-          if (assetCode && assetCode !== "VND") return false;
-          return true;
+          return !assetCode || assetCode === "VND";
         })
         .map((col, idx) => ({
           name: col.name || col.field,
@@ -50,20 +35,17 @@ export const ExpenseBreakdownChart: React.FC<{
           color: COLORS[idx % COLORS.length],
         }))
         .filter((item) => item.value > 0);
-      if (walletData.length) return [...walletData, ...goldEntry];
+      if (walletData.length) return walletData;
     }
 
-    return [
-      ...budgets
-        .map((item, idx) => ({
-          name: item.name,
-          value: Math.max(0, item.used),
-          color: COLORS[idx % COLORS.length],
-        }))
-        .filter((item) => item.value > 0),
-      ...goldEntry,
-    ];
-  }, [budgets, walletColumns, latestWalletRow, goldValue]);
+    return budgets
+      .map((item, idx) => ({
+        name: item.name,
+        value: Math.max(0, item.used),
+        color: COLORS[idx % COLORS.length],
+      }))
+      .filter((item) => item.value > 0);
+  }, [budgets, walletColumns, latestWalletRow]);
 
   const total = useMemo(
     () => data.reduce((sum, item) => sum + item.value, 0),

@@ -6,7 +6,7 @@ export type OverviewStat = {
   name: string;
   value: string;
   change: string;
-  changeType: "increase" | "decrease" | "alert";
+  changeType: "increase" | "decrease" | "alert" | "neutral";
   icon: React.ElementType;
   accent: keyof typeof STAT_CARD_ACCENTS;
 };
@@ -30,14 +30,18 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({ stats }) => {
           >
             <div
               className={`inline-flex w-full max-w-full flex-wrap items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold tabular-nums ring-1 ring-white/[0.06] sm:text-[13px] ${
-                item.changeType === "increase"
-                  ? "bg-emerald-500/[0.12] text-emerald-200/95 ring-emerald-400/15"
-                  : item.changeType === "decrease"
-                    ? "bg-rose-500/[0.12] text-rose-200/95 ring-rose-400/12"
-                    : "bg-amber-500/[0.12] text-amber-200/95 ring-amber-400/15"
+                item.changeType === "neutral"
+                  ? "bg-slate-500/[0.14] text-slate-200/90 ring-slate-400/12"
+                  : item.changeType === "increase"
+                    ? "bg-emerald-500/[0.12] text-emerald-200/95 ring-emerald-400/15"
+                    : item.changeType === "decrease"
+                      ? "bg-rose-500/[0.12] text-rose-200/95 ring-rose-400/12"
+                      : "bg-amber-500/[0.12] text-amber-200/95 ring-amber-400/15"
               }`}
             >
-              {item.changeType === "alert" ? (
+              {item.changeType === "neutral" ? (
+                <span>{item.change}</span>
+              ) : item.changeType === "alert" ? (
                 <span className="uppercase tracking-widest font-bold">Alert</span>
               ) : item.changeType === "increase" ? (
                 <>

@@ -7,17 +7,9 @@ export type WalletBalancesCardProps = {
   error: string | null;
   onRefresh: () => void;
   currencyFormatter: Intl.NumberFormat;
-  goldPrice: number | null;
 };
 
 export type DisplayColumn = WalletColumn & {
-  sourceFields?: string[];
-  assetCode?: string;
-};
-
-export type ResolvedFieldValue = {
-  field: string;
-  value: number;
   assetCode?: string;
 };
 
@@ -26,6 +18,7 @@ export type WalletBalancesHeaderLabels = {
   totalWallet5Label: string;
   addLabel: string;
   closeLabel: string;
+  manageColumnsLabel: string;
 };
 
 export type WalletBalancesTableLabels = {

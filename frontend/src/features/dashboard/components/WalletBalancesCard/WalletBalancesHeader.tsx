@@ -1,5 +1,5 @@
 import React from "react";
-import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { type WalletBalancesHeaderLabels } from "./types";
 
 type WalletBalancesHeaderProps = {
@@ -8,6 +8,7 @@ type WalletBalancesHeaderProps = {
   currencyFormatter: Intl.NumberFormat;
   adding: boolean;
   onToggleAdd: () => void;
+  onOpenManageColumns?: () => void;
 };
 
 const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
@@ -16,6 +17,7 @@ const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
   currencyFormatter,
   adding,
   onToggleAdd,
+  onOpenManageColumns,
 }) => {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -27,18 +29,30 @@ const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
           </p>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onToggleAdd}
-        className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-      >
-        {adding ? (
-          <XMarkIcon className="h-4 w-4" />
-        ) : (
-          <PlusIcon className="h-4 w-4" />
-        )}
-        {adding ? labels.closeLabel : labels.addLabel}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {onOpenManageColumns ? (
+          <button
+            type="button"
+            onClick={onOpenManageColumns}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+          >
+            <AdjustmentsHorizontalIcon className="h-4 w-4" />
+            {labels.manageColumnsLabel}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onToggleAdd}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          {adding ? (
+            <XMarkIcon className="h-4 w-4" />
+          ) : (
+            <PlusIcon className="h-4 w-4" />
+          )}
+          {adding ? labels.closeLabel : labels.addLabel}
+        </button>
+      </div>
     </div>
   );
 };

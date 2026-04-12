@@ -81,15 +81,21 @@ async function sendZeroDaysRemainingNotification(orders = []) {
             total,
             orderCode: order.id_order || order.idOrder,
           }),
-        attemptFailed: ({ attempt, error, status, body }) =>
-          logger.warn("[Order][Telegram] Send attempt failed", {
+        attemptFailed: ({ attempt, error, status, body, recoverable }) => {
+          const meta = {
             attempt,
             orderIndex: index,
             orderCode: order.id_order || order.idOrder,
             error,
             status,
             body,
-          }),
+          };
+          if (recoverable) {
+            logger.info("[Order][Telegram] Send attempt failed (will retry)", meta);
+          } else {
+            logger.warn("[Order][Telegram] Send attempt failed", meta);
+          }
+        },
         retryNoTopic: () =>
           logger.info("[Order][Telegram] Retrying without topic ID"),
         permanentFailure: ({ error, stack, status, body }) =>

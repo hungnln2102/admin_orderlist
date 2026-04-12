@@ -1,10 +1,6 @@
 import React from "react";
 import { type WalletRow } from "../../hooks/useWalletBalances";
-import {
-  type DisplayColumn,
-  type ResolvedFieldValue,
-  type WalletBalancesTableLabels,
-} from "./types";
+import { type DisplayColumn, type WalletBalancesTableLabels } from "./types";
 
 type WalletBalancesTableProps = {
   displayColumns: DisplayColumn[];
@@ -19,10 +15,7 @@ type WalletBalancesTableProps = {
   onCancel: () => void;
   formatDate: (value: string) => string;
   formatValue: (val: number, assetCode?: string) => string;
-  resolveValue: (
-    row: WalletRow,
-    col: DisplayColumn
-  ) => number | ResolvedFieldValue[];
+  resolveValue: (row: WalletRow, col: DisplayColumn) => number;
   labels: WalletBalancesTableLabels;
 };
 
@@ -50,7 +43,12 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
             <th className="px-3 py-2 text-center">{labels.dateHeader}</th>
             {displayColumns.map((col) => (
               <th key={col.field} className="px-3 py-2 text-center">
-                {col.name || col.field}
+                <span className="block font-semibold">{col.name || col.field}</span>
+                {col.balanceScope === "column_total" ? (
+                  <span className="mt-0.5 block text-[10px] font-normal normal-case tracking-normal text-amber-200/85">
+                    Tổng cột
+                  </span>
+                ) : null}
               </th>
             ))}
           </tr>
@@ -67,40 +65,16 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                     onChange={(e) => onDateChange(e.target.value)}
                   />
                 </td>
-                {displayColumns.map((col) => {
-                  if (col.sourceFields && col.sourceFields.length) {
-                    return (
-                      <td
-                        key={col.field}
-                        className="px-3 py-2 text-center whitespace-pre-line"
-                      >
-                        <div className="flex flex-col gap-1">
-                          {col.sourceFields.map((field) => (
-                            <input
-                              key={field}
-                              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-white/20"
-                              placeholder={field}
-                              value={newValues[field] || ""}
-                              onChange={(e) =>
-                                onValueChange(field, e.target.value)
-                              }
-                            />
-                          ))}
-                        </div>
-                      </td>
-                    );
-                  }
-                  return (
-                    <td key={col.field} className="px-3 py-2 text-center">
-                      <input
-                        className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-white/20"
-                        placeholder="0"
-                        value={newValues[col.field] || ""}
-                        onChange={(e) => onValueChange(col.field, e.target.value)}
-                      />
-                    </td>
-                  );
-                })}
+                {displayColumns.map((col) => (
+                  <td key={col.field} className="px-3 py-2 text-center">
+                    <input
+                      className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white text-center focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-white/20"
+                      placeholder="0"
+                      value={newValues[col.field] || ""}
+                      onChange={(e) => onValueChange(col.field, e.target.value)}
+                    />
+                  </td>
+                ))}
               </tr>
               <tr className="bg-white/5">
                 <td
@@ -155,33 +129,12 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                 </td>
                 {displayColumns.map((col) => {
                   const resolved = resolveValue(row, col);
-                  if (Array.isArray(resolved)) {
-                    const parts = resolved
-                      .map((item) =>
-                        item.value
-                          ? formatValue(
-                              item.value,
-                              item.assetCode || col.assetCode
-                            )
-                          : null
-                      )
-                      .filter(Boolean);
-                    const text = parts.length ? parts.join("\n") : "-";
-                    return (
-                      <td
-                        key={col.field}
-                        className="px-3 py-2 text-center text-white/90 whitespace-pre-line"
-                      >
-                        {text}
-                      </td>
-                    );
-                  }
                   return (
                     <td
                       key={col.field}
                       className="px-3 py-2 text-center text-white/90"
                     >
-                      {formatValue(resolved as number, col.assetCode)}
+                      {formatValue(resolved, col.assetCode)}
                     </td>
                   );
                 })}

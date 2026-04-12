@@ -30,9 +30,13 @@ export const WeeklyStatCard: React.FC<{
           {Math.abs(change)}%
         </div>
       </div>
-      <div className="space-y-0.5">
-        <p className="text-2xl font-bold text-white">{value}</p>
-        <p className="text-xs text-white/60">{title}</p>
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-white/65 line-clamp-2 break-words">
+          {title}
+        </p>
+        <p className="text-lg font-semibold text-white tabular-nums leading-snug">
+          {value}
+        </p>
       </div>
     </div>
   );

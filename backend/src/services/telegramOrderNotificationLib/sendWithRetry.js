@@ -20,7 +20,7 @@ const {
  * @param {object} [options.log]
  * @param {(fields: { attempt: number, includeTopic: boolean, includeButtons: boolean }) => void} [options.log.sending]
  * @param {(fields: { attempt: number, includeTopic: boolean, includeButtons: boolean }) => void} [options.log.success]
- * @param {(fields: { attempt: number, error?: string, status?: number, body?: unknown }) => void} [options.log.attemptFailed]
+ * @param {(fields: { attempt: number, error?: string, status?: number, body?: unknown, recoverable?: boolean }) => void} [options.log.attemptFailed]
  * @param {() => void} [options.log.retryNoTopic]
  * @param {() => void} [options.log.retryNoButtons]
  * @param {() => void} [options.log.retryNoPhoto]
@@ -67,25 +67,33 @@ async function sendWithRetry({
       sent = true;
       break;
     } catch (err) {
+      const threadRetry = includeTopic && isThreadError(err);
+      const buttonRetry =
+        enableCopyButtonRetry && includeButtons && isCopyButtonError(err);
+      const photoRetry =
+        enablePhotoRetry && includePhoto && isPhotoSourceError(err);
+      const recoverable = threadRetry || buttonRetry || photoRetry;
+
       log.attemptFailed?.({
         attempt: attempt + 1,
         error: err?.message,
         status: err?.status,
         body: err?.body,
+        recoverable,
       });
 
       let adjusted = false;
-      if (includeTopic && isThreadError(err)) {
+      if (threadRetry) {
         log.retryNoTopic?.();
         includeTopic = false;
         adjusted = true;
       }
-      if (enableCopyButtonRetry && includeButtons && isCopyButtonError(err)) {
+      if (buttonRetry) {
         log.retryNoButtons?.();
         includeButtons = false;
         adjusted = true;
       }
-      if (enablePhotoRetry && includePhoto && isPhotoSourceError(err)) {
+      if (photoRetry) {
         log.retryNoPhoto?.();
         includePhoto = false;
         adjusted = true;

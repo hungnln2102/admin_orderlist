@@ -124,15 +124,21 @@ async function sendFourDaysRemainingNotification(orders = []) {
             total,
             orderCode,
           }),
-        attemptFailed: ({ attempt, error, status, body }) =>
-          logger.warn("[Order][Telegram] Send attempt failed", {
+        attemptFailed: ({ attempt, error, status, body, recoverable }) => {
+          const meta = {
             attempt,
             orderIndex: index,
             orderCode,
             error,
             status,
             body,
-          }),
+          };
+          if (recoverable) {
+            logger.info("[Order][Telegram] Send attempt failed (will retry)", meta);
+          } else {
+            logger.warn("[Order][Telegram] Send attempt failed", meta);
+          }
+        },
         retryNoTopic: () =>
           logger.info("[Order][Telegram] Retrying without topic ID"),
         retryNoPhoto: () =>

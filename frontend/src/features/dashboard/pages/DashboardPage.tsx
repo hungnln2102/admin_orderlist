@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
@@ -7,7 +7,6 @@ import { DashboardHero } from "../components/DashboardHero";
 import { budgets, currencyFormatter, financeSummary } from "../constants";
 import { useDashboardStats } from "../hooks/useDashboardStats";
 import { useMonthlySummary } from "../hooks/useMonthlySummary";
-import { useGoldPrices } from "../hooks/useGoldPrices";
 import { useWalletBalances } from "../hooks/useWalletBalances";
 import { useSavingGoals } from "../hooks/useSavingGoals";
 
@@ -29,16 +28,9 @@ const Dashboard: React.FC = () => {
   } = useDashboardStats();
 
   const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
-  const { goldLoading, goldError, selectedGoldRows, fetchGoldPrices } = useGoldPrices();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
   const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
   const [activeSection, setActiveSection] = useState<"overview" | "finance">("overview");
-
-  const latestGoldBid = selectedGoldRows.length ? Number(selectedGoldRows[0]?.bid || 0) || null : null;
-
-  useEffect(() => {
-    void fetchGoldPrices();
-  }, [fetchGoldPrices]);
 
   if (loading) {
     return (
@@ -94,11 +86,6 @@ const Dashboard: React.FC = () => {
           budgets={budgets}
           savingGoals={savingGoals}
           currencyFormatter={currencyFormatter}
-          goldRows={selectedGoldRows}
-          goldLoading={goldLoading}
-          goldError={goldError}
-          onRefreshGold={fetchGoldPrices}
-          latestGoldBid={latestGoldBid}
           walletColumns={walletColumns}
           walletRows={walletRows}
           walletLoading={walletLoading}

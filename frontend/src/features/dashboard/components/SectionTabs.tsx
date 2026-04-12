@@ -9,7 +9,7 @@ type SectionTabsProps = {
 
 const SECTION_TABS: Array<{ key: "overview" | "finance"; label: string }> = [
   { key: "overview", label: "Tổng quan" },
-  { key: "finance", label: "Chi tiêu & Ngân sách" },
+  { key: "finance", label: "Tài Sản" },
 ];
 
 export const SectionTabs: React.FC<SectionTabsProps> = ({
