@@ -35,17 +35,20 @@ const {
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
+const { withSavepoint } = require("../savepoint");
 
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
   if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
   try {
-    const { rows } = await client.query(
-      `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
+    return await withSavepoint(client, "fetch_supplier_nm", async () => {
+      const { rows } = await client.query(
+        `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
        WHERE ${SUPPLIER_COLS.ID} = $1 LIMIT 1`,
-      [Number(supplyIdRaw)]
-    );
-    return String(rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? "").trim();
+        [Number(supplyIdRaw)]
+      );
+      return String(rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? "").trim();
+    });
   } catch (e) {
     logger.warn("[Webhook] Không đọc được tên NCC", {
       supplyIdRaw,

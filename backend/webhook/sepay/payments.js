@@ -26,6 +26,7 @@ const logger = require("../../src/utils/logger");
 const {
   calculateOrderPricingFromResolvedValues,
 } = require("../../src/services/pricing/core");
+const { withSavepoint } = require("./savepoint");
 
 let paymentReceiptOrderColCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
@@ -293,13 +294,15 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
         supplyPriceScaled = normalized.scaled;
         if (supplyPriceScaled && rawSupplyPrice !== supplyPriceValue) {
           try {
-            await client.query(
-              `UPDATE ${SUPPLIER_COST_TABLE}
+            await withSavepoint(client, "sup_cost_norm", async () => {
+              await client.query(
+                `UPDATE ${SUPPLIER_COST_TABLE}
                SET ${SUPPLIER_COST_COLS.price} = $1
              WHERE ${SUPPLIER_COST_COLS.variantId} = $2
                AND ${SUPPLIER_COST_COLS.supplierId} = $3`,
-              [supplyPriceValue, resolvedProductId, supplierId]
-            );
+                [supplyPriceValue, resolvedProductId, supplierId]
+              );
+            });
           } catch (adjustErr) {
             logger.error("Failed to normalize supplier_cost", {
               productId: resolvedProductId,
@@ -312,12 +315,14 @@ const ensureSupplyAndPriceFromOrder = async (orderCode, options = {}) => {
       } else {
         try {
           const insertPrice = supplyPriceValue || referenceImport || costValue;
-          await client.query(
-            `INSERT INTO ${SUPPLIER_COST_TABLE} (${SUPPLIER_COST_COLS.variantId}, ${SUPPLIER_COST_COLS.supplierId}, ${SUPPLIER_COST_COLS.price})
+          await withSavepoint(client, "sup_cost_ins", async () => {
+            await client.query(
+              `INSERT INTO ${SUPPLIER_COST_TABLE} (${SUPPLIER_COST_COLS.variantId}, ${SUPPLIER_COST_COLS.supplierId}, ${SUPPLIER_COST_COLS.price})
              VALUES ($1, $2, $3)
              ON CONFLICT ON CONSTRAINT supplier_cost_pkey DO NOTHING`,
-          [resolvedProductId, supplierId, insertPrice]
-          );
+              [resolvedProductId, supplierId, insertPrice]
+            );
+          });
         } catch (insertErr) {
           logger.error("Insert supplier_cost failed", {
             productId: resolvedProductId,
