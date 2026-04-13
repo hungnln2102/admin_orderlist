@@ -131,10 +131,23 @@ export const DB_DEFINITIONS = {
     columns: {
       id: "id",
       sourceId: "supplier_id",
-      importValue: "total_amount",
       round: "payment_period",
       status: "payment_status",
       paid: "amount_paid",
+    },
+  },
+  paymentLedger: {
+    tableName: "supplier_payment_ledger",
+    columns: {
+      id: "id",
+      sourceId: "supplier_id",
+      amount: "amount",
+      amountPaid: "amount_paid",
+      round: "payment_period",
+      status: "payment_status",
+      note: "note",
+      source: "source",
+      createdAt: "created_at",
     },
   },
   refund: {
@@ -200,6 +213,7 @@ export const BANK_LIST_COLS = DB_DEFINITIONS.bankList.columns;
 export const PACKAGE_PRODUCT_COLS = DB_DEFINITIONS.packageProduct.columns;
 export const PAYMENT_RECEIPT_COLS = DB_DEFINITIONS.paymentReceipt.columns;
 export const PAYMENT_SUPPLY_COLS = DB_DEFINITIONS.paymentSupply.columns;
+export const PAYMENT_LEDGER_COLS = DB_DEFINITIONS.paymentLedger.columns;
 export const PRODUCT_PRICE_COLS = DB_DEFINITIONS.productPrice.columns;
 export const PRODUCT_DESC_COLS = DB_DEFINITIONS.productDesc.columns;
 export const REFUND_COLS = DB_DEFINITIONS.refund.columns;
@@ -215,6 +229,7 @@ export default {
   PACKAGE_PRODUCT_COLS,
   PAYMENT_RECEIPT_COLS,
   PAYMENT_SUPPLY_COLS,
+  PAYMENT_LEDGER_COLS,
   PRODUCT_PRICE_COLS,
   PRODUCT_DESC_COLS,
   REFUND_COLS,

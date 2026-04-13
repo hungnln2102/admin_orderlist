@@ -160,6 +160,7 @@ const PARTNER_SCHEMA = {
       ACTIVE_SUPPLY: "active_supply",
     },
   },
+  /** Chu kỳ TT NCC (Sepay / thủ công / confirm). Chi phí theo đơn: supplier_order_cost_log. */
   PAYMENT_SUPPLY: {
     TABLE: "supplier_payments",
     COLS: {
@@ -169,6 +170,20 @@ const PARTNER_SCHEMA = {
       ROUND: "payment_period",
       STATUS: "payment_status",
       PAID: "amount_paid",
+    },
+  },
+  /** Nhiều dòng log / đơn: vào ĐXL (webhook/gia hạn), MAVN tạo/gia hạn, đóng đơn (INSERT thêm). Công nợ UI: dòng mới nhất theo id. */
+  SUPPLIER_ORDER_COST_LOG: {
+    TABLE: "supplier_order_cost_log",
+    COLS: {
+      ID: "id",
+      ORDER_LIST_ID: "order_list_id",
+      SUPPLY_ID: "supply_id",
+      ID_ORDER: "id_order",
+      IMPORT_COST: "import_cost",
+      REFUND_AMOUNT: "refund_amount",
+      NCC_PAYMENT_STATUS: "ncc_payment_status",
+      LOGGED_AT: "logged_at",
     },
   },
   SUPPLIER_COST: SUPPLIER_COST_DEF,

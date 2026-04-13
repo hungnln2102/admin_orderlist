@@ -118,14 +118,25 @@ export const PACKAGE_PRODUCT_COLS = {
   storageTotal: "storage_total",
 };
 
-// 13. PAYMENT_SUPPLY (Backend: PAYMENT_SUPPLY)
+// 13. PAYMENT_SUPPLY (legacy partner.supplier_payments — không còn total_amount)
 export const PAYMENT_SUPPLY_COLS = {
   id: "id",
   sourceId: "supplier_id",
-  importValue: "total_amount", // Backend: IMPORT_VALUE -> total_amount
   round: "payment_period",
   status: "payment_status",
   paid: "amount_paid",
+};
+
+export const PAYMENT_LEDGER_COLS = {
+  id: "id",
+  sourceId: "supplier_id",
+  amount: "amount",
+  amountPaid: "amount_paid",
+  round: "payment_period",
+  status: "payment_status",
+  note: "note",
+  source: "source",
+  createdAt: "created_at",
 };
 
 // 14. USERS (Backend: USERS)
@@ -197,6 +208,7 @@ export const DB_DEFINITIONS = {
   WAREHOUSE: "product_stocks",
   PACKAGE_PRODUCT: "package_product",
   PAYMENT_SUPPLY: "supplier_payments",
+  PAYMENT_LEDGER: "supplier_payment_ledger",
   USERS: "users",
 };
 
@@ -216,6 +228,7 @@ export const SCHEMA_TABLES = {
   PACKAGE_PRODUCT_COLS,
   PAYMENT_RECEIPT_COLS,
   PAYMENT_SUPPLY_COLS,
+  PAYMENT_LEDGER_COLS,
   VARIANT_PRICING_COLS,
   PRODUCT_DESC_COLS,
   REFUND_COLS,

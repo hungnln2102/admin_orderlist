@@ -1,25 +1,11 @@
 const { db } = require("../db");
 const { TABLES, STATUS } = require("../controllers/Order/constants");
-const {
-    PARTNER_SCHEMA,
-    SCHEMA_PARTNER,
-    tableName,
-} = require("../config/dbSchema");
 const { toNullableNumber } = require("../utils/normalizers");
 const logger = require("../utils/logger");
 
-const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
-const PAYMENT_SUPPLY_TABLE = tableName(
-    PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
-    SCHEMA_PARTNER
-);
-
 /**
- * When a supplier cost changes in supplier_cost, propagate to affected orders:
- *
- * - UNPAID orders: simply overwrite cost with the new price.
- * - PROCESSING orders: cost was already added to supplier debt (total_amount).
- *   Overwrite cost AND adjust total_amount by the difference (newPrice − oldCost).
+ * Khi đổi giá nhập NCC: cập nhật cost trên đơn UNPAID / Đang Xử Lý.
+ * Đơn Đang Xử Lý: partner.supplier_order_cost_log đồng bộ qua trigger orders.order_list (cost).
  */
 const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPrice) => {
     const newCost = toNullableNumber(newPrice);
@@ -50,13 +36,7 @@ const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPri
         );
         const processingRows = processingSnapshot.rows || [];
 
-        let totalDelta = 0;
         if (processingRows.length > 0) {
-            for (const row of processingRows) {
-                const oldCost = toNullableNumber(row.cost) || 0;
-                totalDelta += (newCost - oldCost);
-            }
-
             await trx.raw(
                 `UPDATE ${TABLES.orderList}
                  SET "cost" = ?
@@ -65,26 +45,6 @@ const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPri
                    AND "status" = ?`,
                 [newCost, variantId, supplierId, STATUS.PROCESSING]
             );
-
-            if (totalDelta !== 0) {
-                const colId = paymentSupplyCols.ID;
-                const colImport = paymentSupplyCols.IMPORT_VALUE;
-                const colStatus = paymentSupplyCols.STATUS;
-                const colSourceId = paymentSupplyCols.SOURCE_ID;
-
-                const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
-                    .where(colSourceId, supplierId)
-                    .andWhere(colStatus, STATUS.UNPAID)
-                    .orderBy(colId, "desc")
-                    .first();
-
-                if (latestCycle) {
-                    const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
-                    await trx(PAYMENT_SUPPLY_TABLE)
-                        .where(colId, latestCycle[colId])
-                        .update({ [colImport]: currentImport + totalDelta });
-                }
-            }
         }
 
         await trx.commit();
@@ -100,7 +60,6 @@ const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPri
             newCost,
             unpaid: unpaidOrders.length,
             processing: processingRows.length,
-            totalDelta,
         });
 
         return {
@@ -112,7 +71,7 @@ const updateOrderCostsOnSupplyPriceChange = async (variantId, supplierId, newPri
                 newCost,
                 type: o.type,
             })),
-            debtAdjustment: totalDelta,
+            debtAdjustment: 0,
         };
     } catch (error) {
         await trx.rollback();

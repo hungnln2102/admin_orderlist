@@ -156,20 +156,39 @@ const getSupplyInsights = async (_req, res) => {
       GROUP BY sp.${quoteIdent(supplyPriceCols.supplierId)}
     `;
 
-    // Tính tổng đã trả và còn nợ theo trạng thái để không trừ nhầm chu kỳ đã thanh toán
-    const paymentSummarySql = `
+    // Còn nợ theo đơn: supplier_order_cost_log. Đã trả (UI): SUM(amount_paid) trên supplier_payments.
+    const logCols = QUOTED_COLS.supplierOrderCostLog;
+    const paidNccLabel = "Đã Thanh Toán";
+    const orderCostUnpaidSql = `
+      WITH latest AS (
+        SELECT DISTINCT ON (l.${logCols.orderListId})
+          l.${logCols.supplyId} AS supply_id,
+          l.${logCols.importCost} AS import_cost,
+          l.${logCols.refundAmount} AS refund_amount,
+          l.${logCols.nccPaymentStatus} AS ncc_payment_status
+        FROM ${TABLES.supplyOrderCostLog} l
+        ORDER BY l.${logCols.orderListId}, l.${logCols.id} DESC
+      )
       SELECT
-        ps.${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
-        SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_paid_import,
+        latest.supply_id AS source_id,
         SUM(
           CASE
-            WHEN ps.${QUOTED_COLS.paymentSupply.status} = :unpaidStatus
-              THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)
-            ELSE 0
+            WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
+            THEN 0
+            ELSE COALESCE(latest.import_cost, 0) - COALESCE(latest.refund_amount, 0)
           END
         ) AS total_unpaid_import
+      FROM latest
+      GROUP BY latest.supply_id
+    `;
+
+    const ps = QUOTED_COLS.paymentSupply;
+    const supplyPaidSql = `
+      SELECT
+        ps.${ps.sourceId} AS source_id,
+        SUM(COALESCE(ps.${ps.paid}, 0)) AS total_paid_import
       FROM ${TABLES.paymentSupply} ps
-      GROUP BY ps.${QUOTED_COLS.paymentSupply.sourceId}
+      GROUP BY ps.${ps.sourceId}
     `;
 
     const supplierTableName = await resolveSupplierTableName();
@@ -192,11 +211,12 @@ const getSupplyInsights = async (_req, res) => {
       ORDER BY s.${supplierNameIdent};
     `;
 
-    const [monthlyRes, summaryRes, productsRes, paymentsRes, supplyRes] = await Promise.all([
+    const [monthlyRes, summaryRes, productsRes, unpaidRes, paidRes, supplyRes] = await Promise.all([
       db.raw(monthlySql, [monthStart, nextMonthStart]),
       db.raw(summarySql),
       db.raw(productsSql),
-      db.raw(paymentSummarySql, { unpaidStatus: STATUS.UNPAID }),
+      db.raw(orderCostUnpaidSql, { paidNccLabel }),
+      db.raw(supplyPaidSql),
       db.raw(supplySql),
     ]);
 
@@ -225,10 +245,20 @@ const getSupplyInsights = async (_req, res) => {
     });
 
     const paymentsMap = new Map();
-    (paymentsRes.rows || []).forEach((row) => {
-      paymentsMap.set(row.source_id, {
-        total_paid_import: Number(row.total_paid_import) || 0,
+    const mergePaymentRow = (sourceId, patch) => {
+      const sid = Number(sourceId);
+      if (!Number.isFinite(sid)) return;
+      const cur = paymentsMap.get(sid) || { total_paid_import: 0, total_unpaid_import: 0 };
+      paymentsMap.set(sid, { ...cur, ...patch });
+    };
+    (unpaidRes.rows || []).forEach((row) => {
+      mergePaymentRow(row.source_id, {
         total_unpaid_import: Number(row.total_unpaid_import) || 0,
+      });
+    });
+    (paidRes.rows || []).forEach((row) => {
+      mergePaymentRow(row.source_id, {
+        total_paid_import: Number(row.total_paid_import) || 0,
       });
     });
 

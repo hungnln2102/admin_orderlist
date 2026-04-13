@@ -1,3 +1,5 @@
+const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
+
 const deleteOrderWithArchive = async ({
     trx,
     order,
@@ -97,6 +99,38 @@ const deleteOrderWithArchive = async ({
         }
 
         await trx(TABLES.orderList).where({ id: orderId }).update(updatePayload);
+
+        const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
+        const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+        const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
+        if (order?.[supplyIdCol] != null) {
+            const costLogTable = tableName(
+                PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
+                SCHEMA_PARTNER
+            );
+            const logCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
+            const nccRefundForLog = isMavn
+                ? refundValue
+                : (() => {
+                    const r = calcRemainingImport(order, normalized);
+                    return r != null && Number.isFinite(Number(r))
+                        ? Math.max(0, Math.round(Number(r)))
+                        : 0;
+                })();
+            const idOrderVal = String(order[idOrderCol] ?? "").trim();
+            const importCostVal = Math.max(
+                0,
+                Math.round(toNullableNumber(order[costCol]) || 0)
+            );
+            await trx(costLogTable).insert({
+                [logCols.ORDER_LIST_ID]: orderId,
+                [logCols.SUPPLY_ID]: order[supplyIdCol],
+                [logCols.ID_ORDER]: idOrderVal || "",
+                [logCols.IMPORT_COST]: importCostVal,
+                [logCols.REFUND_AMOUNT]: nccRefundForLog,
+                [logCols.NCC_PAYMENT_STATUS]: "Chưa Thanh Toán",
+            });
+        }
 
         const afterOrder = {
             ...order,

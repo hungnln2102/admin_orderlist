@@ -1,44 +1,6 @@
-const { PARTNER_SCHEMA, ORDERS_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../../config/dbSchema");
+const { ORDERS_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../../config/dbSchema");
 const { resolveSupplierNameColumn } = require("../../SuppliesController/helpers");
 const { STATUS, TABLES } = require("../constants");
-const { toNullableNumber } = require("../../../utils/normalizers");
-const logger = require("../../../utils/logger");
-const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../../utils/orderHelpers");
-const { calcRemainingImport, ceilToThousands } = require("./refunds");
-
-const resolveSupplierDisplayName = async(trx, row) => {
-    if (row?.supply != null && String(row.supply).trim() !== "") {
-        return String(row.supply).trim();
-    }
-    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-    const sid = row?.[supplyIdCol];
-    if (sid == null) return null;
-    const supplierNameCol = await resolveSupplierNameColumn();
-    const r = await trx(TABLES.supplier)
-        .select(supplierNameCol)
-        .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, sid)
-        .first();
-    return r ? String(r[supplierNameCol] ?? "").trim() : null;
-};
-
-/**
- * NCC nội bộ Mavryk / Shop: không ghi nhận cộng trừ payment_supply.
- * Đơn MAVN nhập hàng không dùng NCC Mavryk — luôn ghi nhận công nợ NCC.
- */
-const shouldSkipNccLedgerForOrder = async(trx, row) => {
-    if (!row) return false;
-    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
-    const idOrder = row[idOrderCol] ?? row.id_order;
-    if (isMavnImportOrder({ id_order: idOrder })) return false;
-    const name = await resolveSupplierDisplayName(trx, row);
-    return isMavrykShopSupplierName(name);
-};
-
-const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
-const PAYMENT_SUPPLY_TABLE = tableName(
-    PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
-    SCHEMA_PARTNER
-);
 
 const findSupplyIdByName = async(trx, supplyNameRaw) => {
     const supplyName = supplyNameRaw === undefined || supplyNameRaw === null
@@ -48,273 +10,46 @@ const findSupplyIdByName = async(trx, supplyNameRaw) => {
 
     const supplierNameCol = await resolveSupplierNameColumn();
     const row = await trx(TABLES.supplier)
-        .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
+        .select("id")
         .where(supplierNameCol, supplyName)
         .first();
-    return row && row[PARTNER_SCHEMA.SUPPLIER.COLS.ID] !== undefined
-        ? Number(row[PARTNER_SCHEMA.SUPPLIER.COLS.ID]) || null
+    return row && row.id !== undefined
+        ? Number(row.id) || null
         : null;
 };
 
-const formatNoteDate = (noteDate = new Date()) => {
-    const dt = noteDate instanceof Date ? noteDate : new Date();
-    const day = String(dt.getDate()).padStart(2, "0");
-    const month = String(dt.getMonth() + 1).padStart(2, "0");
-    const year = dt.getFullYear();
-    return `${day}/${month}/${year}`;
-};
+/** @deprecated Giữ chữ ký; công nợ theo đơn nằm ở partner.supplier_order_cost_log (trigger). */
+const increaseSupplierDebt = async() => {};
 
-const increaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date()) => {
-    const costValue = toNullableNumber(amount);
-    if (!supplyId || !costValue || costValue <= 0) return;
+/** @deprecated */
+const decreaseSupplierDebt = async() => {};
 
-    const colId = paymentSupplyCols.ID;
-    const colImport = paymentSupplyCols.IMPORT_VALUE;
-    const colPaid = paymentSupplyCols.PAID;
-    const colStatus = paymentSupplyCols.STATUS;
-    const colSourceId = paymentSupplyCols.SOURCE_ID;
-    const colRound = paymentSupplyCols.ROUND;
+/** @deprecated */
+const shiftPaidBackToImportForCancel = async() => {};
 
-    const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
-        .where(colSourceId, supplyId)
-        .andWhere(colStatus, STATUS.UNPAID)
-        .orderBy(colId, "desc")
-        .first();
+/**
+ * Trước đây chỉnh supplier_payments khi hủy/hoàn theo ngày còn lại.
+ * Giờ chỉ cập nhật partner.supplier_order_cost_log (trigger theo cost/refund/status).
+ */
+const adjustSupplierDebtIfNeeded = async() => {};
 
-    if (latestCycle) {
-        const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
-        const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
-        const nextImport = currentImport + costValue;
-        const updatePayload = {
-            [colImport]: nextImport,
-            [colPaid]: currentPaid,
-        };
-        if (latestCycle[colStatus] !== undefined) updatePayload[colStatus] = latestCycle[colStatus];
-        await trx(PAYMENT_SUPPLY_TABLE)
-            .where(colId, latestCycle[colId])
-            .update(updatePayload);
-    } else {
-        await trx(PAYMENT_SUPPLY_TABLE).insert({
-            [colSourceId]: supplyId,
-            [colImport]: costValue,
-            [colPaid]: 0,
-            [colRound]: formatNoteDate(noteDate),
-            [colStatus]: STATUS.UNPAID,
-        });
-    }
-};
+/**
+ * Trước đây cộng total_amount khi vào Đang Xử Lý / đổi NCC.
+ * Giờ trigger order_list ghi log; không đụng supplier_payments.
+ */
+const addSupplierImportOnProcessing = async() => {};
 
-const decreaseSupplierDebt = async(trx, supplyId, amount, noteDate = new Date()) => {
-    const costValue = toNullableNumber(amount);
-    if (!supplyId || !costValue || costValue <= 0) return;
-
-    const colId = paymentSupplyCols.ID;
-    const colImport = paymentSupplyCols.IMPORT_VALUE;
-    const colPaid = paymentSupplyCols.PAID;
-    const colStatus = paymentSupplyCols.STATUS;
-    const colSourceId = paymentSupplyCols.SOURCE_ID;
-    const colRound = paymentSupplyCols.ROUND;
-
-    const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
-        .where(colSourceId, supplyId)
-        .andWhere(colStatus, STATUS.UNPAID)
-        .orderBy(colId, "desc")
-        .first();
-
-    if (latestCycle) {
-        const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
-        const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
-        const nextImport = currentImport - costValue;
-        const roundValue = latestCycle[colRound] != null
-            ? String(latestCycle[colRound])
-            : formatNoteDate(noteDate);
-
-        const updatePayload = {
-            [colImport]: nextImport,
-            [colPaid]: currentPaid,
-            [colRound]: roundValue,
-        };
-        if (latestCycle[colStatus] !== undefined) updatePayload[colStatus] = latestCycle[colStatus];
-        await trx(PAYMENT_SUPPLY_TABLE)
-            .where(colId, latestCycle[colId])
-            .update(updatePayload);
-    } else {
-        await trx(PAYMENT_SUPPLY_TABLE).insert({
-            [colSourceId]: supplyId,
-            [colImport]: -costValue,
-            [colPaid]: 0,
-            [colRound]: `ADJ - ${formatNoteDate(noteDate)}`,
-            [colStatus]: STATUS.UNPAID,
-        });
-    }
-};
-
-const adjustSupplierDebtIfNeeded = async(trx, orderRow, normalized) => {
-    if (await shouldSkipNccLedgerForOrder(trx, orderRow) || await shouldSkipNccLedgerForOrder(trx, normalized)) {
-        return;
-    }
-
-    const statusValue =
-        orderRow?.status ??
-        normalized?.status ??
-        normalized?.status_auto ??
-        "";
-    const isPaidLike =
-        statusValue === STATUS.PROCESSING || statusValue === STATUS.PAID;
-
-    if (!isPaidLike) {
-        logger.debug("[Finance] adjustSupplierDebtIfNeeded skipped: status not PROCESSING/PAID", {
-            status: statusValue,
-            orderId: orderRow?.id,
-        });
-        return;
-    }
-
-    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-    const supplyId = orderRow?.[supplyIdCol] != null
-        ? Number(orderRow[supplyIdCol]) || null
-        : await findSupplyIdByName(trx, orderRow?.supply);
-    if (!supplyId) {
-        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: supplier not found", {
-            supply_id: orderRow?.[supplyIdCol],
-            supply: orderRow?.supply,
-            orderId: orderRow?.id,
-        });
-        return;
-    }
-
-    const prorated = calcRemainingImport(orderRow, normalized);
-    if (!prorated || prorated <= 0) {
-        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: no prorated cost", {
-            cost: orderRow?.cost,
-            days: orderRow?.days,
-            so_ngay_con_lai: normalized?.so_ngay_con_lai,
-            prorated,
-            orderId: orderRow?.id,
-        });
-        return;
-    }
-
-    const roundedProrated = ceilToThousands(prorated);
-    if (!Number.isFinite(roundedProrated) || roundedProrated <= 0) {
-        logger.warn("[Finance] adjustSupplierDebtIfNeeded skipped: rounded prorated is 0", {
-            prorated,
-            roundedProrated,
-            orderId: orderRow?.id,
-        });
-        return;
-    }
-
-    logger.info("[Finance] Decreasing supplier debt", {
-        supplyId,
-        roundedProrated,
-        orderId: orderRow?.id,
-    });
-    await decreaseSupplierDebt(trx, supplyId, roundedProrated);
-};
-
-const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
-    if (await shouldSkipNccLedgerForOrder(trx, beforeRow) || await shouldSkipNccLedgerForOrder(trx, afterRow)) {
-        return;
-    }
-
-    const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
-    const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
-
-    if (prevStatus === nextStatus || prevStatus !== STATUS.PROCESSING || nextStatus !== STATUS.PAID) return;
-
-    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-    const supplyId =
-        (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
-        (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
-        (await findSupplyIdByName(trx, afterRow?.supply)) ||
-        (await findSupplyIdByName(trx, beforeRow?.supply));
-    if (!supplyId) return;
-
-    const costValue = toNullableNumber(afterRow?.cost ?? beforeRow?.cost);
-    if (!costValue || costValue <= 0) return;
-
-    const colId = paymentSupplyCols.ID;
-    const colImport = paymentSupplyCols.IMPORT_VALUE;
-    const colPaid = paymentSupplyCols.PAID;
-    const colStatus = paymentSupplyCols.STATUS;
-    const colSourceId = paymentSupplyCols.SOURCE_ID;
-
-    const latestCycle = await trx(PAYMENT_SUPPLY_TABLE)
-        .where(colSourceId, supplyId)
-        .andWhere(colStatus, STATUS.UNPAID)
-        .orderBy(colId, "desc")
-        .first();
-
-    if (latestCycle) {
-        const currentImport = toNullableNumber(latestCycle[colImport]) || 0;
-        const currentPaid = toNullableNumber(latestCycle[colPaid]) || 0;
-        await trx(PAYMENT_SUPPLY_TABLE)
-            .where(colId, latestCycle[colId])
-            .update({
-                [colImport]: currentImport - costValue,
-                [colPaid]: currentPaid + costValue,
-            });
-    }
-};
-
-const addSupplierImportOnProcessing = async(trx, beforeRow, afterRow) => {
-    const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
-    const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
-
-    const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-
-    if (prevStatus !== nextStatus && nextStatus === STATUS.PROCESSING) {
-        // Chỉ bỏ cộng khi NCC đích là Mavryk/Shop (trừ MAVN — shouldSkip luôn false).
-        if (await shouldSkipNccLedgerForOrder(trx, afterRow)) {
-            return;
-        }
-
-        const supplyId =
-            (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
-            (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
-            (await findSupplyIdByName(trx, afterRow?.supply)) ||
-            (await findSupplyIdByName(trx, beforeRow?.supply));
-        if (!supplyId) return;
-
-        const costValue = toNullableNumber(afterRow?.cost ?? beforeRow?.cost);
-        if (!costValue || costValue <= 0) return;
-
-        await increaseSupplierDebt(trx, supplyId, costValue, afterRow?.order_date);
-        return;
-    }
-
-    if (prevStatus === STATUS.PROCESSING && nextStatus === STATUS.PROCESSING) {
-        let oldSupplyId = beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null;
-        let newSupplyId = afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null;
-        if (!oldSupplyId) {
-            oldSupplyId = await findSupplyIdByName(trx, beforeRow?.supply);
-        }
-        if (!newSupplyId) {
-            newSupplyId = await findSupplyIdByName(trx, afterRow?.supply);
-        }
-
-        if (!oldSupplyId || !newSupplyId || oldSupplyId === newSupplyId) return;
-
-        const oldCost = toNullableNumber(beforeRow?.cost);
-        const newCost = toNullableNumber(afterRow?.cost);
-
-        const skipDecreaseOld = await shouldSkipNccLedgerForOrder(trx, beforeRow);
-        const skipIncreaseNew = await shouldSkipNccLedgerForOrder(trx, afterRow);
-
-        if (!skipDecreaseOld && oldCost && oldCost > 0) {
-            await decreaseSupplierDebt(trx, oldSupplyId, oldCost);
-        }
-        if (!skipIncreaseNew && newCost && newCost > 0) {
-            await increaseSupplierDebt(trx, newSupplyId, newCost, afterRow?.order_date);
-        }
-    }
-};
+/**
+ * Trước đây bút toán IMPORT→PAID trên chu kỳ supplier_payments khi ĐXL→Đã TT.
+ * Giờ ncc_payment_status + số liệu log đủ cho theo dõi theo đơn.
+ */
+const recordSupplierPaymentOnCompletion = async() => {};
 
 module.exports = {
     findSupplyIdByName,
     increaseSupplierDebt,
     decreaseSupplierDebt,
+    shiftPaidBackToImportForCancel,
     adjustSupplierDebtIfNeeded,
     addSupplierImportOnProcessing,
     recordSupplierPaymentOnCompletion,

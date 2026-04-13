@@ -2,14 +2,14 @@ const {
   pool,
   ORDER_TABLE,
   PAYMENT_RECEIPT_TABLE,
-  PAYMENT_SUPPLY_TABLE,
+  PAYMENT_LEDGER_TABLE,
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
   SUPPLIER_TABLE,
   SUPPLIER_COLS,
   SUPPLIER_COST_TABLE,
   SUPPLIER_COST_COLS,
-  PAYMENT_SUPPLY_COLS,
+  PAYMENT_LEDGER_COLS,
 } = require("./config");
 const { STATUS } = require("../../src/utils/statuses");
 const {
@@ -367,19 +367,6 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
       await client.query("BEGIN");
     }
 
-    const latestRes = await client.query(
-      `SELECT
-        ${PAYMENT_SUPPLY_COLS.id} AS id,
-        ${PAYMENT_SUPPLY_COLS.importValue} AS import_value,
-        ${PAYMENT_SUPPLY_COLS.paid} AS paid_value,
-        ${PAYMENT_SUPPLY_COLS.status} AS status_label
-       FROM ${PAYMENT_SUPPLY_TABLE}
-       WHERE ${PAYMENT_SUPPLY_COLS.sourceId} = $1
-       ORDER BY ${PAYMENT_SUPPLY_COLS.id} DESC
-       LIMIT 1`,
-      [sourceId]
-    );
-
     const formatNote = () => {
       const dt = noteDate instanceof Date ? noteDate : new Date();
       const day = String(dt.getDate()).padStart(2, "0");
@@ -388,28 +375,20 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
       return `${day}/${month}/${year}`;
     };
 
-    const latest = latestRes.rows[0];
-    const statusLabel = String(latest?.status_label || "");
-    if (latest && statusLabel === STATUS.UNPAID) {
-      await client.query(
-        `UPDATE ${PAYMENT_SUPPLY_TABLE}
-         SET ${PAYMENT_SUPPLY_COLS.importValue} = COALESCE(${PAYMENT_SUPPLY_COLS.importValue}, 0) + $2
-         WHERE ${PAYMENT_SUPPLY_COLS.id} = $1`,
-        [latest.id, priceValue]
-      );
-    } else {
-      await client.query(
-        `INSERT INTO ${PAYMENT_SUPPLY_TABLE} (
-            ${PAYMENT_SUPPLY_COLS.sourceId},
-            ${PAYMENT_SUPPLY_COLS.importValue},
-            ${PAYMENT_SUPPLY_COLS.round},
-            ${PAYMENT_SUPPLY_COLS.status},
-            ${PAYMENT_SUPPLY_COLS.paid}
-          )
-          VALUES ($1, $2, $3, $4, NULL)`,
-        [sourceId, priceValue, formatNote(), STATUS.UNPAID]
-      );
-    }
+    const period = formatNote();
+    await client.query(
+      `INSERT INTO ${PAYMENT_LEDGER_TABLE} (
+          ${safeIdent(PAYMENT_LEDGER_COLS.sourceId)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.amount)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.amountPaid)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.round)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.status)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.note)},
+          ${safeIdent(PAYMENT_LEDGER_COLS.source)}
+        )
+        VALUES ($1, $2, 0, $3, $4, $5, 'sepay')`,
+      [sourceId, priceValue, period, STATUS.UNPAID, "Sepay"]
+    );
 
     if (manageTransaction) {
       await client.query("COMMIT");

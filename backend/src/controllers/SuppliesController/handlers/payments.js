@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("../constants");
+const { QUOTED_COLS, TABLES, paymentLedgerCols, STATUS } = require("../constants");
 const { parseMoney, parseSupplyId } = require("../helpers");
 const logger = require("../../../utils/logger");
 
@@ -37,21 +37,23 @@ const createPayment = async (req, res) => {
   }
 
   try {
-    const result = await db(TABLES.paymentSupply)
+    const result = await db(TABLES.paymentLedger)
       .insert({
-        [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
-        [paymentSupplyCols.IMPORT_VALUE]: totalImportRaw,
-        [paymentSupplyCols.PAID]: paidRaw,
-        [paymentSupplyCols.ROUND]: roundLabel,
-        [paymentSupplyCols.STATUS]: statusLabel,
+        [paymentLedgerCols.SOURCE_ID]: parsedSupplyId,
+        [paymentLedgerCols.AMOUNT]: totalImportRaw,
+        [paymentLedgerCols.AMOUNT_PAID]: paidRaw,
+        [paymentLedgerCols.ROUND]: roundLabel,
+        [paymentLedgerCols.STATUS]: statusLabel,
+        [paymentLedgerCols.NOTE]: null,
+        [paymentLedgerCols.SOURCE]: "manual",
       })
       .returning([
-        paymentSupplyCols.ID,
-        paymentSupplyCols.SOURCE_ID,
-        paymentSupplyCols.IMPORT_VALUE,
-        paymentSupplyCols.PAID,
-        paymentSupplyCols.ROUND,
-        paymentSupplyCols.STATUS,
+        paymentLedgerCols.ID,
+        paymentLedgerCols.SOURCE_ID,
+        paymentLedgerCols.AMOUNT,
+        paymentLedgerCols.AMOUNT_PAID,
+        paymentLedgerCols.ROUND,
+        paymentLedgerCols.STATUS,
       ]);
     if (!result?.length) {
       return res.status(500).json({
@@ -60,12 +62,12 @@ const createPayment = async (req, res) => {
     }
     const row = result[0];
     res.status(201).json({
-      id: row[paymentSupplyCols.ID],
-      sourceId: row[paymentSupplyCols.SOURCE_ID],
-      totalImport: Number(row[paymentSupplyCols.IMPORT_VALUE]) || 0,
-      paid: Number(row[paymentSupplyCols.PAID]) || 0,
-      round: row[paymentSupplyCols.ROUND] || "",
-      status: row[paymentSupplyCols.STATUS] || "",
+      id: row[paymentLedgerCols.ID],
+      sourceId: row[paymentLedgerCols.SOURCE_ID],
+      totalImport: Number(row[paymentLedgerCols.AMOUNT]) || 0,
+      paid: Number(row[paymentLedgerCols.AMOUNT_PAID]) || 0,
+      round: row[paymentLedgerCols.ROUND] || "",
+      status: row[paymentLedgerCols.STATUS] || "",
     });
   } catch (error) {
     logger.error("Mutation failed (POST /api/supplies/:supplyId/payments)", { supplyId, error: error.message, stack: error.stack });
@@ -94,34 +96,68 @@ const updatePaymentImport = async (req, res) => {
     });
   }
 
+  const lg = QUOTED_COLS.supplierPaymentLedger;
+
   try {
-    const updateQuery = `
-      UPDATE ${TABLES.paymentSupply}
-      SET ${QUOTED_COLS.paymentSupply.importValue} = ?
-      WHERE ${QUOTED_COLS.paymentSupply.id} = ?
-        AND ${QUOTED_COLS.paymentSupply.sourceId} = ?
-      RETURNING
-        ${QUOTED_COLS.paymentSupply.id} AS id,
-        ${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
-        COALESCE(${QUOTED_COLS.paymentSupply.importValue}, 0) AS import_value,
-        COALESCE(${QUOTED_COLS.paymentSupply.paid}, 0) AS paid_value,
-        COALESCE(${QUOTED_COLS.paymentSupply.round}, '') AS round_label,
-        COALESCE(${QUOTED_COLS.paymentSupply.status}, '') AS status_label;
-    `;
-
-    const result = await db.raw(updateQuery, [
-      nextTotalImport,
-      parsedPaymentId,
-      parsedSupplyId,
-    ]);
-
-    if (!result.rows?.length) {
+    const prevRes = await db.raw(
+      `
+      SELECT
+        COALESCE(${lg.amount}, 0)::numeric AS prev_amount,
+        COALESCE(${lg.status}, '') AS prev_status,
+        COALESCE(${lg.round}, '') AS prev_round
+      FROM ${TABLES.paymentLedger}
+      WHERE ${lg.id} = ?
+        AND ${lg.sourceId} = ?
+      LIMIT 1;
+    `,
+      [parsedPaymentId, parsedSupplyId]
+    );
+    if (!prevRes.rows?.length) {
       return res.status(404).json({
         error: "Không tìm thấy chu kỳ thanh toán cho nhà cung cấp này.",
       });
     }
+    const prevAmount = Number(prevRes.rows[0].prev_amount) || 0;
+    const prevStatus = String(prevRes.rows[0].prev_status || STATUS.UNPAID).trim() || STATUS.UNPAID;
+    const prevRound = String(prevRes.rows[0].prev_round || "").trim();
+    const delta = nextTotalImport - prevAmount;
 
-    const row = result.rows[0];
+    const result = await db.raw(
+      `
+      INSERT INTO ${TABLES.paymentLedger} (
+        ${lg.sourceId},
+        ${lg.amount},
+        ${lg.amountPaid},
+        ${lg.round},
+        ${lg.status},
+        ${lg.note},
+        ${lg.source}
+      )
+      VALUES (?, ?, 0, ?, ?, ?, 'manual_adjust')
+      RETURNING
+        ${lg.id} AS id,
+        ${lg.sourceId} AS source_id,
+        ${lg.amount} AS import_value,
+        ${lg.amountPaid} AS paid_value,
+        COALESCE(${lg.round}, '') AS round_label,
+        COALESCE(${lg.status}, '') AS status_label;
+    `,
+      [
+        parsedSupplyId,
+        delta,
+        prevRound,
+        prevStatus,
+        `Điều chỉnh tổng nhập ref#${parsedPaymentId} (${delta >= 0 ? "+" : ""}${delta})`,
+      ]
+    );
+
+    const row = result.rows?.[0];
+    if (!row) {
+      return res.status(500).json({
+        error: "Không thể ghi điều chỉnh.",
+      });
+    }
+
     res.json({
       id: row.id,
       sourceId: row.source_id,

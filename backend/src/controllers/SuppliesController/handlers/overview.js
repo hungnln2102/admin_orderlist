@@ -86,36 +86,38 @@ const getSupplyOverview = async (req, res) => {
       ORDER BY month_num;
     `;
 
+    const lg = QUOTED_COLS.supplierPaymentLedger;
+
     const unpaidSummarySql = `
-      SELECT SUM(COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) - COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0)) AS total_unpaid
-      FROM ${TABLES.paymentSupply} ps
-      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = :supplyId
-        AND ps.${QUOTED_COLS.paymentSupply.status} = :unpaidStatus
+      SELECT SUM(COALESCE(pl.${lg.amount}, 0) - COALESCE(pl.${lg.amountPaid}, 0)) AS total_unpaid
+      FROM ${TABLES.paymentLedger} pl
+      WHERE pl.${lg.sourceId} = :supplyId
+        AND pl.${lg.status} = :unpaidStatus
     `;
 
     const paidSummarySql = `
       SELECT SUM(
         CASE
-          WHEN ps.${QUOTED_COLS.paymentSupply.status} <> :unpaidStatus
-            THEN COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, ps.${QUOTED_COLS.paymentSupply.importValue}, 0)
+          WHEN pl.${lg.status} <> :unpaidStatus
+            THEN COALESCE(pl.${lg.amountPaid}, pl.${lg.amount}, 0)
           ELSE 0
         END
       ) AS total_paid_cycles
-      FROM ${TABLES.paymentSupply} ps
-      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = :supplyId
+      FROM ${TABLES.paymentLedger} pl
+      WHERE pl.${lg.sourceId} = :supplyId
     `;
 
     const unpaidQuery = `
       SELECT
-        ps.${QUOTED_COLS.paymentSupply.id} AS id,
-        ps.${QUOTED_COLS.paymentSupply.round} AS round,
-        COALESCE(ps.${QUOTED_COLS.paymentSupply.importValue}, 0) AS import_value,
-        COALESCE(ps.${QUOTED_COLS.paymentSupply.paid}, 0) AS paid_value,
-        COALESCE(ps.${QUOTED_COLS.paymentSupply.status}, '') AS status_label
-      FROM ${TABLES.paymentSupply} ps
-      WHERE ps.${QUOTED_COLS.paymentSupply.sourceId} = :supplyId
-        AND ps.${QUOTED_COLS.paymentSupply.status} = :unpaidStatus
-      ORDER BY ps.${QUOTED_COLS.paymentSupply.id} DESC;
+        pl.${lg.id} AS id,
+        pl.${lg.round} AS round,
+        COALESCE(pl.${lg.amount}, 0) AS import_value,
+        COALESCE(pl.${lg.amountPaid}, 0) AS paid_value,
+        COALESCE(pl.${lg.status}, '') AS status_label
+      FROM ${TABLES.paymentLedger} pl
+      WHERE pl.${lg.sourceId} = :supplyId
+        AND pl.${lg.status} = :unpaidStatus
+      ORDER BY pl.${lg.id} DESC;
     `;
 
     const bindings = {

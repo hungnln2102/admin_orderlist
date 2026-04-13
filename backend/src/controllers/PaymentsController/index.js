@@ -16,13 +16,14 @@ const {
 const logger = require("../../utils/logger");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
-const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
+const PAYMENT_LEDGER_DEF = getDefinition("SUPPLIER_PAYMENT_LEDGER", PARTNER_SCHEMA);
 const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
-  paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
+  paymentLedger: tableName(PAYMENT_LEDGER_DEF.tableName, SCHEMA_PARTNER),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
 };
+const L = QUOTED_COLS.supplierPaymentLedger;
 
 const listPaymentReceipts = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -95,14 +96,14 @@ const confirmPaymentSupply = async (req, res) => {
     const updatedRow = await withTransaction(async (trx) => {
       const paymentResult = await trx.raw(
         `
-        SELECT ${QUOTED_COLS.paymentSupply.id} AS id,
-               ${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
-               ${QUOTED_COLS.paymentSupply.importValue} AS import,
-               ${QUOTED_COLS.paymentSupply.paid} AS paid,
-               ${QUOTED_COLS.paymentSupply.round} AS round,
-               ${QUOTED_COLS.paymentSupply.status} AS status
-        FROM ${TABLES.paymentSupply}
-        WHERE ${QUOTED_COLS.paymentSupply.id} = ?
+        SELECT ${L.id} AS id,
+               ${L.sourceId} AS source_id,
+               ${L.amount} AS import,
+               ${L.amountPaid} AS paid,
+               ${L.round} AS round,
+               ${L.status} AS status
+        FROM ${TABLES.paymentLedger}
+        WHERE ${L.id} = ?
         LIMIT 1;
       `,
         [parsedPaymentId]
@@ -119,15 +120,15 @@ const confirmPaymentSupply = async (req, res) => {
       if (importValue < 0) {
         const updateNegativeResult = await trx.raw(
           `
-          UPDATE ${TABLES.paymentSupply}
-          SET ${QUOTED_COLS.paymentSupply.status} = ?
-          WHERE ${QUOTED_COLS.paymentSupply.id} = ?
-          RETURNING ${QUOTED_COLS.paymentSupply.id} AS id,
-                    ${QUOTED_COLS.paymentSupply.sourceId} AS source_id,
-                    ${QUOTED_COLS.paymentSupply.importValue} AS import,
-                    ${QUOTED_COLS.paymentSupply.paid} AS paid,
-                    ${QUOTED_COLS.paymentSupply.status} AS status,
-                    ${QUOTED_COLS.paymentSupply.round} AS round;
+          UPDATE ${TABLES.paymentLedger}
+          SET ${L.status} = ?
+          WHERE ${L.id} = ?
+          RETURNING ${L.id} AS id,
+                    ${L.sourceId} AS source_id,
+                    ${L.amount} AS import,
+                    ${L.amountPaid} AS paid,
+                    ${L.status} AS status,
+                    ${L.round} AS round;
         `,
           [STATUS.PAID, parsedPaymentId]
         );
@@ -210,10 +211,10 @@ const confirmPaymentSupply = async (req, res) => {
         const unpaidCycleResult = await trx.raw(
           `
           SELECT 1
-          FROM ${TABLES.paymentSupply} ps
-          WHERE ${QUOTED_COLS.paymentSupply.sourceId} = ?
-            AND ${QUOTED_COLS.paymentSupply.status} = ?
-            AND ${QUOTED_COLS.paymentSupply.id} <> ?
+          FROM ${TABLES.paymentLedger} pl
+          WHERE ${L.sourceId} = ?
+            AND ${L.status} = ?
+            AND ${L.id} <> ?
           LIMIT 1;
         `,
           [sourceId, UNPAID_STATUS, parsedPaymentId]
@@ -224,8 +225,8 @@ const confirmPaymentSupply = async (req, res) => {
       if (carryoverImport !== null && carryoverImport > 0 && sourceId && !hasUnpaidCycle) {
         await trx.raw(
           `
-          INSERT INTO ${TABLES.paymentSupply} (${QUOTED_COLS.paymentSupply.sourceId}, ${QUOTED_COLS.paymentSupply.importValue}, ${QUOTED_COLS.paymentSupply.paid}, ${QUOTED_COLS.paymentSupply.round}, ${QUOTED_COLS.paymentSupply.status})
-          VALUES (?, ?, 0, ?, ?);
+          INSERT INTO ${TABLES.paymentLedger} (${L.sourceId}, ${L.amount}, ${L.amountPaid}, ${L.round}, ${L.status}, ${L.note}, ${L.source})
+          VALUES (?, ?, 0, ?, ?, NULL, 'carryover');
         `,
           [sourceId, carryoverImport, todayDMY, UNPAID_STATUS]
         );
@@ -233,17 +234,17 @@ const confirmPaymentSupply = async (req, res) => {
 
       const updateResult = await trx.raw(
         `
-      UPDATE ${TABLES.paymentSupply}
-      SET ${QUOTED_COLS.paymentSupply.status} = ?,
-          ${QUOTED_COLS.paymentSupply.paid} = ?,
-          ${QUOTED_COLS.paymentSupply.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${QUOTED_COLS.paymentSupply.round}::text, ''), ' - ', ?::text))
-      WHERE ${QUOTED_COLS.paymentSupply.id} = ?
-      RETURNING ${QUOTED_COLS.paymentSupply.id} AS id, 
-                ${QUOTED_COLS.paymentSupply.sourceId} AS source_id, 
-                ${QUOTED_COLS.paymentSupply.importValue} AS import, 
-                ${QUOTED_COLS.paymentSupply.paid} AS paid, 
-                ${QUOTED_COLS.paymentSupply.status} AS status, 
-                ${QUOTED_COLS.paymentSupply.round} AS round;
+      UPDATE ${TABLES.paymentLedger}
+      SET ${L.status} = ?,
+          ${L.amountPaid} = ?,
+          ${L.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${L.round}::text, ''), ' - ', ?::text))
+      WHERE ${L.id} = ?
+      RETURNING ${L.id} AS id,
+                ${L.sourceId} AS source_id,
+                ${L.amount} AS import,
+                ${L.amountPaid} AS paid,
+                ${L.status} AS status,
+                ${L.round} AS round;
     `,
         [PAID_STATUS, normalizedPaidAmount, todayDMY, parsedPaymentId]
       );

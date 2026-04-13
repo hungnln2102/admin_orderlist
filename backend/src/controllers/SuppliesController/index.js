@@ -6,6 +6,7 @@ const {
   listSupplies,
   getProductsBySupply,
   listPaymentsBySupply,
+  listSupplyOrderCosts,
 } = require("./handlers/list");
 const { createPayment, updatePaymentImport } = require("./handlers/payments");
 const {
@@ -25,6 +26,7 @@ const {
 router.get("/insights", getSupplyInsights);
 
 router.get("/", listSupplies);
+router.get("/order-costs", listSupplyOrderCosts);
 router.get("/:supplyId/products", ...supplyIdParam, getProductsBySupply);
 router.get("/:supplyId/payments", ...supplyIdParam, listPaymentsBySupply);
 router.get("/:supplyId/overview", ...supplyIdParam, getSupplyOverview);

@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
 
   SUPPLIES: "/api/supplies",
+  SUPPLIES_ORDER_COSTS: "/api/supplies/order-costs",
   PRODUCTS_BY_SUPPLY: (supplyId: number) =>
     `/api/supplies/${supplyId}/products`,
 

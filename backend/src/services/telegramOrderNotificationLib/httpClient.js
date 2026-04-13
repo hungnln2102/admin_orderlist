@@ -18,13 +18,44 @@ const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ECONNABORTED",
 ]);
 
-const preferIpv4Lookup = (hostname, options, cb) =>
-  dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
-    if (err || !address) {
-      return dns.lookup(hostname, { ...options, all: false }, cb);
+/**
+ * Agent truyền `options` có thể chứa localAddress, port… — spread vào dns.lookup
+ * gây lỗi trên một số bản Node/Windows (ERR_INVALID_IP_ADDRESS: undefined).
+ * Chỉ forward các field dns.lookup hỗ trợ.
+ */
+const dnsLookupOpts = (options, overrides) => {
+  const out = { ...overrides };
+  if (options && typeof options === "object") {
+    if (options.hints != null) out.hints = options.hints;
+    if (options.verbatim != null) out.verbatim = options.verbatim;
+  }
+  return out;
+};
+
+const preferIpv4Lookup = (hostname, options, cb) => {
+  if (typeof hostname !== "string" || !hostname.trim()) {
+    process.nextTick(() => cb(new TypeError("Invalid hostname for DNS lookup")));
+    return;
+  }
+  const tryCb = (err, address, family) => {
+    if (err) {
+      cb(err);
+      return;
     }
-    cb(null, address, family);
+    if (address == null || address === "") {
+      cb(new Error("DNS lookup returned no address"));
+      return;
+    }
+    cb(null, String(address), Number(family) || 4);
+  };
+
+  dns.lookup(hostname, dnsLookupOpts(options, { family: 4, all: false }), (err, address, family) => {
+    if (err || address == null || address === "") {
+      return dns.lookup(hostname, dnsLookupOpts(options, { all: false }), tryCb);
+    }
+    tryCb(null, address, family);
   });
+};
 
 const getErrorCode = (err) =>
   String(err?.code || err?.cause?.code || "")

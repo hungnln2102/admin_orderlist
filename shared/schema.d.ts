@@ -12,6 +12,7 @@ export const BANK_LIST_COLS: ColumnDict;
 export const PACKAGE_PRODUCT_COLS: ColumnDict;
 export const PAYMENT_RECEIPT_COLS: ColumnDict;
 export const PAYMENT_SUPPLY_COLS: ColumnDict;
+export const PAYMENT_LEDGER_COLS: ColumnDict;
 export const PRODUCT_PRICE_COLS: ColumnDict;
 export const PRODUCT_DESC_COLS: ColumnDict;
 export const REFUND_COLS: ColumnDict;

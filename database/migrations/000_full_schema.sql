@@ -247,9 +247,8 @@ CREATE TABLE IF NOT EXISTS partner.supplier (
 CREATE TABLE IF NOT EXISTS partner.supplier_payments (
   id              SERIAL PRIMARY KEY,
   supplier_id     INTEGER REFERENCES partner.supplier(id),
-  total_amount    NUMERIC(18,2),
-  payment_period  VARCHAR(50),
-  payment_status  VARCHAR(50),
+  payment_period  TEXT,
+  payment_status  TEXT,
   amount_paid     NUMERIC(18,2)
 );
 
@@ -260,6 +259,21 @@ CREATE INDEX IF NOT EXISTS idx_payment_supply_source_status
 CREATE INDEX IF NOT EXISTS idx_payment_supply_source_id
   ON partner.supplier_payments(supplier_id)
   WHERE supplier_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS partner.supplier_payment_ledger (
+  id              BIGSERIAL PRIMARY KEY,
+  supplier_id     INTEGER NOT NULL REFERENCES partner.supplier(id),
+  amount          NUMERIC(18,2) NOT NULL DEFAULT 0,
+  amount_paid     NUMERIC(18,2) NOT NULL DEFAULT 0,
+  payment_period  TEXT,
+  payment_status  TEXT,
+  note            TEXT,
+  source          TEXT NOT NULL DEFAULT 'manual',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_supplier_payment_ledger_supplier_created
+  ON partner.supplier_payment_ledger (supplier_id, created_at DESC);
 
 -- supplier_cost: có thể nằm ở product hoặc partner tùy env
 CREATE TABLE IF NOT EXISTS product.supplier_cost (
