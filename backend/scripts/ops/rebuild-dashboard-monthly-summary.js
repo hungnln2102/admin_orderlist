@@ -2,8 +2,10 @@ const { db } = require("../../src/db");
 const {
   FINANCE_SCHEMA,
   ORDERS_SCHEMA,
+  PARTNER_SCHEMA,
   SCHEMA_FINANCE,
   SCHEMA_ORDERS,
+  SCHEMA_SUPPLIER,
   tableName,
 } = require("../../src/config/dbSchema");
 const { STATUS } = require("../../src/utils/statuses");
@@ -12,8 +14,29 @@ const {
   createNumericExtraction,
   quoteIdent,
 } = require("../../src/utils/sql");
+const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
+
+const mavnPrefixUpper = String(ORDER_PREFIXES.import || "MAVN")
+  .toUpperCase()
+  .replace(/'/g, "''");
+const giftPrefixUpper = String(ORDER_PREFIXES.gift || "MAVT")
+  .toUpperCase()
+  .replace(/'/g, "''");
+
+const salesPrefixEscList = [
+  ORDER_PREFIXES.ctv,
+  ORDER_PREFIXES.customer,
+  ORDER_PREFIXES.promo,
+  ORDER_PREFIXES.student,
+].map((p) => String(p || "").toUpperCase().replace(/'/g, "''"));
+
+const idOrderMatchesSalesSql = `(${salesPrefixEscList
+  .map((p) => `id_order_upper LIKE '${p}%'`)
+  .join(" OR ")})`;
 
 const orderTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
+const supplierTable = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER);
+const supplierCols = PARTNER_SCHEMA.SUPPLIER.COLS;
 const summaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
   SCHEMA_FINANCE
@@ -22,11 +45,12 @@ const summaryTable = tableName(
 const orderCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
-const orderDateExpr = createDateNormalization(quoteIdent(orderCols.ORDER_DATE));
-const canceledAtExpr = createDateNormalization(quoteIdent(orderCols.CANCELED_AT));
-const priceExpr = createNumericExtraction(quoteIdent(orderCols.PRICE));
-const costExpr = createNumericExtraction(quoteIdent(orderCols.COST));
-const refundExpr = createNumericExtraction(quoteIdent(orderCols.REFUND));
+const o = "o";
+const orderDateExpr = createDateNormalization(`${o}.${quoteIdent(orderCols.ORDER_DATE)}`);
+const canceledAtExpr = createDateNormalization(`${o}.${quoteIdent(orderCols.CANCELED_AT)}`);
+const priceExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.PRICE)}`);
+const costExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.COST)}`);
+const refundExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.REFUND)}`);
 
 // Order-counted statuses: everything from PROCESSING onwards in the lifecycle
 const orderCountedStatuses = [
@@ -44,6 +68,7 @@ const toSqlLiteral = (value) => `'${String(value).replace(/'/g, "''")}'`;
 
 const orderCountedSql = orderCountedStatuses.map(toSqlLiteral).join(", ");
 const refundCountedSql = refundCountedStatuses.map(toSqlLiteral).join(", ");
+const processingStatusSql = toSqlLiteral(STATUS.PROCESSING);
 
 const aggregateSql = `
   WITH normalized_orders AS (
@@ -53,18 +78,36 @@ const aggregateSql = `
       ${priceExpr} AS price_value,
       ${costExpr} AS cost_value,
       ${refundExpr} AS refund_value,
-      TRIM(COALESCE(${quoteIdent(orderCols.STATUS)}::text, '')) AS status_value
-    FROM ${orderTable}
+      TRIM(COALESCE(${o}.${quoteIdent(orderCols.STATUS)}::text, '')) AS status_value,
+      UPPER(TRIM(COALESCE(${o}.${quoteIdent(orderCols.ID_ORDER)}::text, ''))) AS id_order_upper,
+      LOWER(TRIM(COALESCE(sup.${quoteIdent(supplierCols.SUPPLIER_NAME)}::text, ''))) AS supplier_lower
+    FROM ${orderTable} ${o}
+    LEFT JOIN ${supplierTable} sup
+      ON sup.${quoteIdent(supplierCols.ID)} = ${o}.${quoteIdent(orderCols.ID_SUPPLY)}
   ),
   monthly_orders AS (
     SELECT
       TO_CHAR(date_trunc('month', order_date), 'YYYY-MM') AS month_key,
-      COUNT(*) AS total_orders,
-      COALESCE(SUM(price_value), 0) AS total_revenue,
-      COALESCE(SUM(price_value - cost_value), 0) AS total_profit
+      COALESCE(SUM(CASE WHEN ${idOrderMatchesSalesSql} THEN 1 ELSE 0 END), 0) AS total_orders,
+      COALESCE(SUM(CASE WHEN ${idOrderMatchesSalesSql} THEN price_value ELSE 0 END), 0) AS total_revenue,
+      COALESCE(SUM(
+        CASE
+          WHEN id_order_upper LIKE '${mavnPrefixUpper}%' THEN
+            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN 0 ELSE -cost_value END
+          WHEN id_order_upper LIKE '${giftPrefixUpper}%' THEN
+            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN 0 ELSE -cost_value END
+          WHEN ${idOrderMatchesSalesSql} THEN
+            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN price_value ELSE price_value - cost_value END
+          ELSE 0
+        END
+      ), 0) AS total_profit
     FROM normalized_orders
     WHERE order_date IS NOT NULL
       AND status_value IN (${orderCountedSql})
+      AND (
+        id_order_upper NOT LIKE '${mavnPrefixUpper}%'
+        OR status_value <> ${processingStatusSql}
+      )
     GROUP BY 1
   ),
   monthly_cancellations AS (

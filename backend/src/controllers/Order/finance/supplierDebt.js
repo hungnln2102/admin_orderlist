@@ -259,16 +259,17 @@ const recordSupplierPaymentOnCompletion = async(trx, beforeRow, afterRow) => {
 };
 
 const addSupplierImportOnProcessing = async(trx, beforeRow, afterRow) => {
-    if (await shouldSkipNccLedgerForOrder(trx, beforeRow) || await shouldSkipNccLedgerForOrder(trx, afterRow)) {
-        return;
-    }
-
     const prevStatus = (beforeRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
     const nextStatus = (afterRow?.status ?? STATUS.UNPAID) || STATUS.UNPAID;
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 
     if (prevStatus !== nextStatus && nextStatus === STATUS.PROCESSING) {
+        // Chỉ bỏ cộng khi NCC đích là Mavryk/Shop (trừ MAVN — shouldSkip luôn false).
+        if (await shouldSkipNccLedgerForOrder(trx, afterRow)) {
+            return;
+        }
+
         const supplyId =
             (afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null) ||
             (beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null) ||
@@ -284,18 +285,27 @@ const addSupplierImportOnProcessing = async(trx, beforeRow, afterRow) => {
     }
 
     if (prevStatus === STATUS.PROCESSING && nextStatus === STATUS.PROCESSING) {
-        const oldSupplyId = beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null;
-        const newSupplyId = afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null;
+        let oldSupplyId = beforeRow?.[supplyIdCol] != null ? Number(beforeRow[supplyIdCol]) || null : null;
+        let newSupplyId = afterRow?.[supplyIdCol] != null ? Number(afterRow[supplyIdCol]) || null : null;
+        if (!oldSupplyId) {
+            oldSupplyId = await findSupplyIdByName(trx, beforeRow?.supply);
+        }
+        if (!newSupplyId) {
+            newSupplyId = await findSupplyIdByName(trx, afterRow?.supply);
+        }
 
         if (!oldSupplyId || !newSupplyId || oldSupplyId === newSupplyId) return;
 
         const oldCost = toNullableNumber(beforeRow?.cost);
         const newCost = toNullableNumber(afterRow?.cost);
 
-        if (oldCost && oldCost > 0) {
+        const skipDecreaseOld = await shouldSkipNccLedgerForOrder(trx, beforeRow);
+        const skipIncreaseNew = await shouldSkipNccLedgerForOrder(trx, afterRow);
+
+        if (!skipDecreaseOld && oldCost && oldCost > 0) {
             await decreaseSupplierDebt(trx, oldSupplyId, oldCost);
         }
-        if (newCost && newCost > 0) {
+        if (!skipIncreaseNew && newCost && newCost > 0) {
             await increaseSupplierDebt(trx, newSupplyId, newCost, afterRow?.order_date);
         }
     }

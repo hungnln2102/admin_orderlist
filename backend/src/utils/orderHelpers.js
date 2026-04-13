@@ -162,6 +162,18 @@ function isGiftOrder(row) {
   return Boolean(prefix && code.startsWith(prefix));
 }
 
+/** Đơn tính doanh thu + số đơn dashboard: MAVC, MAVL, MAVK, MAVS (prefix theo tier). */
+function isDashboardSalesOrder(row) {
+  const prefixes = [
+    String(ORDER_PREFIXES.ctv || "MAVC").toUpperCase(),
+    String(ORDER_PREFIXES.customer || "MAVL").toUpperCase(),
+    String(ORDER_PREFIXES.promo || "MAVK").toUpperCase(),
+    String(ORDER_PREFIXES.student || "MAVS").toUpperCase(),
+  ];
+  const code = String(row?.id_order ?? row?.idOrder ?? "").trim().toUpperCase();
+  return prefixes.some((p) => p && code.startsWith(p));
+}
+
 module.exports = {
   ORDER_PREFIXES,
   getOrderPrefixes,
@@ -172,5 +184,6 @@ module.exports = {
   calculatePeriods,
   isMavnImportOrder,
   isGiftOrder,
+  isDashboardSalesOrder,
   isMavrykShopSupplierName,
 };

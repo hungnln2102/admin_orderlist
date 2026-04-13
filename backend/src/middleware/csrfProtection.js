@@ -21,6 +21,20 @@
 const csrf = require("csrf");
 const tokens = new csrf();
 
+/** POST công khai pricing — không session CSRF; khớp path sau mount /api, originalUrl, req.url. */
+function isPublicPricingPost(req) {
+  const stripped = String(req.path || "");
+  const orig = String(req.originalUrl || "").split("?")[0];
+  const url = String(req.url || "").split("?")[0];
+  const needle = "/public/pricing/";
+  return (
+    stripped.startsWith(needle) ||
+    url.startsWith(needle) ||
+    /^\/api\/public\/pricing(\/|$)/.test(orig) ||
+    /^\/api\/public\/pricing(\/|$)/.test(url)
+  );
+}
+
 /**
  * Generate CSRF token for the session
  * Call this on GET requests to provide token to frontend
@@ -77,6 +91,10 @@ const verifyToken = (req, res, next) => {
 
   // Skip CSRF for webhook endpoints (they have signature verification)
   if (req.path.startsWith("/api/payment/")) {
+    return next();
+  }
+
+  if (isPublicPricingPost(req)) {
     return next();
   }
 

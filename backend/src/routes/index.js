@@ -34,6 +34,7 @@ const ipWhitelistRoutes = require("./ipWhitelistRoutes");
 const pricingTierRoutes = require("./pricingTierRoutes");
 const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
 const publicContentRoutes = require("./publicContentRoutes");
+const publicPricingRoutes = require("./publicPricingRoutes");
 
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
@@ -50,6 +51,7 @@ router.use("/", systemRoutes);
 
 /** Tin tức công khai (storefront) — không cần đăng nhập */
 router.use("/public/content", publicContentRoutes);
+router.use("/public/pricing", publicPricingRoutes);
 
 router.use(authGuard);
 
