@@ -86,38 +86,38 @@ const getSupplyOverview = async (req, res) => {
       ORDER BY month_num;
     `;
 
-    const lg = QUOTED_COLS.supplierPaymentLedger;
+    const ps = QUOTED_COLS.paymentSupply;
 
     const unpaidSummarySql = `
-      SELECT SUM(COALESCE(pl.${lg.amount}, 0) - COALESCE(pl.${lg.amountPaid}, 0)) AS total_unpaid
-      FROM ${TABLES.paymentLedger} pl
-      WHERE pl.${lg.sourceId} = :supplyId
-        AND pl.${lg.status} = :unpaidStatus
+      SELECT SUM(COALESCE(pl.${ps.importValue}, 0) - COALESCE(pl.${ps.paid}, 0)) AS total_unpaid
+      FROM ${TABLES.paymentSupply} pl
+      WHERE pl.${ps.sourceId} = :supplyId
+        AND pl.${ps.status} = :unpaidStatus
     `;
 
     const paidSummarySql = `
       SELECT SUM(
         CASE
-          WHEN pl.${lg.status} <> :unpaidStatus
-            THEN COALESCE(pl.${lg.amountPaid}, pl.${lg.amount}, 0)
+          WHEN pl.${ps.status} <> :unpaidStatus
+            THEN COALESCE(pl.${ps.paid}, pl.${ps.importValue}, 0)
           ELSE 0
         END
       ) AS total_paid_cycles
-      FROM ${TABLES.paymentLedger} pl
-      WHERE pl.${lg.sourceId} = :supplyId
+      FROM ${TABLES.paymentSupply} pl
+      WHERE pl.${ps.sourceId} = :supplyId
     `;
 
     const unpaidQuery = `
       SELECT
-        pl.${lg.id} AS id,
-        pl.${lg.round} AS round,
-        COALESCE(pl.${lg.amount}, 0) AS import_value,
-        COALESCE(pl.${lg.amountPaid}, 0) AS paid_value,
-        COALESCE(pl.${lg.status}, '') AS status_label
-      FROM ${TABLES.paymentLedger} pl
-      WHERE pl.${lg.sourceId} = :supplyId
-        AND pl.${lg.status} = :unpaidStatus
-      ORDER BY pl.${lg.id} DESC;
+        pl.${ps.id} AS id,
+        pl.${ps.round} AS round,
+        COALESCE(pl.${ps.importValue}, 0) AS import_value,
+        COALESCE(pl.${ps.paid}, 0) AS paid_value,
+        COALESCE(pl.${ps.status}, '') AS status_label
+      FROM ${TABLES.paymentSupply} pl
+      WHERE pl.${ps.sourceId} = :supplyId
+        AND pl.${ps.status} = :unpaidStatus
+      ORDER BY pl.${ps.id} DESC;
     `;
 
     const bindings = {

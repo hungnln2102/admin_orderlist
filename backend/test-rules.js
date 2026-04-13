@@ -21,8 +21,8 @@ const { todayYMDInVietnam } = require("./src/utils/normalizers");
 const { nextId } = require("./src/services/idService");
 const { runRenewal } = require("./webhook/sepay/renewal");
 const { ORDERS_SCHEMA } = require("./src/config/dbSchema");
-const PAYMENT_LEDGER_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER_PAYMENT_LEDGER.TABLE, SCHEMA_PARTNER);
-const PAYMENT_LEDGER_COLS = PARTNER_SCHEMA.SUPPLIER_PAYMENT_LEDGER.COLS;
+const PAYMENT_SUPPLY_TABLE = tableName(PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE, SCHEMA_PARTNER);
+const PAYMENT_SUPPLY_COLS = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
 const COST_LOG_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER);
 const COST_LOG_COLS = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
 
@@ -595,22 +595,22 @@ const tests = {
     }
 
     // Giả lập chu kỳ NCC đã thanh toán hết: set status = PAID và paid = import_value
-    const latestUnpaid = await db(PAYMENT_LEDGER_TABLE)
-      .where(PAYMENT_LEDGER_COLS.SOURCE_ID, supplyId)
-      .andWhere(PAYMENT_LEDGER_COLS.STATUS, STATUS.UNPAID)
-      .orderBy(PAYMENT_LEDGER_COLS.ID, "desc")
+    const latestUnpaid = await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.SOURCE_ID, supplyId)
+      .andWhere(PAYMENT_SUPPLY_COLS.STATUS, STATUS.UNPAID)
+      .orderBy(PAYMENT_SUPPLY_COLS.ID, "desc")
       .first();
 
     if (!latestUnpaid) {
-      throw new Error("Không tìm thấy dòng ledger UNPAID để giả lập thanh toán.");
+      throw new Error("Không tìm thấy chu kỳ supplier_payments UNPAID để giả lập thanh toán.");
     }
 
-    const importValue = Number(latestUnpaid[PAYMENT_LEDGER_COLS.AMOUNT] || 0);
-    await db(PAYMENT_LEDGER_TABLE)
-      .where(PAYMENT_LEDGER_COLS.ID, latestUnpaid[PAYMENT_LEDGER_COLS.ID])
+    const importValue = Number(latestUnpaid[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.ID, latestUnpaid[PAYMENT_SUPPLY_COLS.ID])
       .update({
-        [PAYMENT_LEDGER_COLS.STATUS]: STATUS.PAID,
-        [PAYMENT_LEDGER_COLS.AMOUNT_PAID]: importValue,
+        [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.PAID,
+        [PAYMENT_SUPPLY_COLS.PAID]: importValue,
       });
 
     // Xóa đơn: vì không còn UNPAID cycle -> phải insert dòng điều chỉnh âm
@@ -638,12 +638,12 @@ const tests = {
       throw err;
     }
 
-    const adjustmentRow = await db(PAYMENT_LEDGER_TABLE)
-      .where(PAYMENT_LEDGER_COLS.SOURCE_ID, supplyId)
-      .orderBy(PAYMENT_LEDGER_COLS.ID, "desc")
+    const adjustmentRow = await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.SOURCE_ID, supplyId)
+      .orderBy(PAYMENT_SUPPLY_COLS.ID, "desc")
       .first();
 
-    const adjustmentImport = Number(adjustmentRow?.[PAYMENT_LEDGER_COLS.AMOUNT] || 0);
+    const adjustmentImport = Number(adjustmentRow?.[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
     const expectedProrated = Math.ceil((remainingDaysExpected / totalDays) * cost / 1000) * 1000;
 
     console.log(`  - Latest import_value: ${adjustmentImport}`);
@@ -666,32 +666,30 @@ const tests = {
     const supplyId = await createTestSupplier(supplyName);
     const negativeAmount = -150000;
 
-    const [inserted] = await db(PAYMENT_LEDGER_TABLE)
+    const [inserted] = await db(PAYMENT_SUPPLY_TABLE)
       .insert({
-        [PAYMENT_LEDGER_COLS.SOURCE_ID]: supplyId,
-        [PAYMENT_LEDGER_COLS.AMOUNT]: negativeAmount,
-        [PAYMENT_LEDGER_COLS.AMOUNT_PAID]: 0,
-        [PAYMENT_LEDGER_COLS.ROUND]: `ADJ - ${formatDate(new Date())}`,
-        [PAYMENT_LEDGER_COLS.STATUS]: STATUS.UNPAID,
-        [PAYMENT_LEDGER_COLS.NOTE]: null,
-        [PAYMENT_LEDGER_COLS.SOURCE]: "test",
+        [PAYMENT_SUPPLY_COLS.SOURCE_ID]: supplyId,
+        [PAYMENT_SUPPLY_COLS.IMPORT_VALUE]: negativeAmount,
+        [PAYMENT_SUPPLY_COLS.PAID]: 0,
+        [PAYMENT_SUPPLY_COLS.ROUND]: `ADJ - ${formatDate(new Date())}`,
+        [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.UNPAID,
       })
-      .returning(PAYMENT_LEDGER_COLS.ID);
+      .returning(PAYMENT_SUPPLY_COLS.ID);
 
-    const paymentId = inserted[PAYMENT_LEDGER_COLS.ID];
-    const beforeConfirm = await db(PAYMENT_LEDGER_TABLE).where(PAYMENT_LEDGER_COLS.ID, paymentId).first();
+    const paymentId = inserted[PAYMENT_SUPPLY_COLS.ID];
+    const beforeConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
 
-    if (Number(beforeConfirm[PAYMENT_LEDGER_COLS.AMOUNT]) >= 0) {
+    if (Number(beforeConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE]) >= 0) {
       throw new Error("Chuẩn bị test: row phải có amount âm");
     }
 
-    await db(PAYMENT_LEDGER_TABLE)
-      .where(PAYMENT_LEDGER_COLS.ID, paymentId)
-      .update({ [PAYMENT_LEDGER_COLS.STATUS]: STATUS.PAID });
+    await db(PAYMENT_SUPPLY_TABLE)
+      .where(PAYMENT_SUPPLY_COLS.ID, paymentId)
+      .update({ [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.PAID });
 
-    const afterConfirm = await db(PAYMENT_LEDGER_TABLE).where(PAYMENT_LEDGER_COLS.ID, paymentId).first();
-    const importAfter = Number(afterConfirm[PAYMENT_LEDGER_COLS.AMOUNT] || 0);
-    const statusAfter = String(afterConfirm[PAYMENT_LEDGER_COLS.STATUS] || "").trim();
+    const afterConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
+    const importAfter = Number(afterConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const statusAfter = String(afterConfirm[PAYMENT_SUPPLY_COLS.STATUS] || "").trim();
 
     console.log(`  - Import trước confirm: ${negativeAmount}`);
     console.log(`  - Import sau confirm: ${importAfter}`);

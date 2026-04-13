@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { QUOTED_COLS, TABLES, paymentLedgerCols, STATUS } = require("../constants");
+const { QUOTED_COLS, TABLES, paymentSupplyCols, STATUS } = require("../constants");
 const { parseMoney, parseSupplyId } = require("../helpers");
 const logger = require("../../../utils/logger");
 
@@ -37,23 +37,21 @@ const createPayment = async (req, res) => {
   }
 
   try {
-    const result = await db(TABLES.paymentLedger)
+    const result = await db(TABLES.paymentSupply)
       .insert({
-        [paymentLedgerCols.SOURCE_ID]: parsedSupplyId,
-        [paymentLedgerCols.AMOUNT]: totalImportRaw,
-        [paymentLedgerCols.AMOUNT_PAID]: paidRaw,
-        [paymentLedgerCols.ROUND]: roundLabel,
-        [paymentLedgerCols.STATUS]: statusLabel,
-        [paymentLedgerCols.NOTE]: null,
-        [paymentLedgerCols.SOURCE]: "manual",
+        [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
+        [paymentSupplyCols.IMPORT_VALUE]: totalImportRaw,
+        [paymentSupplyCols.PAID]: paidRaw,
+        [paymentSupplyCols.ROUND]: roundLabel,
+        [paymentSupplyCols.STATUS]: statusLabel,
       })
       .returning([
-        paymentLedgerCols.ID,
-        paymentLedgerCols.SOURCE_ID,
-        paymentLedgerCols.AMOUNT,
-        paymentLedgerCols.AMOUNT_PAID,
-        paymentLedgerCols.ROUND,
-        paymentLedgerCols.STATUS,
+        paymentSupplyCols.ID,
+        paymentSupplyCols.SOURCE_ID,
+        paymentSupplyCols.IMPORT_VALUE,
+        paymentSupplyCols.PAID,
+        paymentSupplyCols.ROUND,
+        paymentSupplyCols.STATUS,
       ]);
     if (!result?.length) {
       return res.status(500).json({
@@ -62,12 +60,12 @@ const createPayment = async (req, res) => {
     }
     const row = result[0];
     res.status(201).json({
-      id: row[paymentLedgerCols.ID],
-      sourceId: row[paymentLedgerCols.SOURCE_ID],
-      totalImport: Number(row[paymentLedgerCols.AMOUNT]) || 0,
-      paid: Number(row[paymentLedgerCols.AMOUNT_PAID]) || 0,
-      round: row[paymentLedgerCols.ROUND] || "",
-      status: row[paymentLedgerCols.STATUS] || "",
+      id: row[paymentSupplyCols.ID],
+      sourceId: row[paymentSupplyCols.SOURCE_ID],
+      totalImport: Number(row[paymentSupplyCols.IMPORT_VALUE]) || 0,
+      paid: Number(row[paymentSupplyCols.PAID]) || 0,
+      round: row[paymentSupplyCols.ROUND] || "",
+      status: row[paymentSupplyCols.STATUS] || "",
     });
   } catch (error) {
     logger.error("Mutation failed (POST /api/supplies/:supplyId/payments)", { supplyId, error: error.message, stack: error.stack });
@@ -96,18 +94,18 @@ const updatePaymentImport = async (req, res) => {
     });
   }
 
-  const lg = QUOTED_COLS.supplierPaymentLedger;
+  const ps = QUOTED_COLS.paymentSupply;
 
   try {
     const prevRes = await db.raw(
       `
       SELECT
-        COALESCE(${lg.amount}, 0)::numeric AS prev_amount,
-        COALESCE(${lg.status}, '') AS prev_status,
-        COALESCE(${lg.round}, '') AS prev_round
-      FROM ${TABLES.paymentLedger}
-      WHERE ${lg.id} = ?
-        AND ${lg.sourceId} = ?
+        COALESCE(${ps.importValue}, 0)::numeric AS prev_amount,
+        COALESCE(${ps.status}, '') AS prev_status,
+        COALESCE(${ps.round}, '') AS prev_round
+      FROM ${TABLES.paymentSupply}
+      WHERE ${ps.id} = ?
+        AND ${ps.sourceId} = ?
       LIMIT 1;
     `,
       [parsedPaymentId, parsedSupplyId]
@@ -124,30 +122,27 @@ const updatePaymentImport = async (req, res) => {
 
     const result = await db.raw(
       `
-      INSERT INTO ${TABLES.paymentLedger} (
-        ${lg.sourceId},
-        ${lg.amount},
-        ${lg.amountPaid},
-        ${lg.round},
-        ${lg.status},
-        ${lg.note},
-        ${lg.source}
+      INSERT INTO ${TABLES.paymentSupply} (
+        ${ps.sourceId},
+        ${ps.importValue},
+        ${ps.paid},
+        ${ps.round},
+        ${ps.status}
       )
-      VALUES (?, ?, 0, ?, ?, ?, 'manual_adjust')
+      VALUES (?, ?, 0, ?, ?)
       RETURNING
-        ${lg.id} AS id,
-        ${lg.sourceId} AS source_id,
-        ${lg.amount} AS import_value,
-        ${lg.amountPaid} AS paid_value,
-        COALESCE(${lg.round}, '') AS round_label,
-        COALESCE(${lg.status}, '') AS status_label;
+        ${ps.id} AS id,
+        ${ps.sourceId} AS source_id,
+        ${ps.importValue} AS import_value,
+        ${ps.paid} AS paid_value,
+        COALESCE(${ps.round}, '') AS round_label,
+        COALESCE(${ps.status}, '') AS status_label;
     `,
       [
         parsedSupplyId,
         delta,
-        prevRound,
+        `${prevRound} — Điều chỉnh ref#${parsedPaymentId} (${delta >= 0 ? "+" : ""}${delta})`,
         prevStatus,
-        `Điều chỉnh tổng nhập ref#${parsedPaymentId} (${delta >= 0 ? "+" : ""}${delta})`,
       ]
     );
 

@@ -172,7 +172,7 @@ const PARTNER_SCHEMA = {
       PAID: "amount_paid",
     },
   },
-  /** Nhiều dòng log / đơn: vào ĐXL (webhook/gia hạn), MAVN tạo/gia hạn, đóng đơn (INSERT thêm). Công nợ UI: dòng mới nhất theo id. */
+  /** Log NCC: mỗi lần Chưa TT/Cần GH→ĐXL INSERT dòng mới (logged_at); đồng bộ cost trên dòng mới nhất khi vẫn ĐXL. */
   SUPPLIER_ORDER_COST_LOG: {
     TABLE: "supplier_order_cost_log",
     COLS: {

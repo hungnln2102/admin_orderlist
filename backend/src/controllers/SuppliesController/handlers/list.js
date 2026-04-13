@@ -80,20 +80,20 @@ const listPaymentsBySupply = async (req, res) => {
   const supplierTable = await resolveSupplierTableName();
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = quoteIdent(supplierNameCol);
-  const lg = QUOTED_COLS.supplierPaymentLedger;
+  const ps = QUOTED_COLS.paymentSupply;
   const q = `
     SELECT
-      pl.${lg.id} AS id,
-      pl.${lg.sourceId} AS source_id,
+      pl.${ps.id} AS id,
+      pl.${ps.sourceId} AS source_id,
       COALESCE(s.${supplierNameIdent}, '') AS source_name,
-      ${createNumericExtraction(`pl.${lg.amount}`)} AS import_value,
-      ${createNumericExtraction(`pl.${lg.amountPaid}`)} AS paid_value,
-      COALESCE(pl.${lg.round}, '') AS round_label,
-      COALESCE(pl.${lg.status}, '') AS status_label
-    FROM ${TABLES.paymentLedger} pl
-    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = pl.${lg.sourceId}
-    WHERE pl.${lg.sourceId} = ?
-    ORDER BY pl.${lg.id} DESC
+      ${createNumericExtraction(`pl.${ps.importValue}`)} AS import_value,
+      ${createNumericExtraction(`pl.${ps.paid}`)} AS paid_value,
+      COALESCE(pl.${ps.round}, '') AS round_label,
+      COALESCE(pl.${ps.status}, '') AS status_label
+    FROM ${TABLES.paymentSupply} pl
+    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = pl.${ps.sourceId}
+    WHERE pl.${ps.sourceId} = ?
+    ORDER BY pl.${ps.id} DESC
     OFFSET ?
     LIMIT ?;
   `;
