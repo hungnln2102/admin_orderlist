@@ -2,14 +2,14 @@ const {
   pool,
   ORDER_TABLE,
   PAYMENT_RECEIPT_TABLE,
-  PAYMENT_LEDGER_TABLE,
+  PAYMENT_SUPPLY_TABLE,
   ORDER_COLS,
   PAYMENT_RECEIPT_COLS,
   SUPPLIER_TABLE,
   SUPPLIER_COLS,
   SUPPLIER_COST_TABLE,
   SUPPLIER_COST_COLS,
-  PAYMENT_LEDGER_COLS,
+  PAYMENT_SUPPLY_COLS,
 } = require("./config");
 const { STATUS } = require("../../src/utils/statuses");
 const {
@@ -377,17 +377,15 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
 
     const period = formatNote();
     await client.query(
-      `INSERT INTO ${PAYMENT_LEDGER_TABLE} (
-          ${safeIdent(PAYMENT_LEDGER_COLS.sourceId)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.amount)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.amountPaid)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.round)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.status)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.note)},
-          ${safeIdent(PAYMENT_LEDGER_COLS.source)}
+      `INSERT INTO ${PAYMENT_SUPPLY_TABLE} (
+          ${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.importValue)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.round)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.status)}
         )
-        VALUES ($1, $2, 0, $3, $4, $5, 'sepay')`,
-      [sourceId, priceValue, period, STATUS.UNPAID, "Sepay"]
+        VALUES ($1, $2, 0, $3, $4)`,
+      [sourceId, priceValue, period, STATUS.UNPAID]
     );
 
     if (manageTransaction) {
