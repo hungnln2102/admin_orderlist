@@ -43,11 +43,11 @@ const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
   try {
     return await withSavepoint(client, "fetch_supplier_nm", async () => {
       const { rows } = await client.query(
-        `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
-       WHERE ${SUPPLIER_COLS.ID} = $1 LIMIT 1`,
+        `SELECT ${SUPPLIER_COLS.supplierName} FROM ${SUPPLIER_TABLE}
+       WHERE ${SUPPLIER_COLS.id} = $1 LIMIT 1`,
         [Number(supplyIdRaw)]
       );
-      return String(rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? "").trim();
+      return String(rows[0]?.[SUPPLIER_COLS.supplierName] ?? "").trim();
     });
   } catch (e) {
     logger.warn("[Webhook] Không đọc được tên NCC", {

@@ -224,12 +224,12 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     if (supplierId != null && Number.isFinite(Number(supplierId))) {
       try {
         const supRes = await client.query(
-          `SELECT ${SUPPLIER_COLS.SUPPLIER_NAME} FROM ${SUPPLIER_TABLE}
-           WHERE ${SUPPLIER_COLS.ID} = $1 LIMIT 1`,
+          `SELECT ${SUPPLIER_COLS.supplierName} FROM ${SUPPLIER_TABLE}
+           WHERE ${SUPPLIER_COLS.id} = $1 LIMIT 1`,
           [supplierId]
         );
         supplierNameForNcc = String(
-          supRes.rows[0]?.[SUPPLIER_COLS.SUPPLIER_NAME] ?? ""
+          supRes.rows[0]?.[SUPPLIER_COLS.supplierName] ?? ""
         ).trim();
       } catch (e) {
         logger.warn("[Renewal] Không đọc được tên NCC", { supplierId, error: e.message });
