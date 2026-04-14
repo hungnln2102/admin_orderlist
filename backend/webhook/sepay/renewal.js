@@ -238,12 +238,8 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
     const isMavn = isMavnImportOrder({ id_order: orderCode });
     // MAVN không dùng NCC Mavryk — luôn cộng NCC khi gia hạn. Đơn khác + NCC Mavryk/Shop: không cộng NCC.
     const skipNccLedger = !isMavn && isMavrykShopSupplierName(supplierNameForNcc);
-    // MAVN nhập hàng: sau gia hạn luôn Đang Xử Lý (+ công nợ NCC khi có); Đã Thanh Toán chỉ qua thanh toán NCC.
-    const renewalNextStatus = isMavn
-      ? ORDER_STATUS.PROCESSING
-      : skipNccLedger
-        ? ORDER_STATUS.PAID
-        : ORDER_STATUS.PROCESSING;
+    // Rule mới: gia hạn thành công chuyển Đã Thanh Toán cho tất cả mã đơn.
+    const renewalNextStatus = ORDER_STATUS.PAID;
 
     const updateSql = `
       UPDATE ${ORDER_TABLE}
@@ -267,7 +263,7 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
       orderCode,
     ]);
 
-    // Renewal: NCC thường → Đang Xử Lý; NCC Mavryk/Shop (không MAVN) → Đã Thanh Toán.
+    // Renewal: gia hạn thành công đều chuyển Đã Thanh Toán.
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
       if (monthKey) {

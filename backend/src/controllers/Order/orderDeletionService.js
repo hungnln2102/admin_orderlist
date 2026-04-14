@@ -1,5 +1,3 @@
-const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../config/dbSchema");
-
 const deleteOrderWithArchive = async ({
     trx,
     order,
@@ -15,13 +13,18 @@ const deleteOrderWithArchive = async ({
     const { calcRemainingImport } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
-    const { isMavnImportOrder } = require("../../utils/orderHelpers");
+    const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
     const logger = require("../../utils/logger");
 
     const orderId = order?.id;
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
     const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
     const canceledAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CANCELED_AT;
+    const toNegativeAmount = (value) => {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num === 0) return 0;
+        return -Math.abs(Math.round(num));
+    };
 
     try {
         await adjustSupplierDebtIfNeeded(trx, order, normalized);
@@ -56,31 +59,35 @@ const deleteOrderWithArchive = async ({
     const shouldArchiveToCanceled =
         normalizedStatus === STATUS.PAID ||
         normalizedStatus === STATUS.PROCESSING;
+    let movedTo = shouldArchiveToCanceled ? "canceled" : "expired";
 
     if (shouldArchiveToCanceled) {
         const isMavn = isMavnImportOrder(order);
+        const isGift = isGiftOrder(order);
         const bodyRefund =
             toNullableNumber(reqBody?.can_hoan) ??
             toNullableNumber(reqBody?.gia_tri_con_lai);
 
-        let refundValue;
+        let refundValue = 0;
         if (isMavn) {
             const importRefund =
                 bodyRefund !== null && bodyRefund !== undefined
                     ? Math.max(0, bodyRefund)
-                    : calcRemainingImport(order, normalized);
-            refundValue =
-                importRefund != null && Number.isFinite(importRefund)
-                    ? Math.max(0, Math.round(importRefund))
-                    : 0;
+                    : (calcRemainingImport(order, normalized) ?? calcRemainingRefund(order, normalized));
+            refundValue = toNegativeAmount(importRefund);
+        } else if (isGift) {
+            // MAVT: giá trị hoàn trên đơn luôn 0 (log NCC được trigger tính riêng theo cost/ngày còn lại).
+            refundValue = 0;
         } else {
-            refundValue =
+            const computedRefund =
                 bodyRefund !== null && bodyRefund !== undefined
                     ? Math.max(0, bodyRefund)
-                    : calcRemainingRefund(order, normalized);
+                    : (calcRemainingImport(order, normalized) ?? calcRemainingRefund(order, normalized));
+            refundValue = toNegativeAmount(computedRefund);
         }
 
-        const archiveStatus = isMavn ? STATUS.CANCELED : STATUS.PENDING_REFUND;
+        const archiveStatus = (isMavn || isGift) ? STATUS.REFUNDED : STATUS.PENDING_REFUND;
+        movedTo = archiveStatus === STATUS.REFUNDED ? "refunded" : "canceled";
 
         // canceled_at: chỉ ghi một lần lúc chuyển sang Chờ Hoàn / Hủy (ngày VN, YYYY-MM-DD).
         const existingCanceledRaw = order?.[canceledAtCol] ?? order?.canceled_at;
@@ -100,38 +107,6 @@ const deleteOrderWithArchive = async ({
 
         await trx(TABLES.orderList).where({ id: orderId }).update(updatePayload);
 
-        const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-        const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
-        const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
-        if (order?.[supplyIdCol] != null) {
-            const costLogTable = tableName(
-                PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
-                SCHEMA_PARTNER
-            );
-            const logCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
-            const nccRefundForLog = isMavn
-                ? refundValue
-                : (() => {
-                    const r = calcRemainingImport(order, normalized);
-                    return r != null && Number.isFinite(Number(r))
-                        ? Math.max(0, Math.round(Number(r)))
-                        : 0;
-                })();
-            const idOrderVal = String(order[idOrderCol] ?? "").trim();
-            const importCostVal = Math.max(
-                0,
-                Math.round(toNullableNumber(order[costCol]) || 0)
-            );
-            await trx(costLogTable).insert({
-                [logCols.ORDER_LIST_ID]: orderId,
-                [logCols.SUPPLY_ID]: order[supplyIdCol],
-                [logCols.ID_ORDER]: idOrderVal || "",
-                [logCols.IMPORT_COST]: importCostVal,
-                [logCols.REFUND_AMOUNT]: nccRefundForLog,
-                [logCols.NCC_PAYMENT_STATUS]: "Chưa Thanh Toán",
-            });
-        }
-
         const afterOrder = {
             ...order,
             [statusCol]: archiveStatus,
@@ -148,7 +123,7 @@ const deleteOrderWithArchive = async ({
     }
 
     await trx.commit();
-    return { success: true, movedTo: shouldArchiveToCanceled ? "canceled" : "expired", deletedOrder: normalized };
+    return { success: true, movedTo, deletedOrder: normalized };
 };
 
 module.exports = {

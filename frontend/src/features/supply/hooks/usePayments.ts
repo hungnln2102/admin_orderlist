@@ -33,12 +33,18 @@ export const usePayments = ({
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [qrPayment, setQrPayment] = useState<QrPayment | null>(null);
 
-  const confirmPayment = async (paymentId: number) => {
+  const confirmPayment = async (paymentId: number, opts?: { paidAmount?: number }) => {
     setConfirmingId(paymentId);
     try {
+      const paidAmount = opts?.paidAmount;
+      const body =
+        paidAmount != null && Number.isFinite(paidAmount) && paidAmount > 0
+          ? JSON.stringify({ paidAmount: Math.round(paidAmount) })
+          : undefined;
       const res = await apiFetch(`/api/payment-supply/${paymentId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        ...(body !== undefined ? { body } : {}),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

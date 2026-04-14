@@ -21,13 +21,11 @@ const createPayment = async (req, res) => {
       ? req.body.status.trim()
       : null;
   const totalImportRaw = Number(req.body?.totalImport);
+  const totalImportEffective = Number.isFinite(totalImportRaw) ? totalImportRaw : 0;
   const paidRaw = Number(req.body?.paid);
 
   if (!roundLabel) {
     return res.status(400).json({ error: "Chu kỳ không hợp lệ." });
-  }
-  if (!Number.isFinite(totalImportRaw)) {
-    return res.status(400).json({ error: "Tổng nhập không hợp lệ." });
   }
   if (!Number.isFinite(paidRaw)) {
     return res.status(400).json({ error: "Giá trị đã thanh toán không hợp lệ." });
@@ -40,7 +38,6 @@ const createPayment = async (req, res) => {
     const result = await db(TABLES.paymentSupply)
       .insert({
         [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
-        [paymentSupplyCols.IMPORT_VALUE]: totalImportRaw,
         [paymentSupplyCols.PAID]: paidRaw,
         [paymentSupplyCols.ROUND]: roundLabel,
         [paymentSupplyCols.STATUS]: statusLabel,
@@ -48,7 +45,6 @@ const createPayment = async (req, res) => {
       .returning([
         paymentSupplyCols.ID,
         paymentSupplyCols.SOURCE_ID,
-        paymentSupplyCols.IMPORT_VALUE,
         paymentSupplyCols.PAID,
         paymentSupplyCols.ROUND,
         paymentSupplyCols.STATUS,
@@ -62,7 +58,7 @@ const createPayment = async (req, res) => {
     res.status(201).json({
       id: row[paymentSupplyCols.ID],
       sourceId: row[paymentSupplyCols.SOURCE_ID],
-      totalImport: Number(row[paymentSupplyCols.IMPORT_VALUE]) || 0,
+      totalImport: totalImportEffective,
       paid: Number(row[paymentSupplyCols.PAID]) || 0,
       round: row[paymentSupplyCols.ROUND] || "",
       status: row[paymentSupplyCols.STATUS] || "",
@@ -100,7 +96,7 @@ const updatePaymentImport = async (req, res) => {
     const prevRes = await db.raw(
       `
       SELECT
-        COALESCE(${ps.importValue}, 0)::numeric AS prev_amount,
+        COALESCE(${ps.paid}, 0)::numeric AS prev_amount,
         COALESCE(${ps.status}, '') AS prev_status,
         COALESCE(${ps.round}, '') AS prev_round
       FROM ${TABLES.paymentSupply}
@@ -124,16 +120,15 @@ const updatePaymentImport = async (req, res) => {
       `
       INSERT INTO ${TABLES.paymentSupply} (
         ${ps.sourceId},
-        ${ps.importValue},
         ${ps.paid},
         ${ps.round},
         ${ps.status}
       )
-      VALUES (?, ?, 0, ?, ?)
+      VALUES (?, ?, ?, ?)
       RETURNING
         ${ps.id} AS id,
         ${ps.sourceId} AS source_id,
-        ${ps.importValue} AS import_value,
+        ${ps.paid} AS import_value,
         ${ps.paid} AS paid_value,
         COALESCE(${ps.round}, '') AS round_label,
         COALESCE(${ps.status}, '') AS status_label;

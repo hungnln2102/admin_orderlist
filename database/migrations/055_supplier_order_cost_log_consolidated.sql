@@ -1,4 +1,5 @@
--- Gộp: supplier_order_cost_log + trigger (039→054) + supplier_payments/ledger (045–048).
+-- Gộp: supplier_order_cost_log + trigger (039→054) + supplier_payments/ledger (045–048)
+--       + 056 (DROP total_amount, idempotent với khối 047) + 057 (luồng webhook / thanh toán).
 -- Chạy một lần trên DB mới hoặc sau khi dọn knex_migrations các bản cũ cùng chuỗi.
 
 -- ========== 039_supplier_order_cost_log.sql ==========
@@ -949,11 +950,8 @@ ALTER TABLE partner.supplier_payments DROP COLUMN IF EXISTS total_amount;
 
 -- ========== 048_drop_supplier_payment_ledger.sql ==========
 
--- Bỏ supplier_payment_ledger; chu kỳ / Sepay / confirm dùng lại partner.supplier_payments (+ total_amount).
+-- Bỏ supplier_payment_ledger; chu kỳ / Sepay / confirm dùng partner.supplier_payments (không tạo lại total_amount).
 DROP TABLE IF EXISTS partner.supplier_payment_ledger;
-
-ALTER TABLE partner.supplier_payments
-  ADD COLUMN IF NOT EXISTS total_amount NUMERIC(18,2);
 
 
 -- ========== 049_supplier_order_cost_log_unpaid_renewal_to_processing.sql ==========
@@ -2218,6 +2216,204 @@ BEGIN
       );
     END IF;
     RETURN NEW;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER tr_supplier_order_cost_log_order_success
+  AFTER INSERT OR UPDATE OF status, supply_id, cost, refund, id_order
+  ON orders.order_list
+  FOR EACH ROW
+  EXECUTE PROCEDURE partner.fn_supplier_order_cost_log_on_success();
+
+-- ========== 056_supplier_payments_drop_total_amount.sql ==========
+-- (Có thể đã DROP trong khối 047 phía trên; giữ để đồng bộ với migration 056 riêng lẻ.)
+
+ALTER TABLE partner.supplier_payments DROP COLUMN IF EXISTS total_amount;
+
+-- ========== 057_supplier_order_cost_log_webhook_paid_flow.sql ==========
+-- Luồng mới: không ghi log khi tạo đơn; ghi log khi thanh toán (Chưa TT → Đã TT),
+-- khi gia hạn (Cần Gia Hạn → ĐXL/Đã TT), khi archive xóa (ĐXL/Đã TT → Chờ Hoàn hoặc Hủy MAVN).
+-- Đồng bộ cost trên dòng mới nhất khi vẫn ĐXL/Đã TT và không đổi trạng thái.
+
+DROP TRIGGER IF EXISTS tr_supplier_order_cost_log_order_success ON orders.order_list;
+
+CREATE OR REPLACE FUNCTION partner.fn_supplier_order_cost_log_on_success()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_unpaid CONSTANT text := 'Chưa Thanh Toán';
+  v_renewal CONSTANT text := 'Cần Gia Hạn';
+  v_paid CONSTANT text := 'Đã Thanh Toán';
+  v_processing CONSTANT text := 'Đang Xử Lý';
+  v_pending_refund CONSTANT text := 'Chờ Hoàn';
+  v_canceled CONSTANT text := 'Hủy';
+  v_chua_tt_ncc CONSTANT text := 'Chưa Thanh Toán';
+  v_da_tt_ncc CONSTANT text := 'Đã Thanh Toán';
+BEGIN
+  IF NEW.supply_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    -- Thanh toán lần đầu (webhook / xác nhận): Chưa TT → Đã TT
+    IF COALESCE(OLD.status, '') = v_unpaid
+       AND NEW.status IS NOT DISTINCT FROM v_paid
+    THEN
+      INSERT INTO partner.supplier_order_cost_log (
+        order_list_id,
+        supply_id,
+        id_order,
+        import_cost,
+        refund_amount,
+        ncc_payment_status
+      )
+      VALUES (
+        NEW.id,
+        NEW.supply_id,
+        COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
+        COALESCE(NEW.cost, 0),
+        COALESCE(NEW.refund, 0),
+        v_da_tt_ncc
+      );
+      RETURN NEW;
+    END IF;
+
+    -- Gia hạn thành công: Cần Gia Hạn → ĐXL hoặc Đã TT
+    IF COALESCE(OLD.status, '') = v_renewal
+       AND (
+         NEW.status IS NOT DISTINCT FROM v_processing
+         OR NEW.status IS NOT DISTINCT FROM v_paid
+       )
+    THEN
+      INSERT INTO partner.supplier_order_cost_log (
+        order_list_id,
+        supply_id,
+        id_order,
+        import_cost,
+        refund_amount,
+        ncc_payment_status
+      )
+      VALUES (
+        NEW.id,
+        NEW.supply_id,
+        COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
+        COALESCE(NEW.cost, 0),
+        COALESCE(NEW.refund, 0),
+        CASE
+          WHEN NEW.status IS NOT DISTINCT FROM v_paid THEN v_da_tt_ncc
+          ELSE v_chua_tt_ncc
+        END
+      );
+      RETURN NEW;
+    END IF;
+
+    -- Xóa đơn (archive): ĐXL hoặc Đã TT → Chờ Hoàn; MAVN → Hủy
+    IF (
+      OLD.status IS NOT DISTINCT FROM v_paid
+      OR OLD.status IS NOT DISTINCT FROM v_processing
+    )
+       AND (
+         NEW.status IS NOT DISTINCT FROM v_pending_refund
+         OR NEW.status IS NOT DISTINCT FROM v_canceled
+       )
+    THEN
+      INSERT INTO partner.supplier_order_cost_log (
+        order_list_id,
+        supply_id,
+        id_order,
+        import_cost,
+        refund_amount,
+        ncc_payment_status
+      )
+      VALUES (
+        NEW.id,
+        NEW.supply_id,
+        COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
+        COALESCE(NEW.cost, 0),
+        COALESCE(NEW.refund, 0),
+        v_chua_tt_ncc
+      );
+      RETURN NEW;
+    END IF;
+
+    -- Tương thích: Chưa TT → ĐXL (không gồm renewal — đã xử lý ở trên)
+    IF COALESCE(OLD.status, '') = v_unpaid
+       AND NEW.status IS NOT DISTINCT FROM v_processing
+    THEN
+      INSERT INTO partner.supplier_order_cost_log (
+        order_list_id,
+        supply_id,
+        id_order,
+        import_cost,
+        refund_amount,
+        ncc_payment_status
+      )
+      VALUES (
+        NEW.id,
+        NEW.supply_id,
+        COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
+        COALESCE(NEW.cost, 0),
+        COALESCE(NEW.refund, 0),
+        v_chua_tt_ncc
+      );
+      RETURN NEW;
+    END IF;
+
+    -- Xác nhận thanh toán NCC: ĐXL → Đã TT (cập nhật dòng log mới nhất)
+    IF COALESCE(OLD.status, '') = v_processing
+       AND NEW.status IS NOT DISTINCT FROM v_paid
+    THEN
+      UPDATE partner.supplier_order_cost_log l
+      SET
+        ncc_payment_status = v_da_tt_ncc,
+        logged_at = NOW()
+      WHERE l.id = (
+        SELECT MAX(id)
+        FROM partner.supplier_order_cost_log
+        WHERE order_list_id = NEW.id
+      );
+      RETURN NEW;
+    END IF;
+
+    -- Chỉnh cost/NCC/id_order/supply khi vẫn ĐXL hoặc Đã TT, không đổi trạng thái
+    IF NEW.status IS NOT DISTINCT FROM v_processing
+       OR NEW.status IS NOT DISTINCT FROM v_paid
+    THEN
+      IF EXISTS (SELECT 1 FROM partner.supplier_order_cost_log WHERE order_list_id = NEW.id)
+         AND OLD.status IS NOT DISTINCT FROM NEW.status
+         AND (
+           NEW.cost IS DISTINCT FROM OLD.cost
+           OR NEW.supply_id IS DISTINCT FROM OLD.supply_id
+           OR NEW.refund IS DISTINCT FROM OLD.refund
+           OR NEW.id_order IS DISTINCT FROM OLD.id_order
+         )
+      THEN
+        UPDATE partner.supplier_order_cost_log l
+        SET
+          supply_id = NEW.supply_id,
+          id_order = COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
+          import_cost = COALESCE(NEW.cost, 0),
+          refund_amount = COALESCE(NEW.refund, 0),
+          ncc_payment_status = CASE
+            WHEN NEW.status IS NOT DISTINCT FROM v_paid THEN v_da_tt_ncc
+            ELSE v_chua_tt_ncc
+          END,
+          logged_at = NOW()
+        WHERE l.id = (
+          SELECT MAX(id)
+          FROM partner.supplier_order_cost_log
+          WHERE order_list_id = NEW.id
+        );
+      END IF;
+    END IF;
   END IF;
 
   RETURN NEW;

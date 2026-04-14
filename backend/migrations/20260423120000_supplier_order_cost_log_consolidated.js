@@ -1,5 +1,6 @@
 /**
- * Gộp toàn bộ chuỗi supplier_order_cost_log (039→054) + supplier_payments/ledger (045→048).
+ * Gộp toàn bộ chuỗi supplier_order_cost_log (039→054) + supplier_payments/ledger (045→048)
+ * và phần cuối tương đương 056–057 (DROP total_amount + luồng webhook/thanh toán).
  * @see database/migrations/055_supplier_order_cost_log_consolidated.sql
  *
  * Nếu DB đã chạy các migration 20260414*…20260422* riêng lẻ: xóa các dòng tương ứng trong

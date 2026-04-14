@@ -192,11 +192,14 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
     }
 
-    // Order entered the "counted" lifecycle ONLY via PROCESSING (UNPAID/CANCELLED → PROCESSING)
+    // Vào vòng đời đếm doanh thu: Chưa TT → ĐXL, hoặc Chưa TT → Đã TT (thanh toán webhook)
     if (
         !isOrderCounted(prevStatus) &&
-        nextStatus === STATUS.PROCESSING &&
-        !isMavnImportOrder(afterRow)
+        !isMavnImportOrder(afterRow) &&
+        (
+            nextStatus === STATUS.PROCESSING ||
+            (nextStatus === STATUS.PAID && prevStatus === STATUS.UNPAID)
+        )
     ) {
         if (isGiftOrder(afterRow)) {
             const giftCost = await externalSupplierCostHitForMavtOrMavn(trx, afterRow);

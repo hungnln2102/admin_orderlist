@@ -69,6 +69,7 @@ const SupplyList: React.FC<Props> = ({
               <th className="px-4 py-3">Tháng này</th>
               <th className="px-4 py-3">Lần cuối</th>
               <th className="px-4 py-3">Đã trả</th>
+              <th className="px-4 py-3">Chưa Thanh Toán</th>
               <th className="px-4 py-3 text-center">TT</th>
               <th className="px-4 py-3 text-right">Thao tác</th>
             </tr>
@@ -76,13 +77,13 @@ const SupplyList: React.FC<Props> = ({
           <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-white/50">
+                <td colSpan={8} className="text-center py-8 text-white/50">
                   Đang tải...
                 </td>
               </tr>
             ) : supplies.length === 0 ? (
                 <tr>
-                    <td colSpan={7} className="text-center py-8 text-white/50">
+                    <td colSpan={8} className="text-center py-8 text-white/50">
                         Chưa có nhà cung cấp nào
                     </td>
                 </tr>
@@ -147,6 +148,7 @@ const SupplyRow = ({
         </td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatDate(supply.lastOrderDate)}</td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatCurrency(supply.totalPaidImport)}</td>
+        <td className="px-4 py-4 text-white/80 text-sm">{formatCurrency(supply.totalUnpaidImport ?? 0)}</td>
         <td className="px-4 py-4 text-center">
           <button
             onClick={(e) => {
@@ -195,7 +197,7 @@ const SupplyRow = ({
 
       {isExpanded && (
         <tr>
-          <td colSpan={7} className="px-0 pb-4 pt-0 bg-indigo-950/30">
+          <td colSpan={8} className="px-0 pb-4 pt-0 bg-indigo-950/30">
             <div className="p-4 border-b border-white/10 shadow-inner">
               <PaymentHistoryTable supplyId={supply.id} onRefreshSupplies={onRefreshSupplies} />
             </div>

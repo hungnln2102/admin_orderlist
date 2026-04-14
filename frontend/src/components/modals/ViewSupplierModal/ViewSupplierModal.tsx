@@ -35,11 +35,15 @@ export default function ViewSupplierModal({
     setConfirming(true);
     try {
       const payment = data.unpaidPayments.find((p: any) => p.id === selectedPaymentId);
-      const importVal = Number(payment?.totalImport ?? payment?.import_value ?? 0);
+      const raw = Number(payment?.totalImport ?? payment?.import_value ?? 0);
+      const paid = Number(payment?.paid ?? 0);
+      const amountDue = raw < 0 ? Math.abs(raw) : Math.max(0, raw - paid);
       const res = await apiFetch(`/api/payment-supply/${selectedPaymentId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(importVal >= 0 ? { paidAmount: importVal } : {}),
+        body: JSON.stringify(
+          selectedPaymentId !== 0 && amountDue > 0 ? { paidAmount: Math.round(amountDue) } : {}
+        ),
       });
       if (!res.ok) throw new Error("Lỗi xác nhận thanh toán");
       await fetchDetail();
@@ -146,8 +150,9 @@ export default function ViewSupplierModal({
                            <h3 className="text-xl font-bold">{selectedPayment.round}</h3>
                            {(() => {
                              const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
+                             const paid = Number(selectedPayment.paid ?? 0);
                              const isNegative = raw < 0;
-                             const displayAmount = isNegative ? Math.abs(raw) : raw;
+                             const displayAmount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
                              return (
                                <div className="grid grid-cols-2 gap-4 text-sm">
                                  <div><p className="text-white/60">Chủ TK</p><p>{isNegative ? ACCOUNT_NAME : supply.sourceName}</p></div>
@@ -157,7 +162,11 @@ export default function ViewSupplierModal({
                              );
                            })()}
                            <div className="pt-4 flex justify-end">
-                              <button disabled={confirming} onClick={handleConfirmPayment} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold disabled:opacity-50">
+                              <button
+                                disabled={confirming || !selectedPaymentId || selectedPaymentId === 0}
+                                onClick={handleConfirmPayment}
+                                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold disabled:opacity-50"
+                              >
                                 {confirming ? "Đang xử lý..." : "Xác nhận đã chuyển khoản"}
                               </button>
                            </div>

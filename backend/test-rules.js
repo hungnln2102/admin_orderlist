@@ -545,7 +545,7 @@ const tests = {
 
   /**
    * Test: Nếu chu kỳ NCC đã PAID (không còn UNPAID), khi xóa đơn cần tạo dòng điều chỉnh âm
-   * để total_amount (import_value) âm đúng nghĩa "trừ NCC".
+   * để amount_paid âm đúng nghĩa "trừ NCC".
    */
   async test7_DeleteOrder_WhenAllCyclesPaid_InsertNegativeAdjustment() {
     console.log("\n=== TEST 7: Xóa đơn khi chu kỳ đã PAID - tạo adjustment âm cho NCC ===");
@@ -605,7 +605,7 @@ const tests = {
       throw new Error("Không tìm thấy chu kỳ supplier_payments UNPAID để giả lập thanh toán.");
     }
 
-    const importValue = Number(latestUnpaid[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const importValue = Number(latestUnpaid[PAYMENT_SUPPLY_COLS.PAID] || 0);
     await db(PAYMENT_SUPPLY_TABLE)
       .where(PAYMENT_SUPPLY_COLS.ID, latestUnpaid[PAYMENT_SUPPLY_COLS.ID])
       .update({
@@ -643,7 +643,7 @@ const tests = {
       .orderBy(PAYMENT_SUPPLY_COLS.ID, "desc")
       .first();
 
-    const adjustmentImport = Number(adjustmentRow?.[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const adjustmentImport = Number(adjustmentRow?.[PAYMENT_SUPPLY_COLS.PAID] || 0);
     const expectedProrated = Math.ceil((remainingDaysExpected / totalDays) * cost / 1000) * 1000;
 
     console.log(`  - Latest import_value: ${adjustmentImport}`);
@@ -656,8 +656,8 @@ const tests = {
   },
 
   /**
-   * Test: Confirm chu kỳ âm (NCC trả mình) - chỉ đổi status PAID, KHÔNG đổi import_value.
-   * Sau bấm Thanh toán, total_amount (import_value) vẫn âm.
+   * Test: Confirm chu kỳ âm (NCC trả mình) - chỉ đổi status PAID, KHÔNG đổi amount_paid.
+   * Sau bấm Thanh toán, amount_paid vẫn âm.
    */
   async test8_ConfirmNegativeCycle_OnlyStatusChange() {
     console.log("\n=== TEST 8: Confirm chu kỳ âm - chỉ đổi status, import vẫn âm ===");
@@ -669,8 +669,7 @@ const tests = {
     const [inserted] = await db(PAYMENT_SUPPLY_TABLE)
       .insert({
         [PAYMENT_SUPPLY_COLS.SOURCE_ID]: supplyId,
-        [PAYMENT_SUPPLY_COLS.IMPORT_VALUE]: negativeAmount,
-        [PAYMENT_SUPPLY_COLS.PAID]: 0,
+        [PAYMENT_SUPPLY_COLS.PAID]: negativeAmount,
         [PAYMENT_SUPPLY_COLS.ROUND]: `ADJ - ${formatDate(new Date())}`,
         [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.UNPAID,
       })
@@ -679,7 +678,7 @@ const tests = {
     const paymentId = inserted[PAYMENT_SUPPLY_COLS.ID];
     const beforeConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
 
-    if (Number(beforeConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE]) >= 0) {
+    if (Number(beforeConfirm[PAYMENT_SUPPLY_COLS.PAID]) >= 0) {
       throw new Error("Chuẩn bị test: row phải có amount âm");
     }
 
@@ -688,7 +687,7 @@ const tests = {
       .update({ [PAYMENT_SUPPLY_COLS.STATUS]: STATUS.PAID });
 
     const afterConfirm = await db(PAYMENT_SUPPLY_TABLE).where(PAYMENT_SUPPLY_COLS.ID, paymentId).first();
-    const importAfter = Number(afterConfirm[PAYMENT_SUPPLY_COLS.IMPORT_VALUE] || 0);
+    const importAfter = Number(afterConfirm[PAYMENT_SUPPLY_COLS.PAID] || 0);
     const statusAfter = String(afterConfirm[PAYMENT_SUPPLY_COLS.STATUS] || "").trim();
 
     console.log(`  - Import trước confirm: ${negativeAmount}`);
@@ -699,7 +698,7 @@ const tests = {
     const passedStatus = statusAfter === STATUS.PAID;
     const passed = passedImport && passedStatus;
 
-    console.log(`  ✓ ${passedImport ? "PASS" : "FAIL"}: import_value vẫn âm sau confirm`);
+    console.log(`  ✓ ${passedImport ? "PASS" : "FAIL"}: amount_paid vẫn âm sau confirm`);
     console.log(`  ✓ ${passedStatus ? "PASS" : "FAIL"}: status = Đã Thanh Toán`);
 
     return { passed, supplyId };

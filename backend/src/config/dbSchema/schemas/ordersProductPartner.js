@@ -166,13 +166,12 @@ const PARTNER_SCHEMA = {
     COLS: {
       ID: "id",
       SOURCE_ID: "supplier_id",
-      IMPORT_VALUE: "total_amount",
       ROUND: "payment_period",
       STATUS: "payment_status",
       PAID: "amount_paid",
     },
   },
-  /** Log NCC: mỗi lần Chưa TT/Cần GH→ĐXL INSERT dòng mới (logged_at); đồng bộ cost trên dòng mới nhất khi vẫn ĐXL. */
+  /** Log NCC: thanh toán (Chưa TT→Đã TT), gia hạn (Cần GH→ĐXL/Đã TT), archive xóa; đồng bộ cost trên dòng mới nhất khi ĐXL/Đã TT. */
   SUPPLIER_ORDER_COST_LOG: {
     TABLE: "supplier_order_cost_log",
     COLS: {

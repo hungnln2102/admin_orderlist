@@ -59,8 +59,16 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     });
   }, [supply, selectedPayment]);
 
-  const handleConfirmPayment = async (paymentId: number) => {
-    const result = await confirmPayment(paymentId);
+  const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
+    const raw = Number(p.totalImport ?? p.import_value ?? 0);
+    const paid = Number(p.paid ?? 0);
+    if (raw < 0) return Math.abs(raw);
+    return Math.max(0, raw - paid);
+  };
+
+  const handleConfirmPayment = async (p: { id: number; totalImport?: number; import_value?: number; paid?: number }) => {
+    if (!p.id) return;
+    const result = await confirmPayment(p.id, { paidAmount: amountDueForPayment(p) });
     if (!result.success) {
       setError(result.error || "Không thể thanh toán chu kỳ");
     }
@@ -214,8 +222,8 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                               })()}
                             </div>
                             <button
-                              disabled={confirmingId === p.id}
-                              onClick={(e) => { e.stopPropagation(); handleConfirmPayment(p.id); }}
+                              disabled={confirmingId === p.id || !p.id}
+                              onClick={(e) => { e.stopPropagation(); void handleConfirmPayment(p); }}
                               className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60 font-semibold transition flex-shrink-0"
                             >
                               {confirmingId === p.id ? "..." : "Thanh toán"}

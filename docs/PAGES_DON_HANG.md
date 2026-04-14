@@ -88,9 +88,28 @@ frontend/src/features/orders/
 
 ## Luồng nghiệp vụ (đơn hàng — tài liệu nội bộ)
 
+### Trạng thái & log chi phí NCC (`supplier_order_cost_log`)
+
+- **MAVC, MAVL, MAVK, MAVS**:
+  - Tạo đơn: luôn **Chưa Thanh Toán**.
+  - Nhận webhook thanh toán / webhook gia hạn thành công: chuyển **Đã Thanh Toán** và **INSERT 1 log**.
+  - Xóa khi đang **Đã Thanh Toán** hoặc **Đang Xử Lý**: chuyển **Chờ Hoàn**, chạy tính hoàn NCC, lưu `refund` **số âm**, và **INSERT 1 log**.
+- **MAVN**:
+  - Tạo đơn: luôn **Đã Thanh Toán** và **INSERT 1 log**.
+  - Đang **Cần Gia Hạn** + bấm nút Gia Hạn: chuyển **Đã Thanh Toán** và **INSERT 1 log**.
+  - Xóa đơn **Đã Thanh Toán**: chuyển **Đã Hoàn** và **INSERT 1 log**.
+  - Webhook Sepay: **không** đổi trạng thái MAVN.
+- **MAVT**:
+  - Tạo đơn: luôn **Đã Thanh Toán** và **INSERT 1 log**.
+  - Xóa đơn: chuyển **Đã Hoàn**, `refund` trên đơn luôn `0`; tiền NCC cần hoàn vẫn tính riêng theo cost/ngày còn lại và ghi vào log NCC.
+- **NCC Mavryk**: không lưu log ở `partner.supplier_order_cost_log` (nếu có log cũ theo đơn sẽ bị dọn khi phát sinh cập nhật đơn).
+
 ### Tạo đơn & Telegram
 
-- Tạo đơn **thành công** → gửi **thông báo Telegram** đơn mới (backend: `sendOrderCreatedNotification` sau khi tạo).
+- Tạo đơn **thành công**:
+  - **MAVC/MAVL/MAVK/MAVS** → **Chưa Thanh Toán**
+  - **MAVN/MAVT** → **Đã Thanh Toán**
+  - Sau tạo vẫn gửi **thông báo Telegram** đơn mới (backend: `sendOrderCreatedNotification`).
 
 ### Theo loại mã (prefix) & thông báo
 
@@ -115,31 +134,34 @@ frontend/src/features/orders/
 
 ### Khi bấm hủy (xóa / chuyển trạng thái hủy)
 
-- **MAVC, MAVL, MAVK**: Chuyển sang luồng **Hoàn tiền** (tab Hoàn tiền), khi trạng thái đơn **Đang Xử Lý** hoặc **Đã Thanh Toán**; lấy **Tiền hoàn từ NCC**, **trừ** vào công nợ NCC (bảng NCC cho phép ghi nhận / note số âm theo thiết kế hiện tại).
-- **MAVN**: **Không** chuyển sang bảng/tab Hoàn tiền; **giữ** ở **Nhập hàng**, trạng thái **Hủy** (`CANCELED`), vẫn tính tiền còn lại như **Tiền hoàn từ NCC**; số ngày còn lại từ lúc hủy: `expiry_date − canceled_at` (quy ước ngày như hệ thống); sau khi tính hoàn → ghi **cột refund** và **trừ** NCC.
+- **MAVC, MAVL, MAVK, MAVS** (và đơn thường tương tự): từ **Đang Xử Lý** hoặc **Đã Thanh Toán** → chuyển trạng thái **Chờ Hoàn**; tính hoàn NCC theo tỷ lệ ngày và ghi `refund` **số âm**; trigger ghi thêm **1 dòng** `supplier_order_cost_log`.
+- **MAVN**: xóa đơn **Đã Thanh Toán** → chuyển **Đã Hoàn**; trigger ghi thêm **1 dòng** `supplier_order_cost_log`.
+- **MAVT**: xóa đơn → chuyển **Đã Hoàn**; `refund` trên đơn luôn `0`; tiền NCC cần hoàn vẫn tính riêng theo cost/ngày còn lại và ghi vào log NCC.
 
 ### NCC Mavryk / Shop (đơn thường — không phải MAVN)
 
 - Coi **Mavryk** và **Shop** là cùng nhóm NCC nội bộ (`isMavrykShopSupplierName` trong backend).
-- **Tạo đơn**: **không dùng giá nhập** — `cost` lưu **0**; **giá bán = lợi nhuận**. API `/api/orders/calculate-price` có thể trả `mavryk_profit_mode`, `gia_nhap = 0`.
-- **Công nợ NCC (`payment_supply`)**: đơn thường + NCC Mavryk/Shop → **không cộng** qua các luồng “nội bộ” (`shouldSkipNccLedgerForOrder` — **không** áp cho MAVN).
-- **Sepay webhook** (thanh toán khách): đơn **Chưa Thanh Toán** → **Đã Thanh Toán**; vòng import sau biên lai **bỏ qua** cộng `payment_supply` cho NCC Mavryk/Shop. Đơn **Chưa Thanh Toán** khác → **Đang Xử Lý** rồi cộng NCC như cũ (nếu áp dụng).
-- **Gia hạn** (`renewal.js`, đơn **không** MAVN + NCC Mavryk/Shop): sau gia hạn có thể **Đã Thanh Toán** và **không** cộng thêm import NCC trong bước renewal.
+- **Tạo đơn**: **không dùng giá nhập** — `cost` lưu **0**; **giá bán = lợi nhuận**. API `/api/orders/calculate-price` có thể trả `mavryk_profit_mode`, `gia_nhap = 0`. Trạng thái ban đầu vẫn là **Chưa Thanh Toán**.
+- **Công nợ NCC (`payment_supply` / chu kỳ thanh toán)**: đơn thường + NCC Mavryk/Shop → **không cộng** `updatePaymentSupplyBalance` sau biên lai / renewal (`shouldSkipNccLedgerForOrder` — **không** áp cho MAVN).
+- **Sepay webhook** (thanh toán khách): mọi đơn **Chưa Thanh Toán** (trừ MAVN — xem dưới) → **Đã Thanh Toán**; sau biên lai vẫn **bỏ qua** cộng `payment_supply` cho NCC Mavryk/Shop; đơn NCC thường vẫn **cộng** chu kỳ NCC khi có biên lai (như `webhook.js`).
+- **Gia hạn** (`renewal.js`, đơn **không** MAVN + NCC Mavryk/Shop): sau gia hạn chuyển **Đã Thanh Toán** và **không** cộng thêm import NCC trong bước renewal.
+- **Riêng NCC Mavryk**: không lưu `supplier_order_cost_log`.
 
 ### MAVN (nhập hàng)
 
-- **Quy ước**: MAVN **không** gắn NCC Mavryk/Shop — luôn NCC nhà cung cấp thật → **luôn** ghi nhận công nợ NCC khi **tạo đơn** và **gia hạn** (backend: không ép `cost = 0` vì Mavryk khi prefix MAVN; `orderPricingService` không bật `mavryk_profit_mode` cho mã MAVN; `shouldSkipNccLedgerForOrder` **không** bỏ qua sổ NCC với MAVN).
-- **Tạo đơn thành công** → **Đang Xử Lý**, **cộng** NCC (`addSupplierImportOnProcessing` trong `createOrder.js`).
-- **Sepay webhook**: **không** đổi trạng thái đơn MAVN qua Sepay; **không** chạy renewal tự động từ webhook cho mã MAVN; fallback match theo số tiền (`resolveOrderByPayment`) **loại** đơn MAVN. Biên lai Sepay vẫn có thể được ghi nếu có mã trong nội dung — nhưng **không** dùng để chốt trạng thái MAVN.
-- **Cần Gia Hạn** → nút **Gia hạn** (API renew, `runRenewal`) → **Đang Xử Lý**, **cộng** NCC theo giá nhập gia hạn (`updatePaymentSupplyBalance` trong `renewal.js`).
-- **Đã Thanh Toán** (đơn MAVN): khi xác nhận **thanh toán NCC** — `POST /api/payment-supply/:paymentId/confirm` (`PaymentsController`): các đơn **Đang Xử Lý** của đúng NCC được chuyển **Đã Thanh Toán** theo tiền thanh toán (không qua Sepay để chốt trạng thái MAVN).
+- **Quy ước**: MAVN **không** gắn NCC Mavryk/Shop — luôn NCC nhà cung cấp thật (không ép `cost = 0` vì Mavryk khi prefix MAVN; `orderPricingService` không bật `mavryk_profit_mode` cho MAVN).
+- **Tạo đơn thành công** → **Đã Thanh Toán** và ghi **1 dòng** `supplier_order_cost_log` (trừ NCC Mavryk).
+- **Sepay webhook**: **không** đổi trạng thái đơn MAVN qua Sepay; **không** chạy renewal tự động từ webhook cho mã MAVN; fallback match theo số tiền (`resolveOrderByPayment`) **loại** đơn MAVN. Biên lai có thể được ghi nếu có mã trong nội dung — **không** dùng để chốt trạng thái MAVN.
+- **Cần Gia Hạn** → **Gia hạn** (`runRenewal`) → chuyển **Đã Thanh Toán** + **cộng** NCC (`updatePaymentSupplyBalance` trong `renewal.js`) + **INSERT** `supplier_order_cost_log`.
+- `POST /api/payment-supply/:paymentId/confirm` vẫn dùng để đối soát chu kỳ NCC, nhưng MAVN không cần đợi bước này để lên trạng thái **Đã Thanh Toán**.
 
 ### Modal tạo đơn (`CreateOrderModal`)
 
-- Khối **Chi phí & thời hạn** (`CreateOrderPricingSection`): phụ đề và nhãn cột giá theo **loại mã** (MAVC…MAVN) và **NCC Mavryk/Shop** (đơn thường: cost = 0, cột giá bán = lợi nhuận). **MAVN** vẫn dùng giá nhập / công nợ NCC như đơn nhập hàng. Copy UI: `frontend/src/components/modals/CreateOrderModal/createOrderPricingCopy.ts` — khi đổi nghiệp vụ, cập nhật song song đoạn này và mục “Luồng nghiệp vụ”.
+- Khối **Chi phí & thời hạn** (`CreateOrderPricingSection`): phụ đề và nhãn cột giá theo **loại mã** (MAVC…MAVN) và **NCC Mavryk/Shop** (đơn thường: cost = 0, cột giá bán = lợi nhuận). **Sau lưu**: MAVC/MAVL/MAVK/MAVS là **Chưa Thanh Toán**; MAVN/MAVT là **Đã Thanh Toán** (xem mục “Trạng thái & log chi phí NCC”). Copy UI: `frontend/src/components/modals/CreateOrderModal/createOrderPricingCopy.ts` — khi đổi nghiệp vụ, cập nhật song song đoạn này và mục “Luồng nghiệp vụ”.
 
 ### Khớp code (kiểm tra định kỳ)
 
-- **NCC / MAVN / Mavryk**: `backend/src/controllers/Order/finance/supplierDebt.js`, `Order/crud/createOrder.js`, `services/pricing/orderPricingService.js`, `Order/orderDeletionService`, `PaymentsController` (xác nhận thanh toán NCC).
+- **Log chi phí NCC (DB)**: `database/migrations/057_supplier_order_cost_log_webhook_paid_flow.sql` (trigger `partner.fn_supplier_order_cost_log_on_success` trên `orders.order_list`).
+- **NCC / MAVN / Mavryk**: `Order/finance/supplierDebt.js` (stub / không còn bút toán cũ), `Order/crud/createOrder.js`, `services/orderService.js`, `services/pricing/orderPricingService.js`, `Order/orderDeletionService`, `Order/finance/dashboardSummary.js`, `PaymentsController` (xác nhận thanh toán NCC).
 - **Sepay webhook & renewal tự động**: `backend/webhook/sepay/routes/webhook.js`, `backend/webhook/sepay/utils.js` (`resolveOrderByPayment`), `backend/webhook/sepay/renewal.js`; gia hạn tay: `backend/src/controllers/Order/renewRoutes.js`.
 - UI tạo đơn: `createOrderPricingCopy.ts` như mục trên.

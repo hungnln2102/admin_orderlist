@@ -86,7 +86,7 @@ const listPaymentsBySupply = async (req, res) => {
       pl.${ps.id} AS id,
       pl.${ps.sourceId} AS source_id,
       COALESCE(s.${supplierNameIdent}, '') AS source_name,
-      ${createNumericExtraction(`pl.${ps.importValue}`)} AS import_value,
+      0::numeric AS import_value,
       ${createNumericExtraction(`pl.${ps.paid}`)} AS paid_value,
       COALESCE(pl.${ps.round}, '') AS round_label,
       COALESCE(pl.${ps.status}, '') AS status_label
@@ -126,7 +126,7 @@ const listPaymentsBySupply = async (req, res) => {
 };
 
 /**
- * Chi tiết chi phí NCC theo đơn — partner.supplier_order_cost_log (nhiều dòng/đơn: vào ĐXL, gia hạn, đóng đơn). Tổng hợp: dòng mới nhất theo id.
+ * Chi tiết chi phí NCC theo đơn — partner.supplier_order_cost_log (nhiều dòng/đơn: thanh toán, gia hạn, chờ hoàn/hủy). Tổng hợp: dòng mới nhất theo id.
  * GET /api/supplies/order-costs?limit=&offset=&supply_id=&q=
  */
 const listSupplyOrderCosts = async (req, res) => {
@@ -198,9 +198,23 @@ const listSupplyOrderCosts = async (req, res) => {
         ORDER BY ${lt}.${orderListIdCol}, ${lt}.${logIdCol} DESC
       )
       SELECT
-        COUNT(*)::bigint AS order_count,
-        COALESCE(SUM(COALESCE(import_cost, 0)::numeric), 0) AS total_cost,
-        COALESCE(SUM(COALESCE(refund_amount, 0)::numeric), 0) AS total_refund
+        COUNT(*) FILTER (
+          WHERE TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
+        )::bigint AS order_count,
+        COALESCE(SUM(
+          CASE
+            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            THEN 0::numeric
+            ELSE COALESCE(import_cost, 0)::numeric - COALESCE(refund_amount, 0)::numeric
+          END
+        ), 0) AS total_cost,
+        COALESCE(SUM(
+          CASE
+            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            THEN 0::numeric
+            ELSE COALESCE(refund_amount, 0)::numeric
+          END
+        ), 0) AS total_refund
       FROM latest
     `;
     const aggResult = await db.raw(aggSql, bindings);

@@ -23,7 +23,6 @@ const createPaymentRules = [
     .isInt({ min: 1 })
     .withMessage("ID nhà cung cấp không hợp lệ."),
   body("round").trim().notEmpty().withMessage("Chu kỳ không hợp lệ."),
-  body("totalImport").isFloat().withMessage("Tổng nhập không hợp lệ."),
   body("paid").isFloat().withMessage("Giá trị đã thanh toán không hợp lệ."),
   body("status").trim().notEmpty().withMessage("Trạng thái không hợp lệ."),
   validate,

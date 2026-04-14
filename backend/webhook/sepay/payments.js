@@ -379,12 +379,11 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
     await client.query(
       `INSERT INTO ${PAYMENT_SUPPLY_TABLE} (
           ${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)},
-          ${safeIdent(PAYMENT_SUPPLY_COLS.importValue)},
           ${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
           ${safeIdent(PAYMENT_SUPPLY_COLS.round)},
           ${safeIdent(PAYMENT_SUPPLY_COLS.status)}
         )
-        VALUES ($1, $2, 0, $3, $4)`,
+        VALUES ($1, $2, $3, $4)`,
       [sourceId, priceValue, period, STATUS.UNPAID]
     );
 

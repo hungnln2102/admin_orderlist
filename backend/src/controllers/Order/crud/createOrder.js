@@ -16,10 +16,6 @@ const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../services/o
 const { sendOrderCreatedNotification } = require("../../../services/telegramOrderNotification");
 const logger = require("../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
-const {
-    addSupplierImportOnProcessing,
-    updateDashboardMonthlySummaryOnStatusChange,
-} = require("../orderFinanceHelpers");
 const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
 const attachCreateOrderRoute = (router) => {
@@ -104,12 +100,10 @@ const attachCreateOrderRoute = (router) => {
 
         if (isGiftOrderCreate) {
             payload[priceCol] = 0;
-            payload.status = STATUS.PROCESSING;
-        } else if (isMavnCreate) {
-            payload.status = STATUS.PROCESSING;
-        } else {
-            payload.status = STATUS.UNPAID;
         }
+        payload.status = (isGiftOrderCreate || isMavnCreate)
+            ? STATUS.PAID
+            : STATUS.UNPAID;
 
         const trx = await db.transaction();
         try {
@@ -120,14 +114,6 @@ const attachCreateOrderRoute = (router) => {
             payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
-
-            if (isGiftOrderCreate) {
-                await addSupplierImportOnProcessing(trx, { status: STATUS.UNPAID }, newOrder);
-                await updateDashboardMonthlySummaryOnStatusChange(trx, { status: STATUS.UNPAID }, newOrder);
-            } else if (isMavnCreate) {
-                await addSupplierImportOnProcessing(trx, { status: STATUS.UNPAID }, newOrder);
-                await updateDashboardMonthlySummaryOnStatusChange(trx, { status: STATUS.UNPAID }, newOrder);
-            }
 
             await trx.commit();
 

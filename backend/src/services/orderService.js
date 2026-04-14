@@ -16,10 +16,6 @@ const { nextId } = require("./idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
 const { todayYMDInVietnam } = require("../utils/normalizers");
 const { ORDER_PREFIXES } = require("../utils/orderHelpers");
-const {
-  addSupplierImportOnProcessing,
-  updateDashboardMonthlySummaryOnStatusChange,
-} = require("../controllers/Order/orderFinanceHelpers");
 
 /**
  * Create a new order
@@ -51,13 +47,15 @@ const createOrder = async (orderData, trx = null) => {
     const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
     const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
     const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
+    const importPrefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
     const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
+    const isMavnOrderCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
     if (isGiftOrderCreate) {
       payload[priceCol] = 0;
-      payload.status = STATUS.PROCESSING;
-    } else {
-      payload.status = STATUS.UNPAID;
     }
+    payload.status = (isGiftOrderCreate || isMavnOrderCreate)
+      ? STATUS.PAID
+      : STATUS.UNPAID;
 
     payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, transaction);
 
@@ -66,11 +64,6 @@ const createOrder = async (orderData, trx = null) => {
     payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, transaction);
 
     const [newOrder] = await transaction(TABLES.orderList).insert(payload).returning("*");
-
-    if (isGiftOrderCreate) {
-      await addSupplierImportOnProcessing(transaction, { status: STATUS.UNPAID }, newOrder);
-      await updateDashboardMonthlySummaryOnStatusChange(transaction, { status: STATUS.UNPAID }, newOrder);
-    }
 
     if (shouldCommit) {
       await transaction.commit();

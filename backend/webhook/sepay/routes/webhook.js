@@ -272,24 +272,25 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Chưa Thanh Toán: mặc định → Đang Xử Lý; NCC Mavryk/Shop → Đã Thanh Toán (không cộng NCC ở vòng import phía trên).
+      // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger ghi supplier_order_cost_log).
       // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
-      // Cần Gia Hạn (không MAVN): renewal sau COMMIT; NCC Mavryk/Shop → Đã Thanh Toán trong renewal.js.
+      // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
       if (receiptResult?.inserted || receiptResult?.duplicate) {
         const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
         for (const code of codesToUpdate) {
+          if (isMavnImportOrder({ id_order: code })) {
+            logger.info("[Webhook] Skip status update for MAVN (nhập hàng)", {
+              orderCode: code,
+            });
+            continue;
+          }
+
           const state = stateByOrderCode.get(code);
           if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
           if (statusValue === ORDER_STATUS.UNPAID) {
-            const supplierName = await fetchSupplierNameBySupplyId(
-              client,
-              state[ORDER_COLS.idSupply]
-            );
-            const nextStatus = isMavrykShopSupplierName(supplierName)
-              ? ORDER_STATUS.PAID
-              : ORDER_STATUS.PROCESSING;
+            const nextStatus = ORDER_STATUS.PAID;
             const statusUpdateResult = await client.query(
               `UPDATE ${ORDER_TABLE}
                SET ${ORDER_COLS.status} = $2
@@ -300,16 +301,11 @@ router.post("/", async (req, res) => {
             if (statusUpdateResult.rowCount > 0) {
               await incrementDashboardSummaryOnProcessing(client, state);
             }
-            logger.debug(
-              nextStatus === ORDER_STATUS.PAID
-                ? "[Webhook] Order status → Đã Thanh Toán (NCC Mavryk/Shop)"
-                : "[Webhook] Order status → Đang Xử Lý",
-              {
-                orderCode: code,
-                previousStatus: statusValue,
-                nextStatus,
-              }
-            );
+            logger.debug("[Webhook] Order status → Đã Thanh Toán", {
+              orderCode: code,
+              previousStatus: statusValue,
+              nextStatus,
+            });
           }
         }
       }

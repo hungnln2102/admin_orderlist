@@ -98,7 +98,7 @@ const confirmPaymentSupply = async (req, res) => {
         `
         SELECT ${PS.id} AS id,
                ${PS.sourceId} AS source_id,
-               COALESCE(${PS.importValue}::numeric, 0) AS import,
+               COALESCE(${PS.paid}::numeric, 0) AS import,
                COALESCE(${PS.paid}::numeric, 0) AS paid,
                ${PS.round} AS round,
                ${PS.status} AS status
@@ -125,7 +125,7 @@ const confirmPaymentSupply = async (req, res) => {
           WHERE ${PS.id} = ?
           RETURNING ${PS.id} AS id,
                     ${PS.sourceId} AS source_id,
-                    COALESCE(${PS.importValue}::numeric, 0) AS import,
+                    COALESCE(${PS.paid}::numeric, 0) AS import,
                     COALESCE(${PS.paid}::numeric, 0) AS paid,
                     ${PS.status} AS status,
                     ${PS.round} AS round;
@@ -225,8 +225,8 @@ const confirmPaymentSupply = async (req, res) => {
       if (carryoverImport !== null && carryoverImport > 0 && sourceId && !hasUnpaidCycle) {
         await trx.raw(
           `
-          INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.importValue}, ${PS.paid}, ${PS.round}, ${PS.status})
-          VALUES (?, ?, 0, ?, ?);
+          INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.paid}, ${PS.round}, ${PS.status})
+          VALUES (?, ?, ?, ?);
         `,
           [sourceId, carryoverImport, todayDMY, UNPAID_STATUS]
         );
@@ -241,7 +241,7 @@ const confirmPaymentSupply = async (req, res) => {
       WHERE ${PS.id} = ?
       RETURNING ${PS.id} AS id,
                 ${PS.sourceId} AS source_id,
-                COALESCE(${PS.importValue}::numeric, 0) AS import,
+                COALESCE(${PS.paid}::numeric, 0) AS import,
                 COALESCE(${PS.paid}::numeric, 0) AS paid,
                 ${PS.status} AS status,
                 ${PS.round} AS round;

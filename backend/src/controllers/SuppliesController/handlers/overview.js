@@ -87,19 +87,34 @@ const getSupplyOverview = async (req, res) => {
     `;
 
     const ps = QUOTED_COLS.paymentSupply;
-
-    const unpaidSummarySql = `
-      SELECT SUM(COALESCE(pl.${ps.importValue}, 0) - COALESCE(pl.${ps.paid}, 0)) AS total_unpaid
-      FROM ${TABLES.paymentSupply} pl
-      WHERE pl.${ps.sourceId} = :supplyId
-        AND pl.${ps.status} = :unpaidStatus
+    const lc = QUOTED_COLS.supplierOrderCostLog;
+    const paidNccLabel = "Đã Thanh Toán";
+    const orderUnpaidSql = `
+      WITH latest AS (
+        SELECT DISTINCT ON (l.${lc.orderListId})
+          l.${lc.supplyId} AS supply_id,
+          l.${lc.importCost} AS import_cost,
+          l.${lc.refundAmount} AS refund_amount,
+          l.${lc.nccPaymentStatus} AS ncc_payment_status
+        FROM ${TABLES.supplyOrderCostLog} l
+        WHERE l.${lc.supplyId} = :supplyId
+        ORDER BY l.${lc.orderListId}, l.${lc.id} DESC
+      )
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
+          THEN 0::numeric
+          ELSE COALESCE(latest.import_cost, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
+        END
+      ), 0)::numeric AS total_unpaid_import
+      FROM latest
     `;
 
     const paidSummarySql = `
       SELECT SUM(
         CASE
           WHEN pl.${ps.status} <> :unpaidStatus
-            THEN COALESCE(pl.${ps.paid}, pl.${ps.importValue}, 0)
+            THEN COALESCE(pl.${ps.paid}, 0)
           ELSE 0
         END
       ) AS total_paid_cycles
@@ -111,7 +126,7 @@ const getSupplyOverview = async (req, res) => {
       SELECT
         pl.${ps.id} AS id,
         pl.${ps.round} AS round,
-        COALESCE(pl.${ps.importValue}, 0) AS import_value,
+        0::numeric AS import_value,
         COALESCE(pl.${ps.paid}, 0) AS paid_value,
         COALESCE(pl.${ps.status}, '') AS status_label
       FROM ${TABLES.paymentSupply} pl
@@ -124,12 +139,13 @@ const getSupplyOverview = async (req, res) => {
       unpaidStatus: STATUS.UNPAID,
       supplyName: supplyRow.source_name,
       supplyId: parsedSupplyId,
+      paidNccLabel,
     };
 
-    const [statsResult, monthlyResult, unpaidSummary, paidSummary, unpaidResult] = await Promise.all([
+    const [statsResult, monthlyResult, orderUnpaidRes, paidSummary, unpaidResult] = await Promise.all([
       client.raw(statsQuery, bindings),
       client.raw(monthlyQuery, bindings),
-      client.raw(unpaidSummarySql, bindings),
+      client.raw(orderUnpaidSql, bindings),
       client.raw(paidSummarySql, bindings),
       client.raw(unpaidQuery, bindings),
     ]);
@@ -147,21 +163,25 @@ const getSupplyOverview = async (req, res) => {
         orders: Number(row.monthly_orders) || 0,
       })) || [];
 
-    const totalUnpaidAmount = Number(unpaidSummary.rows?.[0]?.total_unpaid) || 0;
+    const orderUnpaidImport = Number(orderUnpaidRes.rows?.[0]?.total_unpaid_import) || 0;
 
-    const unpaidPayments = (unpaidResult.rows || []).map((row) => ({
+    const dbUnpaidRows = unpaidResult.rows || [];
+    const unpaidPayments = dbUnpaidRows.map((row, idx) => ({
       id: row.id,
       round: row.round || "",
-      totalImport: Number(row.import_value) || 0,
+      totalImport:
+        orderUnpaidImport > 0 && (dbUnpaidRows.length === 1 || idx === 0)
+          ? orderUnpaidImport
+          : Number(row.import_value) || 0,
       paid: Number(row.paid_value) || 0,
       status: row.status_label || "",
     }));
 
-    if ((!unpaidPayments || unpaidPayments.length === 0) && totalUnpaidAmount > 0) {
+    if (dbUnpaidRows.length === 0 && orderUnpaidImport > 0) {
       unpaidPayments.push({
         id: 0,
-        round: "Tiền nợ",
-        totalImport: totalUnpaidAmount,
+        round: "Công nợ theo đơn (Chưa TT NCC)",
+        totalImport: orderUnpaidImport,
         paid: 0,
         status: STATUS.UNPAID,
       });
