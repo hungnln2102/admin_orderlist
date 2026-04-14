@@ -31,6 +31,7 @@ const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
 const {
   isMavnImportOrder,
   isMavrykShopSupplierName,
+  isDashboardSalesOrder,
 } = require("../../../src/utils/orderHelpers");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
@@ -70,7 +71,8 @@ const toMonthKey = (value) => {
   return `${year}-${month}`;
 };
 
-const incrementDashboardSummaryOnProcessing = async (client, orderState) => {
+const incrementDashboardSummaryOnProcessing = async (client, orderState, orderCode = "") => {
+  if (!isDashboardSalesOrder({ id_order: orderCode })) return;
   const monthKey = toMonthKey(orderState?.[ORDER_COLS.orderDate]);
   if (!monthKey) return;
 
@@ -299,7 +301,7 @@ router.post("/", async (req, res) => {
               [code, nextStatus, ORDER_STATUS.UNPAID]
             );
             if (statusUpdateResult.rowCount > 0) {
-              await incrementDashboardSummaryOnProcessing(client, state);
+              await incrementDashboardSummaryOnProcessing(client, state, code);
             }
             logger.debug("[Webhook] Order status → Đã Thanh Toán", {
               orderCode: code,

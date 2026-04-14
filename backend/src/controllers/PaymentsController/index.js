@@ -10,9 +10,6 @@ const {
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 const { STATUS } = require("../../utils/statuses");
-const {
-  createDateNormalization,
-} = require("../../utils/sql");
 const logger = require("../../utils/logger");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
@@ -21,7 +18,7 @@ const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
-  orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+  supplyOrderCostLog: tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER),
 };
 const PS = QUOTED_COLS.paymentSupply;
 
@@ -72,13 +69,16 @@ const listPaymentReceipts = async (req, res) => {
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;
   const parsedPaymentId = Number.parseInt(paymentId, 10);
-  if (!Number.isInteger(parsedPaymentId) || parsedPaymentId <= 0) {
+  if (!Number.isInteger(parsedPaymentId) || parsedPaymentId < 0) {
     return res.status(400).json({
       error: "ID thanh toán không hợp lệ.",
     });
   }
 
-  const paidAmountRaw = req.body?.paidAmount;
+  const parsePositiveInt = (value) => {
+    const num = Number.parseInt(String(value ?? ""), 10);
+    return Number.isInteger(num) && num > 0 ? num : null;
+  };
   const parsePaid = (value) => {
     if (value === null || value === undefined) return null;
     if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
@@ -89,180 +89,105 @@ const confirmPaymentSupply = async (req, res) => {
     const num = Number(cleaned);
     return Number.isFinite(num) && num >= 0 ? num : null;
   };
-  const paidAmountNumber = parsePaid(paidAmountRaw);
-  const hasPaidAmount = paidAmountNumber !== null;
+
+  const supplyIdFromBody = parsePositiveInt(req.body?.supplyId);
+  const paidAmountNumber = parsePaid(req.body?.paidAmount);
+  const paymentContent = String(req.body?.paymentContent ?? "").trim();
+
+  if (paidAmountNumber === null || paidAmountNumber <= 0) {
+    return res.status(400).json({ error: "Số tiền thanh toán không hợp lệ." });
+  }
 
   try {
-    const updatedRow = await withTransaction(async (trx) => {
-      const paymentResult = await trx.raw(
-        `
-        SELECT ${PS.id} AS id,
-               ${PS.sourceId} AS source_id,
-               COALESCE(${PS.paid}::numeric, 0) AS import,
-               COALESCE(${PS.paid}::numeric, 0) AS paid,
-               ${PS.round} AS round,
-               ${PS.status} AS status
-        FROM ${TABLES.paymentSupply}
-        WHERE ${PS.id} = ?
-        LIMIT 1;
-      `,
-        [parsedPaymentId]
-      );
-      if (!paymentResult.rows?.length) {
-        return null;
-      }
-      const paymentRow = paymentResult.rows[0];
-      const sourceId = Number(paymentRow.source_id);
-      const importValue = Number(paymentRow.import) || 0;
+    const createdRow = await withTransaction(async (trx) => {
+      let resolvedSupplyId = supplyIdFromBody;
 
-      // Chu kỳ âm (điều chỉnh hoàn tiền / NCC trả mình): chỉ chuyển trạng thái Đã Thanh Toán,
-      // không đổi import_value, không đánh dấu đơn, không tạo carryover.
-      if (importValue < 0) {
-        const updateNegativeResult = await trx.raw(
+      if (!resolvedSupplyId && parsedPaymentId > 0) {
+        const paymentLookup = await trx.raw(
           `
-          UPDATE ${TABLES.paymentSupply}
-          SET ${PS.status} = ?
+          SELECT ${PS.sourceId} AS source_id
+          FROM ${TABLES.paymentSupply}
           WHERE ${PS.id} = ?
-          RETURNING ${PS.id} AS id,
-                    ${PS.sourceId} AS source_id,
-                    COALESCE(${PS.paid}::numeric, 0) AS import,
-                    COALESCE(${PS.paid}::numeric, 0) AS paid,
-                    ${PS.status} AS status,
-                    ${PS.round} AS round;
-        `,
-          [STATUS.PAID, parsedPaymentId]
-        );
-        return updateNegativeResult.rows?.[0] || null;
-      }
-
-      const normalizedPaidAmount =
-        hasPaidAmount && paidAmountNumber !== null
-          ? paidAmountNumber
-          : importValue;
-
-      const todayDMY = (() => {
-        const now = new Date();
-        const day = String(now.getUTCDate()).padStart(2, "0");
-        const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-        const year = now.getUTCFullYear();
-        return `${day}/${month}/${year}`;
-      })();
-
-      const UNPAID_STATUS = STATUS.UNPAID;
-      const PROCESSING_STATUS = STATUS.PROCESSING;
-      const PAID_STATUS = STATUS.PAID;
-
-      let carryoverImport = null;
-      try {
-        const processingResult = await trx.raw(
-          `
-          SELECT
-            ${QUOTED_COLS.orderList.id} AS id,
-            COALESCE(${QUOTED_COLS.orderList.cost}, 0) AS cost,
-            ${createDateNormalization(QUOTED_COLS.orderList.orderDate)} AS order_date
-          FROM ${TABLES.orderList}
-          WHERE ${QUOTED_COLS.orderList.status} = ?
-            AND ${QUOTED_COLS.orderList.idSupply} = ?
-          ORDER BY order_date ASC NULLS FIRST, ${QUOTED_COLS.orderList.id} ASC;
-        `,
-        [PROCESSING_STATUS, sourceId]
-        );
-
-        const processingRows = processingResult.rows || [];
-        let runningSum = 0;
-        const orderIdsToMark = [];
-        for (const row of processingRows) {
-          if (runningSum >= normalizedPaidAmount) break;
-          const costValue = Number(row.cost) || 0;
-          runningSum += costValue;
-          orderIdsToMark.push(row.id);
-        }
-
-        if (orderIdsToMark.length) {
-          await trx.raw(
-            `
-            UPDATE ${TABLES.orderList}
-            SET ${QUOTED_COLS.orderList.status} = ?
-            WHERE ${QUOTED_COLS.orderList.id} = ANY(?::int[]);
-          `,
-            [PAID_STATUS, orderIdsToMark]
-          );
-        }
-
-
-        const totalProcessingImport = processingRows.reduce(
-          (acc, row) => acc + (Number(row.cost) || 0),
-          0
-        );
-        const importDelta = totalProcessingImport - normalizedPaidAmount;
-        // Chỉ tạo chu kỳ mới khi còn nợ (tổng đơn > tiền thanh toán)
-        // Nếu tiền thanh toán > tổng đơn, không tạo chu kỳ mới (tránh vòng lặp vô tận)
-        carryoverImport = importDelta > 0 ? importDelta : null;
-      } catch (orderErr) {
-        logger.error("[payments] Không thể đối chiếu các đơn đặt hàng chưa thanh toán cho hàng hóa", {
-          sourceId,
-          error: orderErr?.message,
-          stack: orderErr?.stack,
-        });
-      }
-
-      let hasUnpaidCycle = false;
-      if (sourceId) {
-        const unpaidCycleResult = await trx.raw(
-          `
-          SELECT 1
-          FROM ${TABLES.paymentSupply} pl
-          WHERE pl.${PS.sourceId} = ?
-            AND pl.${PS.status} = ?
-            AND pl.${PS.id} <> ?
           LIMIT 1;
         `,
-          [sourceId, UNPAID_STATUS, parsedPaymentId]
+          [parsedPaymentId]
         );
-        hasUnpaidCycle = unpaidCycleResult.rows?.length > 0;
+        resolvedSupplyId = parsePositiveInt(paymentLookup.rows?.[0]?.source_id);
       }
 
-      if (carryoverImport !== null && carryoverImport > 0 && sourceId && !hasUnpaidCycle) {
-        await trx.raw(
-          `
-          INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.paid}, ${PS.round}, ${PS.status})
-          VALUES (?, ?, ?, ?);
-        `,
-          [sourceId, carryoverImport, todayDMY, UNPAID_STATUS]
-        );
+      if (!resolvedSupplyId) {
+        throw new Error("Thiếu nhà cung cấp để xác nhận thanh toán.");
       }
 
-      const updateResult = await trx.raw(
+      const logCols = QUOTED_COLS.supplierOrderCostLog;
+      const unpaidLogSummary = await trx.raw(
         `
-      UPDATE ${TABLES.paymentSupply}
-      SET ${PS.status} = ?,
-          ${PS.paid} = ?,
-          ${PS.round} = TRIM(BOTH ' ' FROM CONCAT(COALESCE(${PS.round}::text, ''), ' - ', ?::text))
-      WHERE ${PS.id} = ?
-      RETURNING ${PS.id} AS id,
-                ${PS.sourceId} AS source_id,
-                COALESCE(${PS.paid}::numeric, 0) AS import,
-                COALESCE(${PS.paid}::numeric, 0) AS paid,
-                ${PS.status} AS status,
-                ${PS.round} AS round;
-    `,
-        [PAID_STATUS, normalizedPaidAmount, todayDMY, parsedPaymentId]
+        SELECT
+          MIN(${logCols.loggedAt}::date) AS oldest_date,
+          MAX(${logCols.loggedAt}::date) AS newest_date,
+          COUNT(*)::int AS unpaid_count
+        FROM ${TABLES.supplyOrderCostLog}
+        WHERE ${logCols.supplyId} = ?
+          AND TRIM(COALESCE(${logCols.nccPaymentStatus}::text, '')) <> ?;
+      `,
+        [resolvedSupplyId, STATUS.PAID]
       );
 
-      return updateResult.rows?.[0] || null;
+      const summary = unpaidLogSummary.rows?.[0] || {};
+      const unpaidCount = Number(summary.unpaid_count) || 0;
+      if (unpaidCount <= 0) {
+        throw new Error("Không có log NCC chưa thanh toán để chốt.");
+      }
+
+      const oldestDate = summary.oldest_date ? new Date(summary.oldest_date) : null;
+      const newestDate = summary.newest_date ? new Date(summary.newest_date) : null;
+      const toDmy = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = String(date.getFullYear());
+        return `${day}/${month}/${year}`;
+      };
+      const periodLabel = `${toDmy(oldestDate)} - ${toDmy(newestDate)}`;
+
+      const insertResult = await trx.raw(
+        `
+        INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
+        VALUES (?, ?, ?, ?)
+        RETURNING ${PS.id} AS id,
+                  ${PS.sourceId} AS source_id,
+                  ${PS.round} AS round,
+                  ${PS.status} AS status,
+                  COALESCE(${PS.paid}::numeric, 0) AS paid;
+      `,
+        [resolvedSupplyId, periodLabel, paymentContent, Math.round(paidAmountNumber)]
+      );
+
+      await trx.raw(
+        `
+        UPDATE ${TABLES.supplyOrderCostLog}
+        SET ${logCols.nccPaymentStatus} = ?,
+            ${logCols.loggedAt} = NOW()
+        WHERE ${logCols.supplyId} = ?
+          AND TRIM(COALESCE(${logCols.nccPaymentStatus}::text, '')) <> ?;
+      `,
+        [STATUS.PAID, resolvedSupplyId, STATUS.PAID]
+      );
+
+      return insertResult.rows?.[0] || null;
     });
 
-    if (!updatedRow) {
-      return res.status(404).json({ error: "Không tìm thấy hồ sơ thanh toán." });
+    if (!createdRow) {
+      return res.status(500).json({ error: "Không thể tạo chu kỳ thanh toán." });
     }
-    res.json(updatedRow);
+    res.json(createdRow);
   } catch (error) {
     logger.error(
       `[payments] Mutation failed (POST /api/payment-supply/${paymentId}/confirm)`,
       { paymentId, error: error.message, stack: error.stack }
     );
     res.status(500).json({
-      error: "Không thể xác nhận thanh toán.",
+      error: error.message || "Không thể xác nhận thanh toán.",
     });
   }
 };

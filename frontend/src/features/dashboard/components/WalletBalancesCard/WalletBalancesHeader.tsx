@@ -9,6 +9,10 @@ type WalletBalancesHeaderProps = {
   adding: boolean;
   onToggleAdd: () => void;
   onOpenManageColumns?: () => void;
+  centerSlot?: React.ReactNode;
+  showManageButton?: boolean;
+  showAddButton?: boolean;
+  rightSlot?: React.ReactNode;
 };
 
 const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
@@ -18,10 +22,14 @@ const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
   adding,
   onToggleAdd,
   onOpenManageColumns,
+  centerSlot,
+  showManageButton = true,
+  showAddButton = true,
+  rightSlot,
 }) => {
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div>
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="min-w-[180px]">
         <p className="text-sm font-semibold text-white">{labels.title}</p>
         {totalWallet5 !== null && (
           <p className="text-xs text-white/70">
@@ -29,8 +37,12 @@ const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
           </p>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {onOpenManageColumns ? (
+      <div className="flex min-w-[220px] flex-1 items-center justify-center">
+        {centerSlot}
+      </div>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        {rightSlot}
+        {showManageButton && onOpenManageColumns ? (
           <button
             type="button"
             onClick={onOpenManageColumns}
@@ -40,18 +52,20 @@ const WalletBalancesHeader: React.FC<WalletBalancesHeaderProps> = ({
             {labels.manageColumnsLabel}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={onToggleAdd}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-        >
-          {adding ? (
-            <XMarkIcon className="h-4 w-4" />
-          ) : (
-            <PlusIcon className="h-4 w-4" />
-          )}
-          {adding ? labels.closeLabel : labels.addLabel}
-        </button>
+        {showAddButton ? (
+          <button
+            type="button"
+            onClick={onToggleAdd}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+          >
+            {adding ? (
+              <XMarkIcon className="h-4 w-4" />
+            ) : (
+              <PlusIcon className="h-4 w-4" />
+            )}
+            {adding ? labels.closeLabel : labels.addLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   );

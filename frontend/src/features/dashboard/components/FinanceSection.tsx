@@ -27,6 +27,7 @@ type FinanceSectionProps = {
   walletError: string | null;
   onRefreshWallets: () => void;
   onRefetchGoals?: () => void;
+  availableProfit?: { current: number; previous: number };
 };
 
 export const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -40,6 +41,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   walletError,
   onRefreshWallets,
   onRefetchGoals,
+  availableProfit,
 }) => {
   return (
     <div className="space-y-5 sm:space-y-6 rounded-3xl bg-gradient-to-br from-indigo-950/20 via-slate-900/30 to-slate-950/20 border border-indigo-400/10 p-4 sm:p-5 lg:p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)]">
@@ -56,6 +58,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
         walletColumns={walletColumns}
         walletRows={walletRows}
         onRefetchGoals={onRefetchGoals}
+        availableProfit={availableProfit}
       />
 
       <WalletBalancesCard

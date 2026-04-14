@@ -13,6 +13,11 @@ const summaryTableName = tableName(
   SCHEMA_FINANCE
 );
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+const expenseTableName = tableName(
+  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
+  SCHEMA_FINANCE
+);
+const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 
 const MS_PER_DAY = 86400000;
 
@@ -41,14 +46,50 @@ const computePreviousRange = (fromStr, toStr) => {
 const taxFromRevenueValue = (revenue) =>
   Math.round((Number(revenue) || 0) * (dashboardMonthlyTaxRatePercent / 100));
 
+const toNumber = (value) => Number(value || 0);
+
+const fetchAvailableProfitPair = async ({ currentMonthKey, monthStartDate }) => {
+  const [profitAllRow, profitBeforeRow, expenseAllRow, expenseBeforeRow] =
+    await Promise.all([
+      db(summaryTableName)
+        .sum({ total: summaryCols.TOTAL_PROFIT })
+        .first(),
+      db(summaryTableName)
+        .where(summaryCols.MONTH_KEY, "<", currentMonthKey)
+        .sum({ total: summaryCols.TOTAL_PROFIT })
+        .first(),
+      db(expenseTableName)
+        .sum({ total: expenseCols.AMOUNT })
+        .first(),
+      db(expenseTableName)
+        .whereRaw(`DATE(${expenseCols.CREATED_AT}) < ?`, [monthStartDate])
+        .sum({ total: expenseCols.AMOUNT })
+        .first(),
+    ]);
+
+  const profitAll = toNumber(profitAllRow?.total);
+  const profitBefore = toNumber(profitBeforeRow?.total);
+  const expenseAll = toNumber(expenseAllRow?.total);
+  const expenseBefore = toNumber(expenseBeforeRow?.total);
+
+  return {
+    current: profitAll - expenseAll,
+    previous: profitBefore - expenseBefore,
+  };
+};
+
 const fetchDashboardStats = async () => {
   const now = new Date();
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const rows = await db(summaryTableName)
-    .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]);
+  const [rows, availableProfit] = await Promise.all([
+    db(summaryTableName)
+      .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
+    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+  ]);
 
   const currentRow = rows.find((r) => r.month_key === currentMonthKey) || {};
   const previousRow = rows.find((r) => r.month_key === previousMonthKey) || {};
@@ -82,16 +123,24 @@ const fetchDashboardStats = async () => {
       current: taxFromRevenue(curr.total_revenue),
       previous: taxFromRevenue(prev.total_revenue),
     },
+    availableProfit,
   };
 };
 
 const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const { p0, p1 } = computePreviousRange(from, to);
-  const result = await db.raw(buildRangeCompareStatsQuery(), [
-    from,
-    to,
-    p0,
-    p1,
+  const currentMonthKey = `${new Date().getFullYear()}-${String(
+    new Date().getMonth() + 1
+  ).padStart(2, "0")}`;
+  const monthStartDate = `${currentMonthKey}-01`;
+  const [result, availableProfit] = await Promise.all([
+    db.raw(buildRangeCompareStatsQuery(), [
+      from,
+      to,
+      p0,
+      p1,
+    ]),
+    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
   ]);
   const row = (result.rows && result.rows[0]) || {};
 
@@ -119,6 +168,7 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
       current: taxFromRevenueValue(currRev),
       previous: taxFromRevenueValue(prevRev),
     },
+    availableProfit,
     range: { from, to, previousFrom: p0, previousTo: p1 },
   };
 };

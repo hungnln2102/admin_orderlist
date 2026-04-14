@@ -168,6 +168,7 @@ const PARTNER_SCHEMA = {
       SOURCE_ID: "supplier_id",
       ROUND: "payment_period",
       STATUS: "payment_status",
+      CONTENT: "payment_status",
       PAID: "amount_paid",
     },
   },

@@ -124,6 +124,7 @@ export const PAYMENT_SUPPLY_COLS = {
   sourceId: "supplier_id",
   round: "payment_period",
   status: "payment_status",
+  content: "payment_status",
   paid: "amount_paid",
 };
 

@@ -19,10 +19,17 @@ export const ExpenseBreakdownChart: React.FC<{
   walletColumns: WalletColumn[];
   walletRows: WalletRow[];
   currencyFormatter: Intl.NumberFormat;
-}> = ({ budgets, walletColumns, walletRows, currencyFormatter }) => {
+  availableProfit?: number;
+}> = ({
+  budgets,
+  walletColumns,
+  walletRows,
+  currencyFormatter,
+  availableProfit = 0,
+}) => {
   const latestWalletRow = walletRows?.[0];
 
-  const data = useMemo(() => {
+  const chartData = useMemo(() => {
     if (latestWalletRow) {
       const walletData = walletColumns
         .filter((col) => {
@@ -47,10 +54,11 @@ export const ExpenseBreakdownChart: React.FC<{
       .filter((item) => item.value > 0);
   }, [budgets, walletColumns, latestWalletRow]);
 
-  const total = useMemo(
-    () => data.reduce((sum, item) => sum + item.value, 0),
-    [data]
+  const chartTotal = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.value, 0),
+    [chartData]
   );
+  const displayTotal = chartTotal + Math.max(0, Number(availableProfit || 0));
 
   const renderTooltip = ({
     payload,
@@ -60,7 +68,7 @@ export const ExpenseBreakdownChart: React.FC<{
     if (!payload || payload.length === 0) return null;
     const item = payload[0];
     const value = Number(item?.value || 0);
-    const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+    const percent = chartTotal > 0 ? Math.round((value / chartTotal) * 100) : 0;
     return (
       <div className="rounded-lg border border-white/10 bg-slate-900/90 px-3 py-2 text-xs text-white shadow-lg">
         <div className="font-semibold">{item?.name}</div>
@@ -74,20 +82,20 @@ export const ExpenseBreakdownChart: React.FC<{
     <div className="relative h-72 w-full">
       <div className="absolute inset-0 rounded-2xl border border-white/20 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 shadow-inner shadow-slate-900/50" />
       <div className="relative z-10 flex h-full w-full items-center justify-center text-white/70">
-        {data.length === 0 ? (
+        {chartData.length === 0 ? (
           <div className="text-sm">Chưa có dữ liệu chi tiêu</div>
         ) : (
           <>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data}
+                  data={chartData}
                   dataKey="value"
                   nameKey="name"
                   innerRadius={75}
                   outerRadius={100}
                 >
-                  {data.map((entry, idx) => (
+                  {chartData.map((entry, idx) => (
                     <Cell
                       key={`${entry.name}-${idx}`}
                       fill={entry.color}
@@ -98,14 +106,14 @@ export const ExpenseBreakdownChart: React.FC<{
                 <Tooltip content={renderTooltip} />
               </PieChart>
             </ResponsiveContainer>
-            {total > 0 && (
+            {displayTotal > 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white">
                   <div className="text-xs uppercase tracking-wide text-white/80">
                     Tài sản
                   </div>
                   <div className="text-lg font-bold">
-                    {currencyFormatter.format(total)}
+                    {currencyFormatter.format(displayTotal)}
                   </div>
                 </div>
               </div>

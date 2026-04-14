@@ -199,7 +199,7 @@ const SupplyRow = ({
         <tr>
           <td colSpan={8} className="px-0 pb-4 pt-0 bg-indigo-950/30">
             <div className="p-4 border-b border-white/10 shadow-inner">
-              <PaymentHistoryTable supplyId={supply.id} onRefreshSupplies={onRefreshSupplies} />
+              <PaymentHistoryTable supplyId={supply.id} />
             </div>
           </td>
         </tr>

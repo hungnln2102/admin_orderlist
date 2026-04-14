@@ -25,6 +25,11 @@ const COLUMN_STAT_ICONS = [
   CubeIcon,
 ] as const;
 
+const calcChangePct = (curr: number, prev: number) => {
+  if (prev === 0) return curr > 0 ? 100 : 0;
+  return Number((((curr - prev) / prev) * 100).toFixed(1));
+};
+
 const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   budgets,
   savingGoals,
@@ -32,6 +37,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   walletColumns,
   walletRows,
   onRefetchGoals,
+  availableProfit,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [goalIdPendingDelete, setGoalIdPendingDelete] = useState<number | null>(null);
@@ -84,6 +90,21 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   }, [savingGoals, totals.totalTarget]);
 
   const columnStats = useWalletColumnStats(walletRows, walletColumns);
+  const displayColumnStats = useMemo(() => {
+    const availableCurrent = Number(availableProfit?.current || 0);
+    const availablePrevious = Number(availableProfit?.previous || 0);
+
+    const availableProfitStat = {
+      field: "__available_profit__",
+      name: "Lợi nhuận khả dụng",
+      assetCode: "VND",
+      current: availableCurrent,
+      previous: availablePrevious,
+      changePct: calcChangePct(availableCurrent, availablePrevious),
+    };
+
+    return [availableProfitStat, ...columnStats];
+  }, [availableProfit?.current, availableProfit?.previous, columnStats]);
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
@@ -104,10 +125,11 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
           walletColumns={walletColumns}
           walletRows={walletRows}
           currencyFormatter={currencyFormatter}
+          availableProfit={Number(availableProfit?.current || 0)}
         />
 
         <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">
-          {columnStats.map((stat, index) => {
+          {displayColumnStats.map((stat, index) => {
             const Icon = COLUMN_STAT_ICONS[index % COLUMN_STAT_ICONS.length];
             return (
               <WeeklyStatCard

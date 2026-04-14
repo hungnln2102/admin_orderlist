@@ -74,6 +74,16 @@ const FINANCE_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  STORE_PROFIT_EXPENSES: {
+    TABLE: "store_profit_expenses",
+    COLS: {
+      ID: "id",
+      AMOUNT: "amount",
+      REASON: "reason",
+      EXPENSE_TYPE: "expense_type",
+      CREATED_AT: "created_at",
+    },
+  },
 };
 
 module.exports = {

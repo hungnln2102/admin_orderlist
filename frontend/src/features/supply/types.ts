@@ -29,7 +29,8 @@ export interface Payment {
   round: string;
   totalImport: number;
   paid: number;
-  status: string;
+  content?: string;
+  status?: string;
 }
 
 export interface BankOption {

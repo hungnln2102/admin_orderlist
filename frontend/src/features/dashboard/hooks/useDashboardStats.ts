@@ -31,6 +31,7 @@ interface StatsApiResponse {
   totalRefund: { current: number; previous: number };
   monthlyProfit?: { current: number; previous: number };
   monthlyTax?: { current: number; previous: number };
+  availableProfit?: { current: number; previous: number };
 }
 
 const formatCurrency = Helpers.formatCurrency;
@@ -96,7 +97,7 @@ const buildStats = (stats: StatsApiResponse): OverviewStat[] => {
     accent: "amber",
   },
   {
-    ...calculateStat("Lợi nhuận", profitPair.current, profitPair.previous, true),
+    ...calculateStat("Lợi nhuận tháng", profitPair.current, profitPair.previous, true),
     icon: ArrowTrendingUpIcon,
     accent: "teal",
   },
@@ -127,6 +128,10 @@ export const useDashboardStats = () => {
   );
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [availableProfit, setAvailableProfit] = useState<{ current: number; previous: number }>({
+    current: 0,
+    previous: 0,
+  });
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -134,11 +139,16 @@ export const useDashboardStats = () => {
 
     try {
       const stats: StatsApiResponse = await fetchDashboardStats(dashboardRange);
-      setStatsData(buildStats(stats));
 
       const charts: ChartsApiResponse = dashboardRange
         ? await fetchChartDataRange(dashboardRange.from, dashboardRange.to)
         : await fetchChartData(selectedYear);
+      setStatsData(buildStats(stats));
+      setAvailableProfit({
+        current: Number(stats.availableProfit?.current || 0),
+        previous: Number(stats.availableProfit?.previous || 0),
+      });
+
       setRevenueChartData(charts.revenueData);
       setOrderChartData(charts.orderStatusData);
       setProfitChartData(charts.profitData);
@@ -234,5 +244,6 @@ export const useDashboardStats = () => {
     setDashboardRange,
     loading,
     errorMessage,
+    availableProfit,
   };
 };

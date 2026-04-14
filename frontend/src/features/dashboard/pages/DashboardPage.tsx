@@ -25,6 +25,7 @@ const Dashboard: React.FC = () => {
     setDashboardRange,
     loading,
     errorMessage,
+    availableProfit,
   } = useDashboardStats();
 
   const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
@@ -92,6 +93,7 @@ const Dashboard: React.FC = () => {
           walletError={walletError}
           onRefreshWallets={fetchWalletBalances}
           onRefetchGoals={refetchGoals}
+          availableProfit={availableProfit}
         />
       )}
     </div>

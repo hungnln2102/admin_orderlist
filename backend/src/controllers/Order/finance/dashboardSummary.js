@@ -1,45 +1,16 @@
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName, ORDERS_SCHEMA } = require("../../../config/dbSchema");
-const { STATUS, TABLES, COLS } = require("../constants");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
+const { STATUS, COLS } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const { quoteIdent } = require("../../../utils/sql");
 const {
-    isMavnImportOrder,
-    isGiftOrder,
     isDashboardSalesOrder,
-    isMavrykShopSupplierName,
 } = require("../../../utils/orderHelpers");
 
-const orderSupplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-
-/**
- * MAVT / MAVN: trừ lợi nhuận bằng cost khi NCC không phải Mavryk/Shop (chủ shop).
- */
-const externalSupplierCostHitForMavtOrMavn = async (trx, row) => {
-    if (!isGiftOrder(row) && !isMavnImportOrder(row)) return 0;
-    const cost = toNullableNumber(row?.cost ?? row?.[COLS.ORDER.COST]) || 0;
-    if (cost <= 0) return 0;
-    const supplyId = row?.[orderSupplyIdCol] ?? row?.supply_id ?? row?.id_supply;
-    if (supplyId == null || supplyId === "") return cost;
-    const sup = await trx(TABLES.supplier)
-        .select(COLS.SUPPLIER.SUPPLIER_NAME)
-        .where(COLS.SUPPLIER.ID, supplyId)
-        .first();
-    if (isMavrykShopSupplierName(sup?.[COLS.SUPPLIER.SUPPLIER_NAME])) return 0;
-    return cost;
-};
-
-/** MAVC/L/K/S: NCC Mavryk/Shop → lợi nhuận = giá bán; NCC khác → giá bán - cost. */
-const salesOrderProfitDeltaForDashboard = async (trx, row) => {
+/** MAVC/L/K/S: lợi nhuận = giá bán - cost. */
+const salesOrderProfitDeltaForDashboard = (row) => {
     if (!isDashboardSalesOrder(row)) return 0;
     const price = toNullableNumber(row?.price ?? row?.[COLS.ORDER.PRICE]) || 0;
     const cost = toNullableNumber(row?.cost ?? row?.[COLS.ORDER.COST]) || 0;
-    const supplyId = row?.[orderSupplyIdCol] ?? row?.supply_id ?? row?.id_supply;
-    if (supplyId == null || supplyId === "") return price - cost;
-    const sup = await trx(TABLES.supplier)
-        .select(COLS.SUPPLIER.SUPPLIER_NAME)
-        .where(COLS.SUPPLIER.ID, supplyId)
-        .first();
-    if (isMavrykShopSupplierName(sup?.[COLS.SUPPLIER.SUPPLIER_NAME])) return price;
     return price - cost;
 };
 
@@ -163,86 +134,45 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     const revenueUpdates = {};
     const refundUpdates = {};
 
-    // Order left the "counted" lifecycle → -1 order, -revenue, -profit (đơn thường)
-    // MAVN nhập hàng: không vào doanh thu / đếm đơn; khi đã PAID đã trừ profit = cost → hủy hoàn lại +cost
+    // Order left counted lifecycle → trừ theo rule dashboard chỉ cho MAVC/MAVL/MAVK/MAVS.
     if (isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
-        if (isMavnImportOrder(beforeRow)) {
-            if (prevStatus !== STATUS.PROCESSING) {
-                const addBack = await externalSupplierCostHitForMavtOrMavn(trx, beforeRow);
-                revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + addBack;
-            }
-        } else if (isGiftOrder(beforeRow)) {
-            const giftBack = await externalSupplierCostHitForMavtOrMavn(trx, beforeRow);
+        if (isDashboardSalesOrder(beforeRow)) {
             const price = toNullableNumber(beforeRow?.price) || 0;
-            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) - price;
-            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + giftBack;
-        } else if (isDashboardSalesOrder(beforeRow)) {
-            const price = toNullableNumber(beforeRow?.price) || 0;
-            const profit = await salesOrderProfitDeltaForDashboard(trx, beforeRow);
+            const profit = salesOrderProfitDeltaForDashboard(beforeRow);
             revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) - 1;
             revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) - price;
             revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - profit;
         }
     }
 
-    // Order left refund lifecycle → -1 canceled, -refund
-    if (isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
+    // Order left refund lifecycle → -1 canceled, -refund (chỉ MAVC/MAVL/MAVK/MAVS)
+    if (isDashboardSalesOrder(beforeRow) && isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(beforeRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) - 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
     }
 
-    // Vào vòng đời đếm doanh thu: Chưa TT → ĐXL, hoặc Chưa TT → Đã TT (thanh toán webhook)
+    // Vào vòng đời đếm doanh thu: Chưa TT → ĐXL, hoặc Chưa TT → Đã TT (chỉ MAVC/MAVL/MAVK/MAVS).
     if (
         !isOrderCounted(prevStatus) &&
-        !isMavnImportOrder(afterRow) &&
+        isDashboardSalesOrder(afterRow) &&
         (
             nextStatus === STATUS.PROCESSING ||
             (nextStatus === STATUS.PAID && prevStatus === STATUS.UNPAID)
         )
     ) {
-        if (isGiftOrder(afterRow)) {
-            const giftCost = await externalSupplierCostHitForMavtOrMavn(trx, afterRow);
-            const price = toNullableNumber(afterRow?.price) || 0;
-            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
-            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - giftCost;
-        } else if (isDashboardSalesOrder(afterRow)) {
-            const price = toNullableNumber(afterRow?.price) || 0;
-            const profit = await salesOrderProfitDeltaForDashboard(trx, afterRow);
-            revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
-            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
-            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
-        }
+        const price = toNullableNumber(afterRow?.price) || 0;
+        const profit = salesOrderProfitDeltaForDashboard(afterRow);
+        revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
+        revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
+        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
     }
 
-    // MAVN nhập hàng: Đang xử lý hoặc Chưa TT → Đã thanh toán — trừ lợi nhuận bằng giá nhập (cost), không động doanh thu
-    if (
-        nextStatus === STATUS.PAID &&
-        isMavnImportOrder(afterRow) &&
-        (prevStatus === STATUS.PROCESSING || prevStatus === STATUS.UNPAID)
-    ) {
-        const deduct = await externalSupplierCostHitForMavtOrMavn(trx, afterRow);
-        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - deduct;
-    }
-
-    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund
-    if (!isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
+    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund (chỉ MAVC/MAVL/MAVK/MAVS)
+    if (isDashboardSalesOrder(afterRow) && !isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
-    }
-
-    // MAVN nhập hàng: PAID/PROCESSING → CANCELED (không qua Chờ Hoàn) — vẫn ghi nhận hoàn theo cột refund
-    if (
-        !isRefundCounted(prevStatus) &&
-        nextStatus === STATUS.CANCELED &&
-        isMavnImportOrder(afterRow)
-    ) {
-        const refund = toNullableNumber(afterRow?.refund) || 0;
-        if (refund > 0) {
-            refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
-            refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
-        }
     }
 
     const revenueKey = orderMonthKey;

@@ -21,4 +21,5 @@ export interface BudgetsGoalsProps {
   walletColumns: WalletColumn[];
   walletRows: WalletRow[];
   onRefetchGoals?: () => void;
+  availableProfit?: { current: number; previous: number };
 }

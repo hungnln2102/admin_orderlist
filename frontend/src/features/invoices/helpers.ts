@@ -34,6 +34,14 @@ const extractSenderFromNote = (note?: string | null): string | null => {
 export const resolveSender = (receipt: PaymentReceipt): string =>
   extractSenderFromNote(receipt.note) || receipt.sender || "";
 
+export const extractTransactionCodeFromNote = (
+  note: string | null | undefined
+): string => {
+  if (!note) return "";
+  const match = String(note).match(/trace\D*([0-9]{3,})/i);
+  return match?.[1] || "";
+};
+
 export const determineReceiptCategory = (
   orderCode: string | null | undefined
 ): ReceiptCategory => {
@@ -118,6 +126,7 @@ export const buildExportWorksheet = (
     "Số tiền gốc",
     "Số tiền định dạng",
     "Nội dung chuyển khoản",
+    "Mã giao dịch",
     "Ngày thanh toán",
     "Nhóm",
   ];
@@ -130,6 +139,7 @@ export const buildExportWorksheet = (
     receipt.amount,
     formatCurrencyVnd(receipt.amount),
     receipt.note || "",
+    extractTransactionCodeFromNote(receipt.note),
     receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "",
     determineReceiptCategory(receipt.orderCode) === "receipt"
       ? "Biên nhận"
@@ -144,6 +154,7 @@ export const buildExportWorksheet = (
     { wch: 14 },
     { wch: 20 },
     { wch: 48 },
+    { wch: 16 },
     { wch: 14 },
     { wch: 12 },
   ];

@@ -35,6 +35,7 @@ const pricingTierRoutes = require("./pricingTierRoutes");
 const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
 const publicContentRoutes = require("./publicContentRoutes");
 const publicPricingRoutes = require("./publicPricingRoutes");
+const storeProfitExpensesRoutes = require("./storeProfitExpensesRoutes");
 
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
@@ -85,5 +86,6 @@ router.get("/run-scheduler", runSchedulerNow);
 router.get("/supply-insights", suppliesController.getSupplyInsights);
 router.use("/saving-goals", savingGoalsController);
 router.use("/pricing-tiers", pricingTierRoutes);
+router.use("/store-profit-expenses", storeProfitExpensesRoutes);
 
 module.exports = router;

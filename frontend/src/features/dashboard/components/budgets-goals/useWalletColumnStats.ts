@@ -6,6 +6,7 @@ export type WalletColumnStat = {
   name: string;
   assetCode?: string;
   current: number;
+  previous: number;
   changePct: number;
 };
 
@@ -33,6 +34,7 @@ export const useWalletColumnStats = (
         name: col.name || col.field,
         assetCode: col.assetCode,
         current,
+        previous,
         changePct: calcChange(current, previous),
       };
     });

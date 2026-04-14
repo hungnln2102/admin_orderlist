@@ -1,6 +1,7 @@
 import React from "react";
 import * as Helpers from "@/lib/helpers";
 import {
+  extractTransactionCodeFromNote,
   PaymentReceipt,
   QR_BANK_INFO,
   formatCurrencyVnd,
@@ -12,6 +13,7 @@ type ReceiptsTableProps = {
   expandedReceiptId: number | null;
   onToggle: (receiptId: number) => void;
   onSelectReceipt?: (receipt: PaymentReceipt) => void;
+  showOrderCode?: boolean;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
@@ -19,18 +21,25 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   expandedReceiptId,
   onToggle,
   onSelectReceipt,
+  showOrderCode = true,
 }) => {
+  const expandedColSpan = showOrderCode ? 7 : 6;
+  const expandedGridClass = showOrderCode
+    ? "grid grid-cols-1 md:grid-cols-5 gap-6"
+    : "grid grid-cols-1 md:grid-cols-4 gap-6";
+
   return (
     <div className="bg-transparent overflow-visible">
       <div className="overflow-x-auto">
         <table className="min-w-full border-separate border-spacing-y-4 text-white">
           <thead>
             <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
-              <th className="w-[120px]">MÃ ĐƠN</th>
+              {showOrderCode ? <th className="w-[120px]">MÃ ĐƠN</th> : null}
               <th className="w-[180px]">NGƯỜI GỬI</th>
               <th className="w-[180px]">NGƯỜI NHẬN</th>
               <th className="w-[140px]">SỐ TIỀN</th>
               <th>NỘI DUNG CHUYỂN KHOẢN</th>
+              <th className="w-[150px]">MÃ GIAO DỊCH</th>
               <th className="w-[150px] text-right pr-6">NGÀY THANH TOÁN</th>
             </tr>
           </thead>
@@ -46,11 +55,13 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                       onSelectReceipt ? onSelectReceipt(receipt) : undefined
                     }
                   >
-                    <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <span className="text-sm font-bold text-white tracking-wider uppercase">
-                        {receipt.orderCode || "—"}
-                      </span>
-                    </td>
+                    {showOrderCode ? (
+                      <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+                        <span className="text-sm font-bold text-white tracking-wider uppercase">
+                          {receipt.orderCode || "—"}
+                        </span>
+                      </td>
+                    ) : null}
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
                       <div className="text-sm font-bold text-white tracking-tight">
                         {resolveSender(receipt) || "—"}
@@ -71,6 +82,11 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                         {receipt.note || "—"}
                       </span>
                     </td>
+                    <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+                      <span className="text-sm font-bold text-indigo-100/90">
+                        {extractTransactionCodeFromNote(receipt.note) || "—"}
+                      </span>
+                    </td>
                     <td className="px-5 py-5 last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-right pr-6">
                       <span className="text-xs font-bold text-indigo-300/80 tracking-tighter">
                         {receipt.paidAt
@@ -81,15 +97,17 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                   </tr>
                   {isExpanded && (
                     <tr className="animate-in fade-in slide-in-from-top-2 duration-300 relative z-0">
-                      <td colSpan={6} className="px-6 pb-8 pt-2">
+                      <td colSpan={expandedColSpan} className="px-6 pb-8 pt-2">
                         <div className="rounded-[32px] glass-panel-light p-6 shadow-2xl border border-indigo-500/20">
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Mã đơn hàng</p>
-                              <p className="text-sm font-black text-white">
-                                {receipt.orderCode || "—"}
-                              </p>
-                            </div>
+                          <div className={expandedGridClass}>
+                            {showOrderCode ? (
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Mã đơn hàng</p>
+                                <p className="text-sm font-black text-white">
+                                  {receipt.orderCode || "—"}
+                                </p>
+                              </div>
+                            ) : null}
                             <div className="space-y-1">
                               <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Người gửi</p>
                               <p className="text-sm font-bold text-white">
@@ -100,6 +118,12 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                               <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Người nhận</p>
                               <p className="text-sm font-medium text-indigo-200/80">
                                 {QR_BANK_INFO.accountNumber}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Mã giao dịch</p>
+                              <p className="text-sm font-bold text-indigo-100/90">
+                                {extractTransactionCodeFromNote(receipt.note) || "—"}
                               </p>
                             </div>
                             <div className="space-y-1">

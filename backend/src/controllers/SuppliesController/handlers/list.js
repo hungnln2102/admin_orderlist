@@ -89,7 +89,7 @@ const listPaymentsBySupply = async (req, res) => {
       0::numeric AS import_value,
       ${createNumericExtraction(`pl.${ps.paid}`)} AS paid_value,
       COALESCE(pl.${ps.round}, '') AS round_label,
-      COALESCE(pl.${ps.status}, '') AS status_label
+      COALESCE(pl.${ps.status}, '') AS content_label
     FROM ${TABLES.paymentSupply} pl
     LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = pl.${ps.sourceId}
     WHERE pl.${ps.sourceId} = ?
@@ -109,7 +109,8 @@ const listPaymentsBySupply = async (req, res) => {
       totalImport: Number(row.import_value) || 0,
       paid: Number(row.paid_value) || 0,
       round: row.round_label || "",
-      status: row.status_label || "",
+      content: row.content_label || "",
+      status: row.content_label || "",
     }));
 
     res.json({

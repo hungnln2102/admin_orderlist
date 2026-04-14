@@ -246,6 +246,7 @@ export default function Invoices() {
           expandedReceiptId={expandedReceiptId}
           onToggle={toggleRowDetails}
           onSelectReceipt={handleSelectReceipt}
+          showOrderCode={categoryFilter !== "refund"}
         />
 
         {!loading && filteredReceipts.length === 0 && (

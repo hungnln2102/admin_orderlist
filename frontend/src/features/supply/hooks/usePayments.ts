@@ -19,6 +19,8 @@ interface PaymentInput {
 interface SupplyBankInfo {
   numberBank?: string | null;
   binBank?: string | null;
+  sourceName?: string | null;
+  nameBank?: string | null;
 }
 
 export const usePayments = ({
@@ -33,13 +35,29 @@ export const usePayments = ({
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [qrPayment, setQrPayment] = useState<QrPayment | null>(null);
 
-  const confirmPayment = async (paymentId: number, opts?: { paidAmount?: number }) => {
+  const confirmPayment = async (
+    paymentId: number,
+    opts?: { paidAmount?: number; paymentContent?: string; supplyId?: number }
+  ) => {
     setConfirmingId(paymentId);
     try {
       const paidAmount = opts?.paidAmount;
+      const paymentContent = typeof opts?.paymentContent === "string"
+        ? opts.paymentContent.trim()
+        : "";
+      const bodyPayload: Record<string, unknown> = {};
+      if (paidAmount != null && Number.isFinite(paidAmount) && paidAmount > 0) {
+        bodyPayload.paidAmount = Math.round(paidAmount);
+      }
+      if (paymentContent) {
+        bodyPayload.paymentContent = paymentContent;
+      }
+      if (opts?.supplyId != null && Number.isFinite(opts.supplyId) && opts.supplyId > 0) {
+        bodyPayload.supplyId = Math.round(opts.supplyId);
+      }
       const body =
-        paidAmount != null && Number.isFinite(paidAmount) && paidAmount > 0
-          ? JSON.stringify({ paidAmount: Math.round(paidAmount) })
+        Object.keys(bodyPayload).length > 0
+          ? JSON.stringify(bodyPayload)
           : undefined;
       const res = await apiFetch(`/api/payment-supply/${paymentId}/confirm`, {
         method: "POST",
@@ -65,13 +83,14 @@ export const usePayments = ({
     const diff = (payment.totalImport || 0) - (payment.paid || 0);
     const amount = Math.abs(diff);
     const isPositive = diff > 0;
-    const today = (() => {
+    const compactDate = (() => {
       const now = new Date();
       const day = String(now.getDate()).padStart(2, "0");
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const year = now.getFullYear();
-      return `${day}/${month}/${year}`;
+      return `${day}${month}${year}`;
     })();
+    const supplierName = String(supply?.sourceName || "").trim() || "NCC";
 
     const accountNumber = isPositive ? supply?.numberBank || "" : "9183400998";
     const bankCode = isPositive ? supply?.binBank || "" : "VPB"; // VietQR short code
@@ -81,7 +100,7 @@ export const usePayments = ({
       accountNumber,
       bankCode,
       amount,
-      description: payment.round || today,
+      description: `TT ${supplierName} kỳ ${compactDate}`,
       accountName,
     });
 

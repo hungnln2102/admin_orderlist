@@ -2,10 +2,8 @@ const { db } = require("../../src/db");
 const {
   FINANCE_SCHEMA,
   ORDERS_SCHEMA,
-  PARTNER_SCHEMA,
   SCHEMA_FINANCE,
   SCHEMA_ORDERS,
-  SCHEMA_SUPPLIER,
   tableName,
 } = require("../../src/config/dbSchema");
 const { STATUS } = require("../../src/utils/statuses");
@@ -15,13 +13,6 @@ const {
   quoteIdent,
 } = require("../../src/utils/sql");
 const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
-
-const mavnPrefixUpper = String(ORDER_PREFIXES.import || "MAVN")
-  .toUpperCase()
-  .replace(/'/g, "''");
-const giftPrefixUpper = String(ORDER_PREFIXES.gift || "MAVT")
-  .toUpperCase()
-  .replace(/'/g, "''");
 
 const salesPrefixEscList = [
   ORDER_PREFIXES.ctv,
@@ -35,8 +26,6 @@ const idOrderMatchesSalesSql = `(${salesPrefixEscList
   .join(" OR ")})`;
 
 const orderTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
-const supplierTable = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER);
-const supplierCols = PARTNER_SCHEMA.SUPPLIER.COLS;
 const summaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
   SCHEMA_FINANCE
@@ -68,7 +57,6 @@ const toSqlLiteral = (value) => `'${String(value).replace(/'/g, "''")}'`;
 
 const orderCountedSql = orderCountedStatuses.map(toSqlLiteral).join(", ");
 const refundCountedSql = refundCountedStatuses.map(toSqlLiteral).join(", ");
-const processingStatusSql = toSqlLiteral(STATUS.PROCESSING);
 
 const aggregateSql = `
   WITH normalized_orders AS (
@@ -79,11 +67,8 @@ const aggregateSql = `
       ${costExpr} AS cost_value,
       ${refundExpr} AS refund_value,
       TRIM(COALESCE(${o}.${quoteIdent(orderCols.STATUS)}::text, '')) AS status_value,
-      UPPER(TRIM(COALESCE(${o}.${quoteIdent(orderCols.ID_ORDER)}::text, ''))) AS id_order_upper,
-      LOWER(TRIM(COALESCE(sup.${quoteIdent(supplierCols.SUPPLIER_NAME)}::text, ''))) AS supplier_lower
+      UPPER(TRIM(COALESCE(${o}.${quoteIdent(orderCols.ID_ORDER)}::text, ''))) AS id_order_upper
     FROM ${orderTable} ${o}
-    LEFT JOIN ${supplierTable} sup
-      ON sup.${quoteIdent(supplierCols.ID)} = ${o}.${quoteIdent(orderCols.ID_SUPPLY)}
   ),
   monthly_orders AS (
     SELECT
@@ -92,22 +77,14 @@ const aggregateSql = `
       COALESCE(SUM(CASE WHEN ${idOrderMatchesSalesSql} THEN price_value ELSE 0 END), 0) AS total_revenue,
       COALESCE(SUM(
         CASE
-          WHEN id_order_upper LIKE '${mavnPrefixUpper}%' THEN
-            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN 0 ELSE -cost_value END
-          WHEN id_order_upper LIKE '${giftPrefixUpper}%' THEN
-            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN 0 ELSE -cost_value END
           WHEN ${idOrderMatchesSalesSql} THEN
-            CASE WHEN supplier_lower IN (${toSqlLiteral("mavryk")}, ${toSqlLiteral("shop")}) THEN price_value ELSE price_value - cost_value END
+            price_value - cost_value
           ELSE 0
         END
       ), 0) AS total_profit
     FROM normalized_orders
     WHERE order_date IS NOT NULL
       AND status_value IN (${orderCountedSql})
-      AND (
-        id_order_upper NOT LIKE '${mavnPrefixUpper}%'
-        OR status_value <> ${processingStatusSql}
-      )
     GROUP BY 1
   ),
   monthly_cancellations AS (

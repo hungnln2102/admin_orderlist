@@ -7,6 +7,15 @@ import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
 import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "@/components/modals/ViewOrderModal/constants";
 
+const formatCompactDate = (date = new Date()) => {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear());
+  return `${day}${month}${year}`;
+};
+const buildPaymentContent = (supplierName: string) =>
+  `TT ${supplierName || "NCC"} kỳ ${formatCompactDate()}`;
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -23,11 +32,23 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     onRefreshList,
   });
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
+  const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
 
   // Tính toán các giá trị từ overview (phải đặt trước useMemo)
   const supply = overview?.supply;
   const stats = overview?.stats;
   const unpaidPayments: any[] = overview?.unpaidPayments || [];
+  const logOrdersByMonth: Array<{
+    month: number;
+    orders: Array<{
+      orderListId: number;
+      idOrder: string;
+      importCost: number;
+      refundAmount: number;
+      nccPaymentStatus: string;
+      loggedAt: string;
+    }>;
+  }> = overview?.logOrdersByMonth || [];
   const selectedPayment = unpaidPayments.find((p) => p.id === selectedPaymentId) || unpaidPayments[0] || null;
 
   // useMemo phải được gọi trước conditional return
@@ -36,7 +57,8 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     if (!supply || !selectedPayment) return null;
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
-    const desc = selectedPayment.round || `PAY ${supply.id}`;
+    const supplierName = String(supply.sourceName || "").trim() || "NCC";
+    const desc = buildPaymentContent(supplierName);
     const isNegative = raw < 0;
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
@@ -67,8 +89,13 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   };
 
   const handleConfirmPayment = async (p: { id: number; totalImport?: number; import_value?: number; paid?: number }) => {
-    if (!p.id) return;
-    const result = await confirmPayment(p.id, { paidAmount: amountDueForPayment(p) });
+    if (p.id == null || !Number.isFinite(Number(p.id))) return;
+    const supplierName = String(supply?.sourceName || "").trim() || "NCC";
+    const result = await confirmPayment(p.id, {
+      paidAmount: amountDueForPayment(p),
+      paymentContent: buildPaymentContent(supplierName),
+      supplyId: supply?.id,
+    });
     if (!result.success) {
       setError(result.error || "Không thể thanh toán chu kỳ");
     }
@@ -76,6 +103,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
 
   const handleClose = () => {
     setSelectedPaymentId(null);
+    setExpandedMonth(null);
     onClose();
   };
 
@@ -83,7 +111,23 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   if (!isOpen || !supplyId) return null;
 
   const totalUnpaid = unpaidPayments.reduce((sum, p) => sum + Math.max(0, (p.totalImport || 0) - (p.paid || 0)), 0);
-  const monthlyOrders: Array<{ month: number; orders: number }> = stats?.monthlyOrders || [];
+  const monthlyLogOrders = logOrdersByMonth
+    .map((item) => ({
+      month: Number(item.month) || 0,
+      orders: Array.isArray(item.orders) ? item.orders.length : 0,
+    }))
+    .filter((item) => item.month > 0)
+    .sort((a, b) => a.month - b.month);
+  const logOrdersByMonthMap = new Map<number, Array<{
+    orderListId: number;
+    idOrder: string;
+    importCost: number;
+    refundAmount: number;
+    nccPaymentStatus: string;
+    loggedAt: string;
+  }>>(
+    logOrdersByMonth.map((item) => [item.month, item.orders || []])
+  );
   const statusLabel = supply?.isActive ? "Đang hoạt động" : "Tạm dừng";
   const statusClass = supply?.isActive ? "bg-emerald-500/20 text-emerald-200" : "bg-gray-500/20 text-gray-200";
   const bankNameResolved =
@@ -222,7 +266,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                               })()}
                             </div>
                             <button
-                              disabled={confirmingId === p.id || !p.id}
+                              disabled={confirmingId === p.id}
                               onClick={(e) => { e.stopPropagation(); void handleConfirmPayment(p); }}
                               className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60 font-semibold transition flex-shrink-0"
                             >
@@ -252,18 +296,45 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Đơn theo tháng</h3>
-                    <span className="text-xs text-white/60">{monthlyOrders.length} tháng</span>
+                    <span className="text-xs text-white/60">{monthlyLogOrders.length} tháng</span>
                   </div>
-                  {monthlyOrders.length === 0 ? (
-                    <p className="text-white/50 text-sm">Chưa có dữ liệu.</p>
+                  {monthlyLogOrders.length === 0 ? (
+                    <p className="text-white/50 text-sm">Chưa có dữ liệu đơn trong log.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scroll scroll-overlay">
-                      {monthlyOrders.map((m) => (
-                        <div key={m.month} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 border border-white/5">
-                          <span className="text-sm font-semibold">Tháng {m.month}</span>
-                          <span className="text-sm">{m.orders} đơn</span>
-                        </div>
-                      ))}
+                      {monthlyLogOrders.map((m) => {
+                        const monthLogOrders = logOrdersByMonthMap.get(m.month) || [];
+                        const isExpanded = expandedMonth === m.month;
+                        return (
+                          <div key={m.month} className="rounded-lg border border-white/5 bg-white/5">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedMonth((prev) => (prev === m.month ? null : m.month))}
+                              className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition"
+                            >
+                              <span className="text-sm font-semibold">Tháng {m.month}</span>
+                              <span className="text-sm">{m.orders} đơn</span>
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-white/5 px-3 py-2 space-y-1.5 bg-black/10">
+                                {monthLogOrders.length === 0 ? (
+                                  <p className="text-xs text-white/50">Chưa có đơn log trong tháng này.</p>
+                                ) : (
+                                  monthLogOrders.map((order) => (
+                                    <div key={`${m.month}-${order.orderListId}-${order.idOrder}`} className="rounded-md border border-white/10 px-2 py-1.5">
+                                      <p className="text-xs font-semibold text-white/90 truncate">{order.idOrder || `#${order.orderListId}`}</p>
+                                      <p className="text-[11px] text-white/60 truncate">{order.nccPaymentStatus || "—"}</p>
+                                      <p className="text-[11px] text-emerald-300 mt-0.5">
+                                        Chi phí: {Helpers.formatCurrency(order.importCost)}
+                                      </p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
