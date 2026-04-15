@@ -30,11 +30,23 @@ const safeStringify = (data) => {
   }
 };
 
+const ORDER_CODE_REGEX_GLOBAL = /\bMAV[A-Z0-9]{3,20}\b/gi;
+const ORDER_CODE_REGEX_STRICT = /^MAV[A-Z0-9]{3,20}$/i;
+
+const normalizeOrderCode = (value) => {
+  const text = String(value || "").trim().toUpperCase();
+  if (!text) return "";
+  return ORDER_CODE_REGEX_STRICT.test(text) ? text : "";
+};
+
 const extractOrderCodeFromText = (...fields) => {
   for (const field of fields) {
     if (!field) continue;
-    const match = String(field).match(/MAV\w+/i);
-    if (match) return match[0].toUpperCase();
+    const match = String(field).match(ORDER_CODE_REGEX_GLOBAL);
+    if (match && match[0]) {
+      const normalized = normalizeOrderCode(match[0]);
+      if (normalized) return normalized;
+    }
   }
   return "";
 };
@@ -42,8 +54,24 @@ const extractOrderCodeFromText = (...fields) => {
 const extractSenderFromContent = (text) => {
   if (!text) return "";
   const str = String(text);
-  const match = str.match(/NHAN\s+TU\s+([A-Za-z0-9]+)/i);
-  if (match && match[1]) return match[1].trim();
+  // Ưu tiên lấy đoạn sau "NHAN TU" tới trước "TRACE"/"ND"/kết chuỗi.
+  const match = str.match(
+    /NHAN\s+TU\s+(.+?)(?=\s+TRACE\b|\s+ND\b|$)/i
+  );
+  if (match && match[1]) {
+    return match[1].replace(/\s+/g, " ").trim();
+  }
+  // Fallback cũ cho chuỗi đơn giản.
+  const fallback = str.match(/NHAN\s+TU\s+([A-Za-z0-9]+)/i);
+  if (fallback && fallback[1]) return fallback[1].trim();
+  return "";
+};
+
+const extractReferenceCodeFromText = (text) => {
+  if (!text) return "";
+  const str = String(text);
+  const match = str.match(/\bTRACE\s*([A-Za-z0-9-]{4,})\b/i);
+  if (match && match[1]) return match[1].trim().toUpperCase();
   return "";
 };
 
@@ -245,29 +273,36 @@ const calcGiaBan = ({
  */
 const extractOrderCodes = (transaction) => {
   const fields = [
+    transaction?.code,
     transaction?.transaction_content,
     transaction?.note,
     transaction?.description,
   ];
   const codes = new Set();
-  const orderCodePattern = /MAV\w{3,}/gi;
   for (const text of fields) {
     if (!text) continue;
     const str = String(text).trim();
     // Tách theo "-" để lấy từng mã đơn
     const parts = str.split("-").map((p) => p.trim()).filter(Boolean);
     for (const part of parts) {
-      const matches = part.match(orderCodePattern);
+      const matches = part.match(ORDER_CODE_REGEX_GLOBAL);
       if (matches) {
-        matches.forEach((m) => codes.add(m.toUpperCase()));
-      } else if (/^MAV\w{3,}$/i.test(part)) {
-        codes.add(part.toUpperCase());
+        matches.forEach((m) => {
+          const normalized = normalizeOrderCode(m);
+          if (normalized) codes.add(normalized);
+        });
+      } else {
+        const normalizedPart = normalizeOrderCode(part);
+        if (normalizedPart) codes.add(normalizedPart);
       }
     }
     // Fallback: tìm tất cả MAVxxx trong cả chuỗi
-    const globalMatches = str.match(orderCodePattern);
+    const globalMatches = str.match(ORDER_CODE_REGEX_GLOBAL);
     if (globalMatches) {
-      globalMatches.forEach((m) => codes.add(m.toUpperCase()));
+      globalMatches.forEach((m) => {
+        const normalized = normalizeOrderCode(m);
+        if (normalized) codes.add(normalized);
+      });
     }
   }
   return Array.from(codes);
@@ -278,8 +313,7 @@ const deriveOrderCode = (transaction) => {
   if (codes.length > 0) return codes[0];
   // Fallback: chỉ chấp nhận nếu có prefix MAV
   const [fromSplit] = splitTransactionContent(transaction?.transaction_content);
-  const candidate = (fromSplit || "").trim().toUpperCase();
-  return /^MAV\w{3,}$/i.test(candidate) ? candidate : "";
+  return normalizeOrderCode(fromSplit);
 };
 
 /**
@@ -450,8 +484,10 @@ const fetchMaxSupplyPrice = async (client, identifiers) => {
 module.exports = {
   stripAccents,
   safeStringify,
+  normalizeOrderCode,
   extractOrderCodeFromText,
   extractSenderFromContent,
+  extractReferenceCodeFromText,
   splitTransactionContent,
   parsePaidDate,
   normalizeAmount,

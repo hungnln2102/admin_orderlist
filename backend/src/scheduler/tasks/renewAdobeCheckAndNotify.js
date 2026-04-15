@@ -17,6 +17,7 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
+const { runCheckAllAccountsFlow } = require("../../controllers/RenewAdobeController/autoAssign");
 const { sendAdobeZeroDaysNotification } = require("../../services/telegramOrderNotification");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { purgeAndDeleteNoLicenseAdobeAdminAccount } = require("../../services/renewAdobePurgeNoLicenseAccount");
@@ -162,97 +163,19 @@ async function buildEmailToOrderMap(emails) {
 
 function createRenewAdobeCheckAndNotifyTask() {
   return async function renewAdobeCheckAndNotifyTask(trigger = "cron") {
-    logger.info("[CRON] Bắt đầu job check tài khoản Renew Adobe và thông báo hết gói", { trigger });
-
-    // Bước 0: Đồng bộ đơn hàng mới/hết hạn vào mapping table
-    try {
-      const syncResult = await syncOrdersToMapping();
-      logger.info("[CRON] Sync mapping xong", syncResult);
-    } catch (err) {
-      logger.warn("[CRON] syncOrdersToMapping thất bại (tiếp tục job)", { error: err.message });
-    }
-    const rows = await db(TABLE)
-      .select(COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.IS_ACTIVE)
-      .whereNotNull(COLS.EMAIL)
-      .whereNotNull(COLS.PASSWORD_ENC);
-
-    const activeIds = rows
-      .filter((r) => r[COLS.IS_ACTIVE] !== false && r[COLS.IS_ACTIVE] !== 0)
-      .map((r) => r[COLS.ID]);
-
-    if (activeIds.length === 0) {
-      logger.info("[CRON] Không có tài khoản active để check.");
-      return;
-    }
-
-    // Track id của những account check thành công (DB đã được cập nhật)
-    const checkedIds = [];
-    for (const id of activeIds) {
-      try {
-        await runCheckForAccountId(id);
-        checkedIds.push(id);
-      } catch (err) {
-        logger.warn("[CRON] Check account Adobe thất bại (bỏ qua)", { id, error: err.message });
-      }
-      await new Promise((r) => setTimeout(r, 4000));
-    }
-
-    if (checkedIds.length === 0) {
-      logger.info("[CRON] Tất cả tài khoản đều check thất bại, không gửi thông báo.");
-      return;
-    }
-
-    // Tìm tài khoản hết hạn (status ≠ "Paid") trong số đã check thành công
-    const selectCols = [
-      COLS.ID, COLS.EMAIL, COLS.PASSWORD_ENC, COLS.ORG_NAME,
-      COLS.USERS_SNAPSHOT, COLS.LICENSE_STATUS, COLS.USER_COUNT,
-    ];
-    if (COLS.MAIL_BACKUP_ID) selectCols.push(COLS.MAIL_BACKUP_ID);
-    if (COLS.OTP_SOURCE) selectCols.push(COLS.OTP_SOURCE);
-    if (COLS.ALERT_CONFIG) selectCols.push(COLS.ALERT_CONFIG);
-
-    const expiredAccounts = await db(TABLE)
-      .select(selectCols)
-      .whereIn(COLS.ID, checkedIds)
-      .whereNot(COLS.LICENSE_STATUS, "Paid");
-
-    logger.info("[CRON] Kết quả sau check:", {
-      total_checked: checkedIds.length,
-      expired_count: expiredAccounts.length,
-      statuses: expiredAccounts.map((r) => ({ id: r[COLS.ID], status: r[COLS.LICENSE_STATUS] })),
+    logger.info("[CRON] Bắt đầu job check all tài khoản Renew Adobe", { trigger });
+    const result = await runCheckAllAccountsFlow({
+      runCheckForAccountId,
+      includeAutoAssign: true,
+      logPrefix: "[CRON][check-all]",
     });
-
-    // Bước 1: Xóa user trên Adobe + mapping + bản ghi accounts_admin (hết gói)
-    const allEmailsToReassign = [];
-    for (const account of expiredAccounts) {
-      const { emailsForReassign } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
-        account,
-        { logPrefix: "[CRON]" }
-      );
-      allEmailsToReassign.push(...emailsForReassign);
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-
-    // Bước 2: Reassign user sang tài khoản còn gói
-    if (allEmailsToReassign.length > 0) {
-      await reassignUsersToAvailableAccounts(allEmailsToReassign);
-    }
-
-    // Bước 3: Gửi Telegram thông báo (dữ liệu từ snapshot trước khi xóa DB)
-    const toNotify = expiredAccounts
-      .filter((r) => (r[COLS.EMAIL] || "").toString().trim())
-      .map((r) => ({
-        email: (r[COLS.EMAIL] || "").toString().trim(),
-        org_name: (r[COLS.ORG_NAME] || "").toString().trim() || "—",
-        users_snapshot: r[COLS.USERS_SNAPSHOT],
-      }));
-
-    if (toNotify.length > 0) {
-      logger.info("[CRON] Gửi Telegram thông báo hết gói", { count: toNotify.length });
-      await sendAdobeZeroDaysNotification(toNotify);
-    } else {
-      logger.info("[CRON] Không có tài khoản Adobe hết gói cần thông báo.");
-    }
+    logger.info("[CRON] Kết thúc job check all tài khoản Renew Adobe", {
+      trigger,
+      total: result.total,
+      completed: result.completed,
+      failed: result.failed,
+      autoAssign: result.autoAssign,
+    });
   };
 }
 

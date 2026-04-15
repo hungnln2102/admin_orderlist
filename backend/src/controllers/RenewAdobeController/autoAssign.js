@@ -277,6 +277,144 @@ const adobeQueueStatus = (_req, res) => {
   });
 };
 
+async function runCheckAllAccountsFlow({
+  runCheckForAccountId,
+  onEvent = null,
+  shouldAbort = () => false,
+  includeAutoAssign = true,
+  logPrefix = "[renew-adobe][check-all]",
+}) {
+  const emit = (data) => {
+    if (typeof onEvent === "function") {
+      onEvent(data);
+    }
+  };
+
+  const rows = await db(TABLE)
+    .select(COLS.ID, COLS.EMAIL)
+    .where(COLS.IS_ACTIVE, true)
+    .orderBy(COLS.ID, "asc");
+
+  const total = rows.length;
+  if (total === 0) {
+    emit({ type: "complete", total: 0, completed: 0, failed: 0 });
+    return {
+      total: 0,
+      completed: 0,
+      failed: 0,
+      autoAssign: null,
+    };
+  }
+
+  emit({ type: "start", total });
+
+  let completed = 0;
+  let failed = 0;
+  let index = 0;
+  const queue = [...rows];
+
+  await new Promise((resolve) => {
+    const running = new Set();
+
+    function next() {
+      if (shouldAbort()) {
+        resolve();
+        return;
+      }
+
+      while (running.size < MAX_CHECK_ALL_CONCURRENT && index < queue.length) {
+        const account = queue[index++];
+        const id = account[COLS.ID];
+        const email = account[COLS.EMAIL];
+
+        emit({ type: "checking", id, email, completed, failed, total });
+
+        const task = (async () => {
+          try {
+            await runCheckForAccountId(id);
+            completed++;
+            let updated = await db(TABLE).where(COLS.ID, id).first();
+            let removedFromDb = false;
+            if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
+              const { deletedFromDb } =
+                await purgeAndDeleteNoLicenseAdobeAdminAccount(updated, {
+                  logPrefix,
+                });
+              if (deletedFromDb) {
+                removedFromDb = true;
+                updated = null;
+              }
+            }
+            emit({
+              type: "done",
+              id,
+              email,
+              completed,
+              failed,
+              total,
+              removed_from_db: removedFromDb,
+              org_name: updated?.[COLS.ORG_NAME] ?? null,
+              user_count: updated?.[COLS.USER_COUNT] ?? 0,
+              license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",
+            });
+          } catch (err) {
+            completed++;
+            failed++;
+            emit({
+              type: "error",
+              id,
+              email,
+              error: err.message,
+              completed,
+              failed,
+              total,
+            });
+          }
+        })().then(() => {
+          running.delete(task);
+          if (running.size === 0 && index >= queue.length) {
+            resolve();
+          } else {
+            next();
+          }
+        });
+
+        running.add(task);
+      }
+
+      if (running.size === 0 && index >= queue.length) {
+        resolve();
+      }
+    }
+
+    next();
+  });
+
+  emit({ type: "complete", total, completed, failed });
+
+  let autoAssign = null;
+  if (!shouldAbort() && includeAutoAssign) {
+    emit({ type: "auto_assign_start" });
+    try {
+      autoAssign = await autoAssignUsers({
+        onProgress: (message) => {
+          emit({ type: "auto_assign_progress", ...message });
+        },
+      });
+      emit({ type: "auto_assign_done", ...autoAssign });
+    } catch (assignError) {
+      emit({ type: "auto_assign_error", error: assignError.message });
+    }
+  }
+
+  return {
+    total,
+    completed,
+    failed,
+    autoAssign,
+  };
+}
+
 const checkAllAccounts = async ({
   req,
   res,
@@ -302,116 +440,13 @@ const checkAllAccounts = async ({
   };
 
   try {
-    const rows = await db(TABLE)
-      .select(COLS.ID, COLS.EMAIL)
-      .where(COLS.IS_ACTIVE, true)
-      .orderBy(COLS.ID, "asc");
-
-    const total = rows.length;
-    if (total === 0) {
-      sendEvent({ type: "complete", total: 0, completed: 0, failed: 0 });
-      return res.end();
-    }
-
-    sendEvent({ type: "start", total });
-
-    let completed = 0;
-    let failed = 0;
-    let index = 0;
-    const queue = [...rows];
-
-    await new Promise((resolve) => {
-      const running = new Set();
-
-      function next() {
-        if (aborted) {
-          resolve();
-          return;
-        }
-
-        while (running.size < MAX_CHECK_ALL_CONCURRENT && index < queue.length) {
-          const account = queue[index++];
-          const id = account[COLS.ID];
-          const email = account[COLS.EMAIL];
-
-          sendEvent({ type: "checking", id, email, completed, failed, total });
-
-          const task = (async () => {
-            try {
-              await runCheckForAccountId(id);
-              completed++;
-              let updated = await db(TABLE).where(COLS.ID, id).first();
-              let removedFromDb = false;
-              if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
-                const { deletedFromDb } =
-                  await purgeAndDeleteNoLicenseAdobeAdminAccount(updated, {
-                    logPrefix: "[renew-adobe][check-all]",
-                  });
-                if (deletedFromDb) {
-                  removedFromDb = true;
-                  updated = null;
-                }
-              }
-              sendEvent({
-                type: "done",
-                id,
-                email,
-                completed,
-                failed,
-                total,
-                removed_from_db: removedFromDb,
-                org_name: updated?.[COLS.ORG_NAME] ?? null,
-                user_count: updated?.[COLS.USER_COUNT] ?? 0,
-                license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",
-              });
-            } catch (err) {
-              completed++;
-              failed++;
-              sendEvent({
-                type: "error",
-                id,
-                email,
-                error: err.message,
-                completed,
-                failed,
-                total,
-              });
-            }
-          })().then(() => {
-            running.delete(task);
-            if (running.size === 0 && index >= queue.length) {
-              resolve();
-            } else {
-              next();
-            }
-          });
-
-          running.add(task);
-        }
-
-        if (running.size === 0 && index >= queue.length) {
-          resolve();
-        }
-      }
-
-      next();
+    await runCheckAllAccountsFlow({
+      runCheckForAccountId,
+      onEvent: sendEvent,
+      shouldAbort: () => aborted,
+      includeAutoAssign: true,
+      logPrefix: "[renew-adobe][check-all]",
     });
-
-    sendEvent({ type: "complete", total, completed, failed });
-
-    if (!aborted) {
-      sendEvent({ type: "auto_assign_start" });
-      try {
-        const assignResult = await autoAssignUsers({
-          onProgress: (message) => {
-            sendEvent({ type: "auto_assign_progress", ...message });
-          },
-        });
-        sendEvent({ type: "auto_assign_done", ...assignResult });
-      } catch (assignError) {
-        sendEvent({ type: "auto_assign_error", error: assignError.message });
-      }
-    }
   } catch (err) {
     logger.error("[renew-adobe] Check all failed", { error: err.message });
     sendEvent({ type: "fatal", error: err.message });
@@ -423,6 +458,7 @@ const checkAllAccounts = async ({
 module.exports = {
   adobeQueueStatus,
   checkAllAccounts,
+  runCheckAllAccountsFlow,
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,

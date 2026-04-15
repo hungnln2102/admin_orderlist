@@ -1,42 +1,86 @@
 const { deriveOrderCode } = require("./utils");
 
-const normalizeTransactionPayload = (payload) => {
-  if (!payload) return null;
-  if (payload.transaction && typeof payload.transaction === "object") {
-    return payload.transaction;
+const pickFirst = (source, keys = []) => {
+  for (const key of keys) {
+    if (!key) continue;
+    const value = source?.[key];
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
   }
+  return null;
+};
 
+const normalizeTransactionLikePayload = (raw = {}) => {
   const transaction_content =
-    payload.content ||
-    payload.description ||
-    payload.note ||
-    payload.transaction_content ||
-    "";
-  const transaction_date =
-    payload.transactionDate ||
-    payload.transaction_date ||
-    payload.transferTime ||
-    payload.time;
-  const amount_in =
-    payload.amount_in ||
-    payload.transferAmount ||
-    payload.amountIn ||
-    payload.amount ||
-    0;
+    pickFirst(raw, [
+      "content",
+      "transaction_content",
+      "note",
+      "description",
+    ]) || "";
 
-  if (!transaction_content && !transaction_date && !amount_in) return null;
+  const transaction_date = pickFirst(raw, [
+    "transactionDate",
+    "transaction_date",
+    "transferTime",
+    "time",
+  ]);
+
+  const amount_in = pickFirst(raw, [
+    "amount_in",
+    "transferAmount",
+    "amountIn",
+    "amount",
+  ]) || 0;
 
   return {
     transaction_content,
     transaction_date,
     amount_in,
-    note: payload.note || payload.description || payload.content || "",
-    description: payload.description || "",
-    account_number: payload.accountNumber || payload.account_number || "",
-    transfer_amount: payload.transferAmount || payload.amount || payload.amount_in,
-    transaction_date_raw:
-      payload.transactionDate || payload.transaction_date || payload.transferTime || payload.time,
+    code: pickFirst(raw, ["code", "paymentCode"]),
+    transaction_id: pickFirst(raw, ["id", "transaction_id", "transactionId"]),
+    reference_code: pickFirst(raw, [
+      "referenceCode",
+      "reference_code",
+      "referenceNumber",
+      "reference_number",
+    ]),
+    transfer_type: pickFirst(raw, ["transferType", "transfer_type"]),
+    gateway: pickFirst(raw, ["gateway"]),
+    note:
+      pickFirst(raw, ["note", "description", "content", "transaction_content"]) || "",
+    description: pickFirst(raw, ["description"]) || "",
+    account_number: pickFirst(raw, ["accountNumber", "account_number"]) || "",
+    transfer_amount:
+      pickFirst(raw, ["transferAmount", "amount", "amount_in", "amountIn"]) || 0,
+    transaction_date_raw: pickFirst(raw, [
+      "transactionDate",
+      "transaction_date",
+      "transferTime",
+      "time",
+    ]),
   };
+};
+
+const normalizeTransactionPayload = (payload) => {
+  if (!payload) return null;
+
+  const source =
+    payload.transaction && typeof payload.transaction === "object"
+      ? payload.transaction
+      : payload;
+  const normalized = normalizeTransactionLikePayload(source);
+
+  if (
+    !normalized.transaction_content &&
+    !normalized.transaction_date &&
+    !normalized.amount_in
+  ) {
+    return null;
+  }
+
+  return normalized;
 };
 
 module.exports = {

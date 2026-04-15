@@ -18,6 +18,8 @@ const {
 } = require("../auth");
 const {
   insertPaymentReceipt,
+  getReceiptFinancialState,
+  updateReceiptFinancialState,
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
 } = require("../payments");
@@ -99,6 +101,61 @@ const incrementDashboardSummaryOnProcessing = async (client, orderState, orderCo
     `,
     [monthKey, 1, price, profit]
   );
+};
+
+const incrementDashboardSummaryByDelta = async (
+  client,
+  monthKey,
+  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0 } = {}
+) => {
+  const revenue = normalizeMoney(revenueDelta);
+  const profit = normalizeMoney(profitDelta);
+  const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
+  if (!monthKey) return;
+  if (!revenue && !profit && !orders) return;
+
+  await client.query(
+    `
+      INSERT INTO ${summaryTable} (
+        ${summaryCols.MONTH_KEY},
+        ${summaryCols.TOTAL_ORDERS},
+        ${summaryCols.TOTAL_REVENUE},
+        ${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.UPDATED_AT}
+      )
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (${summaryCols.MONTH_KEY})
+      DO UPDATE SET
+        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
+        ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
+        ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.UPDATED_AT} = NOW()
+    `,
+    [monthKey, orders, revenue, profit]
+  );
+};
+
+const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orderDateRaw) => {
+  if (!orderCode) return false;
+  const currentId = Number(currentReceiptId);
+  const parsedOrderDate = parseFlexibleDate(orderDateRaw);
+  const fromDate = parsedOrderDate
+    ? parsedOrderDate.toISOString().slice(0, 10)
+    : "1900-01-01";
+
+  const res = await client.query(
+    `
+      SELECT 1
+      FROM orders.payment_receipt pr
+      WHERE LOWER(COALESCE(pr.id_order::text, '')) = LOWER($1)
+        AND pr.payment_date >= $2::date
+        AND ($3::bigint IS NULL OR pr.id <> $3::bigint)
+      ORDER BY pr.id DESC
+      LIMIT 1
+    `,
+    [orderCode, fromDate, Number.isFinite(currentId) ? currentId : null]
+  );
+  return res.rows.length > 0;
 };
 
 // Health check for webhook endpoint
@@ -216,6 +273,12 @@ router.post("/", async (req, res) => {
       // Dùng mã đơn đã resolve (fallback hoặc extract) thay vì orderCode gốc
       const resolvedOrderCode = orderCodes[0] || orderCode;
       receiptResult = await insertPaymentReceipt(transaction, { client, orderCode: resolvedOrderCode });
+      const receiptId = receiptResult?.id ?? receiptResult?.existingId ?? null;
+      const receiptState = await getReceiptFinancialState(client, receiptId);
+      const alreadyFinancialPosted = !!receiptState?.is_financial_posted;
+      const paidMonthKey = toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
+      let postedRevenueDelta = 0;
+      let postedProfitDelta = 0;
 
       if (receiptResult?.inserted) {
         const referenceImport =
@@ -302,13 +365,82 @@ router.post("/", async (req, res) => {
             );
             if (statusUpdateResult.rowCount > 0) {
               await incrementDashboardSummaryOnProcessing(client, state, code);
+              if (!alreadyFinancialPosted) {
+                postedRevenueDelta += normalizeMoney(state[ORDER_COLS.price]);
+                postedProfitDelta += normalizeMoney(state[ORDER_COLS.price]) - normalizeMoney(state[ORDER_COLS.cost]);
+              }
             }
             logger.debug("[Webhook] Order status → Đã Thanh Toán", {
               orderCode: code,
               previousStatus: statusValue,
               nextStatus,
             });
+          } else if (
+            !alreadyFinancialPosted &&
+            (statusValue === ORDER_STATUS.PAID || statusValue === ORDER_STATUS.PROCESSING)
+          ) {
+            const hasPrior = await hasPriorReceiptForOrder(
+              client,
+              code,
+              receiptId,
+              state[ORDER_COLS.orderDate]
+            );
+            if (hasPrior) {
+              await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+                revenueDelta: transferAmountNormalized,
+                profitDelta: transferAmountNormalized,
+                ordersDelta: 0,
+              });
+              postedRevenueDelta += transferAmountNormalized;
+              postedProfitDelta += transferAmountNormalized;
+            } else {
+              logger.info("[Webhook] Skip financial posting for first late payment after shop pre-renewed", {
+                orderCode: code,
+                status: statusValue,
+              });
+            }
+          } else if (
+            !alreadyFinancialPosted &&
+            statusValue === ORDER_STATUS.EXPIRED
+          ) {
+            await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+              revenueDelta: transferAmountNormalized,
+              profitDelta: transferAmountNormalized,
+              ordersDelta: 0,
+            });
+            postedRevenueDelta += transferAmountNormalized;
+            postedProfitDelta += transferAmountNormalized;
           }
+        }
+      }
+
+      if (
+        !alreadyFinancialPosted &&
+        (!orderCodes.length && !orderCode) &&
+        transferAmountNormalized > 0
+      ) {
+        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+          revenueDelta: transferAmountNormalized,
+          profitDelta: transferAmountNormalized,
+          ordersDelta: 0,
+        });
+        postedRevenueDelta += transferAmountNormalized;
+        postedProfitDelta += transferAmountNormalized;
+      }
+
+      if (receiptId) {
+        if (!alreadyFinancialPosted && (postedRevenueDelta !== 0 || postedProfitDelta !== 0)) {
+          await updateReceiptFinancialState(client, receiptId, {
+            is_financial_posted: true,
+            posted_revenue: postedRevenueDelta,
+            posted_profit: postedProfitDelta,
+          });
+        } else if (!alreadyFinancialPosted) {
+          await updateReceiptFinancialState(client, receiptId, {
+            is_financial_posted: false,
+            posted_revenue: 0,
+            posted_profit: 0,
+          });
         }
       }
 

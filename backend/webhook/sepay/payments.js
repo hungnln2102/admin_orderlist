@@ -16,7 +16,9 @@ const {
   normalizeAmount,
   parsePaidDate,
   extractOrderCodeFromText,
+  normalizeOrderCode,
   extractSenderFromContent,
+  extractReferenceCodeFromText,
   safeIdent,
   normalizeMoney,
   normalizeImportValue,
@@ -29,10 +31,23 @@ const {
 const { withSavepoint } = require("./savepoint");
 
 let paymentReceiptOrderColCache = null;
+let paymentReceiptColumnsCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
   ? PAYMENT_RECEIPT_TABLE.split(".")[0]
   : process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
+const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
+const RECEIPT_STATE_COLS = {
+  ID: "id",
+  PAYMENT_RECEIPT_ID: "payment_receipt_id",
+  IS_FINANCIAL_POSTED: "is_financial_posted",
+  POSTED_REVENUE: "posted_revenue",
+  POSTED_PROFIT: "posted_profit",
+  RECONCILED_AT: "reconciled_at",
+  ADJUSTMENT_APPLIED: "adjustment_applied",
+  CREATED_AT: "created_at",
+  UPDATED_AT: "updated_at",
+};
 
 const getPaymentReceiptOrderColumn = async () => {
   if (paymentReceiptOrderColCache) return paymentReceiptOrderColCache;
@@ -75,7 +90,46 @@ const normalizeKeyText = (value) =>
     .replace(/\s+/g, " ")
     .toLowerCase();
 
+const normalizeOptionalText = (value) => {
+  const text = String(value ?? "").trim();
+  return text || "";
+};
+
+const normalizeSepayTransactionId = (value) => {
+  if (value == null || value === "") return "";
+  const numeric = Number.parseInt(String(value), 10);
+  if (Number.isFinite(numeric) && numeric > 0) return String(numeric);
+  return "";
+};
+
+const getPaymentReceiptColumns = async () => {
+  if (paymentReceiptColumnsCache) return paymentReceiptColumnsCache;
+  try {
+    const res = await pool.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2
+      `,
+      [PAYMENT_RECEIPT_SCHEMA, PAYMENT_RECEIPT_BASE_TABLE]
+    );
+    paymentReceiptColumnsCache = new Set(
+      res.rows.map((r) => String(r.column_name || "").toLowerCase())
+    );
+  } catch (err) {
+    logger.error("Failed to resolve payment_receipt columns", {
+      error: err?.message,
+      stack: err?.stack,
+    });
+    paymentReceiptColumnsCache = new Set();
+  }
+  return paymentReceiptColumnsCache;
+};
+
 const buildReceiptIdempotencyKey = ({
+  sepayTransactionId,
+  referenceCode,
+  transferType,
   orderCode,
   paidDate,
   amount,
@@ -84,6 +138,9 @@ const buildReceiptIdempotencyKey = ({
   noteValue,
 }) =>
   [
+    normalizeKeyText(sepayTransactionId),
+    normalizeKeyText(referenceCode),
+    normalizeKeyText(transferType),
     normalizeKeyText(orderCode),
     normalizeKeyText(paidDate),
     String(Number(amount) || 0),
@@ -92,15 +149,109 @@ const buildReceiptIdempotencyKey = ({
     normalizeKeyText(noteValue),
   ].join("|");
 
+const ensureReceiptFinancialState = async (client, receiptId) => {
+  const normalizedId = Number(receiptId);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return;
+  await client.query(
+    `
+      INSERT INTO ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE} (
+        payment_receipt_id
+      )
+      VALUES ($1)
+      ON CONFLICT (payment_receipt_id)
+      DO UPDATE SET
+        updated_at = NOW()
+    `,
+    [normalizedId]
+  );
+};
+
+const getReceiptFinancialState = async (client, receiptId) => {
+  const normalizedId = Number(receiptId);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return null;
+  await ensureReceiptFinancialState(client, normalizedId);
+  const res = await client.query(
+    `
+      SELECT
+        ${safeIdent(RECEIPT_STATE_COLS.ID)} AS id,
+        ${safeIdent(RECEIPT_STATE_COLS.PAYMENT_RECEIPT_ID)} AS payment_receipt_id,
+        ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
+        ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
+      FROM ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE}
+      WHERE ${safeIdent(RECEIPT_STATE_COLS.PAYMENT_RECEIPT_ID)} = $1
+      LIMIT 1
+    `,
+    [normalizedId]
+  );
+  return res.rows[0] || null;
+};
+
+const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
+  const normalizedId = Number(receiptId);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) return null;
+  await ensureReceiptFinancialState(client, normalizedId);
+
+  const assignments = [];
+  const values = [];
+  const push = (column, value) => {
+    assignments.push(`${safeIdent(column)} = $${values.length + 1}`);
+    values.push(value);
+  };
+
+  if (Object.prototype.hasOwnProperty.call(patch, "is_financial_posted")) {
+    push(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED, !!patch.is_financial_posted);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "posted_revenue")) {
+    push(RECEIPT_STATE_COLS.POSTED_REVENUE, Number(patch.posted_revenue) || 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "posted_profit")) {
+    push(RECEIPT_STATE_COLS.POSTED_PROFIT, Number(patch.posted_profit) || 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "reconciled_at")) {
+    push(RECEIPT_STATE_COLS.RECONCILED_AT, patch.reconciled_at);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "adjustment_applied")) {
+    push(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED, !!patch.adjustment_applied);
+  }
+
+  push(RECEIPT_STATE_COLS.UPDATED_AT, new Date());
+  values.push(normalizedId);
+
+  const res = await client.query(
+    `
+      UPDATE ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE}
+      SET ${assignments.join(", ")}
+      WHERE ${safeIdent(RECEIPT_STATE_COLS.PAYMENT_RECEIPT_ID)} = $${values.length}
+      RETURNING
+        ${safeIdent(RECEIPT_STATE_COLS.ID)} AS id,
+        ${safeIdent(RECEIPT_STATE_COLS.PAYMENT_RECEIPT_ID)} AS payment_receipt_id,
+        ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
+        ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
+    `,
+    values
+  );
+  return res.rows[0] || null;
+};
+
 const insertPaymentReceipt = async (transaction, options = {}) => {
   if (!transaction) return { inserted: false, skipped: true, reason: "missing_transaction" };
 
   const orderCode =
-    (options.orderCode !== undefined ? String(options.orderCode || "") : "") ||
-    extractOrderCodeFromText(
+    normalizeOrderCode(
+      options.orderCode !== undefined ? String(options.orderCode || "") : ""
+    ) ||
+    normalizeOrderCode(
+      extractOrderCodeFromText(
       transaction.transaction_content,
       transaction.note,
       transaction.description
+    )
     ) ||
     "";
   const paidDate = parsePaidDate(
@@ -113,18 +264,38 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
   const senderParsed = extractSenderFromContent(
     transaction.transaction_content || transaction.description
   );
+  const sepayTransactionId = normalizeSepayTransactionId(
+    transaction.transaction_id || transaction.id
+  );
+  const referenceCode = normalizeOptionalText(
+    transaction.reference_code || transaction.referenceCode || transaction.reference_number
+  ) || normalizeOptionalText(
+    extractReferenceCodeFromText(
+      transaction.transaction_content || transaction.note || transaction.description
+    )
+  );
+  const transferType = normalizeOptionalText(
+    transaction.transfer_type || transaction.transferType
+  );
+  const gateway = normalizeOptionalText(transaction.gateway);
   const noteValue = transaction.note || transaction.description || "";
 
   const orderCodeColumn =
     (await getPaymentReceiptOrderColumn()) ||
     PAYMENT_RECEIPT_COLS.orderCode ||
     "id_order";
+  const paymentReceiptColumns = await getPaymentReceiptColumns();
+  const hasReceiptColumn = (name) =>
+    paymentReceiptColumns.has(String(name || "").toLowerCase());
 
   const externalClient = options.client || null;
   const client = externalClient || (await pool.connect());
   const manageTransaction = !externalClient;
 
   const receiptKey = buildReceiptIdempotencyKey({
+    sepayTransactionId,
+    referenceCode,
+    transferType,
     orderCode,
     paidDate,
     amount,
@@ -144,28 +315,95 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       ["sepay_payment_receipt", receiptKey]
     );
 
+    if (sepayTransactionId && hasReceiptColumn(PAYMENT_RECEIPT_COLS.sepayTransactionId)) {
+      const byTxnIdRes = await client.query(
+        `
+          SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
+          FROM ${PAYMENT_RECEIPT_TABLE}
+          WHERE ${safeIdent(PAYMENT_RECEIPT_COLS.sepayTransactionId)}::text = $1
+          LIMIT 1
+        `,
+        [sepayTransactionId]
+      );
+      if (byTxnIdRes.rows.length) {
+        await ensureReceiptFinancialState(client, byTxnIdRes.rows[0]?.id);
+        if (manageTransaction) {
+          await client.query("COMMIT");
+        }
+        return {
+          inserted: false,
+          duplicate: true,
+          existingId: byTxnIdRes.rows[0]?.id ?? null,
+          receiptKey,
+          orderCode,
+          paidDate,
+          amount,
+        };
+      }
+    }
+
+    if (
+      referenceCode &&
+      transferType &&
+      hasReceiptColumn(PAYMENT_RECEIPT_COLS.referenceCode) &&
+      hasReceiptColumn(PAYMENT_RECEIPT_COLS.transferType)
+    ) {
+      const byReferenceRes = await client.query(
+        `
+          SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
+          FROM ${PAYMENT_RECEIPT_TABLE}
+          WHERE LOWER(COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.referenceCode)}::text, '')) = LOWER($1)
+            AND LOWER(COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.transferType)}::text, '')) = LOWER($2)
+            AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $3
+            AND ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)} = $4::date
+          LIMIT 1
+        `,
+        [referenceCode, transferType, amount, paidDate]
+      );
+      if (byReferenceRes.rows.length) {
+        await ensureReceiptFinancialState(client, byReferenceRes.rows[0]?.id);
+        if (manageTransaction) {
+          await client.query("COMMIT");
+        }
+        return {
+          inserted: false,
+          duplicate: true,
+          existingId: byReferenceRes.rows[0]?.id ?? null,
+          receiptKey,
+          orderCode,
+          paidDate,
+          amount,
+        };
+      }
+    }
+
     const existsSql = `
       SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
       FROM ${PAYMENT_RECEIPT_TABLE}
-      WHERE LOWER(${safeIdent(orderCodeColumn)}) = LOWER($1)
-        AND ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)} = $2
-        AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $3
-        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.receiver)}::text, '') = $4
-        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.sender)}::text, '') = $5
-        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.note)}::text, '') = $6
+      WHERE ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)} = $1::date
+        AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $2
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.receiver)}::text, '') = $3
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.sender)}::text, '') = $4
+        AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.note)}::text, '') = $5
+        AND (
+          LOWER(COALESCE(${safeIdent(orderCodeColumn)}::text, '')) = LOWER($6)
+          OR COALESCE(${safeIdent(orderCodeColumn)}::text, '') = ''
+          OR $6 = ''
+        )
       LIMIT 1
     `;
 
     const existsRes = await client.query(existsSql, [
-      orderCode,
       paidDate,
       amount,
       receiverAccount,
       senderParsed || "",
       noteValue,
+      orderCode,
     ]);
 
     if (existsRes.rows.length) {
+      await ensureReceiptFinancialState(client, existsRes.rows[0]?.id);
       if (manageTransaction) {
         await client.query("COMMIT");
       }
@@ -180,31 +418,53 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       };
     }
 
-    const sql = `
-      INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
-        ${safeIdent(orderCodeColumn)},
-        ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)},
-        ${safeIdent(PAYMENT_RECEIPT_COLS.amount)},
-        ${safeIdent(PAYMENT_RECEIPT_COLS.receiver)},
-        ${safeIdent(PAYMENT_RECEIPT_COLS.sender)},
-        ${safeIdent(PAYMENT_RECEIPT_COLS.note)}
-      )
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
-    `;
-    logger.debug("[Webhook] payment_receipt SQL", {
-      sql: sql.trim(),
-      params: [orderCode, paidDate, amount, receiverAccount, senderParsed || "", noteValue],
-    });
-
-    const insertRes = await client.query(sql, [
+    const insertColumns = [
+      safeIdent(orderCodeColumn),
+      safeIdent(PAYMENT_RECEIPT_COLS.paidDate),
+      safeIdent(PAYMENT_RECEIPT_COLS.amount),
+      safeIdent(PAYMENT_RECEIPT_COLS.receiver),
+      safeIdent(PAYMENT_RECEIPT_COLS.sender),
+      safeIdent(PAYMENT_RECEIPT_COLS.note),
+    ];
+    const insertValues = [
       orderCode,
       paidDate,
       amount,
       receiverAccount,
       senderParsed || "",
       noteValue,
-    ]);
+    ];
+
+    const pushOptionalColumn = (columnName, value) => {
+      if (!hasReceiptColumn(columnName)) return;
+      insertColumns.push(safeIdent(columnName));
+      insertValues.push(value || null);
+    };
+
+    pushOptionalColumn(PAYMENT_RECEIPT_COLS.sepayTransactionId, sepayTransactionId);
+    pushOptionalColumn(PAYMENT_RECEIPT_COLS.referenceCode, referenceCode);
+    pushOptionalColumn(PAYMENT_RECEIPT_COLS.transferType, transferType);
+    pushOptionalColumn(PAYMENT_RECEIPT_COLS.gateway, gateway);
+
+    const sql = `
+      INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
+        ${insertColumns.join(", ")}
+      )
+      VALUES (
+        ${insertValues
+          .map((_, idx) => (idx === 1 ? `$${idx + 1}::date` : `$${idx + 1}`))
+          .join(", ")}
+      )
+      RETURNING ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
+    `;
+    logger.debug("[Webhook] payment_receipt SQL", {
+      sql: sql.trim(),
+      params: insertValues,
+    });
+
+    const insertRes = await client.query(sql, insertValues);
+    const insertedId = insertRes.rows[0]?.id ?? null;
+    await ensureReceiptFinancialState(client, insertedId);
 
     if (manageTransaction) {
       await client.query("COMMIT");
@@ -212,7 +472,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
 
     return {
       inserted: true,
-      id: insertRes.rows[0]?.id ?? null,
+      id: insertedId,
       receiptKey,
       orderCode,
       paidDate,
@@ -429,6 +689,9 @@ const calculateSalePrice = ({
 
 module.exports = {
   insertPaymentReceipt,
+  getReceiptFinancialState,
+  updateReceiptFinancialState,
+  ensureReceiptFinancialState,
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
   calculateSalePrice,
