@@ -28,10 +28,10 @@ export function OrdersFiltersBar({
   onDurationRangeChange,
 }: OrdersFiltersBarProps) {
   return (
-    <div className="rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
-      {/* Cột trên mobile để nút Tạo Đơn không nằm ngoài viewport (hàng ngang + overflow ẩn scrollbar). */}
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative w-full min-w-0 sm:min-w-[11rem] sm:flex-1 sm:basis-0 lg:min-w-[14rem]">
+    <div className="min-w-0 rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
+      {/* Tới lg: xếp cột để khối co theo chiều ngang; từ lg: một hàng + wrap phần filter phải khi thiếu chỗ. */}
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
+        <div className="relative w-full min-w-0 lg:min-w-[11rem] lg:flex-1 lg:basis-0 xl:min-w-[14rem]">
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opacity-70" />
           <input
             type="text"
@@ -43,20 +43,20 @@ export function OrdersFiltersBar({
           />
         </div>
 
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-nowrap sm:items-center sm:gap-3">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-3 lg:ml-auto lg:w-auto lg:max-w-full lg:flex-1 lg:basis-0 lg:justify-end">
           <div
-            className="hidden h-8 w-px shrink-0 self-center bg-white/10 sm:block"
+            className="hidden h-8 w-px shrink-0 self-center bg-white/10 lg:block"
             aria-hidden
           />
 
           <DashboardDateRangeFilter
             value={durationRange}
             onChange={onDurationRangeChange}
-            className="w-full min-w-0 sm:w-[min(16rem,72vw)] sm:min-w-[11.5rem] sm:shrink-0 md:w-[16.5rem] md:min-w-[16.5rem]"
+            className="w-full min-w-0 max-w-full flex-[1_1_12rem] sm:min-w-0 lg:max-w-[min(18rem,100%)] lg:shrink"
           />
 
-          <div className="flex w-full min-w-0 items-stretch gap-2 sm:w-auto sm:shrink-0">
-            <div className="relative min-w-0 flex-1 sm:w-[9rem] sm:flex-none sm:shrink-0">
+          <div className="flex min-w-0 w-full flex-[1_1_14rem] flex-wrap items-stretch gap-2 sm:w-auto sm:min-w-0 sm:justify-end">
+            <div className="relative min-w-0 flex-1 basis-[8.5rem] sm:max-w-[11rem] sm:flex-none">
               <select
                 className="w-full min-w-0 px-3.5 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
                 style={{
@@ -83,11 +83,11 @@ export function OrdersFiltersBar({
             </div>
 
             {isActiveDataset && (
-              <div className="shrink-0 self-center">
+              <div className="min-w-0 shrink-0 self-center">
                 <GradientButton
                   icon={PlusIcon}
                   onClick={openCreateModal}
-                  className="!px-4 !py-2 text-xs sm:!px-5 sm:!py-2.5 sm:text-sm whitespace-nowrap"
+                  className="!px-4 !py-2 text-xs sm:!px-5 sm:!py-2.5 sm:text-sm whitespace-nowrap max-w-full"
                 >
                   Tạo Đơn
                 </GradientButton>
