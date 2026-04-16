@@ -337,7 +337,7 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger ghi supplier_order_cost_log).
+      // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger có thể ghi log chi phí NCC; TT NCC trên log mặc định Chưa Thanh Toán).
       // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
       // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
       if (receiptResult?.inserted || receiptResult?.duplicate) {
