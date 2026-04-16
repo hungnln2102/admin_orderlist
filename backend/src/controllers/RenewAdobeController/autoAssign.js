@@ -366,6 +366,13 @@ async function runCheckAllAccountsFlow({
 
   let autoAssign = null;
   if (!shouldAbort() && includeAutoAssign) {
+    logger.info(
+      "%s Đã check xong toàn bộ %d tài khoản (completed=%d, failed=%d) — bắt đầu auto-assign (sau khi check, không song song với check).",
+      logPrefix,
+      total,
+      completed,
+      failed
+    );
     emit({ type: "auto_assign_start" });
     try {
       autoAssign = await autoAssignUsers({
