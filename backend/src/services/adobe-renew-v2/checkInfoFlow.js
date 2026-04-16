@@ -37,6 +37,19 @@ function isAdminConsoleOrgScopedNonUsers(url) {
   return !isAdminConsoleUsersPath(url);
 }
 
+/**
+ * Cần goto lại URL users đã biết (recovery) khi đang kẹt trên Admin Console nhưng không phải trang users.
+ * Bao gồm cả /{org}@AdobeOrg/products và redirect global tới /products (không có @AdobeOrg trong path).
+ */
+function needsUsersPageRecovery(url) {
+  if (!url || typeof url !== "string") return false;
+  if (!/adminconsole\.adobe\.com/i.test(url)) return false;
+  if (isAdminConsoleUsersPath(url)) return false;
+  if (isAdminConsoleOrgScopedNonUsers(url)) return true;
+  if (/\/products(?:\/|$|\?|#)/i.test(url)) return true;
+  return false;
+}
+
 const USERS_READY_SELECTOR = [
   '[data-testid^="member-email-"]',
   '[data-testid="table"]',
@@ -65,7 +78,7 @@ async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS, options = 
       const now = Date.now();
       if (
         recoveryUsersUrl &&
-        isAdminConsoleOrgScopedNonUsers(url) &&
+        needsUsersPageRecovery(url) &&
         now - lastRecoveryAt >= recoverEveryMs
       ) {
         lastRecoveryAt = now;
@@ -207,4 +220,5 @@ async function runB10ToB13(page, options = {}) {
 
 module.exports = {
   runB10ToB13,
+  needsUsersPageRecovery,
 };

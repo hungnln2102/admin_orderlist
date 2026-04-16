@@ -534,11 +534,19 @@ async function addUsersToOrgViaUI(page, userEmails) {
 
   const added = [];
   const failed = [];
-  const BATCH_SIZE = 3; // Form Adobe cho tối đa ~3 slot cùng lúc
+  const BATCH_SIZE = 3; // Form Adobe cho tối đa ~3 slot cùng lúc (một số org chỉ render 2 ô — xử lý theo pickerCount)
 
-  for (let batchStart = 0; batchStart < emails.length; batchStart += BATCH_SIZE) {
-    const batch = emails.slice(batchStart, batchStart + BATCH_SIZE);
-    logger.info("[adobe-v2] AddUsers: batch %d–%d / %d", batchStart + 1, batchStart + batch.length, emails.length);
+  let emailIdx = 0;
+  while (emailIdx < emails.length) {
+    const planned = Math.min(BATCH_SIZE, emails.length - emailIdx);
+    const batchSlice = emails.slice(emailIdx, emailIdx + planned);
+    logger.info(
+      "[adobe-v2] AddUsers: batch index %d–%d / %d (planned %d)",
+      emailIdx,
+      emailIdx + batchSlice.length - 1,
+      emails.length,
+      planned
+    );
 
     await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
 
@@ -557,8 +565,9 @@ async function addUsersToOrgViaUI(page, userEmails) {
       }
     }
     if (!clicked) {
-      batch.forEach((e) => failed.push(e));
+      batchSlice.forEach((e) => failed.push(e));
       logger.warn("[adobe-v2] AddUsers: không bấm được nút Thêm người dùng");
+      emailIdx += planned;
       continue;
     }
 
@@ -566,10 +575,39 @@ async function addUsersToOrgViaUI(page, userEmails) {
     await page.waitForTimeout(1500);
     const modal = await waitForAddUserModal(page);
     if (!modal) {
-      batch.forEach((e) => failed.push(e));
+      batchSlice.forEach((e) => failed.push(e));
       logger.warn("[adobe-v2] AddUsers: modal add-users-to-org không xuất hiện");
+      emailIdx += planned;
       continue;
     }
+
+    // 2b. Adobe đôi khi chỉ mount 2 input user-picker dù muốn thêm 3 — chờ DOM hoặc giảm chunk
+    const pickerLocator = modal.locator('input[data-testid="user-picker"]');
+    let pickerCount = await pickerLocator.count().catch(() => 0);
+    const pickerWaitDeadline = Date.now() + 10000;
+    while (pickerCount < planned && pickerCount < BATCH_SIZE && Date.now() < pickerWaitDeadline) {
+      await page.waitForTimeout(400);
+      pickerCount = await pickerLocator.count().catch(() => 0);
+    }
+    if (pickerCount === 0) {
+      batchSlice.forEach((e) => failed.push(e));
+      logger.warn("[adobe-v2] AddUsers: không thấy user-picker trong modal");
+      emailIdx += planned;
+      continue;
+    }
+
+    const chunkLen = Math.min(planned, pickerCount);
+    const batch = batchSlice.slice(0, chunkLen);
+    if (chunkLen < planned) {
+      logger.info(
+        "[adobe-v2] AddUsers: modal có %d user-picker — điền %d email; %d email còn lại sẽ xử lý ở lần mở modal tiếp",
+        pickerCount,
+        chunkLen,
+        planned - chunkLen
+      );
+    }
+
+    const batchAdded = [];
 
     // 3. Điền email + assign product cho mỗi slot
     for (let i = 0; i < batch.length; i++) {
@@ -591,11 +629,12 @@ async function addUsersToOrgViaUI(page, userEmails) {
         // Không push vào failed vì user vẫn có thể được add mà chưa có product
       }
 
+      batchAdded.push(email);
       added.push(email);
     }
 
     // 4. Bấm "Lưu" (cta-button trong modal chính)
-    if (added.length > 0 || batch.some((e) => !failed.includes(e))) {
+    if (batchAdded.length > 0) {
       const saveBtn = modal.locator('button[data-testid="cta-button"]').first();
       let saved = false;
 
@@ -612,7 +651,7 @@ async function addUsersToOrgViaUI(page, userEmails) {
           await saveBtn.click({ timeout: 12000 }).catch(() => {});
           await page.waitForTimeout(2000);
           saved = true;
-          logger.info("[adobe-v2] AddUsers: bấm Lưu xong (batch %d–%d)", batchStart + 1, batchStart + batch.length);
+          logger.info("[adobe-v2] AddUsers: bấm Lưu xong (%d email)", batchAdded.length);
         }
       }
 
@@ -631,6 +670,8 @@ async function addUsersToOrgViaUI(page, userEmails) {
       }
     }
 
+    emailIdx += chunkLen;
+
     await page.waitForTimeout(1200);
     const hadPostSaveErrorToast = await dismissAddUsersPostSaveErrorToast(page, "[adobe-v2] AddUsers");
     if (hadPostSaveErrorToast) {
@@ -642,8 +683,8 @@ async function addUsersToOrgViaUI(page, userEmails) {
     await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
     await page.waitForTimeout(800);
 
-    // Nếu còn batch tiếp → làm mới trang Users và chờ UI sẵn sàng (batch 4 sau batch 1–3)
-    if (batchStart + BATCH_SIZE < emails.length) {
+    // Nếu còn email → làm mới trang Users và chờ UI sẵn sàng
+    if (emailIdx < emails.length) {
       await dismissBlockingOverlays(page, { logPrefix: "[adobe-v2] AddUsers" });
       const reloaded = await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => false);
       if (!reloaded) {
