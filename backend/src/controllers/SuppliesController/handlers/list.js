@@ -1,7 +1,7 @@
 const { db } = require("../../../db");
 const { PARTNER_SCHEMA } = require("../../../config/dbSchema");
-const { QUOTED_COLS, TABLES, variantCols, supplyPriceCols, orderCols, supplyCols } = require("../constants");
-const { quoteIdent, createNumericExtraction } = require("../../../utils/sql");
+const { QUOTED_COLS, TABLES, variantCols, supplyPriceCols, orderCols, supplyCols, STATUS } = require("../constants");
+const { quoteIdent } = require("../../../utils/sql");
 
 const logCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
 const { parseSupplyId, resolveSupplierTableName, resolveSupplierNameColumn } = require("../helpers");
@@ -70,53 +70,80 @@ const listPaymentsBySupply = async (req, res) => {
     return res.status(400).json({ error: "ID nhà cung cấp không hợp lệ." });
   }
 
-  const limitParam = Number.parseInt(req.query.limit, 10);
-  const offsetParam = Number.parseInt(req.query.offset, 10);
-  const limit = Number.isFinite(limitParam)
-    ? Math.min(Math.max(limitParam, 1), 50)
-    : 5;
-  const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
-  const limitPlusOne = limit + 1;
   const supplierTable = await resolveSupplierTableName();
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = quoteIdent(supplierNameCol);
   const ps = QUOTED_COLS.paymentSupply;
+  const lc = QUOTED_COLS.supplierOrderCostLog;
+  const paidNccLabel = STATUS.PAID;
+
+  /** Một dòng duy nhất: chu kỳ = ngày logged_at cũ nhất (theo đơn mới nhất), tổng nhập = công nợ chưa TT NCC, đã TT = tổng đã chốt trên supplier_payments. */
   const q = `
+    WITH latest AS (
+      SELECT DISTINCT ON (l.${lc.orderListId})
+        l.${lc.loggedAt} AS logged_at,
+        l.${lc.importCost} AS import_cost,
+        l.${lc.refundAmount} AS refund_amount,
+        l.${lc.nccPaymentStatus} AS ncc_payment_status
+      FROM ${TABLES.supplyOrderCostLog} l
+      WHERE l.${lc.supplyId} = ?
+      ORDER BY l.${lc.orderListId}, l.${lc.id} DESC
+    ),
+    agg AS (
+      SELECT
+        MIN(latest.logged_at::date) AS oldest_date,
+        COALESCE(SUM(
+          CASE
+            WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) <> ?
+            THEN COALESCE(latest.import_cost, 0) - COALESCE(latest.refund_amount, 0)
+            ELSE 0::numeric
+          END
+        ), 0)::numeric AS total_unpaid
+      FROM latest
+    ),
+    pay AS (
+      SELECT
+        COALESCE(SUM(COALESCE(pl.${ps.paid}, 0)), 0)::numeric AS total_paid,
+        MAX(pl.${ps.id}) AS payment_id
+      FROM ${TABLES.paymentSupply} pl
+      WHERE pl.${ps.sourceId} = ?
+    )
     SELECT
-      pl.${ps.id} AS id,
-      pl.${ps.sourceId} AS source_id,
+      COALESCE(pay.payment_id, 0)::bigint AS id,
+      ?::int AS source_id,
       COALESCE(s.${supplierNameIdent}, '') AS source_name,
-      0::numeric AS import_value,
-      ${createNumericExtraction(`pl.${ps.paid}`)} AS paid_value,
-      COALESCE(pl.${ps.round}, '') AS round_label,
-      COALESCE(pl.${ps.status}, '') AS content_label
-    FROM ${TABLES.paymentSupply} pl
-    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = pl.${ps.sourceId}
-    WHERE pl.${ps.sourceId} = ?
-    ORDER BY pl.${ps.id} DESC
-    OFFSET ?
-    LIMIT ?;
+      COALESCE(agg.total_unpaid, 0)::numeric AS import_value,
+      COALESCE(pay.total_paid, 0)::numeric AS paid_value,
+      CASE
+        WHEN agg.oldest_date IS NULL THEN ''
+        ELSE TO_CHAR(agg.oldest_date, 'DD/MM/YYYY')
+      END AS round_label
+    FROM agg
+    CROSS JOIN pay
+    LEFT JOIN ${supplierTable} s ON s.${quoteIdent("id")} = ?
+    LIMIT 1;
   `;
 
   try {
-    const result = await db.raw(q, [parsedSupplyId, offset, limitPlusOne]);
-    const rows = result.rows || [];
-    const hasMore = rows.length > limit;
-    const payments = rows.slice(0, limit).map((row) => ({
-      id: row.id,
-      sourceId: row.source_id,
-      sourceName: row.source_name,
-      totalImport: Number(row.import_value) || 0,
-      paid: Number(row.paid_value) || 0,
-      round: row.round_label || "",
-      content: row.content_label || "",
-      status: row.content_label || "",
-    }));
+    const result = await db.raw(q, [parsedSupplyId, paidNccLabel, parsedSupplyId, parsedSupplyId, parsedSupplyId]);
+    const row = result.rows?.[0];
+    const payments = row
+      ? [
+          {
+            id: Number(row.id) || 0,
+            sourceId: Number(row.source_id) || parsedSupplyId,
+            sourceName: row.source_name || "",
+            totalImport: Number(row.import_value) || 0,
+            paid: Number(row.paid_value) || 0,
+            round: row.round_label || "",
+          },
+        ]
+      : [];
 
     res.json({
       payments,
-      hasMore,
-      nextOffset: offset + payments.length,
+      hasMore: false,
+      nextOffset: payments.length,
     });
   } catch (error) {
     logger.error("Query failed (GET /api/supplies/:id/payments)", { supplyId, error: error.message, stack: error.stack });

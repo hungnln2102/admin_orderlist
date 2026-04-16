@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { QUOTED_COLS, TABLES, paymentSupplyCols, STATUS } = require("../constants");
+const { QUOTED_COLS, TABLES, paymentSupplyCols } = require("../constants");
 const { parseMoney, parseSupplyId } = require("../helpers");
 const logger = require("../../../utils/logger");
 
@@ -35,6 +35,40 @@ const createPayment = async (req, res) => {
   }
 
   try {
+    const existing = await db(TABLES.paymentSupply)
+      .select(paymentSupplyCols.ID)
+      .where(paymentSupplyCols.SOURCE_ID, parsedSupplyId)
+      .first();
+
+    if (existing) {
+      const updated = await db(TABLES.paymentSupply)
+        .where(paymentSupplyCols.ID, existing[paymentSupplyCols.ID])
+        .update({
+          [paymentSupplyCols.PAID]: paidRaw,
+          [paymentSupplyCols.ROUND]: roundLabel,
+          [paymentSupplyCols.STATUS]: statusLabel,
+        })
+        .returning([
+          paymentSupplyCols.ID,
+          paymentSupplyCols.SOURCE_ID,
+          paymentSupplyCols.PAID,
+          paymentSupplyCols.ROUND,
+          paymentSupplyCols.STATUS,
+        ]);
+      const row = updated?.[0];
+      if (!row) {
+        return res.status(500).json({ error: "Không thể cập nhật chu kỳ thanh toán." });
+      }
+      return res.status(200).json({
+        id: row[paymentSupplyCols.ID],
+        sourceId: row[paymentSupplyCols.SOURCE_ID],
+        totalImport: totalImportEffective,
+        paid: Number(row[paymentSupplyCols.PAID]) || 0,
+        round: row[paymentSupplyCols.ROUND] || "",
+        status: row[paymentSupplyCols.STATUS] || "",
+      });
+    }
+
     const result = await db(TABLES.paymentSupply)
       .insert({
         [paymentSupplyCols.SOURCE_ID]: parsedSupplyId,
@@ -112,19 +146,18 @@ const updatePaymentImport = async (req, res) => {
       });
     }
     const prevAmount = Number(prevRes.rows[0].prev_amount) || 0;
-    const prevStatus = String(prevRes.rows[0].prev_status || STATUS.UNPAID).trim() || STATUS.UNPAID;
     const prevRound = String(prevRes.rows[0].prev_round || "").trim();
     const delta = nextTotalImport - prevAmount;
+    const nextPaid = Math.round(prevAmount + delta);
 
     const result = await db.raw(
       `
-      INSERT INTO ${TABLES.paymentSupply} (
-        ${ps.sourceId},
-        ${ps.paid},
-        ${ps.round},
-        ${ps.status}
-      )
-      VALUES (?, ?, ?, ?)
+      UPDATE ${TABLES.paymentSupply}
+      SET
+        ${ps.paid} = ?,
+        ${ps.round} = ?
+      WHERE ${ps.id} = ?
+        AND ${ps.sourceId} = ?
       RETURNING
         ${ps.id} AS id,
         ${ps.sourceId} AS source_id,
@@ -134,10 +167,10 @@ const updatePaymentImport = async (req, res) => {
         COALESCE(${ps.status}, '') AS status_label;
     `,
       [
-        parsedSupplyId,
-        delta,
+        nextPaid,
         `${prevRound} — Điều chỉnh ref#${parsedPaymentId} (${delta >= 0 ? "+" : ""}${delta})`,
-        prevStatus,
+        parsedPaymentId,
+        parsedSupplyId,
       ]
     );
 

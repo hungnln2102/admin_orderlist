@@ -284,7 +284,6 @@ const confirmPaymentSupply = async (req, res) => {
 
   const supplyIdFromBody = parsePositiveInt(req.body?.supplyId);
   const paidAmountNumber = parsePaid(req.body?.paidAmount);
-  const paymentContent = String(req.body?.paymentContent ?? "").trim();
 
   if (paidAmountNumber === null || paidAmountNumber <= 0) {
     return res.status(400).json({ error: "Số tiền thanh toán không hợp lệ." });
@@ -316,7 +315,6 @@ const confirmPaymentSupply = async (req, res) => {
         `
         SELECT
           MIN(${logCols.loggedAt}::date) AS oldest_date,
-          MAX(${logCols.loggedAt}::date) AS newest_date,
           COUNT(*)::int AS unpaid_count
         FROM ${TABLES.supplyOrderCostLog}
         WHERE ${logCols.supplyId} = ?
@@ -332,7 +330,6 @@ const confirmPaymentSupply = async (req, res) => {
       }
 
       const oldestDate = summary.oldest_date ? new Date(summary.oldest_date) : null;
-      const newestDate = summary.newest_date ? new Date(summary.newest_date) : null;
       const toDmy = (date) => {
         if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
         const day = String(date.getDate()).padStart(2, "0");
@@ -340,20 +337,52 @@ const confirmPaymentSupply = async (req, res) => {
         const year = String(date.getFullYear());
         return `${day}/${month}/${year}`;
       };
-      const periodLabel = `${toDmy(oldestDate)} - ${toDmy(newestDate)}`;
+      const periodLabel = toDmy(oldestDate);
+      const addAmount = Math.round(paidAmountNumber);
 
-      const insertResult = await trx.raw(
+      const existingPay = await trx.raw(
         `
-        INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
-        VALUES (?, ?, ?, ?)
-        RETURNING ${PS.id} AS id,
-                  ${PS.sourceId} AS source_id,
-                  ${PS.round} AS round,
-                  ${PS.status} AS status,
-                  COALESCE(${PS.paid}::numeric, 0) AS paid;
+        SELECT ${PS.id} AS id
+        FROM ${TABLES.paymentSupply}
+        WHERE ${PS.sourceId} = ?
+        LIMIT 1;
       `,
-        [resolvedSupplyId, periodLabel, paymentContent, Math.round(paidAmountNumber)]
+        [resolvedSupplyId]
       );
+      const existingId = existingPay.rows?.[0]?.id;
+
+      let insertResult;
+      if (existingId != null) {
+        insertResult = await trx.raw(
+          `
+          UPDATE ${TABLES.paymentSupply}
+          SET
+            ${PS.paid} = COALESCE(${PS.paid}, 0) + ?,
+            ${PS.round} = ?,
+            ${PS.status} = COALESCE(NULLIF(TRIM(${PS.status}), ''), '')
+          WHERE ${PS.id} = ?
+          RETURNING ${PS.id} AS id,
+                    ${PS.sourceId} AS source_id,
+                    ${PS.round} AS round,
+                    ${PS.status} AS status,
+                    COALESCE(${PS.paid}::numeric, 0) AS paid;
+        `,
+          [addAmount, periodLabel, existingId]
+        );
+      } else {
+        insertResult = await trx.raw(
+          `
+          INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
+          VALUES (?, ?, ?, ?)
+          RETURNING ${PS.id} AS id,
+                    ${PS.sourceId} AS source_id,
+                    ${PS.round} AS round,
+                    ${PS.status} AS status,
+                    COALESCE(${PS.paid}::numeric, 0) AS paid;
+        `,
+          [resolvedSupplyId, periodLabel, "", addAmount]
+        );
+      }
 
       await trx.raw(
         `

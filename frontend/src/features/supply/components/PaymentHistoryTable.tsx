@@ -34,7 +34,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
     <div className="bg-slate-900/80 rounded-xl border border-white/10 overflow-hidden">
       <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center">
         <h4 className="text-sm font-semibold text-white">Lịch Sử Thanh Toán</h4>
-        <span className="text-xs text-white/50">Theo dõi nội dung chuyển khoản đã chốt</span>
+        <span className="text-xs text-white/50">Một chu kỳ / NCC — tổng nhập là công nợ chưa TT</span>
       </div>
 
       <table className="w-full text-sm text-left text-white/80">
@@ -44,19 +44,18 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
             <th className="px-4 py-2">Tổng Nhập</th>
             <th className="px-4 py-2">Còn Nợ</th>
             <th className="px-4 py-2">Đã Thanh Toán</th>
-            <th className="px-4 py-2">Nội Dung Thanh Toán</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
           {loading ? (
             <tr>
-              <td colSpan={5} className="text-center py-4">
+              <td colSpan={4} className="text-center py-4">
                 Đang tải...
               </td>
             </tr>
           ) : payments.length === 0 ? (
             <tr>
-              <td colSpan={5} className="text-center py-4 opacity-50">
+              <td colSpan={4} className="text-center py-4 opacity-50">
                 Chưa có dữ liệu thanh toán
               </td>
             </tr>
@@ -69,8 +68,7 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
                   <td className={`px-4 py-2 ${p.totalImport < 0 ? "text-rose-400 font-semibold" : ""}`}>
                     {p.totalImport < 0 ? formatCurrency(Math.abs(p.totalImport)) : "—"}
                   </td>
-                  <td className="px-4 py-2">{formatCurrency(p.paid)}</td>
-                  <td className="px-4 py-2 text-white/75">{p.content || p.status || "—"}</td>
+                  <td className="px-4 py-2">{p.paid > 0 ? formatCurrency(p.paid) : "—"}</td>
                 </tr>
               );
             })
