@@ -8,7 +8,9 @@
  *   node scheduler.js
  *   npm run start:scheduler
  */
-require("dotenv").config();
+const path = require("path");
+// Cùng file .env với API (backend/.env) — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const logger = require("./src/utils/logger");
 const { notifyCritical } = require("./src/utils/telegramErrorNotifier");

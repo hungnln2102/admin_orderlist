@@ -32,10 +32,13 @@ export default function RenewAdobeAdmin() {
     autoAssignPhase,
     autoAssignResult,
     isCheckingAll,
+    cronTestLoading,
+    cronTestBanner,
     loadAccounts,
     dismissCheckAllProgress,
     handleCheckAll,
     handleCancelCheckAll,
+    handleTestCronJob,
     handleDeleteUser,
     handleFixUser,
     handleFixAllUsers,
@@ -73,10 +76,18 @@ export default function RenewAdobeAdmin() {
         loading={loading}
         accountCount={accounts.length}
         checkingId={checkingId}
+        cronTestLoading={cronTestLoading}
         onCheckAll={handleCheckAll}
         onCancelCheckAll={handleCancelCheckAll}
+        onTestCronJob={handleTestCronJob}
         onAddAdmin={() => setAddAdminOpen(true)}
       />
+
+      {cronTestBanner && (
+        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100/95">
+          {cronTestBanner}
+        </p>
+      )}
 
       {checkAllProgress && checkAllProgress.total > 0 && (
         <RenewAdobeProgressPanel

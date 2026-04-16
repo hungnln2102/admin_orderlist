@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/lib/api";
-import { deleteAdobeAdminAccount, fetchAdobeAdminAccounts } from "../api/renewAdobeApi";
+import {
+  deleteAdobeAdminAccount,
+  fetchAdobeAdminAccounts,
+  runSchedulerRenewAdobeCheck,
+} from "../api/renewAdobeApi";
 import type { AdobeAdminAccount, LicenseStatus } from "../types";
 
 type CheckAllProgress = {
@@ -38,6 +42,8 @@ export function useRenewAdobeAdmin() {
   } | null>(null);
   const checkAllAbortRef = useRef<AbortController | null>(null);
   const fixAllInFlightRef = useRef(false);
+  const [cronTestLoading, setCronTestLoading] = useState(false);
+  const [cronTestBanner, setCronTestBanner] = useState<string | null>(null);
 
   const isCheckingAll =
     checkAllProgress !== null &&
@@ -73,6 +79,7 @@ export function useRenewAdobeAdmin() {
     }
 
     setCheckError(null);
+    setCronTestBanner(null);
 
     const abort = new AbortController();
     checkAllAbortRef.current = abort;
@@ -254,6 +261,28 @@ export function useRenewAdobeAdmin() {
     checkAllAbortRef.current?.abort();
     setCheckAllProgress(null);
   }, []);
+
+  const handleTestCronJob = useCallback(() => {
+    if (cronTestLoading || isCheckingAll || checkingId !== null) {
+      return;
+    }
+    setCheckError(null);
+    setCronTestBanner(null);
+    setCronTestLoading(true);
+    runSchedulerRenewAdobeCheck()
+      .then(() => {
+        setCronTestBanner(
+          "Đã chạy xong job giống cron (check all + auto-assign) trên process API. Cron thật chạy trong `scheduler` — xem log service đó để so sánh."
+        );
+        loadAccounts();
+      })
+      .catch((err) =>
+        setCheckError(
+          err?.message ?? "Lỗi khi chạy test job cron (scheduler/run-adobe-check)."
+        )
+      )
+      .finally(() => setCronTestLoading(false));
+  }, [checkingId, cronTestLoading, isCheckingAll, loadAccounts]);
 
   const handleDeleteUser = useCallback(
     (accountId: number, userEmail: string) => {
@@ -494,10 +523,13 @@ export function useRenewAdobeAdmin() {
     autoAssignPhase,
     autoAssignResult,
     isCheckingAll,
+    cronTestLoading,
+    cronTestBanner,
     loadAccounts,
     dismissCheckAllProgress,
     handleCheckAll,
     handleCancelCheckAll,
+    handleTestCronJob,
     handleDeleteUser,
     handleFixUser,
     handleFixAllUsers,

@@ -158,21 +158,39 @@ async function buildEmailToOrderMap(emails) {
   return map;
 }
 
+/** Tránh hai lần gọi chồng nhau (cron mỗi giờ + job chạy lâu → Playwright/OOM/timeout). */
+let renewAdobeCheckAllInFlight = false;
+
 function createRenewAdobeCheckAndNotifyTask() {
   return async function renewAdobeCheckAndNotifyTask(trigger = "cron") {
-    logger.info("[CRON] Bắt đầu job check all tài khoản Renew Adobe", { trigger });
-    const result = await runCheckAllAccountsFlow({
-      runCheckForAccountId,
-      includeAutoAssign: true,
-      logPrefix: "[CRON][check-all]",
-    });
-    logger.info("[CRON] Kết thúc job check all tài khoản Renew Adobe", {
+    if (renewAdobeCheckAllInFlight) {
+      logger.warn(
+        "[CRON] Job Renew Adobe (check all + auto-assign) vẫn đang chạy — bỏ qua lần gọi trùng",
+        { trigger, pid: process.pid }
+      );
+      return;
+    }
+    renewAdobeCheckAllInFlight = true;
+    logger.info("[CRON] Bắt đầu job check all tài khoản Renew Adobe", {
       trigger,
-      total: result.total,
-      completed: result.completed,
-      failed: result.failed,
-      autoAssign: result.autoAssign,
+      pid: process.pid,
     });
+    try {
+      const result = await runCheckAllAccountsFlow({
+        runCheckForAccountId,
+        includeAutoAssign: true,
+        logPrefix: "[CRON][check-all]",
+      });
+      logger.info("[CRON] Kết thúc job check all tài khoản Renew Adobe", {
+        trigger,
+        total: result.total,
+        completed: result.completed,
+        failed: result.failed,
+        autoAssign: result.autoAssign,
+      });
+    } finally {
+      renewAdobeCheckAllInFlight = false;
+    }
   };
 }
 

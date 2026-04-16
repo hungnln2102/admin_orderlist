@@ -76,6 +76,29 @@ export function createRenewAdobeMailBackupMailbox(payload: {
   });
 }
 
+/**
+ * Gọi job Renew Adobe giống lịch cron (check all + auto-assign), qua API server.
+ * Không chạy trong process `node scheduler.js` — dùng để so sánh hành vi với cron trên server.
+ */
+export function runSchedulerRenewAdobeCheck(): Promise<{ success: boolean }> {
+  return apiFetch(API_ENDPOINTS.SCHEDULER_RUN_ADOBE_CHECK, { method: "GET" }).then(
+    async (res) => {
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        success?: boolean;
+      };
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+            res.statusText ||
+            "Không chạy được job (scheduler/run-adobe-check)."
+        );
+      }
+      return { success: data.success === true };
+    }
+  );
+}
+
 export function fetchAdobeAdminAccounts() {
   return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS)
     .then((res) => {

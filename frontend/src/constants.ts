@@ -68,6 +68,8 @@ export const API_ENDPOINTS = {
     `/api/renew-adobe/accounts/${id}/auto-delete-users`,
   RENEW_ADOBE_ACCOUNTS_ADD_USERS_BATCH: "/api/renew-adobe/accounts/add-users-batch",
   RENEW_ADOBE_CHECK_ALL: "/api/renew-adobe/accounts/check-all",
+  /** Cùng hàm với job cron hàng giờ (`renewAdobeCheckAndNotifyTask`), chạy trong process API (không phải process `scheduler.js`). */
+  SCHEDULER_RUN_ADOBE_CHECK: "/api/scheduler/run-adobe-check",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
   /** Một vòng Fix All: batch theo slot tài khoản gần đầy nhất (lặp cho tới hết emails). */

@@ -81,7 +81,7 @@ router.use("/", walletRoutes);
 router.use("/key-active", keyActiveRoutes);
 router.use("/warehouse", warehouseRoutes);
 router.use("/warehouses", warehouseRoutes);
-router.use("/scheduler", schedulerRoutes);
+router.use("/scheduler", longTimeout(900_000), schedulerRoutes);
 router.get("/run-scheduler", runSchedulerNow);
 router.get("/supply-insights", suppliesController.getSupplyInsights);
 router.use("/saving-goals", savingGoalsController);

@@ -5,8 +5,10 @@ export type RenewAdobeHeaderProps = {
   loading: boolean;
   accountCount: number;
   checkingId: number | null;
+  cronTestLoading: boolean;
   onCheckAll: MouseEventHandler<HTMLButtonElement>;
   onCancelCheckAll: MouseEventHandler<HTMLButtonElement>;
+  onTestCronJob: MouseEventHandler<HTMLButtonElement>;
   onAddAdmin?: MouseEventHandler<HTMLButtonElement>;
 };
 
@@ -15,8 +17,10 @@ export function RenewAdobeHeader({
   loading,
   accountCount,
   checkingId,
+  cronTestLoading,
   onCheckAll,
   onCancelCheckAll,
+  onTestCronJob,
   onAddAdmin,
 }: RenewAdobeHeaderProps) {
   return (
@@ -34,7 +38,7 @@ export function RenewAdobeHeader({
           <button
             type="button"
             onClick={onAddAdmin}
-            disabled={loading || checkingId !== null}
+            disabled={loading || checkingId !== null || cronTestLoading}
             className="rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             + Thêm tài khoản admin
@@ -52,12 +56,31 @@ export function RenewAdobeHeader({
           <button
             type="button"
             onClick={onCheckAll}
-            disabled={loading || accountCount === 0 || checkingId !== null}
+            disabled={
+              loading ||
+              accountCount === 0 ||
+              checkingId !== null ||
+              cronTestLoading
+            }
             className="rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 px-4 py-2 text-sm font-semibold hover:bg-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Check All
           </button>
         )}
+        <button
+          type="button"
+          onClick={onTestCronJob}
+          disabled={
+            loading ||
+            checkingId !== null ||
+            isCheckingAll ||
+            cronTestLoading
+          }
+          title="Gọi cùng job với cron hàng giờ (check all + auto-assign), chạy trong process API. Process scheduler riêng (`node scheduler.js`) xem log server."
+          className="rounded-xl bg-amber-500/15 text-amber-200 border border-amber-400/35 px-4 py-2 text-sm font-semibold hover:bg-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {cronTestLoading ? "Đang chạy job…" : "Test job cron"}
+        </button>
       </div>
     </div>
   );
