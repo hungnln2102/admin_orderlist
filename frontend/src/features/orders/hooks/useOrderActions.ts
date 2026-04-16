@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
   API_ENDPOINTS,
-  ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
   ORDER_STATUSES,
   VIRTUAL_FIELDS,
@@ -91,13 +90,10 @@ export function useOrderActions(deps: OrderActionsDeps) {
       )
         .trim()
         .toUpperCase();
-      const isMavnImport = orderCode.startsWith(ORDER_CODE_PREFIXES.IMPORT);
       let payload: Partial<Order> | null = null;
       if (statusText === ORDER_STATUSES.CHUA_THANH_TOAN) {
         payload = {
-          [ORDER_FIELDS.STATUS]: isMavnImport
-            ? ORDER_STATUSES.DA_THANH_TOAN
-            : ORDER_STATUSES.DANG_XU_LY,
+          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
         };
       } else if (statusText === ORDER_STATUSES.DANG_XU_LY) {
         payload = {

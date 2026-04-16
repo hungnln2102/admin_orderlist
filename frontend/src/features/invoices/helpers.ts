@@ -11,6 +11,14 @@ export interface PaymentReceipt {
   note: string;
 }
 
+export interface MatchableOrder {
+  id: number;
+  orderCode: string;
+  status: string;
+  customer: string;
+  informationOrder: string;
+}
+
 export type ReceiptCategory = "receipt" | "refund";
 
 export const formatCurrencyVnd = (value: number): string => {

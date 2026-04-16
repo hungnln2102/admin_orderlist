@@ -20,6 +20,7 @@ const {
   insertPaymentReceipt,
   getReceiptFinancialState,
   updateReceiptFinancialState,
+  insertFinancialAuditLog,
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
 } = require("../payments");
@@ -237,7 +238,7 @@ router.post("/", async (req, res) => {
           orderCodes.push(...fallbackCodes);
           logger.info("[Webhook] Fallback matched orders", { orderCodes: fallbackCodes });
         } else {
-          logger.warn("[Webhook] Fallback could not match any order", {
+          logger.warn("[Webhook] Fallback không tìm thấy đơn hàng phù hợp", {
             amount: transferAmountNormalized,
           });
         }
@@ -279,6 +280,20 @@ router.post("/", async (req, res) => {
       const paidMonthKey = toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
       let postedRevenueDelta = 0;
       let postedProfitDelta = 0;
+
+      if (receiptId && alreadyFinancialPosted) {
+        await insertFinancialAuditLog(client, {
+          payment_receipt_id: receiptId,
+          order_code: String(resolvedOrderCode || "").trim(),
+          rule_branch: "SKIP_DUPLICATE_OR_ALREADY_POSTED",
+          delta: {
+            duplicate: !!receiptResult?.duplicate,
+            inserted: !!receiptResult?.inserted,
+            is_financial_posted: true,
+          },
+          source: "webhook",
+        });
+      }
 
       if (receiptResult?.inserted) {
         const referenceImport =
@@ -340,7 +355,7 @@ router.post("/", async (req, res) => {
       // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger có thể ghi log chi phí NCC; TT NCC trên log mặc định Chưa Thanh Toán).
       // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
       // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
-      if (receiptResult?.inserted || receiptResult?.duplicate) {
+      if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate)) {
         const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
         for (const code of codesToUpdate) {
           if (isMavnImportOrder({ id_order: code })) {
@@ -365,9 +380,18 @@ router.post("/", async (req, res) => {
             );
             if (statusUpdateResult.rowCount > 0) {
               await incrementDashboardSummaryOnProcessing(client, state, code);
-              if (!alreadyFinancialPosted) {
-                postedRevenueDelta += normalizeMoney(state[ORDER_COLS.price]);
-                postedProfitDelta += normalizeMoney(state[ORDER_COLS.price]) - normalizeMoney(state[ORDER_COLS.cost]);
+              const rev = normalizeMoney(state[ORDER_COLS.price]);
+              const prof = rev - normalizeMoney(state[ORDER_COLS.cost]);
+              postedRevenueDelta += rev;
+              postedProfitDelta += prof;
+              if (receiptId) {
+                await insertFinancialAuditLog(client, {
+                  payment_receipt_id: receiptId,
+                  order_code: code,
+                  rule_branch: "UNPAID_TO_PAID",
+                  delta: { posted_revenue: rev, posted_profit: prof, month_key: paidMonthKey },
+                  source: "webhook",
+                });
               }
             }
             logger.debug("[Webhook] Order status → Đã Thanh Toán", {
@@ -375,10 +399,7 @@ router.post("/", async (req, res) => {
               previousStatus: statusValue,
               nextStatus,
             });
-          } else if (
-            !alreadyFinancialPosted &&
-            (statusValue === ORDER_STATUS.PAID || statusValue === ORDER_STATUS.PROCESSING)
-          ) {
+          } else if (statusValue === ORDER_STATUS.PAID || statusValue === ORDER_STATUS.PROCESSING) {
             const hasPrior = await hasPriorReceiptForOrder(
               client,
               code,
@@ -393,16 +414,36 @@ router.post("/", async (req, res) => {
               });
               postedRevenueDelta += transferAmountNormalized;
               postedProfitDelta += transferAmountNormalized;
+              if (receiptId) {
+                await insertFinancialAuditLog(client, {
+                  payment_receipt_id: receiptId,
+                  order_code: code,
+                  rule_branch: "PAID_OR_PROCESSING_LATE_WITH_PRIOR_RECEIPT",
+                  delta: {
+                    posted_revenue: transferAmountNormalized,
+                    posted_profit: transferAmountNormalized,
+                    month_key: paidMonthKey,
+                    order_status: statusValue,
+                  },
+                  source: "webhook",
+                });
+              }
             } else {
               logger.info("[Webhook] Skip financial posting for first late payment after shop pre-renewed", {
                 orderCode: code,
                 status: statusValue,
               });
+              if (receiptId) {
+                await insertFinancialAuditLog(client, {
+                  payment_receipt_id: receiptId,
+                  order_code: code,
+                  rule_branch: "PAID_OR_PROCESSING_LATE_NO_PRIOR_SKIP",
+                  delta: { order_status: statusValue },
+                  source: "webhook",
+                });
+              }
             }
-          } else if (
-            !alreadyFinancialPosted &&
-            statusValue === ORDER_STATUS.EXPIRED
-          ) {
+          } else if (statusValue === ORDER_STATUS.EXPIRED) {
             await incrementDashboardSummaryByDelta(client, paidMonthKey, {
               revenueDelta: transferAmountNormalized,
               profitDelta: transferAmountNormalized,
@@ -410,6 +451,19 @@ router.post("/", async (req, res) => {
             });
             postedRevenueDelta += transferAmountNormalized;
             postedProfitDelta += transferAmountNormalized;
+            if (receiptId) {
+              await insertFinancialAuditLog(client, {
+                payment_receipt_id: receiptId,
+                order_code: code,
+                rule_branch: "EXPIRED_PAYMENT_POST",
+                delta: {
+                  posted_revenue: transferAmountNormalized,
+                  posted_profit: transferAmountNormalized,
+                  month_key: paidMonthKey,
+                },
+                source: "webhook",
+              });
+            }
           }
         }
       }
@@ -426,6 +480,19 @@ router.post("/", async (req, res) => {
         });
         postedRevenueDelta += transferAmountNormalized;
         postedProfitDelta += transferAmountNormalized;
+        if (receiptId) {
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: receiptId,
+            order_code: "",
+            rule_branch: "NO_ORDER_CODE_AMOUNT_POST",
+            delta: {
+              posted_revenue: transferAmountNormalized,
+              posted_profit: transferAmountNormalized,
+              month_key: paidMonthKey,
+            },
+            source: "webhook",
+          });
+        }
       }
 
       if (receiptId) {
@@ -440,6 +507,17 @@ router.post("/", async (req, res) => {
             is_financial_posted: false,
             posted_revenue: 0,
             posted_profit: 0,
+          });
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: receiptId,
+            order_code: String(resolvedOrderCode || "").trim(),
+            rule_branch: "WEBHOOK_STATE_NOT_POSTED",
+            delta: {
+              posted_revenue: 0,
+              posted_profit: 0,
+              is_financial_posted: false,
+            },
+            source: "webhook",
           });
         }
       }

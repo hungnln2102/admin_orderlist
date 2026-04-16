@@ -51,7 +51,30 @@ const toMonthKey = (value) => {
   return `${year}-${month}`;
 };
 
-const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
+const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
+  const normalizedCode = String(orderCode || "").trim();
+  if (!normalizedCode) return false;
+  const parsedOrderDate = parseFlexibleDate(orderDateRaw);
+  const fromDate = parsedOrderDate
+    ? parsedOrderDate.toISOString().slice(0, 10)
+    : "1900-01-01";
+  const res = await client.query(
+    `
+      SELECT 1
+      FROM orders.payment_receipt pr
+      INNER JOIN orders.payment_receipt_financial_state fs
+        ON fs.payment_receipt_id = pr.id
+      WHERE LOWER(COALESCE(pr.id_order::text, '')) = LOWER($1)
+        AND pr.payment_date >= $2::date
+        AND fs.is_financial_posted = TRUE
+      LIMIT 1
+    `,
+    [normalizedCode, fromDate]
+  );
+  return res.rows.length > 0;
+};
+
+const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" } = {}) => {
   if (!orderCode) {
     return { success: false, details: "Thiếu mã đơn hàng", processType: "error" };
   }
@@ -265,8 +288,17 @@ const runRenewal = async (orderCode, { forceRenewal = false } = {}) => {
 
     // Renewal: gia hạn thành công đều chuyển Đã Thanh Toán.
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
+      const shouldSkipSummaryForManual = source === "manual" && (
+        await hasPostedReceiptForOrder(client, orderCode, order[ORDER_COLS.orderDate])
+      );
+      if (shouldSkipSummaryForManual) {
+        logger.info("[Renewal] Skip dashboard summary for manual renewal (receipt already posted)", {
+          orderCode,
+          source,
+        });
+      }
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
-      if (monthKey) {
+      if (monthKey && !shouldSkipSummaryForManual) {
         const revenue = normalizeMoney(finalGiaBan);
         const cost = normalizeMoney(finalGiaNhap);
         const profit = revenue - cost;

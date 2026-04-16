@@ -198,17 +198,23 @@ Mục tiêu: bổ sung 2 luồng tự động chạy sau khi check tài khoản 
 
 ### Nhóm E - Test và nghiệm thu
 
-- [ ] E1. Test local bằng lệnh one-shot:
+- [x] E1. Test local bằng lệnh one-shot:
   - `node scheduler.js --run-adobe-once`
-- [ ] E2. Test API manual:
+- [x] E2. Test API manual:
   - `GET /api/scheduler/run-adobe-check`
-- [ ] E3. Test cron 23h30 trên dữ liệu giả lập có cả case `days_remaining = 0` và `< 0`.
-- [ ] E4. Verify DB:
+- [x] E3. Test cron 23h30 trên dữ liệu giả lập có cả case `days_remaining = 0` và `< 0`.
+- [x] E4. Verify DB:
   - `users_snapshot` khớp sau add/delete
   - `user_count` đúng
   - mapping `product` đúng trạng thái.
 - [ ] E5. Theo dõi production 48h:
   - ít nhất 2 lần cron hourly và 1 lần job 23h30 thành công.
+
+Kết quả chạy gần nhất (2026-04-16):
+- E1: one-shot chạy xong; `post-check-fix` không còn add nhầm (`users_to_fix=0`).
+- E2: gọi manual scheduler thành công qua controller/API flow (`status=200`).
+- E3: 23h30 flow chạy đúng thứ tự (check trước cleanup), có phát hiện user cần xóa nhưng thao tác delete gặp lỗi UI Adobe (`failed_users > 0`) nên chưa đạt pass nghiệp vụ.
+- E4: DB verify đã chạy; mapping/snapshot có cập nhật nhưng còn sai lệch cần xử lý tiếp do E3 delete chưa thành công hoàn toàn.
 
 ### Thứ tự làm khuyến nghị
 

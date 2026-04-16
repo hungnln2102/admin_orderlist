@@ -37,6 +37,7 @@ const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
   ? PAYMENT_RECEIPT_TABLE.split(".")[0]
   : process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
 const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
+const PAYMENT_RECEIPT_FINANCIAL_AUDIT_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_audit_log`;
 const RECEIPT_STATE_COLS = {
   ID: "id",
   PAYMENT_RECEIPT_ID: "payment_receipt_id",
@@ -237,6 +238,37 @@ const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
     values
   );
   return res.rows[0] || null;
+};
+
+/**
+ * Ghi audit mỗi lần ghi số / nhánh rule (webhook hoặc reconcile).
+ * @param {import('pg').PoolClient} client
+ */
+const insertFinancialAuditLog = async (
+  client,
+  { payment_receipt_id: paymentReceiptId, order_code: orderCode = "", rule_branch: ruleBranch, delta = {}, source = "webhook" }
+) => {
+  const id = Number(paymentReceiptId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const branch = String(ruleBranch || "").trim();
+  if (!branch) return;
+  const payload =
+    delta && typeof delta === "object" && !Array.isArray(delta)
+      ? JSON.stringify(delta)
+      : JSON.stringify({ value: delta });
+  await client.query(
+    `
+      INSERT INTO ${PAYMENT_RECEIPT_FINANCIAL_AUDIT_TABLE} (
+        payment_receipt_id,
+        order_code,
+        rule_branch,
+        delta,
+        source
+      )
+      VALUES ($1, $2, $3, $4::jsonb, $5)
+    `,
+    [id, String(orderCode ?? "").trim(), branch, payload, String(source || "webhook")]
+  );
 };
 
 const insertPaymentReceipt = async (transaction, options = {}) => {
@@ -692,6 +724,7 @@ module.exports = {
   getReceiptFinancialState,
   updateReceiptFinancialState,
   ensureReceiptFinancialState,
+  insertFinancialAuditLog,
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
   calculateSalePrice,

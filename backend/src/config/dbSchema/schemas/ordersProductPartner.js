@@ -53,6 +53,18 @@ const ORDERS_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG: {
+    TABLE: "payment_receipt_financial_audit_log",
+    COLS: {
+      ID: "id",
+      PAYMENT_RECEIPT_ID: "payment_receipt_id",
+      ORDER_CODE: "order_code",
+      RULE_BRANCH: "rule_branch",
+      DELTA: "delta",
+      SOURCE: "source",
+      CREATED_AT: "created_at",
+    },
+  },
   REFUND: {
     TABLE: "refund",
     COLS: {

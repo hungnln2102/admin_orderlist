@@ -13,10 +13,16 @@ const {
 const { QUOTED_COLS } = require("../../utils/columns");
 const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
+const { updateDashboardMonthlySummaryOnStatusChange } = require("../Order/finance/dashboardSummary");
+const { runRenewal } = require("../../../webhook/sepay/renewal");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
 const PAYMENT_RECEIPT_STATE_DEF = getDefinition(
   "PAYMENT_RECEIPT_FINANCIAL_STATE",
+  ORDERS_SCHEMA
+);
+const PAYMENT_RECEIPT_AUDIT_DEF = getDefinition(
+  "PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG",
   ORDERS_SCHEMA
 );
 const ORDER_LIST_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
@@ -28,6 +34,7 @@ const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
   paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_ORDERS),
+  paymentReceiptAudit: tableName(PAYMENT_RECEIPT_AUDIT_DEF.tableName, SCHEMA_ORDERS),
   orderList: tableName(ORDER_LIST_DEF.tableName, SCHEMA_ORDERS),
   dashboardSummary: tableName(DASHBOARD_SUMMARY_DEF.tableName, SCHEMA_FINANCE),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
@@ -38,6 +45,16 @@ const PS = QUOTED_COLS.paymentSupply;
 const RECEIPT_STATE_COLS = PAYMENT_RECEIPT_STATE_DEF.columns;
 const ORDER_COLS = ORDER_LIST_DEF.columns;
 const SUMMARY_COLS = DASHBOARD_SUMMARY_DEF.columns;
+const RECONCILE_ACTIONS = {
+  ONLY: "reconcile_only",
+  MARK_PAID: "reconcile_and_mark_paid",
+  RENEW: "reconcile_and_renew",
+};
+const SUPPORTED_RECONCILE_ACTIONS = new Set([
+  RECONCILE_ACTIONS.ONLY,
+  RECONCILE_ACTIONS.MARK_PAID,
+  RECONCILE_ACTIONS.RENEW,
+]);
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
@@ -47,6 +64,12 @@ const normalizeMoney = (value) => {
     .trim();
   const numeric = Number.parseFloat(cleaned || "0");
   return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+};
+
+const createHttpError = (status, message) => {
+  const error = new Error(message);
+  error.status = status;
+  return error;
 };
 
 const toMonthKey = (value) => {
@@ -95,31 +118,38 @@ const listPaymentReceipts = async (req, res) => {
     ? Math.min(Math.max(limitParam, 1), 500)
     : 200;
   const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0;
+  const missingOrderOnly =
+    String(req.query.missingOrderCode ?? req.query.emptyOrderCode ?? "").trim() === "1";
 
   try {
-    const rows = await db(TABLES.paymentReceipt)
+    let query = db({ pr: TABLES.paymentReceipt })
       .leftJoin(
-        TABLES.paymentReceiptState,
-        `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.paymentReceiptId}`,
-        `${TABLES.paymentReceipt}.${PAYMENT_RECEIPT_DEF.columns.id}`
-      )
+        { fs: TABLES.paymentReceiptState },
+        `fs.${RECEIPT_STATE_COLS.paymentReceiptId}`,
+        `pr.${PAYMENT_RECEIPT_DEF.columns.id}`
+      );
+    if (missingOrderOnly) {
+      const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
+      query = query.whereRaw(`COALESCE(TRIM(pr.${orderCol}::text), '') = ''`);
+    }
+    const rows = await query
       .select({
-        id: PAYMENT_RECEIPT_DEF.columns.id,
-        orderCode: PAYMENT_RECEIPT_DEF.columns.orderCode,
-        paidAt: PAYMENT_RECEIPT_DEF.columns.paidDate,
-        amount: PAYMENT_RECEIPT_DEF.columns.amount,
-        sender: PAYMENT_RECEIPT_DEF.columns.sender,
-        receiver: PAYMENT_RECEIPT_DEF.columns.receiver,
-        note: PAYMENT_RECEIPT_DEF.columns.note,
-        isFinancialPosted: `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.isFinancialPosted}`,
-        postedRevenue: `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.postedRevenue}`,
-        postedProfit: `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.postedProfit}`,
-        reconciledAt: `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.reconciledAt}`,
-        adjustmentApplied: `${TABLES.paymentReceiptState}.${RECEIPT_STATE_COLS.adjustmentApplied}`,
+        id: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`,
+        orderCode: `pr.${PAYMENT_RECEIPT_DEF.columns.orderCode}`,
+        paidAt: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`,
+        amount: `pr.${PAYMENT_RECEIPT_DEF.columns.amount}`,
+        sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
+        receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
+        note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
+        isFinancialPosted: `fs.${RECEIPT_STATE_COLS.isFinancialPosted}`,
+        postedRevenue: `fs.${RECEIPT_STATE_COLS.postedRevenue}`,
+        postedProfit: `fs.${RECEIPT_STATE_COLS.postedProfit}`,
+        reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
+        adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
       })
       .orderBy([
-        { column: PAYMENT_RECEIPT_DEF.columns.paidDate, order: "desc" },
-        { column: PAYMENT_RECEIPT_DEF.columns.id, order: "desc" },
+        { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
+        { column: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`, order: "desc" },
       ])
       .offset(offset)
       .limit(limit);
@@ -142,19 +172,135 @@ const listPaymentReceipts = async (req, res) => {
 
     res.json({ receipts, count: receipts.length, offset, limit });
   } catch (error) {
+    const missingStateTable =
+      error?.code === "42P01" &&
+      String(error?.message || "").includes("payment_receipt_financial_state");
+    if (missingStateTable) {
+      try {
+        let fallbackQuery = db({ pr: TABLES.paymentReceipt });
+        if (missingOrderOnly) {
+          const orderCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
+          fallbackQuery = fallbackQuery.whereRaw(`COALESCE(TRIM(pr.${orderCol}::text), '') = ''`);
+        }
+        const fallbackRows = await fallbackQuery
+          .select({
+            id: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`,
+            orderCode: `pr.${PAYMENT_RECEIPT_DEF.columns.orderCode}`,
+            paidAt: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`,
+            amount: `pr.${PAYMENT_RECEIPT_DEF.columns.amount}`,
+            sender: `pr.${PAYMENT_RECEIPT_DEF.columns.sender}`,
+            receiver: `pr.${PAYMENT_RECEIPT_DEF.columns.receiver}`,
+            note: `pr.${PAYMENT_RECEIPT_DEF.columns.note}`,
+          })
+          .orderBy([
+            { column: `pr.${PAYMENT_RECEIPT_DEF.columns.paidDate}`, order: "desc" },
+            { column: `pr.${PAYMENT_RECEIPT_DEF.columns.id}`, order: "desc" },
+          ])
+          .offset(offset)
+          .limit(limit);
+
+        const receipts = (fallbackRows || []).map((row) => ({
+          id: row.id,
+          orderCode: row.orderCode,
+          paidAt: row.paidAt,
+          amount: Number(row.amount) || 0,
+          sender: row.sender,
+          receiver: row.receiver,
+          note: row.note,
+          isFinancialPosted: false,
+          postedRevenue: 0,
+          postedProfit: 0,
+          reconciledAt: null,
+          adjustmentApplied: false,
+        }));
+        logger.warn("[payments] payment_receipt_financial_state missing, fallback query used");
+        return res.json({ receipts, count: receipts.length, offset, limit });
+      } catch (fallbackErr) {
+        logger.error("[payments] Fallback query failed (payment-receipts)", {
+          error: fallbackErr.message,
+          stack: fallbackErr.stack,
+        });
+      }
+    }
     logger.error("[payments] Query failed (payment-receipts)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải biên lai thanh toán." });
   }
 };
 
+const listMatchableOrders = async (req, res) => {
+  const limitParam = Number.parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 500)
+    : 200;
+  const q = String(req.query.q || "").trim().toUpperCase();
+
+  try {
+    let query = db({ o: TABLES.orderList })
+      .select({
+        id: `o.${ORDER_COLS.id}`,
+        orderCode: `o.${ORDER_COLS.idOrder}`,
+        status: `o.${ORDER_COLS.status}`,
+        customer: `o.${ORDER_COLS.customer}`,
+        informationOrder: `o.${ORDER_COLS.informationOrder}`,
+      })
+      .whereIn(`o.${ORDER_COLS.status}`, [STATUS.UNPAID, STATUS.RENEWAL])
+      .whereRaw(`COALESCE(TRIM(o.${ORDER_COLS.idOrder}::text), '') <> ''`)
+      .orderBy([
+        { column: `o.${ORDER_COLS.orderDate}`, order: "desc" },
+        { column: `o.${ORDER_COLS.id}`, order: "desc" },
+      ])
+      .limit(limit);
+
+    if (q) {
+      query = query.whereRaw(
+        `(
+          COALESCE(o.${ORDER_COLS.idOrder}::text, '') ILIKE ?
+          OR COALESCE(o.${ORDER_COLS.customer}::text, '') ILIKE ?
+          OR COALESCE(o.${ORDER_COLS.informationOrder}::text, '') ILIKE ?
+        )`,
+        [`%${q}%`, `%${q}%`, `%${q}%`]
+      );
+    }
+
+    const rows = await query;
+    const orders = (rows || []).map((row) => ({
+      id: Number(row.id) || 0,
+      orderCode: String(row.orderCode || "").trim().toUpperCase(),
+      status: String(row.status || ""),
+      customer: String(row.customer || ""),
+      informationOrder: String(row.informationOrder || ""),
+    }));
+
+    res.json({ orders, count: orders.length, limit });
+  } catch (error) {
+    logger.error("[payments] Query failed (matchable-orders)", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({ error: "Không thể tải danh sách đơn hàng để ghép biên nhận." });
+  }
+};
+
 const reconcilePaymentReceipt = async (req, res) => {
   const receiptId = Number.parseInt(req.params.receiptId, 10);
-  const orderCodeRaw = String(req.body?.orderCode || "").trim().toUpperCase();
+  const rawOrderCodeValue = String(req.body?.orderCode || "").trim().toUpperCase();
+  const extractedOrderCode = rawOrderCodeValue.match(/MAV[A-Z0-9]{3,20}/)?.[0] || "";
+  const orderCodeRaw = extractedOrderCode || rawOrderCodeValue;
+  const actionRaw = String(req.body?.action || RECONCILE_ACTIONS.ONLY)
+    .trim()
+    .toLowerCase();
+  const action = actionRaw || RECONCILE_ACTIONS.ONLY;
   if (!Number.isFinite(receiptId) || receiptId <= 0) {
     return res.status(400).json({ error: "receiptId không hợp lệ." });
   }
   if (!/^MAV[A-Z0-9]{3,20}$/i.test(orderCodeRaw)) {
     return res.status(400).json({ error: "orderCode không đúng định dạng MAV." });
+  }
+  if (!SUPPORTED_RECONCILE_ACTIONS.has(action)) {
+    return res.status(400).json({
+      error:
+        "action không hợp lệ. Chỉ chấp nhận reconcile_only, reconcile_and_mark_paid, reconcile_and_renew.",
+    });
   }
 
   try {
@@ -187,52 +333,147 @@ const reconcilePaymentReceipt = async (req, res) => {
           [PAYMENT_RECEIPT_DEF.columns.orderCode]: orderCodeRaw,
         });
 
-      if (stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied]) {
-        return {
-          receiptId,
-          orderCode: orderCodeRaw,
-          skipped: true,
-          reason: "adjustment already applied",
-        };
-      }
-
-      const receiptMonthKey = toMonthKey(receiptRes[PAYMENT_RECEIPT_DEF.columns.paidDate]);
-      const postedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
-      const postedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
-      const statusValue = String(orderRow[ORDER_COLS.status] || "").trim();
-
+      const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
+      const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
+      let statusValue = statusValueInitial;
       let revenueDelta = 0;
       let profitDelta = 0;
+      let nextPostedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
+      let nextPostedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
 
-      if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
-        // Đơn đã được xử lý trước đó: đảo phần đã cộng tạm từ receipt không mã.
-        revenueDelta = -postedRevenue;
-        profitDelta = -postedProfit;
-      } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
-        // Chỉ điều chỉnh lợi nhuận về đúng amount - cost.
-        const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
-        profitDelta = -cost;
+      if (adjustmentApplied) {
+        await trx.raw(
+          `INSERT INTO ${TABLES.paymentReceiptAudit} (payment_receipt_id, order_code, rule_branch, delta, source) VALUES (?, ?, ?, ?::jsonb, ?)`,
+          [
+            receiptId,
+            orderCodeRaw,
+            "RECONCILE_SKIPPED_ALREADY_APPLIED",
+            JSON.stringify({ reason: "adjustment already applied", action }),
+            "reconcile",
+          ]
+        );
+      } else {
+        const receiptMonthKey = toMonthKey(receiptRes[PAYMENT_RECEIPT_DEF.columns.paidDate]);
+        const postedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
+        const postedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
+
+        if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
+          // Đơn đã được xử lý trước đó: trừ lại phần đã cộng trước ở receipt không mã.
+          revenueDelta = -postedRevenue;
+          profitDelta = -postedProfit;
+        } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
+          // Chỉ điều chỉnh lợi nhuận về đúng amount - cost.
+          const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
+          profitDelta = -cost;
+        }
+
+        await applyDashboardDelta(trx, receiptMonthKey, {
+          revenueDelta,
+          profitDelta,
+          ordersDelta: 0,
+        });
+
+        nextPostedRevenue = postedRevenue + revenueDelta;
+        nextPostedProfit = postedProfit + profitDelta;
+
+        await trx(TABLES.paymentReceiptState)
+          .where(RECEIPT_STATE_COLS.paymentReceiptId, receiptId)
+          .update({
+            [RECEIPT_STATE_COLS.isFinancialPosted]: true,
+            [RECEIPT_STATE_COLS.postedRevenue]: nextPostedRevenue,
+            [RECEIPT_STATE_COLS.postedProfit]: nextPostedProfit,
+            [RECEIPT_STATE_COLS.reconciledAt]: new Date(),
+            [RECEIPT_STATE_COLS.adjustmentApplied]: true,
+            [RECEIPT_STATE_COLS.updatedAt]: new Date(),
+          });
+
+        const reconcileRuleBranch =
+          statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING
+            ? "RECONCILE_CASE1_REVERSE_TEMP_POST"
+            : "RECONCILE_CASE2_UNPAID_RENEWAL_PROFIT_ADJUST";
+        await trx.raw(
+          `INSERT INTO ${TABLES.paymentReceiptAudit} (payment_receipt_id, order_code, rule_branch, delta, source) VALUES (?, ?, ?, ?::jsonb, ?)`,
+          [
+            receiptId,
+            orderCodeRaw,
+            reconcileRuleBranch,
+            JSON.stringify({
+              revenueDelta,
+              profitDelta,
+              postedRevenue: nextPostedRevenue,
+              postedProfit: nextPostedProfit,
+              orderStatus: statusValue,
+              action,
+            }),
+            "reconcile",
+          ]
+        );
       }
 
-      await applyDashboardDelta(trx, receiptMonthKey, {
-        revenueDelta,
-        profitDelta,
-        ordersDelta: 0,
-      });
+      const actionResult = {
+        actionApplied: action,
+        statusBeforeAction: statusValueInitial,
+        statusAfterAction: statusValue,
+      };
+      let shouldRunRenewal = false;
 
-      const nextPostedRevenue = postedRevenue + revenueDelta;
-      const nextPostedProfit = postedProfit + profitDelta;
+      if (action === RECONCILE_ACTIONS.MARK_PAID) {
+        if (statusValueInitial !== STATUS.UNPAID) {
+          throw createHttpError(
+            409,
+            "Chỉ được dùng reconcile_and_mark_paid cho đơn Chưa Thanh Toán."
+          );
+        }
 
-      await trx(TABLES.paymentReceiptState)
-        .where(RECEIPT_STATE_COLS.paymentReceiptId, receiptId)
-        .update({
-          [RECEIPT_STATE_COLS.isFinancialPosted]: true,
-          [RECEIPT_STATE_COLS.postedRevenue]: nextPostedRevenue,
-          [RECEIPT_STATE_COLS.postedProfit]: nextPostedProfit,
-          [RECEIPT_STATE_COLS.reconciledAt]: new Date(),
-          [RECEIPT_STATE_COLS.adjustmentApplied]: true,
-          [RECEIPT_STATE_COLS.updatedAt]: new Date(),
-        });
+        const [updatedOrder] = await trx(TABLES.orderList)
+          .where(ORDER_COLS.id, orderRow[ORDER_COLS.id])
+          .update({
+            [ORDER_COLS.status]: STATUS.PAID,
+          })
+          .returning("*");
+
+        if (!updatedOrder) {
+          throw createHttpError(500, "Không thể cập nhật trạng thái đơn hàng.");
+        }
+
+        await updateDashboardMonthlySummaryOnStatusChange(trx, orderRow, updatedOrder);
+        statusValue = STATUS.PAID;
+        actionResult.statusAfterAction = statusValue;
+
+        await trx.raw(
+          `INSERT INTO ${TABLES.paymentReceiptAudit} (payment_receipt_id, order_code, rule_branch, delta, source) VALUES (?, ?, ?, ?::jsonb, ?)`,
+          [
+            receiptId,
+            orderCodeRaw,
+            "RECONCILE_AND_MARK_PAID_APPLIED",
+            JSON.stringify({
+              fromStatus: statusValueInitial,
+              toStatus: statusValue,
+            }),
+            "reconcile",
+          ]
+        );
+      } else if (action === RECONCILE_ACTIONS.RENEW) {
+        if (statusValueInitial !== STATUS.RENEWAL) {
+          throw createHttpError(
+            409,
+            "Chỉ được dùng reconcile_and_renew cho đơn Cần Gia Hạn."
+          );
+        }
+        shouldRunRenewal = true;
+        await trx.raw(
+          `INSERT INTO ${TABLES.paymentReceiptAudit} (payment_receipt_id, order_code, rule_branch, delta, source) VALUES (?, ?, ?, ?::jsonb, ?)`,
+          [
+            receiptId,
+            orderCodeRaw,
+            "RECONCILE_AND_RENEW_QUEUED",
+            JSON.stringify({
+              fromStatus: statusValueInitial,
+            }),
+            "reconcile",
+          ]
+        );
+      }
 
       return {
         receiptId,
@@ -243,18 +484,57 @@ const reconcilePaymentReceipt = async (req, res) => {
         postedRevenue: nextPostedRevenue,
         postedProfit: nextPostedProfit,
         reconciledAt: new Date().toISOString(),
+        skipped: adjustmentApplied,
+        reason: adjustmentApplied ? "adjustment already applied" : null,
+        actionResult,
+        shouldRunRenewal,
       };
     });
 
-    return res.json({ success: true, ...result });
-  } catch (error) {
-    logger.error("[payments] reconcile payment receipt failed", {
-      receiptId,
-      orderCode: orderCodeRaw,
-      error: error.message,
-      stack: error.stack,
+    let renewalResult = null;
+    if (result.shouldRunRenewal) {
+      renewalResult = await runRenewal(orderCodeRaw, {
+        forceRenewal: true,
+        source: "manual",
+      });
+    }
+    const actionResult = {
+      ...(result.actionResult || {}),
+    };
+    if (renewalResult?.success && renewalResult?.details?.TINH_TRANG) {
+      actionResult.statusAfterAction = renewalResult.details.TINH_TRANG;
+    }
+
+    return res.json({
+      success: true,
+      action,
+      ...result,
+      shouldRunRenewal: undefined,
+      actionResult,
+      renewalSuccess: renewalResult ? !!renewalResult?.success : null,
+      renewalDetails: renewalResult?.details || null,
     });
-    return res.status(500).json({ error: error.message || "Không thể reconcile biên lai." });
+  } catch (error) {
+    const statusCode = Number(error?.status) || 500;
+    if (statusCode >= 400 && statusCode < 500) {
+      logger.warn("[payments] Từ chối reconcile biên lai theo rule nghiệp vụ", {
+        receiptId,
+        orderCode: orderCodeRaw,
+        action,
+        statusCode,
+        error: error.message,
+      });
+    } else {
+      logger.error("[payments] Reconcile biên lai thất bại", {
+        receiptId,
+        orderCode: orderCodeRaw,
+        action,
+        statusCode,
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+    return res.status(statusCode).json({ error: error.message || "Không thể reconcile biên lai." });
   }
 };
 
@@ -415,6 +695,7 @@ const confirmPaymentSupply = async (req, res) => {
 
 module.exports = {
   listPaymentReceipts,
+  listMatchableOrders,
   confirmPaymentSupply,
   reconcilePaymentReceipt,
 };

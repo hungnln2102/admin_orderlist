@@ -10,7 +10,10 @@ const attachRenewRoutes = (router) => {
         const forceRenewal = req.body?.forceRenewal ?? req.body?.force ?? true;
 
         try {
-            const result = await sepayWebhookApp.runRenewal(orderCode, { forceRenewal });
+            const result = await sepayWebhookApp.runRenewal(orderCode, {
+                forceRenewal,
+                source: "manual",
+            });
             if (result?.success) {
                 if (typeof sepayWebhookApp.sendRenewalNotification === "function") {
                     sepayWebhookApp.sendRenewalNotification(orderCode, result).catch((err) => logger.error("sendRenewalNotification failed", { orderCode, error: err?.message }));

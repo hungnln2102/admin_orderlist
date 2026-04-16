@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import * as Helpers from "@/lib/helpers";
 import {
   extractTransactionCodeFromNote,
+  MatchableOrder,
   PaymentReceipt,
   QR_BANK_INFO,
   formatCurrencyVnd,
@@ -10,6 +11,10 @@ import {
 
 type ReceiptsTableProps = {
   receipts: PaymentReceipt[];
+  matchableOrders: MatchableOrder[];
+  matchingReceiptId: number | null;
+  onMatchReceipt: (receiptId: number, orderCode: string) => Promise<void>;
+  enableMatching?: boolean;
   expandedReceiptId: number | null;
   onToggle: (receiptId: number) => void;
   onSelectReceipt?: (receipt: PaymentReceipt) => void;
@@ -18,15 +23,89 @@ type ReceiptsTableProps = {
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   receipts,
+  matchableOrders,
+  matchingReceiptId,
+  onMatchReceipt,
+  enableMatching = false,
   expandedReceiptId,
   onToggle,
   onSelectReceipt,
   showOrderCode = true,
 }) => {
-  const expandedColSpan = showOrderCode ? 7 : 6;
+  const [selectionByReceiptId, setSelectionByReceiptId] = useState<
+    Record<number, string>
+  >({});
+  const [manualCodeByReceiptId, setManualCodeByReceiptId] = useState<
+    Record<number, string>
+  >({});
+  const [rowErrorByReceiptId, setRowErrorByReceiptId] = useState<
+    Record<number, string>
+  >({});
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    receiptId: number;
+    orderCode: string;
+  } | null>(null);
+
+  const visibleColsBase = showOrderCode ? 7 : 6;
+  const expandedColSpan = visibleColsBase + (enableMatching ? 1 : 0);
   const expandedGridClass = showOrderCode
     ? "grid grid-cols-1 md:grid-cols-5 gap-6"
     : "grid grid-cols-1 md:grid-cols-4 gap-6";
+  const orderOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return matchableOrders.filter((order) => {
+      const key = (order.orderCode || "").toUpperCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [matchableOrders]);
+
+  const getSelectedValue = (receipt: PaymentReceipt): string => {
+    const stateValue = selectionByReceiptId[receipt.id];
+    if (typeof stateValue === "string") return stateValue;
+    const currentOrderCode = String(receipt.orderCode || "").trim().toUpperCase();
+    return currentOrderCode || "";
+  };
+
+  const handleSelectMatch = async (receipt: PaymentReceipt, value: string) => {
+    setSelectionByReceiptId((prev) => ({ ...prev, [receipt.id]: value }));
+    setRowErrorByReceiptId((prev) => ({ ...prev, [receipt.id]: "" }));
+    if (!value || value === "__manual__") return;
+    setPendingConfirm({ receiptId: receipt.id, orderCode: value });
+  };
+
+  const handleSubmitManualMatch = (receipt: PaymentReceipt) => {
+    const manualCode = String(manualCodeByReceiptId[receipt.id] || "")
+      .trim()
+      .toUpperCase();
+    if (!manualCode) {
+      setRowErrorByReceiptId((prev) => ({
+        ...prev,
+        [receipt.id]: "Bạn chưa nhập mã đơn hàng.",
+      }));
+      return;
+    }
+    setRowErrorByReceiptId((prev) => ({ ...prev, [receipt.id]: "" }));
+    setPendingConfirm({ receiptId: receipt.id, orderCode: manualCode });
+  };
+
+  const handleConfirmMatch = async () => {
+    if (!pendingConfirm) return;
+    const { receiptId, orderCode } = pendingConfirm;
+    setPendingConfirm(null);
+    try {
+      await onMatchReceipt(receiptId, orderCode);
+      setSelectionByReceiptId((prev) => ({ ...prev, [receiptId]: orderCode }));
+      setManualCodeByReceiptId((prev) => ({ ...prev, [receiptId]: "" }));
+    } catch (err) {
+      setRowErrorByReceiptId((prev) => ({
+        ...prev,
+        [receiptId]:
+          err instanceof Error ? err.message : "Không thể ghép mã đơn cho biên lai.",
+      }));
+    }
+  };
 
   return (
     <div className="bg-transparent overflow-visible">
@@ -34,6 +113,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
         <table className="min-w-full border-separate border-spacing-y-4 text-white">
           <thead>
             <tr className="[&>th]:px-5 [&>th]:pb-2 [&>th]:text-[11px] [&>th]:font-black [&>th]:uppercase [&>th]:tracking-[0.2em] [&>th]:text-indigo-300/70 [&>th]:text-left">
+              {enableMatching ? <th className="w-[320px]">GHÉP MÃ ĐƠN</th> : null}
               {showOrderCode ? <th className="w-[120px]">MÃ ĐƠN</th> : null}
               <th className="w-[180px]">NGƯỜI GỬI</th>
               <th className="w-[180px]">NGƯỜI NHẬN</th>
@@ -46,6 +126,10 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
           <tbody className="">
             {receipts.map((receipt) => {
               const isExpanded = expandedReceiptId === receipt.id;
+              const selectedValue = getSelectedValue(receipt);
+              const isManualInput = selectedValue === "__manual__";
+              const rowError = rowErrorByReceiptId[receipt.id] || "";
+              const isMatching = matchingReceiptId === receipt.id;
               return (
                 <React.Fragment key={receipt.id}>
                   <tr
@@ -55,8 +139,73 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                       onSelectReceipt ? onSelectReceipt(receipt) : undefined
                     }
                   >
-                    {showOrderCode ? (
+                    {enableMatching ? (
                       <td className="px-5 py-5 first:rounded-l-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
+                        <div
+                          className="space-y-2"
+                          onClick={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                        >
+                          <select
+                            value={selectedValue}
+                            onChange={(event) =>
+                              void handleSelectMatch(receipt, event.target.value)
+                            }
+                            disabled={isMatching}
+                            className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                          >
+                            <option value="">Chọn đơn cần ghép...</option>
+                            <option value="__manual__">Tự điền mã đơn hàng</option>
+                            {orderOptions.map((order) => (
+                              <option key={order.orderCode} value={order.orderCode}>
+                                {order.orderCode} - {order.status}
+                              </option>
+                            ))}
+                          </select>
+                          {isManualInput && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={manualCodeByReceiptId[receipt.id] || ""}
+                                onChange={(event) =>
+                                  setManualCodeByReceiptId((prev) => ({
+                                    ...prev,
+                                    [receipt.id]: event.target.value.toUpperCase(),
+                                  }))
+                                }
+                                disabled={isMatching}
+                                placeholder="Nhập mã đơn (VD: MAVC...)"
+                                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void handleSubmitManualMatch(receipt)}
+                                disabled={isMatching}
+                                className="shrink-0 rounded-xl border border-indigo-400/40 bg-indigo-500/20 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                              >
+                                Ghép
+                              </button>
+                            </div>
+                          )}
+                          {isMatching ? (
+                            <p className="text-[10px] font-semibold text-indigo-200/70">
+                              Đang ghép biên lai...
+                            </p>
+                          ) : null}
+                          {rowError ? (
+                            <p className="text-[10px] font-semibold text-rose-300">
+                              {rowError}
+                            </p>
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
+                    {showOrderCode ? (
+                      <td
+                        className={`px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 ${
+                          enableMatching ? "" : "first:rounded-l-[24px]"
+                        }`}
+                      >
                         <span className="text-sm font-bold text-white tracking-wider uppercase">
                           {receipt.orderCode || "—"}
                         </span>
@@ -158,6 +307,40 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
           </tbody>
         </table>
       </div>
+      {pendingConfirm ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-indigo-400/30 bg-slate-900/95 p-6 shadow-2xl">
+            <h3 className="text-lg font-black text-white tracking-tight">
+              Xác nhận gắn mã đơn
+            </h3>
+            <p className="mt-3 text-sm text-indigo-100/90 leading-relaxed">
+              Bạn có chắc muốn gắn mã đơn{" "}
+              <span className="font-black text-white">{pendingConfirm.orderCode}</span>{" "}
+              cho biên lai này không?
+            </p>
+            <p className="mt-2 text-xs text-indigo-200/70 leading-relaxed">
+              Khi xác nhận, hệ thống sẽ chạy luồng gán mã đơn (reconcile) và tự động
+              cộng/trừ doanh thu, lợi nhuận theo đúng quy tắc đối soát hiện hành.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingConfirm(null)}
+                className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmMatch()}
+                className="rounded-xl border border-indigo-300/30 bg-indigo-600/70 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -6,6 +6,9 @@ const { Pool } = require("pg");
 const webhookApp = require("../../webhook/sepay/app");
 const { reconcilePaymentReceipt } = require("../../src/controllers/PaymentsController");
 const { STATUS } = require("../../src/utils/statuses");
+const { db } = require("../../src/db");
+const { updateDashboardMonthlySummaryOnStatusChange } = require("../../src/controllers/Order/finance/dashboardSummary");
+const { runRenewal } = require("../../webhook/sepay/renewal");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -97,6 +100,37 @@ async function getReceiptState(receiptId) {
   return res.rows[0] || null;
 }
 
+async function insertPostedReceiptState({ orderCode, amount, note }) {
+  const receiptRes = await pool.query(
+    `
+      INSERT INTO orders.payment_receipt (id_order, payment_date, amount, receiver, note, sender)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
+    `,
+    [orderCode, TEST_PAYMENT_DATE, amount, "918340998", note, "TEST"]
+  );
+  const receiptId = Number(receiptRes.rows[0]?.id || 0);
+  await pool.query(
+    `
+      INSERT INTO orders.payment_receipt_financial_state (
+        payment_receipt_id,
+        is_financial_posted,
+        posted_revenue,
+        posted_profit
+      )
+      VALUES ($1, TRUE, $2, $3)
+      ON CONFLICT (payment_receipt_id)
+      DO UPDATE SET
+        is_financial_posted = TRUE,
+        posted_revenue = EXCLUDED.posted_revenue,
+        posted_profit = EXCLUDED.posted_profit,
+        updated_at = NOW()
+    `,
+    [receiptId, amount, amount]
+  );
+  return receiptId;
+}
+
 async function createOrder({ idOrder, status, price, cost }) {
   if (!Number.isFinite(nextOrderId)) {
     throw new Error("nextOrderId chưa được khởi tạo.");
@@ -159,12 +193,12 @@ async function callWebhook(payload) {
   return req.send(body);
 }
 
-async function callReconcile(receiptId, orderCode) {
+async function callReconcile(receiptId, orderCode, action = "reconcile_only") {
   let statusCode = 200;
   let jsonPayload = null;
   const req = {
     params: { receiptId: String(receiptId) },
-    body: { orderCode },
+    body: { orderCode, action },
   };
   const res = {
     status(code) {
@@ -227,6 +261,23 @@ async function run() {
       revenueDelta: c1After.revenue - c1Before.revenue,
       profitDelta: c1After.profit - c1Before.profit,
       state: c1State,
+    },
+  });
+
+  const c7Before = await getSummary(TEST_MONTH_KEY);
+  const c7Res = await callWebhook(c1Payload);
+  const c7After = await getSummary(TEST_MONTH_KEY);
+  results.push({
+    id: "C7",
+    name: "Duplicate webhook cung noi dung — khong cong doanh thu lan 2",
+    ok:
+      c7Res.status === 200 &&
+      c7After.revenue === c7Before.revenue &&
+      c7After.profit === c7Before.profit,
+    detail: {
+      httpStatus: c7Res.status,
+      revenueDelta: c7After.revenue - c7Before.revenue,
+      profitDelta: c7After.profit - c7Before.profit,
     },
   });
 
@@ -396,6 +447,183 @@ async function run() {
       revenueDelta: c6After.revenue - c6Before.revenue,
       profitDelta: c6After.profit - c6Before.profit,
       state: c6State,
+    },
+  });
+
+  // Case 8: manual "Thanh Toan" after a posted receipt should not double-count dashboard
+  const c8OrderCode = makeOrderCode("A8");
+  const c8Order = await createOrder({
+    idOrder: c8OrderCode,
+    status: STATUS.UNPAID,
+    price: 180000,
+    cost: 60000,
+  });
+  await insertPostedReceiptState({
+    orderCode: c8OrderCode,
+    amount: 180000,
+    note: `${MARKER} C8 MANUAL PAID`,
+  });
+  const c8Before = await getSummary(TEST_MONTH_KEY);
+  await db.transaction(async (trx) => {
+    const beforeRow = await trx("orders.order_list").where({ id: c8Order.id }).first();
+    const [afterRow] = await trx("orders.order_list")
+      .where({ id: c8Order.id })
+      .update({ status: STATUS.PAID })
+      .returning("*");
+    await updateDashboardMonthlySummaryOnStatusChange(trx, beforeRow, afterRow);
+  });
+  const c8After = await getSummary(TEST_MONTH_KEY);
+  results.push({
+    id: "C8",
+    name: "Manual Thanh Toan sau receipt da post khong double-count",
+    ok:
+      c8After.revenue - c8Before.revenue === 0 &&
+      c8After.profit - c8Before.profit === 0,
+    detail: {
+      revenueDelta: c8After.revenue - c8Before.revenue,
+      profitDelta: c8After.profit - c8Before.profit,
+    },
+  });
+
+  // Case 9: manual "Gia Han" with posted receipt should not double-count dashboard
+  const c9OrderCode = makeOrderCode("A9");
+  await createOrder({
+    idOrder: c9OrderCode,
+    status: STATUS.RENEWAL,
+    price: 190000,
+    cost: 70000,
+  });
+  await insertPostedReceiptState({
+    orderCode: c9OrderCode,
+    amount: 190000,
+    note: `${MARKER} C9 MANUAL RENEW`,
+  });
+  const c9Before = await getSummary(TEST_MONTH_KEY);
+  const c9RenewResult = await runRenewal(c9OrderCode, {
+    forceRenewal: true,
+    source: "manual",
+  });
+  const c9After = await getSummary(TEST_MONTH_KEY);
+  results.push({
+    id: "C9",
+    name: "Manual Gia Han sau receipt da post khong double-count",
+    ok:
+      !!c9RenewResult?.success &&
+      c9After.revenue - c9Before.revenue === 0 &&
+      c9After.profit - c9Before.profit === 0,
+    detail: {
+      renewalSuccess: !!c9RenewResult?.success,
+      renewalDetails: c9RenewResult?.details || null,
+      revenueDelta: c9After.revenue - c9Before.revenue,
+      profitDelta: c9After.profit - c9Before.profit,
+    },
+  });
+
+  // Case 10: reconcile + mark paid (UNPAID) -> run reconcile, then change status to PAID without double-count
+  const c10OrderCode = makeOrderCode("B0");
+  await createOrder({
+    idOrder: c10OrderCode,
+    status: STATUS.UNPAID,
+    price: 210000,
+    cost: 80000,
+  });
+  await callWebhook({
+    transactionDate: `${TEST_PAYMENT_DATE} 14:00:00`,
+    accountNumber: "918340998",
+    transferType: "in",
+    transferAmount: 300000,
+    content: `${MARKER} NHAN TU TEST TRACE C10 ND KHONG MA`,
+    description: `${MARKER} C10`,
+  });
+  const c10Receipt = await getReceiptByMarkerAndEmptyOrder(`${MARKER} C10`);
+  const c10Before = await getSummary(TEST_MONTH_KEY);
+  const c10Recon = await callReconcile(c10Receipt.id, c10OrderCode, "reconcile_and_mark_paid");
+  const c10After = await getSummary(TEST_MONTH_KEY);
+  const c10OrderRow = await pool.query(
+    `SELECT status FROM orders.order_list WHERE LOWER(id_order) = LOWER($1) LIMIT 1`,
+    [c10OrderCode]
+  );
+  results.push({
+    id: "C10",
+    name: "Reconcile + mark paid cho don UNPAID",
+    ok:
+      c10Recon.statusCode === 200 &&
+      c10After.revenue - c10Before.revenue === 0 &&
+      c10After.profit - c10Before.profit === -80000 &&
+      String(c10OrderRow.rows?.[0]?.status || "") === STATUS.PAID,
+    detail: {
+      httpStatus: c10Recon.statusCode,
+      revenueDelta: c10After.revenue - c10Before.revenue,
+      profitDelta: c10After.profit - c10Before.profit,
+      orderStatus: c10OrderRow.rows?.[0]?.status || null,
+      actionResult: c10Recon.body?.actionResult || null,
+    },
+  });
+
+  // Case 11: reconcile + renew (RENEWAL) -> run reconcile, trigger renewal without double-count
+  const c11OrderCode = makeOrderCode("B1");
+  await createOrder({
+    idOrder: c11OrderCode,
+    status: STATUS.RENEWAL,
+    price: 220000,
+    cost: 90000,
+  });
+  await callWebhook({
+    transactionDate: `${TEST_PAYMENT_DATE} 15:00:00`,
+    accountNumber: "918340998",
+    transferType: "in",
+    transferAmount: 320000,
+    content: `${MARKER} NHAN TU TEST TRACE C11 ND KHONG MA`,
+    description: `${MARKER} C11`,
+  });
+  const c11Receipt = await getReceiptByMarkerAndEmptyOrder(`${MARKER} C11`);
+  const c11Before = await getSummary(TEST_MONTH_KEY);
+  const c11Recon = await callReconcile(c11Receipt.id, c11OrderCode, "reconcile_and_renew");
+  const c11After = await getSummary(TEST_MONTH_KEY);
+  const c11OrderRow = await pool.query(
+    `SELECT status FROM orders.order_list WHERE LOWER(id_order) = LOWER($1) LIMIT 1`,
+    [c11OrderCode]
+  );
+  results.push({
+    id: "C11",
+    name: "Reconcile + renew cho don CAN GIA HAN",
+    ok:
+      c11Recon.statusCode === 200 &&
+      !!c11Recon.body?.renewalSuccess &&
+      c11After.revenue - c11Before.revenue === 0 &&
+      c11After.profit - c11Before.profit === -90000 &&
+      String(c11OrderRow.rows?.[0]?.status || "") === STATUS.PAID,
+    detail: {
+      httpStatus: c11Recon.statusCode,
+      renewalSuccess: c11Recon.body?.renewalSuccess || false,
+      revenueDelta: c11After.revenue - c11Before.revenue,
+      profitDelta: c11After.profit - c11Before.profit,
+      orderStatus: c11OrderRow.rows?.[0]?.status || null,
+      actionResult: c11Recon.body?.actionResult || null,
+    },
+  });
+
+  // Case 12: idempotent protect for mark_paid action (status no longer UNPAID)
+  const c12Recon = await callReconcile(c10Receipt.id, c10OrderCode, "reconcile_and_mark_paid");
+  results.push({
+    id: "C12",
+    name: "Idempotent mark paid action bi chan khi status da doi",
+    ok: c12Recon.statusCode === 409,
+    detail: {
+      httpStatus: c12Recon.statusCode,
+      error: c12Recon.body?.error || null,
+    },
+  });
+
+  // Case 13: idempotent protect for renew action (status no longer RENEWAL)
+  const c13Recon = await callReconcile(c11Receipt.id, c11OrderCode, "reconcile_and_renew");
+  results.push({
+    id: "C13",
+    name: "Idempotent renew action bi chan khi status da doi",
+    ok: c13Recon.statusCode === 409,
+    detail: {
+      httpStatus: c13Recon.statusCode,
+      error: c13Recon.body?.error || null,
     },
   });
 

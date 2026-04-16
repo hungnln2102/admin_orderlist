@@ -9,13 +9,15 @@ Chuẩn hóa 2 chỉ số tài chính:
 
 ## 2) Quy tắc nghiệp vụ gốc
 
-Áp dụng cho luồng lợi nhuận tháng:
+Áp dụng cho luồng lợi nhuận tháng (tổng hợp; chi tiết đối soát webhook xem mục 9):
 
 1. Webhook **có mã đơn hàng**: cộng `price - cost`.
 2. Webhook **không có mã đơn hàng**: cộng thẳng `amount`.
 3. Đơn bấm **Gia Hạn** hoặc **Thanh Toán**: cộng `price - cost`.
 4. Đơn **nhập hàng** (MAVN), khi **tạo đơn thành công** hoặc **gia hạn**: trừ `cost`.
 5. **Hoàn tiền khách**: trừ `refund`.
+
+Chi tiết webhook Sepay, dedupe và reconcile: xem **mục 9** cuối tài liệu.
 
 ## 3) Chi phí ngoài luồng (dùng cho khả dụng)
 
@@ -92,4 +94,17 @@ Ghi chú:
 - `Lợi nhuận tháng` khớp logic nghiệp vụ hiện hành.
 - `Lợi nhuận khả dụng` khớp công thức tổng lợi nhuận trừ tổng chi phí ngoài luồng.
 - Có thể đối soát đầy đủ từng khoản chi ngoài luồng qua lịch sử bảng mới.
+
+## 9) Webhook Sepay & đối soát tài chính
+
+Nguồn ghi nhận: `orders.payment_receipt`, cờ `orders.payment_receipt_financial_state`, cộng trừ `finance.dashboard_monthly_summary`, audit `orders.payment_receipt_financial_audit_log`.
+
+- **Idempotency / dedupe**: cùng giao dịch (`sepay_transaction_id` hoặc `reference_code + transfer_type + amount + payment_date` hoặc khớp biên lai) → không insert biên lai lần 2; nếu đã `is_financial_posted` thì **không** cộng doanh thu/lợi nhuận lần nữa.
+- **Chưa Thanh Toán** (có mã): khi webhook đổi sang **Đã Thanh Toán**, cộng doanh thu = `price`, lợi nhuận = `price - cost` (đơn bán dashboard).
+- **Đã Thanh Toán / Đang Xử Lý**: nếu đã có biên lai cùng đơn từ `order_date` trở đi → cộng thêm `amount` cho cả doanh thu và lợi nhuận; nếu **chưa** có biên lai trước đó → **không** cộng (tránh double với gia hạn tay shop).
+- **Hết hạn**: cộng `amount` cho doanh thu và lợi nhuận theo policy đã chốt.
+- **Không mã đơn**: post doanh thu/lợi nhuận = `amount` theo tháng thanh toán; **reconcile** gắn mã đơn để điều chỉnh (case 1: đảo phần tạm nếu đơn PAID/PROCESSING; case 2: giữ doanh thu, trừ `cost` trên lợi nhuận nếu đơn **Chưa TT / Cần Gia Hạn**).
+- **Audit**: mỗi nhánh ghi số / mỗi lần reconcile ghi một dòng (`rule_branch`, `delta` JSON).
+
+API: `GET /api/payment-receipts?missingOrderCode=1` — biên lai **thiếu mã đơn** (`id_order` rỗng). Script backfill audit tùy chọn: `backend/scripts/ops/backfill-financial-audit-from-state.js`.
 

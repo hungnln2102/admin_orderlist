@@ -2,14 +2,10 @@ const deleteOrderWithArchive = async ({
     trx,
     order,
     normalized,
-    reqBody,
     helpers,
 }) => {
     const { TABLES, ORDERS_SCHEMA, STATUS } = helpers;
-    const {
-        adjustSupplierDebtIfNeeded,
-        calcRemainingRefund,
-    } = require("./orderFinanceHelpers");
+    const { adjustSupplierDebtIfNeeded } = require("./orderFinanceHelpers");
     const { calcRemainingImport } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
@@ -20,10 +16,10 @@ const deleteOrderWithArchive = async ({
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
     const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
     const canceledAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CANCELED_AT;
-    const toNegativeAmount = (value) => {
+    const toPositiveAmount = (value) => {
         const num = Number(value);
         if (!Number.isFinite(num) || num === 0) return 0;
-        return -Math.abs(Math.round(num));
+        return Math.abs(Math.round(num));
     };
 
     try {
@@ -64,26 +60,22 @@ const deleteOrderWithArchive = async ({
     if (shouldArchiveToCanceled) {
         const isMavn = isMavnImportOrder(order);
         const isGift = isGiftOrder(order);
-        const bodyRefund =
-            toNullableNumber(reqBody?.can_hoan) ??
-            toNullableNumber(reqBody?.gia_tri_con_lai);
-
         let refundValue = 0;
         if (isMavn) {
-            const importRefund =
-                bodyRefund !== null && bodyRefund !== undefined
-                    ? Math.max(0, bodyRefund)
-                    : (calcRemainingImport(order, normalized) ?? calcRemainingRefund(order, normalized));
-            refundValue = toNegativeAmount(importRefund);
+            const importRefund = calcRemainingImport(order, normalized);
+            const fallbackCost = toNullableNumber(order?.cost) || 0;
+            refundValue = toPositiveAmount(
+                Math.max(0, importRefund != null ? Number(importRefund) : fallbackCost)
+            );
         } else if (isGift) {
             // MAVT: giá trị hoàn trên đơn luôn 0 (log NCC được trigger tính riêng theo cost/ngày còn lại).
             refundValue = 0;
         } else {
-            const computedRefund =
-                bodyRefund !== null && bodyRefund !== undefined
-                    ? Math.max(0, bodyRefund)
-                    : (calcRemainingImport(order, normalized) ?? calcRemainingRefund(order, normalized));
-            refundValue = toNegativeAmount(computedRefund);
+            const importRefund = calcRemainingImport(order, normalized);
+            const fallbackCost = toNullableNumber(order?.cost) || 0;
+            refundValue = toPositiveAmount(
+                Math.max(0, importRefund != null ? Number(importRefund) : fallbackCost)
+            );
         }
 
         const archiveStatus = (isMavn || isGift) ? STATUS.REFUNDED : STATUS.PENDING_REFUND;

@@ -80,12 +80,16 @@ export const OrderRow = React.memo(function OrderRow({
   const refundFromRow = Number.isFinite(Number(order.can_hoan))
     ? Number(order.can_hoan)
     : null;
+  const refundFromRowAbs =
+    refundFromRow !== null && Number.isFinite(refundFromRow)
+      ? Math.abs(refundFromRow)
+      : null;
   const giaTriConLaiForCanceled = isCanceled
     ? Math.max(
         0,
-        refundFromRow !== null && Number.isFinite(giaTriConLaiSafe)
-          ? Math.min(refundFromRow, giaTriConLaiSafe)
-          : refundFromRow ?? giaTriConLaiSafe
+        refundFromRowAbs !== null && Number.isFinite(giaTriConLaiSafe)
+          ? Math.min(refundFromRowAbs, Math.abs(giaTriConLaiSafe))
+          : refundFromRowAbs ?? Math.abs(giaTriConLaiSafe)
       )
     : giaTriConLaiSafe;
 

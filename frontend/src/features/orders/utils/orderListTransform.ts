@@ -88,8 +88,9 @@ export function enrichOrdersWithVirtualFields(
     if (dataset === "canceled") {
       refundFromDb = parseNumeric((order as Record<string, unknown>)["refund"]);
       if (refundFromDb !== null) {
-        giaTriConLai = refundFromDb;
-        canHoanValue = refundFromDb;
+        // refund trong DB đang lưu âm để phục vụ bút toán; UI hoàn tiền cần hiển thị giá trị tuyệt đối.
+        giaTriConLai = Math.abs(refundFromDb);
+        canHoanValue = Math.abs(refundFromDb);
       }
     }
 

@@ -4,6 +4,7 @@ import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { apiFetch } from "@/lib/api";
 import * as Helpers from "@/lib/helpers";
 import {
+  MatchableOrder,
   PaymentReceipt,
   ReceiptCategory,
   buildExportWorksheet,
@@ -29,6 +30,8 @@ export default function Invoices() {
   const [categoryFilter, setCategoryFilter] =
     useState<ReceiptCategory>("receipt");
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
+  const [matchableOrders, setMatchableOrders] = useState<MatchableOrder[]>([]);
+  const [matchingReceiptId, setMatchingReceiptId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
@@ -47,17 +50,40 @@ export default function Invoices() {
       try {
         setLoading(true);
         setError(null);
-        const response = await apiFetch("/api/payment-receipts");
-        if (!response.ok) {
+        const [receiptsResponse, ordersResponse] = await Promise.all([
+          apiFetch("/api/payment-receipts"),
+          apiFetch("/api/payment-receipts/matchable-orders?limit=500"),
+        ]);
+        if (!receiptsResponse.ok) {
           throw new Error("Không thể tải biên nhận.");
         }
-        const data = await response.json();
+        const data = await receiptsResponse.json();
         const rawList = Array.isArray(data?.receipts)
           ? data.receipts
           : Array.isArray(data)
           ? data
           : [];
         setReceipts(rawList.map(normalizeReceiptRow));
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          const ordersRaw = Array.isArray(ordersData?.orders)
+            ? ordersData.orders
+            : Array.isArray(ordersData)
+            ? ordersData
+            : [];
+          const normalizedOrders = ordersRaw
+            .map((item: Partial<MatchableOrder>) => ({
+              id: Number(item?.id) || 0,
+              orderCode: String(item?.orderCode || "").trim().toUpperCase(),
+              status: String(item?.status || ""),
+              customer: String(item?.customer || ""),
+              informationOrder: String(item?.informationOrder || ""),
+            }))
+            .filter((item: MatchableOrder) => item.orderCode);
+          setMatchableOrders(normalizedOrders);
+        } else {
+          setMatchableOrders([]);
+        }
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : "Không thể tải biên nhận.");
@@ -182,6 +208,46 @@ export default function Invoices() {
     setSelectedReceipt(receipt);
   };
 
+  const handleMatchReceipt = async (receiptId: number, orderCode: string) => {
+    const rawValue = String(orderCode || "").trim().toUpperCase();
+    const extractedOrderCode = rawValue.match(/MAV[A-Z0-9]{3,20}/)?.[0] || "";
+    const normalizedOrderCode = extractedOrderCode || rawValue;
+    if (!normalizedOrderCode) {
+      throw new Error("Mã đơn hàng không hợp lệ.");
+    }
+
+    setMatchingReceiptId(receiptId);
+    setError(null);
+    try {
+      const response = await apiFetch(`/api/payment-receipts/${receiptId}/reconcile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderCode: normalizedOrderCode }),
+      });
+      if (!response.ok) {
+        let message = "Không thể ghép mã đơn cho biên lai.";
+        try {
+          const body = await response.json();
+          message = body?.error || message;
+        } catch {}
+        throw new Error(message);
+      }
+
+      setReceipts((current) =>
+        current.map((item) =>
+          item.id === receiptId ? { ...item, orderCode: normalizedOrderCode } : item
+        )
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Không thể ghép mã đơn cho biên lai.";
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setMatchingReceiptId(null);
+    }
+  };
+
   const closeDetailModal = () => {
     setSelectedReceipt(null);
   };
@@ -243,6 +309,10 @@ export default function Invoices() {
 
         <ReceiptsTable
           receipts={filteredReceipts}
+          matchableOrders={matchableOrders}
+          matchingReceiptId={matchingReceiptId}
+          onMatchReceipt={handleMatchReceipt}
+          enableMatching={categoryFilter === "refund"}
           expandedReceiptId={expandedReceiptId}
           onToggle={toggleRowDetails}
           onSelectReceipt={handleSelectReceipt}

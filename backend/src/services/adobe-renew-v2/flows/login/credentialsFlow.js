@@ -3,6 +3,26 @@ const { detectLoginScreen, runOtpIfPresent } = require("./otpFlow");
 
 const PASSWORD_SELECTORS = ['input[name="password"]', 'input[type="password"]', 'input#password'];
 
+async function getAuthPageErrorReason(page) {
+  const result = await page
+    .evaluate(() => {
+      const text = (document.body?.innerText || "").toLowerCase().replace(/\s+/g, " ").trim();
+      if (!text) return null;
+      if (/your computer seems to be offline|seems to be offline|please check your internet/.test(text)) {
+        return "Adobe auth báo offline/network error.";
+      }
+      if (/no account associated with this email address|no account associated/.test(text)) {
+        return "Adobe auth báo email không tồn tại/không liên kết account.";
+      }
+      if (/too many requests|rate limit|try again later/.test(text)) {
+        return "Adobe auth báo giới hạn tần suất đăng nhập.";
+      }
+      return null;
+    })
+    .catch(() => null);
+  return result || null;
+}
+
 async function waitForEmailInput(page, timeoutMs = LOGIN_TIMEOUTS.EMAIL_INPUT_WAIT_MS) {
   const emailInput = page
     .locator('input[name="username"], input[type="email"], input[name="email"]')
@@ -77,11 +97,19 @@ async function runCredentialsFixedOnce(page, email, password, otpOptions = {}, {
   await page.waitForTimeout(LOGIN_TIMEOUTS.EMAIL_SUBMIT_SETTLE_MS);
 
   let state = await resolvePostEmailState(page, { isOnAdobeSite });
+  let authErrorReason = await getAuthPageErrorReason(page);
+  if (authErrorReason) {
+    throw new Error(authErrorReason);
+  }
 
   if (state === "2fa") {
     await runOtpIfPresent(page, otpOptions, { stage: "after-email", isOnAdobeSite });
     await page.waitForTimeout(LOGIN_TIMEOUTS.POST_OTP_SETTLE_MS);
     state = await resolvePostEmailState(page, { isOnAdobeSite });
+    authErrorReason = await getAuthPageErrorReason(page);
+    if (authErrorReason) {
+      throw new Error(authErrorReason);
+    }
   }
 
   if (state === "password") {
@@ -99,6 +127,10 @@ async function runCredentialsFixedOnce(page, email, password, otpOptions = {}, {
     isOnAdobeSite,
     timeoutMs: LOGIN_TIMEOUTS.SCREEN_DETECT_MS * 2,
   });
+  authErrorReason = await getAuthPageErrorReason(page);
+  if (authErrorReason) {
+    throw new Error(authErrorReason);
+  }
   if (retryState === "password") {
     await enterPassword(page, password);
     return;

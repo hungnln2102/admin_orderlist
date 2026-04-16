@@ -28,6 +28,7 @@ DECLARE
   v_days_total numeric := 0;
   v_days_remaining numeric := 0;
   v_mavt_refund numeric := 0;
+  v_refund_for_log numeric := 0;
 BEGIN
   IF NEW.supply_id IS NULL THEN
     RETURN NEW;
@@ -54,6 +55,11 @@ BEGIN
     IF NEW.status IS NOT DISTINCT FROM v_paid
        AND (v_is_mavn OR v_is_gift)
     THEN
+      v_refund_for_log := CASE
+        WHEN v_is_gift AND NEW.status IS NOT DISTINCT FROM v_refunded THEN COALESCE(v_mavt_refund, 0)
+        ELSE COALESCE(NEW.refund, 0)
+      END;
+
       INSERT INTO partner.supplier_order_cost_log (
         order_list_id,
         supply_id,
@@ -142,9 +148,9 @@ BEGIN
           COALESCE(NEW.expired_at::date, CURRENT_DATE) - COALESCE(NEW.canceled_at::date, CURRENT_DATE)
         );
         IF v_days_total > 0 THEN
-          v_mavt_refund := -ROUND(COALESCE(NEW.cost, 0) * (v_days_remaining / v_days_total));
+          v_mavt_refund := ROUND(COALESCE(NEW.cost, 0) * (v_days_remaining / v_days_total));
         ELSE
-          v_mavt_refund := -ROUND(COALESCE(NEW.cost, 0));
+          v_mavt_refund := ROUND(COALESCE(NEW.cost, 0));
         END IF;
       END IF;
 
@@ -160,11 +166,11 @@ BEGIN
         NEW.id,
         NEW.supply_id,
         COALESCE(NULLIF(TRIM(NEW.id_order::text), ''), ''),
-        COALESCE(NEW.cost, 0),
         CASE
-          WHEN v_is_gift AND NEW.status IS NOT DISTINCT FROM v_refunded THEN COALESCE(v_mavt_refund, 0)
-          ELSE COALESCE(NEW.refund, 0)
+          WHEN COALESCE(v_refund_for_log, 0) > 0 THEN 0
+          ELSE COALESCE(NEW.cost, 0)
         END,
+        v_refund_for_log,
         v_chua_tt_ncc
       );
       RETURN NEW;

@@ -1,4 +1,10 @@
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
+const {
+    FINANCE_SCHEMA,
+    ORDERS_SCHEMA,
+    SCHEMA_FINANCE,
+    SCHEMA_ORDERS,
+    tableName,
+} = require("../../../config/dbSchema");
 const { STATUS, COLS } = require("../constants");
 const { toNullableNumber } = require("../../../utils/normalizers");
 const { quoteIdent } = require("../../../utils/sql");
@@ -17,6 +23,13 @@ const salesOrderProfitDeltaForDashboard = (row) => {
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const summaryTableBase = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE;
+const paymentReceiptTable = tableName(ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE, SCHEMA_ORDERS);
+const paymentReceiptCols = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS;
+const paymentReceiptStateTable = tableName(
+    ORDERS_SCHEMA.PAYMENT_RECEIPT_FINANCIAL_STATE.TABLE,
+    SCHEMA_ORDERS
+);
+const paymentReceiptStateCols = ORDERS_SCHEMA.PAYMENT_RECEIPT_FINANCIAL_STATE.COLS;
 
 /** Trong ON CONFLICT DO UPDATE, tên cột trần bị ambiguous với excluded.* — phải qualify bảng. */
 const qualifiedSummaryCol = (colName) => {
@@ -70,6 +83,24 @@ const monthKeyFromRefundRow = (beforeRow, afterRow) => {
     const fallback = afterRow?.order_date || beforeRow?.order_date;
     const anchor = canceledRaw || fallback;
     return anchor ? getMonthKey(anchor) : null;
+};
+
+const hasFinancialPostedReceiptForOrder = async(trx, row) => {
+    const orderCode = String(row?.id_order || row?.[COLS.ORDER.ID_ORDER] || "").trim();
+    if (!orderCode) return false;
+    const res = await trx.raw(
+        `
+            SELECT 1
+            FROM ${paymentReceiptTable} pr
+            INNER JOIN ${paymentReceiptStateTable} fs
+              ON fs.${paymentReceiptStateCols.PAYMENT_RECEIPT_ID} = pr.${paymentReceiptCols.ID}
+            WHERE LOWER(COALESCE(pr.${paymentReceiptCols.ORDER_CODE}::text, '')) = LOWER(?)
+              AND fs.${paymentReceiptStateCols.IS_FINANCIAL_POSTED} = TRUE
+            LIMIT 1
+        `,
+        [orderCode]
+    );
+    return Array.isArray(res?.rows) && res.rows.length > 0;
 };
 
 const mergeSummaryUpdates = async (trx, monthKey, updates) => {
@@ -161,11 +192,14 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
             (nextStatus === STATUS.PAID && prevStatus === STATUS.UNPAID)
         )
     ) {
-        const price = toNullableNumber(afterRow?.price) || 0;
-        const profit = salesOrderProfitDeltaForDashboard(afterRow);
-        revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
-        revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
-        revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
+        const hasPostedReceipt = await hasFinancialPostedReceiptForOrder(trx, afterRow);
+        if (!hasPostedReceipt) {
+            const price = toNullableNumber(afterRow?.price) || 0;
+            const profit = salesOrderProfitDeltaForDashboard(afterRow);
+            revenueUpdates.total_orders = (revenueUpdates.total_orders || 0) + 1;
+            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) + price;
+            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) + profit;
+        }
     }
 
     // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund (chỉ MAVC/MAVL/MAVK/MAVS)

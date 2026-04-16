@@ -3,11 +3,10 @@
 ## Thông tin chạy test
 
 - Script test: `backend/scripts/tests/run-webhook-financial-reconcile-tests.js`
-- Marker dữ liệu test: `TEST-WEBHOOK-1776278588300`
+- Marker dữ liệu test: `TEST-WEBHOOK-1776362190779`
 - Kỳ test tổng hợp: `2099-12`
-- Mục tiêu: kiểm thử luồng webhook + reconcile + cờ state tài chính + tránh double-count
-- Trạng thái tổng: **PASS toàn bộ**
-- Cập nhật gần nhất: `2026-04-16 01:43` (GMT+7)
+- Trạng thái tổng: **PASS toàn bộ (C1 -> C13)**
+- Cập nhật gần nhất: `2026-04-17 00:56` (GMT+7)
 
 ## Danh sách test case
 
@@ -16,71 +15,34 @@
 | C1 | Webhook có mã đơn, đơn `Chưa Thanh Toán` | PASS |
 | C2 | Webhook có mã đơn, đơn `Đã Thanh Toán` đã có receipt trước đó | PASS |
 | C3 | Webhook có mã đơn, đơn `Đã Thanh Toán` chưa có receipt trước đó | PASS |
-| C4 | Webhook không mã đơn | PASS |
-| C5 | Reconcile receipt không mã vào đơn `Đã Thanh Toán` | PASS |
-| C6 | Reconcile receipt không mã vào đơn `Chưa Thanh Toán` | PASS |
+| C4 | Webhook không mã đơn (cộng trước doanh thu/lợi nhuận) | PASS |
+| C5 | Reconcile receipt không mã vào đơn `Đã Thanh Toán` (trừ lại phần đã cộng trước) | PASS |
+| C6 | Reconcile receipt không mã vào đơn `Chưa Thanh Toán` (giữ doanh thu, trừ lợi nhuận theo cost) | PASS |
+| C7 | Duplicate webhook không cộng lần 2 | PASS |
+| C8 | Manual `Thanh Toán` sau receipt đã post không double-count | PASS |
+| C9 | Manual `Gia Hạn` sau receipt đã post không double-count | PASS |
+| C10 | Action `reconcile_and_mark_paid` cho đơn `Chưa Thanh Toán` | PASS |
+| C11 | Action `reconcile_and_renew` cho đơn `Cần Gia Hạn` | PASS |
+| C12 | Idempotent `reconcile_and_mark_paid` (gọi lặp) trả `409` đúng rule | PASS |
+| C13 | Idempotent `reconcile_and_renew` (gọi lặp) trả `409` đúng rule | PASS |
 
-## Chi tiết kết quả
+## Tóm tắt nhanh delta chính
 
-### C1 - PASS
+- `C1`: `revenue +100000`, `profit +70000`
+- `C2`: `revenue +250000`, `profit +250000`
+- `C3`: `revenue +0`, `profit +0`
+- `C4`: `revenue +270000`, `profit +270000`
+- `C5`: `revenue -270000`, `profit -270000`
+- `C6`: `revenue +0`, `profit -50000`
+- `C8`: `revenue +0`, `profit +0`
+- `C9`: `revenue +0`, `profit +0`
+- `C10`: `revenue +0`, `profit -80000`, đơn -> `Đã Thanh Toán`
+- `C11`: `revenue +0`, `profit -90000`, renewal success, đơn -> `Đã Thanh Toán`
+- `C12`, `C13`: trả `409` đúng guard trạng thái/action
 
-- HTTP: `200`
-- Delta summary: `revenue +100000`, `profit +70000`
-- State row:
-  - `is_financial_posted = true`
-  - `posted_revenue = 100000`
-  - `posted_profit = 70000`
+## Xác nhận cleanup dữ liệu test
 
-### C2 - PASS
-
-- HTTP: `200`
-- Delta summary: `revenue +250000`, `profit +250000`
-- State row:
-  - `is_financial_posted = true`
-  - `posted_revenue = 250000`
-  - `posted_profit = 250000`
-
-### C3 - PASS
-
-- HTTP: `200`
-- Delta summary: `revenue +0`, `profit +0`
-- State row:
-  - `is_financial_posted = false`
-  - `posted_revenue = 0`
-  - `posted_profit = 0`
-
-### C4 - PASS
-
-- HTTP: `200`
-- Delta summary: `revenue +270000`, `profit +270000`
-- State row:
-  - `is_financial_posted = true`
-  - `posted_revenue = 270000`
-  - `posted_profit = 270000`
-
-### C5 - PASS
-
-- HTTP: `200`
-- Reconcile receipt không mã vào đơn `Đã Thanh Toán`
-- Delta summary: `revenue -270000`, `profit -270000`
-- State row:
-  - `adjustment_applied = true`
-  - `posted_revenue = 0`
-  - `posted_profit = 0`
-
-### C6 - PASS
-
-- HTTP: `200`
-- Reconcile receipt không mã vào đơn `Chưa Thanh Toán`
-- Delta summary: `revenue +0`, `profit -50000`
-- State row:
-  - `adjustment_applied = true`
-  - `posted_revenue = 280000`
-  - `posted_profit = 230000`
-
-## Xác nhận đã xóa dữ liệu test
-
-- Script verify cleanup: `backend/scripts/tests/verify-cleanup-marker.js TEST-WEBHOOK-1776278588300`
+- Script verify: `backend/scripts/tests/verify-cleanup-marker.js TEST-WEBHOOK-1776362190779`
 - Kết quả:
   - `receipt_rows = 0`
   - `order_rows = 0`
@@ -92,9 +54,14 @@ Không còn dữ liệu test tồn đọng trong:
 - `orders.order_list`
 - `finance.dashboard_monthly_summary` (month_key `2099-12`)
 
-## Ghi chú fix đã áp dụng
+## Ánh xạ test bắt buộc
 
-1. Chuẩn hóa `payment_date` về kiểu `DATE` và ép kiểu khi query/insert để tránh lỗi so sánh kiểu dữ liệu.
-2. Cập nhật logic kiểm tra prior receipt theo mốc `order_date` (đúng rule late payment).
-3. Chỉnh lại công thức reconcile case `UNPAID/RENEWAL` để chỉ trừ `cost`.
-4. Đồng bộ dữ liệu test theo prefix mã đơn hợp lệ cho luồng dashboard sales.
+| Yêu cầu | Test case |
+| --- | --- |
+| Duplicate không cộng lần 2 | C7 |
+| Webhook không mã cộng trước + state đúng | C4 |
+| Webhook có mã theo trạng thái đơn | C1-C3 |
+| Reconcile 2 case adjustment | C5, C6 |
+| Manual action sau webhook không double-count | C8, C9 |
+| Action reconcile mới | C10, C11 |
+| Idempotent cho action mới | C12, C13 |

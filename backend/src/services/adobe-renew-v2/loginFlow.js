@@ -24,6 +24,24 @@ function isOnAdobeSite(url) {
   return false;
 }
 
+async function buildAuthFailureSummary(page, contextLabel) {
+  const u = page.url ? (page.url() || "") : "";
+  const body = await page
+    .evaluate(() => (document.body && document.body.innerText) ? document.body.innerText.slice(0, 900) : "")
+    .catch(() => "");
+  const normalized = body.replace(/\s+/g, " ").slice(0, 280);
+  let reason = "Không xác định nguyên nhân trên auth page.";
+  const lower = normalized.toLowerCase();
+  if (/offline|check your internet/.test(lower)) {
+    reason = "Adobe auth báo offline/network.";
+  } else if (/no account associated/.test(lower)) {
+    reason = "Adobe auth báo email không tồn tại/không liên kết.";
+  } else if (/too many requests|rate limit|try again later/.test(lower)) {
+    reason = "Adobe auth báo rate-limit.";
+  }
+  return `${contextLabel} ${reason} url=${u.slice(0, 160)} body=${normalized}`;
+}
+
 async function runLoginStep(stepName, handler) {
   logger.info("[adobe-v2] Login step start: %s", stepName);
   try {
@@ -220,7 +238,9 @@ async function runLoginFlow(page, opts) {
   if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(urlAfterRetry)) {
     logger.info("[adobe-v2] B2: Đang ở auth page (%s) → login trực tiếp", urlAfterRetry.slice(0, 90));
     const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
-    if (!ok) throw new Error("Login thất bại trên trang auth (fallback).");
+    if (!ok) {
+      throw new Error(await buildAuthFailureSummary(page, "Login thất bại trên trang auth (fallback)."));
+    }
     return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
@@ -244,7 +264,9 @@ async function runLoginFlow(page, opts) {
   if (/auth\.services\.adobe\.com|adobelogin\.com/i.test(urlAfterWait)) {
     logger.info("[adobe-v2] B2: Sau chờ SPA → auth page (%s) → login trực tiếp", urlAfterWait.slice(0, 90));
     const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
-    if (!ok) throw new Error("Login thất bại trên trang auth (sau chờ SPA).");
+    if (!ok) {
+      throw new Error(await buildAuthFailureSummary(page, "Login thất bại trên trang auth (sau chờ SPA)."));
+    }
     return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
@@ -258,7 +280,9 @@ async function runLoginFlow(page, opts) {
   if (emailInputVisible) {
     logger.info("[adobe-v2] B2: Thấy form login (email input) → login trực tiếp, url=%s", (page.url() || "").slice(0, 90));
     const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
-    if (!ok) throw new Error("Login thất bại trên trang form login (fallback).");
+    if (!ok) {
+      throw new Error(await buildAuthFailureSummary(page, "Login thất bại trên trang form login (fallback)."));
+    }
     return { selectedOrgName: otpOptions.selectedOrgName || null };
   }
 
@@ -305,6 +329,7 @@ async function runLoginFlow(page, opts) {
     await page.waitForTimeout(LOGIN_TIMEOUTS.PROFILE_ACTION_WAIT_MS);
     const ok = await doFormLoginOnAuthPage(page, email, password, otpOptions);
     if (ok) return;
+    throw new Error(await buildAuthFailureSummary(page, "Login thất bại sau fallback IMS."));
   }
 
   if (!signInClicked) {
