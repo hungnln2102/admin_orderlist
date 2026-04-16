@@ -10,15 +10,6 @@ const { TABLE, COLS } = require("./accountTable");
 const { persistCheckResult } = require("./checkSyncService");
 
 async function runCheckForAccountId(id) {
-  logger.info(
-    "[renew-adobe] DEBUG: typeof adobeRenewV2.checkAccount = %s",
-    typeof adobeRenewV2.checkAccount
-  );
-  logger.info(
-    "[renew-adobe] DEBUG: adobeRenewV2 keys = %s",
-    Object.keys(adobeRenewV2).join(", ")
-  );
-
   const account = await db(TABLE).where(COLS.ID, id).first();
   if (!account) {
     throw new Error("Không tìm thấy tài khoản.");

@@ -1,10 +1,7 @@
 /**
- * Job: Chạy check tất cả tài khoản Renew Adobe, sau đó:
- *  1. Xóa toàn bộ user khỏi tài khoản hết hạn + xóa mapping.
- *  2. Xóa luôn bản ghi accounts_admin (license_status ≠ Paid) khỏi database.
- *  3. Auto-reassign user sang tài khoản còn gói.
- *  4. Gửi Telegram thông báo hết gói (topic ZERO_DAYS_TOPIC_ID).
- * Chạy mỗi giờ một lần (phút 0, theo timezone scheduler — xem scheduler/index.js).
+ * Job (cron): check tuần tự từng tài khoản Renew Adobe — cùng hàm POST /accounts/:id/check (runCheckForAccountId).
+ * Không chạy auto-assign Playwright trong job này (tránh tải song song / trùng browser với check).
+ * Chạy mỗi giờ (phút 0, timezone scheduler — xem scheduler/index.js).
  */
 
 const logger = require("../../utils/logger");
@@ -166,7 +163,8 @@ function createRenewAdobeCheckAndNotifyTask() {
     logger.info("[CRON] Bắt đầu job check all tài khoản Renew Adobe", { trigger });
     const result = await runCheckAllAccountsFlow({
       runCheckForAccountId,
-      includeAutoAssign: true,
+      // Giống POST /accounts/:id/check: chỉ runCheckForAccountId tuần tự — không auto-assign (Playwright) trong cùng job.
+      includeAutoAssign: false,
       logPrefix: "[CRON][check-all]",
     });
     logger.info("[CRON] Kết thúc job check all tài khoản Renew Adobe", {

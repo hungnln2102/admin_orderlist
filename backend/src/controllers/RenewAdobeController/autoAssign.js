@@ -17,8 +17,6 @@ const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
 } = require("../../services/renewAdobePurgeNoLicenseAccount");
 
-const MAX_CHECK_ALL_CONCURRENT = 3;
-
 function logAutoAssign(onProgress, data) {
   if (onProgress) {
     onProgress(data);
@@ -310,85 +308,59 @@ async function runCheckAllAccountsFlow({
 
   let completed = 0;
   let failed = 0;
-  let index = 0;
   const queue = [...rows];
 
-  await new Promise((resolve) => {
-    const running = new Set();
-
-    function next() {
-      if (shouldAbort()) {
-        resolve();
-        return;
-      }
-
-      while (running.size < MAX_CHECK_ALL_CONCURRENT && index < queue.length) {
-        const account = queue[index++];
-        const id = account[COLS.ID];
-        const email = account[COLS.EMAIL];
-
-        emit({ type: "checking", id, email, completed, failed, total });
-
-        const task = (async () => {
-          try {
-            await runCheckForAccountId(id);
-            completed++;
-            let updated = await db(TABLE).where(COLS.ID, id).first();
-            let removedFromDb = false;
-            if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
-              const { deletedFromDb } =
-                await purgeAndDeleteNoLicenseAdobeAdminAccount(updated, {
-                  logPrefix,
-                });
-              if (deletedFromDb) {
-                removedFromDb = true;
-                updated = null;
-              }
-            }
-            emit({
-              type: "done",
-              id,
-              email,
-              completed,
-              failed,
-              total,
-              removed_from_db: removedFromDb,
-              org_name: updated?.[COLS.ORG_NAME] ?? null,
-              user_count: updated?.[COLS.USER_COUNT] ?? 0,
-              license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",
-            });
-          } catch (err) {
-            completed++;
-            failed++;
-            emit({
-              type: "error",
-              id,
-              email,
-              error: err.message,
-              completed,
-              failed,
-              total,
-            });
-          }
-        })().then(() => {
-          running.delete(task);
-          if (running.size === 0 && index >= queue.length) {
-            resolve();
-          } else {
-            next();
-          }
-        });
-
-        running.add(task);
-      }
-
-      if (running.size === 0 && index >= queue.length) {
-        resolve();
-      }
+  // Tuần tự: cùng hàm POST /accounts/:id/check (runCheckForAccountId) — tránh nhiều Playwright song song gây timeout trên server.
+  for (const account of queue) {
+    if (shouldAbort()) {
+      break;
     }
+    const id = account[COLS.ID];
+    const email = account[COLS.EMAIL];
 
-    next();
-  });
+    emit({ type: "checking", id, email, completed, failed, total });
+
+    try {
+      await runCheckForAccountId(id);
+      completed++;
+      let updated = await db(TABLE).where(COLS.ID, id).first();
+      let removedFromDb = false;
+      if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
+        const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
+          updated,
+          { logPrefix }
+        );
+        if (deletedFromDb) {
+          removedFromDb = true;
+          updated = null;
+        }
+      }
+      emit({
+        type: "done",
+        id,
+        email,
+        completed,
+        failed,
+        total,
+        removed_from_db: removedFromDb,
+        org_name: updated?.[COLS.ORG_NAME] ?? null,
+        user_count: updated?.[COLS.USER_COUNT] ?? 0,
+        license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",
+      });
+    } catch (err) {
+      completed++;
+      failed++;
+      emit({
+        type: "error",
+        id,
+        email,
+        error: err.message,
+        completed,
+        failed,
+        total,
+      });
+    }
+  }
 
   emit({ type: "complete", total, completed, failed });
 
