@@ -79,7 +79,7 @@ if (runOnStart) {
 cron.schedule(
   "30 23 * * *",
   async () => {
-    logger.info("[Scheduler] Cron 23:30 — cleanup expired Adobe users (số ngày còn lại <= 0)");
+    logger.info("[Scheduler] Cron 23:30 — check all Adobe rồi cleanup expired users (số ngày còn lại <= 0)");
     await runCleanupExpiredAdobeUsersSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }
