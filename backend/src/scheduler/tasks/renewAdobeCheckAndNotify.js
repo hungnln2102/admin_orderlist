@@ -1,6 +1,7 @@
 /**
- * Job (cron): (1) Check tuần tự từng tài khoản — runCheckForAccountId giống POST /accounts/:id/check.
- * (2) Chỉ sau khi check hết tất cả mới chạy autoAssignUsers (gán user vào các tài khoản còn slot — có thể đụng nhiều NCC).
+ * Job (cron): check tuần tự từng tài khoản — runCheckForAccountId giống POST /accounts/:id/check.
+ * Trigger `cron`: không chạy autoAssignUsers / AddUsers (tránh fillEmailInSlot khi B13 chậm).
+ * Trigger `manual` (API /scheduler/run-adobe-check): vẫn có thể bật auto-assign — xem includeAutoAssign bên dưới.
  * Chạy mỗi giờ (phút 0, timezone scheduler — xem scheduler/index.js).
  */
 
@@ -165,20 +166,22 @@ function createRenewAdobeCheckAndNotifyTask() {
   return async function renewAdobeCheckAndNotifyTask(trigger = "cron") {
     if (renewAdobeCheckAllInFlight) {
       logger.warn(
-        "[CRON] Job Renew Adobe (check all + auto-assign) vẫn đang chạy — bỏ qua lần gọi trùng",
+        "[CRON] Job Renew Adobe (check all) vẫn đang chạy — bỏ qua lần gọi trùng",
         { trigger, pid: process.pid }
       );
       return;
     }
+    const includeAutoAssign = trigger !== "cron";
     renewAdobeCheckAllInFlight = true;
     logger.info("[CRON] Bắt đầu job check all tài khoản Renew Adobe", {
       trigger,
       pid: process.pid,
+      includeAutoAssign,
     });
     try {
       const result = await runCheckAllAccountsFlow({
         runCheckForAccountId,
-        includeAutoAssign: true,
+        includeAutoAssign,
         logPrefix: "[CRON][check-all]",
       });
       logger.info("[CRON] Kết thúc job check all tài khoản Renew Adobe", {

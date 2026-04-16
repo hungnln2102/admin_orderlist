@@ -8,9 +8,20 @@ const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = requir
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
+/** Cron/headless trên server thường chậm hơn tay bấm — mặc định 90s; ghi đè bằng ADOBE_V2_WAIT_USERS_MS. */
 const WAIT_USERS_MS = (() => {
   const n = Number.parseInt(process.env.ADOBE_V2_WAIT_USERS_MS || "", 10);
-  return Number.isFinite(n) && n >= 25000 ? n : 55000;
+  return Number.isFinite(n) && n >= 30000 ? n : 90000;
+})();
+
+const B13_GOTO_MS = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_B13_GOTO_MS || "", 10);
+  return Number.isFinite(n) && n >= 30000 ? n : 60000;
+})();
+
+const USERS_GRID_WAIT_MS = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_B13_GRID_WAIT_MS || "", 10);
+  return Number.isFinite(n) && n >= 15000 ? n : 32000;
 })();
 
 /** Giống add/delete users flow: trang users thật thường là /{orgId}@AdobeOrg/users */
@@ -70,11 +81,14 @@ async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS, options = 
   const recoverEveryMs = 10000;
   /** Cho phép recover ngay lần đầu gặp route sai (SPA Adobe hay giữ /products). */
   let lastRecoveryAt = Date.now() - recoverEveryMs;
+  /** Đã đúng URL /users nhưng grid chưa render — reload có thể gỡ kẹt SPA trên server chậm. */
+  let usersPathNoGridPasses = 0;
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const url = page.url();
     if (!isAdminConsoleUsersPath(url)) {
+      usersPathNoGridPasses = 0;
       const now = Date.now();
       if (
         recoveryUsersUrl &&
@@ -83,8 +97,8 @@ async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS, options = 
       ) {
         lastRecoveryAt = now;
         logger.info("[adobe-v2] B13: Chưa vào route /users — goto lại (%s)", recoveryUsersUrl.slice(0, 96));
-        await page.goto(recoveryUsersUrl, { waitUntil: "domcontentloaded", timeout: 40000 }).catch(() => {});
-        await page.waitForLoadState("networkidle", { timeout: 22000 }).catch(() => {});
+        await page.goto(recoveryUsersUrl, { waitUntil: "domcontentloaded", timeout: B13_GOTO_MS }).catch(() => {});
+        await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
         await page.waitForTimeout(900);
       }
       await page.waitForTimeout(1200);
@@ -93,7 +107,7 @@ async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS, options = 
     const ready = await page
       .locator(USERS_READY_SELECTOR)
       .first()
-      .waitFor({ state: "visible", timeout: 20000 })
+      .waitFor({ state: "visible", timeout: USERS_GRID_WAIT_MS })
       .then(() => true)
       .catch(() => false);
     if (ready) {
@@ -101,7 +115,18 @@ async function waitForUsersPageReady(page, timeoutMs = WAIT_USERS_MS, options = 
       logger.info("[adobe-v2] B13: Trang users đã load xong");
       return;
     }
-    await page.waitForTimeout(1200);
+    usersPathNoGridPasses += 1;
+    if (usersPathNoGridPasses === 2 || usersPathNoGridPasses % 4 === 0) {
+      logger.info(
+        "[adobe-v2] B13: Đã vào /users nhưng chưa thấy bảng — thử reload (lần %s)",
+        usersPathNoGridPasses
+      );
+      await page.reload({ waitUntil: "domcontentloaded", timeout: B13_GOTO_MS }).catch(() => {});
+      await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+    } else {
+      await page.waitForTimeout(1200);
+    }
   }
   logger.warn("[adobe-v2] B13: Timeout chờ trang users (vẫn scrape thử)");
 }
@@ -184,11 +209,11 @@ async function runB10ToB13(page, options = {}) {
   logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
 
   await page
-    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: 40000 })
+    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: B13_GOTO_MS })
     .catch(() => {});
-  await page.waitForLoadState("networkidle", { timeout: 22000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
   await page
-    .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 12000 })
+    .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
     .catch(() => {});
   await waitForUsersPageReady(page, WAIT_USERS_MS, { recoveryUsersUrl: usersUrlPrimary });
 
@@ -199,10 +224,10 @@ async function runB10ToB13(page, options = {}) {
   }
   if (orgId && !isAdminConsoleUsersPath(usersUrl)) {
     logger.info("[adobe-v2] B13: Không ở route users sau goto org — thử /users gốc (redirect Adobe)");
-    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: 40000 }).catch(() => {});
-    await page.waitForLoadState("networkidle", { timeout: 22000 }).catch(() => {});
+    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: B13_GOTO_MS }).catch(() => {});
+    await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
     await page
-      .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 12000 })
+      .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
       .catch(() => {});
     await waitForUsersPageReady(page, WAIT_USERS_MS, { recoveryUsersUrl: usersUrlPrimary });
     usersUrl = page.url();
