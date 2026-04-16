@@ -7,6 +7,8 @@
  * Usage:
  *   node scheduler.js
  *   npm run start:scheduler
+ *   node scheduler.js --run-adobe-once   # chạy một lần job check Adobe giống cron (không đăng ký cron khác)
+ *   npm run start:scheduler:adobe-once
  */
 const path = require("path");
 // Cùng file .env với API (backend/.env) — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
@@ -35,4 +37,23 @@ process.on("unhandledRejection", (reason) => {
   notifyCritical({ message: `[Scheduler] unhandledRejection: ${msg}`, stack });
 });
 
-require("./src/scheduler");
+if (process.argv.includes("--run-adobe-once")) {
+  const { renewAdobeCheckAndNotifyTask } = require("./src/scheduler/taskInstances");
+  logger.info(
+    "[Scheduler] CLI --run-adobe-once: chạy job check tài khoản Adobe (cùng logic trigger=cron, dùng backend/.env hiện tại)"
+  );
+  renewAdobeCheckAndNotifyTask("cron")
+    .then(() => {
+      logger.info("[Scheduler] CLI --run-adobe-once hoàn thành.");
+      process.exit(0);
+    })
+    .catch((err) => {
+      logger.error("[Scheduler] CLI --run-adobe-once thất bại", {
+        error: err.message,
+        stack: err.stack,
+      });
+      process.exit(1);
+    });
+} else {
+  require("./src/scheduler");
+}

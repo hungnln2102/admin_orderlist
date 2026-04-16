@@ -110,6 +110,10 @@ cron.schedule(
 
 logger.info(`[Scheduler] Đã khởi động`, {
   cronExpression,
+  /** Job update DB / backup — không phải Renew Adobe. */
+  cronExpressionNote: "CRON_SCHEDULE (vd. 1 0 * * * = 00:01 mỗi ngày)",
+  renewAdobeCron: "0 * * * *",
+  renewAdobeNote: "Mỗi giờ phút 0 (timezone scheduler) — check tài khoản Adobe",
   schedulerTimezone,
   runOnStart,
 });

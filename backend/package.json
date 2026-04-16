@@ -17,6 +17,7 @@
         "start:api": "node index.js",
         "start:webhook": "node webhook-server.js",
         "start:scheduler": "node scheduler.js",
+        "start:scheduler:adobe-once": "node scheduler.js --run-adobe-once",
         "dev": "nodemon index.js",
         "dev:api": "nodemon index.js",
         "start:new": "node src/server.js",
