@@ -675,7 +675,17 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
           ${safeIdent(PAYMENT_SUPPLY_COLS.round)},
           ${safeIdent(PAYMENT_SUPPLY_COLS.status)}
         )
-        VALUES ($1, $2, $3, $4)`,
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)})
+        DO UPDATE SET
+          ${safeIdent(PAYMENT_SUPPLY_COLS.paid)} =
+            COALESCE(${PAYMENT_SUPPLY_TABLE}.${safeIdent(PAYMENT_SUPPLY_COLS.paid)}::numeric, 0)
+            + EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.round)} = EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.round)},
+          ${safeIdent(PAYMENT_SUPPLY_COLS.status)} = COALESCE(
+            NULLIF(TRIM(${PAYMENT_SUPPLY_TABLE}.${safeIdent(PAYMENT_SUPPLY_COLS.status)}::text), ''),
+            EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.status)}
+          )`,
       [sourceId, priceValue, period, STATUS.UNPAID]
     );
 

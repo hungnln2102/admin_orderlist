@@ -117,6 +117,26 @@ async function waitForAddUserModalGone(page, timeoutMs = 20000) {
 }
 
 /**
+ * Sau khi bấm "Áp dụng" trong modal chọn sản phẩm, modal con phải đóng trước khi bấm "Lưu".
+ * Nếu không, `cta-button`.first() trong modal cha có thể vẫn trỏ vào nút trong subtree product-assignment-modal
+ * hoặc Playwright chờ actionable quá lâu → nhìn như treo sau log "bấm Áp dụng xong".
+ */
+async function waitForProductAssignmentModalClosed(page, timeoutMs = 20000) {
+  const pm = page.locator('[data-testid="product-assignment-modal"]').first();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const vis = await pm.isVisible().catch(() => false);
+    if (!vis) return true;
+    await page.waitForTimeout(400);
+  }
+  logger.warn(
+    "[adobe-v2] AddUsers: product-assignment-modal vẫn hiển thị sau %dms — vẫn thử bấm Lưu (có thể DOM chậm/mạng)",
+    timeoutMs
+  );
+  return false;
+}
+
+/**
  * Bấm nút "Thêm người dùng" trên trang /users để mở modal.
  */
 async function clickAddUserButton(page) {
@@ -633,12 +653,16 @@ async function addUsersToOrgViaUI(page, userEmails) {
       added.push(email);
     }
 
-    // 4. Bấm "Lưu" (cta-button trong modal chính)
+    // 4. Bấm "Lưu" (cta-button trong modal chính — scope #add-users-to-org-modal để không nhầm cta trong modal chọn SP)
     if (batchAdded.length > 0) {
-      const saveBtn = modal.locator('button[data-testid="cta-button"]').first();
+      await waitForProductAssignmentModalClosed(page);
+      logger.info("[adobe-v2] AddUsers: chuẩn bị bấm Lưu (batch %d email)", batchAdded.length);
+
+      const mainAddModal = page.locator("#add-users-to-org-modal").first();
+      const saveBtn = mainAddModal.locator('button[data-testid="cta-button"]').first();
       let saved = false;
 
-      if (await saveBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await saveBtn.isVisible({ timeout: 8000 }).catch(() => false)) {
         // Chờ nút enabled
         const saveDeadline = Date.now() + 10000;
         while (Date.now() < saveDeadline) {
@@ -656,8 +680,8 @@ async function addUsersToOrgViaUI(page, userEmails) {
       }
 
       if (!saved) {
-        // Fallback: tìm nút text "Lưu" hoặc "Save"
-        const saveFallback = modal.getByRole("button", { name: /^lưu$|^save$/i }).first();
+        // Fallback: tìm nút text "Lưu" hoặc "Save" trong modal thêm user (không dùng dialog khác)
+        const saveFallback = mainAddModal.getByRole("button", { name: /^lưu$|^save$/i }).first();
         if (await saveFallback.isVisible({ timeout: 3000 }).catch(() => false)) {
           await saveFallback.click({ timeout: 12000 }).catch(() => {});
           await page.waitForTimeout(2000);
