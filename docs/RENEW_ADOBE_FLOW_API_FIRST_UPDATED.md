@@ -2,14 +2,14 @@
 
 Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 - Tái sử dụng browser profile (persistent profile) theo từng tài khoản admin.
-- Add user bằng API `users:batch` thay vì thao tác UI trên trang Users.
+- Add user theo 2 bước API: create user rồi assign product.
 - Tạo/lấy link auto-assign bằng API (`jil-api` + `acrs`) thay vì click UI để copy link.
 
 ## 1) Mục tiêu thay đổi
 
 - Giảm số bước login lặp lại (tối ưu tốc độ check/add).
 - Giảm độ mong manh do thay đổi DOM/UI của Adobe.
-- Trả về kết quả rõ ràng theo từng email khi add batch.
+- Trả về kết quả rõ ràng theo từng email khi add.
 - Lấy được link auto-assign ổn định qua API.
 
 ## 2) Thành phần đã thay đổi
@@ -23,9 +23,10 @@ Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
   - Nếu profile lỗi thì fallback về context cũ để tránh fail cứng.
 
 - `backend/src/services/adobe-renew-v2/flows/users/addUsersFlow.js`
-  - Đã chuyển sang gọi API:
-    - `POST https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users:batch`
-  - Parse response batch (kể cả HTTP 207) thành `done/failed`.
+  - Đã chuyển sang luồng 2 bước API:
+    - Tạo user: `POST https://abpapi.adobe.io/abpapi/organizations/{orgId}@AdobeOrg/users`
+    - Gán gói: `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users` với `op=add` vào `/products/{productId}`.
+  - Nếu API tạo user báo lỗi nhưng user đã tồn tại trong org, hệ thống tiếp tục bước gán gói.
 
 - `backend/src/services/adobe-renew-v2/addUsersWithProductV2.js`
   - Dùng persistent profile cho phiên add.
@@ -62,12 +63,13 @@ Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 5. Nếu session hết hạn:
    - Chạy login flow để refresh.
 6. Lưu lại cookie mới để dùng cho lần sau.
+7. Đồng thời suy ra `contractActiveLicenseCount` từ dữ liệu products và lưu vào `cookie_config` để dùng làm hạn mức fix-all.
 
 Lợi ích:
 - Nhiều lần check/add liên tiếp sẽ nhanh hơn rõ rệt.
 - Giảm tần suất OTP/login lại.
 
-## 4) Luồng Add User mới (API users:batch)
+## 4) Luồng Add User mới (API create + assign)
 
 ### 4.1 Đầu vào
 - `orgId` (lấy từ URL đang hoạt động hoặc options).
@@ -75,15 +77,21 @@ Lợi ích:
 - Session đã login hợp lệ (authorization + x-api-key lấy từ request thật trong trang users).
 
 ### 4.2 API gọi
-- `POST https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users:batch`
+- Tạo user:
+  - `POST https://abpapi.adobe.io/abpapi/organizations/{orgId}@AdobeOrg/users`
+- Gán product:
+  - `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users`
+  - Payload kiểu:
+    - `[{ "op": "add", "path": "/{userId}/products/{productId}" }]`
 
 ### 4.3 Cách đánh giá kết quả
-- Nếu response là mảng item:
-  - Mỗi item có `responseCode`, `request.email`, `response.errorCode`.
-  - `2xx` => `done`
-  - Khác `2xx` => `failed` với `reason = errorCode`.
-- Nếu response không đúng schema:
-  - Dựa theo HTTP status tổng để fallback.
+- Bước tạo user thành công nhưng bước gán product fail:
+  - User đã được tạo nhưng chưa có gói.
+  - Flow trả `failed` với `reason` theo lỗi PATCH.
+- Bước tạo user báo lỗi nhưng user đã tồn tại:
+  - Flow coi là có thể tiếp tục và thử gán product.
+- Bước gán product trả lỗi nhưng user đã có product từ trước:
+  - Flow coi là thành công để tránh fail giả khi chạy fix-all.
 
 ### 4.4 Các error code thường gặp
 - `DOMAIN_NAME_INVALID`
@@ -142,17 +150,18 @@ Lợi ích:
 
 ## 6) Hành vi mong đợi khi add thất bại
 
-- Add API có thể fail theo từng email (partial fail).
+- Add API có thể fail theo từng email.
 - Hệ thống vẫn có thể trả/lấy `auto-assign URL` để dùng fallback.
 - Kịch bản nghiệp vụ khuyến nghị:
-  1) Thử add API,
+  1) Thử add API create + assign,
   2) Nếu fail -> lấy link auto-assign có sẵn (hoặc tạo nếu chưa có),
   3) Trả link cho bộ phận xử lý tiếp theo.
 
 ## 7) Kiểm thử nhanh đã xác nhận
 
 - Check flow mở persistent profile thành công.
-- Add flow đã đi qua `users:batch`.
+- Add flow đi qua `abpapi` (create user) + `PATCH /users` (add product).
+- Delete flow đi qua `PATCH /users` với `op=remove`.
 - Auto-assign flow đã trả được link qua API:
   - Ví dụ: `https://acrs.adobe.com/go/5377d4ca-0b96-4a0e-b569-2e856fe66770`
 
@@ -175,4 +184,11 @@ Mỗi user trong snapshot hiện lưu các trường chính:
 - `products`: mảng product id Adobe cấp cho user.
 - `hasPackage`: boolean theo `products.length > 0`.
 - `product`: giữ tương thích ngược với hệ thống cũ (`true/false` như `hasPackage`).
+
+## 10) Hạn mức Fix All theo contract
+
+- Hệ thống dùng `contractActiveLicenseCount` (lấy sau login/check) làm hạn mức user tối đa cho mỗi account.
+- Khi chạy fix-all:
+  - Chỉ add user đến khi đạt ngưỡng này (đã trừ admin qua `user_count` hiện tại).
+  - Nếu user cần fix > hạn mức, hệ thống chỉ xử lý tối đa bằng hạn mức và để lại phần dư.
 

@@ -91,6 +91,14 @@ function scrapeProductsPage(page) {
     .catch(() => []);
 }
 
+function deriveContractActiveLicenseCount(products = []) {
+  const totals = (Array.isArray(products) ? products : [])
+    .map((p) => Number(p?.total || 0))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (totals.length === 0) return 0;
+  return Math.max(...totals);
+}
+
 async function runCheckProductFlow(page) {
   return withRecoverableRetry(
     "B12-check-product",
@@ -107,6 +115,7 @@ async function runCheckProductFlow(page) {
 
       const orgId = extractOrgIdFromUrl(productsUrl);
       const products = await scrapeProductsPage(page);
+      const contractActiveLicenseCount = deriveContractActiveLicenseCount(products);
 
       const onProductsPage =
         productsUrl.includes("adminconsole.adobe.com") && productsUrl.includes("/products");
@@ -120,14 +129,15 @@ async function runCheckProductFlow(page) {
             : "Expired";
 
       logger.info(
-        "[adobe-v2] products: %d, license_status: %s, orgId: %s, onProductsPage: %s",
+        "[adobe-v2] products: %d, license_status: %s, orgId: %s, onProductsPage: %s, contractActiveLicenseCount: %s",
         products.length,
         license_status,
         orgId || "(null)",
-        onProductsPage
+        onProductsPage,
+        contractActiveLicenseCount
       );
 
-      return { orgId, products, license_status };
+      return { orgId, products, license_status, contractActiveLicenseCount };
     },
     { retries: 1, waitMs: 1200 }
   );

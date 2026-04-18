@@ -77,45 +77,132 @@ function normalizeBatchResult(userEmails, status, rawBody) {
   return { done, failed };
 }
 
-async function reconcileFailedUsersByCurrentOrgUsers(page, orgId, normalized) {
-  const done = [...normalized.done];
-  const failed = [...normalized.failed];
-  if (!failed.length) return { done, failed };
-
-  let usersApi = null;
+function extractUserIdFromAbpCreateBody(rawBody) {
   try {
-    usersApi = await fetchUsersViaApi(page, { orgId });
-  } catch (err) {
-    logger.warn(
-      "[adobe-v2] runAddUsersFlow(API): reconcile users-api failed: %s",
-      err.message
-    );
-    return { done, failed };
+    const parsed = JSON.parse(rawBody || "{}");
+    return String(parsed?.id || "").trim() || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeAbpReason(status, rawBody) {
+  try {
+    const parsed = JSON.parse(rawBody || "{}");
+    const detail = String(parsed?.detail || "").trim();
+    if (detail) return detail;
+    const type = String(parsed?.type || "").trim();
+    if (type) return type.split("/").pop() || `http_${status}`;
+  } catch (_) {}
+  return `http_${status}`;
+}
+
+async function resolveAssignableProductId(page, orgToken, headers, options = {}) {
+  if (options.productId) return String(options.productId).trim();
+
+  const url =
+    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgToken}/products/` +
+    "?include_created_date=true&include_expired=true&include_groups_quantity=true" +
+    "&include_inactive=false&include_license_activations=true&include_license_allocation_info=false" +
+    "&includeAcquiredOfferIds=false&includeConfiguredProductArrangementId=false" +
+    "&includeLegacyLSFields=false&license_group_limit=100&processing_instruction_codes=administration,license_data";
+
+  const resp = await page.context().request.get(url, {
+    headers: {
+      accept: "application/json, text/plain, */*",
+      "content-type": "application/json",
+      authorization: headers.authorization || headers.Authorization || "",
+      "x-api-key": headers["x-api-key"] || headers["X-Api-Key"] || "",
+      "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
+      "x-jil-feature": headers["x-jil-feature"] || "",
+      origin: "https://adminconsole.adobe.com",
+      referer: `https://adminconsole.adobe.com/${orgToken}/products`,
+    },
+    timeout: 30000,
+  });
+  const text = await resp.text().catch(() => "");
+  if (!resp.ok()) {
+    throw new Error(`products_api_fail_${resp.status()}: ${text.slice(0, 200)}`);
   }
 
-  const existingEmails = new Set(
-    (usersApi.users || [])
-      .map((u) => String(u?.email || "").trim().toLowerCase())
-      .filter(Boolean)
-  );
+  let list = [];
+  try {
+    const parsed = JSON.parse(text || "[]");
+    list = Array.isArray(parsed) ? parsed : parsed?.items || parsed?.data || [];
+  } catch (e) {
+    throw new Error(`products_api_parse_fail: ${e.message}`);
+  }
 
-  const stillFailed = [];
-  for (const item of failed) {
-    const email = String(item?.email || "").trim().toLowerCase();
-    const reason = String(item?.reason || "");
-    if (email && existingEmails.has(email)) {
-      logger.info(
-        "[adobe-v2] runAddUsersFlow(API): user exists after batch error (%s), treat as added: %s",
-        reason || "unknown",
-        email
-      );
-      done.push(email);
-      continue;
+  const product =
+    list.find((p) => String(p?.status || "").toLowerCase() !== "expired") ||
+    list[0];
+  const productId = String(product?.id || product?.productId || "").trim();
+  if (!productId) throw new Error("product_id_missing");
+  return productId;
+}
+
+async function createUserViaAbpApi(page, orgToken, email, headers) {
+  const apiResponse = await page.context().request.post(
+    `https://abpapi.adobe.io/abpapi/organizations/${orgToken}/users`,
+    {
+      headers: {
+        accept: "application/json, text/plain, */*",
+        "content-type": "application/json",
+        origin: "https://www.adobe.com",
+        referer: "https://www.adobe.com/",
+        authorization: headers.authorization || headers.Authorization || "",
+        "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
+        "x-api-key": headers["x-api-key"] || headers["X-Api-Key"] || "",
+      },
+      data: { email: { primary: email } },
+      timeout: 30000,
     }
-    stillFailed.push(item);
-  }
+  );
+  const status = apiResponse.status();
+  const rawBody = await apiResponse.text().catch(() => "");
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    rawBody,
+    userId: extractUserIdFromAbpCreateBody(rawBody),
+    reason: normalizeAbpReason(status, rawBody),
+  };
+}
 
-  return { done, failed: stillFailed };
+async function assignProductViaPatch(page, orgToken, userId, productId, headers) {
+  const apiResponse = await page.context().request.fetch(
+    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgToken}/users`,
+    {
+      method: "PATCH",
+      headers: {
+        accept: "application/json, text/plain, */*",
+        "content-type": "application/json",
+        origin: "https://adminconsole.adobe.com",
+        referer: `https://adminconsole.adobe.com/${orgToken}/users`,
+        authorization: headers.authorization || headers.Authorization || "",
+        "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
+        "x-api-key": headers["x-api-key"] || headers["X-Api-Key"] || "",
+        "x-jil-feature": headers["x-jil-feature"] || "",
+        "x-current-page": "1",
+        "x-page-size": "10",
+        "x-next-page": "",
+        "x-request-id":
+          headers["x-request-id"] || `renew-adobe-assign-${Date.now()}`,
+      },
+      data: [{ op: "add", path: `/${userId}/products/${productId}` }],
+      timeout: 30000,
+    }
+  );
+  const status = apiResponse.status();
+  const rawBody = await apiResponse.text().catch(() => "");
+  const patchParsed = normalizeBatchResult(["_one_"], status, rawBody);
+  const oneFailedReason = patchParsed.failed[0]?.reason || `http_${status}`;
+  return {
+    ok: patchParsed.failed.length === 0 && patchParsed.done.length > 0,
+    status,
+    rawBody,
+    reason: oneFailedReason,
+  };
 }
 
 async function runAddUsersFlow(page, userEmails = [], options = {}) {
@@ -159,61 +246,90 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
     };
   }
 
-  const payload = {
-    users: list.map((email) => ({
-      email,
-      firstname: email.split("@")[0]?.slice(0, 40) || "User",
-      lastname: "Adobe",
-    })),
-  };
+  const orgToken = `${orgId}@AdobeOrg`;
+  const productId = await resolveAssignableProductId(page, orgToken, headers, options);
+  const usersBefore = await fetchUsersViaApi(page, { orgId });
+  const emailToUser = new Map(
+    (usersBefore.users || [])
+      .filter((u) => u?.email)
+      .map((u) => [String(u.email).trim().toLowerCase(), u])
+  );
 
-  const apiResponse = await page.context().request.post(
-    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgId}@AdobeOrg/users:batch`,
-    {
-      headers: {
-        accept: "application/json, text/plain, */*",
-        "content-type": "application/json",
-        origin: "https://adminconsole.adobe.com",
-        referer: `https://adminconsole.adobe.com/${orgId}@AdobeOrg/users`,
-        authorization,
-        "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
-        "x-api-key": xApiKey,
-        "x-jil-feature": headers["x-jil-feature"] || "",
-        "x-current-page": "1",
-        "x-page-size": String(list.length),
-        "x-next-page": "",
-        "x-request-id": headers["x-request-id"] || `renew-adobe-${Date.now()}`,
-      },
-      data: payload,
-      timeout: 30000,
+  const done = [];
+  const failed = [];
+  for (const email of list) {
+    const preUser = emailToUser.get(email) || null;
+    const hadAnyProductBefore =
+      !!preUser &&
+      Array.isArray(preUser.products) &&
+      preUser.products.length > 0;
+    let userId = String(preUser?.id || "").trim() || null;
+    if (!userId) {
+      const createRes = await createUserViaAbpApi(page, orgToken, email, headers);
+      if (createRes.ok) {
+        userId = createRes.userId || null;
+      } else {
+        const refreshed = await fetchUsersViaApi(page, { orgId });
+        const existed = (refreshed.users || []).find(
+          (u) => String(u?.email || "").trim().toLowerCase() === email
+        );
+        if (existed?.id) {
+          userId = String(existed.id);
+          logger.info(
+            "[adobe-v2] runAddUsersFlow(API): user already exists after ABP error (%s): %s",
+            createRes.reason,
+            email
+          );
+        } else {
+          failed.push({ email, reason: `create_user_failed:${createRes.reason}` });
+          continue;
+        }
+      }
     }
-  );
 
-  const status = apiResponse.status();
-  const rawBody = await apiResponse.text().catch(() => "");
-  const normalized = normalizeBatchResult(list, status, rawBody);
-  const reconciled = await reconcileFailedUsersByCurrentOrgUsers(
-    page,
-    orgId,
-    normalized
-  );
+    const assignRes = await assignProductViaPatch(page, orgToken, userId, productId, headers);
+    if (assignRes.ok) {
+      done.push(email);
+      continue;
+    }
+
+    const refreshed = await fetchUsersViaApi(page, { orgId });
+    const existed = (refreshed.users || []).find(
+      (u) => String(u?.email || "").trim().toLowerCase() === email
+    );
+    const hasAnyProductNow =
+      !!existed && Array.isArray(existed.products) && existed.products.length > 0;
+    const hasAssignedProduct =
+      existed &&
+      Array.isArray(existed.products) &&
+      existed.products.some((p) => String(p?.id || p || "").trim() === productId);
+
+    if (hasAssignedProduct || (hadAnyProductBefore && hasAnyProductNow)) {
+      done.push(email);
+      logger.info(
+        "[adobe-v2] runAddUsersFlow(API): assign returned error but product already present, treat success: %s",
+        email
+      );
+      continue;
+    }
+
+    failed.push({ email, reason: `assign_product_failed:${assignRes.reason}` });
+  }
+
   logger.info(
-    "[adobe-v2] runAddUsersFlow(API): status=%s raw(done=%d,failed=%d) reconciled(done=%d,failed=%d)",
-    status,
-    normalized.done.length,
-    normalized.failed.length,
-    reconciled.done.length,
-    reconciled.failed.length
+    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d failed=%d",
+    orgToken,
+    productId,
+    done.length,
+    failed.length
   );
-
-  const failed = reconciled.failed;
 
   const stoppedByPolicy =
     options.stopOnError === true && failed.length > 0;
 
   return {
-    success: reconciled.done.length > 0 && !stoppedByPolicy,
-    done: reconciled.done,
+    success: done.length > 0 && !stoppedByPolicy,
+    done,
     failed,
     stoppedByPolicy,
   };

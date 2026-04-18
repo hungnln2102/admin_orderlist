@@ -97,7 +97,8 @@ async function autoAssignUsers({ onProgress = null } = {}) {
     count: available.length,
     slots: available.map((account) => ({
       id: account[COLS.ID],
-      slots: MAX_USERS_PER_ACCOUNT - account.currentCount,
+      slots: Math.max(0, (account.userLimit || MAX_USERS_PER_ACCOUNT) - account.currentCount),
+      limit: account.userLimit || MAX_USERS_PER_ACCOUNT,
     })),
   });
 
@@ -117,7 +118,10 @@ async function autoAssignUsers({ onProgress = null } = {}) {
       break;
     }
 
-    const slotsLeft = MAX_USERS_PER_ACCOUNT - account.currentCount;
+    const slotsLeft = Math.max(
+      0,
+      (account.userLimit || MAX_USERS_PER_ACCOUNT) - account.currentCount
+    );
     const take = Math.min(slotsLeft, remaining.length);
     const chunk = remaining.splice(0, take);
     if (chunk.length > 0) {

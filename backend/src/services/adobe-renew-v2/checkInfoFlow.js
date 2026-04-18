@@ -188,7 +188,7 @@ function scrapeUsersPage(page) {
  * Nếu options.existingOrgName có sẵn thì bỏ qua B10–B11 (không vào account.adobe.com lấy profile).
  * @param {import('playwright').Page} page
  * @param {{ existingOrgName?: string|null }} options
- * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[] }>}
+ * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number }>}
  */
 async function runB10ToB13(page, options = {}) {
   const existingOrgName = options.existingOrgName && String(options.existingOrgName).trim() ? String(options.existingOrgName).trim() : null;
@@ -197,6 +197,7 @@ async function runB10ToB13(page, options = {}) {
   let products = [];
   let users = [];
   let license_status = "unknown";
+  let contractActiveLicenseCount = 0;
 
   const orgResult = await runCheckOrgNameFlow(page, { existingOrgName });
   org_name = orgResult.org_name;
@@ -205,6 +206,7 @@ async function runB10ToB13(page, options = {}) {
   orgId = productResult.orgId || orgId;
   products = productResult.products || [];
   license_status = productResult.license_status || "unknown";
+  contractActiveLicenseCount = Number(productResult.contractActiveLicenseCount || 0);
 
   const usersUrlPrimary = buildAdminUsersUrl(orgId);
   logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
@@ -228,7 +230,14 @@ async function runB10ToB13(page, options = {}) {
   }));
   logger.info("[adobe-v2] users-api: %d", users.length);
 
-  return { org_name, orgId, license_status, products, users };
+  return {
+    org_name,
+    orgId,
+    license_status,
+    products,
+    users,
+    contractActiveLicenseCount,
+  };
 }
 
 module.exports = {

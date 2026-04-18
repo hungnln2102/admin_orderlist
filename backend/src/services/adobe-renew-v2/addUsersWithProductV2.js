@@ -1,7 +1,6 @@
 /**
- * Add users + assign product via Admin Console UI (V2).
- * Luồng: B1–B9 (onlyLogin) → /users → addUsersToOrgViaUI (add + assign inline) → B15 → scrape snapshot.
- * Theo docs Renew_Adobe_V2.md dòng 326: combobox → dropdown → product modal → Lưu.
+ * Add users + assign product via API (V2).
+ * Luồng: B1–B9 (onlyLogin) → /users → create user (abpapi) + assign product (PATCH) → B15 → API snapshot.
  */
 
 const logger = require("../../utils/logger");
@@ -100,8 +99,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       };
     }
 
-    // Product đã được assign inline trong addUsersToOrgViaUI (theo flow docs dòng 326)
-    // Không cần select-users + edit-products riêng nữa
+    // Product đã được assign ngay trong runAddUsersFlow (create user + PATCH add product).
 
     // Remove product from admin if needed (B15)
     try {

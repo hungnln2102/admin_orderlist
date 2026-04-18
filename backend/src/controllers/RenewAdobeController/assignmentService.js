@@ -10,6 +10,27 @@ const {
   normalizeLicenseStatus,
 } = require("./statusUtils");
 
+function parseAlertConfig(raw) {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function resolveAccountUserLimit(account) {
+  const conf = parseAlertConfig(account?.[COLS.ALERT_CONFIG]);
+  const n = Number(conf?.contractActiveLicenseCount || 0);
+  if (Number.isFinite(n) && n > 0) return n;
+  return MAX_USERS_PER_ACCOUNT;
+}
+
 function buildAvailableAccounts(accounts) {
   return accounts
     .filter((account) => {
@@ -24,11 +45,12 @@ function buildAvailableAccounts(accounts) {
     .map((account) => ({
       ...account,
       currentCount: Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0),
+      userLimit: resolveAccountUserLimit(account),
     }))
-    .filter((account) => account.currentCount < MAX_USERS_PER_ACCOUNT)
+    .filter((account) => account.currentCount < account.userLimit)
     .sort((a, b) => {
-      const slotsA = MAX_USERS_PER_ACCOUNT - a.currentCount;
-      const slotsB = MAX_USERS_PER_ACCOUNT - b.currentCount;
+      const slotsA = a.userLimit - a.currentCount;
+      const slotsB = b.userLimit - b.currentCount;
       return slotsA - slotsB;
     });
 }
@@ -175,7 +197,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
   const accountId = target[COLS.ID];
   const accountEmail = target[COLS.EMAIL];
   const accountPassword = target[COLS.PASSWORD_ENC] || "";
-  const slotsLeft = MAX_USERS_PER_ACCOUNT - target.currentCount;
+  const slotsLeft = Math.max(0, target.userLimit - target.currentCount);
   const take = Math.min(slotsLeft, remainingDistinct.length);
   const chunk = remainingDistinct.slice(0, take);
   const stillRemaining = remainingDistinct.slice(take);

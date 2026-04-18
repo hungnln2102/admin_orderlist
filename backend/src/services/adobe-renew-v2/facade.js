@@ -148,6 +148,9 @@ async function checkAccount(email, password, options = {}) {
       orgName: result.org_name || null,
       userCount: manageTeamMembers.length,
       licenseStatus: result.license_status || "unknown",
+      contractActiveLicenseCount: Number(
+        result.contractActiveLicenseCount || 0
+      ),
       adobe_org_id: result.orgId || null,
       profileName: result.org_name || null,
       manageTeamMembers,
@@ -158,6 +161,9 @@ async function checkAccount(email, password, options = {}) {
     const savedCookies = {
       cookies: result.cookies || [],
       savedAt: new Date().toISOString(),
+      contractActiveLicenseCount: Number(
+        result.contractActiveLicenseCount || 0
+      ),
     };
 
     return {
