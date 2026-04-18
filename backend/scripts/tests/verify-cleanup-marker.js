@@ -11,7 +11,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 (async () => {
   const r1 = await pool.query(
-    "SELECT COUNT(*)::int AS c FROM orders.payment_receipt WHERE note ILIKE $1",
+    "SELECT COUNT(*)::int AS c FROM receipt.payment_receipt WHERE note ILIKE $1",
     [`%${marker}%`]
   );
   const r2 = await pool.query(
@@ -19,7 +19,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     [`%${marker}%`]
   );
   const r3 = await pool.query(
-    "SELECT COUNT(*)::int AS c FROM finance.dashboard_monthly_summary WHERE month_key = $1",
+    "SELECT COUNT(*)::int AS c FROM dashboard.dashboard_monthly_summary WHERE month_key = $1",
     ["2099-12"]
   );
   console.log(

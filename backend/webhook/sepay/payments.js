@@ -33,13 +33,11 @@ const { withSavepoint } = require("./savepoint");
 let paymentReceiptOrderColCache = null;
 let paymentReceiptColumnsCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
-const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
-  ? PAYMENT_RECEIPT_TABLE.split(".")[0]
-  : process.env.DB_SCHEMA_RECEIPT ||
-    process.env.SCHEMA_RECEIPT ||
-    process.env.DB_SCHEMA_ORDERS ||
-    process.env.SCHEMA_ORDERS ||
-    "receipt";
+// Always prioritize receipt schema for webhook receipt flow.
+// Do not fallback to orders.* because payment_receipt tables have been migrated.
+const PAYMENT_RECEIPT_SCHEMA =
+  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
+const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
 const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
 const PAYMENT_RECEIPT_FINANCIAL_AUDIT_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_audit_log`;
 const RECEIPT_STATE_COLS = {
@@ -355,7 +353,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       const byTxnIdRes = await client.query(
         `
           SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
-          FROM ${PAYMENT_RECEIPT_TABLE}
+          FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED}
           WHERE ${safeIdent(PAYMENT_RECEIPT_COLS.sepayTransactionId)}::text = $1
           LIMIT 1
         `,
@@ -387,7 +385,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       const byReferenceRes = await client.query(
         `
           SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
-          FROM ${PAYMENT_RECEIPT_TABLE}
+          FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED}
           WHERE LOWER(COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.referenceCode)}::text, '')) = LOWER($1)
             AND LOWER(COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.transferType)}::text, '')) = LOWER($2)
             AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $3
@@ -415,7 +413,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
 
     const existsSql = `
       SELECT ${safeIdent(PAYMENT_RECEIPT_COLS.id)} AS id
-      FROM ${PAYMENT_RECEIPT_TABLE}
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED}
       WHERE ${safeIdent(PAYMENT_RECEIPT_COLS.paidDate)} = $1::date
         AND ${safeIdent(PAYMENT_RECEIPT_COLS.amount)} = $2
         AND COALESCE(${safeIdent(PAYMENT_RECEIPT_COLS.receiver)}::text, '') = $3
@@ -483,7 +481,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     pushOptionalColumn(PAYMENT_RECEIPT_COLS.gateway, gateway);
 
     const sql = `
-      INSERT INTO ${PAYMENT_RECEIPT_TABLE} (
+      INSERT INTO ${PAYMENT_RECEIPT_TABLE_RESOLVED} (
         ${insertColumns.join(", ")}
       )
       VALUES (

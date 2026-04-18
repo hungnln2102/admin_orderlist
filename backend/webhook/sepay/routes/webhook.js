@@ -43,6 +43,10 @@ const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/
 const logger = require("../../../src/utils/logger");
 const { withSavepoint } = require("../savepoint");
 const UNDERPAY_TOLERANCE_VND = 5000;
+const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
+const PAYMENT_RECEIPT_SCHEMA =
+  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
+const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
 
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
@@ -181,7 +185,7 @@ const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
   const res = await client.query(
     `
       SELECT COALESCE(SUM(pr.${PAYMENT_RECEIPT_COLS.amount})::numeric, 0) AS accumulated_amount
-      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED} pr
       WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
         AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
     `,
@@ -201,7 +205,7 @@ const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orde
   const res = await client.query(
     `
       SELECT 1
-      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED} pr
       WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
         AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
         AND ($3::bigint IS NULL OR pr.${PAYMENT_RECEIPT_COLS.id} <> $3::bigint)

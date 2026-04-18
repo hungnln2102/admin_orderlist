@@ -6,7 +6,6 @@ const { runCheckFlow, toPwCookies, fromPwCookies } = require("./runCheckFlow");
 const { getOrCreateAutoAssignUrlWithPage } = require("./autoAssignFlow");
 const { doFormLoginOnAuthPage } = require("./loginFlow");
 const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
-const { gotoUsersPageWithCurrentSession, deleteUsersWithExistingPage, scrapeUsersSnapshot } = require("./userDeleteActions");
 const { deleteUsersV2 } = require("./deleteUsersV2");
 const { addUsersWithProductV2 } = require("./addUsersWithProductV2");
 const flows = require("./flows");
@@ -19,9 +18,6 @@ module.exports = {
   getOrCreateAutoAssignUrlWithPage,
   doFormLoginOnAuthPage,
   runB15RemoveProductFromAdmin,
-  gotoUsersPageWithCurrentSession,
-  deleteUsersWithExistingPage,
-  scrapeUsersSnapshot,
   deleteUsersV2,
   addUsersWithProductV2,
   flows,

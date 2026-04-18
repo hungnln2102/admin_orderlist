@@ -6,13 +6,13 @@ async function run() {
   try {
     const preview = await pool.query(`
       SELECT COUNT(*)::int AS cnt
-      FROM orders.payment_receipt
+      FROM receipt.payment_receipt
       WHERE COALESCE(BTRIM(id_order), '') != ''
         AND BTRIM(id_order) !~* '^MAV[A-Z0-9]{3,20}$'
     `);
 
     const updated = await pool.query(`
-      UPDATE orders.payment_receipt
+      UPDATE receipt.payment_receipt
       SET id_order = ''
       WHERE COALESCE(BTRIM(id_order), '') != ''
         AND BTRIM(id_order) !~* '^MAV[A-Z0-9]{3,20}$'

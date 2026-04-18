@@ -45,7 +45,7 @@ async function getSummary(monthKey) {
       SELECT
         COALESCE(total_revenue::numeric, 0) AS total_revenue,
         COALESCE(total_profit::numeric, 0) AS total_profit
-      FROM finance.dashboard_monthly_summary
+      FROM dashboard.dashboard_monthly_summary
       WHERE month_key = $1
       LIMIT 1
     `,
@@ -62,7 +62,7 @@ async function getReceiptByOrderCode(orderCode) {
   const res = await pool.query(
     `
       SELECT id, id_order, payment_date, amount, note
-      FROM orders.payment_receipt
+      FROM receipt.payment_receipt
       WHERE LOWER(COALESCE(id_order, '')) = LOWER($1)
       ORDER BY id DESC
       LIMIT 1
@@ -76,7 +76,7 @@ async function getReceiptByMarkerAndEmptyOrder(marker) {
   const res = await pool.query(
     `
       SELECT id, id_order, payment_date, amount, note
-      FROM orders.payment_receipt
+      FROM receipt.payment_receipt
       WHERE COALESCE(id_order, '') = ''
         AND note ILIKE $1
       ORDER BY id DESC
@@ -91,7 +91,7 @@ async function getReceiptState(receiptId) {
   const res = await pool.query(
     `
       SELECT payment_receipt_id, is_financial_posted, posted_revenue, posted_profit, reconciled_at, adjustment_applied
-      FROM orders.payment_receipt_financial_state
+      FROM receipt.payment_receipt_financial_state
       WHERE payment_receipt_id = $1
       LIMIT 1
     `,
@@ -103,7 +103,7 @@ async function getReceiptState(receiptId) {
 async function insertPostedReceiptState({ orderCode, amount, note }) {
   const receiptRes = await pool.query(
     `
-      INSERT INTO orders.payment_receipt (id_order, payment_date, amount, receiver, note, sender)
+      INSERT INTO receipt.payment_receipt (id_order, payment_date, amount, receiver, note, sender)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `,
@@ -112,7 +112,7 @@ async function insertPostedReceiptState({ orderCode, amount, note }) {
   const receiptId = Number(receiptRes.rows[0]?.id || 0);
   await pool.query(
     `
-      INSERT INTO orders.payment_receipt_financial_state (
+      INSERT INTO receipt.payment_receipt_financial_state (
         payment_receipt_id,
         is_financial_posted,
         posted_revenue,
@@ -291,7 +291,7 @@ async function run() {
   });
   await pool.query(
     `
-      INSERT INTO orders.payment_receipt (id_order, payment_date, amount, receiver, note, sender)
+      INSERT INTO receipt.payment_receipt (id_order, payment_date, amount, receiver, note, sender)
       VALUES ($1, $2, $3, $4, $5, $6)
     `,
     [c2OrderCode, TEST_PAYMENT_DATE, 50000, "918340998", `${MARKER} PRIOR`, "TEST"]
@@ -631,9 +631,9 @@ async function run() {
 }
 
 async function cleanup() {
-  await pool.query("DELETE FROM orders.payment_receipt WHERE note ILIKE $1", [`%${MARKER}%`]);
+  await pool.query("DELETE FROM receipt.payment_receipt WHERE note ILIKE $1", [`%${MARKER}%`]);
   await pool.query("DELETE FROM orders.order_list WHERE note ILIKE $1 OR customer ILIKE $1", [`%${MARKER}%`]);
-  await pool.query("DELETE FROM finance.dashboard_monthly_summary WHERE month_key = $1", [TEST_MONTH_KEY]);
+  await pool.query("DELETE FROM dashboard.dashboard_monthly_summary WHERE month_key = $1", [TEST_MONTH_KEY]);
 }
 
 (async () => {

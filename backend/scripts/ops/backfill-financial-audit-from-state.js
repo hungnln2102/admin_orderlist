@@ -13,7 +13,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function main() {
   const res = await pool.query(`
-    INSERT INTO orders.payment_receipt_financial_audit_log (
+    INSERT INTO receipt.payment_receipt_financial_audit_log (
       payment_receipt_id,
       order_code,
       rule_branch,
@@ -31,8 +31,8 @@ async function main() {
         'note', 'synthetic row from existing financial_state'
       ),
       'backfill'
-    FROM orders.payment_receipt_financial_state fs
-    INNER JOIN orders.payment_receipt pr ON pr.id = fs.payment_receipt_id
+    FROM receipt.payment_receipt_financial_state fs
+    INNER JOIN receipt.payment_receipt pr ON pr.id = fs.payment_receipt_id
     WHERE (
       COALESCE(fs.posted_revenue, 0) <> 0
       OR COALESCE(fs.posted_profit, 0) <> 0
@@ -40,7 +40,7 @@ async function main() {
     )
     AND NOT EXISTS (
       SELECT 1
-      FROM orders.payment_receipt_financial_audit_log a
+      FROM receipt.payment_receipt_financial_audit_log a
       WHERE a.payment_receipt_id = fs.payment_receipt_id
     )
     RETURNING payment_receipt_id

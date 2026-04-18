@@ -44,9 +44,10 @@ const {
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
-const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
-  ? PAYMENT_RECEIPT_TABLE.split(".")[0]
-  : "receipt";
+const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
+const PAYMENT_RECEIPT_SCHEMA =
+  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
+const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
 const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
 
 const toMonthKey = (value) => {
@@ -67,7 +68,7 @@ const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
   const res = await client.query(
     `
       SELECT 1
-      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED} pr
       INNER JOIN ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE} fs
         ON fs.payment_receipt_id = pr.${PAYMENT_RECEIPT_COLS.id}
       WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)

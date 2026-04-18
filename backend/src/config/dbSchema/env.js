@@ -38,8 +38,6 @@ const SCHEMA_FINANCE = pickSchema(
   "dashboard"
 );
 const SCHEMA_IDENTITY = pickSchema(
-  process.env.DB_SCHEMA_IDENTITY,
-  process.env.SCHEMA_IDENTITY,
   process.env.DB_SCHEMA_CUSTOMER_WEB,
   process.env.SCHEMA_CUSTOMER_WEB,
   "customer_web"
@@ -75,13 +73,15 @@ const SCHEMA_FORM_DESC = pickSchema(
   "form_desc"
 );
 const SCHEMA_RENEW_ADOBE = pickSchema(
+  process.env.DB_SCHEMA_SYSTEM_AUTOMATION,
+  process.env.SCHEMA_SYSTEM_AUTOMATION,
   process.env.DB_SCHEMA_RENEW_ADOBE,
   process.env.SCHEMA_RENEW_ADOBE,
   "system_automation"
 );
 const SCHEMA_KEY_ACTIVE = pickSchema(
-  process.env.DB_SCHEMA_KEY_ACTIVE,
-  process.env.SCHEMA_KEY_ACTIVE,
+  process.env.DB_SCHEMA_SYSTEM_AUTOMATION,
+  process.env.SCHEMA_SYSTEM_AUTOMATION,
   process.env.DB_SCHEMA_RENEW_ADOBE,
   process.env.SCHEMA_RENEW_ADOBE,
   "system_automation"
