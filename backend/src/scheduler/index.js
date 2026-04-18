@@ -13,6 +13,7 @@ const {
   notifyFourDaysRemainingTask,
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
+  cleanupAdobeProfileGarbageTask,
   getSchedulerStatus,
   schedulerTimezone,
   cronExpression,
@@ -59,6 +60,14 @@ const runCleanupExpiredAdobeUsersSafe = (source) =>
     })
   );
 
+const runCleanupAdobeProfileGarbageSafe = (source) =>
+  cleanupAdobeProfileGarbageTask(source).catch((err) =>
+    logger.error(`[CRON] Cleanup Adobe profile garbage failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
 if (require.main === module && process.argv.includes("--run-once")) {
   runCronSafe("manual");
 }
@@ -75,6 +84,15 @@ cron.schedule(
 if (runOnStart) {
   runCronSafe("startup");
 }
+
+cron.schedule(
+  "0 0 * * *",
+  async () => {
+    logger.info("[Scheduler] Cron 00:00 — cleanup orphan Adobe profile dirs");
+    await runCleanupAdobeProfileGarbageSafe("cron");
+  },
+  { scheduled: true, timezone: schedulerTimezone }
+);
 
 cron.schedule(
   "30 23 * * *",
@@ -124,5 +142,6 @@ module.exports = {
   notifyFourDaysRemainingTask,
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
+  cleanupAdobeProfileGarbageTask,
   getSchedulerStatus,
 };

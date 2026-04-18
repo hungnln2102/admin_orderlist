@@ -19,6 +19,7 @@ type ReceiptsTableProps = {
   onToggle: (receiptId: number) => void;
   onSelectReceipt?: (receipt: PaymentReceipt) => void;
   showOrderCode?: boolean;
+  enableOrderCodeEdit?: boolean;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
@@ -31,6 +32,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   onToggle,
   onSelectReceipt,
   showOrderCode = true,
+  enableOrderCodeEdit = false,
 }) => {
   const [selectionByReceiptId, setSelectionByReceiptId] = useState<
     Record<number, string>
@@ -45,6 +47,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
     receiptId: number;
     orderCode: string;
   } | null>(null);
+  const [editingReceiptId, setEditingReceiptId] = useState<number | null>(null);
+  const [editingOrderCode, setEditingOrderCode] = useState("");
 
   const visibleColsBase = showOrderCode ? 7 : 6;
   const expandedColSpan = visibleColsBase + (enableMatching ? 1 : 0);
@@ -107,6 +111,39 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
     }
   };
 
+  const startEditOrderCode = (receipt: PaymentReceipt) => {
+    setRowErrorByReceiptId((prev) => ({ ...prev, [receipt.id]: "" }));
+    setEditingReceiptId(receipt.id);
+    setEditingOrderCode(String(receipt.orderCode || "").trim().toUpperCase());
+  };
+
+  const cancelEditOrderCode = () => {
+    setEditingReceiptId(null);
+    setEditingOrderCode("");
+  };
+
+  const saveEditedOrderCode = async (receipt: PaymentReceipt) => {
+    const nextCode = String(editingOrderCode || "").trim().toUpperCase();
+    if (!nextCode) {
+      setRowErrorByReceiptId((prev) => ({
+        ...prev,
+        [receipt.id]: "Bạn chưa nhập mã đơn hàng.",
+      }));
+      return;
+    }
+    try {
+      setRowErrorByReceiptId((prev) => ({ ...prev, [receipt.id]: "" }));
+      await onMatchReceipt(receipt.id, nextCode);
+      cancelEditOrderCode();
+    } catch (err) {
+      setRowErrorByReceiptId((prev) => ({
+        ...prev,
+        [receipt.id]:
+          err instanceof Error ? err.message : "Không thể cập nhật mã đơn.",
+      }));
+    }
+  };
+
   return (
     <div className="bg-transparent overflow-visible">
       <div className="overflow-x-auto">
@@ -130,6 +167,8 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
               const isManualInput = selectedValue === "__manual__";
               const rowError = rowErrorByReceiptId[receipt.id] || "";
               const isMatching = matchingReceiptId === receipt.id;
+              const isEditingOrderCode =
+                enableOrderCodeEdit && editingReceiptId === receipt.id;
               return (
                 <React.Fragment key={receipt.id}>
                   <tr
@@ -206,9 +245,62 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                           enableMatching ? "" : "first:rounded-l-[24px]"
                         }`}
                       >
-                        <span className="text-sm font-bold text-white tracking-wider uppercase">
-                          {receipt.orderCode || "—"}
-                        </span>
+                        <div
+                          className="space-y-2"
+                          onClick={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                        >
+                          {isEditingOrderCode ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={editingOrderCode}
+                                onChange={(event) =>
+                                  setEditingOrderCode(
+                                    event.target.value.toUpperCase()
+                                  )
+                                }
+                                disabled={isMatching}
+                                placeholder="Nhập mã đơn..."
+                                className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-white outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void saveEditedOrderCode(receipt)}
+                                  disabled={isMatching}
+                                  className="rounded-xl border border-emerald-300/40 bg-emerald-500/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100 disabled:opacity-60"
+                                >
+                                  Lưu
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEditOrderCode}
+                                  disabled={isMatching}
+                                  className="rounded-xl border border-white/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/80 disabled:opacity-60"
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-white tracking-wider uppercase">
+                                {receipt.orderCode || "—"}
+                              </span>
+                              {enableOrderCodeEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditOrderCode(receipt)}
+                                  disabled={isMatching}
+                                  className="rounded-lg border border-indigo-400/40 bg-indigo-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-100 disabled:opacity-60"
+                                >
+                                  Sửa
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     ) : null}
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">

@@ -313,6 +313,7 @@ export default function Invoices() {
           matchingReceiptId={matchingReceiptId}
           onMatchReceipt={handleMatchReceipt}
           enableMatching={categoryFilter === "refund"}
+          enableOrderCodeEdit={categoryFilter === "receipt"}
           expandedReceiptId={expandedReceiptId}
           onToggle={toggleRowDetails}
           onSelectReceipt={handleSelectReceipt}

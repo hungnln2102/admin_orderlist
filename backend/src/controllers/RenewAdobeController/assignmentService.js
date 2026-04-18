@@ -31,6 +31,12 @@ function resolveAccountUserLimit(account) {
   return MAX_USERS_PER_ACCOUNT;
 }
 
+function hasActivePackageByContractCount(account) {
+  const conf = parseAlertConfig(account?.[COLS.ALERT_CONFIG]);
+  const n = Number(conf?.contractActiveLicenseCount || 0);
+  return Number.isFinite(n) && n > 0;
+}
+
 function buildAvailableAccounts(accounts) {
   return accounts
     .filter((account) => {
@@ -40,7 +46,11 @@ function buildAvailableAccounts(accounts) {
         account[COLS.IS_ACTIVE] !== 0 &&
         account[COLS.IS_ACTIVE] !== "0";
 
-      return isActive && ACTIVE_LICENSE_STATUSES.has(licenseStatus);
+      const hasPackageByContract = hasActivePackageByContractCount(account);
+      return (
+        isActive &&
+        (hasPackageByContract || ACTIVE_LICENSE_STATUSES.has(licenseStatus))
+      );
     })
     .map((account) => ({
       ...account,

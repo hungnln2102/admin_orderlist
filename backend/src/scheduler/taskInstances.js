@@ -12,6 +12,9 @@ const { createNotifyZeroDaysTask } = require("./tasks/notifyZeroDays");
 const { createNotifyFourDaysTask } = require("./tasks/notifyFourDays");
 const { createRenewAdobeCheckAndNotifyTask } = require("./tasks/renewAdobeCheckAndNotify");
 const { createCleanupExpiredAdobeUsersTask } = require("./tasks/cleanupExpiredAdobeUsers");
+const {
+  createCleanupAdobeProfileGarbageTask,
+} = require("./tasks/cleanupAdobeProfileGarbage");
 
 const {
   pool,
@@ -37,6 +40,7 @@ const notifyFourDaysRemainingTask = createNotifyFourDaysTask(
 );
 const renewAdobeCheckAndNotifyTask = createRenewAdobeCheckAndNotifyTask();
 const cleanupExpiredAdobeUsersTask = createCleanupExpiredAdobeUsersTask();
+const cleanupAdobeProfileGarbageTask = createCleanupAdobeProfileGarbageTask();
 
 function getSchedulerStatus() {
   return {
@@ -53,6 +57,7 @@ module.exports = {
   notifyFourDaysRemainingTask,
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
+  cleanupAdobeProfileGarbageTask,
   getSchedulerStatus,
   schedulerTimezone,
   cronExpression,

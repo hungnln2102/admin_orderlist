@@ -1,4 +1,11 @@
-const { updateDatabaseTask, getSchedulerStatus, notifyFourDaysRemainingTask, cleanupExpiredAdobeUsersTask, renewAdobeCheckAndNotifyTask } = require("../../scheduler/taskInstances");
+const {
+  updateDatabaseTask,
+  getSchedulerStatus,
+  notifyFourDaysRemainingTask,
+  cleanupExpiredAdobeUsersTask,
+  renewAdobeCheckAndNotifyTask,
+  cleanupAdobeProfileGarbageTask,
+} = require("../../scheduler/taskInstances");
 const logger = require("../../utils/logger");
 const { syncOrdersToMapping } = require("../../services/userAccountMappingService");
 
@@ -60,11 +67,27 @@ const runSyncMappingNow = async (_req, res) => {
   }
 };
 
+const runCleanupAdobeProfileGarbageNow = async (_req, res) => {
+  try {
+    const result = await cleanupAdobeProfileGarbageTask("manual");
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error("[scheduler] Cleanup Adobe profile garbage failed", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res
+      .status(500)
+      .json({ error: "Không thể chạy cleanup profile rác Adobe." });
+  }
+};
+
 module.exports = {
   runSchedulerNow,
   schedulerStatus,
   runFourDaysNotificationNow,
   runCleanupExpiredAdobeUsersNow,
+  runCleanupAdobeProfileGarbageNow,
   runRenewAdobeCheckNow,
   runSyncMappingNow,
 };

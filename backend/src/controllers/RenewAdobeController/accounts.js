@@ -9,6 +9,9 @@ const { TABLE, COLS } = require("./accountTable");
 const { findAccountMatchByEmail, normalizeEmail } = require("./accountLookup");
 const { removeMappingsForAccount } = require("../../services/userAccountMappingService");
 const { normalizeOtpSource } = require("../../services/otpProviderService");
+const {
+  removeProfileDirForEmail,
+} = require("../../services/adobe-renew-v2/shared/profileSession");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP
@@ -445,6 +448,22 @@ const deleteAccount = async (req, res) => {
       id,
       email: trimStr(row[COLS.EMAIL]),
     });
+    try {
+      const clean = removeProfileDirForEmail(row[COLS.EMAIL]);
+      if (clean.removed) {
+        logger.info("[renew-adobe] Deleted local profile dir", {
+          id,
+          email: trimStr(row[COLS.EMAIL]),
+          profileDir: clean.profileDir,
+        });
+      }
+    } catch (profileErr) {
+      logger.warn("[renew-adobe] deleteAccount profile cleanup failed", {
+        id,
+        email: trimStr(row[COLS.EMAIL]),
+        error: profileErr.message,
+      });
+    }
     return res.json({ success: true, id });
   } catch (err) {
     logger.error("[renew-adobe] deleteAccount failed", {

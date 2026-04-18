@@ -8,6 +8,9 @@ const { db } = require("../db");
 const adobeRenewV2 = require("./adobe-renew-v2");
 const { removeMappingsForAccount } = require("./userAccountMappingService");
 const { TABLE, COLS } = require("../controllers/RenewAdobeController/accountTable");
+const {
+  removeProfileDirForEmail,
+} = require("./adobe-renew-v2/shared/profileSession");
 
 /**
  * @param {object} accountRow — đủ cột: id, email, password_enc, users_snapshot, mail_backup_id?, alert_config?
@@ -84,6 +87,26 @@ async function purgeAndDeleteNoLicenseAdobeAdminAccount(
     deletedFromDb = removed > 0;
     if (deletedFromDb) {
       logger.info("%s Đã xóa accounts_admin id=%s (%s)", logPrefix, id, email);
+      try {
+        const profileClean = removeProfileDirForEmail(email);
+        if (profileClean.removed) {
+          logger.info(
+            "%s Đã xóa profile local cho account %s (%s): %s",
+            logPrefix,
+            id,
+            email,
+            profileClean.profileDir
+          );
+        }
+      } catch (profileErr) {
+        logger.warn(
+          "%s Xóa profile local thất bại cho account %s (%s): %s",
+          logPrefix,
+          id,
+          email,
+          profileErr.message
+        );
+      }
     }
   } catch (err) {
     logger.error(

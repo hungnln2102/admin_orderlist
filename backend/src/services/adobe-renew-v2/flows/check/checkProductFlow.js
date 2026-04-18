@@ -99,6 +99,11 @@ function deriveContractActiveLicenseCount(products = []) {
   return Math.max(...totals);
 }
 
+function deriveLicenseStatusByContractCount(contractActiveLicenseCount) {
+  const n = Number(contractActiveLicenseCount || 0);
+  return n > 0 ? "Paid" : "Expired";
+}
+
 async function runCheckProductFlow(page) {
   return withRecoverableRetry(
     "B12-check-product",
@@ -118,15 +123,11 @@ async function runCheckProductFlow(page) {
       const contractActiveLicenseCount = deriveContractActiveLicenseCount(products);
 
       const onProductsPage =
-        productsUrl.includes("adminconsole.adobe.com") && productsUrl.includes("/products");
-      const license_status =
-        products.length === 0
-          ? onProductsPage
-            ? "Expired"
-            : "unknown"
-          : products.some((p) => (p.total || 0) > 0)
-            ? "Paid"
-            : "Expired";
+        productsUrl.includes("adminconsole.adobe.com") &&
+        productsUrl.includes("/products");
+      const license_status = deriveLicenseStatusByContractCount(
+        contractActiveLicenseCount
+      );
 
       logger.info(
         "[adobe-v2] products: %d, license_status: %s, orgId: %s, onProductsPage: %s, contractActiveLicenseCount: %s",

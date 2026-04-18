@@ -71,10 +71,10 @@ async function runCheckForAccountId(id) {
     license_status: scrapedData.licenseStatus,
   });
 
-  if (
-    scrapedData.licenseStatus &&
-    scrapedData.licenseStatus.toLowerCase() === "expired"
-  ) {
+  const contractActiveLicenseCount = Number(
+    scrapedData.contractActiveLicenseCount || 0
+  );
+  if (contractActiveLicenseCount <= 0) {
     const userEmails = (scrapedData.manageTeamMembers || [])
       .map((user) => user.email)
       .filter(Boolean);

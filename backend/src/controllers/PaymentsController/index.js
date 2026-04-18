@@ -286,17 +286,17 @@ const reconcilePaymentReceipt = async (req, res) => {
   const rawOrderCodeValue = String(req.body?.orderCode || "").trim().toUpperCase();
   const extractedOrderCode = rawOrderCodeValue.match(/MAV[A-Z0-9]{3,20}/)?.[0] || "";
   const orderCodeRaw = extractedOrderCode || rawOrderCodeValue;
-  const actionRaw = String(req.body?.action || RECONCILE_ACTIONS.ONLY)
+  const requestedActionRaw = String(req.body?.action || RECONCILE_ACTIONS.ONLY)
     .trim()
     .toLowerCase();
-  const action = actionRaw || RECONCILE_ACTIONS.ONLY;
+  const requestedAction = requestedActionRaw || RECONCILE_ACTIONS.ONLY;
   if (!Number.isFinite(receiptId) || receiptId <= 0) {
     return res.status(400).json({ error: "receiptId không hợp lệ." });
   }
   if (!/^MAV[A-Z0-9]{3,20}$/i.test(orderCodeRaw)) {
     return res.status(400).json({ error: "orderCode không đúng định dạng MAV." });
   }
-  if (!SUPPORTED_RECONCILE_ACTIONS.has(action)) {
+  if (!SUPPORTED_RECONCILE_ACTIONS.has(requestedAction)) {
     return res.status(400).json({
       error:
         "action không hợp lệ. Chỉ chấp nhận reconcile_only, reconcile_and_mark_paid, reconcile_and_renew.",
@@ -335,6 +335,13 @@ const reconcilePaymentReceipt = async (req, res) => {
 
       const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
       const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
+      // Mặc định luồng "Sửa mã đơn" sẽ tự mark paid nếu đơn đang Chưa Thanh Toán.
+      // Giúp đảm bảo phát sinh log NCC (trigger DB) và đúng rule nghiệp vụ mới.
+      const effectiveAction =
+        requestedAction === RECONCILE_ACTIONS.ONLY &&
+        statusValueInitial === STATUS.UNPAID
+          ? RECONCILE_ACTIONS.MARK_PAID
+          : requestedAction;
       let statusValue = statusValueInitial;
       let revenueDelta = 0;
       let profitDelta = 0;
@@ -348,7 +355,10 @@ const reconcilePaymentReceipt = async (req, res) => {
             receiptId,
             orderCodeRaw,
             "RECONCILE_SKIPPED_ALREADY_APPLIED",
-            JSON.stringify({ reason: "adjustment already applied", action }),
+            JSON.stringify({
+              reason: "adjustment already applied",
+              action: effectiveAction,
+            }),
             "reconcile",
           ]
         );
@@ -403,7 +413,7 @@ const reconcilePaymentReceipt = async (req, res) => {
               postedRevenue: nextPostedRevenue,
               postedProfit: nextPostedProfit,
               orderStatus: statusValue,
-              action,
+              action: effectiveAction,
             }),
             "reconcile",
           ]
@@ -411,13 +421,14 @@ const reconcilePaymentReceipt = async (req, res) => {
       }
 
       const actionResult = {
-        actionApplied: action,
+        actionApplied: effectiveAction,
+        actionRequested: requestedAction,
         statusBeforeAction: statusValueInitial,
         statusAfterAction: statusValue,
       };
       let shouldRunRenewal = false;
 
-      if (action === RECONCILE_ACTIONS.MARK_PAID) {
+      if (effectiveAction === RECONCILE_ACTIONS.MARK_PAID) {
         if (statusValueInitial !== STATUS.UNPAID) {
           throw createHttpError(
             409,
@@ -453,7 +464,7 @@ const reconcilePaymentReceipt = async (req, res) => {
             "reconcile",
           ]
         );
-      } else if (action === RECONCILE_ACTIONS.RENEW) {
+      } else if (effectiveAction === RECONCILE_ACTIONS.RENEW) {
         if (statusValueInitial !== STATUS.RENEWAL) {
           throw createHttpError(
             409,
@@ -488,6 +499,7 @@ const reconcilePaymentReceipt = async (req, res) => {
         reason: adjustmentApplied ? "adjustment already applied" : null,
         actionResult,
         shouldRunRenewal,
+        effectiveAction,
       };
     });
 
@@ -507,9 +519,11 @@ const reconcilePaymentReceipt = async (req, res) => {
 
     return res.json({
       success: true,
-      action,
+      actionRequested: requestedAction,
+      actionApplied: result.effectiveAction || requestedAction,
       ...result,
       shouldRunRenewal: undefined,
+      effectiveAction: undefined,
       actionResult,
       renewalSuccess: renewalResult ? !!renewalResult?.success : null,
       renewalDetails: renewalResult?.details || null,
@@ -520,7 +534,7 @@ const reconcilePaymentReceipt = async (req, res) => {
       logger.warn("[payments] Từ chối reconcile biên lai theo rule nghiệp vụ", {
         receiptId,
         orderCode: orderCodeRaw,
-        action,
+        action: requestedAction,
         statusCode,
         error: error.message,
       });
@@ -528,7 +542,7 @@ const reconcilePaymentReceipt = async (req, res) => {
       logger.error("[payments] Reconcile biên lai thất bại", {
         receiptId,
         orderCode: orderCodeRaw,
-        action,
+        action: requestedAction,
         statusCode,
         error: error.message,
         stack: error.stack,

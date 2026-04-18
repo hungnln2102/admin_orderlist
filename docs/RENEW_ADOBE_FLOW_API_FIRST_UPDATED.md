@@ -2,7 +2,9 @@
 
 Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 - Tái sử dụng browser profile (persistent profile) theo từng tài khoản admin.
+- Check account theo API-first (products/users), không fallback DOM.
 - Add user theo 2 bước API: create user rồi assign product.
+- Xóa product admin bằng API `PATCH /assignments` (B15), không click UI.
 - Tạo/lấy link auto-assign bằng API (`jil-api` + `acrs`) thay vì click UI để copy link.
 
 ## 1) Mục tiêu thay đổi
@@ -52,6 +54,14 @@ Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 
 - `backend/src/services/adobe-renew-v2/facade.js`
   - Đồng bộ payload trả về để chứa đầy đủ thông tin user từ API.
+  - Luồng check thực hiện B15 bằng API assignments khi admin còn product.
+
+- `backend/src/services/adobe-renew-v2/removeProductAdminFlow.js`
+  - Đã chuyển B15 sang API-first:
+    - `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/assignments`
+  - Payload remove theo `userId/productId` của admin:
+    - `[{ "op": "remove", "path": "/{adminUserId}/products/{productId}" }]`
+  - Có bước reconcile sau PATCH (đọc lại users API) để tránh fail giả.
 
 ## 3) Luồng login/session mới (persistent profile)
 
@@ -68,6 +78,27 @@ Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 Lợi ích:
 - Nhiều lần check/add liên tiếp sẽ nhanh hơn rõ rệt.
 - Giảm tần suất OTP/login lại.
+
+## 3.1) Luồng Check Adobe hiện tại (B1-B15)
+
+1. B1-B9:
+   - Mở session từ persistent profile.
+   - Reuse cookies nếu còn hạn; nếu hết hạn thì login + OTP để refresh.
+2. B10-B11:
+   - Xác định `org_name` từ Admin Console.
+3. B12:
+   - Lấy danh sách products.
+   - Tính `contractActiveLicenseCount`.
+   - Suy ra trạng thái gói:
+     - `contractActiveLicenseCount = 0` => `Expired`
+     - `contractActiveLicenseCount > 0` => `Paid`
+4. B13:
+   - Lấy users bằng API `GET /jil-api/.../users`.
+   - Chuẩn hóa snapshot users (id, email, products, hasPackage...).
+5. B14 (khi cần):
+   - Lấy/tạo auto-assign URL bằng API.
+6. B15:
+   - Nếu admin còn product thì gọi API `PATCH /assignments` để remove product admin (giải phóng license), không thao tác DOM.
 
 ## 4) Luồng Add User mới (API create + assign)
 
@@ -160,8 +191,10 @@ Lợi ích:
 ## 7) Kiểm thử nhanh đã xác nhận
 
 - Check flow mở persistent profile thành công.
+- Check flow xác định trạng thái gói theo `contractActiveLicenseCount`.
 - Add flow đi qua `abpapi` (create user) + `PATCH /users` (add product).
 - Delete flow đi qua `PATCH /users` với `op=remove`.
+- B15 remove product admin đi qua `PATCH /assignments`.
 - Auto-assign flow đã trả được link qua API:
   - Ví dụ: `https://acrs.adobe.com/go/5377d4ca-0b96-4a0e-b569-2e856fe66770`
 
@@ -188,7 +221,24 @@ Mỗi user trong snapshot hiện lưu các trường chính:
 ## 10) Hạn mức Fix All theo contract
 
 - Hệ thống dùng `contractActiveLicenseCount` (lấy sau login/check) làm hạn mức user tối đa cho mỗi account.
+- Rule xác định account còn gói:
+  - `contractActiveLicenseCount = 0` => không còn gói (`Expired`).
+  - `contractActiveLicenseCount > 0` => còn gói (`Paid`).
 - Khi chạy fix-all:
   - Chỉ add user đến khi đạt ngưỡng này (đã trừ admin qua `user_count` hiện tại).
   - Nếu user cần fix > hạn mức, hệ thống chỉ xử lý tối đa bằng hạn mức và để lại phần dư.
+
+## 11) Dọn rác profile định kỳ lúc 0h
+
+- Mục tiêu:
+  - Xóa các thư mục profile local không còn tài khoản tương ứng trong DB (`orphan profiles`).
+- Cron:
+  - `0 0 * * *` theo `schedulerTimezone`.
+- Cách hoạt động:
+  1) Đọc toàn bộ email hiện có trong bảng `accounts_admin`.
+  2) Chuẩn hóa email theo cùng rule đặt tên thư mục profile.
+  3) Quét `backend/.adobe-profiles`.
+  4) Xóa thư mục nào không còn nằm trong tập email hiện tại.
+- Endpoint chạy tay để test:
+  - `GET /scheduler/run-cleanup-adobe-profiles`
 

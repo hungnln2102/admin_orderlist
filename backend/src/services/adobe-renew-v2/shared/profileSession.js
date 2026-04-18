@@ -23,6 +23,15 @@ function getProfileDirForEmail(email) {
   return path.join(root, key);
 }
 
+function removeProfileDirForEmail(email) {
+  const profileDir = getProfileDirForEmail(email);
+  if (!fs.existsSync(profileDir)) {
+    return { removed: false, profileDir, reason: "not_found" };
+  }
+  fs.rmSync(profileDir, { recursive: true, force: true });
+  return { removed: true, profileDir };
+}
+
 async function launchSessionFromProfile({
   adminEmail,
   headless = true,
@@ -54,7 +63,10 @@ async function launchSessionFromProfile({
 }
 
 module.exports = {
+  sanitizeEmailForPath,
+  getProfilesRootDir,
   launchSessionFromProfile,
   getProfileDirForEmail,
+  removeProfileDirForEmail,
 };
 
