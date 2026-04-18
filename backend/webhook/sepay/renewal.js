@@ -44,11 +44,43 @@ const {
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+const VARIANT_ID_COL = VARIANT_COLS.id || VARIANT_COLS.ID || "id";
+const VARIANT_DISPLAY_NAME_COL =
+  VARIANT_COLS.displayName || VARIANT_COLS.DISPLAY_NAME || "display_name";
+const VARIANT_NAME_COL = VARIANT_COLS.variantName || VARIANT_COLS.VARIANT_NAME || "variant_name";
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 const PAYMENT_RECEIPT_SCHEMA =
   process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
 const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
 const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
+
+const formatDurationLabel = (raw) => {
+  if (!raw) return "";
+  const match = String(raw).match(/^(\d+)([mMyYdD])$/i);
+  if (!match) return String(raw);
+  const num = match[1];
+  const unit = String(match[2]).toLowerCase();
+  if (unit === "m") return `${num} tháng`;
+  if (unit === "y") return `${Number(num) * 12} tháng`;
+  if (unit === "d") return `${num} ngày`;
+  return String(raw);
+};
+
+const extractDurationFromDisplayName = (displayName) => {
+  if (!displayName) return "";
+  const match = String(displayName).match(/--([\d]+[mMyYdD])/i);
+  return match ? formatDurationLabel(match[1]) : "";
+};
+
+const buildReadableVariantLabel = ({ variantName, displayName, fallback }) => {
+  const normalizedVariantName = String(variantName || "").trim();
+  const normalizedDisplayName = String(displayName || "").trim();
+  const duration = extractDurationFromDisplayName(normalizedDisplayName);
+  if (normalizedVariantName) {
+    return `${normalizedVariantName}${duration ? ` (${duration})` : ""}`;
+  }
+  return normalizedDisplayName || String(fallback || "").trim();
+};
 
 const toMonthKey = (value) => {
   const parsedDate = parseFlexibleDate(value);
@@ -146,6 +178,7 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
     // - Nếu id_product là số (ID variant), ưu tiên dùng variant.display_name (vd: NETFLIX_SLOT--1M).
     // - Nếu không, dùng trực tiếp giá trị id_product như trước đây.
     let productLabel = sanPham || "";
+    let productDisplayLabel = String(sanPham || "").trim();
     const numericId = Number(sanPham);
     const isNumericId =
       Number.isFinite(numericId) &&
@@ -154,16 +187,24 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
     if (isNumericId) {
       try {
         const variantSql = `
-          SELECT ${VARIANT_COLS.displayName} AS display_name
+          SELECT
+            ${VARIANT_DISPLAY_NAME_COL} AS display_name,
+            ${VARIANT_NAME_COL} AS variant_name
           FROM ${VARIANT_TABLE}
-          WHERE ${VARIANT_COLS.id} = $1
+          WHERE ${VARIANT_ID_COL} = $1
           LIMIT 1
         `;
         const variantRes = await client.query(variantSql, [numericId]);
         const displayName = variantRes.rows[0]?.display_name;
+        const variantName = variantRes.rows[0]?.variant_name;
         if (displayName) {
           productLabel = String(displayName);
         }
+        productDisplayLabel = buildReadableVariantLabel({
+          variantName,
+          displayName,
+          fallback: productLabel || sanPham,
+        });
       } catch (lookupErr) {
         logger.warn("[Renewal] Không thể lấy display_name từ variant, fallback id_product", {
           orderCode,
@@ -308,7 +349,8 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
       if (monthKey && !shouldSkipSummaryForManual) {
         const revenue = normalizeMoney(finalGiaBan);
         const cost = normalizeMoney(finalGiaNhap);
-        const profit = revenue - cost;
+        // NCC Mavryk/Shop: không ghi nhận cost vào profit khi renewal.
+        const profit = skipNccLedger ? revenue : (revenue - cost);
         await client.query(
           `
             INSERT INTO ${summaryTable} (
@@ -351,12 +393,12 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
 
     const details = {
       ID_DON_HANG: orderCode,
-      SAN_PHAM: sanPham,
+      SAN_PHAM: String(productDisplayLabel || productLabel || sanPham || "").trim(),
       THONG_TIN_DON: thongTin,
       SLOT: slot,
       NGAY_DANG_KY: formatDateDMY(ngayBatDauMoi),
       HET_HAN: formatDateDMY(ngayHetHanMoi),
-      NGUON: supplierId != null ? String(supplierId) : "",
+      NGUON: supplierNameForNcc || (supplierId != null ? String(supplierId) : ""),
       GIA_NHAP: finalGiaNhap,
       GIA_BAN: finalGiaBan,
       TINH_TRANG: renewalNextStatus,
