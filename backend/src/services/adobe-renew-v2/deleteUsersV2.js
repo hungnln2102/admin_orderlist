@@ -1,6 +1,6 @@
 /**
  * Xóa user trong luồng V2.
- * Luồng: B1–B9 (login) → vào /users xóa user → chạy lại check users (scrape bảng) → kết thúc.
+ * Luồng: B1–B9 (login) → vào /users → gọi API PATCH xóa user theo id → chạy lại users API snapshot.
  */
 
 const { chromium } = require("playwright");
@@ -17,7 +17,7 @@ const {
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 
 /**
- * Xóa danh sách user qua V2: B1–B9 (chỉ login) rồi vào /users xóa, đọc snapshot. Không check org_name/B10–B13.
+ * Xóa danh sách user qua V2: B1–B9 (chỉ login), gọi API xóa theo id rồi đọc snapshot.
  * @param {string} email - Admin email
  * @param {string} password - Mật khẩu
  * @param {string[]} userEmails - Danh sách email cần xóa
@@ -91,7 +91,7 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
     await runGotoUsersFlow(page);
     const snapshotResult = await runUsersSnapshotFlow(page, { adminEmail: email });
     logger.info(
-      "[adobe-v2] Check users (scrape bảng) xong → kết thúc. users=%d",
+      "[adobe-v2] Check users (API snapshot) xong → kết thúc. users=%d",
       (snapshotResult.users || []).length
     );
     const snapshot = {

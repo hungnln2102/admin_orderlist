@@ -1,8 +1,13 @@
-const { scrapeUsersSnapshot } = require("../../userDeleteActions");
+const { fetchUsersViaApi } = require("../../shared/usersListApi");
 
 async function runCheckAdminProductFlow(page, adminEmail) {
   const adminNorm = String(adminEmail || "").trim().toLowerCase();
-  const users = await scrapeUsersSnapshot(page);
+  const apiResult = await fetchUsersViaApi(page);
+  const users = apiResult.users.map((u) => ({
+    name: u.name || "",
+    email: String(u.email || "").trim(),
+    product: u.product === true,
+  }));
   const adminRow = users.find(
     (u) => String(u?.email || "").trim().toLowerCase() === adminNorm
   );

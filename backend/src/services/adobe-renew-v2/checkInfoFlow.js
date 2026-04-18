@@ -5,6 +5,7 @@
 
 const logger = require("../../utils/logger");
 const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = require("./flows/check");
+const { fetchUsersViaApi } = require("./shared/usersListApi");
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
@@ -215,30 +216,17 @@ async function runB10ToB13(page, options = {}) {
   await page
     .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
     .catch(() => {});
-  await waitForUsersPageReady(page, WAIT_USERS_MS, { recoveryUsersUrl: usersUrlPrimary });
-
-  let usersUrl = page.url();
-  if (orgId && !isAdminConsoleUsersPath(usersUrl)) {
-    await tryNavigateUsersViaUi(page);
-    usersUrl = page.url();
-  }
-  if (orgId && !isAdminConsoleUsersPath(usersUrl)) {
-    logger.info("[adobe-v2] B13: Không ở route users sau goto org — thử /users gốc (redirect Adobe)");
-    await page.goto(ADMIN_USERS, { waitUntil: "domcontentloaded", timeout: B13_GOTO_MS }).catch(() => {});
-    await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
-    await page
-      .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
-      .catch(() => {});
-    await waitForUsersPageReady(page, WAIT_USERS_MS, { recoveryUsersUrl: usersUrlPrimary });
-    usersUrl = page.url();
-  }
-
-  if (!isAdminConsoleUsersPath(usersUrl)) {
-    logger.warn("[adobe-v2] B13: URL đã đổi sau khi load (redirect?), url=%s", usersUrl.slice(0, 100));
-  }
   if (!orgId) orgId = extractOrgIdFromUrl(page.url());
-  users = await scrapeUsersPage(page);
-  logger.info("[adobe-v2] users: %d", users.length);
+  const apiUsers = await fetchUsersViaApi(page, { orgId });
+  users = apiUsers.users.map((u) => ({
+    id: u.id || null,
+    authenticatingAccountId: u.authenticatingAccountId || null,
+    name: u.name || "",
+    email: u.email || "",
+    products: Array.isArray(u.products) ? u.products : [],
+    hasProduct: u.hasProduct === true,
+  }));
+  logger.info("[adobe-v2] users-api: %d", users.length);
 
   return { org_name, orgId, license_status, products, users };
 }

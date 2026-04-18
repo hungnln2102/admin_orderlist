@@ -4,10 +4,10 @@
  * Theo docs Renew_Adobe_V2.md dòng 326: combobox → dropdown → product modal → Lưu.
  */
 
-const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { runCheckFlow } = require("./runCheckFlow");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
+const { launchSessionFromProfile } = require("./shared/profileSession");
 const {
   runGotoUsersFlow,
   runCheckAdminProductFlow,
@@ -37,12 +37,31 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
   };
   if (proxyOptions) launchOptions.proxy = proxyOptions;
 
-  const browser = await chromium.launch(launchOptions);
-  const context = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 720 },
-  });
-  const sharedSession = { context, page: await context.newPage() };
+  let context = null;
+  let page = null;
+  try {
+    const prof = await launchSessionFromProfile({
+      adminEmail,
+      headless,
+      proxyOptions,
+    });
+    context = prof.context;
+    page = prof.page;
+  } catch (profileErr) {
+    logger.warn(
+      "[adobe-v2] addUsersWithProductV2: persistent profile unavailable, fallback to ephemeral context: %s",
+      profileErr.message
+    );
+    const { chromium } = require("playwright");
+    const browser = await chromium.launch(launchOptions);
+    context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+    });
+    page = await context.newPage();
+    context.__adobeEphemeralBrowser = browser;
+  }
+  const sharedSession = { context, page };
 
   try {
     logger.info("[adobe-v2] addUsersWithProductV2: login (B1–B9 onlyLogin) → add=%d", emails.length);
@@ -75,7 +94,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       }));
       return {
         success: false,
-        error: "Add user UI fail",
+        error: "Add user API fail",
         savedCookies: sessionResult.savedCookies,
         snapshot: null,
       };
@@ -120,7 +139,13 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     logger.error("[adobe-v2] addUsersWithProductV2 error: %s", err.message);
     return { success: false, error: err.message, savedCookies: null, snapshot: null };
   } finally {
-    await browser.close().catch(() => {});
+    if (context) {
+      const ephemeralBrowser = context.__adobeEphemeralBrowser || null;
+      await context.close().catch(() => {});
+      if (ephemeralBrowser) {
+        await ephemeralBrowser.close().catch(() => {});
+      }
+    }
   }
 }
 

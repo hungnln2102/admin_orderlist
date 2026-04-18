@@ -3,12 +3,12 @@
  * B1 tại đây; B2–B9 giao loginFlow.js; B10–B13 giao checkInfoFlow.js.
  */
 
-const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { FLOW_ERROR_CODES } = require("./shared/errorCodes");
 const { runLoginFlow } = require("./loginFlow");
 const { runB10ToB13 } = require("./checkInfoFlow");
+const { launchSessionFromProfile } = require("./shared/profileSession");
 const {
   DEFAULT_COOKIE_EXPIRY_DAYS,
   gotoAdobeAdminConsoleB1,
@@ -41,7 +41,7 @@ function mapRunCheckErrorCode(error) {
 async function runCheckFlow(email, password, options = {}) {
   logger.info("[adobe-v2] runCheckFlow BẮT ĐẦU (cookie expiry=%d ngày) — adobe-renew-v2", DEFAULT_COOKIE_EXPIRY_DAYS);
   const { savedCookies = [], mailBackupId = null, otpSource = "imap", sharedSession = null, existingOrgName = null, onlyLogin = false } = options;
-  let browser = null;
+  let ownedContext = null;
   let context;
   let page;
 
@@ -53,25 +53,41 @@ async function runCheckFlow(email, password, options = {}) {
     const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
     const proxyOptions = getPlaywrightProxyOptions();
     if (proxyOptions) logger.info("[adobe-v2] Proxy: %s", proxyOptions.server);
-    const launchOptions = {
-      headless,
-      slowMo: headless ? 0 : 80,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        // Giảm lỗi mạng kiểu ERR_HTTP2_PROTOCOL_ERROR/QUIC trên một số môi trường/proxy
-        "--disable-quic",
-      ],
-    };
-    if (proxyOptions) launchOptions.proxy = proxyOptions;
-    browser = await chromium.launch(launchOptions);
-    context = await browser.newContext({
-      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      viewport: { width: 1280, height: 720 },
-    });
-    page = await context.newPage();
+    try {
+      const prof = await launchSessionFromProfile({
+        adminEmail: email,
+        headless,
+        proxyOptions,
+      });
+      context = prof.context;
+      page = prof.page;
+      ownedContext = context;
+    } catch (profileErr) {
+      logger.warn(
+        "[adobe-v2] profile-session launch failed, fallback to normal context: %s",
+        profileErr.message
+      );
+      const { chromium } = require("playwright");
+      const launchOptions = {
+        headless,
+        slowMo: headless ? 0 : 80,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-quic",
+        ],
+      };
+      if (proxyOptions) launchOptions.proxy = proxyOptions;
+      const browser = await chromium.launch(launchOptions);
+      context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        viewport: { width: 1280, height: 720 },
+      });
+      page = await context.newPage();
+      ownedContext = context;
+    }
   }
 
   try {
@@ -181,7 +197,7 @@ async function runCheckFlow(email, password, options = {}) {
       errorCode: mapRunCheckErrorCode(err),
     };
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (ownedContext) await ownedContext.close().catch(() => {});
   }
 }
 
