@@ -196,11 +196,8 @@ export const PackageRow: React.FC<PackageRowProps> = ({
             <div className="package-row__expandable-content glass-panel-dark border border-white/5 bg-slate-900/40 rounded-3xl p-6 space-y-6">
               <div className="package-row__expandable-header flex items-center justify-between border-b border-white/5 pb-4">
                 <div className="text-left">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-300/70">
-                    Chi Tiết Các Vị Trí
-                  </p>
                   <p className="text-xl font-bold text-white tracking-tight mt-1">
-                    Slot Distribution Maps
+                    Chi Tiết Các Vị Trí
                   </p>
                 </div>
                 <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold uppercase tracking-widest text-white/70">

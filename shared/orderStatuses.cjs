@@ -4,7 +4,7 @@ const ORDER_STATUS = {
   PAID: "Đã Thanh Toán",
   CANCELED: "Hủy",
   REFUNDED: "Đã Hoàn",
-  PENDING_REFUND: "Chờ Hoàn",
+  PENDING_REFUND: "Chưa Hoàn",
   EXPIRED: "Hết Hạn",
   RENEWAL: "Cần Gia Hạn",
 };

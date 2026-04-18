@@ -85,11 +85,6 @@ export const menuSections: MenuSection[] = [
         href: "/form-info",
         icon: ClipboardDocumentIcon,
       },
-      {
-        name: "Danh sách sản phẩm",
-        href: "/active-key-products",
-        icon: CubeIcon,
-      },
       { name: "Danh sách Key", href: "/active-keys", icon: KeyIcon },
     ],
   },

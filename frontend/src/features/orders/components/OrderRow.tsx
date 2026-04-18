@@ -17,6 +17,7 @@ import { getOrderCodeTheme } from "../utils/orderCodeTheme";
 import {
   CheckCircleIcon,
   EyeIcon,
+  PlusCircleIcon,
   PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
@@ -38,6 +39,7 @@ type OrderRowProps = {
   onEdit: (order: Order) => void;
   onDelete: (order: Order) => void;
   onConfirmRefund: (order: Order) => void;
+  onCreateTopupOrderFromRefund: (order: Order) => void;
   onMarkPaid: (order: Order) => void;
   onRenew: (order: Order) => void;
 };
@@ -58,6 +60,7 @@ export const OrderRow = React.memo(function OrderRow({
   onEdit,
   onDelete,
   onConfirmRefund,
+  onCreateTopupOrderFromRefund,
   onMarkPaid,
   onRenew,
 }: OrderRowProps) {
@@ -77,6 +80,22 @@ export const OrderRow = React.memo(function OrderRow({
   const giaTriConLaiSafe = Number.isFinite(Number(giaTriConLai))
     ? Number(giaTriConLai)
     : 0;
+  const orderRecord = order as Record<string, unknown>;
+  const webhookAmountRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
+  const webhookAmount = Number.isFinite(Number(webhookAmountRaw))
+    ? Number(webhookAmountRaw)
+    : null;
+  const webhookDelta = webhookAmount !== null ? webhookAmount - priceValue : null;
+  const webhookDeltaDisplay =
+    webhookDelta !== null ? formatCurrency(webhookDelta) : "Chưa có webhook";
+  const webhookDeltaClass =
+    webhookDelta === null
+      ? "text-indigo-100/80"
+      : webhookDelta === 0
+      ? "text-emerald-300"
+      : webhookDelta > 0
+      ? "text-amber-300"
+      : "text-rose-300";
   const refundFromRow = Number.isFinite(Number(order.can_hoan))
     ? Number(order.can_hoan)
     : null;
@@ -251,6 +270,15 @@ export const OrderRow = React.memo(function OrderRow({
             </button>
             {canConfirmRefund && (
               <button
+                onClick={stopPropagation(onCreateTopupOrderFromRefund)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition-all flex-shrink-0"
+                title="Tạo đơn bù từ credit hoàn tiền"
+              >
+                <PlusCircleIcon className="h-4 w-4" />
+              </button>
+            )}
+            {canConfirmRefund && (
+              <button
                 onClick={stopPropagation(onConfirmRefund)}
                 className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-all flex-shrink-0"
                 title="Xác nhận đã giải/hoàn tiền"
@@ -328,7 +356,7 @@ export const OrderRow = React.memo(function OrderRow({
               </div>
               <div
                 className={`order-row__detail-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 ${
-                  showSupplierRefundColumn ? "xl:grid-cols-6" : "xl:grid-cols-5"
+                  showSupplierRefundColumn ? "xl:grid-cols-7" : "xl:grid-cols-6"
                 }`}
               >
                 <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
@@ -363,6 +391,14 @@ export const OrderRow = React.memo(function OrderRow({
                     {formatCurrency(giaTriConLaiForCanceled)}
                   </p>
                 </div>
+                <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
+                    Chênh lệch webhook
+                  </p>
+                  <p className={`mt-1 text-sm font-semibold ${webhookDeltaClass}`}>
+                    {webhookDeltaDisplay}
+                  </p>
+                </div>
                 {showSupplierRefundColumn && (
                   <div className={`order-row__detail-item rounded-xl border p-3 text-center ${orderTheme.detailItemClass}`}>
                     <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>
@@ -383,7 +419,7 @@ export const OrderRow = React.memo(function OrderRow({
                 </div>
                 <div
                   className={`order-row__detail-item order-row__detail-item--note rounded-xl border p-3 text-center sm:col-span-2 ${
-                    showSupplierRefundColumn ? "xl:col-span-6" : "xl:col-span-5"
+                    showSupplierRefundColumn ? "xl:col-span-7" : "xl:col-span-6"
                   } flex flex-col items-center justify-center ${orderTheme.detailItemClass}`}
                 >
                   <p className={`text-xs font-medium uppercase tracking-wide ${orderTheme.detailLabelClass}`}>

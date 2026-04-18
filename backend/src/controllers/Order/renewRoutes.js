@@ -33,16 +33,37 @@ const attachRenewRoutes = (router) => {
 
         const { ORDERS_SCHEMA } = require("../../config/dbSchema");
         const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
+        const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+        const informationOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.INFORMATION_ORDER;
+        const buildRefundReferenceCode = (orderCodeRaw) => {
+            const normalizedCode = String(orderCodeRaw || "").trim();
+            return normalizedCode ? `RF ${normalizedCode}` : "RF";
+        };
 
         try {
+            const currentOrder = await db(TABLES.orderList)
+                .select("id", idOrderCol, informationOrderCol, statusCol)
+                .where({ id })
+                .first();
+            if (!currentOrder) {
+                return res.status(404).json({ error: "Không tìm thấy đơn hàng." });
+            }
+
+            const refundReferenceCode = buildRefundReferenceCode(
+                currentOrder?.[idOrderCol] ?? currentOrder?.id_order
+            );
+
             const [updated] = await db(TABLES.orderList)
                 .where({ id })
                 .whereIn(statusCol, [STATUS.PENDING_REFUND])
-                .update({ [statusCol]: STATUS.REFUNDED })
-                .returning(["id", "id_order", statusCol]);
+                .update({
+                    [statusCol]: STATUS.REFUNDED,
+                    [informationOrderCol]: refundReferenceCode,
+                })
+                .returning(["id", idOrderCol, informationOrderCol, statusCol]);
 
             if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng hoặc đã hoàn tiền" });
-            res.json({ success: true, ...updated });
+            res.json({ success: true, refundReferenceCode, ...updated });
         } catch (error) {
             logger.error("Lỗi hoàn tiền", { id, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể đánh dấu hoàn tiền." });

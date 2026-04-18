@@ -2,6 +2,7 @@ const {
   ORDERS_SCHEMA,
   tableName,
   SCHEMA_ORDERS,
+  SCHEMA_RECEIPT,
   getDefinition,
 } = require("../../config/dbSchema");
 const { createYearExtraction } = require("../../utils/sql");
@@ -11,7 +12,7 @@ const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
 
 const TABLES = {
   orderList: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),
-  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
+  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_RECEIPT),
 };
 
 const DEFAULT_TIMEZONE = "Asia/Ho_Chi_Minh";

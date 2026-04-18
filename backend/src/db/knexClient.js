@@ -11,6 +11,7 @@ const {
   SCHEMA_FINANCE,
   SCHEMA_IDENTITY,
   SCHEMA_ORDERS,
+  SCHEMA_RECEIPT,
   SCHEMA_PARTNER,
   SCHEMA_PRODUCT,
   SCHEMA_PROMOTION,
@@ -47,6 +48,7 @@ const searchPath = Array.from(
   new Set(
     [
       SCHEMA_ORDERS,
+      SCHEMA_RECEIPT,
       SCHEMA_PRODUCT,
       SCHEMA_PARTNER,
       SCHEMA_ADMIN,

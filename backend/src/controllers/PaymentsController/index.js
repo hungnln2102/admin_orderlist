@@ -6,6 +6,7 @@ const {
   SCHEMA_PARTNER,
   SCHEMA_SUPPLIER,
   SCHEMA_ORDERS,
+  SCHEMA_RECEIPT,
   SCHEMA_FINANCE,
   ORDERS_SCHEMA,
   tableName,
@@ -32,9 +33,9 @@ const DASHBOARD_SUMMARY_DEF = getDefinition(
 );
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const TABLES = {
-  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_ORDERS),
-  paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_ORDERS),
-  paymentReceiptAudit: tableName(PAYMENT_RECEIPT_AUDIT_DEF.tableName, SCHEMA_ORDERS),
+  paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_RECEIPT),
+  paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_RECEIPT),
+  paymentReceiptAudit: tableName(PAYMENT_RECEIPT_AUDIT_DEF.tableName, SCHEMA_RECEIPT),
   orderList: tableName(ORDER_LIST_DEF.tableName, SCHEMA_ORDERS),
   dashboardSummary: tableName(DASHBOARD_SUMMARY_DEF.tableName, SCHEMA_FINANCE),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),

@@ -53,8 +53,19 @@ export type CustomerType =
 export interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
+  prefillContext?: CreateOrderPrefillContext | null;
   onSave: (newOrderData: Partial<Order> | Order) => void;
 }
+
+export type CreateOrderPrefillContext = {
+  initialFormData: Partial<Order>;
+  creditNoteId: number;
+  creditAvailableAmount: number;
+  creditApplyAmount: number;
+  creditSourceOrderId: number;
+  creditSourceOrderCode: string;
+  reservedOrderCode?: string | null;
+};
 
 export interface UseCreateOrderLogicResult {
   formData: Partial<Order>;

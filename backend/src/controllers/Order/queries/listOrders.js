@@ -17,6 +17,10 @@ const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name";
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
 const variantDisplayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
+const paymentReceiptOrderCodeCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ORDER_CODE;
+const paymentReceiptAmountCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
+const paymentReceiptPaidDateCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.PAID_DATE;
+const paymentReceiptIdCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ID;
 
 const buildOrdersListQuery = async (scope = "") => {
     const normalizedScope = String(scope || "").toLowerCase();
@@ -25,7 +29,38 @@ const buildOrdersListQuery = async (scope = "") => {
 
     let query = db(table)
         .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
-        .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`);
+        .leftJoin(TABLES.supplier, `${table}.${idSupplyCol}`, `${TABLES.supplier}.${supplierIdCol}`)
+        .joinRaw(
+            `
+            LEFT JOIN LATERAL (
+                SELECT
+                    pr.${paymentReceiptAmountCol} AS latest_webhook_amount,
+                    pr.${paymentReceiptPaidDateCol} AS latest_webhook_paid_date,
+                    pr.${paymentReceiptIdCol} AS latest_webhook_receipt_id
+                FROM ${TABLES.paymentReceipt} pr
+                WHERE COALESCE(${table}.${idOrderCol}::text, '') <> ''
+                  AND LOWER(COALESCE(pr.${paymentReceiptOrderCodeCol}::text, '')) = LOWER(${table}.${idOrderCol}::text)
+                ORDER BY pr.${paymentReceiptPaidDateCol} DESC NULLS LAST, pr.${paymentReceiptIdCol} DESC
+                LIMIT 1
+            ) latest_pr ON TRUE
+            `
+        )
+        .joinRaw(
+            `
+            LEFT JOIN LATERAL (
+                SELECT
+                    rcn.id AS refund_credit_note_id,
+                    rcn.credit_code AS refund_credit_code,
+                    rcn.available_amount AS refund_credit_available_amount,
+                    rcn.status AS refund_credit_status
+                FROM ${TABLES.refundCreditNotes} rcn
+                WHERE rcn.source_order_list_id = ${table}.${idCol}
+                  AND UPPER(COALESCE(rcn.status::text, '')) <> 'VOID'
+                ORDER BY rcn.id DESC
+                LIMIT 1
+            ) latest_rcn ON TRUE
+            `
+        );
 
     const importPattern = `${ORDER_PREFIXES.import}%`;
 
@@ -68,6 +103,13 @@ const buildOrdersListQuery = async (scope = "") => {
             `${TABLES.supplier}.${COLS.SUPPLIER.NUMBER_BANK}::text as supplier_number_bank`
         ),
         db.raw(`${TABLES.supplier}.${COLS.SUPPLIER.BIN_BANK}::text as supplier_bin_bank`),
+        db.raw(`latest_pr.latest_webhook_amount::numeric as latest_webhook_amount`),
+        db.raw(`latest_pr.latest_webhook_paid_date::text as latest_webhook_paid_date`),
+        db.raw(`latest_pr.latest_webhook_receipt_id::bigint as latest_webhook_receipt_id`),
+        db.raw(`latest_rcn.refund_credit_note_id::bigint as refund_credit_note_id`),
+        db.raw(`latest_rcn.refund_credit_code::text as refund_credit_code`),
+        db.raw(`latest_rcn.refund_credit_available_amount::numeric as refund_credit_available_amount`),
+        db.raw(`latest_rcn.refund_credit_status::text as refund_credit_status`),
         includeAccountHolder
             ? db.raw(
                 `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`

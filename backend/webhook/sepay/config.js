@@ -5,6 +5,7 @@ const {
   tableName,
   getDefinition,
   SCHEMA_ORDERS,
+  SCHEMA_RECEIPT,
   SCHEMA_PARTNER,
   SCHEMA_PRODUCT,
   SCHEMA_SUPPLIER,
@@ -70,7 +71,7 @@ const SUPPLIER_COST_COLS = SUPPLIER_COST_DEF.columns;
 // --------------------------------
 const PAYMENT_RECEIPT_TABLE = tableName(
   PAYMENT_RECEIPT_DEF.tableName,
-  SCHEMA_ORDERS
+  SCHEMA_RECEIPT
 );
 const ORDER_TABLE = tableName(ORDER_DEF.tableName, SCHEMA_ORDERS);
 const VARIANT_TABLE = tableName(VARIANT_DEF.tableName, SCHEMA_PRODUCT);

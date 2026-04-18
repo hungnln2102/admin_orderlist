@@ -35,7 +35,11 @@ let paymentReceiptColumnsCache = null;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
   ? PAYMENT_RECEIPT_TABLE.split(".")[0]
-  : process.env.DB_SCHEMA_ORDERS || process.env.SCHEMA_ORDERS || "orders";
+  : process.env.DB_SCHEMA_RECEIPT ||
+    process.env.SCHEMA_RECEIPT ||
+    process.env.DB_SCHEMA_ORDERS ||
+    process.env.SCHEMA_ORDERS ||
+    "receipt";
 const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
 const PAYMENT_RECEIPT_FINANCIAL_AUDIT_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_audit_log`;
 const RECEIPT_STATE_COLS = {

@@ -5,7 +5,12 @@ import {
   ORDER_FIELDS,
 } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
-import { CustomerType, Order, UseCreateOrderLogicResult } from "../types";
+import {
+  CreateOrderPrefillContext,
+  CustomerType,
+  Order,
+  UseCreateOrderLogicResult,
+} from "../types";
 import { useOrderFormState } from "./useOrderFormState";
 import { useOrderInit } from "./useOrderInit";
 import { useOrderPricingSync } from "./useOrderPricingSync";
@@ -18,7 +23,8 @@ import { useSupplySelection } from "./useSupplySelection";
 export const useCreateOrderLogic = (
   isOpen: boolean,
   onSave: (newOrderData: Partial<Order> | Order) => void,
-  customMode: boolean
+  customMode: boolean,
+  prefillContext?: CreateOrderPrefillContext | null
 ): UseCreateOrderLogicResult => {
   const {
     formData,
@@ -77,6 +83,7 @@ export const useCreateOrderLogic = (
     setCustomProductTouched,
     fetchProducts,
     fetchAllSupplies,
+    prefillContext,
   });
 
   useOrderPricingSync({
@@ -159,6 +166,7 @@ export const useCreateOrderLogic = (
     onSave,
     selectedSupplyId,
     products,
+    prefillContext,
   });
 
   return {

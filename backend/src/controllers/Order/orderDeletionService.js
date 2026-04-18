@@ -8,6 +8,7 @@ const deleteOrderWithArchive = async ({
     const { adjustSupplierDebtIfNeeded } = require("./orderFinanceHelpers");
     const { calcRemainingImport } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
+    const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
     const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
     const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
     const logger = require("../../utils/logger");
@@ -16,6 +17,12 @@ const deleteOrderWithArchive = async ({
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
     const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
     const canceledAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CANCELED_AT;
+    const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+    const informationOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.INFORMATION_ORDER;
+    const buildRefundReferenceCode = (orderCodeRaw) => {
+        const normalizedCode = String(orderCodeRaw || "").trim();
+        return normalizedCode ? `RF ${normalizedCode}` : "RF";
+    };
     const toPositiveAmount = (value) => {
         const num = Number(value);
         if (!Number.isFinite(num) || num === 0) return 0;
@@ -78,10 +85,13 @@ const deleteOrderWithArchive = async ({
             );
         }
 
-        const archiveStatus = (isMavn || isGift) ? STATUS.REFUNDED : STATUS.PENDING_REFUND;
-        movedTo = archiveStatus === STATUS.REFUNDED ? "refunded" : "canceled";
+        // Rule mới: xóa đơn luôn vào Chưa Hoàn để theo dõi log NCC và xác nhận hoàn theo từng bước.
+        const archiveStatus = STATUS.PENDING_REFUND;
+        movedTo = "canceled";
+        const orderCode = order?.[idOrderCol] ?? order?.id_order;
+        const refundReferenceCode = buildRefundReferenceCode(orderCode);
 
-        // canceled_at: chỉ ghi một lần lúc chuyển sang Chờ Hoàn / Hủy (ngày VN, YYYY-MM-DD).
+        // canceled_at: chỉ ghi một lần lúc chuyển sang Chưa Hoàn / Hủy (ngày VN, YYYY-MM-DD).
         const existingCanceledRaw = order?.[canceledAtCol] ?? order?.canceled_at;
         const hasCanceledAt =
             existingCanceledRaw !== undefined &&
@@ -92,6 +102,7 @@ const deleteOrderWithArchive = async ({
         const updatePayload = {
             [statusCol]: archiveStatus,
             [refundCol]: refundValue,
+            [informationOrderCol]: refundReferenceCode,
         };
         if (!hasCanceledAt) {
             updatePayload[canceledAtCol] = todayYMDInVietnam();
@@ -103,11 +114,23 @@ const deleteOrderWithArchive = async ({
             ...order,
             [statusCol]: archiveStatus,
             [refundCol]: refundValue,
+            [informationOrderCol]: refundReferenceCode,
         };
         if (updatePayload[canceledAtCol] !== undefined) {
             afterOrder[canceledAtCol] = updatePayload[canceledAtCol];
         }
         await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder);
+
+        if (archiveStatus === STATUS.PENDING_REFUND && refundValue > 0) {
+            await createOrGetRefundCreditNoteForOrder(trx, {
+                sourceOrderListId: orderId,
+                sourceOrderCode: orderCode,
+                customerName: order?.customer,
+                customerContact: order?.contact,
+                refundAmount: refundValue,
+                note: `Tạo tự động khi đơn chuyển ${STATUS.PENDING_REFUND}`,
+            });
+        }
     } else {
         await trx(TABLES.orderList).where({ id: orderId }).update({
             [statusCol]: STATUS.EXPIRED,
@@ -115,7 +138,13 @@ const deleteOrderWithArchive = async ({
     }
 
     await trx.commit();
-    return { success: true, movedTo, deletedOrder: normalized };
+    const deletedOrderCode = order?.[idOrderCol] ?? order?.id_order;
+    return {
+        success: true,
+        movedTo,
+        deletedOrder: normalized,
+        refundReferenceCode: buildRefundReferenceCode(deletedOrderCode),
+    };
 };
 
 module.exports = {

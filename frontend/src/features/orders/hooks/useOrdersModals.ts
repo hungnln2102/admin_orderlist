@@ -2,6 +2,16 @@ import { useCallback, useState } from "react";
 import { ORDER_FIELDS, Order } from "@/constants";
 import type { EditableOrder, ViewModalSource } from "../types";
 
+export type RefundCreatePrefill = {
+  initialFormData: Partial<Order>;
+  creditNoteId: number;
+  creditAvailableAmount: number;
+  creditApplyAmount: number;
+  creditSourceOrderId: number;
+  creditSourceOrderCode: string;
+  reservedOrderCode?: string | null;
+};
+
 export function useOrdersModals() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -11,9 +21,16 @@ export function useOrdersModals() {
   const [viewModalSource, setViewModalSource] = useState<ViewModalSource>("view");
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToEdit, setOrderToEdit] = useState<EditableOrder | null>(null);
+  const [createPrefill, setCreatePrefill] = useState<RefundCreatePrefill | null>(null);
 
-  const openCreateModal = useCallback(() => setIsCreateModalOpen(true), []);
-  const closeCreateModal = useCallback(() => setIsCreateModalOpen(false), []);
+  const openCreateModal = useCallback((prefill: RefundCreatePrefill | null = null) => {
+    setCreatePrefill(prefill);
+    setIsCreateModalOpen(true);
+  }, []);
+  const closeCreateModal = useCallback(() => {
+    setIsCreateModalOpen(false);
+    setCreatePrefill(null);
+  }, []);
   const closeViewModal = useCallback(() => {
     setIsViewModalOpen(false);
     setOrderToView(null);
@@ -58,6 +75,7 @@ export function useOrdersModals() {
     setViewModalSource("view");
     setOrderToDelete(null);
     setOrderToEdit(null);
+    setCreatePrefill(null);
   }, []);
 
   return {
@@ -69,6 +87,7 @@ export function useOrdersModals() {
     orderToView,
     orderToDelete,
     orderToEdit,
+    createPrefill,
     openCreateModal,
     closeCreateModal,
     closeViewModal,

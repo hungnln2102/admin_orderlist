@@ -77,6 +77,31 @@ export const useProductActions = ({
       );
   }, [productPrices]);
 
+  const productPackageOptionsByName = useMemo(() => {
+    const grouped = new Map<string, { displayName: string; packages: Set<string> }>();
+    for (const product of productPrices) {
+      const productName = String(product.packageName || "").trim();
+      const packageName = String(product.packageProduct || "").trim();
+      if (!productName || !packageName) continue;
+      const key = productName.toLowerCase();
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          displayName: productName,
+          packages: new Set<string>(),
+        });
+      }
+      grouped.get(key)?.packages.add(packageName);
+    }
+
+    const mapped: Record<string, string[]> = {};
+    for (const entry of grouped.values()) {
+      mapped[entry.displayName] = Array.from(entry.packages).sort((left, right) =>
+        left.localeCompare(right, "vi", { sensitivity: "base" })
+      );
+    }
+    return mapped;
+  }, [productPrices]);
+
   const referenceOptions = useProductReferenceOptions({
     isCreateModalOpen,
   });
@@ -346,6 +371,7 @@ export const useProductActions = ({
     createError,
     isSubmittingCreate,
     productNameOptions,
+    productPackageOptionsByName,
     supplierOptions: referenceOptions.supplierOptions,
     isLoadingSuppliers: referenceOptions.isLoadingSuppliers,
     refreshSupplierOptions: () =>

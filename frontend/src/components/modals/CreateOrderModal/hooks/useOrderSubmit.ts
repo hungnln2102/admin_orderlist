@@ -7,7 +7,7 @@ import {
 import * as Helpers from "../../../../lib/helpers";
 import { showAppNotification } from "@/lib/notifications";
 import { calculateExpirationDate, convertDMYToYMD } from "../helpers";
-import { Order, Product } from "../types";
+import { CreateOrderPrefillContext, Order, Product } from "../types";
 
 type UseOrderSubmitParams = {
   formData: Partial<Order>;
@@ -16,6 +16,7 @@ type UseOrderSubmitParams = {
   onSave: (newOrderData: Partial<Order> | Order) => void;
   selectedSupplyId: number | null;
   products: Product[];
+  prefillContext?: CreateOrderPrefillContext | null;
 };
 
 export const useOrderSubmit = ({
@@ -25,6 +26,7 @@ export const useOrderSubmit = ({
   onSave,
   selectedSupplyId,
   products,
+  prefillContext,
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
@@ -103,6 +105,22 @@ export const useOrderSubmit = ({
           (dataToSave as Record<string, unknown>).id_product = variantId;
         }
 
+        if (prefillContext?.creditNoteId) {
+          const record = dataToSave as Record<string, unknown>;
+          record.refund_credit_note_id = Number(prefillContext.creditNoteId);
+          record.refund_credit_apply_amount = Number(
+            prefillContext.creditApplyAmount || 0
+          );
+          record.refund_credit_source_order_id = Number(
+            prefillContext.creditSourceOrderId || 0
+          );
+          record.refund_credit_source_order_code =
+            prefillContext.creditSourceOrderCode || "";
+          if (prefillContext.reservedOrderCode) {
+            record.reserved_order_code = prefillContext.reservedOrderCode;
+          }
+        }
+
         onSave(dataToSave as Order);
         return true;
       }
@@ -114,7 +132,15 @@ export const useOrderSubmit = ({
       });
       return false;
     },
-    [formData, isLoading, onSave, updateForm, selectedSupplyId, products]
+    [
+      formData,
+      isLoading,
+      onSave,
+      updateForm,
+      selectedSupplyId,
+      products,
+      prefillContext,
+    ]
   );
 
   return { handleSubmit };

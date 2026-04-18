@@ -2,6 +2,8 @@ const express = require("express");
 const {
   ORDER_COLS,
   ORDER_TABLE,
+  PAYMENT_RECEIPT_TABLE,
+  PAYMENT_RECEIPT_COLS,
   pool,
   SUPPLIER_TABLE,
   SUPPLIER_COLS,
@@ -40,6 +42,7 @@ const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/conf
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
 const { withSavepoint } = require("../savepoint");
+const UNDERPAY_TOLERANCE_VND = 5000;
 
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
@@ -74,36 +77,6 @@ const toMonthKey = (value) => {
   return `${year}-${month}`;
 };
 
-const incrementDashboardSummaryOnProcessing = async (client, orderState, orderCode = "") => {
-  if (!isDashboardSalesOrder({ id_order: orderCode })) return;
-  const monthKey = toMonthKey(orderState?.[ORDER_COLS.orderDate]);
-  if (!monthKey) return;
-
-  const price = normalizeMoney(orderState?.[ORDER_COLS.price]);
-  const cost = normalizeMoney(orderState?.[ORDER_COLS.cost]);
-  const profit = price - cost;
-
-  await client.query(
-    `
-      INSERT INTO ${summaryTable} (
-        ${summaryCols.MONTH_KEY},
-        ${summaryCols.TOTAL_ORDERS},
-        ${summaryCols.TOTAL_REVENUE},
-        ${summaryCols.TOTAL_PROFIT},
-        ${summaryCols.UPDATED_AT}
-      )
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (${summaryCols.MONTH_KEY})
-      DO UPDATE SET
-        ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
-        ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
-        ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
-        ${summaryCols.UPDATED_AT} = NOW()
-    `,
-    [monthKey, 1, price, profit]
-  );
-};
-
 const incrementDashboardSummaryByDelta = async (
   client,
   monthKey,
@@ -136,6 +109,87 @@ const incrementDashboardSummaryByDelta = async (
   );
 };
 
+const computeWebhookAmountDecision = ({
+  orderPrice,
+  currentAmount,
+  accumulatedAmount,
+}) => {
+  const normalizedPrice = normalizeMoney(orderPrice);
+  const receivedCurrent = normalizeMoney(currentAmount);
+  const receivedAccumulated = normalizeMoney(accumulatedAmount);
+  const requiredMin = Math.max(0, normalizedPrice - UNDERPAY_TOLERANCE_VND);
+  const shortfallAmount = Math.max(0, requiredMin - receivedAccumulated);
+  const meetsCurrent = receivedCurrent >= requiredMin;
+  const meetsAccumulated = receivedAccumulated >= requiredMin;
+  const overpaidCurrent = receivedCurrent > normalizedPrice;
+
+  if (meetsCurrent) {
+    return {
+      complete: true,
+      waitTopup: false,
+      useAccumulated: false,
+      branch: overpaidCurrent ? "OVERPAID_COMPLETE" : "WITHIN_5K_COMPLETE",
+      orderPriceAtWebhook: normalizedPrice,
+      requiredMin,
+      receivedCurrent,
+      receivedAccumulated,
+      shortfallAmount,
+      webhookAmountFlow: overpaidCurrent ? "OVERPAID" : "WITHIN_5K",
+      postedAmount: receivedCurrent,
+    };
+  }
+
+  if (meetsAccumulated) {
+    return {
+      complete: true,
+      waitTopup: false,
+      useAccumulated: true,
+      branch: "ACCUMULATED_COMPLETE",
+      orderPriceAtWebhook: normalizedPrice,
+      requiredMin,
+      receivedCurrent,
+      receivedAccumulated,
+      shortfallAmount: 0,
+      webhookAmountFlow: "ACCUMULATED",
+      postedAmount: receivedAccumulated,
+    };
+  }
+
+  return {
+    complete: false,
+    waitTopup: true,
+    useAccumulated: false,
+    branch: "UNDER_5K_WAIT_TOPUP",
+    orderPriceAtWebhook: normalizedPrice,
+    requiredMin,
+    receivedCurrent,
+    receivedAccumulated,
+    shortfallAmount,
+    webhookAmountFlow: "AWAITING_TOPUP",
+    postedAmount: 0,
+  };
+};
+
+const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
+  const normalizedCode = String(orderCode || "").trim();
+  if (!normalizedCode) return 0;
+  const parsedOrderDate = parseFlexibleDate(orderDateRaw);
+  const fromDate = parsedOrderDate
+    ? parsedOrderDate.toISOString().slice(0, 10)
+    : "1900-01-01";
+
+  const res = await client.query(
+    `
+      SELECT COALESCE(SUM(pr.${PAYMENT_RECEIPT_COLS.amount})::numeric, 0) AS accumulated_amount
+      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
+        AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
+    `,
+    [normalizedCode, fromDate]
+  );
+  return normalizeMoney(res.rows?.[0]?.accumulated_amount);
+};
+
 const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orderDateRaw) => {
   if (!orderCode) return false;
   const currentId = Number(currentReceiptId);
@@ -147,11 +201,11 @@ const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orde
   const res = await client.query(
     `
       SELECT 1
-      FROM orders.payment_receipt pr
-      WHERE LOWER(COALESCE(pr.id_order::text, '')) = LOWER($1)
-        AND pr.payment_date >= $2::date
-        AND ($3::bigint IS NULL OR pr.id <> $3::bigint)
-      ORDER BY pr.id DESC
+      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
+        AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
+        AND ($3::bigint IS NULL OR pr.${PAYMENT_RECEIPT_COLS.id} <> $3::bigint)
+      ORDER BY pr.${PAYMENT_RECEIPT_COLS.id} DESC
       LIMIT 1
     `,
     [orderCode, fromDate, Number.isFinite(currentId) ? currentId : null]
@@ -219,6 +273,7 @@ router.post("/", async (req, res) => {
     let receiptResult = null;
     const eligibilityByOrderCode = new Map();
     const stateByOrderCode = new Map();
+    const amountDecisionByOrderCode = new Map();
 
     const client = await pool.connect();
     try {
@@ -369,7 +424,42 @@ router.post("/", async (req, res) => {
           if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
+          let amountDecision = amountDecisionByOrderCode.get(code) || null;
+          if (!amountDecision && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
+            // Must evaluate after receipt has been inserted to include current webhook.
+            const accumulatedAmount = await getAccumulatedReceiptAmount(
+              client,
+              code,
+              state[ORDER_COLS.orderDate]
+            );
+            amountDecision = computeWebhookAmountDecision({
+              orderPrice: state[ORDER_COLS.price],
+              currentAmount: transferAmountNormalized,
+              accumulatedAmount,
+            });
+            amountDecisionByOrderCode.set(code, amountDecision);
+          }
+
           if (statusValue === ORDER_STATUS.UNPAID) {
+            if (amountDecision && !amountDecision.complete) {
+              if (receiptId) {
+                await insertFinancialAuditLog(client, {
+                  payment_receipt_id: receiptId,
+                  order_code: code,
+                  rule_branch: amountDecision.branch,
+                  delta: {
+                    received_current: amountDecision.receivedCurrent,
+                    received_accumulated: amountDecision.receivedAccumulated,
+                    order_price_at_webhook: amountDecision.orderPriceAtWebhook,
+                    required_min: amountDecision.requiredMin,
+                    shortfall_amount: amountDecision.shortfallAmount,
+                    webhook_amount_flow: amountDecision.webhookAmountFlow,
+                  },
+                  source: "webhook",
+                });
+              }
+              continue;
+            }
             const nextStatus = ORDER_STATUS.PAID;
             const statusUpdateResult = await client.query(
               `UPDATE ${ORDER_TABLE}
@@ -379,17 +469,37 @@ router.post("/", async (req, res) => {
               [code, nextStatus, ORDER_STATUS.UNPAID]
             );
             if (statusUpdateResult.rowCount > 0) {
-              await incrementDashboardSummaryOnProcessing(client, state, code);
-              const rev = normalizeMoney(state[ORDER_COLS.price]);
+              const amountToPost =
+                amountDecision?.postedAmount != null
+                  ? normalizeMoney(amountDecision.postedAmount)
+                  : transferAmountNormalized;
+              const rev = amountToPost;
               const prof = rev - normalizeMoney(state[ORDER_COLS.cost]);
+              await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+                revenueDelta: rev,
+                profitDelta: prof,
+                ordersDelta: 1,
+              });
               postedRevenueDelta += rev;
               postedProfitDelta += prof;
               if (receiptId) {
                 await insertFinancialAuditLog(client, {
                   payment_receipt_id: receiptId,
                   order_code: code,
-                  rule_branch: "UNPAID_TO_PAID",
-                  delta: { posted_revenue: rev, posted_profit: prof, month_key: paidMonthKey },
+                  rule_branch: amountDecision?.branch || "WITHIN_5K_COMPLETE",
+                  delta: {
+                    posted_revenue: rev,
+                    posted_profit: prof,
+                    month_key: paidMonthKey,
+                    received_current: amountDecision?.receivedCurrent ?? transferAmountNormalized,
+                    received_accumulated: amountDecision?.receivedAccumulated ?? transferAmountNormalized,
+                    order_price_at_webhook: amountDecision?.orderPriceAtWebhook ?? normalizeMoney(state[ORDER_COLS.price]),
+                    required_min:
+                      amountDecision?.requiredMin ??
+                      Math.max(0, normalizeMoney(state[ORDER_COLS.price]) - UNDERPAY_TOLERANCE_VND),
+                    shortfall_amount: amountDecision?.shortfallAmount ?? 0,
+                    webhook_amount_flow: amountDecision?.webhookAmountFlow ?? "WITHIN_5K",
+                  },
                   source: "webhook",
                 });
               }
@@ -533,6 +643,34 @@ router.post("/", async (req, res) => {
     // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). MAVN không xử lý gia hạn qua Sepay — dùng API gia hạn tay.
     try {
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        let amountDecision = amountDecisionByOrderCode.get(code) || null;
+        if (!amountDecision) {
+          const state = stateByOrderCode.get(code);
+          const statusValue = state?.[ORDER_COLS.status];
+          if (state && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
+            const accumulatedAmount = await getAccumulatedReceiptAmount(
+              client,
+              code,
+              state[ORDER_COLS.orderDate]
+            );
+            amountDecision = computeWebhookAmountDecision({
+              orderPrice: state[ORDER_COLS.price],
+              currentAmount: transferAmountNormalized,
+              accumulatedAmount,
+            });
+            amountDecisionByOrderCode.set(code, amountDecision);
+          }
+        }
+        if (amountDecision && !amountDecision.complete) {
+          logger.warn("[Webhook] Skip renewal, waiting topup by amount rule", {
+            orderCode: code,
+            receivedCurrent: amountDecision.receivedCurrent,
+            receivedAccumulated: amountDecision.receivedAccumulated,
+            requiredMin: amountDecision.requiredMin,
+          });
+          continue;
+        }
+
         if (isMavnImportOrder({ id_order: code })) {
           logger.info("[Webhook] Bỏ qua renewal Sepay cho đơn MAVN", { orderCode: code });
           continue;

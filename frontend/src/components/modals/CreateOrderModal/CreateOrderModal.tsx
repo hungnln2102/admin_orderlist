@@ -25,6 +25,7 @@ const isCompleteDMY = (value: string): boolean =>
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
+  prefillContext,
   onSave,
 }) => {
   const [customMode, setCustomMode] = useState(false);
@@ -46,7 +47,9 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     handleSourceSelect,
     handleCustomerTypeChange,
     handleSubmit,
-  } = useCreateOrderLogic(isOpen, onSave, customMode);
+  } = useCreateOrderLogic(isOpen, onSave, customMode, prefillContext);
+
+  const reservedOrderCode = String(prefillContext?.reservedOrderCode || "").trim();
 
   const infoAValue = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
   const infoBValue = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
@@ -306,6 +309,11 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               Hoàn thiện thông tin khách hàng, sản phẩm và chi phí trong một
               form duy nhất.
             </p>
+            {reservedOrderCode ? (
+              <p className="mt-2 text-[11px] font-semibold text-cyan-200/90">
+                Mã đơn dự kiến: {reservedOrderCode}
+              </p>
+            ) : null}
           </div>
           <button
             type="button"

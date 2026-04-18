@@ -5,7 +5,7 @@ import {
 } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { INITIAL_FORM_DATA } from "../helpers";
-import { CustomerType, Order, Supply, SupplyPrice } from "../types";
+import { CreateOrderPrefillContext, CustomerType, Order, Supply, SupplyPrice } from "../types";
 
 type UseOrderInitParams = {
   isOpen: boolean;
@@ -19,6 +19,7 @@ type UseOrderInitParams = {
   setCustomProductTouched: React.Dispatch<React.SetStateAction<boolean>>;
   fetchProducts: () => void;
   fetchAllSupplies: () => void;
+  prefillContext?: CreateOrderPrefillContext | null;
 };
 
 export const useOrderInit = ({
@@ -33,18 +34,26 @@ export const useOrderInit = ({
   setCustomProductTouched,
   fetchProducts,
   fetchAllSupplies,
+  prefillContext,
 }: UseOrderInitParams) => {
   useEffect(() => {
     if (!isOpen) return;
-    const initialType: CustomerType = DEFAULT_ORDER_CODE_PREFIX;
+    const prefillReservedCode = String(prefillContext?.reservedOrderCode || "").trim().toUpperCase();
+    const detectedPrefix = (["MAVC", "MAVL", "MAVK", "MAVT", "MAVN", "MAVS"] as const).find((prefix) =>
+      prefillReservedCode.startsWith(prefix)
+    );
+    const initialType: CustomerType = (detectedPrefix || DEFAULT_ORDER_CODE_PREFIX) as CustomerType;
     const initialDate = Helpers.getTodayDMY();
 
     setCustomerType(initialType);
     setFormData({
       ...INITIAL_FORM_DATA,
+      ...(prefillContext?.initialFormData || {}),
       [ORDER_FIELDS.ID_ORDER]: initialType,
-      [ORDER_FIELDS.ORDER_DATE]: initialDate,
-      [ORDER_FIELDS.EXPIRY_DATE]: initialDate,
+      [ORDER_FIELDS.ORDER_DATE]:
+        ((prefillContext?.initialFormData?.[ORDER_FIELDS.ORDER_DATE] as string) || initialDate),
+      [ORDER_FIELDS.EXPIRY_DATE]:
+        ((prefillContext?.initialFormData?.[ORDER_FIELDS.EXPIRY_DATE] as string) || initialDate),
     });
     setIsDataLoaded(false);
     setSelectedSupplyId(null);
@@ -54,6 +63,7 @@ export const useOrderInit = ({
     fetchProducts();
     fetchAllSupplies();
   }, [
+    prefillContext,
     fetchAllSupplies,
     fetchProducts,
     isOpen,

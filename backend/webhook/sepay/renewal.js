@@ -8,6 +8,8 @@ const {
   pool,
   ORDER_TABLE,
   ORDER_COLS,
+  PAYMENT_RECEIPT_TABLE,
+  PAYMENT_RECEIPT_COLS,
   VARIANT_TABLE,
   VARIANT_COLS,
   SUPPLIER_TABLE,
@@ -42,6 +44,10 @@ const {
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+const PAYMENT_RECEIPT_SCHEMA = PAYMENT_RECEIPT_TABLE.includes(".")
+  ? PAYMENT_RECEIPT_TABLE.split(".")[0]
+  : "receipt";
+const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_financial_state`;
 
 const toMonthKey = (value) => {
   const parsedDate = parseFlexibleDate(value);
@@ -61,11 +67,11 @@ const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
   const res = await client.query(
     `
       SELECT 1
-      FROM orders.payment_receipt pr
-      INNER JOIN orders.payment_receipt_financial_state fs
-        ON fs.payment_receipt_id = pr.id
-      WHERE LOWER(COALESCE(pr.id_order::text, '')) = LOWER($1)
-        AND pr.payment_date >= $2::date
+      FROM ${PAYMENT_RECEIPT_TABLE} pr
+      INNER JOIN ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE} fs
+        ON fs.payment_receipt_id = pr.${PAYMENT_RECEIPT_COLS.id}
+      WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
+        AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
         AND fs.is_financial_posted = TRUE
       LIMIT 1
     `,

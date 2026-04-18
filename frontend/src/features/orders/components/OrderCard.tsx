@@ -9,6 +9,7 @@ import {
   PencilIcon,
   TrashIcon,
   CheckCircleIcon,
+  PlusCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Order, ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "@/constants";
 import * as Helpers from "@/lib/helpers";
@@ -31,6 +32,7 @@ type OrderCardProps = {
   onEdit: (order: Order) => void;
   onDelete: (order: Order) => void;
   onConfirmRefund?: (order: Order) => void;
+  onCreateTopupOrderFromRefund?: (order: Order) => void;
   onMarkPaid?: (order: Order) => void;
   onRenew?: (order: Order) => void;
 };
@@ -48,6 +50,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onEdit,
   onDelete,
   onConfirmRefund,
+  onCreateTopupOrderFromRefund,
   onMarkPaid,
   onRenew,
 }) => {
@@ -73,7 +76,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
   const statusText = String(status || "").trim();
   const statusColor = statusColors[statusText] || "bg-slate-500/20 text-slate-300 border-slate-500/30";
-  const statusStr = statusText;
+  const canConfirmRefund = isCanceled && statusText === ORDER_STATUSES.CHO_HOAN;
 
   // Determine which action buttons to show (matching OrderRow logic)
   const orderCodeText = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
@@ -231,7 +234,17 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 <EyeIcon className="h-5 w-5" />
               </button>
               
-              {onConfirmRefund && isCanceled && statusStr === "cho_hoan" && (
+              {onCreateTopupOrderFromRefund && canConfirmRefund && (
+                <button
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] active:scale-90"
+                  onClick={() => onCreateTopupOrderFromRefund(order)}
+                  title="Tạo đơn bù từ credit hoàn tiền"
+                >
+                  <PlusCircleIcon className="h-5 w-5" />
+                </button>
+              )}
+
+              {onConfirmRefund && canConfirmRefund && (
                 <button
                   className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] active:scale-90"
                   onClick={() => onConfirmRefund(order)}

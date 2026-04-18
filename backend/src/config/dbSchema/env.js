@@ -10,6 +10,11 @@ const SCHEMA_ORDERS = pickSchema(
   process.env.SCHEMA_ORDERS,
   "orders"
 );
+const SCHEMA_RECEIPT = pickSchema(
+  process.env.DB_SCHEMA_RECEIPT,
+  process.env.SCHEMA_RECEIPT,
+  "receipt"
+);
 const SCHEMA_PRODUCT = pickSchema(
   process.env.DB_SCHEMA_PRODUCT,
   process.env.SCHEMA_PRODUCT,
@@ -28,12 +33,16 @@ const SCHEMA_ADMIN = pickSchema(
 const SCHEMA_FINANCE = pickSchema(
   process.env.DB_SCHEMA_FINANCE,
   process.env.SCHEMA_FINANCE,
-  "finance"
+  process.env.DB_SCHEMA_DASHBOARD,
+  process.env.SCHEMA_DASHBOARD,
+  "dashboard"
 );
 const SCHEMA_IDENTITY = pickSchema(
   process.env.DB_SCHEMA_IDENTITY,
   process.env.SCHEMA_IDENTITY,
-  "identity"
+  process.env.DB_SCHEMA_CUSTOMER_WEB,
+  process.env.SCHEMA_CUSTOMER_WEB,
+  "customer_web"
 );
 const SCHEMA_CUSTOMER_PROFILES = pickSchema(
   process.env.DB_SCHEMA_CUSTOMER_PROFILES,
@@ -73,7 +82,9 @@ const SCHEMA_RENEW_ADOBE = pickSchema(
 const SCHEMA_KEY_ACTIVE = pickSchema(
   process.env.DB_SCHEMA_KEY_ACTIVE,
   process.env.SCHEMA_KEY_ACTIVE,
-  "key_active"
+  process.env.DB_SCHEMA_RENEW_ADOBE,
+  process.env.SCHEMA_RENEW_ADOBE,
+  "system_automation"
 );
 const SCHEMA_INPUTS = pickSchema(
   process.env.DB_SCHEMA_INPUTS,
@@ -97,6 +108,7 @@ const RENEWAL_TOPIC_ID = Number(process.env.RENEWAL_TOPIC_ID) || 0;
 module.exports = {
   pickSchema,
   SCHEMA_ORDERS,
+  SCHEMA_RECEIPT,
   SCHEMA_PRODUCT,
   SCHEMA_PARTNER,
   SCHEMA_ADMIN,

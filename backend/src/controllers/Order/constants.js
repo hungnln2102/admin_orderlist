@@ -2,6 +2,7 @@ const {
     ORDERS_SCHEMA,
     tableName,
     SCHEMA_ORDERS,
+    SCHEMA_RECEIPT,
     SCHEMA_PRODUCT,
     SCHEMA_SUPPLIER,
     SCHEMA_SUPPLIER_COST,
@@ -13,6 +14,9 @@ const { STATUS } = require("../../utils/statuses");
 
 const TABLES = {
     orderList: tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS),
+    paymentReceipt: tableName(ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE, SCHEMA_RECEIPT),
+    refundCreditNotes: tableName("refund_credit_notes", SCHEMA_RECEIPT),
+    refundCreditApplications: tableName("refund_credit_applications", SCHEMA_RECEIPT),
     supplier: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
     packageProduct: tableName(PRODUCT_SCHEMA.PACKAGE_PRODUCT.TABLE, SCHEMA_PRODUCT),
     supplierCost: tableName(PARTNER_SCHEMA.SUPPLIER_COST.TABLE, SCHEMA_SUPPLIER_COST),

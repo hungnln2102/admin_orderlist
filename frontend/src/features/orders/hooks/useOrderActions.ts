@@ -11,12 +11,14 @@ import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
 import { parseErrorResponse } from "../utils/ordersHelpers";
 import type { EditableOrder } from "../types";
+import type { RefundCreatePrefill } from "./useOrdersModals";
 
 export type OrderActionsDeps = {
   fetchOrders: () => Promise<void>;
   closeCreateModal: () => void;
   closeEditModal: () => void;
   closeModal: () => void;
+  openCreateModal: (prefill?: RefundCreatePrefill | null) => void;
   handleViewOrder: (order: Order, source: "create" | "view") => void;
   orderToDelete: Order | null;
   setOrderToDelete: (order: Order | null) => void;
@@ -29,6 +31,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
     closeCreateModal,
     closeEditModal,
     closeModal,
+    openCreateModal,
     handleViewOrder,
     orderToDelete,
     setOrderToDelete,
@@ -61,9 +64,20 @@ export function useOrderActions(deps: OrderActionsDeps) {
             errorData.error || "Lỗi khi tạo đơn hàng mới từ Máy chủ"
           );
         }
-        await fetchOrders();
         const createdOrder: Order = await response.json();
+        await fetchOrders();
         handleViewOrder(createdOrder, "create");
+        const appliedCredit = Number(
+          (createdOrder as Record<string, unknown>).refund_credit_applied_amount ?? 0
+        );
+        showAppNotification({
+          type: "success",
+          title: "Tạo đơn hàng thành công",
+          message:
+            appliedCredit > 0
+              ? `Đơn mới đã tạo. Đã bù credit ${appliedCredit.toLocaleString("vi-VN")} VND.`
+              : "Đơn mới đã tạo thành công.",
+        });
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi tạo đơn hàng:", error);
@@ -81,15 +95,83 @@ export function useOrderActions(deps: OrderActionsDeps) {
     [closeCreateModal, fetchOrders, handleViewOrder]
   );
 
+  const handleCreateTopupOrderFromRefund = useCallback(
+    async (order: Order) => {
+      if (!order || !order.id) return;
+      try {
+        const response = await apiFetch(
+          API_ENDPOINTS.ORDER_REFUND_CREDIT_ENSURE(order.id),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+        if (!response.ok) {
+          const errorMessage = await parseErrorResponse(response);
+          throw new Error(errorMessage || "Không thể khởi tạo credit bù đơn.");
+        }
+
+        const data = (await response.json()) as {
+          credit_note?: {
+            id?: number | string;
+            available_amount?: number | string;
+          };
+          preview_order_code?: string;
+        };
+
+        const creditNoteId = Number(data?.credit_note?.id || 0);
+        if (!Number.isFinite(creditNoteId) || creditNoteId <= 0) {
+          throw new Error("Không tìm thấy phiếu credit hợp lệ.");
+        }
+
+        const creditAvailableAmount = Math.max(
+          0,
+          Number(data?.credit_note?.available_amount || 0) || 0
+        );
+        const basePrice = Math.max(0, Number(order[ORDER_FIELDS.PRICE] || 0) || 0);
+        const creditApplyAmount = Math.min(basePrice, creditAvailableAmount);
+        const payablePrice = Math.max(0, basePrice - creditApplyAmount);
+
+        const prefill: RefundCreatePrefill = {
+          initialFormData: {
+            [ORDER_FIELDS.ID_PRODUCT]: order[ORDER_FIELDS.ID_PRODUCT],
+            [ORDER_FIELDS.INFORMATION_ORDER]:
+              order[ORDER_FIELDS.INFORMATION_ORDER] || "",
+            [ORDER_FIELDS.CUSTOMER]: order[ORDER_FIELDS.CUSTOMER] || "",
+            [ORDER_FIELDS.CONTACT]: order[ORDER_FIELDS.CONTACT] || "",
+            [ORDER_FIELDS.SLOT]: order[ORDER_FIELDS.SLOT] || "",
+            [ORDER_FIELDS.SUPPLY]: order[ORDER_FIELDS.SUPPLY] || "",
+            [ORDER_FIELDS.COST]: Number(order[ORDER_FIELDS.COST] ?? 0) || 0,
+            [ORDER_FIELDS.PRICE]: payablePrice,
+            [ORDER_FIELDS.NOTE]: order[ORDER_FIELDS.NOTE] || "",
+          },
+          creditNoteId,
+          creditAvailableAmount,
+          creditApplyAmount,
+          creditSourceOrderId: Number(order.id),
+          creditSourceOrderCode: String(order[ORDER_FIELDS.ID_ORDER] || "").trim(),
+          reservedOrderCode: String(data?.preview_order_code || "").trim() || null,
+        };
+
+        openCreateModal(prefill);
+      } catch (error) {
+        showAppNotification({
+          type: "error",
+          title: "Lỗi khởi tạo bù đơn",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Không thể mở form tạo đơn từ credit hoàn tiền.",
+        });
+      }
+    },
+    [openCreateModal]
+  );
+
   const handleMarkPaid = useCallback(
     async (order: Order) => {
       if (!order || !order.id) return;
       const statusText = String(order[ORDER_FIELDS.STATUS] || "").trim();
-      const orderCode = String(
-        order[ORDER_FIELDS.ID_ORDER] ?? (order as { id_order?: string }).id_order ?? ""
-      )
-        .trim()
-        .toUpperCase();
       let payload: Partial<Order> | null = null;
       if (statusText === ORDER_STATUSES.CHUA_THANH_TOAN) {
         payload = {
@@ -308,6 +390,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
     handleSaveNewOrder,
     handleMarkPaid,
     handleRenewOrder,
+    handleCreateTopupOrderFromRefund,
     handleConfirmRefund,
     handleSaveEdit,
     confirmDelete,

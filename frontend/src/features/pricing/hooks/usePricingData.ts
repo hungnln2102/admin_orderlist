@@ -165,6 +165,7 @@ export const usePricingData = () => {
     createError: productActions.createError,
     isSubmittingCreate: productActions.isSubmittingCreate,
     productNameOptions: productActions.productNameOptions,
+    productPackageOptionsByName: productActions.productPackageOptionsByName,
     supplierOptions: productActions.supplierOptions,
     isLoadingSuppliers: productActions.isLoadingSuppliers,
     bankOptions: productActions.bankOptions,

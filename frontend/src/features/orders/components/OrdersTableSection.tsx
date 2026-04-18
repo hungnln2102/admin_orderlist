@@ -27,6 +27,7 @@ type OrdersTableSectionProps = {
   onEdit: (order: Order) => void;
   onDelete: (order: Order) => void;
   onConfirmRefund: (order: Order) => void;
+  onCreateTopupOrderFromRefund: (order: Order) => void;
   onMarkPaid: (order: Order) => void;
   onRenew: (order: Order) => void;
   setCurrentPage: (value: number | ((prev: number) => number)) => void;
@@ -64,6 +65,7 @@ export function OrdersTableSection({
   onEdit,
   onDelete,
   onConfirmRefund,
+  onCreateTopupOrderFromRefund,
   onMarkPaid,
   onRenew,
   setCurrentPage,
@@ -93,6 +95,7 @@ export function OrdersTableSection({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onConfirmRefund={onConfirmRefund}
+                  onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
                   onMarkPaid={onMarkPaid}
                   onRenew={onRenew}
                 />
@@ -146,6 +149,7 @@ export function OrdersTableSection({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onConfirmRefund={onConfirmRefund}
+                  onCreateTopupOrderFromRefund={onCreateTopupOrderFromRefund}
                   onMarkPaid={onMarkPaid}
                   onRenew={onRenew}
                 />

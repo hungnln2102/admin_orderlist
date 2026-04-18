@@ -43,6 +43,7 @@ function Pricing() {
     createError,
     isSubmittingCreate,
     productNameOptions,
+    productPackageOptionsByName,
     supplierOptions,
     isLoadingSuppliers,
     bankOptions,
@@ -91,6 +92,8 @@ function Pricing() {
       <CreateProductModal
         isOpen={isCreateModalOpen}
         createForm={createForm}
+        productNameOptions={productNameOptions}
+        productPackageOptionsByName={productPackageOptionsByName}
         createSuppliers={createSuppliers}
         supplierOptions={supplierOptions}
         bankOptions={bankOptions}

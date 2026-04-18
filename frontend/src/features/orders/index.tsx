@@ -49,6 +49,7 @@ export default function Orders() {
     orderToView,
     orderToDelete,
     orderToEdit,
+    createPrefill,
     openCreateModal,
     closeCreateModal,
     closeViewModal,
@@ -60,6 +61,7 @@ export default function Orders() {
     handleSaveNewOrder,
     handleSaveEdit,
     handleConfirmRefund,
+    handleCreateTopupOrderFromRefund,
     handleMarkPaid,
     handleRenewOrder,
     confirmDelete,
@@ -154,6 +156,7 @@ export default function Orders() {
         onEdit={handleEditOrder}
         onDelete={handleDeleteOrder}
         onConfirmRefund={handleConfirmRefund}
+        onCreateTopupOrderFromRefund={handleCreateTopupOrderFromRefund}
         onMarkPaid={handleMarkPaid}
         onRenew={handleRenewOrder}
         setCurrentPage={setCurrentPage}
@@ -183,6 +186,7 @@ export default function Orders() {
       <CreateOrderModal
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
+        prefillContext={createPrefill}
         onSave={(data) => {
           void handleSaveNewOrder(data);
         }}

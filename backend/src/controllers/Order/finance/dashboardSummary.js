@@ -3,6 +3,7 @@ const {
     ORDERS_SCHEMA,
     SCHEMA_FINANCE,
     SCHEMA_ORDERS,
+    SCHEMA_RECEIPT,
     tableName,
 } = require("../../../config/dbSchema");
 const { STATUS, COLS } = require("../constants");
@@ -23,11 +24,11 @@ const salesOrderProfitDeltaForDashboard = (row) => {
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const summaryTableBase = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE;
-const paymentReceiptTable = tableName(ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE, SCHEMA_ORDERS);
+const paymentReceiptTable = tableName(ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE, SCHEMA_RECEIPT);
 const paymentReceiptCols = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS;
 const paymentReceiptStateTable = tableName(
     ORDERS_SCHEMA.PAYMENT_RECEIPT_FINANCIAL_STATE.TABLE,
-    SCHEMA_ORDERS
+    SCHEMA_RECEIPT
 );
 const paymentReceiptStateCols = ORDERS_SCHEMA.PAYMENT_RECEIPT_FINANCIAL_STATE.COLS;
 

@@ -17,6 +17,11 @@ const { sendOrderCreatedNotification } = require("../../../services/telegramOrde
 const logger = require("../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
 const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
+const {
+    lockRefundCreditNoteById,
+    applyRefundCreditToTargetOrder,
+    normalizeMoney,
+} = require("../finance/refundCredits");
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -31,6 +36,12 @@ const attachCreateOrderRoute = (router) => {
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
         const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
         const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
+        const requestedCreditNoteId = Number(req.body?.refund_credit_note_id);
+        const requestedCreditApplyAmount = normalizeMoney(req.body?.refund_credit_apply_amount);
+        const reservedOrderCodeRaw = String(req.body?.reserved_order_code || "").trim().toUpperCase();
+        const requestedPrefixFromReserved = VALID_PREFIXES.find((prefix) =>
+            reservedOrderCodeRaw.startsWith(prefix)
+        ) || null;
 
         if (payload[productIdCol] == null && req.body?.variant_id != null) {
             const numericVariant = Number(req.body.variant_id);
@@ -108,12 +119,54 @@ const attachCreateOrderRoute = (router) => {
         const trx = await db.transaction();
         try {
             payload.id = await nextId(TABLES.orderList, COLS.ORDER.ID, trx);
+            const rawPriceBeforeCredit = normalizeMoney(payload[priceCol]);
+            payload[priceCol] = rawPriceBeforeCredit;
+
+            let creditNoteForOrder = null;
+            let appliedCreditAmount = 0;
+            if (Number.isFinite(requestedCreditNoteId) && requestedCreditNoteId > 0) {
+                creditNoteForOrder = await lockRefundCreditNoteById(trx, requestedCreditNoteId);
+                if (creditNoteForOrder) {
+                    appliedCreditAmount = Math.min(
+                        requestedCreditApplyAmount,
+                        rawPriceBeforeCredit,
+                        normalizeMoney(creditNoteForOrder.available_amount)
+                    );
+                }
+            }
+
+            payload[priceCol] = Math.max(0, rawPriceBeforeCredit - appliedCreditAmount);
 
             const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
-            const detectedPrefix = VALID_PREFIXES.find((prefix) => clientIdOrder.startsWith(prefix)) || "MAVC";
-            payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
+            const detectedPrefix = requestedPrefixFromReserved
+                || VALID_PREFIXES.find((prefix) => clientIdOrder.startsWith(prefix))
+                || "MAVC";
+
+            if (reservedOrderCodeRaw && requestedPrefixFromReserved) {
+                const existingReserved = await trx(TABLES.orderList)
+                    .where(idOrderCol, reservedOrderCodeRaw)
+                    .first();
+                payload[idOrderCol] = existingReserved
+                    ? await generateUniqueOrderCode(detectedPrefix, trx)
+                    : reservedOrderCodeRaw;
+            } else {
+                payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
+            }
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
+
+            let refundCreditApplication = null;
+            if (creditNoteForOrder && appliedCreditAmount > 0) {
+                const result = await applyRefundCreditToTargetOrder(trx, {
+                    creditNoteId: Number(creditNoteForOrder.id),
+                    targetOrderListId: Number(newOrder.id),
+                    targetOrderCode: String(newOrder[idOrderCol] || ""),
+                    requestedAmount: appliedCreditAmount,
+                    note: `Áp credit tự động khi tạo đơn từ đơn hoàn ${creditNoteForOrder.source_order_code || ""}`.trim(),
+                    appliedBy: "system-create-order",
+                });
+                refundCreditApplication = result.application;
+            }
 
             await trx.commit();
 
@@ -166,6 +219,12 @@ const attachCreateOrderRoute = (router) => {
                     normalized.product_display_name = displayName;
                     normalized.id_product = displayName;
                 }
+            }
+
+            if (refundCreditApplication) {
+                normalized.refund_credit_applied_amount = Number(refundCreditApplication.applied_amount || 0);
+                normalized.refund_credit_note_id = Number(refundCreditApplication.credit_note_id || 0);
+                normalized.price_before_credit = rawPriceBeforeCredit;
             }
 
             res.status(201).json(normalized);
