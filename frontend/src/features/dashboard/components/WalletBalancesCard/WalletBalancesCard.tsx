@@ -53,6 +53,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   loading,
   error,
   onRefresh,
+  onRefreshStats,
   currencyFormatter,
 }) => {
   const displayColumns = useMemo(() => buildDisplayColumns(columns), [columns]);
@@ -267,6 +268,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
         onClose={() => setWithdrawModalOpen(false)}
         onSuccess={() => {
           void loadWithdrawRows();
+          onRefreshStats?.();
           setWithdrawModalOpen(false);
         }}
       />

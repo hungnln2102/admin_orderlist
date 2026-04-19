@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
 import { AddGoalModal } from "./AddGoalModal";
+import { EditGoalAmountModal } from "./EditGoalAmountModal";
 import { ExpenseBreakdownChart } from "./budgets-goals/ExpenseBreakdownChart";
 import { SavingGoalsPanel } from "./budgets-goals/SavingGoalsPanel";
 import { WeeklyStatCard } from "./budgets-goals/WeeklyStatCard";
@@ -40,10 +41,14 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   availableProfit,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [goalEditingAmount, setGoalEditingAmount] = useState<
+    BudgetsGoalsProps["savingGoals"][number] | null
+  >(null);
   const [goalIdPendingDelete, setGoalIdPendingDelete] = useState<number | null>(null);
   const [goalDeleteSubmitting, setGoalDeleteSubmitting] = useState(false);
 
-  const { handleReorder, handleDelete } = useSavingGoalsActions({
+  const { handleReorder, handleDelete, handleUpdateTargetAmount } =
+    useSavingGoalsActions({
     savingGoals,
     onRefetchGoals,
   });
@@ -155,6 +160,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
         currencyFormatter={currencyFormatter}
         onAddGoal={() => setIsAddModalOpen(true)}
         onReorderGoal={handleReorder}
+        onEditGoal={(goal) => setGoalEditingAmount(goal)}
         onDeleteGoal={(id) => setGoalIdPendingDelete(id)}
       />
 
@@ -163,6 +169,16 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={() => {
           onRefetchGoals?.();
+        }}
+      />
+
+      <EditGoalAmountModal
+        isOpen={goalEditingAmount !== null}
+        goal={goalEditingAmount}
+        onClose={() => setGoalEditingAmount(null)}
+        onSave={async (goalId, amount) => {
+          await handleUpdateTargetAmount(goalId, amount);
+          setGoalEditingAmount(null);
         }}
       />
 

@@ -7,10 +7,38 @@ import { getSupplyName } from "../utils";
 
 export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<Order | null>(null);
+  const [productOptions, setProductOptions] = useState<string[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [supplyPrices, setSupplyPrices] = useState<SupplyPrice[]>([]);
   const baseOrderRef = useRef<Order | null>(order);
   const [isCustomSupply, setIsCustomSupply] = useState(false);
+
+  const fetchProductOptions = useCallback(async () => {
+    try {
+      const response = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
+      if (!response.ok) throw new Error("Lỗi tải danh sách sản phẩm.");
+      const data = (await response.json()) as Array<Record<string, unknown>>;
+      const names = data
+        .map((item) => {
+          const raw = item.san_pham ?? item.id_product ?? item.product_name ?? item.name;
+          return String(raw || "").trim();
+        })
+        .filter(Boolean);
+      setProductOptions(Array.from(new Set(names)));
+    } catch (error) {
+      console.error("Lỗi khi fetch product options:", error);
+      setProductOptions([]);
+    }
+  }, []);
+
+  const mergedProductOptions = useCallback(
+    (baseOptions: string[], currentProduct: string) => {
+      if (!currentProduct.trim()) return baseOptions;
+      if (baseOptions.some((item) => item === currentProduct)) return baseOptions;
+      return [currentProduct, ...baseOptions];
+    },
+    []
+  );
 
   const getCurrentSupplyOption = useCallback((): Supply | null => {
     const currentSupplyName =
@@ -96,6 +124,7 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       setFormData(normalized);
       baseOrderRef.current = normalized;
       setSupplies((prev) => mergeCurrentSupply(prev));
+      fetchProductOptions();
       const productName = order.id_product as string;
       if (productName) {
         fetchSuppliesForProduct(productName);
@@ -104,6 +133,7 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
       setIsCustomSupply(false);
     } else if (!isOpen) {
       setFormData(null);
+      setProductOptions([]);
       setSupplies([]);
       setSupplyPrices([]);
       setIsCustomSupply(false);
@@ -113,17 +143,21 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
     order,
     fetchSuppliesForProduct,
     fetchSupplyPricesForProduct,
+    fetchProductOptions,
     mergeCurrentSupply,
   ]);
 
   useEffect(() => {
-    if (!isOpen || !formData?.id_product) return;
-    const productName = formData.id_product as string;
-    fetchSuppliesForProduct(productName);
-    fetchSupplyPricesForProduct(productName);
+    if (!isOpen || !formData) return;
+    const productName = String(formData.id_product || "").trim();
+    const timeoutId = window.setTimeout(() => {
+      fetchSuppliesForProduct(productName);
+      fetchSupplyPricesForProduct(productName);
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
   }, [
     isOpen,
-    formData?.id_product,
+    formData,
     fetchSuppliesForProduct,
     fetchSupplyPricesForProduct,
   ]);
@@ -131,6 +165,24 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const setFieldValue = useCallback(
     <K extends keyof Order>(key: K, value: Order[K]) => {
       setFormData((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    []
+  );
+
+  const handleProductChange = useCallback(
+    (value: string) => {
+      const nextProduct = String(value || "");
+      setIsCustomSupply(false);
+      setFormData((prev) => {
+        if (!prev) return prev;
+        const prevProduct = String(prev[ORDER_FIELDS.ID_PRODUCT as keyof Order] || "");
+        if (prevProduct === nextProduct) return prev;
+        return {
+          ...prev,
+          [ORDER_FIELDS.ID_PRODUCT]: nextProduct,
+          [ORDER_FIELDS.SUPPLY]: "",
+        };
+      });
     },
     []
   );
@@ -207,11 +259,16 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
     }
   }, [fetchSuppliesForProduct, fetchSupplyPricesForProduct]);
 
+  const currentProduct = String(formData?.[ORDER_FIELDS.ID_PRODUCT] || "");
+  const selectableProducts = mergedProductOptions(productOptions, currentProduct);
+
   return {
     formData,
+    productOptions: selectableProducts,
     supplies,
     isCustomSupply,
     supplyPrices,
+    handleProductChange,
     handleSupplySelect,
     resetForm,
     setFieldValue,

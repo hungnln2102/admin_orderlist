@@ -4,15 +4,17 @@ import {
   PlusCircleIcon,
 } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../../constants";
-import { inputClass, labelClass, readOnlyClass } from "../styles";
+import { inputClass, labelClass, readOnlyClass, selectClass } from "../styles";
 import type { Order, Supply } from "../types";
 import { getSupplyName } from "../utils";
 
 type EditOrderIdentitySectionProps = {
+  productOptions: string[];
   supplies: Supply[];
   isCustomSupply: boolean;
   supplySelectValue: string;
   stringField: (key: keyof Order) => string;
+  onProductChange: (value: string) => void;
   onInputChange: (
     event: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -24,10 +26,12 @@ type EditOrderIdentitySectionProps = {
 };
 
 export const EditOrderIdentitySection = ({
+  productOptions,
   supplies,
   isCustomSupply,
   supplySelectValue,
   stringField,
+  onProductChange,
   onInputChange,
   onSupplySelect,
   onCustomSupplyChange,
@@ -84,14 +88,19 @@ export const EditOrderIdentitySection = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className={labelClass}>Sản phẩm</label>
-          <input
-            type="text"
+          <select
             name={ORDER_FIELDS.ID_PRODUCT}
             value={stringField(ORDER_FIELDS.ID_PRODUCT as keyof Order)}
-            readOnly
-            disabled
-            className={`${inputClass} ${readOnlyClass}`}
-          />
+            onChange={(event) => onProductChange(String(event.target.value || ""))}
+            className={`${inputClass} ${selectClass}`}
+          >
+            <option value="">-- Chọn sản phẩm --</option>
+            {productOptions.map((productName) => (
+              <option key={productName} value={productName}>
+                {productName}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className={labelClass}>Nguồn</label>
@@ -110,7 +119,7 @@ export const EditOrderIdentitySection = ({
                 name={ORDER_FIELDS.SUPPLY}
                 value={supplySelectValue}
                 onChange={(event) => onSupplySelect(Number(event.target.value))}
-                className={inputClass}
+                className={`${inputClass} ${selectClass}`}
               >
                 <option value="">-- Giữ nguyên hoặc chọn --</option>
                 {supplies.map((supply) => (

@@ -1,7 +1,7 @@
 import React from "react";
 import * as Helpers from "../../../lib/helpers";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { ORDER_FIELDS, VIRTUAL_FIELDS } from "../../../constants";
+import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
 import { buildViewOrderPaymentQrPayload, isImportOrderId } from "./paymentQr";
@@ -37,6 +37,30 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     ) || null;
 
   const importOrder = Boolean(orderId && isImportOrderId(orderId));
+  const orderRecord = order as Record<string, unknown>;
+  const creditAppliedAmount = Math.max(
+    0,
+    Number(orderRecord.refund_credit_applied_amount ?? 0) || 0
+  );
+  const hasCreditApplication =
+    Number(orderRecord.refund_credit_application_id || 0) > 0 ||
+    creditAppliedAmount > 0;
+
+  const targetedStatusForceQrPriceSet = new Set([
+    ORDER_STATUSES.CHUA_THANH_TOAN,
+    ORDER_STATUSES.DA_THANH_TOAN,
+    ORDER_STATUSES.DANG_XU_LY,
+    ORDER_STATUSES.CAN_GIA_HAN,
+  ]);
+  const displayStatus =
+    String(
+      order?.[VIRTUAL_FIELDS.TRANG_THAI_TEXT] ||
+        order?.trangThaiText ||
+        order?.[ORDER_FIELDS.STATUS] ||
+        ""
+    ).trim() || "Chưa Thanh Toán";
+  const shouldForceTargetedCreditQr =
+    hasCreditApplication && targetedStatusForceQrPriceSet.has(displayStatus);
 
   const { calculatedPrice, priceLoading, priceError } = useCalculatedPrice({
     isOpen,
@@ -46,18 +70,27 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     customerType,
     basePrice,
     normalizedOrderDate,
-    skipRecalc: keepOrderPrice || isGift || importOrder,
+    skipRecalc: keepOrderPrice || isGift || importOrder || shouldForceTargetedCreditQr,
   });
 
   if (!isOpen || !order) return null;
 
-  const displayStatus =
-    String(
-      order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] ||
-        order.trangThaiText ||
-        order[ORDER_FIELDS.STATUS] ||
-        ""
-    ).trim() || "Chưa Thanh Toán";
+  const currentPrice = Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0);
+  const basePriceBeforeCreditRaw = Number(orderRecord.price_before_credit);
+  const basePriceBeforeCredit =
+    Number.isFinite(basePriceBeforeCreditRaw) && basePriceBeforeCreditRaw >= 0
+      ? basePriceBeforeCreditRaw
+      : currentPrice + creditAppliedAmount;
+  const unpaidCreditQrAmount = Math.max(
+    0,
+    basePriceBeforeCredit - creditAppliedAmount
+  );
+  const forcedCustomerQrAmount = shouldForceTargetedCreditQr
+    ? displayStatus === ORDER_STATUSES.CHUA_THANH_TOAN
+      ? unpaidCreditQrAmount
+      : currentPrice
+    : null;
+  const effectiveKeepOrderPrice = keepOrderPrice || shouldForceTargetedCreditQr;
 
   const remainingFromBackend =
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== undefined &&
@@ -103,9 +136,10 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
 
   const qrPayload = buildViewOrderPaymentQrPayload({
     order: order as Record<string, unknown>,
-    keepOrderPrice,
-    calculatedPrice,
+    keepOrderPrice: effectiveKeepOrderPrice,
+    calculatedPrice: shouldForceTargetedCreditQr ? null : calculatedPrice,
     isGift,
+    overrideCustomerQrAmount: forcedCustomerQrAmount,
   });
   const {
     qrCodeImageUrl,
@@ -158,7 +192,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             qrCodeImageUrl={qrCodeImageUrl}
             effectiveQrAmount={effectiveQrAmount}
             qrMessage={qrMessage}
-            keepOrderPrice={keepOrderPrice}
+            keepOrderPrice={effectiveKeepOrderPrice}
             priceLoading={priceLoading}
             priceError={priceError}
             formatCurrency={formatCurrency}

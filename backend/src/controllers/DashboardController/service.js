@@ -48,6 +48,39 @@ const taxFromRevenueValue = (revenue) =>
 
 const toNumber = (value) => Number(value || 0);
 
+const sumWithdrawProfitBetweenDates = async ({ from, to }) => {
+  const row = await db(expenseTableName)
+    .where(expenseCols.EXPENSE_TYPE, "withdraw_profit")
+    .whereRaw(`DATE(${expenseCols.CREATED_AT}) >= ?`, [from])
+    .whereRaw(`DATE(${expenseCols.CREATED_AT}) <= ?`, [to])
+    .sum({ total: expenseCols.AMOUNT })
+    .first();
+  return toNumber(row?.total);
+};
+
+const fetchMonthlyWithdrawProfitPair = async ({ monthStartDate }) => {
+  const monthStart = parseYMDLocal(monthStartDate);
+  const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+  const prevMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
+  const prevMonthEnd = new Date(monthStart.getTime() - MS_PER_DAY);
+
+  const [currentMonthWithdraw, previousMonthWithdraw] = await Promise.all([
+    sumWithdrawProfitBetweenDates({
+      from: toYMDDate(monthStart),
+      to: toYMDDate(new Date(nextMonthStart.getTime() - MS_PER_DAY)),
+    }),
+    sumWithdrawProfitBetweenDates({
+      from: toYMDDate(prevMonthStart),
+      to: toYMDDate(prevMonthEnd),
+    }),
+  ]);
+
+  return {
+    current: currentMonthWithdraw,
+    previous: previousMonthWithdraw,
+  };
+};
+
 const fetchAvailableProfitPair = async ({ currentMonthKey, monthStartDate }) => {
   const [profitAllRow, profitBeforeRow, expenseAllRow, expenseBeforeRow] =
     await Promise.all([
@@ -85,10 +118,11 @@ const fetchDashboardStats = async () => {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const [rows, availableProfit] = await Promise.all([
+  const [rows, availableProfit, monthlyWithdrawProfit] = await Promise.all([
     db(summaryTableName)
       .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+    fetchMonthlyWithdrawProfitPair({ monthStartDate }),
   ]);
 
   const currentRow = rows.find((r) => r.month_key === currentMonthKey) || {};
@@ -107,6 +141,8 @@ const fetchDashboardStats = async () => {
     total_profit: Number(previousRow.total_profit || 0),
     total_refund: Number(previousRow.total_refund || 0),
   };
+  const currentMonthlyProfit = curr.total_profit - monthlyWithdrawProfit.current;
+  const previousMonthlyProfit = prev.total_profit - monthlyWithdrawProfit.previous;
 
   const taxFromRevenue = (revenue) => taxFromRevenueValue(revenue);
 
@@ -118,7 +154,7 @@ const fetchDashboardStats = async () => {
       previous: prev.total_revenue - prev.total_profit,
     },
     totalRefund: { current: curr.total_refund, previous: prev.total_refund },
-    monthlyProfit: { current: curr.total_profit, previous: prev.total_profit },
+    monthlyProfit: { current: currentMonthlyProfit, previous: previousMonthlyProfit },
     monthlyTax: {
       current: taxFromRevenue(curr.total_revenue),
       previous: taxFromRevenue(prev.total_revenue),
@@ -133,7 +169,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     new Date().getMonth() + 1
   ).padStart(2, "0")}`;
   const monthStartDate = `${currentMonthKey}-01`;
-  const [result, availableProfit] = await Promise.all([
+  const [result, availableProfit, currentRangeWithdraw, previousRangeWithdraw] =
+    await Promise.all([
     db.raw(buildRangeCompareStatsQuery(), [
       from,
       to,
@@ -141,13 +178,17 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
       p1,
     ]),
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+    sumWithdrawProfitBetweenDates({ from, to }),
+    sumWithdrawProfitBetweenDates({ from: p0, to: p1 }),
   ]);
   const row = (result.rows && result.rows[0]) || {};
 
   const currRev = Number(row.net_revenue_curr || 0);
   const prevRev = Number(row.net_revenue_prev || 0);
-  const currProfit = Number(row.net_profit_curr || 0);
-  const prevProfit = Number(row.net_profit_prev || 0);
+  const currGrossProfit = Number(row.net_profit_curr || 0);
+  const prevGrossProfit = Number(row.net_profit_prev || 0);
+  const currProfit = currGrossProfit - currentRangeWithdraw;
+  const prevProfit = prevGrossProfit - previousRangeWithdraw;
 
   return {
     totalOrders: {
@@ -156,8 +197,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     },
     totalRevenue: { current: currRev, previous: prevRev },
     totalImports: {
-      current: currRev - currProfit,
-      previous: prevRev - prevProfit,
+      current: currRev - currGrossProfit,
+      previous: prevRev - prevGrossProfit,
     },
     totalRefund: {
       current: Number(row.total_refund_curr || 0),

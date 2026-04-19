@@ -88,8 +88,38 @@ export const useSavingGoalsActions = ({
     [onRefetchGoals]
   );
 
+  const handleUpdateTargetAmount = useCallback(
+    async (goalId: number, targetAmount: number) => {
+      try {
+        const response = await apiFetch(`/api/saving-goals/${goalId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_amount: targetAmount }),
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload?.error || "Không thể cập nhật mục tiêu");
+        }
+
+        onRefetchGoals?.();
+      } catch (error) {
+        console.error("Error updating goal target amount:", error);
+        const { handleNetworkError } = await import("@/lib/errorHandler");
+        showAppNotification({
+          type: "error",
+          title: "Lỗi cập nhật mục tiêu",
+          message: handleNetworkError(error),
+        });
+        throw error;
+      }
+    },
+    [onRefetchGoals]
+  );
+
   return {
     handleReorder,
     handleDelete,
+    handleUpdateTargetAmount,
   };
 };

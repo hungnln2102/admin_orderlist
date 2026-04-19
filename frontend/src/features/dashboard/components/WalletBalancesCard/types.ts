@@ -6,6 +6,7 @@ export type WalletBalancesCardProps = {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  onRefreshStats?: () => void;
   currencyFormatter: Intl.NumberFormat;
 };
 

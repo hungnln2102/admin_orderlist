@@ -47,6 +47,7 @@ const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
 const PAYMENT_RECEIPT_SCHEMA =
   process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
 const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
+const REFUND_CREDIT_APPLICATIONS_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.refund_credit_applications`;
 
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
@@ -117,14 +118,18 @@ const computeWebhookAmountDecision = ({
   orderPrice,
   currentAmount,
   accumulatedAmount,
+  creditAppliedAmount,
 }) => {
   const normalizedPrice = normalizeMoney(orderPrice);
   const receivedCurrent = normalizeMoney(currentAmount);
   const receivedAccumulated = normalizeMoney(accumulatedAmount);
+  const creditedAmount = Math.max(0, normalizeMoney(creditAppliedAmount));
+  const effectiveReceivedCurrent = normalizeMoney(receivedCurrent + creditedAmount);
+  const effectiveReceivedAccumulated = normalizeMoney(receivedAccumulated + creditedAmount);
   const requiredMin = Math.max(0, normalizedPrice - UNDERPAY_TOLERANCE_VND);
-  const shortfallAmount = Math.max(0, requiredMin - receivedAccumulated);
-  const meetsCurrent = receivedCurrent >= requiredMin;
-  const meetsAccumulated = receivedAccumulated >= requiredMin;
+  const shortfallAmount = Math.max(0, requiredMin - effectiveReceivedAccumulated);
+  const meetsCurrent = effectiveReceivedCurrent >= requiredMin;
+  const meetsAccumulated = effectiveReceivedAccumulated >= requiredMin;
   const overpaidCurrent = receivedCurrent > normalizedPrice;
 
   if (meetsCurrent) {
@@ -137,6 +142,9 @@ const computeWebhookAmountDecision = ({
       requiredMin,
       receivedCurrent,
       receivedAccumulated,
+      creditedAmount,
+      effectiveReceivedCurrent,
+      effectiveReceivedAccumulated,
       shortfallAmount,
       webhookAmountFlow: overpaidCurrent ? "OVERPAID" : "WITHIN_5K",
       postedAmount: receivedCurrent,
@@ -153,6 +161,9 @@ const computeWebhookAmountDecision = ({
       requiredMin,
       receivedCurrent,
       receivedAccumulated,
+      creditedAmount,
+      effectiveReceivedCurrent,
+      effectiveReceivedAccumulated,
       shortfallAmount: 0,
       webhookAmountFlow: "ACCUMULATED",
       postedAmount: receivedAccumulated,
@@ -168,6 +179,9 @@ const computeWebhookAmountDecision = ({
     requiredMin,
     receivedCurrent,
     receivedAccumulated,
+    creditedAmount,
+    effectiveReceivedCurrent,
+    effectiveReceivedAccumulated,
     shortfallAmount,
     webhookAmountFlow: "AWAITING_TOPUP",
     postedAmount: 0,
@@ -323,7 +337,12 @@ router.post("/", async (req, res) => {
             ${ORDER_COLS.orderDate},
             ${ORDER_COLS.price},
             ${ORDER_COLS.cost},
-            ${ORDER_COLS.idSupply}
+            ${ORDER_COLS.idSupply},
+            (
+              SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
+              FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
+              WHERE LOWER(COALESCE(rca.target_order_code::text, '')) = LOWER(${ORDER_TABLE}.${ORDER_COLS.idOrder}::text)
+            ) AS credit_applied_amount
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
           LIMIT 1`,
@@ -452,6 +471,7 @@ router.post("/", async (req, res) => {
               orderPrice: state[ORDER_COLS.price],
               currentAmount: transferAmountNormalized,
               accumulatedAmount,
+              creditAppliedAmount: state.credit_applied_amount,
             });
             amountDecisionByOrderCode.set(code, amountDecision);
           }
@@ -466,6 +486,9 @@ router.post("/", async (req, res) => {
                   delta: {
                     received_current: amountDecision.receivedCurrent,
                     received_accumulated: amountDecision.receivedAccumulated,
+                    credit_applied_amount: amountDecision.creditedAmount,
+                    effective_received_current: amountDecision.effectiveReceivedCurrent,
+                    effective_received_accumulated: amountDecision.effectiveReceivedAccumulated,
                     order_price_at_webhook: amountDecision.orderPriceAtWebhook,
                     required_min: amountDecision.requiredMin,
                     shortfall_amount: amountDecision.shortfallAmount,
@@ -485,11 +508,7 @@ router.post("/", async (req, res) => {
               [code, nextStatus, ORDER_STATUS.UNPAID]
             );
             if (statusUpdateResult.rowCount > 0) {
-              const amountToPost =
-                amountDecision?.postedAmount != null
-                  ? normalizeMoney(amountDecision.postedAmount)
-                  : transferAmountNormalized;
-              const rev = amountToPost;
+              const rev = normalizeMoney(state[ORDER_COLS.price]);
               const prof = rev - normalizeMoney(state[ORDER_COLS.cost]);
               await incrementDashboardSummaryByDelta(client, paidMonthKey, {
                 revenueDelta: rev,
@@ -509,6 +528,16 @@ router.post("/", async (req, res) => {
                     month_key: paidMonthKey,
                     received_current: amountDecision?.receivedCurrent ?? transferAmountNormalized,
                     received_accumulated: amountDecision?.receivedAccumulated ?? transferAmountNormalized,
+                    credit_applied_amount: amountDecision?.creditedAmount ?? normalizeMoney(state.credit_applied_amount),
+                    effective_received_current:
+                      amountDecision?.effectiveReceivedCurrent ??
+                      normalizeMoney(transferAmountNormalized + normalizeMoney(state.credit_applied_amount)),
+                    effective_received_accumulated:
+                      amountDecision?.effectiveReceivedAccumulated ??
+                      normalizeMoney(
+                        (amountDecision?.receivedAccumulated ?? transferAmountNormalized) +
+                          normalizeMoney(state.credit_applied_amount)
+                      ),
                     order_price_at_webhook: amountDecision?.orderPriceAtWebhook ?? normalizeMoney(state[ORDER_COLS.price]),
                     required_min:
                       amountDecision?.requiredMin ??
@@ -694,6 +723,7 @@ router.post("/", async (req, res) => {
               orderPrice: state[ORDER_COLS.price],
               currentAmount: transferAmountNormalized,
               accumulatedAmount,
+              creditAppliedAmount: state.credit_applied_amount,
             });
             amountDecisionByOrderCode.set(code, amountDecision);
           }

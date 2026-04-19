@@ -26,12 +26,13 @@ const attachDeleteOrderRoute = (router) => {
             const currentStatus = String(order[statusCol] ?? order.status ?? "").trim();
             if (
                 currentStatus === STATUS.PENDING_REFUND ||
-                currentStatus === STATUS.REFUNDED
+                currentStatus === STATUS.REFUNDED ||
+                currentStatus === STATUS.EXPIRED
             ) {
                 await trx.rollback();
                 return res.status(400).json({
                     error:
-                        "Đơn đang chờ hoàn hoặc đã hoàn không dùng lại thao tác xóa này.",
+                        "Đơn Hết Hạn/Chờ Hoàn/Đã Hoàn không dùng lại thao tác xóa này.",
                 });
             }
 

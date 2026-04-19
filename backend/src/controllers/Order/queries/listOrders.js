@@ -60,6 +60,21 @@ const buildOrdersListQuery = async (scope = "") => {
                 LIMIT 1
             ) latest_rcn ON TRUE
             `
+        )
+        .joinRaw(
+            `
+            LEFT JOIN LATERAL (
+                SELECT
+                    rca.id AS refund_credit_application_id,
+                    rca.credit_note_id AS refund_credit_applied_note_id,
+                    rca.applied_amount AS refund_credit_applied_amount,
+                    rca.applied_at AS refund_credit_applied_at
+                FROM ${TABLES.refundCreditApplications} rca
+                WHERE rca.target_order_list_id = ${table}.${idCol}
+                ORDER BY rca.id DESC
+                LIMIT 1
+            ) latest_rca ON TRUE
+            `
         );
 
     const importPattern = `${ORDER_PREFIXES.import}%`;
@@ -110,6 +125,13 @@ const buildOrdersListQuery = async (scope = "") => {
         db.raw(`latest_rcn.refund_credit_code::text as refund_credit_code`),
         db.raw(`latest_rcn.refund_credit_available_amount::numeric as refund_credit_available_amount`),
         db.raw(`latest_rcn.refund_credit_status::text as refund_credit_status`),
+        db.raw(`latest_rca.refund_credit_application_id::bigint as refund_credit_application_id`),
+        db.raw(`latest_rca.refund_credit_applied_note_id::bigint as refund_credit_applied_note_id`),
+        db.raw(`latest_rca.refund_credit_applied_amount::numeric as refund_credit_applied_amount`),
+        db.raw(`latest_rca.refund_credit_applied_at::text as refund_credit_applied_at`),
+        db.raw(
+            `(${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(latest_rca.refund_credit_applied_amount, 0)::numeric) as price_before_credit`
+        ),
         includeAccountHolder
             ? db.raw(
                 `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`

@@ -26,6 +26,7 @@ type FinanceSectionProps = {
   walletLoading: boolean;
   walletError: string | null;
   onRefreshWallets: () => void;
+  onRefreshStats?: () => void;
   onRefetchGoals?: () => void;
   availableProfit?: { current: number; previous: number };
 };
@@ -40,6 +41,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
   walletLoading,
   walletError,
   onRefreshWallets,
+  onRefreshStats,
   onRefetchGoals,
   availableProfit,
 }) => {
@@ -67,6 +69,7 @@ export const FinanceSection: React.FC<FinanceSectionProps> = ({
         loading={walletLoading}
         error={walletError}
         onRefresh={onRefreshWallets}
+        onRefreshStats={onRefreshStats}
         currencyFormatter={currencyFormatter}
       />
     </div>

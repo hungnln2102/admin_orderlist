@@ -2,6 +2,7 @@ import React from "react";
 import {
   ArrowTrendingDownIcon,
   ArrowUpIcon,
+  PencilSquareIcon,
   RocketLaunchIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
@@ -19,6 +20,7 @@ export const SavingGoalsPanel: React.FC<{
   currencyFormatter: Intl.NumberFormat;
   onAddGoal: () => void;
   onReorderGoal: (goalId: number, direction: "up" | "down") => void;
+  onEditGoal: (goal: Goal) => void;
   onDeleteGoal: (goalId: number) => void;
 }> = ({
   savingGoals,
@@ -27,6 +29,7 @@ export const SavingGoalsPanel: React.FC<{
   currencyFormatter,
   onAddGoal,
   onReorderGoal,
+  onEditGoal,
   onDeleteGoal,
 }) => {
   return (
@@ -147,6 +150,13 @@ export const SavingGoalsPanel: React.FC<{
                         <ArrowTrendingDownIcon className="h-4 w-4" />
                       </button>
                       <div className="h-4 w-px bg-white/20 mx-0.5" />
+                      <button
+                        onClick={() => onEditGoal(goal)}
+                        className="rounded-lg p-1.5 text-white/60 hover:bg-amber-400/20 hover:text-amber-200 transition-colors"
+                        title="Sửa giá mục tiêu"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={() => onDeleteGoal(goal.id)}
                         className="rounded-lg p-1.5 text-white/60 hover:bg-red-400/80 hover:text-white transition-colors"

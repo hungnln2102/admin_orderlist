@@ -38,7 +38,15 @@ export const ExpenseBreakdownChart: React.FC<{
         })
         .map((col, idx) => ({
           name: col.name || col.field,
-          value: Math.max(0, Number(latestWalletRow.values[col.field] || 0)),
+          value: Math.max(
+            0,
+            col.balanceScope === "column_total"
+              ? walletRows.reduce(
+                  (sum, row) => sum + (Number(row.values?.[col.field] || 0) || 0),
+                  0
+                )
+              : Number(latestWalletRow.values[col.field] || 0)
+          ),
           color: COLORS[idx % COLORS.length],
         }))
         .filter((item) => item.value > 0);
@@ -52,7 +60,7 @@ export const ExpenseBreakdownChart: React.FC<{
         color: COLORS[idx % COLORS.length],
       }))
       .filter((item) => item.value > 0);
-  }, [budgets, walletColumns, latestWalletRow]);
+  }, [budgets, walletColumns, latestWalletRow, walletRows]);
 
   const chartTotal = useMemo(
     () => chartData.reduce((sum, item) => sum + item.value, 0),

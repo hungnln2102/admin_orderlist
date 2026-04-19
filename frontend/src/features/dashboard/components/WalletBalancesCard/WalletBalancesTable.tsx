@@ -129,12 +129,16 @@ const WalletBalancesTable: React.FC<WalletBalancesTableProps> = ({
                 </td>
                 {displayColumns.map((col) => {
                   const resolved = resolveValue(row, col);
+                  const displayText =
+                    col.balanceScope === "column_total" && !resolved
+                      ? ""
+                      : formatValue(resolved, col.assetCode);
                   return (
                     <td
                       key={col.field}
                       className="px-3 py-2 text-center text-white/90"
                     >
-                      {formatValue(resolved, col.assetCode)}
+                      {displayText}
                     </td>
                   );
                 })}

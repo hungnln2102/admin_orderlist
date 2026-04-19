@@ -25,9 +25,15 @@ export const useWalletColumnStats = (
     if (!walletColumns.length) return [];
 
     return walletColumns.map((col) => {
-      const current = latest
-        ? Number(latest.values[col.field] || 0) || 0
-        : 0;
+      const isColumnTotal = col.balanceScope === "column_total";
+      const current = isColumnTotal
+        ? walletRows.reduce(
+            (sum, row) => sum + (Number(row.values?.[col.field] || 0) || 0),
+            0
+          )
+        : latest
+          ? Number(latest.values[col.field] || 0) || 0
+          : 0;
       const previous = prev ? Number(prev.values[col.field] || 0) || 0 : 0;
       return {
         field: col.field,

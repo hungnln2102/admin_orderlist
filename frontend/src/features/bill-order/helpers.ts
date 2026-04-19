@@ -102,7 +102,6 @@ export const COMPANY_INFO = {
   phone: "(0378.304.963)",
   bank: "VP Bank",
   accountNumber: "9183400998",
-  receiver: "Ngô Lê Ngọc Hương",
 };
 
 export const DEFAULT_FORM: InvoiceForm = {

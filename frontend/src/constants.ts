@@ -213,6 +213,11 @@ export interface Order {
   supplier_number_bank?: string | null;
   supplier_bin_bank?: string | null;
   supplier_account_holder?: string | null;
+  refund_credit_application_id?: number | string | null;
+  refund_credit_applied_note_id?: number | string | null;
+  refund_credit_applied_amount?: number | string | null;
+  refund_credit_applied_at?: string | null;
+  price_before_credit?: number | string | null;
   cost: string;
   price: string;
   note: string;

@@ -26,6 +26,7 @@ const Dashboard: React.FC = () => {
     loading,
     errorMessage,
     availableProfit,
+    refetchDashboardStats,
   } = useDashboardStats();
 
   const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
@@ -92,6 +93,7 @@ const Dashboard: React.FC = () => {
           walletLoading={walletLoading}
           walletError={walletError}
           onRefreshWallets={fetchWalletBalances}
+          onRefreshStats={refetchDashboardStats}
           onRefetchGoals={refetchGoals}
           availableProfit={availableProfit}
         />

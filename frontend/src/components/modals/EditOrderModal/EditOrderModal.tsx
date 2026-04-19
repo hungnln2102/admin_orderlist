@@ -17,8 +17,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 }) => {
   const {
     formData,
+    productOptions,
     supplies,
     isCustomSupply,
+    handleProductChange,
     handleSupplySelect,
     resetForm,
     setFieldValue,
@@ -110,10 +112,12 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <EditOrderIdentitySection
+            productOptions={productOptions}
             supplies={supplies}
             isCustomSupply={isCustomSupply}
             supplySelectValue={supplySelectValue}
             stringField={stringField}
+            onProductChange={handleProductChange}
             onInputChange={handleInputChange}
             onSupplySelect={handleSupplySelect}
             onCustomSupplyChange={handleCustomSupplyChange}

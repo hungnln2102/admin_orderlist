@@ -245,5 +245,6 @@ export const useDashboardStats = () => {
     loading,
     errorMessage,
     availableProfit,
+    refetchDashboardStats: fetchDashboardData,
   };
 };

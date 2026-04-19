@@ -203,11 +203,21 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         }
     }
 
-    // Order entered refund lifecycle (e.g. PAID → PENDING_REFUND) → +1 canceled, +refund (chỉ MAVC/MAVL/MAVK/MAVS)
+    // Order entered refund lifecycle (e.g. PAID/PROCESSING → PENDING_REFUND)
+    // -> +1 canceled, +refund
+    // -> trừ ngay doanh thu/lợi nhuận đã ghi trước đó cho đơn bán
     if (isDashboardSalesOrder(afterRow) && !isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
+
+        if (isOrderCounted(prevStatus)) {
+            const revenueBaseRow = beforeRow || afterRow;
+            const price = toNullableNumber(revenueBaseRow?.price) || 0;
+            const profit = salesOrderProfitDeltaForDashboard(revenueBaseRow);
+            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) - price;
+            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - profit;
+        }
     }
 
     const revenueKey = orderMonthKey;

@@ -8,6 +8,7 @@ export type ViewOrderPaymentQrBuildInput = {
   keepOrderPrice: boolean;
   calculatedPrice: number | null;
   isGift: boolean;
+  overrideCustomerQrAmount?: number | null;
 };
 
 export type ViewOrderPaymentQrPayload = {
@@ -41,6 +42,7 @@ export const buildViewOrderPaymentQrPayload = ({
   keepOrderPrice,
   calculatedPrice,
   isGift,
+  overrideCustomerQrAmount = null,
 }: ViewOrderPaymentQrBuildInput): ViewOrderPaymentQrPayload => {
   const idOrder = String(order[ORDER_FIELDS.ID_ORDER] ?? "");
   const qrMessage = idOrder;
@@ -51,9 +53,12 @@ export const buildViewOrderPaymentQrPayload = ({
   const orderAmountPrice = isGift ? 0 : Math.max(0, Number(order[ORDER_FIELDS.PRICE]) || 0);
   const orderAmountCost = isGift ? 0 : Math.max(0, Number(order[ORDER_FIELDS.COST]) || 0);
 
-  const displayPriceAmount = keepOrderPrice
-    ? orderAmountPrice
-    : (calculatedPrice ?? orderAmountPrice);
+  const displayPriceAmount =
+    overrideCustomerQrAmount !== null && Number.isFinite(Number(overrideCustomerQrAmount))
+      ? Math.max(0, Number(overrideCustomerQrAmount) || 0)
+      : keepOrderPrice
+        ? orderAmountPrice
+        : (calculatedPrice ?? orderAmountPrice);
 
   const importOrder = isImportOrderId(idOrder);
   const { num: supplierAccount, bin: supplierBin } = readSupplierBank(order);
