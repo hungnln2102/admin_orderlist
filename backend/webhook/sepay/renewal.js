@@ -56,7 +56,8 @@ const PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment
 
 const formatDurationLabel = (raw) => {
   if (!raw) return "";
-  const match = String(raw).match(/^(\d+)([mMyYdD])$/i);
+  const normalized = String(raw).trim().replace(/\s+/g, "");
+  const match = normalized.match(/^(\d+)([mMyYdD])$/i);
   if (!match) return String(raw);
   const num = match[1];
   const unit = String(match[2]).toLowerCase();
@@ -66,20 +67,31 @@ const formatDurationLabel = (raw) => {
   return String(raw);
 };
 
-const extractDurationFromDisplayName = (displayName) => {
-  if (!displayName) return "";
-  const match = String(displayName).match(/--([\d]+[mMyYdD])/i);
+const extractDurationFromText = (text) => {
+  if (!text) return "";
+  const match = String(text).match(/--\s*([\d]+\s*[mMyYdD])/i);
   return match ? formatDurationLabel(match[1]) : "";
 };
+
+const stripDurationSuffix = (text) =>
+  String(text || "")
+    .replace(/--\s*[\d]+\s*[mMyYdD]\b/gi, "")
+    .replace(/[_-]+$/g, "")
+    .trim();
 
 const buildReadableVariantLabel = ({ variantName, displayName, fallback }) => {
   const normalizedVariantName = String(variantName || "").trim();
   const normalizedDisplayName = String(displayName || "").trim();
-  const duration = extractDurationFromDisplayName(normalizedDisplayName);
+  const duration =
+    extractDurationFromText(normalizedDisplayName) ||
+    extractDurationFromText(String(fallback || ""));
+  const fallbackLabel = String(fallback || "").trim();
+  const baseLabel = normalizedVariantName || normalizedDisplayName || fallbackLabel;
+  const cleanedBaseLabel = stripDurationSuffix(baseLabel) || baseLabel;
   if (normalizedVariantName) {
-    return `${normalizedVariantName}${duration ? ` (${duration})` : ""}`;
+    return `${cleanedBaseLabel}${duration ? ` (${duration})` : ""}`;
   }
-  return normalizedDisplayName || String(fallback || "").trim();
+  return `${cleanedBaseLabel}${duration ? ` (${duration})` : ""}`.trim();
 };
 
 const toMonthKey = (value) => {
@@ -213,6 +225,11 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
         });
       }
     }
+    productDisplayLabel = buildReadableVariantLabel({
+      variantName: "",
+      displayName: productDisplayLabel,
+      fallback: sanPham,
+    });
 
     const productNormalized = normalizeProductDuration(productLabel || "");
     const months = monthsFromString(productNormalized);

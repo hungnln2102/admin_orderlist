@@ -70,6 +70,21 @@ const parseCurrencyInput = (value: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseBasePriceInput = (
+  value: string,
+  currency: ProductEditFormState["basePriceCurrency"]
+): number | null => {
+  if (currency === "VND") return parseCurrencyInput(value);
+
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/,/g, ".");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export function buildProductEditForm(
   product: ProductPricingRow
 ): ProductEditFormState {
@@ -81,6 +96,7 @@ export function buildProductEditForm(
       product.basePrice !== null && product.basePrice !== undefined
         ? formatVndDisplay(product.basePrice)
         : "",
+    basePriceCurrency: "VND",
     pctCtv:
       product.pctCtv !== null && product.pctCtv !== undefined
         ? String(product.pctCtv)
@@ -246,7 +262,7 @@ export function validateProductEditForm(
   const normalizedPackageProduct = form.packageProduct?.trim() ?? "";
   const normalizedSanPham = form.sanPham?.trim() ?? "";
   const rawBasePrice = form.basePrice?.trim() ?? "";
-  const nextBasePrice = parseCurrencyInput(rawBasePrice);
+  const nextBasePrice = parseBasePriceInput(rawBasePrice, form.basePriceCurrency);
 
   if (!normalizedSanPham) {
     return {

@@ -15,6 +15,10 @@ export interface Supply {
   totalOrders: number;
   totalPaidImport: number;
   totalUnpaidImport: number;
+  /** Luồng 1: Shop cần thanh toán cho NCC */
+  payableToSupplier?: number;
+  /** Luồng 2: NCC cần hoàn tiền lại cho Shop */
+  supplierRefundToShop?: number;
 }
 
 export interface SupplyStats {

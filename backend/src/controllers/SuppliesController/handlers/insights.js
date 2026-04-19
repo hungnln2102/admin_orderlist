@@ -278,6 +278,8 @@ const getSupplyInsights = async (_req, res) => {
       };
       const normalizedStatus = normalizeSupplyStatus(row.raw_status);
       const totalUnpaidImport = payments.total_unpaid_import;
+      const payableToSupplier = Math.max(0, totalUnpaidImport);
+      const supplierRefundToShop = Math.max(0, -totalUnpaidImport);
 
       return {
         id: row.id,
@@ -295,6 +297,8 @@ const getSupplyInsights = async (_req, res) => {
         totalOrders: summary.total_orders,
         totalPaidImport: payments.total_paid_import,
         totalUnpaidImport,
+        payableToSupplier,
+        supplierRefundToShop,
       };
     });
     const stats = supplies.reduce(

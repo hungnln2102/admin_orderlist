@@ -18,6 +18,27 @@ const {
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
 
+function buildDetailedAddUsersError(addResult) {
+  const failed = Array.isArray(addResult?.failed) ? addResult.failed : [];
+  if (failed.length === 0) {
+    return "Add user API fail";
+  }
+
+  const preview = failed
+    .slice(0, 3)
+    .map((item) => {
+      const email = String(item?.email || "").trim().toLowerCase() || "unknown_email";
+      const reason = String(item?.reason || "unknown_error").trim() || "unknown_error";
+      return `${email}:${reason}`;
+    })
+    .join("; ");
+
+  const suffix =
+    failed.length > 3 ? `; ... +${failed.length - 3} user(s)` : "";
+
+  return `Add user API fail (${failed.length} failed): ${preview}${suffix}`;
+}
+
 async function addUsersWithProductV2(adminEmail, password, userEmails, options = {}) {
   const savedCookies = options.savedCookies || [];
   const mailBackupId = options.mailBackupId || null;
@@ -88,12 +109,20 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
 
     const addResult = await runAddUsersFlow(page, emails);
     if (!addResult.success) {
+      const detailedError = buildDetailedAddUsersError(addResult);
+      logger.warn("[adobe-v2] addUsersWithProductV2: add flow failed", {
+        requested: emails.length,
+        done: Array.isArray(addResult?.done) ? addResult.done.length : 0,
+        failed: Array.isArray(addResult?.failed) ? addResult.failed : [],
+        stoppedByPolicy: addResult?.stoppedByPolicy === true,
+        error: detailedError,
+      });
       const sessionResult = await runPersistUsersSessionFlow(context).catch(() => ({
         savedCookies: null,
       }));
       return {
         success: false,
-        error: "Add user API fail",
+        error: detailedError,
         savedCookies: sessionResult.savedCookies,
         snapshot: null,
       };

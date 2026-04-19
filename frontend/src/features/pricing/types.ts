@@ -60,6 +60,7 @@ export interface ProductEditFormState {
   packageProduct: string;
   sanPham: string;
   basePrice: string;
+  basePriceCurrency: "VND" | "USD" | "EUR" | "GBP" | "CNY" | "JPY";
   pctCtv: string;
   pctKhach: string;
   pctPromo: string;

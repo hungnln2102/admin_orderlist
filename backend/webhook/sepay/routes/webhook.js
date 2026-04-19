@@ -194,6 +194,12 @@ const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
   return normalizeMoney(res.rows?.[0]?.accumulated_amount);
 };
 
+const isSupplierSettlementTransfer = (transaction) => {
+  const content = String(transaction?.transaction_content || "").trim();
+  if (!content) return false;
+  return /^TT\s+.+\s+k[ỳy]\s+\d{8}$/i.test(content);
+};
+
 const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orderDateRaw) => {
   if (!orderCode) return false;
   const currentId = Number(currentReceiptId);
@@ -272,6 +278,7 @@ router.post("/", async (req, res) => {
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
   );
+  const supplierSettlementTransfer = isSupplierSettlementTransfer(transaction);
 
   try {
     let receiptResult = null;
@@ -284,7 +291,7 @@ router.post("/", async (req, res) => {
       await client.query("BEGIN");
 
       // Fallback: nếu không extract được mã MAV, thử match theo số tiền + trạng thái
-      if (!orderCodes.length && transferAmountNormalized > 0) {
+      if (!orderCodes.length && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
         logger.info("[Webhook] No MAV order code found, trying amount-based fallback", {
           amount: transferAmountNormalized,
           content: transaction.transaction_content,
@@ -301,6 +308,11 @@ router.post("/", async (req, res) => {
             amount: transferAmountNormalized,
           });
         }
+      } else if (!orderCodes.length && supplierSettlementTransfer) {
+        logger.info("[Webhook] Skip amount-based fallback for supplier settlement transfer", {
+          amount: transferAmountNormalized,
+          content: transaction.transaction_content,
+        });
       }
 
       for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
@@ -585,7 +597,8 @@ router.post("/", async (req, res) => {
       if (
         !alreadyFinancialPosted &&
         (!orderCodes.length && !orderCode) &&
-        transferAmountNormalized > 0
+        transferAmountNormalized > 0 &&
+        !supplierSettlementTransfer
       ) {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
           revenueDelta: transferAmountNormalized,
@@ -607,6 +620,26 @@ router.post("/", async (req, res) => {
             source: "webhook",
           });
         }
+      }
+      if (
+        !alreadyFinancialPosted &&
+        (!orderCodes.length && !orderCode) &&
+        transferAmountNormalized > 0 &&
+        supplierSettlementTransfer &&
+        receiptId
+      ) {
+        await insertFinancialAuditLog(client, {
+          payment_receipt_id: receiptId,
+          order_code: "",
+          rule_branch: "NO_ORDER_CODE_SUPPLIER_SETTLEMENT_SKIP",
+          delta: {
+            posted_revenue: 0,
+            posted_profit: 0,
+            month_key: paidMonthKey,
+            content: String(transaction.transaction_content || ""),
+          },
+          source: "webhook",
+        });
       }
 
       if (receiptId) {

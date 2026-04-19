@@ -19,6 +19,7 @@ import {
   validateProductEditForm,
   enableCustomSupplierEntry,
 } from "./productActionHelpers";
+import { convertAmountToVnd } from "../services/exchangeRateService";
 import { useDeleteProductActions } from "./useDeleteProductActions";
 import { useProductReferenceOptions } from "./useProductReferenceOptions";
 import { useProductStatusActions } from "./useProductStatusActions";
@@ -46,6 +47,16 @@ export const useProductActions = ({
   updatedTimestampMap,
   setUpdatedTimestampMap,
 }: UseProductActionsParams) => {
+  const normalizeBasePriceInputByCurrency = (
+    rawValue: string,
+    currency: ProductEditFormState["basePriceCurrency"]
+  ): string => {
+    if (currency === "VND") return formatVndInput(rawValue);
+    return String(rawValue ?? "")
+      .replace(/[^\d.,]/g, "")
+      .replace(/,/g, ".");
+  };
+
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [productEditForm, setProductEditForm] =
     useState<ProductEditFormState | null>(null);
@@ -141,10 +152,31 @@ export const useProductActions = ({
     field: keyof ProductEditFormState,
     value: string
   ) => {
-    const nextValue = field === "basePrice" ? formatVndInput(value) : value;
-    setProductEditForm((prev) =>
-      prev ? { ...prev, [field]: nextValue } : prev
-    );
+    setProductEditForm((prev) => {
+      if (!prev) return prev;
+
+      if (field === "basePrice") {
+        return {
+          ...prev,
+          basePrice: normalizeBasePriceInputByCurrency(
+            value,
+            prev.basePriceCurrency
+          ),
+        };
+      }
+
+      if (field === "basePriceCurrency") {
+        const nextCurrency = (value ||
+          "VND") as ProductEditFormState["basePriceCurrency"];
+        return {
+          ...prev,
+          basePriceCurrency: nextCurrency,
+          basePrice: normalizeBasePriceInputByCurrency(prev.basePrice, nextCurrency),
+        };
+      }
+
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleCancelProductEdit = () => {
@@ -167,6 +199,15 @@ export const useProductActions = ({
     setProductEditError(null);
 
     try {
+      let resolvedBasePrice = validation.nextBasePrice;
+      if (resolvedBasePrice && resolvedBasePrice > 0) {
+        const conversion = await convertAmountToVnd(
+          resolvedBasePrice,
+          productEditForm.basePriceCurrency
+        );
+        resolvedBasePrice = conversion.convertedAmount;
+      }
+
       const response = await apiFetch(
         API_ENDPOINTS.PRODUCT_PRICE_DETAIL(editingProductId),
         {
@@ -178,7 +219,7 @@ export const useProductActions = ({
             packageName: validation.normalizedPackageName,
             packageProduct: validation.normalizedPackageProduct,
             sanPham: validation.normalizedSanPham,
-            basePrice: validation.nextBasePrice,
+            basePrice: resolvedBasePrice,
             pctCtv: validation.nextPctCtv,
             pctKhach: validation.nextPctKhach,
             pctPromo: validation.nextPctPromo,

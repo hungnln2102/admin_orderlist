@@ -566,26 +566,16 @@ const confirmPaymentSupply = async (req, res) => {
     const num = Number.parseInt(String(value ?? ""), 10);
     return Number.isInteger(num) && num > 0 ? num : null;
   };
-  const parsePaid = (value) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      return value;
-    }
-    const cleaned = String(value).replace(/[^0-9]/g, "");
-    if (!cleaned) return null;
-    const num = Number(cleaned);
-    return Number.isFinite(num) && num >= 0 ? num : null;
+  const parsePaymentContent = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
   };
 
   const supplyIdFromBody = parsePositiveInt(req.body?.supplyId);
-  const paidAmountNumber = parsePaid(req.body?.paidAmount);
-
-  if (paidAmountNumber === null || paidAmountNumber <= 0) {
-    return res.status(400).json({ error: "Số tiền thanh toán không hợp lệ." });
-  }
+  const paymentContent = parsePaymentContent(req.body?.paymentContent);
 
   try {
-    const createdRow = await withTransaction(async (trx) => {
+    const result = await withTransaction(async (trx) => {
       let resolvedSupplyId = supplyIdFromBody;
 
       if (!resolvedSupplyId && parsedPaymentId > 0) {
@@ -602,7 +592,7 @@ const confirmPaymentSupply = async (req, res) => {
       }
 
       if (!resolvedSupplyId) {
-        throw new Error("Thiếu nhà cung cấp để xác nhận thanh toán.");
+        throw createHttpError(400, "Thiếu nhà cung cấp để xác nhận thanh toán.");
       }
 
       const logCols = QUOTED_COLS.supplierOrderCostLog;
@@ -610,7 +600,8 @@ const confirmPaymentSupply = async (req, res) => {
         `
         SELECT
           MIN(${logCols.loggedAt}::date) AS oldest_date,
-          COUNT(*)::int AS unpaid_count
+          COUNT(*)::int AS unpaid_count,
+          COALESCE(SUM(COALESCE(${logCols.importCost}, 0) - COALESCE(${logCols.refundAmount}, 0)), 0)::numeric AS net_unpaid_amount
         FROM ${TABLES.supplyOrderCostLog}
         WHERE ${logCols.supplyId} = ?
           AND TRIM(COALESCE(${logCols.nccPaymentStatus}::text, '')) <> ?;
@@ -621,7 +612,49 @@ const confirmPaymentSupply = async (req, res) => {
       const summary = unpaidLogSummary.rows?.[0] || {};
       const unpaidCount = Number(summary.unpaid_count) || 0;
       if (unpaidCount <= 0) {
-        throw new Error("Không có log NCC chưa thanh toán để chốt.");
+        throw createHttpError(409, "Không có log NCC chưa thanh toán để chốt.");
+      }
+      const netUnpaidAmount = Number(summary.net_unpaid_amount) || 0;
+      if (netUnpaidAmount === 0) {
+        throw createHttpError(
+          409,
+          "Log NCC chưa thanh toán đang cân bằng, không có số tiền cần chốt."
+        );
+      }
+      const isSupplierRefundToShop = netUnpaidAmount < 0;
+      const expectedPaidAmount = Math.abs(Math.round(netUnpaidAmount));
+      let matchedReceipt = null;
+
+      if (isSupplierRefundToShop) {
+        if (!paymentContent) {
+          throw createHttpError(
+            400,
+            "Thiếu nội dung thanh toán để đối soát log Sepay (NCC nợ Shop)."
+          );
+        }
+        const receiptCols = PAYMENT_RECEIPT_DEF.columns;
+        const receiptLookup = await trx.raw(
+          `
+          SELECT
+            pr.${receiptCols.id} AS id,
+            pr.${receiptCols.amount} AS amount,
+            pr.${receiptCols.paidDate} AS paid_date,
+            pr.${receiptCols.note} AS note
+          FROM ${TABLES.paymentReceipt} pr
+          WHERE COALESCE(pr.${receiptCols.note}::text, '') ILIKE ?
+            AND COALESCE(pr.${receiptCols.amount}::numeric, 0) >= ?
+          ORDER BY pr.${receiptCols.paidDate} DESC, pr.${receiptCols.id} DESC
+          LIMIT 1;
+        `,
+          [`%${paymentContent}%`, expectedPaidAmount]
+        );
+        matchedReceipt = receiptLookup.rows?.[0] || null;
+        if (!matchedReceipt) {
+          throw createHttpError(
+            409,
+            `Chưa thấy giao dịch Sepay khớp nội dung "${paymentContent}" với số tiền >= ${expectedPaidAmount}.`
+          );
+        }
       }
 
       const oldestDate = summary.oldest_date ? new Date(summary.oldest_date) : null;
@@ -632,52 +665,26 @@ const confirmPaymentSupply = async (req, res) => {
         const year = String(date.getFullYear());
         return `${day}/${month}/${year}`;
       };
-      const periodLabel = toDmy(oldestDate);
-      const addAmount = Math.round(paidAmountNumber);
-
-      const existingPay = await trx.raw(
+      const paymentDate = new Date();
+      const periodStart = toDmy(oldestDate) || toDmy(paymentDate);
+      const periodEnd = toDmy(paymentDate);
+      const periodLabel = `${periodStart} - ${periodEnd}`;
+      const addAmount = isSupplierRefundToShop
+        ? -Math.abs(expectedPaidAmount)
+        : Math.abs(expectedPaidAmount);
+      await trx.raw("DROP INDEX IF EXISTS partner.uq_supplier_payments_supplier_id;");
+      const insertResult = await trx.raw(
         `
-        SELECT ${PS.id} AS id
-        FROM ${TABLES.paymentSupply}
-        WHERE ${PS.sourceId} = ?
-        LIMIT 1;
+        INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
+        VALUES (?, ?, ?, ?)
+        RETURNING ${PS.id} AS id,
+                  ${PS.sourceId} AS source_id,
+                  ${PS.round} AS round,
+                  ${PS.status} AS status,
+                  COALESCE(${PS.paid}::numeric, 0) AS paid;
       `,
-        [resolvedSupplyId]
+        [resolvedSupplyId, periodLabel, STATUS.PAID, addAmount]
       );
-      const existingId = existingPay.rows?.[0]?.id;
-
-      let insertResult;
-      if (existingId != null) {
-        insertResult = await trx.raw(
-          `
-          UPDATE ${TABLES.paymentSupply}
-          SET
-            ${PS.paid} = COALESCE(${PS.paid}, 0) + ?,
-            ${PS.round} = ?,
-            ${PS.status} = COALESCE(NULLIF(TRIM(${PS.status}), ''), '')
-          WHERE ${PS.id} = ?
-          RETURNING ${PS.id} AS id,
-                    ${PS.sourceId} AS source_id,
-                    ${PS.round} AS round,
-                    ${PS.status} AS status,
-                    COALESCE(${PS.paid}::numeric, 0) AS paid;
-        `,
-          [addAmount, periodLabel, existingId]
-        );
-      } else {
-        insertResult = await trx.raw(
-          `
-          INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
-          VALUES (?, ?, ?, ?)
-          RETURNING ${PS.id} AS id,
-                    ${PS.sourceId} AS source_id,
-                    ${PS.round} AS round,
-                    ${PS.status} AS status,
-                    COALESCE(${PS.paid}::numeric, 0) AS paid;
-        `,
-          [resolvedSupplyId, periodLabel, "", addAmount]
-        );
-      }
 
       await trx.raw(
         `
@@ -690,19 +697,35 @@ const confirmPaymentSupply = async (req, res) => {
         [STATUS.PAID, resolvedSupplyId, STATUS.PAID]
       );
 
-      return insertResult.rows?.[0] || null;
+      return {
+        paymentRow: insertResult.rows?.[0] || null,
+        verification: {
+          supplyId: resolvedSupplyId,
+          unpaidCount,
+          netUnpaidAmount,
+          expectedPaidAmount,
+          direction: isSupplierRefundToShop ? "supplier_refund_to_shop" : "shop_pay_to_supplier",
+          paymentContent: paymentContent || null,
+          paymentPeriod: periodLabel,
+          matchedReceiptId: matchedReceipt?.id || null,
+        },
+      };
     });
 
-    if (!createdRow) {
+    if (!result?.paymentRow) {
       return res.status(500).json({ error: "Không thể tạo chu kỳ thanh toán." });
     }
-    res.json(createdRow);
+    res.json({
+      ...result.paymentRow,
+      verification: result.verification,
+    });
   } catch (error) {
+    const statusCode = Number(error?.status) || 500;
     logger.error(
       `[payments] Mutation failed (POST /api/payment-supply/${paymentId}/confirm)`,
       { paymentId, error: error.message, stack: error.stack }
     );
-    res.status(500).json({
+    res.status(statusCode).json({
       error: error.message || "Không thể xác nhận thanh toán.",
     });
   }

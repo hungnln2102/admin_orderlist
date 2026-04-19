@@ -31,18 +31,24 @@ export function useFilteredSupplies({
     };
 
     return filtered.sort((a, b) => {
-      const debtA = Number(a.totalUnpaidImport) || 0;
-      const debtB = Number(b.totalUnpaidImport) || 0;
-      const positiveA = debtA > 0;
-      const positiveB = debtB > 0;
-      if (positiveA !== positiveB) return positiveA ? -1 : 1;
+      const payableA = Number(
+        a.payableToSupplier ?? Math.max(0, Number(a.totalUnpaidImport) || 0)
+      );
+      const payableB = Number(
+        b.payableToSupplier ?? Math.max(0, Number(b.totalUnpaidImport) || 0)
+      );
+      if (payableA !== payableB) {
+        return payableB - payableA;
+      }
 
-      const negativeA = debtA < 0;
-      const negativeB = debtB < 0;
-      if (negativeA !== negativeB) return negativeA ? -1 : 1;
-
-      if ((positiveA || negativeA) && debtA !== debtB) {
-        return debtB - debtA;
+      const refundA = Number(
+        a.supplierRefundToShop ?? Math.max(0, -(Number(a.totalUnpaidImport) || 0))
+      );
+      const refundB = Number(
+        b.supplierRefundToShop ?? Math.max(0, -(Number(b.totalUnpaidImport) || 0))
+      );
+      if (refundA !== refundB) {
+        return refundB - refundA;
       }
 
       const lastA = getDateValue(a.lastOrderDate);

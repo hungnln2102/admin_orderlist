@@ -84,7 +84,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
     const raw = Number(p.totalImport ?? p.import_value ?? 0);
     const paid = Number(p.paid ?? 0);
-    if (raw < 0) return Math.abs(raw);
+    if (raw < 0) return Math.max(0, Math.abs(raw) - paid);
     return Math.max(0, raw - paid);
   };
 
@@ -110,7 +110,21 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   // Early return sau khi tất cả hooks đã được gọi
   if (!isOpen || !supplyId) return null;
 
-  const totalUnpaid = unpaidPayments.reduce((sum, p) => sum + Math.max(0, (p.totalImport || 0) - (p.paid || 0)), 0);
+  const totals = unpaidPayments.reduce(
+    (acc, p) => {
+      const raw = Number(p.totalImport ?? p.import_value ?? 0);
+      const due = amountDueForPayment(p);
+      if (raw < 0) {
+        acc.supplierRefundToShop += due;
+      } else {
+        acc.payableToSupplier += due;
+      }
+      return acc;
+    },
+    { payableToSupplier: 0, supplierRefundToShop: 0 }
+  );
+  const totalUnpaid = totals.payableToSupplier;
+  const totalSupplierRefund = totals.supplierRefundToShop;
   const monthlyLogOrders = logOrdersByMonth
     .map((item) => ({
       month: Number(item.month) || 0,
@@ -204,12 +218,12 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                       <p className="text-lg font-bold text-orange-400 mt-1">{Helpers.formatCurrency(totalUnpaid)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Nợ đơn</p>
-                      <p className="text-lg font-bold text-white mt-1">{stats?.unpaidOrders ?? 0}</p>
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">NCC hoàn tiền</p>
+                      <p className="text-lg font-bold text-rose-400 mt-1">{Helpers.formatCurrency(totalSupplierRefund)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Đã xong</p>
-                      <p className="text-lg font-bold text-white mt-1">{stats?.paidOrders ?? 0}</p>
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Nợ đơn</p>
+                      <p className="text-lg font-bold text-white mt-1">{stats?.unpaidOrders ?? 0}</p>
                     </div>
                   </div>
                 </div>
@@ -229,7 +243,9 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
-                    <span className="text-xs text-white/60">Còn nợ {Helpers.formatCurrency(totalUnpaid)}</span>
+                    <span className="text-xs text-white/60">
+                      Trả NCC {Helpers.formatCurrency(totalUnpaid)} | NCC hoàn {Helpers.formatCurrency(totalSupplierRefund)}
+                    </span>
                   </div>
                   {unpaidPayments.length === 0 ? (
                     <p className="text-white/50 text-sm">Không có chu kỳ nợ.</p>
@@ -254,7 +270,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                             <div className="text-right text-sm mr-2">
                               {(() => {
                                 const raw = Number(p.totalImport ?? p.import_value ?? 0);
-                                const display = raw < 0 ? Math.abs(raw) : raw;
+                                const display = amountDueForPayment(p);
                                 return (
                                   <>
                                     <p className={raw < 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
@@ -283,7 +299,9 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                             <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
                           ) : (
                             <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">
-                              Thiếu thông tin NH
+                              {Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0) < 0
+                                ? "QR Shop chưa sẵn sàng"
+                                : "Thiếu thông tin NH NCC"}
                             </div>
                           )}
                         </div>

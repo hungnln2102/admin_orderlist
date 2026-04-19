@@ -3,6 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import type { ProductEditFormState } from "../types";
 import { formatCurrencyValue } from "../utils";
 
+const BASE_PRICE_CURRENCY_OPTIONS: Array<{
+  value: ProductEditFormState["basePriceCurrency"];
+  label: string;
+}> = [
+  { value: "VND", label: "VND" },
+  { value: "USD", label: "USD" },
+  { value: "EUR", label: "EUR" },
+  { value: "GBP", label: "GBP" },
+  { value: "CNY", label: "CNY" },
+  { value: "JPY", label: "JPY" },
+];
+
 type ProductEditPanelProps = {
   productId: number;
   currentEditForm: ProductEditFormState;
@@ -201,21 +213,44 @@ export function ProductEditPanel({
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
                 Giá gốc
               </label>
-              <div className="relative mt-1">
+              <div className="mt-1 flex gap-2">
+                <select
+                  className="w-24 rounded-xl border border-white/20 bg-white/10 px-2 py-2 text-sm text-white shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                  value={currentEditForm.basePriceCurrency}
+                  onChange={(event) =>
+                    onProductEditChange("basePriceCurrency", event.target.value)
+                  }
+                >
+                  {BASE_PRICE_CURRENCY_OPTIONS.map((option) => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-slate-900 text-white"
+                    >
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 pr-14 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                  inputMode={
+                    currentEditForm.basePriceCurrency === "VND"
+                      ? "numeric"
+                      : "decimal"
+                  }
+                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
                   value={currentEditForm.basePrice}
                   onChange={(event) =>
                     onProductEditChange("basePrice", event.target.value)
                   }
                   placeholder="0"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wide text-white/45">
-                  VNĐ
-                </span>
               </div>
+              <p className="mt-1 text-[10px] text-white/45">
+                {currentEditForm.basePriceCurrency === "VND"
+                  ? "Lưu theo VND."
+                  : `Lưu sẽ tự quy đổi ${currentEditForm.basePriceCurrency} -> VND theo tỷ giá hiện tại.`}
+              </p>
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
