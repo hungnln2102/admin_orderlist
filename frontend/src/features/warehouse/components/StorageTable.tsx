@@ -25,6 +25,14 @@ type StorageTableProps = {
 
 const inputCls =
   "w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-indigo-500/30 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.08] transition-all";
+const NOTE_PREVIEW_MAX_CHARS = 90;
+
+const toNotePreview = (value?: string | null) => {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "—";
+  if (text.length <= NOTE_PREVIEW_MAX_CHARS) return text;
+  return `${text.slice(0, NOTE_PREVIEW_MAX_CHARS)}...`;
+};
 
 const statusColor = (s?: string | null) => {
   const v = (s || "").toLowerCase();
@@ -108,7 +116,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
               <th className={thCls} style={{ width: 100 }}>Trạng thái</th>
               <th className={thCls} style={{ width: 90 }}>Hạn SD</th>
               <th className={`${thCls} !text-center`} style={{ width: 50 }}>V</th>
-              <th className={thCls}>Ghi chú</th>
+              <th className={thCls} style={{ width: 320 }}>Ghi chú</th>
               <th className={`${thCls} !text-right !pr-4`} style={{ width: 90 }}></th>
             </tr>
           </thead>
@@ -278,12 +286,15 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                   </td>
 
                   {/* Ghi chú */}
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5 max-w-[320px]">
                     {isEditing ? (
                       renderInput("note", cur.note)
                     ) : (
-                      <span className="text-[11px] text-white/35 line-clamp-2 leading-relaxed">
-                        {item.note || "—"}
+                      <span
+                        className="block text-[11px] text-white/35 whitespace-nowrap overflow-hidden text-ellipsis"
+                        title={item.note || ""}
+                      >
+                        {toNotePreview(item.note)}
                       </span>
                     )}
                   </td>

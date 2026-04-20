@@ -765,73 +765,8 @@ async function selectUsersByEmails(page, emails) {
   return selected;
 }
 
-async function openEditProductsModal(page) {
-  const candidates = [
-    () => page.getByRole("button", { name: /chỉnh sửa sản phẩm|edit products|products and user groups/i }).first(),
-    () => page.locator('button:has-text("Chỉnh sửa sản phẩm")').first(),
-    () => page.locator('[data-testid*="edit-products" i], [id*="edit-products" i]').first(),
-  ];
-  for (const getLocator of candidates) {
-    try {
-      const btn = getLocator();
-      if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await btn.scrollIntoViewIfNeeded().catch(() => {});
-        await btn.click({ timeout: 8000 }).catch(() => {});
-        await page.waitForTimeout(1200);
-        const dlg = page.locator('#edit-products-user-groups-modal, [role="dialog"]').first();
-        await dlg.waitFor({ state: "visible", timeout: 12000 }).catch(() => {});
-        return true;
-      }
-    } catch (_) {}
-  }
-  return false;
-}
-
-async function assignProductInModal(page, productNameRe) {
-  const dialog = page.locator('#edit-products-user-groups-modal, [role="dialog"]').first();
-  await dialog.waitFor({ state: "visible", timeout: 12000 }).catch(() => {});
-
-  const productSection = dialog.locator('[data-testid="assignment-modal-section"]').filter({ hasText: /sản phẩm|products/i }).first();
-  const openBtn = productSection.locator('button[data-testid="assignment-modal-open-button"]').first();
-  if (await openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await openBtn.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(1500);
-  }
-
-  const option = page.locator('[role="option"], [role="listbox"] [role="option"], li[role="option"]').filter({ hasText: productNameRe }).first();
-  if (await option.isVisible({ timeout: 12000 }).catch(() => false)) {
-    await option.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(800);
-  } else {
-    const first = page.locator('[role="option"]').first();
-    if (await first.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await first.click({ timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(800);
-    }
-  }
-
-  const saveBtn = dialog.locator('button[data-testid="cta-button"]').first();
-  if (await saveBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    const disabled = await saveBtn.isDisabled().catch(() => false);
-    if (!disabled) {
-      await saveBtn.click({ timeout: 12000 }).catch(() => {});
-      await page.waitForTimeout(2000);
-      return true;
-    }
-  }
-  const saveByText = dialog.getByRole("button", { name: /^lưu$|^save$/i }).first();
-  if (await saveByText.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await saveByText.click({ timeout: 12000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-    return true;
-  }
-  return false;
-}
-
 module.exports = {
   addUsersToOrgViaUI,
   selectUsersByEmails,
-  openEditProductsModal,
-  assignProductInModal,
   waitForUserRowByEmail,
 };
