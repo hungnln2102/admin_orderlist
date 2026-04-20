@@ -37,7 +37,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     ) || null;
 
   const importOrder = Boolean(orderId && isImportOrderId(orderId));
-  const orderRecord = order as Record<string, unknown>;
+  const orderRecord = (order ?? {}) as Record<string, unknown>;
   const creditAppliedAmount = Math.max(
     0,
     Number(orderRecord.refund_credit_applied_amount ?? 0) || 0
