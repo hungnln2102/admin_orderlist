@@ -17,6 +17,10 @@ const {
 } = require("./flows/users");
 
 const ADMIN_CONSOLE_URL = "https://adminconsole.adobe.com/";
+const POST_ADD_REFRESH_DELAY_MS = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_POST_ADD_REFRESH_DELAY_MS || "", 10);
+  return Number.isFinite(n) && n >= 500 ? n : 1500;
+})();
 
 function buildDetailedAddUsersError(addResult) {
   const failed = Array.isArray(addResult?.failed) ? addResult.failed : [];
@@ -146,8 +150,26 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     }
 
     await runGotoUsersFlow(page);
-    const snapshotResult = await runUsersSnapshotFlow(page, { adminEmail });
+    const snapshotAfterAdd = await runUsersSnapshotFlow(page, { adminEmail });
+    let confirmedSnapshot = snapshotAfterAdd;
+    try {
+      // Adobe có độ trễ đồng bộ product theo user, nên re-fetch thêm 1 lần để chốt trạng thái thật.
+      await page.waitForTimeout(POST_ADD_REFRESH_DELAY_MS);
+      await runGotoUsersFlow(page);
+      confirmedSnapshot = await runUsersSnapshotFlow(page, { adminEmail });
+    } catch (refreshErr) {
+      logger.warn(
+        "[adobe-v2] addUsersWithProductV2: re-fetch users after add failed, fallback snapshot đầu: %s",
+        refreshErr.message
+      );
+    }
+
     const sessionResult = await runPersistUsersSessionFlow(context);
+    const adminNorm = String(adminEmail || "").trim().toLowerCase();
+    const adminUser =
+      (confirmedSnapshot.users || []).find(
+        (user) => String(user?.email || "").trim().toLowerCase() === adminNorm
+      ) || null;
 
     return {
       success: true,
@@ -157,8 +179,11 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
         failed: (addResult.failed || []).map((f) => f.email),
       },
       assignResult: { success: true },
-      manageTeamMembers: snapshotResult.manageTeamMembers,
-      userCount: snapshotResult.userCount,
+      manageTeamMembers: confirmedSnapshot.manageTeamMembers,
+      adminConsoleUsers: confirmedSnapshot.users,
+      adminUser,
+      snapshotConfirmed: true,
+      userCount: confirmedSnapshot.userCount,
       licenseStatus: "unknown",
       savedCookies: sessionResult.savedCookies,
     };

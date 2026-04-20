@@ -72,6 +72,8 @@ async function buildSuccessResult({
   runB10ToB13,
   onlyLogin = false,
   existingOrgName = null,
+  cachedContractActiveLicenseCount = null,
+  forceProductCheck = false,
   cookieLogLabel = "Lưu cookies",
   includeWithExpiry = false,
   onlyLoginLogLabel = "onlyLogin: dừng sau login",
@@ -85,7 +87,11 @@ async function buildSuccessResult({
     return { success: true, cookies };
   }
 
-  const result = await runB10ToB13(page, { existingOrgName });
+  const result = await runB10ToB13(page, {
+    existingOrgName,
+    cachedContractActiveLicenseCount,
+    forceProductCheck,
+  });
   if (includeWithExpiry) {
     logger.info(
       "[adobe-v2] %s: %d (expiry %d ngày, %d có expirationDate)",

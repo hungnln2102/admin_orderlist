@@ -18,6 +18,10 @@ const {
   addCounter,
   finishJobRun,
 } = require("./shared/jobRunLogger");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCOUNT_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
@@ -205,10 +209,16 @@ async function runRenewAdobeCleanup2330Flow({
       }
 
       if (deleteResult.snapshot && Array.isArray(deleteResult.snapshot.manageTeamMembers)) {
+        const lisencecount = resolveLisenceCount({
+          usersSnapshot: account[ACCOUNT_COLS.USERS_SNAPSHOT],
+          alertConfig: account[ACCOUNT_COLS.ALERT_CONFIG],
+        });
         await db(ACCOUNT_TABLE)
           .where(ACCOUNT_COLS.ID, account[ACCOUNT_COLS.ID])
           .update({
-            [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(deleteResult.snapshot.manageTeamMembers),
+            [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(
+              attachLisenceCount(deleteResult.snapshot.manageTeamMembers, lisencecount)
+            ),
             ...(deleteResult.snapshot.orgName != null && {
               [ACCOUNT_COLS.ORG_NAME]: deleteResult.snapshot.orgName,
             }),

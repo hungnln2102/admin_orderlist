@@ -3,6 +3,21 @@ const logger = require("../../utils/logger");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { lookupAndRecordIfNeeded } = require("../../services/userAccountMappingService");
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("./usersSnapshotUtils");
+
+function resolveAccountUserLimit(account) {
+  const n = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.[COLS.USERS_SNAPSHOT],
+      alertConfig: account?.[COLS.ALERT_CONFIG],
+    }) || 0
+  );
+  if (Number.isFinite(n) && n > 0) return n;
+  return MAX_USERS_PER_ACCOUNT;
+}
 
 const runAddUsersBatch = async (req, res) => {
   const accountIdsRaw = req.body?.accountIds;
@@ -28,6 +43,7 @@ const runAddUsersBatch = async (req, res) => {
           COLS.EMAIL,
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
+          COLS.USERS_SNAPSHOT,
           COLS.ALERT_CONFIG,
           ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
@@ -45,6 +61,7 @@ const runAddUsersBatch = async (req, res) => {
           COLS.EMAIL,
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
+          COLS.USERS_SNAPSHOT,
           COLS.ALERT_CONFIG,
           ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
@@ -60,15 +77,16 @@ const runAddUsersBatch = async (req, res) => {
         })
         .map((account) => ({
           ...account,
+          _userLimit: resolveAccountUserLimit(account),
           _currentCount: Math.max(
             0,
             parseInt(account[COLS.USER_COUNT], 10) || 0
           ),
         }))
-        .filter((account) => account._currentCount < MAX_USERS_PER_ACCOUNT)
+        .filter((account) => account._currentCount < account._userLimit)
         .sort((a, b) => {
-          const slotsA = MAX_USERS_PER_ACCOUNT - a._currentCount;
-          const slotsB = MAX_USERS_PER_ACCOUNT - b._currentCount;
+          const slotsA = a._userLimit - a._currentCount;
+          const slotsB = b._userLimit - b._currentCount;
           return slotsA - slotsB;
         });
 
@@ -85,7 +103,8 @@ const runAddUsersBatch = async (req, res) => {
 
     for (const account of ordered) {
       const currentCount = Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0);
-      const slotLeft = Math.max(0, MAX_USERS_PER_ACCOUNT - currentCount);
+      const userLimit = resolveAccountUserLimit(account);
+      const slotLeft = Math.max(0, userLimit - currentCount);
       const take = Math.min(slotLeft, remaining.length);
       const chunk = take > 0 ? remaining.splice(0, take) : [];
 
@@ -103,7 +122,7 @@ const runAddUsersBatch = async (req, res) => {
     if (totalToAdd === 0) {
       return res.status(400).json({
         success: false,
-        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn 11 user.",
+        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn user theo lisencecount.",
         distribution: distribution.map((item) => ({
           accountId: item.accountId,
           accountEmail: item.accountEmail,
@@ -158,9 +177,15 @@ const runAddUsersBatch = async (req, res) => {
           throw new Error(v2.error || "addUsersWithProductV2 thất bại");
         }
 
+        const lisencecount = resolveLisenceCount({
+          usersSnapshot: account[COLS.USERS_SNAPSHOT],
+          alertConfig: account[COLS.ALERT_CONFIG],
+        });
         const updatePayload = {
           [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-          [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+          [COLS.USERS_SNAPSHOT]: JSON.stringify(
+            attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+          ),
         };
         if (v2.savedCookies) {
           updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;

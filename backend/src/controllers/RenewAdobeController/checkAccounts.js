@@ -8,6 +8,53 @@ const logger = require("../../utils/logger");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const { TABLE, COLS } = require("./accountTable");
 const { persistCheckResult } = require("./checkSyncService");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("./usersSnapshotUtils");
+
+const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
+const mappingTable = tableName(mappingSchema.TABLE, SCHEMA_RENEW_ADOBE);
+const mappingCols = mappingSchema.COLS;
+
+function pickOverflowUserEmails(manageTeamMembers, contractActiveLicenseCount) {
+  const users = Array.isArray(manageTeamMembers) ? manageTeamMembers : [];
+  const limit = Number(contractActiveLicenseCount || 0);
+  if (!Number.isFinite(limit) || limit < 0) return [];
+  if (users.length <= limit) return [];
+
+  const overflowCount = users.length - limit;
+  return users
+    .map((user, index) => ({
+      index,
+      email: String(user?.email || "").trim().toLowerCase(),
+      hasProduct: user?.product === true || user?.hasPackage === true,
+    }))
+    .filter((item) => item.email)
+    .sort((a, b) => {
+      const productRankA = a.hasProduct ? 1 : 0;
+      const productRankB = b.hasProduct ? 1 : 0;
+      if (productRankA !== productRankB) return productRankA - productRankB;
+      return a.index - b.index;
+    })
+    .slice(0, overflowCount)
+    .map((item) => item.email);
+}
+
+async function markMappingProductFalse(accountId, userEmails) {
+  const deletedLower = (Array.isArray(userEmails) ? userEmails : [])
+    .map((emailValue) => String(emailValue || "").trim().toLowerCase())
+    .filter(Boolean);
+  if (deletedLower.length === 0) return 0;
+
+  return db(mappingTable)
+    .whereIn(db.raw(`LOWER(${mappingCols.USER_EMAIL})`), deletedLower)
+    .andWhere(mappingCols.ADOBE_ACCOUNT_ID, accountId)
+    .update({
+      [mappingCols.PRODUCT]: false,
+      [mappingCols.UPDATED_AT]: new Date(),
+    });
+}
 
 async function runCheckForAccountId(id) {
   const account = await db(TABLE).where(COLS.ID, id).first();
@@ -42,6 +89,15 @@ async function runCheckForAccountId(id) {
       : "";
   const existingOrgName =
     rawOrgName && rawOrgName !== "-" ? rawOrgName : undefined;
+  const cachedContractActiveLicenseCountRaw = resolveLisenceCount({
+    usersSnapshot: account[COLS.USERS_SNAPSHOT],
+    alertConfig: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
+  });
+  // Chỉ dùng cache khi > 0 để tránh stale "0" gây false expired và xóa nhầm user.
+  const cachedContractActiveLicenseCount =
+    Number(cachedContractActiveLicenseCountRaw) > 0
+      ? Number(cachedContractActiveLicenseCountRaw)
+      : null;
 
   const result = await adobeRenewV2.checkAccount(email, password, {
     savedCookiesFromDb: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
@@ -49,6 +105,8 @@ async function runCheckForAccountId(id) {
     otpSource,
     existingUrlAccess,
     existingOrgName,
+    cachedContractActiveLicenseCount,
+    forceProductCheck: true,
   });
 
   if (!result.success) {
@@ -61,7 +119,7 @@ async function runCheckForAccountId(id) {
     throw new Error(result.error || "Check thất bại.");
   }
 
-  const scrapedData = result.scrapedData;
+  let scrapedData = result.scrapedData;
   await persistCheckResult(id, {
     scrapedData,
     savedCookies: result.savedCookies || null,
@@ -71,15 +129,62 @@ async function runCheckForAccountId(id) {
     license_status: scrapedData.licenseStatus,
   });
 
-  const contractActiveLicenseCount = Number(
+  let contractActiveLicenseCount = Number(
     scrapedData.contractActiveLicenseCount || 0
   );
-  if (contractActiveLicenseCount <= 0) {
+  let hasActiveLicense =
+    String(scrapedData.licenseStatus || "")
+      .trim()
+      .toLowerCase() === "paid";
+
+  if (!hasActiveLicense) {
     const userEmails = (scrapedData.manageTeamMembers || [])
       .map((user) => user.email)
       .filter(Boolean);
 
     if (userEmails.length > 0) {
+      // Safe-guard: re-check realtime (force product check) trước khi xóa hàng loạt.
+      try {
+        const confirmResult = await adobeRenewV2.checkAccount(email, password, {
+          savedCookiesFromDb: result.savedCookies || null,
+          mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+          otpSource,
+          existingUrlAccess,
+          existingOrgName,
+          forceProductCheck: true,
+        });
+        if (confirmResult.success && confirmResult.scrapedData) {
+          scrapedData = confirmResult.scrapedData;
+          contractActiveLicenseCount = Number(
+            confirmResult.scrapedData.contractActiveLicenseCount || 0
+          );
+          hasActiveLicense =
+            String(confirmResult.scrapedData.licenseStatus || "")
+              .trim()
+              .toLowerCase() === "paid";
+          await persistCheckResult(id, {
+            scrapedData: confirmResult.scrapedData,
+            savedCookies: confirmResult.savedCookies || result.savedCookies || null,
+          });
+        }
+      } catch (confirmErr) {
+        logger.warn(
+          "[renew-adobe] Account %s: confirm license check failed before delete-all: %s",
+          id,
+          confirmErr.message
+        );
+      }
+
+      if (hasActiveLicense) {
+        logger.warn(
+          "[renew-adobe] Account %s: skip auto-delete-all vì confirm check cho thấy còn gói (license_status=%s, contractActiveLicenseCount=%s)",
+          id,
+          scrapedData.licenseStatus,
+          contractActiveLicenseCount
+        );
+        return;
+      }
+
       logger.info(
         "[renew-adobe] Account %s expired → auto-delete %s users",
         id,
@@ -98,27 +203,8 @@ async function runCheckForAccountId(id) {
           [COLS.USER_COUNT]: 0,
         });
 
-        const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
-        const mappingTable = tableName(
-          mappingSchema.TABLE,
-          SCHEMA_RENEW_ADOBE
-        );
-        const mappingCols = mappingSchema.COLS;
-        const deletedLower = userEmails.map((emailValue) =>
-          emailValue.toLowerCase()
-        );
-
         try {
-          const updated = await db(mappingTable)
-            .whereIn(
-              db.raw(`LOWER(${mappingCols.USER_EMAIL})`),
-              deletedLower
-            )
-            .andWhere(mappingCols.ADOBE_ACCOUNT_ID, id)
-            .update({
-              [mappingCols.PRODUCT]: false,
-              [mappingCols.UPDATED_AT]: new Date(),
-            });
+          const updated = await markMappingProductFalse(id, userEmails);
           logger.info(
             "[renew-adobe] Account %s: user_account_mapping updated=%d rows (product→false)",
             id,
@@ -136,6 +222,89 @@ async function runCheckForAccountId(id) {
       } catch (deleteError) {
         logger.error(
           "[renew-adobe] Auto-delete failed cho account %s: %s",
+          id,
+          deleteError.message
+        );
+      }
+    }
+  }
+
+  if (hasActiveLicense && contractActiveLicenseCount > 0) {
+    const overflowUserEmails = pickOverflowUserEmails(
+      scrapedData.manageTeamMembers || [],
+      contractActiveLicenseCount
+    );
+
+    if (overflowUserEmails.length > 0) {
+      logger.info(
+        "[renew-adobe] Account %s over limit (%s/%s) → auto-delete %s overflow users (ưu tiên user không có product)",
+        id,
+        scrapedData.manageTeamMembers?.length || 0,
+        contractActiveLicenseCount,
+        overflowUserEmails.length
+      );
+
+      try {
+        const deleteResult = await adobeRenewV2.autoDeleteUsers(
+          email,
+          password,
+          overflowUserEmails,
+          {
+            savedCookiesFromDb: result.savedCookies || null,
+            mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+            otpSource,
+          }
+        );
+
+        if (deleteResult.savedCookies && COLS.ALERT_CONFIG) {
+          await db(TABLE).where(COLS.ID, id).update({
+            [COLS.ALERT_CONFIG]: deleteResult.savedCookies,
+          });
+        }
+
+        try {
+          const updated = await markMappingProductFalse(
+            id,
+            deleteResult.deleted || overflowUserEmails
+          );
+          logger.info(
+            "[renew-adobe] Account %s: overflow delete mapping updated=%d rows (product→false)",
+            id,
+            updated
+          );
+        } catch (mappingError) {
+          logger.error(
+            "[renew-adobe] Account %s: overflow sync mapping failed: %s",
+            id,
+            mappingError.message
+          );
+        }
+
+        if (
+          deleteResult.snapshot &&
+          Array.isArray(deleteResult.snapshot.manageTeamMembers)
+        ) {
+          await db(TABLE).where(COLS.ID, id).update({
+            [COLS.USER_COUNT]: deleteResult.snapshot.manageTeamMembers.length,
+            [COLS.USERS_SNAPSHOT]: JSON.stringify(
+              attachLisenceCount(
+                deleteResult.snapshot.manageTeamMembers,
+                contractActiveLicenseCount
+              )
+            ),
+          });
+        } else {
+          await db(TABLE).where(COLS.ID, id).update({
+            [COLS.USER_COUNT]: Math.max(
+              0,
+              (scrapedData.manageTeamMembers?.length || 0) -
+                (deleteResult.deleted?.length || 0)
+            ),
+          });
+        }
+      } catch (deleteError) {
+        logger.error(
+          "[renew-adobe] Auto-delete overflow users failed cho account %s: %s",
           id,
           deleteError.message
         );

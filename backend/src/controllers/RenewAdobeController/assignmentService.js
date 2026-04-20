@@ -9,31 +9,29 @@ const {
   ACTIVE_LICENSE_STATUSES,
   normalizeLicenseStatus,
 } = require("./statusUtils");
-
-function parseAlertConfig(raw) {
-  if (!raw) return {};
-  if (typeof raw === "object") return raw;
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
-  return {};
-}
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("./usersSnapshotUtils");
 
 function resolveAccountUserLimit(account) {
-  const conf = parseAlertConfig(account?.[COLS.ALERT_CONFIG]);
-  const n = Number(conf?.contractActiveLicenseCount || 0);
+  const n = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.[COLS.USERS_SNAPSHOT],
+      alertConfig: account?.[COLS.ALERT_CONFIG],
+    }) || 0
+  );
   if (Number.isFinite(n) && n > 0) return n;
   return MAX_USERS_PER_ACCOUNT;
 }
 
 function hasActivePackageByContractCount(account) {
-  const conf = parseAlertConfig(account?.[COLS.ALERT_CONFIG]);
-  const n = Number(conf?.contractActiveLicenseCount || 0);
+  const n = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.[COLS.USERS_SNAPSHOT],
+      alertConfig: account?.[COLS.ALERT_CONFIG],
+    }) || 0
+  );
   return Number.isFinite(n) && n > 0;
 }
 
@@ -79,6 +77,7 @@ async function assignUserToAvailableAccount(userEmail) {
       COLS.ORG_NAME,
       COLS.LICENSE_STATUS,
       COLS.USER_COUNT,
+      COLS.USERS_SNAPSHOT,
       COLS.ALERT_CONFIG,
       ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID,
@@ -126,9 +125,15 @@ async function assignUserToAvailableAccount(userEmail) {
     throw new Error(v2.error || "addUsersWithProductV2 thất bại");
   }
 
+  const lisencecount = resolveLisenceCount({
+    usersSnapshot: target[COLS.USERS_SNAPSHOT],
+    alertConfig: target[COLS.ALERT_CONFIG],
+  });
   const updatePayload = {
     [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-    [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+    [COLS.USERS_SNAPSHOT]: JSON.stringify(
+      attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+    ),
   };
   if (v2.savedCookies) {
     updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
@@ -185,6 +190,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       COLS.ORG_NAME,
       COLS.LICENSE_STATUS,
       COLS.USER_COUNT,
+      COLS.USERS_SNAPSHOT,
       COLS.ALERT_CONFIG,
       ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
       COLS.MAIL_BACKUP_ID,
@@ -252,9 +258,15 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       };
     }
 
+    const lisencecount = resolveLisenceCount({
+      usersSnapshot: target[COLS.USERS_SNAPSHOT],
+      alertConfig: target[COLS.ALERT_CONFIG],
+    });
     const updatePayload = {
       [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-      [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+      [COLS.USERS_SNAPSHOT]: JSON.stringify(
+        attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+      ),
     };
     if (v2.savedCookies) {
       updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;

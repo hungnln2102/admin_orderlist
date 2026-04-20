@@ -20,6 +20,10 @@ const {
   addCounter,
   finishJobRun,
 } = require("./shared/jobRunLogger");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const ACCOUNT_TABLE = tableName(ACCOUNT_TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);
@@ -41,6 +45,17 @@ const PRODUCT_SYSTEM_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
 const MAX_USERS_PER_ACCOUNT = 10;
 const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
 const ACTIVE_ORDER_STATUSES = [STATUS.PAID, STATUS.RENEWAL, STATUS.PROCESSING];
+
+function resolveAccountUserLimit(account) {
+  const n = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.[ACCOUNT_COLS.USERS_SNAPSHOT],
+      alertConfig: account?.[ACCOUNT_COLS.ALERT_CONFIG],
+    }) || 0
+  );
+  if (Number.isFinite(n) && n > 0) return n;
+  return MAX_USERS_PER_ACCOUNT;
+}
 
 async function retryOnce(taskName, handler) {
   try {
@@ -160,11 +175,12 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
     .map((account) => ({
       ...account,
       currentCount: Math.max(0, Number.parseInt(account[ACCOUNT_COLS.USER_COUNT], 10) || 0),
+      userLimit: resolveAccountUserLimit(account),
     }))
-    .filter((account) => account.currentCount < MAX_USERS_PER_ACCOUNT)
+    .filter((account) => account.currentCount < account.userLimit)
     .sort((a, b) => {
-      const slotsA = MAX_USERS_PER_ACCOUNT - a.currentCount;
-      const slotsB = MAX_USERS_PER_ACCOUNT - b.currentCount;
+      const slotsA = a.userLimit - a.currentCount;
+      const slotsB = b.userLimit - b.currentCount;
       return slotsA - slotsB;
     });
 
@@ -178,7 +194,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
     const accountId = account[ACCOUNT_COLS.ID];
     const accountEmail = account[ACCOUNT_COLS.EMAIL];
     const accountPassword = account[ACCOUNT_COLS.PASSWORD_ENC] || "";
-    const slotsLeft = MAX_USERS_PER_ACCOUNT - account.currentCount;
+    const slotsLeft = Math.max(0, account.userLimit - account.currentCount);
     const chunk = remaining.splice(0, slotsLeft);
     if (chunk.length === 0) continue;
 
@@ -204,10 +220,16 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
 
       if (!addResult.success) throw new Error(addResult.error || "addUsersWithProductV2 thất bại");
 
+      const lisencecount = resolveLisenceCount({
+        usersSnapshot: account[ACCOUNT_COLS.USERS_SNAPSHOT],
+        alertConfig: account[ACCOUNT_COLS.ALERT_CONFIG],
+      });
       const updatePayload = {
         [ACCOUNT_COLS.USER_COUNT]:
           addResult.userCount ?? (addResult.manageTeamMembers?.length ?? 0),
-        [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(addResult.manageTeamMembers || []),
+        [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(
+          attachLisenceCount(addResult.manageTeamMembers || [], lisencecount)
+        ),
       };
       if (addResult.savedCookies) updatePayload[ACCOUNT_COLS.ALERT_CONFIG] = addResult.savedCookies;
       await db(ACCOUNT_TABLE).where(ACCOUNT_COLS.ID, accountId).update(updatePayload);

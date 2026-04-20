@@ -1,4 +1,5 @@
 const ACTIVE_LICENSE_STATUSES = new Set(["paid", "active"]);
+const { resolveLisenceCount } = require("./usersSnapshotUtils");
 
 function normalizeLicenseStatus(value) {
   return String(value || "unknown").trim().toLowerCase() || "unknown";
@@ -111,6 +112,12 @@ function buildWebsiteStatusPayload({
   const profileName = account?.org_name ?? null;
   const licenseStatus = normalizeLicenseStatus(account?.license_status);
   const accountIsActive = account ? isAccountEnabled(account.is_active) : false;
+  const accountLicenseCount = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.users_snapshot,
+      alertConfig: account?.cookie_config,
+    }) || 0
+  );
   const userHasProduct = resolveUserProductState(matchedUser);
   const orderExpired = order ? isOrderExpired(order.expiry_date, now) : false;
   const hasValidOrder = Boolean(order) && !orderExpired;
@@ -132,10 +139,12 @@ function buildWebsiteStatusPayload({
     status = "needs_activation";
   }
 
-  const urlAccessRaw =
-    account && account.url_access != null
-      ? String(account.url_access).trim()
-      : "";
+  const rawAccessUrl =
+    account?.access_url ??
+    account?.url_access ??
+    account?.urlAccess ??
+    null;
+  const urlAccessRaw = rawAccessUrl != null ? String(rawAccessUrl).trim() : "";
   const urlAccess = urlAccessRaw || null;
 
   const profileLabel = profileName ? `Profile ${profileName}` : "Profile hiện tại";
@@ -188,6 +197,7 @@ function buildWebsiteStatusPayload({
           email: account.email ?? null,
           orgName: profileName,
           licenseStatus,
+          licenseCount: accountLicenseCount,
           userCount: Number(account.user_count) || 0,
           isActive: accountIsActive,
           userHasProduct,

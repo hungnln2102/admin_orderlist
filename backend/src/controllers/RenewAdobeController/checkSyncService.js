@@ -1,5 +1,9 @@
 const { db } = require("../../db");
 const { TABLE, COLS } = require("./accountTable");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("./usersSnapshotUtils");
 
 function buildCheckUpdatePayload({ scrapedData = {}, savedCookies = null } = {}) {
   const payload = {
@@ -10,7 +14,14 @@ function buildCheckUpdatePayload({ scrapedData = {}, savedCookies = null } = {})
   };
 
   if (Array.isArray(scrapedData.manageTeamMembers)) {
-    payload[COLS.USERS_SNAPSHOT] = JSON.stringify(scrapedData.manageTeamMembers);
+    const lisencecount = resolveLisenceCount({
+      explicit: scrapedData.contractActiveLicenseCount,
+      usersSnapshot: scrapedData.manageTeamMembers,
+      alertConfig: savedCookies,
+    });
+    payload[COLS.USERS_SNAPSHOT] = JSON.stringify(
+      attachLisenceCount(scrapedData.manageTeamMembers, lisencecount)
+    );
   }
   if (scrapedData.urlAccess && COLS.URL_ACCESS) {
     payload[COLS.URL_ACCESS] = scrapedData.urlAccess;

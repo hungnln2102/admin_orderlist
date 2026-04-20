@@ -1,5 +1,6 @@
 const logger = require("../../../../utils/logger");
 const { withRecoverableRetry } = require("./retry");
+const { checkOrgLicenseCapacity } = require("../../shared/accessChecks");
 
 const ADMIN_PRODUCTS = "https://adminconsole.adobe.com/products";
 
@@ -91,19 +92,6 @@ function scrapeProductsPage(page) {
     .catch(() => []);
 }
 
-function deriveContractActiveLicenseCount(products = []) {
-  const totals = (Array.isArray(products) ? products : [])
-    .map((p) => Number(p?.total || 0))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (totals.length === 0) return 0;
-  return Math.max(...totals);
-}
-
-function deriveLicenseStatusByContractCount(contractActiveLicenseCount) {
-  const n = Number(contractActiveLicenseCount || 0);
-  return n > 0 ? "Paid" : "Expired";
-}
-
 async function runCheckProductFlow(page) {
   return withRecoverableRetry(
     "B12-check-product",
@@ -120,18 +108,19 @@ async function runCheckProductFlow(page) {
 
       const orgId = extractOrgIdFromUrl(productsUrl);
       const products = await scrapeProductsPage(page);
-      const contractActiveLicenseCount = deriveContractActiveLicenseCount(products);
+      const capacity = checkOrgLicenseCapacity(products);
+      const contractActiveLicenseCount = capacity.contractActiveLicenseCount;
 
       const onProductsPage =
         productsUrl.includes("adminconsole.adobe.com") &&
         productsUrl.includes("/products");
-      const license_status = deriveLicenseStatusByContractCount(
-        contractActiveLicenseCount
-      );
+      const license_status = capacity.licenseStatus;
 
       logger.info(
-        "[adobe-v2] products: %d, license_status: %s, orgId: %s, onProductsPage: %s, contractActiveLicenseCount: %s",
+        "[adobe-v2] products: %d, productIds: %d, ccpIds: %d, license_status: %s, orgId: %s, onProductsPage: %s, contractActiveLicenseCount: %s",
         products.length,
+        capacity.productIdCount || 0,
+        (capacity.creativeCloudProProductIds || []).length,
         license_status,
         orgId || "(null)",
         onProductsPage,

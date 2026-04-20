@@ -15,6 +15,24 @@ const WAIT_USERS_MS = (() => {
   return Number.isFinite(n) && n >= 30000 ? n : 90000;
 })();
 
+function toNonNegativeNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+function deriveLicenseStatusByContractCount(contractActiveLicenseCount) {
+  const n = Number(contractActiveLicenseCount || 0);
+  return n > 0 ? "Paid" : "Expired";
+}
+
+function extractOrgIdFromToken(orgToken) {
+  const token = String(orgToken || "").trim();
+  if (!token) return null;
+  const m = token.match(/^([A-Fa-f0-9]{20,})@AdobeOrg$/);
+  return m ? m[1] : null;
+}
+
 const B13_GOTO_MS = (() => {
   const n = Number.parseInt(process.env.ADOBE_V2_B13_GOTO_MS || "", 10);
   return Number.isFinite(n) && n >= 30000 ? n : 60000;
@@ -187,11 +205,15 @@ function scrapeUsersPage(page) {
  * B10–B13: Profile name (account.adobe.com) → products → users (adminconsole).
  * Nếu options.existingOrgName có sẵn thì bỏ qua B10–B11 (không vào account.adobe.com lấy profile).
  * @param {import('playwright').Page} page
- * @param {{ existingOrgName?: string|null }} options
+ * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean }} options
  * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number }>}
  */
 async function runB10ToB13(page, options = {}) {
   const existingOrgName = options.existingOrgName && String(options.existingOrgName).trim() ? String(options.existingOrgName).trim() : null;
+  const cachedContractActiveLicenseCount = toNonNegativeNumber(
+    options.cachedContractActiveLicenseCount
+  );
+  const forceProductCheck = options.forceProductCheck === true;
   let org_name = null;
   let orgId = null;
   let products = [];
@@ -202,11 +224,20 @@ async function runB10ToB13(page, options = {}) {
   const orgResult = await runCheckOrgNameFlow(page, { existingOrgName });
   org_name = orgResult.org_name;
 
-  const productResult = await runCheckProductFlow(page);
-  orgId = productResult.orgId || orgId;
-  products = productResult.products || [];
-  license_status = productResult.license_status || "unknown";
-  contractActiveLicenseCount = Number(productResult.contractActiveLicenseCount || 0);
+  if (!forceProductCheck && cachedContractActiveLicenseCount != null) {
+    contractActiveLicenseCount = cachedContractActiveLicenseCount;
+    license_status = deriveLicenseStatusByContractCount(contractActiveLicenseCount);
+    logger.info(
+      "[adobe-v2] B12: skip products check, dùng lisencecount cache=%s",
+      contractActiveLicenseCount
+    );
+  } else {
+    const productResult = await runCheckProductFlow(page);
+    orgId = productResult.orgId || orgId;
+    products = productResult.products || [];
+    license_status = productResult.license_status || "unknown";
+    contractActiveLicenseCount = Number(productResult.contractActiveLicenseCount || 0);
+  }
 
   const usersUrlPrimary = buildAdminUsersUrl(orgId);
   logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
@@ -219,7 +250,30 @@ async function runB10ToB13(page, options = {}) {
     .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
     .catch(() => {});
   if (!orgId) orgId = extractOrgIdFromUrl(page.url());
-  const apiUsers = await fetchUsersViaApi(page, { orgId });
+  let apiUsers;
+  try {
+    apiUsers = await fetchUsersViaApi(page, { orgId });
+  } catch (usersErr) {
+    if (cachedContractActiveLicenseCount == null) {
+      throw usersErr;
+    }
+    logger.warn(
+      "[adobe-v2] users-api fail khi skip B12, fallback chạy products check: %s",
+      usersErr.message
+    );
+    const productFallback = await runCheckProductFlow(page);
+    orgId = productFallback.orgId || orgId;
+    products = productFallback.products || products;
+    await page
+      .goto(buildAdminUsersUrl(orgId), {
+        waitUntil: "domcontentloaded",
+        timeout: B13_GOTO_MS,
+      })
+      .catch(() => {});
+    await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
+    apiUsers = await fetchUsersViaApi(page, { orgId });
+  }
+  orgId = orgId || extractOrgIdFromToken(apiUsers?.orgToken);
   users = apiUsers.users.map((u) => ({
     id: u.id || null,
     authenticatingAccountId: u.authenticatingAccountId || null,

@@ -16,6 +16,10 @@ const {
 const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
 } = require("../../services/renewAdobePurgeNoLicenseAccount");
+const {
+  attachLisenceCount,
+  resolveLisenceCount,
+} = require("./usersSnapshotUtils");
 
 function logAutoAssign(onProgress, data) {
   if (onProgress) {
@@ -170,9 +174,15 @@ async function autoAssignUsers({ onProgress = null } = {}) {
         throw new Error(v2.error || "addUsersWithProductV2 thất bại");
       }
 
+      const lisencecount = resolveLisenceCount({
+        usersSnapshot: account[COLS.USERS_SNAPSHOT],
+        alertConfig: account[COLS.ALERT_CONFIG],
+      });
       const updatePayload = {
         [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-        [COLS.USERS_SNAPSHOT]: JSON.stringify(v2.manageTeamMembers || []),
+        [COLS.USERS_SNAPSHOT]: JSON.stringify(
+          attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+        ),
       };
       if (v2.savedCookies) {
         updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;

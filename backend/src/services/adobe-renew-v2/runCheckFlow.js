@@ -35,12 +35,21 @@ function mapRunCheckErrorCode(error) {
  * Nếu options.sharedSession = { context, page } thì dùng browser có sẵn (B14 có thể dùng tiếp), không đóng browser.
  * @param {string} email - Email đăng nhập Adobe
  * @param {string} password - Mật khẩu
- * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, onlyLogin?: boolean }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users).
+ * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, onlyLogin?: boolean }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users).
  * @returns {Promise<{ success: boolean, error?: string, org_name?: string, license_status?: string, products?: any[], users?: any[], cookies?: any[] }>}
  */
 async function runCheckFlow(email, password, options = {}) {
   logger.info("[adobe-v2] runCheckFlow BẮT ĐẦU (cookie expiry=%d ngày) — adobe-renew-v2", DEFAULT_COOKIE_EXPIRY_DAYS);
-  const { savedCookies = [], mailBackupId = null, otpSource = "imap", sharedSession = null, existingOrgName = null, onlyLogin = false } = options;
+  const {
+    savedCookies = [],
+    mailBackupId = null,
+    otpSource = "imap",
+    sharedSession = null,
+    existingOrgName = null,
+    cachedContractActiveLicenseCount = null,
+    forceProductCheck = false,
+    onlyLogin = false,
+  } = options;
   let ownedContext = null;
   let context;
   let page;
@@ -132,6 +141,8 @@ async function runCheckFlow(email, password, options = {}) {
         runB10ToB13,
         onlyLogin,
         existingOrgName: resolvedOrgName,
+        cachedContractActiveLicenseCount,
+        forceProductCheck,
         cookieLogLabel: "Lưu cookies sau login mới",
         includeWithExpiry: false,
         onlyLoginLogLabel: "onlyLogin: login xong do thiếu/expired cookie",
@@ -161,6 +172,8 @@ async function runCheckFlow(email, password, options = {}) {
         runB10ToB13,
         onlyLogin,
         existingOrgName,
+        cachedContractActiveLicenseCount,
+        forceProductCheck,
         cookieLogLabel: "Lưu cookies",
         includeWithExpiry: false,
         onlyLoginLogLabel:
@@ -183,6 +196,8 @@ async function runCheckFlow(email, password, options = {}) {
       runB10ToB13,
       onlyLogin,
       existingOrgName: resolvedOrgName,
+      cachedContractActiveLicenseCount,
+      forceProductCheck,
       cookieLogLabel: "Lưu cookies",
       includeWithExpiry: true,
       onlyLoginLogLabel:

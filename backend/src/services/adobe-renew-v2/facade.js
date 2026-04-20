@@ -11,7 +11,10 @@ const { getOrCreateAutoAssignUrlWithPage } = require("./autoAssignFlow");
 const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
 const { deleteUsersV2 } = require("./deleteUsersV2");
 const { addUsersWithProductV2 } = require("./addUsersWithProductV2");
-const { applyAdobeProFlags } = require("./shared/usersListApi");
+const {
+  applyAdobeProFlags,
+  checkUserAssignedProduct,
+} = require("./shared/usersListApi");
 
 /**
  * Chuẩn hóa savedCookiesFromDb từ DB.
@@ -38,7 +41,7 @@ function normalizeSavedCookiesFromDb(raw) {
  * Check account theo luồng V2 (B1-B13 + B14/B15 nếu cần).
  * @param {string} email
  * @param {string} password
- * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, otpSource?: string|null, existingUrlAccess?: string|null, existingOrgName?: string|null }} options
+ * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, otpSource?: string|null, existingUrlAccess?: string|null, existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean }} options
  * @returns {Promise<{ success: boolean, scrapedData: any|null, savedCookies: any|null, error?: string }>}
  */
 async function checkAccount(email, password, options = {}) {
@@ -54,6 +57,11 @@ async function checkAccount(email, password, options = {}) {
     options.existingUrlAccess && String(options.existingUrlAccess).trim()
       ? String(options.existingUrlAccess).trim()
       : null;
+  const cachedContractActiveLicenseCount =
+    Number.isFinite(Number(options.cachedContractActiveLicenseCount))
+      ? Number(options.cachedContractActiveLicenseCount)
+      : null;
+  const forceProductCheck = options.forceProductCheck === true;
 
   const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
   const proxyOptions = getPlaywrightProxyOptions();
@@ -81,6 +89,8 @@ async function checkAccount(email, password, options = {}) {
       otpSource,
       sharedSession,
       existingOrgName,
+      cachedContractActiveLicenseCount,
+      forceProductCheck,
     });
 
     if (!result.success) {
@@ -100,9 +110,12 @@ async function checkAccount(email, password, options = {}) {
       product: u.hasProduct === true,
     }));
     const hasProducts = (result.products || []).length > 0;
+    const hasActiveLicenseByCount =
+      Number(result.contractActiveLicenseCount || 0) > 0;
+    const adminProductCheck = checkUserAssignedProduct(users, adminEmail, adminEmail);
     const adminHasProduct =
-      hasProducts &&
-      users.some((u) => (u.email || "").toLowerCase() === adminEmail && u.product === true);
+      (hasProducts || hasActiveLicenseByCount) &&
+      adminProductCheck.assigned === true;
 
     if (adminHasProduct) {
       try {
@@ -113,7 +126,7 @@ async function checkAccount(email, password, options = {}) {
     }
 
     let urlAccess = existingUrlAccess || null;
-    if (hasProducts && !urlAccess && result.orgId) {
+    if ((hasProducts || hasActiveLicenseByCount) && !urlAccess && result.orgId) {
       try {
         const autoAssign = await getOrCreateAutoAssignUrlWithPage(page, result.orgId, email, password, {
           mailBackupId,

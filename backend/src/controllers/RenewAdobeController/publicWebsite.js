@@ -12,6 +12,8 @@ const {
 } = require("./accountLookup");
 const { assignUserToAvailableAccount } = require("./assignmentService");
 const { buildWebsiteStatusPayload } = require("./statusUtils");
+const { runCheckForAccountId } = require("./checkAccounts");
+const { runCheckAllAccountsFlow } = require("./autoAssign");
 
 function compareOrders(a, b) {
   const expiryA = a.expiry_date ? new Date(a.expiry_date).getTime() : 0;
@@ -65,12 +67,26 @@ async function findLatestRenewOrderByEmail(email) {
   return [...rows].sort(compareOrders)[0];
 }
 
-async function getWebsiteStatusPayload(email) {
+async function getWebsiteStatusPayload(email, options = {}) {
   const normalized = normalizeEmail(email);
-  const [order, accountMatch] = await Promise.all([
+  const [order, initialAccountMatch] = await Promise.all([
     findLatestRenewOrderByEmail(normalized),
     findAccountMatchByEmail(normalized),
   ]);
+  let accountMatch = initialAccountMatch;
+
+  if (options.refreshMatchedAccount && accountMatch?.account?.id) {
+    try {
+      await runCheckForAccountId(accountMatch.account.id);
+      accountMatch = await findAccountMatchByEmail(normalized);
+    } catch (error) {
+      logger.warn("[renew-adobe] website status refresh matched account failed", {
+        email: normalized,
+        accountId: accountMatch.account.id,
+        error: error.message,
+      });
+    }
+  }
 
   return buildWebsiteStatusPayload({
     email: normalized,
@@ -87,7 +103,9 @@ const getWebsiteStatus = async (req, res) => {
   }
 
   try {
-    const payload = await getWebsiteStatusPayload(email);
+    const payload = await getWebsiteStatusPayload(email, {
+      refreshMatchedAccount: true,
+    });
     return res.json(payload);
   } catch (error) {
     logger.error("[renew-adobe] website status failed", {
@@ -108,7 +126,9 @@ const activateWebsiteUser = async (req, res) => {
   }
 
   try {
-    const currentStatus = await getWebsiteStatusPayload(email);
+    const currentStatus = await getWebsiteStatusPayload(email, {
+      refreshMatchedAccount: true,
+    });
 
     if (currentStatus.status === "active") {
       return res.json(currentStatus);
@@ -122,8 +142,21 @@ const activateWebsiteUser = async (req, res) => {
       });
     }
 
+    await runCheckAllAccountsFlow({
+      runCheckForAccountId,
+      includeAutoAssign: false,
+      logPrefix: "[renew-adobe][website-activate]",
+    }).catch((error) => {
+      logger.warn("[renew-adobe] website activate pre-check-all failed", {
+        email,
+        error: error.message,
+      });
+    });
+
     const activated = await assignUserToAvailableAccount(email);
-    const nextStatus = await getWebsiteStatusPayload(email);
+    const nextStatus = await getWebsiteStatusPayload(email, {
+      refreshMatchedAccount: true,
+    });
 
     return res.json({
       ...nextStatus,
