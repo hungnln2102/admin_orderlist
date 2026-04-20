@@ -1,5 +1,85 @@
 const logger = require("../../../utils/logger");
 
+function toNormalizedProductId(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function extractProductId(item) {
+  if (item && typeof item === "object") {
+    return String(item.id || item.productId || item.offerId || "").trim();
+  }
+  return String(item || "").trim();
+}
+
+function extractProductIds(products) {
+  if (!Array.isArray(products)) return [];
+  return [
+    ...new Set(
+      products
+        .map((item) => toNormalizedProductId(extractProductId(item)))
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function inferAdobeProProductIdSet(users, adminEmail = "") {
+  const list = Array.isArray(users) ? users : [];
+  const counts = new Map();
+  const byUser = list.map((u) => {
+    const ids = extractProductIds(u?.products);
+    ids.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
+    return {
+      email: String(u?.email || "").trim().toLowerCase(),
+      ids,
+    };
+  });
+
+  const allIds = new Set(counts.keys());
+  if (allIds.size === 0) return new Set();
+
+  const adminNorm = String(adminEmail || "").trim().toLowerCase();
+  if (adminNorm) {
+    const adminRow = byUser.find((u) => u.email === adminNorm);
+    const adminIds = new Set(adminRow?.ids || []);
+    if (adminIds.size > 0) {
+      return new Set([...allIds].filter((id) => !adminIds.has(id)));
+    }
+  }
+
+  if (allIds.size === 1) {
+    return new Set(allIds);
+  }
+
+  let mostCommonId = "";
+  let mostCommonCount = -1;
+  for (const [id, count] of counts.entries()) {
+    if (count > mostCommonCount) {
+      mostCommonId = id;
+      mostCommonCount = count;
+    }
+  }
+  return new Set([...allIds].filter((id) => id !== mostCommonId));
+}
+
+function hasAdobeProAccessFromProducts(products, proProductIds) {
+  if (!Array.isArray(products) || products.length === 0) return false;
+  const ids = proProductIds instanceof Set ? proProductIds : new Set();
+  if (ids.size === 0) return false;
+  return products.some((item) =>
+    ids.has(toNormalizedProductId(extractProductId(item)))
+  );
+}
+
+function applyAdobeProFlags(users, adminEmail = "") {
+  const list = Array.isArray(users) ? users : [];
+  const proProductIds = inferAdobeProProductIdSet(list, adminEmail);
+  return list.map((u) => ({
+    ...u,
+    hasProduct: hasAdobeProAccessFromProducts(u?.products, proProductIds),
+    product: hasAdobeProAccessFromProducts(u?.products, proProductIds),
+  }));
+}
+
 function extractOrgTokenFromUrl(url) {
   const m = String(url || "").match(/\/([A-Fa-f0-9]{20,}@AdobeOrg)/);
   return m ? m[1] : null;
@@ -17,7 +97,6 @@ function mapApiUserToSnapshotUser(item) {
   const name = `${firstName} ${lastName}`.trim();
   const email = String(item?.email || item?.userName || "").trim();
   const products = Array.isArray(item?.products) ? item.products : [];
-  const hasProduct = products.length > 0;
   return {
     id: String(item?.id || "").trim() || null,
     authenticatingAccountId:
@@ -26,8 +105,8 @@ function mapApiUserToSnapshotUser(item) {
     email,
     products,
     accountStatus: item?.accountStatus || null,
-    product: hasProduct,
-    hasProduct,
+    product: false,
+    hasProduct: false,
   };
 }
 
@@ -102,8 +181,7 @@ async function fetchUsersViaApi(page, options = {}) {
       throw new Error(`Users API parse fail (page=${pageIndex}): ${e.message}`);
     }
 
-    const mapped = arr.map(mapApiUserToSnapshotUser).filter((u) => u.email);
-    users.push(...mapped);
+    users.push(...arr.map(mapApiUserToSnapshotUser).filter((u) => u.email));
 
     const nextHeader = resp.headers()["x-has-next-page"] || "";
     if (!String(nextHeader).toLowerCase().includes("true")) {
@@ -114,13 +192,21 @@ async function fetchUsersViaApi(page, options = {}) {
     }
   }
 
-  logger.info("[adobe-v2] users-api: fetched %d users (org=%s)", users.length, orgToken);
-  return { users, orgToken };
+  const usersWithProFlags = applyAdobeProFlags(users, options.adminEmail);
+  logger.info(
+    "[adobe-v2] users-api: fetched %d users (org=%s)",
+    usersWithProFlags.length,
+    orgToken
+  );
+  return { users: usersWithProFlags, orgToken };
 }
 
 module.exports = {
   fetchUsersViaApi,
   extractOrgTokenFromUrl,
   normalizeOrgToken,
+  inferAdobeProProductIdSet,
+  applyAdobeProFlags,
+  hasAdobeProAccessFromProducts,
 };
 

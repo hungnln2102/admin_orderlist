@@ -2,7 +2,7 @@ const { fetchUsersViaApi } = require("../../shared/usersListApi");
 
 async function runCheckAdminProductFlow(page, adminEmail) {
   const adminNorm = String(adminEmail || "").trim().toLowerCase();
-  const apiResult = await fetchUsersViaApi(page);
+  const apiResult = await fetchUsersViaApi(page, { adminEmail: adminNorm });
   const users = apiResult.users.map((u) => ({
     name: u.name || "",
     email: String(u.email || "").trim(),

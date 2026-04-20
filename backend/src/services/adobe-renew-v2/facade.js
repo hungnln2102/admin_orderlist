@@ -11,6 +11,7 @@ const { getOrCreateAutoAssignUrlWithPage } = require("./autoAssignFlow");
 const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
 const { deleteUsersV2 } = require("./deleteUsersV2");
 const { addUsersWithProductV2 } = require("./addUsersWithProductV2");
+const { applyAdobeProFlags } = require("./shared/usersListApi");
 
 /**
  * Chuẩn hóa savedCookiesFromDb từ DB.
@@ -88,15 +89,14 @@ async function checkAccount(email, password, options = {}) {
 
     const page = sharedSession.page;
     const adminEmail = email.toLowerCase().trim();
-    const users = (result.users || []).map((u) => ({
+    const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail);
+    const users = flaggedUsers.map((u) => ({
       id: u.id || null,
       authenticatingAccountId: u.authenticatingAccountId || null,
       name: u.name || "",
       email: (u.email || "").trim(),
       products: Array.isArray(u.products) ? u.products : [],
-      hasPackage: Array.isArray(u.products)
-        ? u.products.length > 0
-        : u.hasProduct === true,
+      hasPackage: u.hasProduct === true,
       product: u.hasProduct === true,
     }));
     const hasProducts = (result.products || []).length > 0;
@@ -136,12 +136,9 @@ async function checkAccount(email, password, options = {}) {
         name: u.name || "",
         email: (u.email || "").trim(),
         products: Array.isArray(u.products) ? u.products : [],
-        hasPackage: Array.isArray(u.products)
-          ? u.products.length > 0
-          : u.product === true,
-        // Quy ước nghiệp vụ: có products => còn gói; không có products => chưa cấp quyền.
-        product:
-          Array.isArray(u.products) ? u.products.length > 0 : u.product === true,
+        hasPackage: u.product === true,
+        // Quy ước nghiệp vụ mới: chỉ product ID Pro mới tính là còn gói.
+        product: u.product === true,
       }));
 
     const scrapedData = {
