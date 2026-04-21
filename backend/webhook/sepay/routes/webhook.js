@@ -48,6 +48,56 @@ const PAYMENT_RECEIPT_SCHEMA =
   process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
 const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
 const REFUND_CREDIT_APPLICATIONS_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.refund_credit_applications`;
+const PAYMENT_RECEIPT_BATCH_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_batch`;
+const PAYMENT_RECEIPT_BATCH_ITEM_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_batch_item`;
+const BATCH_CODE_REGEX = /\bMAVG[A-Z0-9]{4,20}\b/gi;
+const isBatchCode = (value) => /^MAVG[A-Z0-9]{4,20}$/i.test(String(value || "").trim());
+
+const extractBatchCodes = (transaction) => {
+  const fields = [
+    transaction?.code,
+    transaction?.transaction_content,
+    transaction?.note,
+    transaction?.description,
+  ];
+  const out = new Set();
+  for (const field of fields) {
+    const matches = String(field || "").toUpperCase().match(BATCH_CODE_REGEX) || [];
+    for (const code of matches) {
+      const normalized = String(code || "").trim().toUpperCase();
+      if (normalized) out.add(normalized);
+    }
+  }
+  return [...out];
+};
+
+const resolveOrderCodesByBatchCodes = async (client, batchCodes) => {
+  const normalized = [...new Set((batchCodes || []).map((x) => String(x || "").trim().toUpperCase()).filter(Boolean))];
+  if (normalized.length === 0) return new Map();
+  const sql = `
+    SELECT
+      UPPER(COALESCE(i.batch_code::text, '')) AS batch_code,
+      UPPER(COALESCE(i.order_code::text, '')) AS order_code
+    FROM ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE} i
+    INNER JOIN ${PAYMENT_RECEIPT_BATCH_TABLE} b
+      ON b.id = i.batch_id
+    WHERE UPPER(COALESCE(i.batch_code::text, '')) = ANY($1::text[])
+      AND TRIM(COALESCE(i.order_code::text, '')) <> ''
+      AND LOWER(COALESCE(b.status::text, 'pending')) <> 'cancelled'
+    ORDER BY i.id ASC
+  `;
+  const { rows } = await client.query(sql, [normalized]);
+  const map = new Map();
+  for (const row of rows || []) {
+    const batch = String(row?.batch_code || "").trim().toUpperCase();
+    const orderCode = String(row?.order_code || "").trim().toUpperCase();
+    if (!batch || !orderCode) continue;
+    const list = map.get(batch) || [];
+    if (!list.includes(orderCode)) list.push(orderCode);
+    map.set(batch, list);
+  }
+  return map;
+};
 
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
@@ -274,6 +324,7 @@ router.post("/", async (req, res) => {
 
   const orderCode = deriveOrderCode(transaction);
   const extractedOrderCodes = extractOrderCodes(transaction);
+  const explicitBatchCodes = extractBatchCodes(transaction);
   const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
   const normalizedExtracted = extractedOrderCodes
     .map((code) => String(code || "").trim().toUpperCase())
@@ -288,6 +339,12 @@ router.post("/", async (req, res) => {
           : []
     ),
   ];
+  const batchCodes = [
+    ...new Set([
+      ...explicitBatchCodes,
+      ...orderCodes.filter((code) => isBatchCode(code)),
+    ]),
+  ];
   logger.debug("Order codes from webhook", { orderCodes, count: orderCodes.length });
   const transferAmountNormalized = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
@@ -299,6 +356,7 @@ router.post("/", async (req, res) => {
     const eligibilityByOrderCode = new Map();
     const stateByOrderCode = new Map();
     const amountDecisionByOrderCode = new Map();
+    let loopOrderCodes = [];
 
     const client = await pool.connect();
     try {
@@ -329,7 +387,27 @@ router.post("/", async (req, res) => {
         });
       }
 
-      for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+      const batchOrderMap = await resolveOrderCodesByBatchCodes(client, batchCodes);
+      const expandedOrderCodes = [
+        ...new Set([
+          ...orderCodes.filter((code) => !isBatchCode(code)),
+          ...[...batchOrderMap.values()].flat(),
+        ]),
+      ];
+      loopOrderCodes = expandedOrderCodes.length
+        ? expandedOrderCodes
+        : orderCode && !isBatchCode(orderCode)
+          ? [orderCode]
+          : [];
+
+      if (batchCodes.length > 0) {
+        logger.info("[Webhook] Resolve MAVG batch codes", {
+          batchCodes,
+          expandedOrderCodes: loopOrderCodes,
+        });
+      }
+
+      for (const code of loopOrderCodes) {
         const stateRes = await client.query(
           `SELECT
             ${ORDER_COLS.status},
@@ -362,7 +440,7 @@ router.post("/", async (req, res) => {
       }
 
       // Dùng mã đơn đã resolve (fallback hoặc extract) thay vì orderCode gốc
-      const resolvedOrderCode = orderCodes[0] || orderCode;
+      const resolvedOrderCode = batchCodes[0] || loopOrderCodes[0] || orderCode;
       receiptResult = await insertPaymentReceipt(transaction, { client, orderCode: resolvedOrderCode });
       const receiptId = receiptResult?.id ?? receiptResult?.existingId ?? null;
       const receiptState = await getReceiptFinancialState(client, receiptId);
@@ -387,9 +465,9 @@ router.post("/", async (req, res) => {
 
       if (receiptResult?.inserted) {
         const referenceImport =
-          orderCodes.length > 1 ? null : transferAmountNormalized;
+          loopOrderCodes.length > 1 ? null : transferAmountNormalized;
 
-        for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+        for (const code of loopOrderCodes) {
           const state = stateByOrderCode.get(code);
           const eligibility = eligibilityByOrderCode.get(code);
 
@@ -446,7 +524,7 @@ router.post("/", async (req, res) => {
       // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
       // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
       if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate)) {
-        const codesToUpdate = orderCodes.length ? orderCodes : orderCode ? [orderCode] : [];
+        const codesToUpdate = loopOrderCodes;
         for (const code of codesToUpdate) {
           if (isMavnImportOrder({ id_order: code })) {
             logger.info("[Webhook] Skip status update for MAVN (nhập hàng)", {
@@ -625,7 +703,7 @@ router.post("/", async (req, res) => {
 
       if (
         !alreadyFinancialPosted &&
-        (!orderCodes.length && !orderCode) &&
+        (!loopOrderCodes.length && !orderCode) &&
         transferAmountNormalized > 0 &&
         !supplierSettlementTransfer
       ) {
@@ -652,7 +730,7 @@ router.post("/", async (req, res) => {
       }
       if (
         !alreadyFinancialPosted &&
-        (!orderCodes.length && !orderCode) &&
+        (!loopOrderCodes.length && !orderCode) &&
         transferAmountNormalized > 0 &&
         supplierSettlementTransfer &&
         receiptId
@@ -698,6 +776,21 @@ router.post("/", async (req, res) => {
         }
       }
 
+      if (receiptId && batchCodes.length > 0) {
+        await client.query(
+          `
+            UPDATE ${PAYMENT_RECEIPT_BATCH_TABLE}
+            SET status = 'paid',
+                paid_receipt_id = $1,
+                paid_at = COALESCE(paid_at, NOW()),
+                updated_at = NOW()
+            WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($2::text[])
+              AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
+          `,
+          [receiptId, batchCodes]
+        );
+      }
+
       await client.query("COMMIT");
     } catch (dbErr) {
       await client.query("ROLLBACK");
@@ -708,7 +801,7 @@ router.post("/", async (req, res) => {
 
     // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). MAVN không xử lý gia hạn qua Sepay — dùng API gia hạn tay.
     try {
-      for (const code of orderCodes.length ? orderCodes : orderCode ? [orderCode] : []) {
+      for (const code of loopOrderCodes) {
         let amountDecision = amountDecisionByOrderCode.get(code) || null;
         if (!amountDecision) {
           const state = stateByOrderCode.get(code);

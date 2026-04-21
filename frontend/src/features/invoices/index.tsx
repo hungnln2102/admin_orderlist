@@ -258,6 +258,7 @@ export default function Invoices() {
         open={isQrModalOpen}
         amount={qrAmount}
         note={qrNote}
+        matchableOrders={matchableOrders}
         onClose={() => setIsQrModalOpen(false)}
         onAmountChange={setQrAmount}
         onNoteChange={setQrNote}

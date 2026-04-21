@@ -44,7 +44,13 @@ function inferAdobeProProductIdSet(users, adminEmail = "") {
     const adminRow = byUser.find((u) => u.email === adminNorm);
     const adminIds = new Set(adminRow?.ids || []);
     if (adminIds.size > 0) {
-      return new Set([...allIds].filter((id) => !adminIds.has(id)));
+      const filtered = new Set([...allIds].filter((id) => !adminIds.has(id)));
+      // Nếu admin đang giữ tất cả product IDs (filtered rỗng), fallback dùng allIds
+      // để không đánh dấu sai toàn bộ team là "không có product" ngay sau add.
+      if (filtered.size > 0) {
+        return filtered;
+      }
+      return new Set(allIds);
     }
   }
 

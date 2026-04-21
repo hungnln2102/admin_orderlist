@@ -1,4 +1,5 @@
 const { db, withTransaction } = require("../../db");
+const crypto = require("crypto");
 const {
   getDefinition,
   PARTNER_SCHEMA,
@@ -32,6 +33,29 @@ const DASHBOARD_SUMMARY_DEF = getDefinition(
   FINANCE_SCHEMA
 );
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
+const PAYMENT_RECEIPT_BATCH_COLS = {
+  ID: "id",
+  BATCH_CODE: "batch_code",
+  TOTAL_AMOUNT: "total_amount",
+  ORDER_COUNT: "order_count",
+  STATUS: "status",
+  SOURCE: "source",
+  NOTE: "note",
+  PAID_RECEIPT_ID: "paid_receipt_id",
+  PAID_AT: "paid_at",
+  CREATED_AT: "created_at",
+  UPDATED_AT: "updated_at",
+};
+const PAYMENT_RECEIPT_BATCH_ITEM_COLS = {
+  ID: "id",
+  BATCH_ID: "batch_id",
+  BATCH_CODE: "batch_code",
+  ORDER_CODE: "order_code",
+  ORDER_LIST_ID: "order_list_id",
+  AMOUNT: "amount",
+  STATUS: "status",
+  CREATED_AT: "created_at",
+};
 const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_RECEIPT),
   paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_RECEIPT),
@@ -39,6 +63,8 @@ const TABLES = {
   orderList: tableName(ORDER_LIST_DEF.tableName, SCHEMA_ORDERS),
   dashboardSummary: tableName(DASHBOARD_SUMMARY_DEF.tableName, SCHEMA_FINANCE),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
+  paymentReceiptBatch: tableName("payment_receipt_batch", SCHEMA_RECEIPT),
+  paymentReceiptBatchItem: tableName("payment_receipt_batch_item", SCHEMA_RECEIPT),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   supplyOrderCostLog: tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER),
 };
@@ -65,6 +91,33 @@ const normalizeMoney = (value) => {
     .trim();
   const numeric = Number.parseFloat(cleaned || "0");
   return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+};
+
+const ORDER_CODE_REGEX_GLOBAL = /\bMAV[A-Z0-9]{3,20}\b/gi;
+const BATCH_CODE_REGEX_STRICT = /^MAVG[A-Z0-9]{4,20}$/i;
+const BATCH_CODE_PREFIX = "MAVG";
+
+const parseOrderCodesInput = (rawValue) => {
+  const parts = Array.isArray(rawValue)
+    ? rawValue
+    : typeof rawValue === "string"
+      ? [rawValue]
+      : [];
+  const unique = new Set();
+  for (const part of parts) {
+    const matches = String(part || "").toUpperCase().match(ORDER_CODE_REGEX_GLOBAL) || [];
+    for (const code of matches) {
+      const normalized = String(code || "").trim().toUpperCase();
+      if (!normalized || BATCH_CODE_REGEX_STRICT.test(normalized)) continue;
+      unique.add(normalized);
+    }
+  }
+  return [...unique];
+};
+
+const generateCandidateBatchCode = () => {
+  const suffix = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `${BATCH_CODE_PREFIX}${suffix}`;
 };
 
 const createHttpError = (status, message) => {
@@ -225,6 +278,230 @@ const listPaymentReceipts = async (req, res) => {
     }
     logger.error("[payments] Query failed (payment-receipts)", { error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải biên lai thanh toán." });
+  }
+};
+
+const createPaymentReceiptBatch = async (req, res) => {
+  const rawOrderCodes =
+    req.body?.orderCodes ?? req.body?.orders ?? req.body?.orderCode ?? "";
+  const note = String(req.body?.note || "").trim();
+  const orderCodes = parseOrderCodesInput(rawOrderCodes);
+  if (orderCodes.length === 0) {
+    return res.status(400).json({
+      error: "Thiếu danh sách mã đơn hợp lệ (MAV...).",
+    });
+  }
+
+  try {
+    const result = await withTransaction(async (trx) => {
+      const rows = await trx(TABLES.orderList)
+        .select(
+          ORDER_COLS.id,
+          ORDER_COLS.idOrder,
+          ORDER_COLS.status,
+          ORDER_COLS.price
+        )
+        .whereRaw(`UPPER(${ORDER_COLS.idOrder}::text) IN (${orderCodes.map(() => "?").join(",")})`, orderCodes);
+
+      const byCode = new Map(
+        (rows || []).map((row) => [
+          String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase(),
+          row,
+        ])
+      );
+      const missingOrderCodes = orderCodes.filter((code) => !byCode.has(code));
+      if (missingOrderCodes.length > 0) {
+        throw createHttpError(
+          400,
+          `Không tìm thấy ${missingOrderCodes.length} mã đơn: ${missingOrderCodes.join(", ")}`
+        );
+      }
+
+      const disallowed = rows.filter((row) => {
+        const status = String(row?.[ORDER_COLS.status] || "").trim();
+        return status !== STATUS.UNPAID && status !== STATUS.RENEWAL;
+      });
+      if (disallowed.length > 0) {
+        const preview = disallowed
+          .slice(0, 5)
+          .map((row) => String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase())
+          .join(", ");
+        throw createHttpError(
+          409,
+          `Chỉ tạo biên lai nhóm cho đơn Chưa Thanh Toán/Cần Gia Hạn. Không hợp lệ: ${preview}`
+        );
+      }
+
+      let batchCode = "";
+      for (let i = 0; i < 8; i += 1) {
+        const candidate = generateCandidateBatchCode();
+        const exists = await trx(TABLES.paymentReceiptBatch)
+          .where(PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE, candidate)
+          .first();
+        if (!exists) {
+          batchCode = candidate;
+          break;
+        }
+      }
+      if (!batchCode) {
+        throw createHttpError(500, "Không thể tạo mã MAVG. Vui lòng thử lại.");
+      }
+
+      const totalAmount = rows.reduce(
+        (sum, row) => sum + normalizeMoney(row?.[ORDER_COLS.price]),
+        0
+      );
+
+      const insertedBatchRows = await trx(TABLES.paymentReceiptBatch)
+        .insert({
+          [PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE]: batchCode,
+          [PAYMENT_RECEIPT_BATCH_COLS.TOTAL_AMOUNT]: totalAmount,
+          [PAYMENT_RECEIPT_BATCH_COLS.ORDER_COUNT]: rows.length,
+          [PAYMENT_RECEIPT_BATCH_COLS.STATUS]: "pending",
+          [PAYMENT_RECEIPT_BATCH_COLS.SOURCE]: "invoices",
+          [PAYMENT_RECEIPT_BATCH_COLS.NOTE]: note || null,
+        })
+        .returning("*");
+      const batchRow = insertedBatchRows?.[0] || null;
+
+      await trx(TABLES.paymentReceiptBatchItem).insert(
+        rows.map((row) => ({
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.BATCH_ID]: batchRow?.[PAYMENT_RECEIPT_BATCH_COLS.ID],
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.BATCH_CODE]: batchCode,
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE]: String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase(),
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID]: row?.[ORDER_COLS.id] ?? null,
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT]: normalizeMoney(row?.[ORDER_COLS.price]),
+          [PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS]: "pending",
+        }))
+      );
+
+      return {
+        batchCode,
+        orderCodes,
+        orderCount: rows.length,
+        totalAmount,
+      };
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+      noteForTransfer: result.batchCode,
+    });
+  } catch (error) {
+    const statusCode = Number(error?.status) || 500;
+    logger.error("[payments] Create receipt batch failed", {
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(statusCode).json({
+      error: error.message || "Không thể tạo mã biên lai nhóm.",
+    });
+  }
+};
+
+const listPaymentReceiptBatches = async (req, res) => {
+  const limitParam = Number.parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 100)
+    : 20;
+  try {
+    const rows = await db(TABLES.paymentReceiptBatch)
+      .select(
+        PAYMENT_RECEIPT_BATCH_COLS.ID,
+        PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE,
+        PAYMENT_RECEIPT_BATCH_COLS.TOTAL_AMOUNT,
+        PAYMENT_RECEIPT_BATCH_COLS.ORDER_COUNT,
+        PAYMENT_RECEIPT_BATCH_COLS.STATUS,
+        PAYMENT_RECEIPT_BATCH_COLS.PAID_RECEIPT_ID,
+        PAYMENT_RECEIPT_BATCH_COLS.PAID_AT,
+        PAYMENT_RECEIPT_BATCH_COLS.CREATED_AT
+      )
+      .where(PAYMENT_RECEIPT_BATCH_COLS.SOURCE, "invoices")
+      .orderBy(PAYMENT_RECEIPT_BATCH_COLS.ID, "desc")
+      .limit(limit);
+
+    const batches = (rows || []).map((row) => ({
+      id: Number(row?.[PAYMENT_RECEIPT_BATCH_COLS.ID]) || 0,
+      batchCode: String(row?.[PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE] || "")
+        .trim()
+        .toUpperCase(),
+      totalAmount: Number(row?.[PAYMENT_RECEIPT_BATCH_COLS.TOTAL_AMOUNT]) || 0,
+      orderCount: Number(row?.[PAYMENT_RECEIPT_BATCH_COLS.ORDER_COUNT]) || 0,
+      status: String(row?.[PAYMENT_RECEIPT_BATCH_COLS.STATUS] || "pending"),
+      paidReceiptId: Number(row?.[PAYMENT_RECEIPT_BATCH_COLS.PAID_RECEIPT_ID]) || null,
+      paidAt: row?.[PAYMENT_RECEIPT_BATCH_COLS.PAID_AT] || null,
+      createdAt: row?.[PAYMENT_RECEIPT_BATCH_COLS.CREATED_AT] || null,
+    }));
+    return res.json({ batches, count: batches.length, limit });
+  } catch (error) {
+    logger.error("[payments] List receipt batches failed", {
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ error: "Không thể tải danh sách batch MAVG." });
+  }
+};
+
+const getPaymentReceiptBatchDetail = async (req, res) => {
+  const batchCode = String(req.params.batchCode || "").trim().toUpperCase();
+  if (!BATCH_CODE_REGEX_STRICT.test(batchCode)) {
+    return res.status(400).json({ error: "batchCode không đúng định dạng MAVG." });
+  }
+  try {
+    const batch = await db(TABLES.paymentReceiptBatch)
+      .select("*")
+      .whereRaw(`UPPER(${PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE}::text) = ?`, [batchCode])
+      .first();
+    if (!batch) {
+      return res.status(404).json({ error: "Không tìm thấy batch MAVG." });
+    }
+
+    const items = await db(TABLES.paymentReceiptBatchItem)
+      .select(
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID,
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE,
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID,
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT,
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS,
+        PAYMENT_RECEIPT_BATCH_ITEM_COLS.CREATED_AT
+      )
+      .whereRaw(`UPPER(${PAYMENT_RECEIPT_BATCH_ITEM_COLS.BATCH_CODE}::text) = ?`, [batchCode])
+      .orderBy(PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID, "asc");
+
+    return res.json({
+      batch: {
+        id: Number(batch?.[PAYMENT_RECEIPT_BATCH_COLS.ID]) || 0,
+        batchCode: String(batch?.[PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE] || "")
+          .trim()
+          .toUpperCase(),
+        totalAmount: Number(batch?.[PAYMENT_RECEIPT_BATCH_COLS.TOTAL_AMOUNT]) || 0,
+        orderCount: Number(batch?.[PAYMENT_RECEIPT_BATCH_COLS.ORDER_COUNT]) || 0,
+        status: String(batch?.[PAYMENT_RECEIPT_BATCH_COLS.STATUS] || "pending"),
+        note: batch?.[PAYMENT_RECEIPT_BATCH_COLS.NOTE] || null,
+        paidReceiptId: Number(batch?.[PAYMENT_RECEIPT_BATCH_COLS.PAID_RECEIPT_ID]) || null,
+        paidAt: batch?.[PAYMENT_RECEIPT_BATCH_COLS.PAID_AT] || null,
+        createdAt: batch?.[PAYMENT_RECEIPT_BATCH_COLS.CREATED_AT] || null,
+      },
+      items: (items || []).map((row) => ({
+        id: Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID]) || 0,
+        orderCode: String(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE] || "")
+          .trim()
+          .toUpperCase(),
+        orderListId:
+          Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID]) || null,
+        amount: Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT]) || 0,
+        status: String(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS] || "pending"),
+        createdAt: row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.CREATED_AT] || null,
+      })),
+    });
+  } catch (error) {
+    logger.error("[payments] Get receipt batch detail failed", {
+      batchCode,
+      error: error.message,
+      stack: error.stack,
+    });
+    return res.status(500).json({ error: "Không thể tải chi tiết batch MAVG." });
   }
 };
 
@@ -733,6 +1010,9 @@ const confirmPaymentSupply = async (req, res) => {
 
 module.exports = {
   listPaymentReceipts,
+  createPaymentReceiptBatch,
+  listPaymentReceiptBatches,
+  getPaymentReceiptBatchDetail,
   listMatchableOrders,
   confirmPaymentSupply,
   reconcilePaymentReceipt,

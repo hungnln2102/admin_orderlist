@@ -20,6 +20,7 @@ import {
   normalizeDiscountRatio,
   normalizeKey,
   resolveOrderType,
+  stripVariantDurationSuffix,
   toPositiveNumber,
 } from "./helpers";
 
@@ -107,10 +108,20 @@ export default function BillOrder() {
         extractMonths(order?.[ORDER_COLS.idProduct]) ||
         extractMonths(product?.[VARIANT_PRICING_COLS.code]);
       const monthsLabel = months ? `${months} tháng` : "";
+      const variantNameRaw = String(
+        product?.[VARIANT_PRICING_COLS.variantName] || ""
+      ).trim();
+      const fallbackFromDisplay = stripVariantDurationSuffix(
+        String(
+          product?.[VARIANT_PRICING_COLS.code] ||
+            order?.[ORDER_COLS.idProduct] ||
+            ""
+        )
+      );
       const baseName =
-        (product?.[VARIANT_PRICING_COLS.variantName] as string) ||
+        variantNameRaw ||
+        fallbackFromDisplay ||
         (product?.[VARIANT_PRICING_COLS.packageName] as string) ||
-        order?.[ORDER_COLS.idProduct] ||
         entry.code;
       const description = monthsLabel ? `${baseName} ${monthsLabel}` : baseName;
 

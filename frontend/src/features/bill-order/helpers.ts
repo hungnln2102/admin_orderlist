@@ -53,6 +53,12 @@ export const extractMonths = (value?: string | null): number | null => {
   return null;
 };
 
+export const stripVariantDurationSuffix = (value?: string | null): string => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.replace(/\s*--\s*\d+\s*m\b/gi, "").trim();
+};
+
 export type OrderTypeCode =
   | typeof ORDER_CODE_PREFIXES.COLLABORATOR
   | typeof ORDER_CODE_PREFIXES.STUDENT
