@@ -133,7 +133,7 @@ async function checkAccount(email, password, options = {}) {
       return { success: false, scrapedData: null, savedCookies: null, error: result.error };
     }
 
-    const page = sharedSession.page;
+    const currentPage = sharedSession.page;
     const adminEmail = email.toLowerCase().trim();
     const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail);
     const users = flaggedUsers.map((u) => ({
@@ -155,7 +155,9 @@ async function checkAccount(email, password, options = {}) {
 
     if (adminHasProduct) {
       try {
-        await runB15RemoveProductFromAdmin(page, email, { orgId: result.orgId || null });
+        await runB15RemoveProductFromAdmin(currentPage, email, {
+          orgId: result.orgId || null,
+        });
       } catch (e) {
         logger.warn("[adobe-v2] facade.checkAccount: B15 lỗi: %s", e.message);
       }
@@ -164,10 +166,16 @@ async function checkAccount(email, password, options = {}) {
     let urlAccess = existingUrlAccess || null;
     if ((hasProducts || hasActiveLicenseByCount) && !urlAccess && result.orgId) {
       try {
-        const autoAssign = await getOrCreateAutoAssignUrlWithPage(page, result.orgId, email, password, {
-          mailBackupId,
-          otpSource,
-        });
+        const autoAssign = await getOrCreateAutoAssignUrlWithPage(
+          currentPage,
+          result.orgId,
+          email,
+          password,
+          {
+            mailBackupId,
+            otpSource,
+          }
+        );
         urlAccess = autoAssign.url;
         if (autoAssign.savedCookies && autoAssign.savedCookies.length) {
           result.cookies = autoAssign.savedCookies;
