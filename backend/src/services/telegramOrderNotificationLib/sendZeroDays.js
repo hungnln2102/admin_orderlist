@@ -98,6 +98,15 @@ async function sendZeroDaysRemainingNotification(orders = []) {
         },
         retryNoTopic: () =>
           logger.info("[Order][Telegram] Retrying without topic ID"),
+        rateLimited: ({ attempt, retryAfterSeconds, waitMs, body }) =>
+          logger.warn("[Order][Telegram] Telegram rate-limited send attempt", {
+            attempt,
+            orderIndex: index,
+            orderCode: order.id_order || order.idOrder,
+            retryAfterSeconds,
+            waitMs,
+            body,
+          }),
         permanentFailure: ({ error, stack, status, body }) =>
           logger.error("[Order][Telegram] Send failed permanently for order", {
             orderIndex: index,

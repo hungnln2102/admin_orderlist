@@ -7,7 +7,12 @@ const {
   isThreadError,
   isCopyButtonError,
   isPhotoSourceError,
+  isRateLimitError,
+  extractRetryAfterSeconds,
 } = require("./errorHelpers");
+
+const DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS = 3;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * @param {object} options
@@ -24,6 +29,7 @@ const {
  * @param {() => void} [options.log.retryNoTopic]
  * @param {() => void} [options.log.retryNoButtons]
  * @param {() => void} [options.log.retryNoPhoto]
+ * @param {(fields: { attempt: number, retryAfterSeconds: number, waitMs: number, body?: unknown }) => void} [options.log.rateLimited]
  * @param {(fields: { error?: string, stack?: string, status?: number, body?: unknown }) => void} [options.log.permanentFailure]
  * @param {() => void} [options.log.finalNotSent] Called once if sent is still false after the loop.
  * @returns {Promise<{ sent: boolean }>}
@@ -72,7 +78,8 @@ async function sendWithRetry({
         enableCopyButtonRetry && includeButtons && isCopyButtonError(err);
       const photoRetry =
         enablePhotoRetry && includePhoto && isPhotoSourceError(err);
-      const recoverable = threadRetry || buttonRetry || photoRetry;
+      const rateLimitRetry = isRateLimitError(err);
+      const recoverable = threadRetry || buttonRetry || photoRetry || rateLimitRetry;
 
       log.attemptFailed?.({
         attempt: attempt + 1,
@@ -81,6 +88,20 @@ async function sendWithRetry({
         body: err?.body,
         recoverable,
       });
+
+      if (rateLimitRetry) {
+        const retryAfterSeconds =
+          extractRetryAfterSeconds(err) ?? DEFAULT_RATE_LIMIT_RETRY_AFTER_SECONDS;
+        const waitMs = (retryAfterSeconds + 1) * 1000;
+        log.rateLimited?.({
+          attempt: attempt + 1,
+          retryAfterSeconds,
+          waitMs,
+          body: err?.body,
+        });
+        await sleep(waitMs);
+        continue;
+      }
 
       let adjusted = false;
       if (threadRetry) {

@@ -168,6 +168,14 @@ async function sendOrderCreatedNotification(order) {
         logger.info("[Order][Telegram] Retrying without topic ID"),
       retryNoButtons: () =>
         logger.info("[Order][Telegram] Retrying without copy buttons"),
+      rateLimited: ({ attempt, retryAfterSeconds, waitMs, body }) =>
+        logger.warn("[Order][Telegram] Telegram rate-limited send attempt", {
+          attempt,
+          orderCode,
+          retryAfterSeconds,
+          waitMs,
+          body,
+        }),
       permanentFailure: ({ error, stack, status, body }) =>
         logger.error("[Order][Telegram] Send failed permanently", {
           error,

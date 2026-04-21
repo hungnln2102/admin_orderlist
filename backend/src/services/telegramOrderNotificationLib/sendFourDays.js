@@ -143,6 +143,15 @@ async function sendFourDaysRemainingNotification(orders = []) {
           logger.info("[Order][Telegram] Retrying without topic ID"),
         retryNoPhoto: () =>
           logger.info("[Order][Telegram] Retrying due order as text (QR photo failed)"),
+        rateLimited: ({ attempt, retryAfterSeconds, waitMs, body }) =>
+          logger.warn("[Order][Telegram] Telegram rate-limited send attempt", {
+            attempt,
+            orderIndex: index,
+            orderCode,
+            retryAfterSeconds,
+            waitMs,
+            body,
+          }),
         permanentFailure: ({ error, stack, status, body }) =>
           logger.error("[Order][Telegram] Send failed permanently for order", {
             orderIndex: index,

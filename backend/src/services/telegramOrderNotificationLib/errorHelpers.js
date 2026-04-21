@@ -56,9 +56,44 @@ function isCopyButtonError(err) {
   );
 }
 
+function isRateLimitError(err) {
+  return Number(err?.status) === 429;
+}
+
+function extractRetryAfterSeconds(err) {
+  if (!err) return null;
+
+  if (typeof err.retryAfter === "number" && Number.isFinite(err.retryAfter)) {
+    return Math.max(0, err.retryAfter);
+  }
+
+  const bodyText = String(err?.body || "").trim();
+  if (bodyText) {
+    try {
+      const parsed = JSON.parse(bodyText);
+      const fromJson = parsed?.parameters?.retry_after;
+      if (typeof fromJson === "number" && Number.isFinite(fromJson)) {
+        return Math.max(0, fromJson);
+      }
+    } catch {
+      // ignore body parse error
+    }
+  }
+
+  const combinedText = `${String(err?.message || "")} ${bodyText}`.trim();
+  const matched = combinedText.match(/retry(?:\s+after)?\s*:?\s*(\d+)/i);
+  if (!matched) return null;
+
+  const parsedSeconds = Number.parseInt(matched[1], 10);
+  if (!Number.isFinite(parsedSeconds)) return null;
+  return Math.max(0, parsedSeconds);
+}
+
 module.exports = {
   telegramErrorText,
   isThreadError,
   isCopyButtonError,
   isPhotoSourceError,
+  isRateLimitError,
+  extractRetryAfterSeconds,
 };

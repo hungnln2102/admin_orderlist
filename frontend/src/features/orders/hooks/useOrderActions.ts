@@ -67,17 +67,6 @@ export function useOrderActions(deps: OrderActionsDeps) {
         const createdOrder: Order = await response.json();
         await fetchOrders();
         handleViewOrder(createdOrder, "create");
-        const appliedCredit = Number(
-          (createdOrder as Record<string, unknown>).refund_credit_applied_amount ?? 0
-        );
-        showAppNotification({
-          type: "success",
-          title: "Tạo đơn hàng thành công",
-          message:
-            appliedCredit > 0
-              ? `Đơn mới đã tạo. Đã bù credit ${appliedCredit.toLocaleString("vi-VN")} VND.`
-              : "Đơn mới đã tạo thành công.",
-        });
         emitRefresh(["orders", "dashboard"]);
       } catch (error) {
         console.error("Lỗi khi tạo đơn hàng:", error);
