@@ -52,6 +52,12 @@ const PAYMENT_RECEIPT_BATCH_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_b
 const PAYMENT_RECEIPT_BATCH_ITEM_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_batch_item`;
 const BATCH_CODE_REGEX = /\bMAVG[A-Z0-9]{4,20}\b/gi;
 const isBatchCode = (value) => /^MAVG[A-Z0-9]{4,20}$/i.test(String(value || "").trim());
+const hasMissingTableError = (error, tableName) =>
+  error?.code === "42P01" &&
+  String(error?.message || "").toLowerCase().includes(String(tableName || "").toLowerCase());
+const isMissingBatchTablesError = (error) =>
+  hasMissingTableError(error, "payment_receipt_batch") ||
+  hasMissingTableError(error, "payment_receipt_batch_item");
 
 const extractBatchCodes = (transaction) => {
   const fields = [
@@ -86,9 +92,19 @@ const resolveOrderCodesByBatchCodes = async (client, batchCodes) => {
       AND LOWER(COALESCE(b.status::text, 'pending')) <> 'cancelled'
     ORDER BY i.id ASC
   `;
-  const { rows } = await client.query(sql, [normalized]);
+  let rows = [];
+  try {
+    const result = await client.query(sql, [normalized]);
+    rows = result.rows || [];
+  } catch (error) {
+    if (isMissingBatchTablesError(error)) {
+      logger.warn("[Webhook] Skip batch-code expansion: batch tables missing");
+      return new Map();
+    }
+    throw error;
+  }
   const map = new Map();
-  for (const row of rows || []) {
+  for (const row of rows) {
     const batch = String(row?.batch_code || "").trim().toUpperCase();
     const orderCode = String(row?.order_code || "").trim().toUpperCase();
     if (!batch || !orderCode) continue;
@@ -777,18 +793,26 @@ router.post("/", async (req, res) => {
       }
 
       if (receiptId && batchCodes.length > 0) {
-        await client.query(
-          `
-            UPDATE ${PAYMENT_RECEIPT_BATCH_TABLE}
-            SET status = 'paid',
-                paid_receipt_id = $1,
-                paid_at = COALESCE(paid_at, NOW()),
-                updated_at = NOW()
-            WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($2::text[])
-              AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
-          `,
-          [receiptId, batchCodes]
-        );
+        try {
+          await client.query(
+            `
+              UPDATE ${PAYMENT_RECEIPT_BATCH_TABLE}
+              SET status = 'paid',
+                  paid_receipt_id = $1,
+                  paid_at = COALESCE(paid_at, NOW()),
+                  updated_at = NOW()
+              WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($2::text[])
+                AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
+            `,
+            [receiptId, batchCodes]
+          );
+        } catch (error) {
+          if (isMissingBatchTablesError(error)) {
+            logger.warn("[Webhook] Skip updating batch status: batch tables missing");
+          } else {
+            throw error;
+          }
+        }
       }
 
       await client.query("COMMIT");

@@ -120,6 +120,14 @@ const generateCandidateBatchCode = () => {
   return `${BATCH_CODE_PREFIX}${suffix}`;
 };
 
+const hasMissingTableError = (error, tableName) =>
+  error?.code === "42P01" &&
+  String(error?.message || "").toLowerCase().includes(String(tableName || "").toLowerCase());
+
+const isMissingBatchTablesError = (error) =>
+  hasMissingTableError(error, "payment_receipt_batch") ||
+  hasMissingTableError(error, "payment_receipt_batch_item");
+
 const createHttpError = (status, message) => {
   const error = new Error(message);
   error.status = status;
@@ -389,6 +397,13 @@ const createPaymentReceiptBatch = async (req, res) => {
       noteForTransfer: result.batchCode,
     });
   } catch (error) {
+    if (isMissingBatchTablesError(error)) {
+      logger.warn("[payments] Create receipt batch skipped: missing batch tables");
+      return res.status(503).json({
+        error:
+          "Tính năng batch MAVG chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
+      });
+    }
     const statusCode = Number(error?.status) || 500;
     logger.error("[payments] Create receipt batch failed", {
       error: error.message,
@@ -435,6 +450,17 @@ const listPaymentReceiptBatches = async (req, res) => {
     }));
     return res.json({ batches, count: batches.length, limit });
   } catch (error) {
+    if (isMissingBatchTablesError(error)) {
+      logger.warn("[payments] List receipt batches skipped: missing batch tables");
+      return res.json({
+        batches: [],
+        count: 0,
+        limit,
+        disabled: true,
+        message:
+          "Tính năng batch MAVG chưa sẵn sàng trên database. Vui lòng chạy migration backend.",
+      });
+    }
     logger.error("[payments] List receipt batches failed", {
       error: error.message,
       stack: error.stack,
@@ -496,6 +522,15 @@ const getPaymentReceiptBatchDetail = async (req, res) => {
       })),
     });
   } catch (error) {
+    if (isMissingBatchTablesError(error)) {
+      logger.warn("[payments] Get receipt batch detail skipped: missing batch tables", {
+        batchCode,
+      });
+      return res.status(503).json({
+        error:
+          "Tính năng batch MAVG chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
+      });
+    }
     logger.error("[payments] Get receipt batch detail failed", {
       batchCode,
       error: error.message,
