@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import {
   COMPANY_INFO,
@@ -28,6 +28,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   orderStatusDisplay,
   onDownload,
 }) => {
+  const printAreaRef = useRef<HTMLDivElement | null>(null);
   const { productTotal, discountTotal, subTotal } = useMemo(() => {
     const pt = invoiceLines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
     const sub = totals.subtotal;
@@ -115,6 +116,70 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   const pad = "48px";
   const border = "#334155";
 
+  const handleDownloadPdf = () => {
+    const printNode = printAreaRef.current;
+    const printHtml = printNode?.innerHTML?.trim() || "";
+    if (!printHtml) {
+      onDownload();
+      return;
+    }
+
+    const popup = window.open(
+      "",
+      "_blank",
+      "noopener,noreferrer,width=1200,height=900"
+    );
+    if (!popup) {
+      onDownload();
+      return;
+    }
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hoa don mua hang</title>
+    <style>
+      @page { size: A4; margin: 10mm; }
+      html, body { margin: 0; padding: 0; background: #fff; }
+      body { padding: 8px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      #invoice-preview, #invoice-preview * { font-family: ${INVOICE_FONT_STACK}; }
+      #invoice-preview {
+        max-width: 210mm;
+        margin: 0 auto;
+        border: 1px solid #cbd5e1;
+        box-sizing: border-box;
+      }
+      @media print {
+        body { padding: 0; }
+        #invoice-preview {
+          margin: 0 auto !important;
+          border: 1px solid #cbd5e1 !important;
+          box-shadow: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>${printHtml}</body>
+</html>`;
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+
+    const triggerPrint = () => {
+      popup.focus();
+      popup.print();
+    };
+
+    if (popup.document.readyState === "complete") {
+      window.setTimeout(triggerPrint, 150);
+    } else {
+      popup.onload = () => window.setTimeout(triggerPrint, 150);
+    }
+  };
+
   return (
     <div className="rounded-2xl bg-white shadow-md border border-slate-200 print-target">
       <div className="border-b border-slate-200 px-6 py-4 print-hidden">
@@ -125,7 +190,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
 
       <div className="p-6">
         <style>{printStyles}</style>
-        <div id="invoice-print-area">
+        <div id="invoice-print-area" ref={printAreaRef}>
           <div
             id="invoice-preview"
             className="mx-auto max-w-[980px] border border-[#1e3356] inv-shell"
@@ -384,7 +449,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
         <div className="mt-6 flex justify-center print-hidden">
           <button
             type="button"
-            onClick={onDownload}
+            onClick={handleDownloadPdf}
             className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/30 hover:bg-emerald-700 transition"
           >
             <ArrowDownTrayIcon className="h-5 w-5" />
