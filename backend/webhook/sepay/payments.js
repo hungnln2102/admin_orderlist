@@ -670,26 +670,46 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
     };
 
     const period = formatNote();
-    await client.query(
-      `INSERT INTO ${PAYMENT_SUPPLY_TABLE} (
-          ${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)},
-          ${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
-          ${safeIdent(PAYMENT_SUPPLY_COLS.round)},
-          ${safeIdent(PAYMENT_SUPPLY_COLS.status)}
+    const updated = await client.query(
+      `
+        WITH target AS (
+          SELECT id
+          FROM ${PAYMENT_SUPPLY_TABLE}
+          WHERE ${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)} = $1
+          ORDER BY id DESC
+          LIMIT 1
+          FOR UPDATE
         )
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)})
-        DO UPDATE SET
+        UPDATE ${PAYMENT_SUPPLY_TABLE} sp
+        SET
           ${safeIdent(PAYMENT_SUPPLY_COLS.paid)} =
-            COALESCE(${PAYMENT_SUPPLY_TABLE}.${safeIdent(PAYMENT_SUPPLY_COLS.paid)}::numeric, 0)
-            + EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
-          ${safeIdent(PAYMENT_SUPPLY_COLS.round)} = EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.round)},
+            COALESCE(sp.${safeIdent(PAYMENT_SUPPLY_COLS.paid)}::numeric, 0) + $2,
+          ${safeIdent(PAYMENT_SUPPLY_COLS.round)} = $3,
           ${safeIdent(PAYMENT_SUPPLY_COLS.status)} = COALESCE(
-            NULLIF(TRIM(${PAYMENT_SUPPLY_TABLE}.${safeIdent(PAYMENT_SUPPLY_COLS.status)}::text), ''),
-            EXCLUDED.${safeIdent(PAYMENT_SUPPLY_COLS.status)}
-          )`,
+            NULLIF(TRIM(sp.${safeIdent(PAYMENT_SUPPLY_COLS.status)}::text), ''),
+            $4
+          )
+        FROM target
+        WHERE sp.id = target.id
+        RETURNING sp.id
+      `,
       [sourceId, priceValue, period, STATUS.UNPAID]
     );
+
+    if (!updated.rowCount) {
+      await client.query(
+        `
+          INSERT INTO ${PAYMENT_SUPPLY_TABLE} (
+            ${safeIdent(PAYMENT_SUPPLY_COLS.sourceId)},
+            ${safeIdent(PAYMENT_SUPPLY_COLS.paid)},
+            ${safeIdent(PAYMENT_SUPPLY_COLS.round)},
+            ${safeIdent(PAYMENT_SUPPLY_COLS.status)}
+          )
+          VALUES ($1, $2, $3, $4)
+        `,
+        [sourceId, priceValue, period, STATUS.UNPAID]
+      );
+    }
 
     if (manageTransaction) {
       await client.query("COMMIT");
