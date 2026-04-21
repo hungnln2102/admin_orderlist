@@ -93,6 +93,11 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
         color: #111827 !important;
         border: 1px solid #cbd5e1 !important;
       }
+      /* Force readable text colors on white print background, including inline styles. */
+      #invoice-preview,
+      #invoice-preview * {
+        color: #1e293b !important;
+      }
       #invoice-preview .inv-muted { color: #334155 !important; }
       #invoice-preview .inv-heading { color: #0f172a !important; }
       #invoice-preview .inv-border { border-color: #64748b !important; }
