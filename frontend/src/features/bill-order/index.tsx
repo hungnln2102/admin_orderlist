@@ -233,7 +233,10 @@ export default function BillOrder() {
   };
 
   const handleDownload = () => {
-    window.print();
+    window.focus();
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => window.print(), 60);
+    });
   };
 
   return (
