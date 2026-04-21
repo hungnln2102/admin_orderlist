@@ -1,5 +1,14 @@
 import type { AdobeAdminAccount, LicenseStatus } from "../types";
 
+/** Chuẩn hóa trạng thái gói từ API/SSE (DB có thể là Paid, paid, …). */
+export function normalizeIncomingLicenseStatus(raw: unknown): LicenseStatus {
+  const status = String(raw ?? "unknown").toLowerCase();
+  if (status === "paid") return "paid";
+  if (status === "active") return "active";
+  if (status === "expired") return "expired";
+  return "unknown";
+}
+
 export function maskPassword(_raw: string): string {
   return "••••••••";
 }
@@ -12,15 +21,7 @@ export function hasNoAccountInfo(account: AdobeAdminAccount): boolean {
 export function normalizeAdobeAdminAccount(
   row: Record<string, unknown>
 ): AdobeAdminAccount {
-  const status = String(row.license_status ?? "unknown").toLowerCase();
-  const licenseStatus: LicenseStatus =
-    status === "paid"
-      ? "paid"
-      : status === "active"
-        ? "active"
-        : status === "expired"
-          ? "expired"
-          : "unknown";
+  const licenseStatus = normalizeIncomingLicenseStatus(row.license_status);
 
   const aliasRaw = row.alias;
   const rawOtpSource = String(row.otp_source ?? "imap").trim().toLowerCase();

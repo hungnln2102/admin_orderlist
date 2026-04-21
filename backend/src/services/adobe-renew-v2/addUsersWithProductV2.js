@@ -1,6 +1,7 @@
 /**
  * Add users + assign product via API (V2).
- * Luồng: B1–B9 (onlyLogin) → /users → create user (abpapi) + assign product (PATCH) → B15 → API snapshot.
+ * Luồng: B1–B9 (onlyLogin) → /users → create user (abpapi) + assign product (PATCH) → snapshot.
+ * Không chạy B15 sau add: gói + slot đã kiểm tra ở tầng gán tài khoản; check định kỳ đã gỡ product admin khi cần.
  */
 
 const logger = require("../../utils/logger");
@@ -9,8 +10,6 @@ const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { launchSessionFromProfile } = require("./shared/profileSession");
 const {
   runGotoUsersFlow,
-  runCheckAdminProductFlow,
-  runRemoveAdminProductFlow,
   runAddUsersFlow,
   runUsersSnapshotFlow,
   runPersistUsersSessionFlow,
@@ -133,21 +132,6 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     }
 
     // Product đã được assign ngay trong runAddUsersFlow (create user + PATCH add product).
-
-    // Remove product from admin if needed (B15)
-    try {
-      const checkAdminProduct = await runCheckAdminProductFlow(page, adminEmail);
-      const url = page.url();
-      const orgId =
-        (url.match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/) || [])[1] ||
-        options.orgId ||
-        null;
-      if (checkAdminProduct.hasAdminProduct && orgId) {
-        await runRemoveAdminProductFlow(page, adminEmail, { orgId });
-      }
-    } catch (e) {
-      logger.warn("[adobe-v2] B15 remove admin product error: %s", e.message);
-    }
 
     await runGotoUsersFlow(page);
     const snapshotAfterAdd = await runUsersSnapshotFlow(page, { adminEmail });

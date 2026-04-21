@@ -21,6 +21,7 @@ const {
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
@@ -204,7 +205,11 @@ async function runRenewAdobeCleanup2330Flow({
         await db(ACCOUNT_TABLE)
           .where(ACCOUNT_COLS.ID, account[ACCOUNT_COLS.ID])
           .update({
-            [ACCOUNT_COLS.ALERT_CONFIG]: deleteResult.savedCookies,
+            [ACCOUNT_COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
+              account[ACCOUNT_COLS.ALERT_CONFIG],
+              deleteResult.savedCookies,
+              account[ACCOUNT_COLS.USERS_SNAPSHOT]
+            ),
           });
       }
 

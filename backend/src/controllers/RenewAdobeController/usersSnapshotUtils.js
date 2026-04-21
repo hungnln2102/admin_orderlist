@@ -1,4 +1,5 @@
 function toNonNegativeNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
   return n;
@@ -67,8 +68,42 @@ function attachLisenceCount(users, lisencecount) {
   }));
 }
 
+/**
+ * Luồng V2 sau add/delete chỉ persist `{ cookies }`. Ghép với config DB hiện tại
+ * để không mất contractActiveLicenseCount (tránh fallback MAX_USERS_PER_ACCOUNT).
+ */
+function mergeRenewAdobeAlertConfig(existingRaw, incomingRaw, usersSnapshotRaw = null) {
+  const existing = parseObject(existingRaw) || {};
+  let incoming = parseObject(incomingRaw);
+  if (incoming == null && Array.isArray(incomingRaw)) {
+    incoming = { cookies: incomingRaw };
+  }
+  incoming = incoming || {};
+  if (Object.keys(incoming).length === 0) {
+    return existingRaw ?? null;
+  }
+
+  const merged = { ...existing, ...incoming };
+  let license = resolveLisenceCount({ alertConfig: merged });
+  if (license == null) {
+    const fromExisting = resolveLisenceCount({ alertConfig: existing });
+    if (fromExisting != null) {
+      merged.contractActiveLicenseCount = fromExisting;
+      license = fromExisting;
+    }
+  }
+  if (license == null && usersSnapshotRaw != null) {
+    const fromUsers = resolveLisenceCount({ usersSnapshot: usersSnapshotRaw });
+    if (fromUsers != null) {
+      merged.contractActiveLicenseCount = fromUsers;
+    }
+  }
+  return merged;
+}
+
 module.exports = {
   parseUsersSnapshot,
   resolveLisenceCount,
   attachLisenceCount,
+  mergeRenewAdobeAlertConfig,
 };

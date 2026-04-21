@@ -6,7 +6,8 @@ import {
   fetchAdobeAdminAccounts,
   runSchedulerRenewAdobeCheck,
 } from "../api/renewAdobeApi";
-import type { AdobeAdminAccount, LicenseStatus } from "../types";
+import type { AdobeAdminAccount } from "../types";
+import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
 
 type CheckAllProgress = {
   total: number;
@@ -183,9 +184,9 @@ export function useRenewAdobeAdmin() {
                     org_name: (event.org_name as string) ?? null,
                     user_count:
                       (event.user_count as number) ?? account.user_count,
-                    license_status:
-                      (event.license_status as LicenseStatus) ??
-                      account.license_status,
+                    license_status: normalizeIncomingLicenseStatus(
+                      event.license_status ?? account.license_status
+                    ),
                   }
                 : account
             );
@@ -206,6 +207,18 @@ export function useRenewAdobeAdmin() {
           });
           break;
         case "error":
+          setAccounts((prev) =>
+            prev.map((account) =>
+              account.id === event.id
+                ? {
+                    ...account,
+                    license_status: normalizeIncomingLicenseStatus(
+                      event.license_status ?? account.license_status
+                    ),
+                  }
+                : account
+            )
+          );
           setCheckAllProgress((prev) => {
             if (!prev) {
               return prev;

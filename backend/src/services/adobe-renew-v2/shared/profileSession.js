@@ -23,6 +23,19 @@ function getProfileDirForEmail(email) {
   return path.join(root, key);
 }
 
+function hasExistingProfileForEmail(email) {
+  const profileDir = getProfileDirForEmail(email);
+  if (!fs.existsSync(profileDir)) {
+    return false;
+  }
+  try {
+    const entries = fs.readdirSync(profileDir);
+    return entries.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 function removeProfileDirForEmail(email) {
   const profileDir = getProfileDirForEmail(email);
   if (!fs.existsSync(profileDir)) {
@@ -66,6 +79,7 @@ module.exports = {
   sanitizeEmailForPath,
   getProfilesRootDir,
   launchSessionFromProfile,
+  hasExistingProfileForEmail,
   getProfileDirForEmail,
   removeProfileDirForEmail,
 };

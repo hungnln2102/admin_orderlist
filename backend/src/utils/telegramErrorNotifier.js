@@ -92,7 +92,17 @@ const LEVEL_META = {
   warn:     { icon: "⚠️", label: "Warning" },
 };
 
-const buildMessage = ({ level = "error", message, source, url, method, stack, extra }) => {
+const buildMessage = ({
+  level = "error",
+  message,
+  source,
+  url,
+  method,
+  stack,
+  extra,
+  messageMaxLength = 300,
+  extraMaxLength = 200,
+}) => {
   const meta = LEVEL_META[level] || LEVEL_META.error;
   const timestamp = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   const hostname = os.hostname();
@@ -104,9 +114,19 @@ const buildMessage = ({ level = "error", message, source, url, method, stack, ex
   ];
 
   if (url) lines.push(`📍 ${method ? `${method} ` : ""}${url}`);
-  if (message) lines.push(`💬 <code>${escapeHtml(truncate(message, 300))}</code>`);
+  if (message) {
+    const cap = Number.isFinite(Number(messageMaxLength)) && Number(messageMaxLength) > 0
+      ? Number(messageMaxLength)
+      : 300;
+    lines.push(`💬 <code>${escapeHtml(truncate(message, cap))}</code>`);
+  }
   if (stack) lines.push(`📋 <pre>${escapeHtml(truncate(stack, 400))}</pre>`);
-  if (extra) lines.push(`📎 ${escapeHtml(truncate(String(extra), 200))}`);
+  if (extra) {
+    const capExtra = Number.isFinite(Number(extraMaxLength)) && Number(extraMaxLength) > 0
+      ? Number(extraMaxLength)
+      : 200;
+    lines.push(`📎 ${escapeHtml(truncate(String(extra), capExtra))}`);
+  }
 
   return lines.join("\n");
 };
@@ -163,6 +183,8 @@ const processQueue = async () => {
  * @param {string} [opts.method]
  * @param {string} [opts.stack]
  * @param {string} [opts.extra]
+ * @param {number} [opts.messageMaxLength=300] — giới hạn độ dài message (vd. 3800 cho danh sách dài)
+ * @param {number} [opts.extraMaxLength=200]
  */
 const notify = (opts = {}) => {
   if (!ENABLED || !BOT_TOKEN || !CHAT_ID) return;

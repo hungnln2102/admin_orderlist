@@ -7,6 +7,11 @@ const { chromium } = require("playwright");
 const logger = require("../../utils/logger");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { runCheckFlow } = require("./runCheckFlow");
+const {
+  launchSessionFromProfile,
+  hasExistingProfileForEmail,
+} = require("./shared/profileSession");
+const { recordProfileUsage } = require("./shared/profileUsageMetrics");
 const { getOrCreateAutoAssignUrlWithPage } = require("./autoAssignFlow");
 const { runB15RemoveProductFromAdmin } = require("./removeProductAdminFlow");
 const { deleteUsersV2 } = require("./deleteUsersV2");
@@ -72,15 +77,46 @@ async function checkAccount(email, password, options = {}) {
   };
   if (proxyOptions) launchOptions.proxy = proxyOptions;
 
-  const browser = await chromium.launch(launchOptions);
-  logger.info("[adobe-v2] facade.checkAccount: browser launched OK");
-  try {
-    const context = await browser.newContext({
+  let context = null;
+  let page = null;
+  if (hasExistingProfileForEmail(email)) {
+    try {
+      const prof = await launchSessionFromProfile({
+        adminEmail: email,
+        headless,
+        proxyOptions,
+      });
+      context = prof.context;
+      page = prof.page;
+      recordProfileUsage({ flow: "check", mode: "profile_hit" });
+      logger.info("[adobe-v2] facade.checkAccount: dùng persistent profile");
+    } catch (profileErr) {
+      recordProfileUsage({ flow: "check", mode: "profile_launch_fail" });
+      logger.warn(
+        "[adobe-v2] facade.checkAccount: launch profile fail, fallback ephemeral: %s",
+        profileErr.message
+      );
+    }
+  } else {
+    recordProfileUsage({ flow: "check", mode: "profile_missing" });
+    logger.info("[adobe-v2] facade.checkAccount: chưa có profile local, dùng luồng thường");
+  }
+
+  if (!context || !page) {
+    const browser = await chromium.launch(launchOptions);
+    logger.info("[adobe-v2] facade.checkAccount: browser launched OK (ephemeral)");
+    context = await browser.newContext({
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 720 },
     });
-    const sharedSession = { context, page: await context.newPage() };
+    page = await context.newPage();
+    context.__adobeEphemeralBrowser = browser;
+    recordProfileUsage({ flow: "check", mode: "ephemeral_fallback" });
+  }
+
+  try {
+    const sharedSession = { context, page };
 
     logger.info("[adobe-v2] facade.checkAccount: chạy runCheckFlow (B1-B13)...");
     const result = await runCheckFlow(email, password, {
@@ -191,7 +227,13 @@ async function checkAccount(email, password, options = {}) {
       _stack: error.stack,
     };
   } finally {
-    await browser.close().catch(() => {});
+    if (context) {
+      const ephemeralBrowser = context.__adobeEphemeralBrowser || null;
+      await context.close().catch(() => {});
+      if (ephemeralBrowser) {
+        await ephemeralBrowser.close().catch(() => {});
+      }
+    }
   }
 }
 

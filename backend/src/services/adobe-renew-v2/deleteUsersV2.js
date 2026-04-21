@@ -8,6 +8,11 @@ const logger = require("../../utils/logger");
 const { runCheckFlow } = require("./runCheckFlow");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const {
+  launchSessionFromProfile,
+  hasExistingProfileForEmail,
+} = require("./shared/profileSession");
+const { recordProfileUsage } = require("./shared/profileUsageMetrics");
+const {
   runGotoUsersFlow,
   runDeleteUsersFlow,
   runUsersSnapshotFlow,
@@ -43,12 +48,42 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
   };
   if (proxyOptions) launchOptions.proxy = proxyOptions;
 
-  const browser = await chromium.launch(launchOptions);
-  const context = await browser.newContext({
-    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    viewport: { width: 1280, height: 720 },
-  });
-  const sharedSession = { context, page: await context.newPage() };
+  let context = null;
+  let page = null;
+  if (hasExistingProfileForEmail(email)) {
+    try {
+      const prof = await launchSessionFromProfile({
+        adminEmail: email,
+        headless,
+        proxyOptions,
+      });
+      context = prof.context;
+      page = prof.page;
+      recordProfileUsage({ flow: "delete", mode: "profile_hit" });
+      logger.info("[adobe-v2] deleteUsersV2: dùng persistent profile");
+    } catch (profileErr) {
+      recordProfileUsage({ flow: "delete", mode: "profile_launch_fail" });
+      logger.warn(
+        "[adobe-v2] deleteUsersV2: launch profile fail, fallback ephemeral: %s",
+        profileErr.message
+      );
+    }
+  } else {
+    recordProfileUsage({ flow: "delete", mode: "profile_missing" });
+    logger.info("[adobe-v2] deleteUsersV2: chưa có profile local, dùng luồng thường");
+  }
+
+  if (!context || !page) {
+    const browser = await chromium.launch(launchOptions);
+    context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+    });
+    page = await context.newPage();
+    context.__adobeEphemeralBrowser = browser;
+    recordProfileUsage({ flow: "delete", mode: "ephemeral_fallback" });
+  }
+  const sharedSession = { context, page };
 
   try {
     logger.info("[adobe-v2] deleteUsersV2: B1–B9 (chỉ login) → xóa %d user...", userList.length);
@@ -120,7 +155,13 @@ async function deleteUsersV2(email, password, userEmails, options = {}) {
       error: err.message,
     };
   } finally {
-    await browser.close().catch(() => {});
+    if (context) {
+      const ephemeralBrowser = context.__adobeEphemeralBrowser || null;
+      await context.close().catch(() => {});
+      if (ephemeralBrowser) {
+        await ephemeralBrowser.close().catch(() => {});
+      }
+    }
   }
 }
 

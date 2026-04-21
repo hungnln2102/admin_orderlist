@@ -23,6 +23,7 @@ const {
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
@@ -231,7 +232,13 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
           attachLisenceCount(addResult.manageTeamMembers || [], lisencecount)
         ),
       };
-      if (addResult.savedCookies) updatePayload[ACCOUNT_COLS.ALERT_CONFIG] = addResult.savedCookies;
+      if (addResult.savedCookies) {
+        updatePayload[ACCOUNT_COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+          account[ACCOUNT_COLS.ALERT_CONFIG],
+          addResult.savedCookies,
+          account[ACCOUNT_COLS.USERS_SNAPSHOT]
+        );
+      }
       await db(ACCOUNT_TABLE).where(ACCOUNT_COLS.ID, accountId).update(updatePayload);
 
       const emailOrderMap = await buildEmailToOrderMap(chunk);

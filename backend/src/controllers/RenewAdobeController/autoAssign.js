@@ -16,9 +16,15 @@ const {
 const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
 } = require("../../services/renewAdobePurgeNoLicenseAccount");
+const { notifyWarn } = require("../../utils/telegramErrorNotifier");
+const { shouldPurgeAdobeAccountByLicenseStatus } = require("./statusUtils");
+const {
+  getProfileUsageSnapshot,
+} = require("../../services/adobe-renew-v2/shared/profileUsageMetrics");
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
 
 function logAutoAssign(onProgress, data) {
@@ -185,7 +191,11 @@ async function autoAssignUsers({ onProgress = null } = {}) {
         ),
       };
       if (v2.savedCookies) {
-        updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+        updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+          account[COLS.ALERT_CONFIG],
+          v2.savedCookies,
+          account[COLS.USERS_SNAPSHOT]
+        );
       }
       await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
 
@@ -323,6 +333,8 @@ async function runCheckAllAccountsFlow({
   let completed = 0;
   let failed = 0;
   const queue = [...rows];
+  /** Tài khoản không còn gói (trạng thái rõ ràng, không phải unknown) — gửi Telegram sau batch. */
+  const nonPaidForTelegram = [];
 
   // Tuần tự: cùng hàm POST /accounts/:id/check (runCheckForAccountId) — tránh nhiều Playwright song song gây timeout trên server.
   for (const account of queue) {
@@ -339,7 +351,15 @@ async function runCheckAllAccountsFlow({
       completed++;
       let updated = await db(TABLE).where(COLS.ID, id).first();
       let removedFromDb = false;
-      if (updated && updated[COLS.LICENSE_STATUS] !== "Paid") {
+      const statusAfterCheck = updated?.[COLS.LICENSE_STATUS] ?? null;
+      if (updated && shouldPurgeAdobeAccountByLicenseStatus(statusAfterCheck)) {
+        nonPaidForTelegram.push({
+          id,
+          email,
+          org_name: updated[COLS.ORG_NAME] ?? null,
+          license_status: statusAfterCheck,
+          removed_from_db: false,
+        });
         const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
           updated,
           { logPrefix }
@@ -347,6 +367,10 @@ async function runCheckAllAccountsFlow({
         if (deletedFromDb) {
           removedFromDb = true;
           updated = null;
+          const last = nonPaidForTelegram[nonPaidForTelegram.length - 1];
+          if (last && last.id === id) {
+            last.removed_from_db = true;
+          }
         }
       }
       emit({
@@ -359,11 +383,18 @@ async function runCheckAllAccountsFlow({
         removed_from_db: removedFromDb,
         org_name: updated?.[COLS.ORG_NAME] ?? null,
         user_count: updated?.[COLS.USER_COUNT] ?? 0,
-        license_status: updated?.[COLS.LICENSE_STATUS] ?? "unknown",
+        license_status: updated?.[COLS.LICENSE_STATUS] ?? statusAfterCheck ?? "unknown",
       });
     } catch (err) {
       completed++;
       failed++;
+      let license_status = "unknown";
+      try {
+        const row = await db(TABLE).where(COLS.ID, id).first();
+        license_status = row?.[COLS.LICENSE_STATUS] ?? "unknown";
+      } catch (_) {
+        /* ignore */
+      }
       emit({
         type: "error",
         id,
@@ -372,8 +403,23 @@ async function runCheckAllAccountsFlow({
         completed,
         failed,
         total,
+        license_status,
       });
     }
+  }
+
+  if (nonPaidForTelegram.length > 0) {
+    const lines = nonPaidForTelegram.map((a) => {
+      const org = a.org_name ? ` | ${a.org_name}` : "";
+      const rm = a.removed_from_db ? " | đã gỡ khỏi DB" : "";
+      return `• ${a.email}${org} → ${a.license_status}${rm}`;
+    });
+    const header = `${logPrefix} ${nonPaidForTelegram.length} tài khoản admin không còn gói (sau check-all)`;
+    notifyWarn({
+      message: `${header}\n${lines.join("\n")}`,
+      messageMaxLength: 3800,
+      source: "backend",
+    });
   }
 
   emit({ type: "complete", total, completed, failed });
@@ -398,6 +444,15 @@ async function runCheckAllAccountsFlow({
     } catch (assignError) {
       emit({ type: "auto_assign_error", error: assignError.message });
     }
+  }
+
+  const checkProfileUsage = getProfileUsageSnapshot("check");
+  if (checkProfileUsage.length > 0) {
+    logger.info(
+      "%s Profile usage(check): %s",
+      logPrefix,
+      JSON.stringify(checkProfileUsage)
+    );
   }
 
   return {

@@ -11,6 +11,7 @@ const { persistCheckResult } = require("./checkSyncService");
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
 
 const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
@@ -258,7 +259,11 @@ async function runCheckForAccountId(id) {
 
         if (deleteResult.savedCookies && COLS.ALERT_CONFIG) {
           await db(TABLE).where(COLS.ID, id).update({
-            [COLS.ALERT_CONFIG]: deleteResult.savedCookies,
+            [COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
+              result.savedCookies,
+              deleteResult.savedCookies,
+              account[COLS.USERS_SNAPSHOT]
+            ),
           });
         }
 

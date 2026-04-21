@@ -6,6 +6,7 @@ const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
 
 function resolveAccountUserLimit(account) {
@@ -188,7 +189,11 @@ const runAddUsersBatch = async (req, res) => {
           ),
         };
         if (v2.savedCookies) {
-          updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+          updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+            account[COLS.ALERT_CONFIG],
+            v2.savedCookies,
+            account[COLS.USERS_SNAPSHOT]
+          );
         }
         await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
 
@@ -301,7 +306,13 @@ const runAutoDeleteUsers = async ({
     if (result.savedCookies && COLS.ALERT_CONFIG) {
       await db(TABLE)
         .where(COLS.ID, id)
-        .update({ [COLS.ALERT_CONFIG]: result.savedCookies });
+        .update({
+          [COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
+            account[COLS.ALERT_CONFIG],
+            result.savedCookies,
+            account[COLS.USERS_SNAPSHOT]
+          ),
+        });
     }
 
     try {

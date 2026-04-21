@@ -5,6 +5,21 @@ function normalizeLicenseStatus(value) {
   return String(value || "unknown").trim().toLowerCase() || "unknown";
 }
 
+/** Còn gói theo cột license_status (không phụ thuộc chữ hoa/thường). */
+function isPaidLikeLicenseStatus(value) {
+  return ACTIVE_LICENSE_STATUSES.has(normalizeLicenseStatus(value));
+}
+
+/**
+ * Chỉ purge tài khoản khi trạng thái rõ ràng là không còn gói.
+ * Không purge khi `unknown` (check không chốt được) để tránh xóa nhầm.
+ */
+function shouldPurgeAdobeAccountByLicenseStatus(value) {
+  const n = normalizeLicenseStatus(value);
+  if (n === "unknown") return false;
+  return !ACTIVE_LICENSE_STATUSES.has(n);
+}
+
 function resolveUserProductState(user) {
   if (!user || typeof user !== "object") {
     return null;
@@ -210,6 +225,8 @@ function buildWebsiteStatusPayload({
 module.exports = {
   ACTIVE_LICENSE_STATUSES,
   normalizeLicenseStatus,
+  isPaidLikeLicenseStatus,
+  shouldPurgeAdobeAccountByLicenseStatus,
   resolveUserProductState,
   isOrderExpired,
   formatDateToDMY,

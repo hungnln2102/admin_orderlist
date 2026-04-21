@@ -12,6 +12,7 @@ const {
 const {
   attachLisenceCount,
   resolveLisenceCount,
+  mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
 
 function resolveAccountUserLimit(account) {
@@ -136,7 +137,11 @@ async function assignUserToAvailableAccount(userEmail) {
     ),
   };
   if (v2.savedCookies) {
-    updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+    updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+      target[COLS.ALERT_CONFIG],
+      v2.savedCookies,
+      target[COLS.USERS_SNAPSHOT]
+    );
   }
 
   await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
@@ -269,7 +274,11 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       ),
     };
     if (v2.savedCookies) {
-      updatePayload[COLS.ALERT_CONFIG] = v2.savedCookies;
+      updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+        target[COLS.ALERT_CONFIG],
+        v2.savedCookies,
+        target[COLS.USERS_SNAPSHOT]
+      );
     }
     await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
 
