@@ -160,6 +160,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       addResult: {
         success: true,
         added: addResult.done || emails,
+        noProduct: addResult.noProduct || [],
         failed: (addResult.failed || []).map((f) => f.email),
       },
       assignResult: { success: true },

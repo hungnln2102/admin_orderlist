@@ -8,7 +8,20 @@ const {
   detectSessionValid,
 } = require("./flows/login/sessionFlow");
 
-const ADOBE_ENTRY = ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
+function resolveAdobeEntryUrl() {
+  const raw = String(process.env.ADOBE_ENTRY_URL || "").trim();
+  if (!raw) {
+    return ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
+  }
+  if (!/^https:\/\//i.test(raw)) {
+    logger.warn(
+      "[adobe-v2] ADOBE_ENTRY_URL không hợp lệ (phải bắt đầu bằng https://): %s",
+      raw
+    );
+    return ADMIN_CONSOLE_BASE || "https://adminconsole.adobe.com/";
+  }
+  return raw;
+}
 
 /** Lỗi CDP kiểu "Object with guid response@... was not bound" — thường hết sau khi đóng tab và mở tab mới trong cùng context. */
 function isNavigationRecoverablePlaywrightError(message) {
@@ -32,14 +45,16 @@ function isNavigationRecoverablePlaywrightError(message) {
 async function gotoAdobeAdminConsoleB1(initialPage, context, sharedSession) {
   const maxAttempts = 3;
   let current = initialPage;
+  const adobeEntryUrl = resolveAdobeEntryUrl();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       logger.info(
-        "[adobe-v2] B1: goto ADMIN_CONSOLE entry (attempt %d)",
+        "[adobe-v2] B1: goto Adobe entry=%s (attempt %d)",
+        adobeEntryUrl,
         attempt
       );
-      await current.goto(ADOBE_ENTRY, {
+      await current.goto(adobeEntryUrl, {
         waitUntil: "domcontentloaded",
         timeout: 60000,
       });

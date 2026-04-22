@@ -5,6 +5,10 @@ const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
+const {
+  claimDailyNotificationRun,
+  releaseDailyNotificationRun,
+} = require("./shared/dailyNotificationGuard");
 
 const ADVISORY_LOCK_KEY_1 = 90101;
 const ADVISORY_LOCK_KEY_2 = 4;
@@ -12,9 +16,15 @@ const ADVISORY_LOCK_KEY_2 = 4;
 function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
   return async function notifyFourDaysRemainingTask(trigger = "cron") {
     const sqlDate = getSqlCurrentDate();
+    const dateYmd = todayYMDInVietnam();
     logger.info(
       `[CRON] Bắt đầu thông báo các đơn cần gia hạn (còn 4 ngày)`,
-      { trigger, pid: process.pid, date: process.env.MOCK_DATE || "CURRENT_DATE" }
+      {
+        trigger,
+        pid: process.pid,
+        date: process.env.MOCK_DATE || "CURRENT_DATE",
+        dateYmd,
+      }
     );
 
     if (process.env.MOCK_DATE) {
@@ -23,6 +33,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
 
     const client = await pool.connect();
     let hasLock = false;
+    let dailyGuardKey = null;
     try {
       const lockResult = await client.query(
         "SELECT pg_try_advisory_lock($1, $2) AS locked",
@@ -33,6 +44,20 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         logger.warn(
           "[CRON] notifyFourDays task đang chạy ở process khác — bỏ qua lần gọi trùng",
           { trigger, pid: process.pid }
+        );
+        return;
+      }
+
+      const dailyGuard = await claimDailyNotificationRun(client, {
+        notificationCode: "notify-four-days",
+        dateYmd,
+        trigger,
+      });
+      dailyGuardKey = dailyGuard.key;
+      if (!dailyGuard.claimed) {
+        logger.warn(
+          "[CRON] notifyFourDays đã gửi trong ngày — bỏ qua lần gọi trùng",
+          { trigger, pid: process.pid, dateYmd, dailyGuardKey }
         );
         return;
       }
@@ -77,6 +102,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         error: err.message,
         stack: err.stack,
       });
+      await releaseDailyNotificationRun(client, dailyGuardKey);
       throw err;
     } finally {
       if (hasLock) {
