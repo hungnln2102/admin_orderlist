@@ -5,6 +5,7 @@ import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
 import { buildViewOrderPaymentQrPayload, isImportOrderId } from "./paymentQr";
+import { getOrderQrEligibility } from "./qrEligibility";
 import { ViewOrderModalProps } from "./types";
 import { normalizeDateLike, parseNumberLike } from "./utils";
 import { OrderDetailsSection } from "./components/OrderDetailsSection";
@@ -151,6 +152,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     isSupplierPayout,
     missingSupplierBank,
   } = qrPayload;
+  const qrEligibility = getOrderQrEligibility(displayStatus);
 
   return (
     <ModalPortal>
@@ -201,6 +203,8 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             holderDisplay={holderDisplay}
             isSupplierPayout={isSupplierPayout}
             missingSupplierBank={missingSupplierBank}
+            canUseQr={qrEligibility.canUseQr}
+            qrLockReason={qrEligibility.reason}
           />
         </div>
       </div>

@@ -38,6 +38,7 @@ const {
   isMavrykShopSupplierName,
   isDashboardSalesOrder,
 } = require("../../../src/utils/orderHelpers");
+const { getOrderQrPaymentEligibility } = require("../orderPaymentEligibility");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
 const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
@@ -280,29 +281,6 @@ const isSupplierSettlementTransfer = (transaction) => {
   return /^TT\s+.+\s+k[ỳy]\s+\d{8}$/i.test(content);
 };
 
-const hasPriorReceiptForOrder = async (client, orderCode, currentReceiptId, orderDateRaw) => {
-  if (!orderCode) return false;
-  const currentId = Number(currentReceiptId);
-  const parsedOrderDate = parseFlexibleDate(orderDateRaw);
-  const fromDate = parsedOrderDate
-    ? parsedOrderDate.toISOString().slice(0, 10)
-    : "1900-01-01";
-
-  const res = await client.query(
-    `
-      SELECT 1
-      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED} pr
-      WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
-        AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
-        AND ($3::bigint IS NULL OR pr.${PAYMENT_RECEIPT_COLS.id} <> $3::bigint)
-      ORDER BY pr.${PAYMENT_RECEIPT_COLS.id} DESC
-      LIMIT 1
-    `,
-    [orderCode, fromDate, Number.isFinite(currentId) ? currentId : null]
-  );
-  return res.rows.length > 0;
-};
-
 // Health check for webhook endpoint
 router.get("/", (_req, res) => {
   res.json({ message: "Sepay webhook endpoint. Use POST with signature." });
@@ -486,13 +464,13 @@ router.post("/", async (req, res) => {
         for (const code of loopOrderCodes) {
           const state = stateByOrderCode.get(code);
           const eligibility = eligibilityByOrderCode.get(code);
+          const qrEligibility = getOrderQrPaymentEligibility(state?.[ORDER_COLS.status]);
 
-          // Trường hợp đặc biệt:
-          // - Đơn đã ở trạng thái PAID thì không cộng thêm tiền NCC,
-          //   kể cả khi khách hàng chuyển khoản thêm lần nữa.
-          if (state && state[ORDER_COLS.status] === ORDER_STATUS.PAID) {
-            logger.info("[Webhook] Skip supplier import for already PAID order", {
+          if (!qrEligibility.canPayByQr) {
+            logger.info("[Webhook] Skip supplier import for QR-locked order", {
               orderCode: code,
+              status: state?.[ORDER_COLS.status],
+              reason: qrEligibility.reason,
             });
             continue;
           }
@@ -553,6 +531,28 @@ router.post("/", async (req, res) => {
           if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
+          const qrEligibility = getOrderQrPaymentEligibility(statusValue);
+          if (!qrEligibility.canPayByQr) {
+            logger.info("[Webhook] Skip QR payment posting for locked order", {
+              orderCode: code,
+              status: statusValue,
+              reason: qrEligibility.reason,
+            });
+            if (receiptId) {
+              await insertFinancialAuditLog(client, {
+                payment_receipt_id: receiptId,
+                order_code: code,
+                rule_branch: qrEligibility.auditBranch,
+                delta: {
+                  order_status: statusValue,
+                  reason: qrEligibility.reason,
+                },
+                source: "webhook",
+              });
+            }
+            continue;
+          }
+
           let amountDecision = amountDecisionByOrderCode.get(code) || null;
           if (!amountDecision && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
             // Must evaluate after receipt has been inserted to include current webhook.
@@ -648,71 +648,6 @@ router.post("/", async (req, res) => {
               previousStatus: statusValue,
               nextStatus,
             });
-          } else if (statusValue === ORDER_STATUS.PAID || statusValue === ORDER_STATUS.PROCESSING) {
-            const hasPrior = await hasPriorReceiptForOrder(
-              client,
-              code,
-              receiptId,
-              state[ORDER_COLS.orderDate]
-            );
-            if (hasPrior) {
-              await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-                revenueDelta: transferAmountNormalized,
-                profitDelta: transferAmountNormalized,
-                ordersDelta: 0,
-              });
-              postedRevenueDelta += transferAmountNormalized;
-              postedProfitDelta += transferAmountNormalized;
-              if (receiptId) {
-                await insertFinancialAuditLog(client, {
-                  payment_receipt_id: receiptId,
-                  order_code: code,
-                  rule_branch: "PAID_OR_PROCESSING_LATE_WITH_PRIOR_RECEIPT",
-                  delta: {
-                    posted_revenue: transferAmountNormalized,
-                    posted_profit: transferAmountNormalized,
-                    month_key: paidMonthKey,
-                    order_status: statusValue,
-                  },
-                  source: "webhook",
-                });
-              }
-            } else {
-              logger.info("[Webhook] Skip financial posting for first late payment after shop pre-renewed", {
-                orderCode: code,
-                status: statusValue,
-              });
-              if (receiptId) {
-                await insertFinancialAuditLog(client, {
-                  payment_receipt_id: receiptId,
-                  order_code: code,
-                  rule_branch: "PAID_OR_PROCESSING_LATE_NO_PRIOR_SKIP",
-                  delta: { order_status: statusValue },
-                  source: "webhook",
-                });
-              }
-            }
-          } else if (statusValue === ORDER_STATUS.EXPIRED) {
-            await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-              revenueDelta: transferAmountNormalized,
-              profitDelta: transferAmountNormalized,
-              ordersDelta: 0,
-            });
-            postedRevenueDelta += transferAmountNormalized;
-            postedProfitDelta += transferAmountNormalized;
-            if (receiptId) {
-              await insertFinancialAuditLog(client, {
-                payment_receipt_id: receiptId,
-                order_code: code,
-                rule_branch: "EXPIRED_PAYMENT_POST",
-                delta: {
-                  posted_revenue: transferAmountNormalized,
-                  posted_profit: transferAmountNormalized,
-                  month_key: paidMonthKey,
-                },
-                source: "webhook",
-              });
-            }
           }
         }
       }
@@ -826,10 +761,20 @@ router.post("/", async (req, res) => {
     // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). MAVN không xử lý gia hạn qua Sepay — dùng API gia hạn tay.
     try {
       for (const code of loopOrderCodes) {
+        const state = stateByOrderCode.get(code);
+        const statusValue = state?.[ORDER_COLS.status];
+        const qrEligibility = getOrderQrPaymentEligibility(statusValue);
+        if (!qrEligibility.canPayByQr) {
+          logger.info("[Webhook] Skip renewal for QR-locked order", {
+            orderCode: code,
+            status: statusValue,
+            reason: qrEligibility.reason,
+          });
+          continue;
+        }
+
         let amountDecision = amountDecisionByOrderCode.get(code) || null;
         if (!amountDecision) {
-          const state = stateByOrderCode.get(code);
-          const statusValue = state?.[ORDER_COLS.status];
           if (state && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
             const accumulatedAmount = await getAccumulatedReceiptAmount(
               client,
