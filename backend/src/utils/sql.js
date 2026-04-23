@@ -24,7 +24,7 @@ const createYearExtraction = (column) => `
       THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
     WHEN TRIM(${column}::text) ~ '^[0-9]{4}/[0-9]{2}/[0-9]{2}'
       THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
-    WHEN TRIM(${column}::text) ~ '^[0-9]{4}\\b'
+    WHEN TRIM(${column}::text) ~ '^[0-9]{4}(?:$|[^0-9])'
       THEN SUBSTRING(TRIM(${column}::text) FROM 1 FOR 4)::int
     WHEN TRIM(${column}::text) ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'
       THEN SUBSTRING(TRIM(${column}::text) FROM 7 FOR 4)::int
