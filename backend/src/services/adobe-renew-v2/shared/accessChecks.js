@@ -13,6 +13,15 @@ function normalizeProductName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isCcpLikeProduct(item) {
+  if (!item || typeof item !== "object") return false;
+  const name = normalizeProductName(
+    item.name || item.productName || item.displayName || item.title || ""
+  );
+  if (!name) return false;
+  return name.includes("ccp") || name.includes("creative cloud pro");
+}
+
 function extractProductIds(products) {
   if (!Array.isArray(products)) return [];
   return [
@@ -26,47 +35,18 @@ function extractProductIds(products) {
 
 function inferAdobeProProductIdSet(users, adminEmail = "") {
   const list = Array.isArray(users) ? users : [];
-  const counts = new Map();
-  const byUser = list.map((u) => {
-    const ids = extractProductIds(u?.products);
-    ids.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
-    return {
-      email: String(u?.email || "").trim().toLowerCase(),
-      ids,
-    };
-  });
-
-  const allIds = new Set(counts.keys());
-  if (allIds.size === 0) return new Set();
-
-  const adminNorm = String(adminEmail || "").trim().toLowerCase();
-  if (adminNorm) {
-    const adminRow = byUser.find((u) => u.email === adminNorm);
-    const adminIds = new Set(adminRow?.ids || []);
-    if (adminIds.size > 0) {
-      const filtered = new Set([...allIds].filter((id) => !adminIds.has(id)));
-      // Nếu admin đang giữ tất cả product IDs (filtered rỗng), fallback dùng allIds
-      // để không đánh dấu sai toàn bộ team là "không có product" ngay sau add.
-      if (filtered.size > 0) {
-        return filtered;
-      }
-      return new Set(allIds);
+  const ccpIds = new Set();
+  for (const user of list) {
+    const products = Array.isArray(user?.products) ? user.products : [];
+    for (const product of products) {
+      if (!isCcpLikeProduct(product)) continue;
+      const id = toNormalizedProductId(extractProductId(product));
+      if (id) ccpIds.add(id);
     }
   }
 
-  if (allIds.size === 1) {
-    return new Set(allIds);
-  }
-
-  let mostCommonId = "";
-  let mostCommonCount = -1;
-  for (const [id, count] of counts.entries()) {
-    if (count > mostCommonCount) {
-      mostCommonId = id;
-      mostCommonCount = count;
-    }
-  }
-  return new Set([...allIds].filter((id) => id !== mostCommonId));
+  // Rule nghiệp vụ: chỉ CCP mới tính là đã cấp quyền.
+  return ccpIds;
 }
 
 function hasAdobeProAccessFromProducts(products, proProductIds) {
@@ -117,10 +97,7 @@ function checkOrgLicenseCapacity(products = []) {
     ),
   ];
 
-  const creativeCloudProProducts = list.filter((p) => {
-    const name = normalizeProductName(p?.name);
-    return name.includes("creative cloud pro");
-  });
+  const creativeCloudProProducts = list.filter((p) => isCcpLikeProduct(p));
 
   const creativeCloudProProductIds = [
     ...new Set(

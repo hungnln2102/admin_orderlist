@@ -103,8 +103,12 @@ export const PriceCard: React.FC<PriceCardProps> = ({
           </button>
         </div>
 
-        {/* Prices grid */}
-        <div className={`grid gap-2 ${hasPromo ? "grid-cols-4" : "grid-cols-3"}`}>
+        {/* Prices grid: gốc, sỉ, lẻ, sinh viên; + KM khi có */}
+        <div
+          className={`grid gap-2 ${
+            hasPromo ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"
+          }`}
+        >
           {/* Base price */}
           <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
             <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] block mb-1">
@@ -149,6 +153,19 @@ export const PriceCard: React.FC<PriceCardProps> = ({
                 price: item.retailPrice,
                 basePrice: item.baseSupplyPrice,
               })}
+            </p>
+          </div>
+
+          {/* Student price */}
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
+            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] block mb-1">
+              Giá SV
+            </span>
+            <p className="text-[13px] font-bold text-sky-200 tabular-nums">
+              {formatCurrencyValue(item.studentPrice)}
+            </p>
+            <p className="text-[9px] text-white/40 mt-0.5 truncate">
+              {item.pctStu != null && Number.isFinite(item.pctStu) ? "pct STU" : "Chưa cấu hình"}
             </p>
           </div>
 

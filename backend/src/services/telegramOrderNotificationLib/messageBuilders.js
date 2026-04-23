@@ -9,7 +9,12 @@ const {
   formatCurrency,
   toInlineCode,
 } = require("./formatters");
-const { QR_ACCOUNT_NUMBER } = require("./constants");
+const {
+  QR_ACCOUNT_NUMBER,
+  QR_ACCOUNT_NAME,
+  QR_BANK_CODE,
+  QR_NOTE_PREFIX,
+} = require("./constants");
 
 function buildOrderCreatedMessage(order, paymentNote) {
   if (!order) return "";
@@ -192,10 +197,10 @@ function buildDueOrderMessage(order, index, total) {
     `👤 Tên: ${customer}`,
     contact ? `📞 Liên hệ: ${contact}` : null,
     `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
-    `🏦 Ngân hàng: VP Bank`,
-    `🏧 STK: 9183400998`,
-    `👤 Tên: NGO LE NGOC HUNG`,
-    `📝 Nội dung: Thanh toán ${orderCode}`,
+    QR_BANK_CODE ? `🏦 Ngân hàng: ${QR_BANK_CODE}` : null,
+    QR_ACCOUNT_NUMBER ? `🏧 STK: ${QR_ACCOUNT_NUMBER}` : null,
+    QR_ACCOUNT_NAME ? `👤 Tên: ${QR_ACCOUNT_NAME}` : null,
+    `📝 Nội dung: ${(QR_NOTE_PREFIX || "Thanh toan")} ${orderCode}`,
     ``,
     `⚠️ Vui lòng ghi đúng mã đơn trong nội dung chuyển khoản để xử lý nhanh.`,
     `🙏 Trân trọng cảm ơn quý khách!`,

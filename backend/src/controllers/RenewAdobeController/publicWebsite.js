@@ -101,10 +101,14 @@ const getWebsiteStatus = async (req, res) => {
   if (!email) {
     return res.status(400).json({ success: false, error: "Thiếu tham số email." });
   }
+  const refreshFlagRaw = String(req.query.refresh ?? "").trim().toLowerCase();
+  const refreshMatchedAccount = ["1", "true", "yes", "y"].includes(refreshFlagRaw);
 
   try {
     const payload = await getWebsiteStatusPayload(email, {
-      refreshMatchedAccount: true,
+      // Endpoint status cho web cần phản hồi nhanh, tránh timeout do Playwright.
+      // Muốn check live có thể gọi với ?refresh=1.
+      refreshMatchedAccount,
     });
     return res.json(payload);
   } catch (error) {

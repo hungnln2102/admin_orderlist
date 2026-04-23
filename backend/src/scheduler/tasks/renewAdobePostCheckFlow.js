@@ -22,6 +22,7 @@ const {
 } = require("./shared/jobRunLogger");
 const {
   attachLisenceCount,
+  parseUsersSnapshot,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
@@ -175,7 +176,11 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
   const available = allAccounts
     .map((account) => ({
       ...account,
-      currentCount: Math.max(0, Number.parseInt(account[ACCOUNT_COLS.USER_COUNT], 10) || 0),
+      currentCount: Math.max(
+        0,
+        Number.parseInt(account[ACCOUNT_COLS.USER_COUNT], 10) || 0,
+        parseUsersSnapshot(account[ACCOUNT_COLS.USERS_SNAPSHOT]).length
+      ),
       userLimit: resolveAccountUserLimit(account),
     }))
     .filter((account) => account.currentCount < account.userLimit)
@@ -216,6 +221,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
             savedCookies,
             mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
             otpSource,
+            maxUsers: account.userLimit,
           })
       );
 

@@ -8,6 +8,7 @@ const logger = require("../../utils/logger");
 const { runCheckFlow } = require("./runCheckFlow");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { launchSessionFromProfile } = require("./shared/profileSession");
+const { checkUserAssignedProduct } = require("./shared/usersListApi");
 const {
   runGotoUsersFlow,
   runAddUsersFlow,
@@ -47,6 +48,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
   const mailBackupId = options.mailBackupId || null;
   const otpSource = options.otpSource || "imap";
   const emails = Array.isArray(userEmails) ? userEmails.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean) : [];
+  const maxUsers = Number.parseInt(options.maxUsers, 10);
   if (emails.length === 0) {
     return { success: false, error: "Danh sách userEmails rỗng", savedCookies: null, snapshot: null };
   }
@@ -110,6 +112,19 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
 
     await runGotoUsersFlow(page);
 
+    if (Number.isFinite(maxUsers) && maxUsers > 0) {
+      const preAddSnapshot = await runUsersSnapshotFlow(page, { adminEmail });
+      const currentMembers = Number.parseInt(preAddSnapshot?.userCount, 10) || 0;
+      if (currentMembers >= maxUsers) {
+        return {
+          success: false,
+          error: `Account đã đầy slot (${currentMembers}/${maxUsers}), bỏ qua add user.`,
+          savedCookies: null,
+          snapshot: preAddSnapshot,
+        };
+      }
+    }
+
     const addResult = await runAddUsersFlow(page, emails);
     if (!addResult.success) {
       const detailedError = buildDetailedAddUsersError(addResult);
@@ -154,6 +169,30 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       (confirmedSnapshot.users || []).find(
         (user) => String(user?.email || "").trim().toLowerCase() === adminNorm
       ) || null;
+    const assignmentChecks = emails.map((email) => {
+      const check = checkUserAssignedProduct(
+        confirmedSnapshot.users || [],
+        email,
+        adminEmail
+      );
+      return {
+        email,
+        assigned: check.assigned === true,
+      };
+    });
+    const unassignedEmails = assignmentChecks
+      .filter((item) => item.assigned !== true)
+      .map((item) => item.email);
+    const assignSuccess = unassignedEmails.length === 0;
+    if (!assignSuccess) {
+      logger.warn(
+        "[adobe-v2] addUsersWithProductV2: snapshot shows unassigned users after add",
+        {
+          requested: emails.length,
+          unassigned: unassignedEmails,
+        }
+      );
+    }
 
     return {
       success: true,
@@ -161,8 +200,16 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
         success: true,
         added: addResult.done || emails,
         failed: (addResult.failed || []).map((f) => f.email),
+        unassigned: (addResult.unassigned || []).map((u) => ({
+          email: u.email,
+          reason: u.reason,
+        })),
       },
-      assignResult: { success: true },
+      assignResult: {
+        success: assignSuccess,
+        assignedCount: emails.length - unassignedEmails.length,
+        unassigned: unassignedEmails,
+      },
       manageTeamMembers: confirmedSnapshot.manageTeamMembers,
       adminConsoleUsers: confirmedSnapshot.users,
       adminUser,

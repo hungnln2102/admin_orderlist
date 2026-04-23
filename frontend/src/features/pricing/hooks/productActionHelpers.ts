@@ -110,7 +110,10 @@ export function buildProductEditForm(
         ? String(product.pctPromo)
         : "",
     pctStu:
-      product.pctStu !== null && product.pctStu !== undefined
+      product.pctStu !== null &&
+      product.pctStu !== undefined &&
+      Number.isFinite(product.pctStu) &&
+      product.pctStu > 0
         ? String(product.pctStu)
         : "",
   };
@@ -291,6 +294,9 @@ export function validateProductEditForm(
         error: "Giá Sinh Viên không hợp lệ (cùng định dạng với Giá Khách).",
       };
     }
+    if (nextPctStuRaw === 0) {
+      nextPctStu = null;
+    } else {
     const stuMargin = getMarginRatioInput(nextPctStuRaw);
     if (stuMargin === null) {
       return {
@@ -300,6 +306,7 @@ export function validateProductEditForm(
       };
     }
     nextPctStu = stuMargin;
+    }
   }
   const nextPctCtvMargin = getMarginRatioInput(nextPctCtv);
   const nextPctKhachMargin = getMarginRatioInput(nextPctKhach);
@@ -402,15 +409,19 @@ export function validateCreateProductForm(
         error: "Giá Sinh Viên không hợp lệ (cùng định dạng với Giá Khách).",
       };
     }
-    const stuMarginCreate = getMarginRatioInput(pctStuRaw);
-    if (stuMarginCreate === null) {
-      return {
-        ok: false,
-        error:
-          "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
-      };
+    if (pctStuRaw === 0) {
+      pctStuValue = null;
+    } else {
+      const stuMarginCreate = getMarginRatioInput(pctStuRaw);
+      if (stuMarginCreate === null) {
+        return {
+          ok: false,
+          error:
+            "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
+        };
+      }
+      pctStuValue = stuMarginCreate;
     }
-    pctStuValue = stuMarginCreate;
   }
   const pctCtvMargin =
     pctCtvValue !== null ? getMarginRatioInput(pctCtvValue) : null;

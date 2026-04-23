@@ -33,9 +33,9 @@ const SEND_ORDER_NOTIFICATION =
 const SEND_ORDER_TO_TOPIC =
   String(process.env.SEND_ORDER_TO_TOPIC ?? "true").toLowerCase() !== "false";
 
-const QR_ACCOUNT_NUMBER = process.env.ORDER_QR_ACCOUNT_NUMBER || "9183400998";
-const QR_BANK_CODE = process.env.ORDER_QR_BANK_CODE || "VPB";
-const QR_ACCOUNT_NAME = process.env.ORDER_QR_ACCOUNT_NAME || "NGO LE NGOC HUNG";
+const QR_ACCOUNT_NUMBER = (process.env.ORDER_QR_ACCOUNT_NUMBER || "").trim();
+const QR_BANK_CODE = (process.env.ORDER_QR_BANK_CODE || "VPB").trim();
+const QR_ACCOUNT_NAME = (process.env.ORDER_QR_ACCOUNT_NAME || "").trim();
 const QR_NOTE_PREFIX = process.env.ORDER_QR_NOTE_PREFIX || "Thanh toan";
 const SEND_ORDER_COPY_BUTTONS =
   String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !== "false";

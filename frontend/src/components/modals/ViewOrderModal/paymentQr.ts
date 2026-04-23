@@ -1,7 +1,12 @@
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "@/constants";
 import * as Helpers from "@/lib/helpers";
 import { buildSepayQrUrl } from "@/shared/utils/sepay";
-import { ACCOUNT_NAME, ACCOUNT_NO, BANK_SHORT_CODE } from "./constants";
+import {
+  ACCOUNT_NAME,
+  ACCOUNT_NO,
+  BANK_DISPLAY_NAME,
+  BANK_SHORT_CODE,
+} from "./constants";
 
 export type ViewOrderPaymentQrBuildInput = {
   order: Record<string, unknown>;
@@ -106,7 +111,7 @@ export const buildViewOrderPaymentQrPayload = ({
     }),
     effectiveQrAmount,
     qrMessage,
-    bankDisplay: "VP Bank",
+    bankDisplay: BANK_DISPLAY_NAME || BANK_SHORT_CODE,
     accountNoDisplay: ACCOUNT_NO,
     holderDisplay: ACCOUNT_NAME,
     isSupplierPayout: false,

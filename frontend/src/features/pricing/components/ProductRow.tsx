@@ -121,7 +121,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       ? currentEditForm.pctStu
       : pctStuProvided(item.pctStu)
         ? item.pctStu
-        : previewRatios?.pctKhach ?? null;
+        : null;
   const previewStudentPriceVal =
     previewRatios &&
     typeof resolvedWholesaleBase === "number" &&
@@ -134,8 +134,10 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
     typeof previewStudentPriceVal === "number" &&
     Number.isFinite(previewStudentPriceVal) &&
     previewStudentPriceVal > 0;
+  const displayStudentPrice =
+    isEditingProduct && currentEditForm ? previewStudentPriceVal : item.studentPrice;
   const previewStudentBlendHint =
-    "pct_stu có giá trị → biên riêng; trống → giống khách lẻ (pct_khách)";
+    "Chỉ áp dụng khi cấu hình pct_stu > 0.";
   const highestSupplyPriceDisplay =
     typeof highestSupplyPrice === "number" &&
     Number.isFinite(highestSupplyPrice) &&
@@ -199,6 +201,15 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
           </div>
         </td>
         <td className="whitespace-nowrap px-6 py-4">
+          <div
+            className={`text-sm font-semibold ${
+              isEditingProduct && showPreviewStudent ? "text-sky-300" : "text-sky-200"
+            }`}
+          >
+            {formatCurrencyValue(displayStudentPrice)}
+          </div>
+        </td>
+        <td className="whitespace-nowrap px-6 py-4">
           {hasPromoForRow ? (
             <>
               <div className="text-sm font-semibold text-pink-200">
@@ -258,7 +269,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       </tr>
       {isEditingProduct && currentEditForm && (
         <tr>
-          <td colSpan={8} className="px-2 md:px-6 pb-4 md:pb-6">
+          <td colSpan={9} className="px-2 md:px-6 pb-4 md:pb-6">
             <ProductEditPanel
               productId={item.id}
               currentEditForm={currentEditForm}
@@ -283,7 +294,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
       )}
       {isExpanded && (
         <tr>
-          <td colSpan={8} className="px-2 md:px-6 pb-4 md:pb-6">
+          <td colSpan={9} className="px-2 md:px-6 pb-4 md:pb-6">
             <ProductExpandedDetails
               item={item}
               productKey={productKey}

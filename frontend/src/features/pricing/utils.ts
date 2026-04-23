@@ -170,6 +170,31 @@ export const multiplyValue = (value?: number | null, ratio?: number | null): num
 export const multiplyBasePrice = (ratio?: number | null, basePrice?: number | null): number | null =>
   multiplyValue(basePrice, ratio);
 
+/** Chỉ tính giá sinh viên khi pct_stu > 0; null/0/âm => không hiển thị giá. */
+export const effectiveStudentMarginPct = (
+  pctStu?: number | null,
+  _pctKhach?: number | null
+): number | null => {
+  if (
+    pctStu !== null &&
+    pctStu !== undefined &&
+    Number.isFinite(pctStu) &&
+    pctStu > 0
+  ) {
+    return pctStu;
+  }
+  return null;
+};
+
+export const computeStudentPrice = (
+  wholesalePrice?: number | null,
+  pctStu?: number | null,
+  pctKhach?: number | null
+): number | null => {
+  const mult = effectiveStudentMarginPct(pctStu, pctKhach);
+  return multiplyValue(wholesalePrice, mult);
+};
+
 export const calculatePromoPrice = (
   pctKhach?: number | null,
   pctPromo?: number | null,
@@ -228,6 +253,16 @@ export const applyBasePriceToProduct = (product: ProductPricingRow, basePrice: n
     basePrice
   );
 
+  const wholesaleForStudent =
+    typeof resolvedWholesale === "number" && Number.isFinite(resolvedWholesale) && resolvedWholesale > 0
+      ? resolvedWholesale
+      : basePrice;
+  const studentCandidate = computeStudentPrice(wholesaleForStudent, product.pctStu, product.pctKhach);
+  const hasStudentMargin =
+    typeof product.pctStu === "number" &&
+    Number.isFinite(product.pctStu) &&
+    product.pctStu > 0;
+
   return {
     ...product,
     baseSupplyPrice: basePrice,
@@ -239,6 +274,13 @@ export const applyBasePriceToProduct = (product: ProductPricingRow, basePrice: n
       typeof retailCandidate === "number" && Number.isFinite(retailCandidate) && retailCandidate > 0
         ? retailCandidate
         : product.retailPrice,
+    studentPrice:
+      hasStudentMargin &&
+      typeof studentCandidate === "number" &&
+      Number.isFinite(studentCandidate) &&
+      studentCandidate > 0
+        ? studentCandidate
+        : null,
     promoPrice:
       typeof promoCandidate === "number" && Number.isFinite(promoCandidate) && promoCandidate > 0
         ? promoCandidate
@@ -370,6 +412,16 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
   const packageProduct = cleanupLabel(row?.[VARIANT_PRICING_COLS.variantName] ?? row?.package_product_label);
   const sanPhamRaw = (row?.[VARIANT_PRICING_COLS.code] ?? row?.id_product_label ?? row?.id_product ?? "").toString().trim();
 
+  const pctKhach = toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctKhach]);
+  const pctStuRaw = toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctStu] ?? row?.pct_stu);
+  const pctStu =
+    typeof pctStuRaw === "number" && Number.isFinite(pctStuRaw) && pctStuRaw > 0
+      ? pctStuRaw
+      : null;
+  const wholesalePrice = toNumberOrNull(
+    row?.computed_wholesale_price ?? row?.wholesale_price ?? row?.gia_si ?? row?.gia_ctv
+  );
+
   return {
     id: Number.isFinite(Number(row?.id)) ? Number(row?.id) : fallbackId,
     packageName: packageName || "Không xác định",
@@ -377,18 +429,17 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
     sanPhamRaw,
     variantLabel: buildVariantLabel(packageProduct, sanPhamRaw),
     pctCtv: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctCtv]),
-    pctKhach: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctKhach]),
+    pctKhach,
     pctPromo: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctPromo]),
-    pctStu: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctStu] ?? row?.pct_stu),
+    pctStu,
     isActive: parseBoolean(row?.[VARIANT_PRICING_COLS.isActive]),
     basePrice: toNumberOrNull(
       row?.[VARIANT_PRICING_COLS.basePrice] ?? row?.base_price
     ),
     baseSupplyPrice: toNumberOrNull(row?.max_supply_price),
-    wholesalePrice: toNumberOrNull(
-      row?.computed_wholesale_price ?? row?.wholesale_price ?? row?.gia_si ?? row?.gia_ctv
-    ),
+    wholesalePrice,
     retailPrice: toNumberOrNull(row?.computed_retail_price ?? row?.retail_price ?? row?.gia_le),
+    studentPrice: computeStudentPrice(wholesalePrice, pctStu, pctKhach),
     promoPrice: toNumberOrNull(
       row?.computed_promo_price ?? row?.promo_price ?? row?.gia_khuyen_mai ?? row?.gia_km
     ),

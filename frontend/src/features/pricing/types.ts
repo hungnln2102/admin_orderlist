@@ -14,13 +14,15 @@ export interface ProductPricingRow {
   pctCtv: number | null;
   pctKhach: number | null;
   pctPromo: number | null;
-  /** Biên lớp 2 cho MAVS; null/để trống → backend dùng pct_khách (giá khách lẻ). */
+  /** Biên MAVS cho trang pricing; null/để trống => chưa cấu hình. */
   pctStu: number | null;
   isActive: boolean;
   basePrice: number | null;
   baseSupplyPrice: number | null;
   wholesalePrice: number | null;
   retailPrice: number | null;
+  /** Giá sỉ × pct_stu; null => không hiển thị ở bảng giá. */
+  studentPrice: number | null;
   promoPrice: number | null;
   lastUpdated: string | null;
 }

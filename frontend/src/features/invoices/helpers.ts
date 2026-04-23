@@ -1,5 +1,12 @@
 import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
 import * as Helpers from "@/lib/helpers";
+import {
+  ACCOUNT_NAME,
+  ACCOUNT_NO,
+  BANK_BIN,
+  BANK_DISPLAY_NAME,
+  BANK_SHORT_CODE,
+} from "@/components/modals/ViewOrderModal/constants";
 
 export interface PaymentReceipt {
   id: number;
@@ -76,11 +83,11 @@ export const CATEGORY_OPTIONS: {
 ];
 
 export const QR_BANK_INFO = {
-  bankName: "VP Bank",
-  accountHolder: "NGO LE NGOC HUNG",
-  accountNumber: "9183400998",
-  bankBin: "970432",
-  bankCode: "VPB", // VietQR short code
+  bankName: BANK_DISPLAY_NAME,
+  accountHolder: ACCOUNT_NAME,
+  accountNumber: ACCOUNT_NO,
+  bankBin: BANK_BIN,
+  bankCode: BANK_SHORT_CODE, // VietQR short code
 };
 
 export const parseDMYDate = (value: string): number | null => {

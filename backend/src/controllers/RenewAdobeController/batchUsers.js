@@ -5,6 +5,7 @@ const { lookupAndRecordIfNeeded } = require("../../services/userAccountMappingSe
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
   attachLisenceCount,
+  parseUsersSnapshot,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
@@ -79,10 +80,7 @@ const runAddUsersBatch = async (req, res) => {
         .map((account) => ({
           ...account,
           _userLimit: resolveAccountUserLimit(account),
-          _currentCount: Math.max(
-            0,
-            parseInt(account[COLS.USER_COUNT], 10) || 0
-          ),
+          _currentCount: Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0, parseUsersSnapshot(account[COLS.USERS_SNAPSHOT]).length),
         }))
         .filter((account) => account._currentCount < account._userLimit)
         .sort((a, b) => {
@@ -103,7 +101,7 @@ const runAddUsersBatch = async (req, res) => {
     let remaining = [...userEmails];
 
     for (const account of ordered) {
-      const currentCount = Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0);
+      const currentCount = Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0, parseUsersSnapshot(account[COLS.USERS_SNAPSHOT]).length);
       const userLimit = resolveAccountUserLimit(account);
       const slotLeft = Math.max(0, userLimit - currentCount);
       const take = Math.min(slotLeft, remaining.length);
@@ -172,6 +170,7 @@ const runAddUsersBatch = async (req, res) => {
               : null,
             otpSource,
             orgId: account[COLS.ORG_ID] || null,
+            maxUsers: resolveAccountUserLimit(account),
           }
         );
         if (!v2.success) {

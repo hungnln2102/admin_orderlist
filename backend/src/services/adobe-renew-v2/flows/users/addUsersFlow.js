@@ -214,6 +214,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
       success: false,
       done: [],
       failed: [],
+      unassigned: [],
       stoppedByPolicy: false,
     };
   }
@@ -224,6 +225,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
       success: false,
       done: [],
       failed: list.map((email) => ({ email, reason: "org_id_missing" })),
+      unassigned: [],
       stoppedByPolicy: false,
     };
   }
@@ -242,6 +244,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
       success: false,
       done: [],
       failed: list.map((email) => ({ email, reason: "auth_headers_missing" })),
+      unassigned: [],
       stoppedByPolicy: false,
     };
   }
@@ -257,12 +260,9 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
 
   const done = [];
   const failed = [];
+  const unassigned = [];
   for (const email of list) {
     const preUser = emailToUser.get(email) || null;
-    const hadAnyProductBefore =
-      !!preUser &&
-      Array.isArray(preUser.products) &&
-      preUser.products.length > 0;
     let userId = String(preUser?.id || "").trim() || null;
     if (!userId) {
       const createRes = await createUserViaAbpApi(page, orgToken, email, headers);
@@ -297,14 +297,12 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
     const existed = (refreshed.users || []).find(
       (u) => String(u?.email || "").trim().toLowerCase() === email
     );
-    const hasAnyProductNow =
-      !!existed && Array.isArray(existed.products) && existed.products.length > 0;
     const hasAssignedProduct =
       existed &&
       Array.isArray(existed.products) &&
       existed.products.some((p) => String(p?.id || p || "").trim() === productId);
 
-    if (hasAssignedProduct || (hadAnyProductBefore && hasAnyProductNow)) {
+    if (hasAssignedProduct) {
       done.push(email);
       logger.info(
         "[adobe-v2] runAddUsersFlow(API): assign returned error but product already present, treat success: %s",
@@ -313,15 +311,18 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
       continue;
     }
 
-    failed.push({ email, reason: `assign_product_failed:${assignRes.reason}` });
+    // User đã được tạo/thấy trong org nhưng chưa được gán đúng product.
+    done.push(email);
+    unassigned.push({ email, reason: `assign_product_failed:${assignRes.reason}` });
   }
 
   logger.info(
-    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d failed=%d",
+    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d failed=%d unassigned=%d",
     orgToken,
     productId,
     done.length,
-    failed.length
+    failed.length,
+    unassigned.length
   );
 
   const stoppedByPolicy =
@@ -331,6 +332,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
     success: done.length > 0 && !stoppedByPolicy,
     done,
     failed,
+    unassigned,
     stoppedByPolicy,
   };
 }

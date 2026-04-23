@@ -169,7 +169,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 STK: {COMPANY_INFO.accountNumber}
               </p>
               <p className="inv-muted" style={{ margin: "4px 0 0", fontSize: 14, lineHeight: "24px", color: "#cbd5e1" }}>
-                Tên người nhận: NGO LE NGOC HUNG
+                Tên người nhận: {COMPANY_INFO.accountHolder}
               </p>
             </div>
 

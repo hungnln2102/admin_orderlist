@@ -296,22 +296,19 @@ export function ProductEditPanel({
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Giá Sinh Viên → cột{" "}
-                <span className="font-mono text-white/80">pct_stu</span>
+                Giá Sinh Viên
               </label>
               <input
                 type="number"
                 step="0.01"
                 className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                placeholder="Cùng định dạng Giá Khách"
+                placeholder="0"
                 value={currentEditForm.pctStu}
                 onChange={(event) =>
                   onProductEditChange("pctStu", event.target.value)
                 }
               />
-              <p className="mt-1 text-[10px] text-white/45">
-                Lưu vào DB khi bấm Lưu; để trống = ghi NULL. Định dạng như Giá Khách (vd. 0,28).
-              </p>
+
             </div>
           </div>
         </div>

@@ -173,6 +173,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
           orgId: account[COLS.ORG_ID] || null,
+          maxUsers: account.userLimit || MAX_USERS_PER_ACCOUNT,
         }
       );
 

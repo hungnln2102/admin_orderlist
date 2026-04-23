@@ -11,6 +11,7 @@ const {
 } = require("./statusUtils");
 const {
   attachLisenceCount,
+  parseUsersSnapshot,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
 } = require("./usersSnapshotUtils");
@@ -36,6 +37,12 @@ function hasActivePackageByContractCount(account) {
   return Number.isFinite(n) && n > 0;
 }
 
+function resolveCurrentCount(account) {
+  const dbCount = Math.max(0, parseInt(account?.[COLS.USER_COUNT], 10) || 0);
+  const snapshotCount = parseUsersSnapshot(account?.[COLS.USERS_SNAPSHOT]).length;
+  return Math.max(dbCount, snapshotCount);
+}
+
 function buildAvailableAccounts(accounts) {
   return accounts
     .filter((account) => {
@@ -53,7 +60,7 @@ function buildAvailableAccounts(accounts) {
     })
     .map((account) => ({
       ...account,
-      currentCount: Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0),
+      currentCount: resolveCurrentCount(account),
       userLimit: resolveAccountUserLimit(account),
     }))
     .filter((account) => account.currentCount < account.userLimit)
@@ -119,6 +126,7 @@ async function assignUserToAvailableAccount(userEmail) {
       savedCookies,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
       otpSource,
+      maxUsers: target.userLimit,
     }
   );
 
@@ -250,6 +258,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
         savedCookies,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
         otpSource,
+        maxUsers: target.userLimit,
       }
     );
 

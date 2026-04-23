@@ -102,6 +102,10 @@ export function reconcileFetchedProductPrices(
       typeof row.retailPrice === "number" &&
       Number.isFinite(row.retailPrice) &&
       row.retailPrice > 0;
+    const hasStudent =
+      typeof row.studentPrice === "number" &&
+      Number.isFinite(row.studentPrice) &&
+      row.studentPrice > 0;
     const promoNeeded = hasValidPromoRatio(
       row.pctPromo,
       row.pctKhach,
@@ -112,7 +116,7 @@ export function reconcileFetchedProductPrices(
       Number.isFinite(row.promoPrice) &&
       row.promoPrice > 0;
 
-    if (hasSameBase && hasWholesale && hasRetail && (!promoNeeded || hasPromo)) {
+    if (hasSameBase && hasWholesale && hasRetail && hasStudent && (!promoNeeded || hasPromo)) {
       return row;
     }
 

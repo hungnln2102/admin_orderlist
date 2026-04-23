@@ -20,7 +20,7 @@ export function PricingSummaryCards({
   return (
     <div
       className={`grid gap-2 md:gap-4 text-center grid-cols-2 ${
-        hasPromoForRow ? "md:grid-cols-4" : "md:grid-cols-3"
+        hasPromoForRow ? "md:grid-cols-5" : "md:grid-cols-4"
       }`}
     >
       <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
@@ -48,6 +48,14 @@ export function PricingSummaryCards({
         </p>
         <p className="mt-1 text-base md:text-lg font-semibold text-white">
           {formatCurrencyValue(item.retailPrice)}
+        </p>
+      </div>
+      <div className="flex flex-col items-center rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3">
+        <p className="text-[10px] md:text-xs uppercase text-white/70">
+          Giá sinh viên
+        </p>
+        <p className="mt-1 text-base md:text-lg font-semibold text-sky-200">
+          {formatCurrencyValue(item.studentPrice)}
         </p>
       </div>
       {hasPromoForRow && (

@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { buildSepayQrUrl } from "../utils/supplies";
+import {
+  ACCOUNT_NAME,
+  ACCOUNT_NO,
+  BANK_SHORT_CODE,
+} from "@/components/modals/ViewOrderModal/constants";
 
 export interface QrPayment {
   id: number;
@@ -92,9 +97,9 @@ export const usePayments = ({
     })();
     const supplierName = String(supply?.sourceName || "").trim() || "NCC";
 
-    const accountNumber = isPositive ? supply?.numberBank || "" : "9183400998";
-    const bankCode = isPositive ? supply?.binBank || "" : "VPB"; // VietQR short code
-    const accountName = isPositive ? supply?.nameBank || "" : "NGO LE NGOC HUNG";
+    const accountNumber = isPositive ? supply?.numberBank || "" : ACCOUNT_NO;
+    const bankCode = isPositive ? supply?.binBank || "" : BANK_SHORT_CODE; // VietQR short code
+    const accountName = isPositive ? supply?.nameBank || "" : ACCOUNT_NAME;
 
     const url = buildSepayQrUrl({
       accountNumber,

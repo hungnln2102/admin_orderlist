@@ -60,6 +60,9 @@ export function ProductTableDesktopSection({
               Giá Lẻ
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
+              Giá Sinh Viên
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
               Giá Khuyến Mãi
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-white/80">
@@ -76,13 +79,13 @@ export function ProductTableDesktopSection({
         <tbody className="divide-y divide-white/10 bg-white/5">
           {isLoading ? (
             <tr>
-              <td colSpan={8} className="px-6 py-8 text-center text-sm text-white/80">
+              <td colSpan={9} className="px-6 py-8 text-center text-sm text-white/80">
                 Đang Tải Dữ Liệu...
               </td>
             </tr>
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={8} className="px-6 py-8 text-center text-sm text-white/80">
+              <td colSpan={9} className="px-6 py-8 text-center text-sm text-white/80">
                 {error
                   ? "Không thể tải dữ liệu. Vui lòng thử lại."
                   : "Không có sản phẩm."}
