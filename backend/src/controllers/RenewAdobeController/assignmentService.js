@@ -3,6 +3,7 @@ const logger = require("../../utils/logger");
 const adobeRenewV2 = require("../../services/adobe-renew-v2");
 const {
   lookupAndRecordIfNeeded,
+  markUsersProductFalseByAccount,
 } = require("../../services/userAccountMappingService");
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
@@ -163,6 +164,18 @@ async function assignUserToAvailableAccount(userEmail) {
       error: error.message,
     });
   });
+  const noProductEmails = Array.isArray(v2.addResult?.noProduct)
+    ? v2.addResult.noProduct
+    : [];
+  if (noProductEmails.length > 0) {
+    await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
+      logger.warn("[renew-adobe] assignUserToAvailableAccount mark product=false failed", {
+        accountId,
+        emails: noProductEmails,
+        error: error.message,
+      });
+    });
+  }
 
   return {
     accountId,
@@ -299,6 +312,18 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
         error: error.message,
       });
     });
+    const noProductEmails = Array.isArray(v2.addResult?.noProduct)
+      ? v2.addResult.noProduct
+      : [];
+    if (noProductEmails.length > 0) {
+      await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
+        logger.warn("[renew-adobe] fixUsersOneRoundTightest mark product=false failed", {
+          accountId,
+          emails: noProductEmails,
+          error: error.message,
+        });
+      });
+    }
 
     return {
       success: true,

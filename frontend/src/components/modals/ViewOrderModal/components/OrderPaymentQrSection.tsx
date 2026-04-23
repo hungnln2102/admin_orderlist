@@ -15,6 +15,8 @@ type OrderPaymentQrSectionProps = {
   /** Đơn nhập hàng: QR tài khoản NCC, số tiền = giá nhập */
   isSupplierPayout?: boolean;
   missingSupplierBank?: boolean;
+  canUseQr?: boolean;
+  qrLockReason?: string;
 };
 
 export const OrderPaymentQrSection = ({
@@ -31,6 +33,8 @@ export const OrderPaymentQrSection = ({
   holderDisplay,
   isSupplierPayout = false,
   missingSupplierBank = false,
+  canUseQr = true,
+  qrLockReason = "",
 }: OrderPaymentQrSectionProps) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -43,6 +47,11 @@ export const OrderPaymentQrSection = ({
       >
         Quét mã QR để thanh toán (VietQR)
       </h4>
+      {!canUseQr && (
+        <p className="text-sm text-amber-300/95 mb-3 px-2">
+          {qrLockReason || "QR này đã bị khóa và không thể sử dụng."}
+        </p>
+      )}
       {isSupplierPayout && (
         <p className="text-xs text-amber-200/90 mb-3">
           Thanh toán cho nhà cung cấp — số tiền theo giá nhập
@@ -54,7 +63,7 @@ export const OrderPaymentQrSection = ({
           để tạo mã QR.
         </p>
       )}
-      {qrCodeImageUrl ? (
+      {canUseQr && qrCodeImageUrl ? (
         <div className="flex justify-center mb-3 relative">
           {!imgLoaded && (
             <div className="w-[240px] h-[240px] sm:w-[280px] sm:h-[280px] border-2 border-indigo-200/30 rounded-lg bg-slate-700/50 animate-pulse flex items-center justify-center">
@@ -71,13 +80,14 @@ export const OrderPaymentQrSection = ({
           />
         </div>
       ) : (
+        canUseQr &&
         !missingSupplierBank && (
           <p className="text-red-600 font-medium">
             Không thể tạo mã QR. Vui lòng kiểm tra lại cấu hình
           </p>
         )
       )}
-      <div className="text-sm text-slate-100 space-y-1">
+      <div className={`text-sm text-slate-100 space-y-1 ${!canUseQr ? "opacity-60" : ""}`}>
         <p>
           Ngân hàng: <strong className="text-indigo-100">{bankDisplay}</strong>
         </p>

@@ -17,3 +17,6 @@ backend/manage-team-debug.txt
 backend/admin-console-users.json
 clean_repo/
 *.log
+
+# Playwright / Chromium user data (local automation profiles — never commit)
+backend/.adobe-profiles/

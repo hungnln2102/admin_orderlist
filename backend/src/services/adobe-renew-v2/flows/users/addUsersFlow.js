@@ -97,6 +97,23 @@ function normalizeAbpReason(status, rawBody) {
   return `http_${status}`;
 }
 
+function safeBodyPreview(rawBody, limit = 500) {
+  const text = String(rawBody || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}...`;
+}
+
+function extractApiErrorCode(rawBody) {
+  try {
+    const parsed = JSON.parse(rawBody || "{}");
+    const code = String(parsed?.errorCode || parsed?.code || "").trim();
+    return code || "";
+  } catch (_) {
+    return "";
+  }
+}
+
 async function resolveAssignableProductId(page, orgToken, headers, options = {}) {
   if (options.productId) return String(options.productId).trim();
 
@@ -160,6 +177,14 @@ async function createUserViaAbpApi(page, orgToken, email, headers) {
   );
   const status = apiResponse.status();
   const rawBody = await apiResponse.text().catch(() => "");
+  if (!(status >= 200 && status < 300)) {
+    logger.warn("[adobe-v2] createUserViaAbpApi failed", {
+      email,
+      orgToken,
+      status,
+      body: safeBodyPreview(rawBody),
+    });
+  }
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -196,7 +221,22 @@ async function assignProductViaPatch(page, orgToken, userId, productId, headers)
   const status = apiResponse.status();
   const rawBody = await apiResponse.text().catch(() => "");
   const patchParsed = normalizeBatchResult(["_one_"], status, rawBody);
-  const oneFailedReason = patchParsed.failed[0]?.reason || `http_${status}`;
+  const apiErrorCode = extractApiErrorCode(rawBody);
+  const patchedFailedReason = patchParsed.failed[0]?.reason || "";
+  const oneFailedReason =
+    apiErrorCode && (!patchedFailedReason || /^http_\d+$/i.test(patchedFailedReason))
+      ? apiErrorCode.toLowerCase()
+      : patchedFailedReason || `http_${status}`;
+  if (!(patchParsed.failed.length === 0 && patchParsed.done.length > 0)) {
+    logger.warn("[adobe-v2] assignProductViaPatch failed", {
+      orgToken,
+      userId,
+      productId,
+      status,
+      reason: oneFailedReason,
+      body: safeBodyPreview(rawBody),
+    });
+  }
   return {
     ok: patchParsed.failed.length === 0 && patchParsed.done.length > 0,
     status,
@@ -259,6 +299,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
   );
 
   const done = [];
+  const noProduct = [];
   const failed = [];
   const unassigned = [];
   for (const email of list) {
@@ -293,6 +334,16 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
       continue;
     }
 
+    if (String(assignRes.reason || "").toLowerCase() === "trial_already_consumed") {
+      done.push(email);
+      noProduct.push(email);
+      logger.info(
+        "[adobe-v2] runAddUsersFlow(API): user added but product not assigned (trial already consumed): %s",
+        email
+      );
+      continue;
+    }
+
     const refreshed = await fetchUsersViaApi(page, { orgId });
     const existed = (refreshed.users || []).find(
       (u) => String(u?.email || "").trim().toLowerCase() === email
@@ -317,10 +368,11 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
   }
 
   logger.info(
-    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d failed=%d unassigned=%d",
+    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d noProduct=%d failed=%d unassigned=%d",
     orgToken,
     productId,
     done.length,
+    noProduct.length,
     failed.length,
     unassigned.length
   );
@@ -331,6 +383,7 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
   return {
     success: done.length > 0 && !stoppedByPolicy,
     done,
+    noProduct,
     failed,
     unassigned,
     stoppedByPolicy,

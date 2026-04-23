@@ -282,9 +282,41 @@ async function lookupAndRecordIfNeeded(userEmails, adobeAccountId) {
   return { recorded, skipped, notFound };
 }
 
+/**
+ * Đánh dấu product=false cho mapping theo email + adobe_account_id hiện tại.
+ * Dùng cho case user đã add vào team nhưng Adobe không gán được product.
+ *
+ * @param {string|string[]} userEmails
+ * @param {number|null} adobeAccountId
+ * @returns {Promise<number>} số row updated
+ */
+async function markUsersProductFalseByAccount(userEmails, adobeAccountId) {
+  const emails = (Array.isArray(userEmails) ? userEmails : [userEmails])
+    .map((e) => (e || "").toString().trim().toLowerCase())
+    .filter(Boolean);
+  if (emails.length === 0 || !adobeAccountId) return 0;
+
+  const updated = await db(TABLE)
+    .whereIn(db.raw(`LOWER(${COLS.USER_EMAIL})`), emails)
+    .andWhere(COLS.ADOBE_ACCOUNT_ID, adobeAccountId)
+    .update({
+      [COLS.PRODUCT]: false,
+      [COLS.UPDATED_AT]: new Date(),
+    });
+
+  logger.info(
+    "[Mapping] Đánh dấu product=false cho %d email | adobeAccount=%s | updated=%d",
+    emails.length,
+    adobeAccountId,
+    updated
+  );
+  return updated;
+}
+
 module.exports = {
   syncOrdersToMapping,
   lookupAndRecordIfNeeded,
+  markUsersProductFalseByAccount,
   recordUsersAssigned,
   removeMappingsForAccount,
   removeMappingsByOrders,

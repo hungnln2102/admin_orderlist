@@ -8,6 +8,7 @@ import {
 import * as Helpers from "@/lib/helpers";
 import { prefetchQrImage } from "@/components/modals/ViewOrderModal/components/OrderPaymentQrSection";
 import { buildViewOrderPaymentQrPayload } from "@/components/modals/ViewOrderModal/paymentQr";
+import { getOrderQrEligibility } from "@/components/modals/ViewOrderModal/qrEligibility";
 import {
   formatCurrency,
   formatOrderCodeShort,
@@ -252,7 +253,9 @@ export const OrderRow = React.memo(function OrderRow({
               onClick={stopPropagation(onView)}
               onMouseEnter={() => {
                 const code = String(order[ORDER_FIELDS.ID_ORDER] || "");
+                const qrEligibility = getOrderQrEligibility(statusText);
                 if (!code) return;
+                if (!qrEligibility.canUseQr) return;
                 const { qrCodeImageUrl, effectiveQrAmount } =
                   buildViewOrderPaymentQrPayload({
                     order: order as Record<string, unknown>,
