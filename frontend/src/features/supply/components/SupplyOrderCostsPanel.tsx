@@ -201,7 +201,7 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
           </>
         ) : (
           <div className="min-w-[280px] flex-1 rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-white/70">
-            Danh sách log nhập hàng ngoài luồng (expense_type = external_import)
+            Danh sách log nhập hàng ngoài luồng
           </div>
         )}
         <div className="flex gap-2">

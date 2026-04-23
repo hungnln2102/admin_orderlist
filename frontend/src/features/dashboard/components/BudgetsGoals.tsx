@@ -27,7 +27,10 @@ const COLUMN_STAT_ICONS = [
 ] as const;
 
 const calcChangePct = (curr: number, prev: number) => {
-  if (prev === 0) return curr > 0 ? 100 : 0;
+  if (prev === 0) {
+    if (curr === 0) return 0;
+    return curr > 0 ? 100 : -100;
+  }
   return Number((((curr - prev) / prev) * 100).toFixed(1));
 };
 

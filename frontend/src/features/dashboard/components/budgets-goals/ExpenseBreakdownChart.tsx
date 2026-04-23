@@ -66,7 +66,10 @@ export const ExpenseBreakdownChart: React.FC<{
     () => chartData.reduce((sum, item) => sum + item.value, 0),
     [chartData]
   );
-  const displayTotal = chartTotal + Math.max(0, Number(availableProfit || 0));
+  /** Lợi nhuận khả dụng có thể âm (ví dụ rút vượt lợi nhuận tích lũy) — không clamp về 0. */
+  const profitPool = Number(availableProfit ?? 0);
+  const displayTotal =
+    chartTotal + (Number.isFinite(profitPool) ? profitPool : 0);
 
   const renderTooltip = ({
     payload,
@@ -114,13 +117,17 @@ export const ExpenseBreakdownChart: React.FC<{
                 <Tooltip content={renderTooltip} />
               </PieChart>
             </ResponsiveContainer>
-            {displayTotal > 0 && (
+            {chartData.length > 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-white">
                   <div className="text-xs uppercase tracking-wide text-white/80">
                     Tài sản
                   </div>
-                  <div className="text-lg font-bold">
+                  <div
+                    className={`text-lg font-bold ${
+                      displayTotal < 0 ? "text-rose-300" : ""
+                    }`}
+                  >
                     {currencyFormatter.format(displayTotal)}
                   </div>
                 </div>
