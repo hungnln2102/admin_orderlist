@@ -39,24 +39,8 @@ async function captureProductsApiHeaders(page, orgToken) {
     return reqPromise;
   };
 
-  const cur = String(page.url() || "");
+  /** Admin Console products là nơi JIL products được gọi ổn định; tránh goto embed mặc định (hay gặp net::ERR_HTTP2_PROTOCOL_ERROR trên một số host). */
   try {
-    const req = await captureOnce(async () => {
-      if (isAdobeEmbedHostPageUrl(cur)) {
-        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-        return;
-      }
-      await page.goto(embedUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 60000,
-      });
-    });
-    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
-  } catch (e1) {
-    logger.warn(
-      "[adobe-v2] products-api: không bắt JIL trên Adobe.com (%s), thử adminconsole/products",
-      e1.message
-    );
     const req = await captureOnce(async () => {
       const u = String(page.url() || "");
       if (
@@ -67,6 +51,24 @@ async function captureProductsApiHeaders(page, orgToken) {
         return;
       }
       await page.goto(productsHref, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+    });
+    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
+  } catch (e1) {
+    logger.warn(
+      "[adobe-v2] products-api: không bắt JIL trên adminconsole/products (%s), thử embed (%s)",
+      e1.message,
+      embedUrl
+    );
+    const req = await captureOnce(async () => {
+      const u2 = String(page.url() || "");
+      if (isAdobeEmbedHostPageUrl(u2)) {
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+        return;
+      }
+      await page.goto(embedUrl, {
         waitUntil: "domcontentloaded",
         timeout: 60000,
       });

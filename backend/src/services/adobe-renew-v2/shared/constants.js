@@ -35,15 +35,15 @@ const ADMIN_CONSOLE_API_BASE = "https://bps-il.adobe.io";
 const USER_MANAGEMENT_API = "https://usermanagement.adobe.io";
 
 /**
- * Trang Adobe (www / home, …) nơi SPA gọi bps-il + abpapi — không phải adminconsole.adobe.com.
- * Ghi đè bằng ADOBE_EMBED_PAGE_URL nếu team có URL cụ thể (vd. trang quản lý gói).
+ * Trang Adobe (mặc định https://www.adobe.com/manage-team) — fallback khi bắt header JIL (vd. products) không qua được Admin Console.
+ * Products API ưu tiên adminconsole/.../products; embed chỉ dùng khi cần. Ghi đè bằng ADOBE_EMBED_PAGE_URL.
  */
 function resolveAdobeEmbedPageUrl() {
   const raw = String(process.env.ADOBE_EMBED_PAGE_URL || "").trim();
   if (raw && /^https:\/\//i.test(raw)) {
     return raw;
   }
-  return `${ADOBE_WWW}/home`;
+  return `${ADOBE_WWW}/manage-team`;
 }
 
 module.exports = {
