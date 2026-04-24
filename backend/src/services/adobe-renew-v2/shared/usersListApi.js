@@ -46,17 +46,30 @@ function mapApiUserToSnapshotUser(item) {
 }
 
 async function captureUsersApiHeaders(page, orgToken) {
+  const token = normalizeOrgToken(orgToken);
   const reqPromise = page.waitForRequest(
     (req) =>
       req.method() === "GET" &&
-      req.url().includes(`/jil-api/v2/organizations/${orgToken}/users/?`),
+      req.url().includes(`/jil-api/v2/organizations/${token}/users/?`),
     { timeout: 30000 }
   );
 
-  await page.goto(`https://adminconsole.adobe.com/${orgToken}/users`, {
-    waitUntil: "domcontentloaded",
-    timeout: 60000,
-  });
+  const cur = String(page.url() || "");
+  const usersHref = `https://adminconsole.adobe.com/${token}/users`;
+  const alreadyOnOrgUsers =
+    /adminconsole\.adobe\.com\/[^/]+@AdobeOrg\/users/i.test(cur) &&
+    cur.includes(token.split("@")[0] || "");
+
+  if (alreadyOnOrgUsers) {
+    await page
+      .reload({ waitUntil: "domcontentloaded", timeout: 60000 })
+      .catch(() => {});
+  } else {
+    await page.goto(usersHref, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+  }
 
   const req = await reqPromise;
   const headers = req.headers();
@@ -75,7 +88,7 @@ async function captureUsersApiHeaders(page, orgToken) {
     "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
     "x-jil-feature": headers["x-jil-feature"] || "",
     origin: "https://adminconsole.adobe.com",
-    referer: `https://adminconsole.adobe.com/${orgToken}/users`,
+    referer: usersHref,
   };
 }
 
@@ -86,6 +99,12 @@ async function fetchUsersViaApi(page, options = {}) {
   if (!orgToken) {
     throw new Error("Không xác định được org token để gọi users API.");
   }
+
+  const collectJilRaw =
+    options.collectJilRaw === true ||
+    String(process.env.ADOBE_DUMP_JIL_USERS_RAW || "").trim() === "1";
+  /** @type {{ pageIndex: number, status: number, parsed: unknown }[]} */
+  const jilRawPages = [];
 
   const headers = await captureUsersApiHeaders(page, orgToken);
   const api = page.context().request;
@@ -111,11 +130,20 @@ async function fetchUsersViaApi(page, options = {}) {
     }
 
     let arr = [];
+    let parsed = null;
     try {
-      const parsed = JSON.parse(text);
+      parsed = JSON.parse(text);
       arr = Array.isArray(parsed) ? parsed : parsed?.items || parsed?.data || [];
     } catch (e) {
       throw new Error(`Users API parse fail (page=${pageIndex}): ${e.message}`);
+    }
+
+    if (collectJilRaw) {
+      jilRawPages.push({
+        pageIndex,
+        status: resp.status(),
+        parsed,
+      });
     }
 
     const mappedUsers = arr
@@ -159,7 +187,11 @@ async function fetchUsersViaApi(page, options = {}) {
     usersWithProFlags.length,
     orgToken
   );
-  return { users: usersWithProFlags, orgToken };
+  return {
+    users: usersWithProFlags,
+    orgToken,
+    ...(collectJilRaw && jilRawPages.length ? { jilRawPages } : {}),
+  };
 }
 
 module.exports = {

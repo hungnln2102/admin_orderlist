@@ -62,20 +62,11 @@ async function runCheckFlow(email, password, options = {}) {
     const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
     const proxyOptions = getPlaywrightProxyOptions();
     if (proxyOptions) logger.info("[adobe-v2] Proxy: %s", proxyOptions.server);
-    try {
-      const prof = await launchSessionFromProfile({
-        adminEmail: email,
-        headless,
-        proxyOptions,
-      });
-      context = prof.context;
-      page = prof.page;
-      ownedContext = context;
-    } catch (profileErr) {
-      logger.warn(
-        "[adobe-v2] profile-session launch failed, fallback to normal context: %s",
-        profileErr.message
-      );
+
+    const skipPersistentProfile =
+      String(process.env.ADOBE_V2_SKIP_PERSISTENT_PROFILE || "").trim() === "1";
+
+    const launchEphemeralContext = async () => {
       const { chromium } = require("playwright");
       const launchOptions = {
         headless,
@@ -90,12 +81,43 @@ async function runCheckFlow(email, password, options = {}) {
       };
       if (proxyOptions) launchOptions.proxy = proxyOptions;
       const browser = await chromium.launch(launchOptions);
-      context = await browser.newContext({
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      const ctx = await browser.newContext({
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         viewport: { width: 1280, height: 720 },
       });
-      page = await context.newPage();
+      const pg = await ctx.newPage();
+      return { context: ctx, page: pg };
+    };
+
+    if (skipPersistentProfile) {
+      logger.info(
+        "[adobe-v2] ADOBE_V2_SKIP_PERSISTENT_PROFILE=1 — bỏ qua profile local, dùng ephemeral context"
+      );
+      const ep = await launchEphemeralContext();
+      context = ep.context;
+      page = ep.page;
       ownedContext = context;
+    } else {
+      try {
+        const prof = await launchSessionFromProfile({
+          adminEmail: email,
+          headless,
+          proxyOptions,
+        });
+        context = prof.context;
+        page = prof.page;
+        ownedContext = context;
+      } catch (profileErr) {
+        logger.warn(
+          "[adobe-v2] profile-session launch failed, fallback to normal context: %s",
+          profileErr.message
+        );
+        const ep = await launchEphemeralContext();
+        context = ep.context;
+        page = ep.page;
+        ownedContext = context;
+      }
     }
   }
 
@@ -143,6 +165,7 @@ async function runCheckFlow(email, password, options = {}) {
         existingOrgName: resolvedOrgName,
         cachedContractActiveLicenseCount,
         forceProductCheck,
+        adminLoginEmail: email,
         cookieLogLabel: "Lưu cookies sau login mới",
         includeWithExpiry: false,
         onlyLoginLogLabel: "onlyLogin: login xong do thiếu/expired cookie",
@@ -174,6 +197,7 @@ async function runCheckFlow(email, password, options = {}) {
         existingOrgName,
         cachedContractActiveLicenseCount,
         forceProductCheck,
+        adminLoginEmail: email,
         cookieLogLabel: "Lưu cookies",
         includeWithExpiry: false,
         onlyLoginLogLabel:
@@ -198,6 +222,7 @@ async function runCheckFlow(email, password, options = {}) {
       existingOrgName: resolvedOrgName,
       cachedContractActiveLicenseCount,
       forceProductCheck,
+      adminLoginEmail: email,
       cookieLogLabel: "Lưu cookies",
       includeWithExpiry: true,
       onlyLoginLogLabel:

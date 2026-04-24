@@ -89,6 +89,7 @@ async function buildSuccessResult({
   existingOrgName = null,
   cachedContractActiveLicenseCount = null,
   forceProductCheck = false,
+  adminLoginEmail = null,
   cookieLogLabel = "Lưu cookies",
   includeWithExpiry = false,
   onlyLoginLogLabel = "onlyLogin: dừng sau login",
@@ -106,6 +107,7 @@ async function buildSuccessResult({
     existingOrgName,
     cachedContractActiveLicenseCount,
     forceProductCheck,
+    adminLoginEmail,
   });
   if (includeWithExpiry) {
     logger.info(

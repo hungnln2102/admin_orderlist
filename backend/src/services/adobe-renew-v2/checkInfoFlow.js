@@ -205,8 +205,8 @@ function scrapeUsersPage(page) {
  * B10–B13: Profile name (account.adobe.com) → products → users (adminconsole).
  * Nếu options.existingOrgName có sẵn thì bỏ qua B10–B11 (không vào account.adobe.com lấy profile).
  * @param {import('playwright').Page} page
- * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean }} options
- * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number }>}
+ * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, adminLoginEmail?: string|null }} options
+ * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number, jil_users_raw_pages?: unknown[] }>}
  */
 async function runB10ToB13(page, options = {}) {
   const existingOrgName = options.existingOrgName && String(options.existingOrgName).trim() ? String(options.existingOrgName).trim() : null;
@@ -214,12 +214,23 @@ async function runB10ToB13(page, options = {}) {
     options.cachedContractActiveLicenseCount
   );
   const forceProductCheck = options.forceProductCheck === true;
+  const adminLoginEmail =
+    options.adminLoginEmail && String(options.adminLoginEmail).trim()
+      ? String(options.adminLoginEmail).trim()
+      : "";
   let org_name = null;
   let orgId = null;
   let products = [];
   let users = [];
   let license_status = "unknown";
   let contractActiveLicenseCount = 0;
+  /** @type {unknown[]|null} */
+  let jilUsersRawPages = null;
+  const mergeJilRaw = (apiUsersResult) => {
+    if (!apiUsersResult?.jilRawPages || !Array.isArray(apiUsersResult.jilRawPages)) return;
+    if (!jilUsersRawPages) jilUsersRawPages = [];
+    jilUsersRawPages.push(...apiUsersResult.jilRawPages);
+  };
 
   const orgResult = await runCheckOrgNameFlow(page, { existingOrgName });
   org_name = orgResult.org_name;
@@ -239,20 +250,34 @@ async function runB10ToB13(page, options = {}) {
     contractActiveLicenseCount = Number(productResult.contractActiveLicenseCount || 0);
   }
 
+  /** Khi skip B12, orgId chưa có — lấy từ URL hiện tại (overview …@AdobeOrg/…) tránh goto /users không org. */
+  if (!orgId) {
+    const fromPage = extractOrgIdFromUrl(page.url());
+    if (fromPage) {
+      orgId = fromPage;
+      logger.info("[adobe-v2] B13: orgId từ URL hiện tại=%s", orgId);
+    }
+  }
+
   const usersUrlPrimary = buildAdminUsersUrl(orgId);
   logger.info("[adobe-v2] B13: adminconsole/users (url=%s)", usersUrlPrimary.slice(0, 96));
 
-  await page
-    .goto(usersUrlPrimary, { waitUntil: "domcontentloaded", timeout: B13_GOTO_MS })
-    .catch(() => {});
-  await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
+  await page.goto(usersUrlPrimary, {
+    waitUntil: "domcontentloaded",
+    timeout: B13_GOTO_MS,
+  }).catch((navErr) => {
+    logger.warn("[adobe-v2] B13: goto users thất bại: %s", navErr.message);
+  });
+  /** Tránh networkidle — Adobe SPA dễ treo / làm hỏng context trên một số môi trường headless. */
+  await page.waitForLoadState("domcontentloaded", { timeout: 28000 }).catch(() => {});
   await page
     .waitForURL((u) => isAdminConsoleUsersPath(String(u)), { timeout: 20000 })
     .catch(() => {});
   if (!orgId) orgId = extractOrgIdFromUrl(page.url());
   let apiUsers;
   try {
-    apiUsers = await fetchUsersViaApi(page, { orgId });
+    apiUsers = await fetchUsersViaApi(page, { orgId, adminEmail: adminLoginEmail });
+    mergeJilRaw(apiUsers);
   } catch (usersErr) {
     if (cachedContractActiveLicenseCount == null) {
       throw usersErr;
@@ -271,7 +296,8 @@ async function runB10ToB13(page, options = {}) {
       })
       .catch(() => {});
     await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
-    apiUsers = await fetchUsersViaApi(page, { orgId });
+    apiUsers = await fetchUsersViaApi(page, { orgId, adminEmail: adminLoginEmail });
+    mergeJilRaw(apiUsers);
   }
   orgId = orgId || extractOrgIdFromToken(apiUsers?.orgToken);
   users = apiUsers.users.map((u) => ({
@@ -291,6 +317,9 @@ async function runB10ToB13(page, options = {}) {
     products,
     users,
     contractActiveLicenseCount,
+    ...(jilUsersRawPages && jilUsersRawPages.length
+      ? { jil_users_raw_pages: jilUsersRawPages }
+      : {}),
   };
 }
 
