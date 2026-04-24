@@ -245,6 +245,7 @@ export function useRenewAdobeAdmin() {
                 }
               : null
           );
+          loadAccounts();
           break;
         case "auto_assign_start":
           setAutoAssignPhase("running");

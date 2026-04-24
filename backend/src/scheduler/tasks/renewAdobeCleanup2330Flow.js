@@ -7,7 +7,7 @@ const {
   ORDERS_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
 const { STATUS } = require("../../utils/statuses");
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 const { runCheckAllAccountsFlow } = require("../../controllers/RenewAdobeController/autoAssign");
@@ -19,9 +19,9 @@ const {
   finishJobRun,
 } = require("./shared/jobRunLogger");
 const {
-  attachLisenceCount,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  userCountDbValue,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
@@ -93,10 +93,14 @@ async function collectExpiredOrDueUsers(variantIds) {
   );
 }
 
-function extractEmailsToDeleteFromAccountSnapshot({ usersSnapshot, adminEmail, activeEmails, expiredOrDueEmails }) {
-  const users = Array.isArray(usersSnapshot) ? usersSnapshot : [];
-  return users
-    .map((user) => (user?.email || "").trim())
+function extractEmailsToDeleteFromMappedUsers({
+  mappedEmails,
+  adminEmail,
+  activeEmails,
+  expiredOrDueEmails,
+}) {
+  return (Array.isArray(mappedEmails) ? mappedEmails : [])
+    .map((e) => String(e || "").trim())
     .filter((email) => {
       const lower = email.toLowerCase();
       if (!lower || lower === adminEmail) return false;
@@ -135,33 +139,41 @@ async function runRenewAdobeCleanup2330Flow({
   const activeEmails = await getActiveOrderEmails(variantIds);
   const expiredOrDueEmails = await collectExpiredOrDueUsers(variantIds);
 
-  const accounts = await db(ACCOUNT_TABLE)
-    .select(
-      ACCOUNT_COLS.ID,
-      ACCOUNT_COLS.EMAIL,
-      ACCOUNT_COLS.PASSWORD_ENC,
-      ACCOUNT_COLS.USERS_SNAPSHOT,
-      ACCOUNT_COLS.IS_ACTIVE,
-      ACCOUNT_COLS.ALERT_CONFIG,
-      ACCOUNT_COLS.MAIL_BACKUP_ID
-    )
-    .where(ACCOUNT_COLS.IS_ACTIVE, true)
-    .whereNotNull(ACCOUNT_COLS.USERS_SNAPSHOT);
+  const accountIdsRaw = await db(MAP_TABLE)
+    .distinct(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .pluck(MAP_COLS.ADOBE_ACCOUNT_ID);
+  const accountIds = accountIdsRaw
+    .map((x) => Number(x))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  const accounts =
+    accountIds.length === 0
+      ? []
+      : await db(ACCOUNT_TABLE)
+          .select(
+            ACCOUNT_COLS.ID,
+            ACCOUNT_COLS.EMAIL,
+            ACCOUNT_COLS.PASSWORD_ENC,
+            ACCOUNT_COLS.IS_ACTIVE,
+            ACCOUNT_COLS.ALERT_CONFIG,
+            ACCOUNT_COLS.MAIL_BACKUP_ID,
+            ...(ACCOUNT_COLS.ID_PRODUCT ? [ACCOUNT_COLS.ID_PRODUCT] : [])
+          )
+          .whereIn(ACCOUNT_COLS.ID, accountIds)
+          .where(ACCOUNT_COLS.IS_ACTIVE, true);
 
   const failedAccounts = [];
 
   for (const account of accounts) {
-    let usersSnapshot = [];
-    try {
-      usersSnapshot = JSON.parse(account[ACCOUNT_COLS.USERS_SNAPSHOT] || "[]");
-    } catch {
-      usersSnapshot = [];
-    }
-    if (!Array.isArray(usersSnapshot) || usersSnapshot.length === 0) continue;
+    const mappedEmails = await db(MAP_TABLE)
+      .where(MAP_COLS.ADOBE_ACCOUNT_ID, account[ACCOUNT_COLS.ID])
+      .pluck(MAP_COLS.USER_EMAIL);
+    if (!mappedEmails.length) continue;
 
     const adminEmail = (account[ACCOUNT_COLS.EMAIL] || "").toLowerCase().trim();
-    const toDelete = extractEmailsToDeleteFromAccountSnapshot({
-      usersSnapshot,
+    const toDelete = extractEmailsToDeleteFromMappedUsers({
+      mappedEmails,
       adminEmail,
       activeEmails,
       expiredOrDueEmails,
@@ -208,29 +220,29 @@ async function runRenewAdobeCleanup2330Flow({
             [ACCOUNT_COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
               account[ACCOUNT_COLS.ALERT_CONFIG],
               deleteResult.savedCookies,
-              account[ACCOUNT_COLS.USERS_SNAPSHOT]
+              null
             ),
           });
       }
 
       if (deleteResult.snapshot && Array.isArray(deleteResult.snapshot.manageTeamMembers)) {
         const lisencecount = resolveLisenceCount({
-          usersSnapshot: account[ACCOUNT_COLS.USERS_SNAPSHOT],
+          usersSnapshot: deleteResult.snapshot.manageTeamMembers,
           alertConfig: account[ACCOUNT_COLS.ALERT_CONFIG],
         });
         await db(ACCOUNT_TABLE)
           .where(ACCOUNT_COLS.ID, account[ACCOUNT_COLS.ID])
           .update({
-            [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(
-              attachLisenceCount(deleteResult.snapshot.manageTeamMembers, lisencecount)
-            ),
             ...(deleteResult.snapshot.orgName != null && {
               [ACCOUNT_COLS.ORG_NAME]: deleteResult.snapshot.orgName,
             }),
             ...(deleteResult.snapshot.licenseStatus != null && {
               [ACCOUNT_COLS.LICENSE_STATUS]: deleteResult.snapshot.licenseStatus,
             }),
-            [ACCOUNT_COLS.USER_COUNT]: deleteResult.snapshot.manageTeamMembers.length,
+            [ACCOUNT_COLS.USER_COUNT]: userCountDbValue(
+              lisencecount,
+              deleteResult.snapshot.manageTeamMembers.length
+            ),
           });
       } else {
         await runCheckForAccountId(account[ACCOUNT_COLS.ID]).catch((error) => {

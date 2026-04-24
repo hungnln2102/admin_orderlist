@@ -7,12 +7,16 @@ const {
   ORDERS_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
 const { STATUS } = require("../../utils/statuses");
 const {
   recordUsersAssigned,
   syncOrdersToMapping,
+  getMappingCountsByAdobeAccountIds,
 } = require("../../services/userAccountMappingService");
+const {
+  upsertRenewAdobeOrderUserTrackingForAccount,
+} = require("../../services/renew-adobe/orderUserTrackingService");
 const { notifyWarn } = require("../../utils/telegramErrorNotifier");
 const {
   startJobRun,
@@ -21,10 +25,10 @@ const {
   finishJobRun,
 } = require("./shared/jobRunLogger");
 const {
-  attachLisenceCount,
-  parseUsersSnapshot,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  resolveAccountUserLimit,
+  userCountDbValue,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 const ACCOUNT_TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
@@ -47,17 +51,6 @@ const PRODUCT_SYSTEM_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
 const MAX_USERS_PER_ACCOUNT = 10;
 const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
 const ACTIVE_ORDER_STATUSES = [STATUS.PAID, STATUS.RENEWAL, STATUS.PROCESSING];
-
-function resolveAccountUserLimit(account) {
-  const n = Number(
-    resolveLisenceCount({
-      usersSnapshot: account?.[ACCOUNT_COLS.USERS_SNAPSHOT],
-      alertConfig: account?.[ACCOUNT_COLS.ALERT_CONFIG],
-    }) || 0
-  );
-  if (Number.isFinite(n) && n > 0) return n;
-  return MAX_USERS_PER_ACCOUNT;
-}
 
 async function retryOnce(taskName, handler) {
   try {
@@ -123,30 +116,16 @@ async function collectUnassignedRenewAdobeUsers() {
     if (email) unique.add(email);
   }
 
-  // Snapshot users lấy trực tiếp từ Adobe trong bước check là nguồn sự thật.
-  // Nếu email đã có trong users_snapshot của bất kỳ account active nào thì không add lại.
-  const accounts = await db(ACCOUNT_TABLE)
-    .select(ACCOUNT_COLS.EMAIL, ACCOUNT_COLS.USERS_SNAPSHOT)
-    .where(ACCOUNT_COLS.IS_ACTIVE, true)
-    .whereNotNull(ACCOUNT_COLS.USERS_SNAPSHOT);
-  const alreadyOnAdobe = new Set();
-  for (const account of accounts) {
-    const adminEmail = (account[ACCOUNT_COLS.EMAIL] || "").toString().trim().toLowerCase();
-    let users = [];
-    try {
-      users = JSON.parse(account[ACCOUNT_COLS.USERS_SNAPSHOT] || "[]");
-    } catch {
-      users = [];
-    }
-    if (!Array.isArray(users)) continue;
-    for (const user of users) {
-      const email = (user?.email || "").toString().trim().toLowerCase();
-      if (!email || email === adminEmail) continue;
-      alreadyOnAdobe.add(email);
-    }
+  const assignedRows = await db(MAP_TABLE)
+    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .select(MAP_COLS.USER_EMAIL);
+  const alreadyAssigned = new Set();
+  for (const row of assignedRows) {
+    const e = (row[MAP_COLS.USER_EMAIL] || "").toString().trim().toLowerCase();
+    if (e) alreadyAssigned.add(e);
   }
 
-  return [...unique].filter((email) => !alreadyOnAdobe.has(email));
+  return [...unique].filter((email) => !alreadyAssigned.has(email));
 }
 
 async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
@@ -165,23 +144,24 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
       ACCOUNT_COLS.PASSWORD_ENC,
       ACCOUNT_COLS.USER_COUNT,
       ACCOUNT_COLS.LICENSE_STATUS,
-      ACCOUNT_COLS.USERS_SNAPSHOT,
       ...(ACCOUNT_COLS.MAIL_BACKUP_ID ? [ACCOUNT_COLS.MAIL_BACKUP_ID] : []),
       ...(ACCOUNT_COLS.OTP_SOURCE ? [ACCOUNT_COLS.OTP_SOURCE] : []),
-      ...(ACCOUNT_COLS.ALERT_CONFIG ? [ACCOUNT_COLS.ALERT_CONFIG] : [])
+      ...(ACCOUNT_COLS.ALERT_CONFIG ? [ACCOUNT_COLS.ALERT_CONFIG] : []),
+      ...(ACCOUNT_COLS.ID_PRODUCT ? [ACCOUNT_COLS.ID_PRODUCT] : [])
     )
     .where(ACCOUNT_COLS.IS_ACTIVE, true)
     .where(ACCOUNT_COLS.LICENSE_STATUS, "Paid");
 
+  const accIds = allAccounts
+    .map((a) => Number(a[ACCOUNT_COLS.ID]))
+    .filter((n) => n > 0);
+  const mappingCounts = await getMappingCountsByAdobeAccountIds(accIds);
+
   const available = allAccounts
     .map((account) => ({
       ...account,
-      currentCount: Math.max(
-        0,
-        Number.parseInt(account[ACCOUNT_COLS.USER_COUNT], 10) || 0,
-        parseUsersSnapshot(account[ACCOUNT_COLS.USERS_SNAPSHOT]).length
-      ),
-      userLimit: resolveAccountUserLimit(account),
+      currentCount: mappingCounts.get(Number(account[ACCOUNT_COLS.ID])) ?? 0,
+      userLimit: resolveAccountUserLimit(account, MAX_USERS_PER_ACCOUNT),
     }))
     .filter((account) => account.currentCount < account.userLimit)
     .sort((a, b) => {
@@ -229,21 +209,20 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
       if (!addResult.success) throw new Error(addResult.error || "addUsersWithProductV2 thất bại");
 
       const lisencecount = resolveLisenceCount({
-        usersSnapshot: account[ACCOUNT_COLS.USERS_SNAPSHOT],
+        usersSnapshot: null,
         alertConfig: account[ACCOUNT_COLS.ALERT_CONFIG],
       });
       const updatePayload = {
-        [ACCOUNT_COLS.USER_COUNT]:
-          addResult.userCount ?? (addResult.manageTeamMembers?.length ?? 0),
-        [ACCOUNT_COLS.USERS_SNAPSHOT]: JSON.stringify(
-          attachLisenceCount(addResult.manageTeamMembers || [], lisencecount)
+        [ACCOUNT_COLS.USER_COUNT]: userCountDbValue(
+          lisencecount,
+          addResult.userCount ?? (addResult.manageTeamMembers?.length ?? 0)
         ),
       };
       if (addResult.savedCookies) {
         updatePayload[ACCOUNT_COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
           account[ACCOUNT_COLS.ALERT_CONFIG],
           addResult.savedCookies,
-          account[ACCOUNT_COLS.USERS_SNAPSHOT]
+          null
         );
       }
       await db(ACCOUNT_TABLE).where(ACCOUNT_COLS.ID, accountId).update(updatePayload);
@@ -256,6 +235,10 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
           logger.warn("[CRON][post-check-fix] recordUsersAssigned failed: %s", error.message);
         });
       }
+
+      await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
+        logger.warn("[CRON][post-check-fix] order_user_tracking failed: %s", error.message);
+      });
 
       assigned += chunk.length;
       addCounter(jobRun, "users_fixed", chunk.length);

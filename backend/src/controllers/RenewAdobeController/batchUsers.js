@@ -1,25 +1,20 @@
 const { db } = require("../../db");
 const logger = require("../../utils/logger");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
-const { lookupAndRecordIfNeeded } = require("../../services/userAccountMappingService");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
+const {
+  lookupAndRecordIfNeeded,
+  getMappingCountsByAdobeAccountIds,
+} = require("../../services/userAccountMappingService");
+const {
+  upsertRenewAdobeOrderUserTrackingForAccount,
+} = require("../../services/renew-adobe/orderUserTrackingService");
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
 const {
-  attachLisenceCount,
-  parseUsersSnapshot,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  resolveAccountUserLimit,
+  userCountDbValue,
 } = require("./usersSnapshotUtils");
-
-function resolveAccountUserLimit(account) {
-  const n = Number(
-    resolveLisenceCount({
-      usersSnapshot: account?.[COLS.USERS_SNAPSHOT],
-      alertConfig: account?.[COLS.ALERT_CONFIG],
-    }) || 0
-  );
-  if (Number.isFinite(n) && n > 0) return n;
-  return MAX_USERS_PER_ACCOUNT;
-}
 
 const runAddUsersBatch = async (req, res) => {
   const accountIdsRaw = req.body?.accountIds;
@@ -45,17 +40,24 @@ const runAddUsersBatch = async (req, res) => {
           COLS.EMAIL,
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
-          COLS.USERS_SNAPSHOT,
           COLS.ALERT_CONFIG,
           ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
-          COLS.LICENSE_STATUS
+          COLS.LICENSE_STATUS,
+          ...(COLS.ID_PRODUCT ? [COLS.ID_PRODUCT] : [])
         );
+      const countMap = await getMappingCountsByAdobeAccountIds(accountIds);
       const idToOrder = new Map(accountIds.map((id, idx) => [id, idx]));
-      ordered = [...accounts].sort(
-        (a, b) =>
-          (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0)
-      );
+      ordered = [...accounts]
+        .sort(
+          (a, b) =>
+            (idToOrder.get(a[COLS.ID]) ?? 0) - (idToOrder.get(b[COLS.ID]) ?? 0)
+        )
+        .map((account) => ({
+          ...account,
+          _currentCount: countMap.get(Number(account[COLS.ID])) ?? 0,
+          _userLimit: resolveAccountUserLimit(account, MAX_USERS_PER_ACCOUNT),
+        }));
     } else {
       const allAccounts = await db(TABLE)
         .select(
@@ -63,25 +65,31 @@ const runAddUsersBatch = async (req, res) => {
           COLS.EMAIL,
           COLS.PASSWORD_ENC,
           COLS.USER_COUNT,
-          COLS.USERS_SNAPSHOT,
           COLS.ALERT_CONFIG,
           ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
           COLS.MAIL_BACKUP_ID,
-          COLS.LICENSE_STATUS
+          COLS.LICENSE_STATUS,
+          ...(COLS.ID_PRODUCT ? [COLS.ID_PRODUCT] : [])
         )
         .where(COLS.IS_ACTIVE, true)
         .orderBy(COLS.ID, "asc");
+
+      const ids = allAccounts.map((a) => Number(a[COLS.ID])).filter((n) => n > 0);
+      const countMap = await getMappingCountsByAdobeAccountIds(ids);
 
       ordered = allAccounts
         .filter((account) => {
           const licenseStatus = (account[COLS.LICENSE_STATUS] || "").toLowerCase();
           return licenseStatus !== "expired" && licenseStatus !== "unknown";
         })
-        .map((account) => ({
-          ...account,
-          _userLimit: resolveAccountUserLimit(account),
-          _currentCount: Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0, parseUsersSnapshot(account[COLS.USERS_SNAPSHOT]).length),
-        }))
+        .map((account) => {
+          const id = Number(account[COLS.ID]);
+          return {
+            ...account,
+            _userLimit: resolveAccountUserLimit(account, MAX_USERS_PER_ACCOUNT),
+            _currentCount: countMap.get(id) ?? 0,
+          };
+        })
         .filter((account) => account._currentCount < account._userLimit)
         .sort((a, b) => {
           const slotsA = a._userLimit - a._currentCount;
@@ -101,8 +109,8 @@ const runAddUsersBatch = async (req, res) => {
     let remaining = [...userEmails];
 
     for (const account of ordered) {
-      const currentCount = Math.max(0, parseInt(account[COLS.USER_COUNT], 10) || 0, parseUsersSnapshot(account[COLS.USERS_SNAPSHOT]).length);
-      const userLimit = resolveAccountUserLimit(account);
+      const currentCount = account._currentCount;
+      const userLimit = account._userLimit;
       const slotLeft = Math.max(0, userLimit - currentCount);
       const take = Math.min(slotLeft, remaining.length);
       const chunk = take > 0 ? remaining.splice(0, take) : [];
@@ -121,7 +129,7 @@ const runAddUsersBatch = async (req, res) => {
     if (totalToAdd === 0) {
       return res.status(400).json({
         success: false,
-        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn user theo lisencecount.",
+        error: "Không đủ slot: tất cả tài khoản đã đạt giới hạn theo số slot (user_count).",
         distribution: distribution.map((item) => ({
           accountId: item.accountId,
           accountEmail: item.accountEmail,
@@ -171,7 +179,7 @@ const runAddUsersBatch = async (req, res) => {
               : null,
             otpSource,
             orgId: account[COLS.ORG_ID] || null,
-            maxUsers: resolveAccountUserLimit(account),
+            maxUsers: resolveAccountUserLimit(account, MAX_USERS_PER_ACCOUNT),
           }
         );
         if (!v2.success) {
@@ -179,20 +187,20 @@ const runAddUsersBatch = async (req, res) => {
         }
 
         const lisencecount = resolveLisenceCount({
-          usersSnapshot: account[COLS.USERS_SNAPSHOT],
+          usersSnapshot: null,
           alertConfig: account[COLS.ALERT_CONFIG],
         });
         const updatePayload = {
-          [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-          [COLS.USERS_SNAPSHOT]: JSON.stringify(
-            attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+          [COLS.USER_COUNT]: userCountDbValue(
+            lisencecount,
+            v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
           ),
         };
         if (v2.savedCookies) {
           updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
             account[COLS.ALERT_CONFIG],
             v2.savedCookies,
-            account[COLS.USERS_SNAPSHOT]
+            null
           );
         }
         await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
@@ -205,12 +213,19 @@ const runAddUsersBatch = async (req, res) => {
           });
         });
 
+        await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
+          logger.warn("[renew-adobe] Batch order_user_tracking failed", {
+            error: error.message,
+          });
+        });
+
         const addedCount = v2.addResult?.added?.length ?? item.added.length;
         results.push({
           accountId,
           accountEmail: item.accountEmail,
           added: item.added,
           user_count_after: updatePayload[COLS.USER_COUNT],
+          members_after: (v2.manageTeamMembers || []).length,
         });
         logger.info(
           "[renew-adobe] Batch: đã thêm %s user vào account %s (V2)",
@@ -310,7 +325,7 @@ const runAutoDeleteUsers = async ({
           [COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
             account[COLS.ALERT_CONFIG],
             result.savedCookies,
-            account[COLS.USERS_SNAPSHOT]
+            null
           ),
         });
     }

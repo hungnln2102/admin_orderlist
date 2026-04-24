@@ -5,7 +5,7 @@
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 async function main() {
-  const adobeRenewV2 = require("../src/services/adobe-renew-v2");
+  const adobeRenewV2 = require("../src/services/renew-adobe/adobe-renew-v2");
 
   console.log("DEBUG: typeof adobeRenewV2.checkAccount =", typeof adobeRenewV2.checkAccount);
   console.log("DEBUG: adobeRenewV2 keys =", Object.keys(adobeRenewV2).join(", "));

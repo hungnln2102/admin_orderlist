@@ -6,7 +6,7 @@ require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 
 async function main() {
   console.log("[debug] Loading adobeRenewV2...");
-  const adobeRenewV2 = require("../src/services/adobe-renew-v2");
+  const adobeRenewV2 = require("../src/services/renew-adobe/adobe-renew-v2");
   console.log("[debug] Loaded OK. checkAccount:", typeof adobeRenewV2.checkAccount);
 
   // Test với email/password giả để xem lỗi nào throw trước khi Playwright bắt đầu

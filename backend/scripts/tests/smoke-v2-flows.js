@@ -12,7 +12,7 @@ function assertFunction(obj, key) {
 }
 
 function main() {
-  const v2 = require("../../src/services/adobe-renew-v2");
+  const v2 = require("../../src/services/renew-adobe/adobe-renew-v2");
   const flowRoot = v2.flows;
 
   assert(flowRoot, "Thiếu export flows từ adobe-renew-v2/index.js");

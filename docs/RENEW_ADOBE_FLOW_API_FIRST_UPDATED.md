@@ -16,47 +16,47 @@ Tài liệu này mô tả lại luồng Renew Adobe sau khi đã refactor:
 
 ## 2) Thành phần đã thay đổi
 
-- `backend/src/services/adobe-renew-v2/shared/profileSession.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/shared/profileSession.js`
   - Quản lý persistent browser profile theo email admin.
   - Thư mục profile mặc định: `backend/.adobe-profiles/<email_sanitized>`.
 
-- `backend/src/services/adobe-renew-v2/runCheckFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/runCheckFlow.js`
   - Ưu tiên mở persistent context thay cho context tạm.
   - Nếu profile lỗi thì fallback về context cũ để tránh fail cứng.
 
-- `backend/src/services/adobe-renew-v2/flows/users/addUsersFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/flows/users/addUsersFlow.js`
   - Đã chuyển sang luồng 2 bước API:
     - Tạo user: `POST https://abpapi.adobe.io/abpapi/organizations/{orgId}@AdobeOrg/users`
     - Gán gói: `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users` với `op=add` vào `/products/{productId}`.
   - Nếu API tạo user báo lỗi nhưng user đã tồn tại trong org, hệ thống tiếp tục bước gán gói.
 
-- `backend/src/services/adobe-renew-v2/addUsersWithProductV2.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/addUsersWithProductV2.js`
   - Dùng persistent profile cho phiên add.
   - Báo lỗi `Add user API fail` (không còn `UI fail`).
 
-- `backend/src/services/adobe-renew-v2/flows/users/deleteUsersFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/flows/users/deleteUsersFlow.js`
   - Đã chuyển sang API-first cho delete user:
     - `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/users`
   - Payload xóa theo `id` user Adobe với `op=remove`, không còn click confirm trên DOM.
 
-- `backend/src/services/adobe-renew-v2/autoAssignFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/autoAssignFlow.js`
   - Đã chuyển sang luồng API-first để lấy/tạo auto-assign URL.
 
-- `backend/src/services/adobe-renew-v2/shared/usersListApi.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/shared/usersListApi.js`
   - Thêm helper gọi API danh sách user từ Adobe Admin Console.
   - Chuẩn hóa dữ liệu user trả về cho toàn bộ luồng check/snapshot.
 
-- `backend/src/services/adobe-renew-v2/checkInfoFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/checkInfoFlow.js`
   - B13 lấy danh sách user bằng API (không fallback DOM).
 
-- `backend/src/services/adobe-renew-v2/flows/users/snapshotFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/flows/users/snapshotFlow.js`
   - Snapshot user lấy trực tiếp từ API (không scrape DOM).
 
-- `backend/src/services/adobe-renew-v2/facade.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/facade.js`
   - Đồng bộ payload trả về để chứa đầy đủ thông tin user từ API.
   - Luồng check thực hiện B15 bằng API assignments khi admin còn product.
 
-- `backend/src/services/adobe-renew-v2/removeProductAdminFlow.js`
+- `backend/src/services/renew-adobe/adobe-renew-v2/removeProductAdminFlow.js`
   - Đã chuyển B15 sang API-first:
     - `PATCH https://bps-il.adobe.io/jil-api/v2/organizations/{orgId}@AdobeOrg/assignments`
   - Payload remove theo `userId/productId` của admin:

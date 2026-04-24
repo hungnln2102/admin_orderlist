@@ -7,8 +7,8 @@ const RENEW_ADOBE_SCHEMA = {
       PASSWORD_ENC: "password_encrypted",
       ORG_NAME: "org_name",
       LICENSE_STATUS: "license_status",
+      /** Số slot license (contract cap) */
       USER_COUNT: "user_count",
-      USERS_SNAPSHOT: "users_snapshot",
       ALERT_CONFIG: "cookie_config",
       OTP_SOURCE: "otp_source",
       LAST_CHECKED: "last_checked_at",
@@ -16,6 +16,8 @@ const RENEW_ADOBE_SCHEMA = {
       CREATED_AT: "created_at",
       MAIL_BACKUP_ID: "mail_backup_id",
       URL_ACCESS: "access_url",
+      /** Adobe product id (CCP) lấy sau check; có thể nhiều id cách nhau bởi dấu phẩy */
+      ID_PRODUCT: "id_product",
     },
   },
   PRODUCT_SYSTEM: {

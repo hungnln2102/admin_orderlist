@@ -5,14 +5,19 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
 const { TABLE, COLS } = require("./accountTable");
 const { persistCheckResult } = require("./checkSyncService");
 const {
-  attachLisenceCount,
-  resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  resolveAccountSeatLimit,
 } = require("./usersSnapshotUtils");
+const {
+  upsertRenewAdobeOrderUserTrackingForAccount,
+} = require("../../services/renew-adobe/orderUserTrackingService");
+const {
+  syncRenewAdobeMappingFromTeamMembers,
+} = require("../../services/userAccountMappingService");
 
 const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
 const mappingTable = tableName(mappingSchema.TABLE, SCHEMA_RENEW_ADOBE);
@@ -40,6 +45,20 @@ function pickOverflowUserEmails(manageTeamMembers, contractActiveLicenseCount) {
     })
     .slice(0, overflowCount)
     .map((item) => item.email);
+}
+
+async function syncMappingAndUpsertTracking(accountId, scrapedData, syncFromTeam) {
+  if (syncFromTeam) {
+    await syncRenewAdobeMappingFromTeamMembers(
+      accountId,
+      scrapedData?.manageTeamMembers || []
+    ).catch((err) => {
+      logger.warn("[renew-adobe] sync mapping từ team Adobe: %s", err.message);
+    });
+  }
+  await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((err) => {
+    logger.warn("[renew-adobe] order_user_tracking: %s", err.message);
+  });
 }
 
 async function markMappingProductFalse(accountId, userEmails) {
@@ -90,10 +109,7 @@ async function runCheckForAccountId(id) {
       : "";
   const existingOrgName =
     rawOrgName && rawOrgName !== "-" ? rawOrgName : undefined;
-  const cachedContractActiveLicenseCountRaw = resolveLisenceCount({
-    usersSnapshot: account[COLS.USERS_SNAPSHOT],
-    alertConfig: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
-  });
+  const cachedContractActiveLicenseCountRaw = resolveAccountSeatLimit(account);
   // Chỉ dùng cache khi > 0 để tránh stale "0" gây false expired và xóa nhầm user.
   const cachedContractActiveLicenseCount =
     Number(cachedContractActiveLicenseCountRaw) > 0
@@ -183,6 +199,7 @@ async function runCheckForAccountId(id) {
           scrapedData.licenseStatus,
           contractActiveLicenseCount
         );
+        await syncMappingAndUpsertTracking(id, scrapedData, true);
         return;
       }
 
@@ -197,9 +214,6 @@ async function runCheckForAccountId(id) {
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
         });
-        // Chỉ cập nhật user_count; giữ users_snapshot (danh sách email trước khi kick) để job
-        // renewAdobeCheckAndNotify → purgeAndDeleteNoLicenseAdobeAdminAccount vẫn có fallback
-        // khi user_account_mapping không có adobe_account_id (tránh mất danh sách reassign).
         await db(TABLE).where(COLS.ID, id).update({
           [COLS.USER_COUNT]: 0,
         });
@@ -262,7 +276,7 @@ async function runCheckForAccountId(id) {
             [COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
               result.savedCookies,
               deleteResult.savedCookies,
-              account[COLS.USERS_SNAPSHOT]
+              null
             ),
           });
         }
@@ -290,21 +304,7 @@ async function runCheckForAccountId(id) {
           Array.isArray(deleteResult.snapshot.manageTeamMembers)
         ) {
           await db(TABLE).where(COLS.ID, id).update({
-            [COLS.USER_COUNT]: deleteResult.snapshot.manageTeamMembers.length,
-            [COLS.USERS_SNAPSHOT]: JSON.stringify(
-              attachLisenceCount(
-                deleteResult.snapshot.manageTeamMembers,
-                contractActiveLicenseCount
-              )
-            ),
-          });
-        } else {
-          await db(TABLE).where(COLS.ID, id).update({
-            [COLS.USER_COUNT]: Math.max(
-              0,
-              (scrapedData.manageTeamMembers?.length || 0) -
-                (deleteResult.deleted?.length || 0)
-            ),
+            [COLS.USER_COUNT]: Number(contractActiveLicenseCount) || 0,
           });
         }
       } catch (deleteError) {
@@ -316,6 +316,8 @@ async function runCheckForAccountId(id) {
       }
     }
   }
+
+  await syncMappingAndUpsertTracking(id, scrapedData, hasActiveLicense);
 }
 
 const runCheck = async (req, res) => {

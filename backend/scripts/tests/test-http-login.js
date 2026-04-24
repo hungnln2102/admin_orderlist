@@ -10,7 +10,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
-const { checkAccount } = require("../../src/services/adobe-renew-v2");
+const { checkAccount } = require("../../src/services/renew-adobe/adobe-renew-v2");
 
 const email = process.argv[2] || "";
 const password = process.argv[3] || "";

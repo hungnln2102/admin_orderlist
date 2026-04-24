@@ -8,18 +8,14 @@ export type AdobeAdminAccount = {
   /** mail_backup.alias_prefix (OTP / Gmail +alias) */
   alias?: string | null;
   org_name: string | null;
+  /** Số slot license (contract cap / y trong cột SLOT), đồng bộ meta snapshot */
   user_count: number;
+  /** Số dòng order_user_tracking khớp org_name admin (x trong cột SLOT) */
+  tracking_user_count?: number;
   license_status: LicenseStatus;
-  users_snapshot?: string | null;
   order_code?: string | null;
   last_checked_at?: string | null;
   access_url?: string | null;
-};
-
-export type SnapshotUser = {
-  name: string | null;
-  email: string;
-  role?: string;
-  access?: string | boolean;
-  product?: boolean | string | number;
+  /** Adobe product id (CCP), ghi sau khi check thành công */
+  id_product?: string | null;
 };

@@ -25,12 +25,12 @@ require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
 const { db } = require("../../src/db");
 const { TABLE, COLS } = require("../../src/controllers/RenewAdobeController/accountTable");
-const { runCheckFlow } = require("../../src/services/adobe-renew-v2/runCheckFlow");
-const { resolveLisenceCount } = require("../../src/controllers/RenewAdobeController/usersSnapshotUtils");
+const { runCheckFlow } = require("../../src/services/renew-adobe/adobe-renew-v2/runCheckFlow");
+const { resolveAccountSeatLimit } = require("../../src/controllers/RenewAdobeController/usersSnapshotUtils");
 const {
   inferAdobeProProductIdSet,
   checkUserAssignedProduct,
-} = require("../../src/services/adobe-renew-v2/shared/accessChecks");
+} = require("../../src/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
 
 const adminEmailArg = (process.argv[2] || "").trim().toLowerCase();
 const debugUserEmail = (process.env.DEBUG_USER_EMAIL || "").trim().toLowerCase();
@@ -82,10 +82,7 @@ async function main() {
       String(account[COLS.URL_ACCESS]).trim()) ||
     null;
 
-  const cachedContractActiveLicenseCountRaw = resolveLisenceCount({
-    usersSnapshot: account[COLS.USERS_SNAPSHOT],
-    alertConfig: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
-  });
+  const cachedContractActiveLicenseCountRaw = resolveAccountSeatLimit(account);
   const cachedContractActiveLicenseCount =
     Number(cachedContractActiveLicenseCountRaw) > 0
       ? Number(cachedContractActiveLicenseCountRaw)

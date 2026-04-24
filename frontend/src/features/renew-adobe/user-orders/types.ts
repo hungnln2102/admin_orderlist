@@ -1,6 +1,6 @@
 import type { LicenseStatus } from "../types";
 
-/** not_added = email chưa có trong users_snapshot; no_product = đã add nhưng chưa gán product Adobe */
+/** not_added = chưa gán admin; no_product = đã gán nhưng chưa cấp quyền Adobe */
 export type DisplayStatus = LicenseStatus | "no_product" | "not_added";
 
 export type UserOrderRow = {
@@ -21,4 +21,10 @@ export type OrderInfo = {
   contact: string;
   expiry_date: string | null;
   status: string;
+  tracking_org_name?: string | null;
+  tracking_status?: string | null;
+  tracking_id_product?: string | null;
+  adobe_account_id?: number | null;
+  admin_license_status?: string | null;
+  admin_org_name?: string | null;
 };

@@ -39,7 +39,7 @@ async function main() {
     }
   }
 
-  const adobeRenewV2 = require("../../src/services/adobe-renew-v2");
+  const adobeRenewV2 = require("../../src/services/renew-adobe/adobe-renew-v2");
 
   try {
     console.log("[test] Gọi checkAccount (V2)...");

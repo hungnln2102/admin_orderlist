@@ -4,26 +4,20 @@
  * Luồng dữ liệu:
  * 1. order_list lọc theo variant_id thuộc hệ thống renew_adobe (product_system)
  * 2. API trả về order_code, information_order, customer, expiry_date, status
- * 3. Match email ↔ users_snapshot JSON → điền profile, tình trạng gói
+ * 3. Join order_user_tracking + mapping (API) → profile, tình trạng gói
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
-import type {
-  AdobeAdminAccount,
-  LicenseStatus,
-} from "@/features/renew-adobe/types";
+import type { LicenseStatus } from "@/features/renew-adobe/types";
 import { fetchRenewAdobeUserOrders } from "@/features/renew-adobe/user-orders/api";
 import type {
   DisplayStatus,
   OrderInfo,
   UserOrderRow,
 } from "@/features/renew-adobe/user-orders/types";
-import {
-  buildEmailOrderMap,
-  flattenToUserRows,
-} from "@/features/renew-adobe/user-orders/utils";
+import { flattenToUserRows } from "@/features/renew-adobe/user-orders/utils";
 
 const STATUS_LABELS: Record<LicenseStatus, string> = {
   paid: "Còn gói",
@@ -32,7 +26,7 @@ const STATUS_LABELS: Record<LicenseStatus, string> = {
   unknown: "Chờ gia hạn",
 };
 
-/** no_product = đã add team nhưng chưa gán product; not_added = chưa có trong users_snapshot */
+/** no_product = chưa cấp quyền Adobe; not_added = chưa gán admin */
 const DISPLAY_LABELS: Record<DisplayStatus, string> = {
   ...STATUS_LABELS,
   no_product: "Chưa cấp quyền",
@@ -63,7 +57,8 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
 }
 
 export type UserOrdersTableProps = {
-  accounts: AdobeAdminAccount[];
+  /** Đổi khi load lại danh sách admin → refetch user-orders (join API). */
+  accountsRefreshDep?: string;
   onDeleteUser?: (accountId: number, userEmail: string) => void;
   deletingId?: string | null;
   onFixUser?: (userEmail: string) => void;
@@ -74,7 +69,7 @@ export type UserOrdersTableProps = {
 };
 
 export function UserOrdersTable({
-  accounts,
+  accountsRefreshDep = "",
   onDeleteUser,
   deletingId,
   onFixUser,
@@ -90,10 +85,9 @@ export function UserOrdersTable({
     fetchRenewAdobeUserOrders()
       .then((data) => setOrderData(data))
       .catch(() => setOrderData([]));
-  }, [accounts]);
+  }, [accountsRefreshDep]);
 
-  const emailOrderMap = useMemo(() => buildEmailOrderMap(orderData), [orderData]);
-  const allRows = useMemo(() => flattenToUserRows(accounts, emailOrderMap), [accounts, emailOrderMap]);
+  const allRows = useMemo(() => flattenToUserRows(orderData), [orderData]);
 
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return allRows;
@@ -106,7 +100,7 @@ export function UserOrdersTable({
     );
   }, [allRows, searchTerm]);
 
-  /** Cùng điều kiện với nút Fix từng dòng: chưa khớp admin trong snapshot */
+  /** Chưa có adobe_account_id (chưa gán admin) */
   const fixableEmailsInView = useMemo(
     () =>
       filtered.filter((r) => r.accountId === 0).map((r) => r.email),

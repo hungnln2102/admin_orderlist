@@ -1,7 +1,7 @@
 /**
  * Gửi thông báo Telegram khi tài khoản Adobe không còn gói (license hết hạn).
  * Gửi vào topic ZERO_DAYS_TOPIC_ID.
- * Nội dung: tài khoản, org_name, danh sách user từ users_snapshot.
+ * Nội dung: tài khoản, org_name, danh sách email (mapped_user_emails hoặc users_snapshot legacy).
  */
 
 const logger = require("../../utils/logger");
@@ -18,6 +18,15 @@ const { isThreadError } = require("./errorHelpers");
  * @param {string|object[]|null} usersSnapshot
  * @returns {string}
  */
+function formatEmailList(emails) {
+  if (!Array.isArray(emails) || emails.length === 0) return null;
+  return emails
+    .map((e) => String(e || "").trim())
+    .filter(Boolean)
+    .map((e) => `• ${e}`)
+    .join("\n");
+}
+
 function formatUsersList(usersSnapshot) {
   let list = [];
   if (Array.isArray(usersSnapshot)) {
@@ -42,7 +51,7 @@ function formatUsersList(usersSnapshot) {
 
 /**
  * Gửi thông báo Telegram cho các tài khoản Adobe hết gói.
- * @param {Array<{ email: string, org_name?: string, users_snapshot?: string|object[] }>} accounts
+ * @param {Array<{ email: string, org_name?: string, mapped_user_emails?: string[], users_snapshot?: string|object[] }>} accounts
  */
 async function sendAdobeZeroDaysNotification(accounts = []) {
   logger.info("[Adobe][Telegram] sendAdobeZeroDaysNotification", {
@@ -66,7 +75,10 @@ async function sendAdobeZeroDaysNotification(accounts = []) {
     const acc = accounts[i];
     const email = (acc.email || "").toString().trim() || "—";
     const orgName = (acc.org_name ?? acc.orgName ?? "").toString().trim() || "—";
-    const usersList = formatUsersList(acc.users_snapshot ?? acc.usersSnapshot ?? null);
+    const fromMapped = formatEmailList(acc.mapped_user_emails ?? acc.mappedUserEmails);
+    const usersList =
+      fromMapped ||
+      formatUsersList(acc.users_snapshot ?? acc.usersSnapshot ?? null);
 
     const text = [
       "⚠️ <b>Adobe: Tài khoản không còn gói</b>",

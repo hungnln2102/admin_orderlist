@@ -1,5 +1,16 @@
 const { db } = require("../../db");
+const {
+  SCHEMA_RENEW_ADOBE,
+  RENEW_ADOBE_SCHEMA,
+  tableName,
+} = require("../../config/dbSchema");
 const { TABLE, COLS } = require("./accountTable");
+
+const MAP_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 
 const LOOKUP_COLUMNS = [
   `${TABLE}.${COLS.ID}`,
@@ -7,36 +18,15 @@ const LOOKUP_COLUMNS = [
   `${TABLE}.${COLS.ORG_NAME}`,
   `${TABLE}.${COLS.LICENSE_STATUS}`,
   `${TABLE}.${COLS.USER_COUNT}`,
-  `${TABLE}.${COLS.USERS_SNAPSHOT}`,
   `${TABLE}.${COLS.LAST_CHECKED}`,
   `${TABLE}.${COLS.IS_ACTIVE}`,
   `${TABLE}.${COLS.CREATED_AT}`,
   ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
+  ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : []),
 ];
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
-}
-
-function parseUsersSnapshot(rawValue) {
-  if (!rawValue) {
-    return [];
-  }
-
-  if (Array.isArray(rawValue)) {
-    return rawValue;
-  }
-
-  if (typeof rawValue === "string") {
-    try {
-      const parsed = JSON.parse(rawValue);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  return [];
 }
 
 function createLookupQuery() {
@@ -57,18 +47,27 @@ async function findAccountMatchByEmail(email) {
     return { account: row, matchedUser: null };
   }
 
-  const rows = await createLookupQuery()
-    .whereNotNull(COLS.USERS_SNAPSHOT)
-    .where(COLS.USERS_SNAPSHOT, "!=", "");
+  const mapping = await db(MAP_TABLE)
+    .whereRaw("LOWER(TRIM(COALESCE(??, ''))) = ?", [
+      MAP_COLS.USER_EMAIL,
+      emailLower,
+    ])
+    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .first();
 
-  for (const candidate of rows) {
-    const matchedUser = parseUsersSnapshot(candidate[COLS.USERS_SNAPSHOT]).find(
-      (user) => normalizeEmail(user?.email) === emailLower
-    );
-
-    if (matchedUser) {
-      row = candidate;
-      return { account: row, matchedUser };
+  if (mapping) {
+    const accountId = Number(mapping[MAP_COLS.ADOBE_ACCOUNT_ID]);
+    if (Number.isFinite(accountId) && accountId > 0) {
+      row = await createLookupQuery().where(COLS.ID, accountId).first();
+      if (row) {
+        return {
+          account: row,
+          matchedUser: {
+            email: emailLower,
+            product: mapping[MAP_COLS.PRODUCT],
+          },
+        };
+      }
     }
   }
 
@@ -77,6 +76,5 @@ async function findAccountMatchByEmail(email) {
 
 module.exports = {
   normalizeEmail,
-  parseUsersSnapshot,
   findAccountMatchByEmail,
 };

@@ -1,5 +1,6 @@
 import * as Helpers from "@/lib/helpers";
-import type { AdobeAdminAccount, LicenseStatus, SnapshotUser } from "../types";
+import type { LicenseStatus } from "../types";
+import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
 import type { DisplayStatus, OrderInfo, UserOrderRow } from "./types";
 
 /**
@@ -54,62 +55,46 @@ export function buildEmailOrderMap(
   return map;
 }
 
-export function flattenToUserRows(
-  accounts: AdobeAdminAccount[],
-  emailOrderMap: Map<string, OrderInfo>
-): UserOrderRow[] {
-  type SnapshotInfo = {
-    accountId: number;
-    orgName: string;
-    product: boolean | string | number | undefined;
-    licenseStatus: LicenseStatus;
-  };
-
-  const snapshotLookup = new Map<string, SnapshotInfo>();
-
-  for (const account of accounts) {
-    let users: SnapshotUser[] = [];
-
-    if (account.users_snapshot) {
-      try {
-        users = JSON.parse(account.users_snapshot) as SnapshotUser[];
-      } catch {
-        users = [];
-      }
-    }
-
-    for (const user of users) {
-      const key = (user.email || "").toLowerCase().trim();
-      if (key && !snapshotLookup.has(key)) {
-        snapshotLookup.set(key, {
-          accountId: account.id,
-          orgName: account.org_name ?? "—",
-          product: user.product,
-          licenseStatus: account.license_status,
-        });
-      }
-    }
+/** Trạng thái hiển thị từ order_user_tracking + admin (API user-orders đã join). */
+function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
+  const aid = Number(order.adobe_account_id) || 0;
+  if (aid <= 0) return "not_added";
+  const ts = (order.tracking_status || "").trim().toLowerCase();
+  if (ts.includes("chưa cấp")) return "no_product";
+  if (ts.includes("chưa add")) return "not_added";
+  if (ts.includes("có gói")) {
+    return normalizeIncomingLicenseStatus(order.admin_license_status);
   }
+  return "not_added";
+}
 
+export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
   const rows: UserOrderRow[] = [];
-  for (const [email, order] of emailOrderMap) {
-    const snapshot = snapshotLookup.get(email);
+  for (const order of orders) {
+    const email = (order.information_order || "").trim().toLowerCase();
+    if (!email) continue;
+    const aid = Number(order.adobe_account_id) || 0;
+    const profile =
+      (order.tracking_org_name != null &&
+        String(order.tracking_org_name).trim() !== "" &&
+        String(order.tracking_org_name).trim()) ||
+      (order.admin_org_name != null &&
+        String(order.admin_org_name).trim() !== "" &&
+        String(order.admin_org_name).trim()) ||
+      "—";
 
     rows.push({
-      id: snapshot ? `acc-${snapshot.accountId}-${email}` : `order-${email}`,
+      id: aid > 0 ? `acc-${aid}-${email}` : `order-${email}`,
       order_code: order.order_code ?? "—",
       customer_name: order.customer || "—",
       email,
-      profile: snapshot?.orgName ?? "—",
-      display_status: snapshot
-        ? resolveDisplayStatus(snapshot.product, snapshot.licenseStatus)
-        : "not_added",
+      profile,
+      display_status: displayStatusFromOrder(order),
       expiry: order.expiry_date
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",
-      accountId: snapshot?.accountId ?? 0,
+      accountId: aid,
     });
   }
-
   return rows;
 }

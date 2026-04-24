@@ -21,7 +21,11 @@ admin_orderlist/backend/src/
     index.js          ← Knex instance (db) — dùng cho mọi query
   services/
     adobe-http/       ← HTTP/Browser functions: autoDeleteUsers, addUsersWithProduct (v1)
-    adobe-renew-v2/   ← Playwright browser flows (V2): addUsersWithProductV2, autoAssignFlow
+    renew-adobe/      ← Luồng Renew Adobe (gom chung)
+      adobe-renew-v2/ ← Playwright V2: addUsersWithProductV2, facade, runCheckFlow, flows
+      orderUserTrackingService.js
+      renewAdobePurgeNoLicenseAccount.js
+      adobeCheckService.js  ← re-export adobe-renew-v2
     userAccountMappingService.js  ← CRUD bảng user_account_mapping
   scheduler/
     index.js          ← Đăng ký tất cả cron jobs
@@ -123,8 +127,8 @@ const ACTIVE_STATUSES = [STATUS.PROCESSING, STATUS.PAID, STATUS.RENEWAL];
 |---|---|---|
 | `adobe-http` | `autoDeleteUsers(email, pwd, [emails], opts)` | Xóa user khỏi org (browser V1) |
 | `adobe-http` | `addUsersWithProduct(email, pwd, [emails], opts)` | Add user + product (V1 - cũ) |
-| `adobe-renew-v2` | `addUsersWithProductV2(email, pwd, [emails], opts)` | Add user + product (V2 Playwright - ưu tiên dùng) |
-| `adobe-renew-v2` | `getOrCreateAutoAssignUrlWithPage(page, orgId, email, pwd, opts)` | Lấy/tạo URL auto-assign |
+| `renew-adobe/adobe-renew-v2` | `addUsersWithProductV2(email, pwd, [emails], opts)` | Add user + product (V2 Playwright - ưu tiên dùng) |
+| `renew-adobe/adobe-renew-v2` | `getOrCreateAutoAssignUrlWithPage(page, orgId, email, pwd, opts)` | Lấy/tạo URL auto-assign |
 | `RenewAdobeController` | `runCheckForAccountId(accountId)` | Crawl lại snapshot 1 account |
 
 ### userAccountMappingService — API

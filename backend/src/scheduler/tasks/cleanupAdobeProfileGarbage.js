@@ -6,7 +6,7 @@ const { TABLE, COLS } = require("../../controllers/RenewAdobeController/accountT
 const {
   getProfilesRootDir,
   sanitizeEmailForPath,
-} = require("../../services/adobe-renew-v2/shared/profileSession");
+} = require("../../services/renew-adobe/adobe-renew-v2/shared/profileSession");
 
 function buildExpectedProfileKeysFromEmails(emails = []) {
   const keys = new Set();

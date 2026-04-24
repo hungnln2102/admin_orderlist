@@ -1,6 +1,6 @@
 /**
- * In ra users_snapshot trong DB + kết quả inferAdobeProProductIdSet / applyAdobeProFlags
- * (cùng logic với JIL users API sau xử lý), không cần Playwright.
+ * In ra user từ user_account_mapping + kết quả inferAdobeProProductIdSet / applyAdobeProFlags
+ * (cột users_snapshot đã bỏ — nguồn đối chiếu là mapping + order_user_tracking).
  *
  * Usage (từ backend):
  *   node scripts/ops/dump-snapshot-flags-for-admin-email.js matthew.mack39211@graphiclean.site
@@ -10,12 +10,23 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
 const { db } = require("../../src/db");
+const {
+  SCHEMA_RENEW_ADOBE,
+  RENEW_ADOBE_SCHEMA,
+  tableName,
+} = require("../../src/config/dbSchema");
 const { TABLE, COLS } = require("../../src/controllers/RenewAdobeController/accountTable");
-const { applyAdobeProFlags } = require("../../src/services/adobe-renew-v2/shared/usersListApi");
+const { applyAdobeProFlags } = require("../../src/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   inferAdobeProProductIdSet,
   parseCcpProductIdsFromAlertConfig,
-} = require("../../src/services/adobe-renew-v2/shared/accessChecks");
+} = require("../../src/services/renew-adobe/adobe-renew-v2/shared/accessChecks");
+
+const MAP_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 
 async function main() {
   const target = (process.argv[2] || "").trim().toLowerCase();
@@ -33,20 +44,17 @@ async function main() {
     process.exit(1);
   }
 
-  let snap = [];
-  try {
-    snap = JSON.parse(row[COLS.USERS_SNAPSHOT] || "[]");
-  } catch (e) {
-    console.error("Parse users_snapshot lỗi:", e.message);
-    process.exit(1);
-  }
+  const accountId = Number(row[COLS.ID]);
+  const emails = await db(MAP_TABLE)
+    .where(MAP_COLS.ADOBE_ACCOUNT_ID, accountId)
+    .pluck(MAP_COLS.USER_EMAIL);
 
   const admin = String(row[COLS.EMAIL] || "").trim().toLowerCase();
-  const asApiUsers = snap.map((u) => ({
-    id: u.id || null,
-    name: u.name || "",
-    email: String(u.email || "").trim(),
-    products: Array.isArray(u.products) ? u.products : [],
+  const asApiUsers = emails.map((email) => ({
+    id: null,
+    name: "",
+    email: String(email || "").trim(),
+    products: [],
     accountStatus: null,
     product: false,
     hasProduct: false,
@@ -57,7 +65,7 @@ async function main() {
   const flagged = applyAdobeProFlags(asApiUsers, admin, pinnedFromDb);
 
   const out = {
-    source: "db_users_snapshot",
+    source: "user_account_mapping",
     adminEmail: row[COLS.EMAIL],
     org_name: row[COLS.ORG_NAME],
     license_status: row[COLS.LICENSE_STATUS],
