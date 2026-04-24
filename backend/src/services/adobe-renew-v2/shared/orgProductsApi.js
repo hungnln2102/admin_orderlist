@@ -1,6 +1,9 @@
 const logger = require("../../../utils/logger");
-const { ADMIN_CONSOLE_API_BASE } = require("./constants");
-const { normalizeOrgToken } = require("./usersListApi");
+const { ADMIN_CONSOLE_API_BASE, resolveAdobeEmbedPageUrl } = require("./constants");
+const {
+  normalizeOrgToken,
+  buildForwardHeadersFromCapturedRequest,
+} = require("./usersListApi");
 const { extractCcpSeatProductIdsFromOrgProductsList } = require("./accessChecks");
 
 /** Query đúng Admin Console (JIL products) — tách CCP vs gói member theo longName. */
@@ -10,57 +13,72 @@ const PRODUCTS_LIST_QUERY =
   "&include_license_allocation_info=false&include_pricing_data=false&includeFulfillableItemCodesOnly=true" +
   "&processing_instruction_codes=administration";
 
-async function captureProductsApiHeaders(page, orgToken) {
-  const token = normalizeOrgToken(orgToken);
-  const reqPromise = page.waitForRequest(
-    (req) =>
-      req.method() === "GET" &&
-      req.url().includes(`/jil-api/v2/organizations/${token}/products`) &&
-      !req.url().includes("/users"),
-    { timeout: 30000 }
+function isAdobeEmbedHostPageUrl(url) {
+  const u = String(url || "");
+  return (
+    /:\/\/(www\.)?adobe\.com\//i.test(u) ||
+    /:\/\/account\.adobe\.com\//i.test(u) ||
+    /:\/\/experience\.adobe\.com\//i.test(u)
   );
-
-  const cur = String(page.url() || "");
-  const productsHref = `https://adminconsole.adobe.com/${token}/products`;
-  const orgHex = token.split("@")[0] || "";
-  const alreadyOnProducts =
-    /adminconsole\.adobe\.com\/[^/]+@AdobeOrg\/products/i.test(cur) &&
-    (orgHex ? cur.includes(orgHex) : false);
-
-  if (alreadyOnProducts) {
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
-  } else {
-    await page.goto(productsHref, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
-  }
-
-  const req = await reqPromise;
-  const headers = req.headers();
-  const authorization = headers.authorization || headers.Authorization || "";
-  const xApiKey = headers["x-api-key"] || headers["X-Api-Key"] || "";
-
-  if (!authorization || !xApiKey) {
-    throw new Error("Thiếu authorization/x-api-key từ request products.");
-  }
-
-  return {
-    accept: "application/json, text/plain, */*",
-    "content-type": "application/json",
-    authorization,
-    "x-api-key": xApiKey,
-    "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
-    "x-jil-feature": headers["x-jil-feature"] || "",
-    origin: "https://adminconsole.adobe.com",
-    referer: productsHref,
-  };
 }
 
-async function fetchOrganizationProductsJson(page, orgToken, headers) {
+async function captureProductsApiHeaders(page, orgToken) {
+  const token = normalizeOrgToken(orgToken);
+  const matchProducts = (req) =>
+    req.method() === "GET" &&
+    req.url().includes(`/jil-api/v2/organizations/${token}/products`) &&
+    !req.url().includes("/users");
+
+  const embedUrl = resolveAdobeEmbedPageUrl();
+  const orgHex = token.split("@")[0] || "";
+  const productsHref = `https://adminconsole.adobe.com/${token}/products`;
+
+  const captureOnce = async (navFn) => {
+    const reqPromise = page.waitForRequest(matchProducts, { timeout: 32000 });
+    await navFn();
+    return reqPromise;
+  };
+
+  const cur = String(page.url() || "");
+  try {
+    const req = await captureOnce(async () => {
+      if (isAdobeEmbedHostPageUrl(cur)) {
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+        return;
+      }
+      await page.goto(embedUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+    });
+    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
+  } catch (e1) {
+    logger.warn(
+      "[adobe-v2] products-api: không bắt JIL trên Adobe.com (%s), thử adminconsole/products",
+      e1.message
+    );
+    const req = await captureOnce(async () => {
+      const u = String(page.url() || "");
+      if (
+        /adminconsole\.adobe\.com\/[^/]+@AdobeOrg\/products/i.test(u) &&
+        (orgHex ? u.includes(orgHex) : true)
+      ) {
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+        return;
+      }
+      await page.goto(productsHref, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+    });
+    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
+  }
+}
+
+async function fetchOrganizationProductsJson(page, orgToken, forwardedHeaders) {
   const token = normalizeOrgToken(orgToken);
   const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${token}/products${PRODUCTS_LIST_QUERY}`;
-  const resp = await page.context().request.get(url, { headers, timeout: 30000 });
+  const resp = await page.context().request.get(url, { headers: forwardedHeaders, timeout: 30000 });
   const text = await resp.text().catch(() => "");
   if (!resp.ok()) {
     throw new Error(`Products API fail ${resp.status()}: ${text.slice(0, 220)}`);
@@ -84,8 +102,8 @@ async function fetchVerifiedCcpSeatProductIdsFromOrgProductsApi(page, orgId) {
   if (!orgNorm) return [];
   const token = normalizeOrgToken(orgNorm);
   try {
-    const headers = await captureProductsApiHeaders(page, token);
-    const list = await fetchOrganizationProductsJson(page, token, headers);
+    const { forwardedHeaders } = await captureProductsApiHeaders(page, token);
+    const list = await fetchOrganizationProductsJson(page, token, forwardedHeaders);
     const ids = extractCcpSeatProductIdsFromOrgProductsList(list);
     logger.info(
       "[adobe-v2] products-api: org products=%d, ccp_seat_product_ids=%d",

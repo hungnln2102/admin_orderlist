@@ -34,6 +34,18 @@ const DEFAULT_HEADERS = {
 const ADMIN_CONSOLE_API_BASE = "https://bps-il.adobe.io";
 const USER_MANAGEMENT_API = "https://usermanagement.adobe.io";
 
+/**
+ * Trang Adobe (www / home, …) nơi SPA gọi bps-il + abpapi — không phải adminconsole.adobe.com.
+ * Ghi đè bằng ADOBE_EMBED_PAGE_URL nếu team có URL cụ thể (vd. trang quản lý gói).
+ */
+function resolveAdobeEmbedPageUrl() {
+  const raw = String(process.env.ADOBE_EMBED_PAGE_URL || "").trim();
+  if (raw && /^https:\/\//i.test(raw)) {
+    return raw;
+  }
+  return `${ADOBE_WWW}/home`;
+}
+
 module.exports = {
   TIMEOUTS,
   ADOBE_IMS_BASE,
@@ -46,4 +58,5 @@ module.exports = {
   DEFAULT_HEADERS,
   ADMIN_CONSOLE_API_BASE,
   USER_MANAGEMENT_API,
+  resolveAdobeEmbedPageUrl,
 };
