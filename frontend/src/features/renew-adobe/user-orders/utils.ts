@@ -13,7 +13,17 @@ export function userHasAssignedProduct(
   if (typeof userProduct === "number") return userProduct === 1;
   if (typeof userProduct === "string") {
     const n = userProduct.trim().toLowerCase();
-    return n === "true" || n === "1" || n === "yes";
+    return (
+      n === "true" ||
+      n === "1" ||
+      n === "yes" ||
+      n.includes("ccp") ||
+      n.includes("creative cloud pro") ||
+      n.includes("creativecloudpro") ||
+      n.includes("all apps") ||
+      n.includes("all-app") ||
+      n.includes("all app")
+    );
   }
   return false;
 }

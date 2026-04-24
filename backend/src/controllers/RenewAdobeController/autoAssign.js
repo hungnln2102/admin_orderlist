@@ -353,7 +353,7 @@ async function runCheckAllAccountsFlow({
       let updated = await db(TABLE).where(COLS.ID, id).first();
       let removedFromDb = false;
       const statusAfterCheck = updated?.[COLS.LICENSE_STATUS] ?? null;
-      if (updated && shouldPurgeAdobeAccountByLicenseStatus(statusAfterCheck)) {
+      if (updated && shouldPurgeAdobeAccountByLicenseStatus(statusAfterCheck, updated)) {
         nonPaidForTelegram.push({
           id,
           email,

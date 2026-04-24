@@ -14,10 +14,21 @@ function isPaidLikeLicenseStatus(value) {
  * Chỉ purge tài khoản khi trạng thái rõ ràng là không còn gói.
  * Không purge khi `unknown` (check không chốt được) để tránh xóa nhầm.
  */
-function shouldPurgeAdobeAccountByLicenseStatus(value) {
+function shouldPurgeAdobeAccountByLicenseStatus(value, account = null) {
   const n = normalizeLicenseStatus(value);
   if (n === "unknown") return false;
-  return !ACTIVE_LICENSE_STATUSES.has(n);
+  if (ACTIVE_LICENSE_STATUSES.has(n)) return false;
+
+  const contractActiveLicenseCount = Number(
+    resolveLisenceCount({
+      usersSnapshot: account?.users_snapshot,
+      alertConfig: account?.cookie_config ?? account?.alert_config ?? null,
+    }) || 0
+  );
+  // Safe-guard: nếu còn license count > 0 thì chưa purge account để tránh xóa nhầm.
+  if (contractActiveLicenseCount > 0) return false;
+
+  return true;
 }
 
 function resolveUserProductState(user) {

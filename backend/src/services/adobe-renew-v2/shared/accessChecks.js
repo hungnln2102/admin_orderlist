@@ -13,13 +13,27 @@ function normalizeProductName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isCcpLikeName(value) {
+  const name = normalizeProductName(value);
+  if (!name) return false;
+  return (
+    name.includes("ccp") ||
+    name.includes("creative cloud pro") ||
+    name.includes("creativecloudpro") ||
+    name.includes("all apps") ||
+    name.includes("all-app") ||
+    name.includes("all app")
+  );
+}
+
 function isCcpLikeProduct(item) {
   if (!item || typeof item !== "object") return false;
-  const name = normalizeProductName(
+  const rawId = toNormalizedProductId(extractProductId(item));
+  if (rawId && rawId.includes("CCP")) return true;
+  const name = (
     item.name || item.productName || item.displayName || item.title || ""
   );
-  if (!name) return false;
-  return name.includes("ccp") || name.includes("creative cloud pro");
+  return isCcpLikeName(name);
 }
 
 function extractProductIds(products) {
@@ -52,9 +66,12 @@ function inferAdobeProProductIdSet(users, adminEmail = "") {
 function hasAdobeProAccessFromProducts(products, proProductIds) {
   if (!Array.isArray(products) || products.length === 0) return false;
   const ids = proProductIds instanceof Set ? proProductIds : new Set();
-  if (ids.size === 0) return false;
+  if (ids.size === 0) {
+    return products.some((item) => isCcpLikeProduct(item));
+  }
   return products.some((item) =>
-    ids.has(toNormalizedProductId(extractProductId(item)))
+    ids.has(toNormalizedProductId(extractProductId(item))) ||
+    isCcpLikeProduct(item)
   );
 }
 
