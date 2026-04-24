@@ -6,12 +6,29 @@ const {
 } = require("./usersListApi");
 const { extractCcpSeatProductIdsFromOrgProductsList } = require("./accessChecks");
 
-/** Query đúng Admin Console (JIL products) — tách CCP vs gói member theo longName. */
-const PRODUCTS_LIST_QUERY =
+/**
+ * Query mặc định khi không parse được từ request đã bắt — khớp SPA www.adobe.com/manage-team (JIL products).
+ */
+const PRODUCTS_LIST_QUERY_MANAGE_TEAM =
   "?include_created_date=true&include_expired=true&include_groups_quantity=false" +
   "&include_inactive=false&include_legacy_ls_fields=true&include_license_activations=true" +
   "&include_license_allocation_info=false&include_pricing_data=false&includeFulfillableItemCodesOnly=true" +
   "&processing_instruction_codes=administration";
+
+/**
+ * Lấy nguyên `?include=…` từ URL request mà trình duyệt vừa gửi (manage-team hoặc admin console) để gọi lại cho đúng contract.
+ */
+function extractProductsListQueryFromRequestUrl(reqUrl) {
+  try {
+    const parsed = new URL(String(reqUrl || ""));
+    const path = String(parsed.pathname || "").replace(/\/+$/, "");
+    if (!/\/products$/i.test(path)) return null;
+    const search = parsed.search;
+    return search && search.length > 1 ? search : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 function isAdobeEmbedHostPageUrl(url) {
   const u = String(url || "");
@@ -39,6 +56,13 @@ async function captureProductsApiHeaders(page, orgToken) {
     return reqPromise;
   };
 
+  const buildResult = (req) => {
+    const forwardedHeaders = buildForwardHeadersFromCapturedRequest(req);
+    const productsListQuery =
+      extractProductsListQueryFromRequestUrl(req.url()) || PRODUCTS_LIST_QUERY_MANAGE_TEAM;
+    return { forwardedHeaders, productsListQuery };
+  };
+
   /** Admin Console products là nơi JIL products được gọi ổn định; tránh goto embed mặc định (hay gặp net::ERR_HTTP2_PROTOCOL_ERROR trên một số host). */
   try {
     const req = await captureOnce(async () => {
@@ -55,7 +79,7 @@ async function captureProductsApiHeaders(page, orgToken) {
         timeout: 60000,
       });
     });
-    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
+    return buildResult(req);
   } catch (e1) {
     logger.warn(
       "[adobe-v2] products-api: không bắt JIL trên adminconsole/products (%s), thử embed (%s)",
@@ -73,13 +97,20 @@ async function captureProductsApiHeaders(page, orgToken) {
         timeout: 60000,
       });
     });
-    return { forwardedHeaders: buildForwardHeadersFromCapturedRequest(req) };
+    return buildResult(req);
   }
 }
 
-async function fetchOrganizationProductsJson(page, orgToken, forwardedHeaders) {
+async function fetchOrganizationProductsJson(
+  page,
+  orgToken,
+  forwardedHeaders,
+  productsListQuery
+) {
   const token = normalizeOrgToken(orgToken);
-  const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${token}/products${PRODUCTS_LIST_QUERY}`;
+  const raw = String(productsListQuery || "").trim() || PRODUCTS_LIST_QUERY_MANAGE_TEAM;
+  const query = raw.startsWith("?") ? raw : `?${raw}`;
+  const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${token}/products${query}`;
   const resp = await page.context().request.get(url, { headers: forwardedHeaders, timeout: 30000 });
   const text = await resp.text().catch(() => "");
   if (!resp.ok()) {
@@ -104,8 +135,13 @@ async function fetchVerifiedCcpSeatProductIdsFromOrgProductsApi(page, orgId) {
   if (!orgNorm) return [];
   const token = normalizeOrgToken(orgNorm);
   try {
-    const { forwardedHeaders } = await captureProductsApiHeaders(page, token);
-    const list = await fetchOrganizationProductsJson(page, token, forwardedHeaders);
+    const { forwardedHeaders, productsListQuery } = await captureProductsApiHeaders(page, token);
+    const list = await fetchOrganizationProductsJson(
+      page,
+      token,
+      forwardedHeaders,
+      productsListQuery
+    );
     const ids = extractCcpSeatProductIdsFromOrgProductsList(list);
     logger.info(
       "[adobe-v2] products-api: org products=%d, ccp_seat_count=%d, ccp_seat_product_ids=[%s]",
@@ -124,4 +160,6 @@ module.exports = {
   fetchVerifiedCcpSeatProductIdsFromOrgProductsApi,
   captureProductsApiHeaders,
   fetchOrganizationProductsJson,
+  extractProductsListQueryFromRequestUrl,
+  PRODUCTS_LIST_QUERY_MANAGE_TEAM,
 };
