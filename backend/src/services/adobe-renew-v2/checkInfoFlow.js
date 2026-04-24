@@ -205,7 +205,7 @@ function scrapeUsersPage(page) {
  * B10–B13: Profile name (account.adobe.com) → products → users (adminconsole).
  * Nếu options.existingOrgName có sẵn thì bỏ qua B10–B11 (không vào account.adobe.com lấy profile).
  * @param {import('playwright').Page} page
- * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, adminLoginEmail?: string|null }} options
+ * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, adminLoginEmail?: string|null, pinnedCcpProductIds?: string[] }} options
  * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number, jil_users_raw_pages?: unknown[] }>}
  */
 async function runB10ToB13(page, options = {}) {
@@ -218,6 +218,9 @@ async function runB10ToB13(page, options = {}) {
     options.adminLoginEmail && String(options.adminLoginEmail).trim()
       ? String(options.adminLoginEmail).trim()
       : "";
+  const pinnedCcpProductIds = Array.isArray(options.pinnedCcpProductIds)
+    ? options.pinnedCcpProductIds
+    : [];
   let org_name = null;
   let orgId = null;
   let products = [];
@@ -276,7 +279,11 @@ async function runB10ToB13(page, options = {}) {
   if (!orgId) orgId = extractOrgIdFromUrl(page.url());
   let apiUsers;
   try {
-    apiUsers = await fetchUsersViaApi(page, { orgId, adminEmail: adminLoginEmail });
+    apiUsers = await fetchUsersViaApi(page, {
+      orgId,
+      adminEmail: adminLoginEmail,
+      pinnedCcpProductIds,
+    });
     mergeJilRaw(apiUsers);
   } catch (usersErr) {
     if (cachedContractActiveLicenseCount == null) {
@@ -296,7 +303,11 @@ async function runB10ToB13(page, options = {}) {
       })
       .catch(() => {});
     await page.waitForLoadState("networkidle", { timeout: 28000 }).catch(() => {});
-    apiUsers = await fetchUsersViaApi(page, { orgId, adminEmail: adminLoginEmail });
+    apiUsers = await fetchUsersViaApi(page, {
+      orgId,
+      adminEmail: adminLoginEmail,
+      pinnedCcpProductIds,
+    });
     mergeJilRaw(apiUsers);
   }
   orgId = orgId || extractOrgIdFromToken(apiUsers?.orgToken);

@@ -1,8 +1,8 @@
 const { fetchUsersViaApi } = require("../../shared/usersListApi");
 const { exportCookies } = require("../login");
 
-async function runUsersSnapshotFlow(page, { adminEmail = "" } = {}) {
-  const apiResult = await fetchUsersViaApi(page, { adminEmail });
+async function runUsersSnapshotFlow(page, { adminEmail = "", pinnedCcpProductIds = [] } = {}) {
+  const apiResult = await fetchUsersViaApi(page, { adminEmail, pinnedCcpProductIds });
   const users = apiResult.users.map((u) => ({
     id: u.id || null,
     authenticatingAccountId: u.authenticatingAccountId || null,

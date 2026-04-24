@@ -219,6 +219,7 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
         async () =>
           adobeRenewV2.addUsersWithProductV2(accountEmail, accountPassword, chunk, {
             savedCookies,
+            savedCookiesFromDb: account[ACCOUNT_COLS.ALERT_CONFIG] ?? null,
             mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
             otpSource,
             maxUsers: account.userLimit,

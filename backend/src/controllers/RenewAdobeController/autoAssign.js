@@ -170,6 +170,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
         emails,
         {
           savedCookies,
+          savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null,
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
           orgId: account[COLS.ORG_ID] || null,

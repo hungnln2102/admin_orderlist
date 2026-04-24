@@ -89,6 +89,7 @@ async function buildSuccessResult({
   existingOrgName = null,
   cachedContractActiveLicenseCount = null,
   forceProductCheck = false,
+  pinnedCcpProductIds = [],
   adminLoginEmail = null,
   cookieLogLabel = "Lưu cookies",
   includeWithExpiry = false,
@@ -107,6 +108,7 @@ async function buildSuccessResult({
     existingOrgName,
     cachedContractActiveLicenseCount,
     forceProductCheck,
+    pinnedCcpProductIds,
     adminLoginEmail,
   });
   if (includeWithExpiry) {

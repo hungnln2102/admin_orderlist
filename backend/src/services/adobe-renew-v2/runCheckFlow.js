@@ -35,7 +35,7 @@ function mapRunCheckErrorCode(error) {
  * Nếu options.sharedSession = { context, page } thì dùng browser có sẵn (B14 có thể dùng tiếp), không đóng browser.
  * @param {string} email - Email đăng nhập Adobe
  * @param {string} password - Mật khẩu
- * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, onlyLogin?: boolean }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users).
+ * @param {{ savedCookies?: any[], mailBackupId?: number, otpSource?: string, sharedSession?: { context: import('playwright').BrowserContext, page: import('playwright').Page }, existingOrgName?: string, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, onlyLogin?: boolean, pinnedCcpProductIds?: string[] }} options - existingOrgName: bỏ qua B10–B11; onlyLogin: chỉ B1–B9 (login), không chạy B10–B13 (check org/products/users). pinnedCcpProductIds: id CCP đã lưu trong DB cho admin này.
  * @returns {Promise<{ success: boolean, error?: string, org_name?: string, license_status?: string, products?: any[], users?: any[], cookies?: any[] }>}
  */
 async function runCheckFlow(email, password, options = {}) {
@@ -49,6 +49,7 @@ async function runCheckFlow(email, password, options = {}) {
     cachedContractActiveLicenseCount = null,
     forceProductCheck = false,
     onlyLogin = false,
+    pinnedCcpProductIds = [],
   } = options;
   let ownedContext = null;
   let context;
@@ -165,6 +166,7 @@ async function runCheckFlow(email, password, options = {}) {
         existingOrgName: resolvedOrgName,
         cachedContractActiveLicenseCount,
         forceProductCheck,
+        pinnedCcpProductIds,
         adminLoginEmail: email,
         cookieLogLabel: "Lưu cookies sau login mới",
         includeWithExpiry: false,
@@ -197,6 +199,7 @@ async function runCheckFlow(email, password, options = {}) {
         existingOrgName,
         cachedContractActiveLicenseCount,
         forceProductCheck,
+        pinnedCcpProductIds,
         adminLoginEmail: email,
         cookieLogLabel: "Lưu cookies",
         includeWithExpiry: false,
@@ -222,6 +225,7 @@ async function runCheckFlow(email, password, options = {}) {
       existingOrgName: resolvedOrgName,
       cachedContractActiveLicenseCount,
       forceProductCheck,
+      pinnedCcpProductIds,
       adminLoginEmail: email,
       cookieLogLabel: "Lưu cookies",
       includeWithExpiry: true,

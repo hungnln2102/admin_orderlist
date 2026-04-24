@@ -125,6 +125,7 @@ async function assignUserToAvailableAccount(userEmail) {
     [normalizedEmail],
     {
       savedCookies,
+      savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
       mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
       otpSource,
       maxUsers: target.userLimit,
@@ -269,6 +270,7 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       chunk,
       {
         savedCookies,
+        savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
         mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
         otpSource,
         maxUsers: target.userLimit,

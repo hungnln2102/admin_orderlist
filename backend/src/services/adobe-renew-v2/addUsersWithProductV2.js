@@ -6,6 +6,7 @@
 
 const logger = require("../../utils/logger");
 const { runCheckFlow } = require("./runCheckFlow");
+const { parseCcpProductIdsFromAlertConfig } = require("./shared/accessChecks");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { launchSessionFromProfile } = require("./shared/profileSession");
 const { checkUserAssignedProduct } = require("./shared/usersListApi");
@@ -45,6 +46,13 @@ function buildDetailedAddUsersError(addResult) {
 
 async function addUsersWithProductV2(adminEmail, password, userEmails, options = {}) {
   const savedCookies = options.savedCookies || [];
+  const pinnedCcpProductIds = parseCcpProductIdsFromAlertConfig(
+    options.savedCookiesFromDb != null
+      ? options.savedCookiesFromDb
+      : !Array.isArray(options.savedCookies) && options.savedCookies && typeof options.savedCookies === "object"
+        ? options.savedCookies
+        : null
+  );
   const mailBackupId = options.mailBackupId || null;
   const otpSource = options.otpSource || "imap";
   const emails = Array.isArray(userEmails) ? userEmails.map((e) => String(e || "").trim().toLowerCase()).filter(Boolean) : [];
@@ -113,7 +121,10 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     await runGotoUsersFlow(page);
 
     if (Number.isFinite(maxUsers) && maxUsers > 0) {
-      const preAddSnapshot = await runUsersSnapshotFlow(page, { adminEmail });
+      const preAddSnapshot = await runUsersSnapshotFlow(page, {
+        adminEmail,
+        pinnedCcpProductIds,
+      });
       const currentMembers = Number.parseInt(preAddSnapshot?.userCount, 10) || 0;
       if (currentMembers >= maxUsers) {
         return {
@@ -149,13 +160,19 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     // Product đã được assign ngay trong runAddUsersFlow (create user + PATCH add product).
 
     await runGotoUsersFlow(page);
-    const snapshotAfterAdd = await runUsersSnapshotFlow(page, { adminEmail });
+    const snapshotAfterAdd = await runUsersSnapshotFlow(page, {
+      adminEmail,
+      pinnedCcpProductIds,
+    });
     let confirmedSnapshot = snapshotAfterAdd;
     try {
       // Adobe có độ trễ đồng bộ product theo user, nên re-fetch thêm 1 lần để chốt trạng thái thật.
       await page.waitForTimeout(POST_ADD_REFRESH_DELAY_MS);
       await runGotoUsersFlow(page);
-      confirmedSnapshot = await runUsersSnapshotFlow(page, { adminEmail });
+      confirmedSnapshot = await runUsersSnapshotFlow(page, {
+        adminEmail,
+        pinnedCcpProductIds,
+      });
     } catch (refreshErr) {
       logger.warn(
         "[adobe-v2] addUsersWithProductV2: re-fetch users after add failed, fallback snapshot đầu: %s",
@@ -173,7 +190,8 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       const check = checkUserAssignedProduct(
         confirmedSnapshot.users || [],
         email,
-        adminEmail
+        adminEmail,
+        pinnedCcpProductIds
       );
       return {
         email,

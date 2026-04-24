@@ -20,6 +20,12 @@ const {
   applyAdobeProFlags,
   checkUserAssignedProduct,
 } = require("./shared/usersListApi");
+const {
+  discoverAdobeProProductIdSet,
+  computeCcpProductIdsToPersist,
+  parseCcpProductIdsFromAlertConfig,
+} = require("./shared/accessChecks");
+const { mergeRenewAdobeAlertConfig } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
 
 /**
  * Chuẩn hóa savedCookiesFromDb từ DB.
@@ -46,7 +52,7 @@ function normalizeSavedCookiesFromDb(raw) {
  * Check account theo luồng V2 (B1-B13 + B14/B15 nếu cần).
  * @param {string} email
  * @param {string} password
- * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, otpSource?: string|null, existingUrlAccess?: string|null, existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean }} options
+ * @param {{ savedCookiesFromDb?: any, mailBackupId?: number|null, otpSource?: string|null, existingUrlAccess?: string|null, existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean }} options - cookie_config có thể chứa ccp_product_ids (ghi sau check) để các lần sau chỉ đối chiếu theo id.
  * @returns {Promise<{ success: boolean, scrapedData: any|null, savedCookies: any|null, error?: string }>}
  */
 async function checkAccount(email, password, options = {}) {
@@ -67,6 +73,7 @@ async function checkAccount(email, password, options = {}) {
       ? Number(options.cachedContractActiveLicenseCount)
       : null;
   const forceProductCheck = options.forceProductCheck === true;
+  const pinnedFromDb = parseCcpProductIdsFromAlertConfig(options.savedCookiesFromDb);
 
   const headless = process.env.PLAYWRIGHT_HEADLESS !== "false";
   const proxyOptions = getPlaywrightProxyOptions();
@@ -127,6 +134,7 @@ async function checkAccount(email, password, options = {}) {
       existingOrgName,
       cachedContractActiveLicenseCount,
       forceProductCheck,
+      pinnedCcpProductIds: pinnedFromDb,
     });
 
     if (!result.success) {
@@ -135,7 +143,15 @@ async function checkAccount(email, password, options = {}) {
 
     const currentPage = sharedSession.page;
     const adminEmail = email.toLowerCase().trim();
-    const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail);
+    const discoveredIds = [
+      ...discoverAdobeProProductIdSet(result.users || [], adminEmail),
+    ];
+    const nextPinned = computeCcpProductIdsToPersist({
+      existingPinned: pinnedFromDb,
+      discovered: discoveredIds,
+      forceRefresh: forceProductCheck,
+    });
+    const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail, nextPinned);
     const users = flaggedUsers.map((u) => ({
       id: u.id || null,
       authenticatingAccountId: u.authenticatingAccountId || null,
@@ -148,7 +164,12 @@ async function checkAccount(email, password, options = {}) {
     const hasProducts = (result.products || []).length > 0;
     const hasActiveLicenseByCount =
       Number(result.contractActiveLicenseCount || 0) > 0;
-    const adminProductCheck = checkUserAssignedProduct(users, adminEmail, adminEmail);
+    const adminProductCheck = checkUserAssignedProduct(
+      users,
+      adminEmail,
+      adminEmail,
+      nextPinned
+    );
     const adminHasProduct =
       (hasProducts || hasActiveLicenseByCount) &&
       adminProductCheck.assigned === true;
@@ -212,13 +233,21 @@ async function checkAccount(email, password, options = {}) {
       urlAccess,
     };
 
-    const savedCookies = {
+    const partialIncoming = {
       cookies: result.cookies || [],
       savedAt: new Date().toISOString(),
       contractActiveLicenseCount: Number(
         result.contractActiveLicenseCount || 0
       ),
     };
+    if (nextPinned.length > 0) {
+      partialIncoming.ccp_product_ids = nextPinned;
+    }
+    const savedCookies = mergeRenewAdobeAlertConfig(
+      options.savedCookiesFromDb,
+      partialIncoming,
+      JSON.stringify(manageTeamMembers)
+    );
 
     return {
       success: true,
@@ -305,13 +334,14 @@ async function autoDeleteUsers(email, password, userEmails, options = {}) {
  * @param {string} email
  * @param {string} password
  * @param {string[]} userEmails
- * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, otpSource?: string|null, orgId?: string|null, _orgName?: string|null }} options
+ * @param {{ savedCookiesFromDb?: any, savedCookies?: any[], mailBackupId?: number|null, otpSource?: string|null, orgId?: string|null, _orgName?: string|null }} options - savedCookiesFromDb: cookie_config đầy đủ (có ccp_product_ids nếu đã check).
  */
 async function addUsersWithProduct(email, password, userEmails, options = {}) {
   const savedCookies =
     options.savedCookiesFromDb?.cookies || options.savedCookies || [];
   const v2 = await addUsersWithProductV2(email, password, userEmails, {
     savedCookies,
+    savedCookiesFromDb: options.savedCookiesFromDb ?? null,
     mailBackupId: options.mailBackupId || null,
     otpSource: options.otpSource || "imap",
     orgId: options.orgId || null,

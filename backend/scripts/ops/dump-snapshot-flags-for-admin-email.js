@@ -12,7 +12,10 @@ require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 const { db } = require("../../src/db");
 const { TABLE, COLS } = require("../../src/controllers/RenewAdobeController/accountTable");
 const { applyAdobeProFlags } = require("../../src/services/adobe-renew-v2/shared/usersListApi");
-const { inferAdobeProProductIdSet } = require("../../src/services/adobe-renew-v2/shared/accessChecks");
+const {
+  inferAdobeProProductIdSet,
+  parseCcpProductIdsFromAlertConfig,
+} = require("../../src/services/adobe-renew-v2/shared/accessChecks");
 
 async function main() {
   const target = (process.argv[2] || "").trim().toLowerCase();
@@ -49,8 +52,9 @@ async function main() {
     hasProduct: false,
   }));
 
-  const proIds = inferAdobeProProductIdSet(asApiUsers, admin);
-  const flagged = applyAdobeProFlags(asApiUsers, admin);
+  const pinnedFromDb = parseCcpProductIdsFromAlertConfig(row[COLS.ALERT_CONFIG]);
+  const proIds = inferAdobeProProductIdSet(asApiUsers, admin, pinnedFromDb);
+  const flagged = applyAdobeProFlags(asApiUsers, admin, pinnedFromDb);
 
   const out = {
     source: "db_users_snapshot",
@@ -58,7 +62,8 @@ async function main() {
     org_name: row[COLS.ORG_NAME],
     license_status: row[COLS.LICENSE_STATUS],
     user_count_db: row[COLS.USER_COUNT],
-    inferred_ccp_product_ids: [...proIds],
+    ccp_product_ids_from_db: pinnedFromDb,
+    effective_ccp_product_ids: [...proIds],
     users: flagged.map((u) => ({
       email: u.email,
       name: u.name,

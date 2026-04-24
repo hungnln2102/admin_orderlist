@@ -165,6 +165,7 @@ const runAddUsersBatch = async (req, res) => {
           item.added,
           {
             savedCookies,
+            savedCookiesFromDb: account[COLS.ALERT_CONFIG] ?? null,
             mailBackupId: Number.isFinite(batchMailBackupId)
               ? batchMailBackupId
               : null,
