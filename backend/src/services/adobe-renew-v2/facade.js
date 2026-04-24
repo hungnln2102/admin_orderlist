@@ -143,15 +143,21 @@ async function checkAccount(email, password, options = {}) {
 
     const currentPage = sharedSession.page;
     const adminEmail = email.toLowerCase().trim();
-    const discoveredIds = [
-      ...discoverAdobeProProductIdSet(result.users || [], adminEmail),
-    ];
+    const verifiedSeatIds = Array.isArray(result.ccpSeatProductIds)
+      ? result.ccpSeatProductIds
+      : [];
+    const discoveredIds =
+      verifiedSeatIds.length > 0
+        ? verifiedSeatIds
+        : [...discoverAdobeProProductIdSet(result.users || [], adminEmail)];
     const nextPinned = computeCcpProductIdsToPersist({
       existingPinned: pinnedFromDb,
       discovered: discoveredIds,
       forceRefresh: forceProductCheck,
     });
-    const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail, nextPinned);
+    const flaggedUsers = applyAdobeProFlags(result.users || [], adminEmail, nextPinned, {
+      verifiedCcpSeatProductIds: verifiedSeatIds,
+    });
     const users = flaggedUsers.map((u) => ({
       id: u.id || null,
       authenticatingAccountId: u.authenticatingAccountId || null,
@@ -168,7 +174,8 @@ async function checkAccount(email, password, options = {}) {
       users,
       adminEmail,
       adminEmail,
-      nextPinned
+      nextPinned,
+      { verifiedCcpSeatProductIds: verifiedSeatIds }
     );
     const adminHasProduct =
       (hasProducts || hasActiveLicenseByCount) &&

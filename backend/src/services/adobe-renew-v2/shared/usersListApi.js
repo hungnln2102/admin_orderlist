@@ -3,21 +3,26 @@ const {
   checkUserAssignedProduct,
   inferAdobeProProductIdSet,
   hasAdobeProAccessFromProducts,
-  normalizeCcpProductIdList,
+  resolveAuthoritativeCcpProductIdSet,
 } = require("./accessChecks");
 
-function applyAdobeProFlags(users, adminEmail = "", pinnedProductIds) {
+function applyAdobeProFlags(users, adminEmail = "", pinnedProductIds, extra = {}) {
   const list = Array.isArray(users) ? users : [];
-  const pinned = normalizeCcpProductIdList(pinnedProductIds);
-  const proProductIds = inferAdobeProProductIdSet(list, adminEmail, pinned);
-  const strictIdOnly = pinned.length > 0;
+  const { idSet, authoritativeOnly } = resolveAuthoritativeCcpProductIdSet({
+    verifiedFromProductsApi: extra.verifiedCcpSeatProductIds,
+    pinnedProductIds,
+    users: list,
+    adminEmail,
+  });
   return list.map((u) => ({
     ...u,
-    hasProduct: hasAdobeProAccessFromProducts(u?.products, proProductIds, {
-      strictIdOnly,
+    hasProduct: hasAdobeProAccessFromProducts(u?.products, idSet, {
+      strictIdOnly: authoritativeOnly,
+      authoritativeIdsOnly: authoritativeOnly,
     }),
-    product: hasAdobeProAccessFromProducts(u?.products, proProductIds, {
-      strictIdOnly,
+    product: hasAdobeProAccessFromProducts(u?.products, idSet, {
+      strictIdOnly: authoritativeOnly,
+      authoritativeIdsOnly: authoritativeOnly,
     }),
   }));
 }
@@ -191,7 +196,8 @@ async function fetchUsersViaApi(page, options = {}) {
   const usersWithProFlags = applyAdobeProFlags(
     users,
     options.adminEmail,
-    options.pinnedCcpProductIds
+    options.pinnedCcpProductIds,
+    { verifiedCcpSeatProductIds: options.verifiedCcpSeatProductIds }
   );
   logger.info(
     "[adobe-v2] users-api: fetched %d users (org=%s)",

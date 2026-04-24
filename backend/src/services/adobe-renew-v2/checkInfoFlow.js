@@ -6,6 +6,7 @@
 const logger = require("../../utils/logger");
 const { runCheckOrgNameFlow, runCheckProductFlow, extractOrgIdFromUrl } = require("./flows/check");
 const { fetchUsersViaApi } = require("./shared/usersListApi");
+const { fetchVerifiedCcpSeatProductIdsFromOrgProductsApi } = require("./shared/orgProductsApi");
 
 const ADMIN_USERS = "https://adminconsole.adobe.com/users";
 
@@ -206,7 +207,7 @@ function scrapeUsersPage(page) {
  * Nếu options.existingOrgName có sẵn thì bỏ qua B10–B11 (không vào account.adobe.com lấy profile).
  * @param {import('playwright').Page} page
  * @param {{ existingOrgName?: string|null, cachedContractActiveLicenseCount?: number|null, forceProductCheck?: boolean, adminLoginEmail?: string|null, pinnedCcpProductIds?: string[] }} options
- * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number, jil_users_raw_pages?: unknown[] }>}
+ * @returns {Promise<{ org_name: string|null, orgId: string|null, license_status: string, products: any[], users: any[], contractActiveLicenseCount: number, ccpSeatProductIds: string[], jil_users_raw_pages?: unknown[] }>}
  */
 async function runB10ToB13(page, options = {}) {
   const existingOrgName = options.existingOrgName && String(options.existingOrgName).trim() ? String(options.existingOrgName).trim() : null;
@@ -227,6 +228,9 @@ async function runB10ToB13(page, options = {}) {
   let users = [];
   let license_status = "unknown";
   let contractActiveLicenseCount = 0;
+  /** @type {string[]} */
+  let ccpSeatProductIds = [];
+  let ranProductPageCheck = false;
   /** @type {unknown[]|null} */
   let jilUsersRawPages = null;
   const mergeJilRaw = (apiUsersResult) => {
@@ -251,6 +255,7 @@ async function runB10ToB13(page, options = {}) {
     products = productResult.products || [];
     license_status = productResult.license_status || "unknown";
     contractActiveLicenseCount = Number(productResult.contractActiveLicenseCount || 0);
+    ranProductPageCheck = true;
   }
 
   /** Khi skip B12, orgId chưa có — lấy từ URL hiện tại (overview …@AdobeOrg/…) tránh goto /users không org. */
@@ -260,6 +265,11 @@ async function runB10ToB13(page, options = {}) {
       orgId = fromPage;
       logger.info("[adobe-v2] B13: orgId từ URL hiện tại=%s", orgId);
     }
+  }
+
+  /** JIL products API (sau B12): lấy đúng productId CCP seat trước khi đọc users — đối chiếu id tuyệt đối. */
+  if (ranProductPageCheck && orgId) {
+    ccpSeatProductIds = await fetchVerifiedCcpSeatProductIdsFromOrgProductsApi(page, orgId);
   }
 
   const usersUrlPrimary = buildAdminUsersUrl(orgId);
@@ -283,6 +293,7 @@ async function runB10ToB13(page, options = {}) {
       orgId,
       adminEmail: adminLoginEmail,
       pinnedCcpProductIds,
+      verifiedCcpSeatProductIds: ccpSeatProductIds,
     });
     mergeJilRaw(apiUsers);
   } catch (usersErr) {
@@ -296,6 +307,10 @@ async function runB10ToB13(page, options = {}) {
     const productFallback = await runCheckProductFlow(page);
     orgId = productFallback.orgId || orgId;
     products = productFallback.products || products;
+    ranProductPageCheck = true;
+    if (orgId) {
+      ccpSeatProductIds = await fetchVerifiedCcpSeatProductIdsFromOrgProductsApi(page, orgId);
+    }
     await page
       .goto(buildAdminUsersUrl(orgId), {
         waitUntil: "domcontentloaded",
@@ -307,6 +322,7 @@ async function runB10ToB13(page, options = {}) {
       orgId,
       adminEmail: adminLoginEmail,
       pinnedCcpProductIds,
+      verifiedCcpSeatProductIds: ccpSeatProductIds,
     });
     mergeJilRaw(apiUsers);
   }
@@ -328,6 +344,7 @@ async function runB10ToB13(page, options = {}) {
     products,
     users,
     contractActiveLicenseCount,
+    ccpSeatProductIds,
     ...(jilUsersRawPages && jilUsersRawPages.length
       ? { jil_users_raw_pages: jilUsersRawPages }
       : {}),

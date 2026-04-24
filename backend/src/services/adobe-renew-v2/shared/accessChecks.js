@@ -13,27 +13,61 @@ function normalizeProductName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+/** Gộp mọi trường hiển thị tên từ JIL/API để khớp / loại trừ gói. */
+function combinedProductLabel(item) {
+  if (!item || typeof item !== "object") return "";
+  const parts = [
+    item.name,
+    item.productName,
+    item.displayName,
+    item.title,
+    item.offerName,
+    item.localizedName,
+    item.shortDisplayName,
+    item.productArrangementDisplayName,
+    item.offerDisplayName,
+  ]
+    .map((x) => String(x || "").trim())
+    .filter(Boolean);
+  return parts.join(" ").trim();
+}
+
+/**
+ * Gói Member / thành viên miễn phí — không được tính là "còn gói" CCP.
+ * Chỉ áp dụng khi có chuỗi tên (id-only không suy ra đây là Member).
+ */
+function isNonProMembershipProduct(item) {
+  const n = normalizeProductName(combinedProductLabel(item));
+  if (!n) return false;
+  if (n.includes("miễn phí") || n.includes("mien phi")) return true;
+  if (n.includes("gói thành viên") || n.includes("goi thanh vien")) return true;
+  if (n.includes("thành viên miễn phí") || n.includes("thanh vien mien phi")) {
+    return true;
+  }
+  if (n.includes("free membership")) return true;
+  if (n.includes("free") && n.includes("member")) return true;
+  if (n.includes("membership") && (n.includes("free") || n.includes("miễn phí"))) {
+    return true;
+  }
+  return false;
+}
+
 function isCcpLikeName(value) {
   const name = normalizeProductName(value);
   if (!name) return false;
-  return (
-    name.includes("ccp") ||
-    name.includes("creative cloud pro") ||
-    name.includes("creativecloudpro") ||
-    name.includes("all apps") ||
-    name.includes("all-app") ||
-    name.includes("all app")
-  );
+  if (isNonProMembershipProduct({ name: value, productName: "", displayName: "" })) {
+    return false;
+  }
+  // Chỉ Creative Cloud Pro theo tên (id chứa CCP xử lý tại isCcpLikeProduct). Không dùng heuristic "all apps".
+  return name.includes("creative cloud pro") || name.includes("creativecloudpro");
 }
 
 function isCcpLikeProduct(item) {
   if (!item || typeof item !== "object") return false;
+  if (isNonProMembershipProduct(item)) return false;
   const rawId = toNormalizedProductId(extractProductId(item));
   if (rawId && rawId.includes("CCP")) return true;
-  const name = (
-    item.name || item.productName || item.displayName || item.title || ""
-  );
-  return isCcpLikeName(name);
+  return isCcpLikeName(combinedProductLabel(item));
 }
 
 function extractProductIds(products) {
@@ -47,10 +81,6 @@ function extractProductIds(products) {
   ];
 }
 
-/**
- * Khi API chỉ trả product dạng `{ id }` không có name (UI Adobe vẫn resolve "Creative Cloud Pro"),
- * suy ra id gói team bằng tần suất: id xuất hiện trên nhiều user thường là commercial seat chung (CCP).
- */
 function normalizeCcpProductIdList(value) {
   if (value == null) return [];
   const arr = Array.isArray(value) ? value : [value].filter((x) => x != null);
@@ -104,52 +134,11 @@ function computeCcpProductIdsToPersist({
   return disc;
 }
 
-function inferCcpProductIdsFromIdOnlyTeamProducts(list) {
-  const users = Array.isArray(list) ? list : [];
-  const idCounts = new Map();
-  let usersWithAnyProduct = 0;
-
-  for (const user of users) {
-    const products = Array.isArray(user?.products) ? user.products : [];
-    if (products.length === 0) continue;
-    usersWithAnyProduct += 1;
-    const seenThisUser = new Set();
-    for (const p of products) {
-      if (!p || typeof p !== "object") continue;
-      const hasName = ["name", "productName", "displayName", "title"].some(
-        (k) => String(p[k] || "").trim().length > 0
-      );
-      if (hasName) continue;
-      const id = toNormalizedProductId(extractProductId(p));
-      if (!id) continue;
-      if (seenThisUser.has(id)) continue;
-      seenThisUser.add(id);
-      idCounts.set(id, (idCounts.get(id) || 0) + 1);
-    }
-  }
-
-  if (idCounts.size === 0) return [];
-
-  const sorted = [...idCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const [topId, topCount] = sorted[0];
-  const secondCount = sorted.length > 1 ? sorted[1][1] : 0;
-
-  if (topCount >= 2 && topCount > secondCount) {
-    return [topId];
-  }
-  if (
-    usersWithAnyProduct >= 2 &&
-    topCount >= Math.max(2, Math.ceil(usersWithAnyProduct * 0.5))
-  ) {
-    return [topId];
-  }
-  return [];
-}
-
 /**
- * Suy ra id gói CCP từ snapshot hiện tại (tên + id-only heuristic), không dùng pin DB.
+ * Suy ra id gói CCP từ snapshot: chỉ khi product có tên Creative Cloud Pro / id chứa CCP.
+ * Không suy từ tần suất id-only (gói Member không tên hay bị gán nhầm thành CCP).
  */
-function discoverAdobeProProductIdSet(users, adminEmail = "") {
+function discoverAdobeProProductIdSet(users, _adminEmail = "") {
   const list = Array.isArray(users) ? users : [];
   const ccpIds = new Set();
   for (const user of list) {
@@ -158,12 +147,6 @@ function discoverAdobeProProductIdSet(users, adminEmail = "") {
       if (!isCcpLikeProduct(product)) continue;
       const id = toNormalizedProductId(extractProductId(product));
       if (id) ccpIds.add(id);
-    }
-  }
-
-  if (ccpIds.size === 0) {
-    for (const id of inferCcpProductIdsFromIdOnlyTeamProducts(list)) {
-      ccpIds.add(id);
     }
   }
 
@@ -182,32 +165,83 @@ function inferAdobeProProductIdSet(users, adminEmail = "", pinnedProductIds) {
 }
 
 function hasAdobeProAccessFromProducts(products, proProductIds, options = {}) {
-  const strictIdOnly = options.strictIdOnly === true;
+  const authoritativeIdsOnly = options.authoritativeIdsOnly === true;
+  const strictIdOnly = authoritativeIdsOnly || options.strictIdOnly === true;
   if (!Array.isArray(products) || products.length === 0) return false;
   const ids = proProductIds instanceof Set ? proProductIds : new Set(proProductIds || []);
   if (ids.size === 0) {
     return products.some((item) => isCcpLikeProduct(item));
   }
   return products.some((item) => {
-    if (ids.has(toNormalizedProductId(extractProductId(item)))) return true;
+    const pid = toNormalizedProductId(extractProductId(item));
+    if (ids.has(pid)) {
+      // Pin DB có thể cũ/sai: nếu API đã trả tên rõ là gói miễn phí/Member thì không tính là CCP.
+      if (combinedProductLabel(item) && isNonProMembershipProduct(item)) return false;
+      return true;
+    }
+    if (authoritativeIdsOnly) return false;
     return strictIdOnly ? false : isCcpLikeProduct(item);
   });
+}
+
+/**
+ * Danh sách product id CCP seat từ API products org (đã có tên đầy đủ).
+ */
+function extractCcpSeatProductIdsFromOrgProductsList(list) {
+  const arr = Array.isArray(list) ? list : [];
+  const out = [];
+  const seen = new Set();
+  for (const p of arr) {
+    if (!p || typeof p !== "object") continue;
+    if (!isCcpLikeProduct(p)) continue;
+    const id = toNormalizedProductId(extractProductId(p));
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Ưu tiên id từ check products API (lần này) → pin DB → suy từ snapshot user (legacy).
+ */
+function resolveAuthoritativeCcpProductIdSet({
+  verifiedFromProductsApi = [],
+  pinnedProductIds = [],
+  users = [],
+  adminEmail = "",
+} = {}) {
+  const verified = normalizeCcpProductIdList(verifiedFromProductsApi);
+  if (verified.length > 0) {
+    return { idSet: new Set(verified), authoritativeOnly: true };
+  }
+  const pinned = normalizeCcpProductIdList(pinnedProductIds);
+  if (pinned.length > 0) {
+    return { idSet: new Set(pinned), authoritativeOnly: true };
+  }
+  return {
+    idSet: inferAdobeProProductIdSet(users, adminEmail, []),
+    authoritativeOnly: false,
+  };
 }
 
 /**
  * Check user cụ thể đã được gán product Adobe Pro chưa.
  * Dùng users API snapshot làm nguồn sự thật.
  */
-function checkUserAssignedProduct(users, email, adminEmail = "", pinnedProductIds) {
+function checkUserAssignedProduct(users, email, adminEmail = "", pinnedProductIds, extra = {}) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) {
     return { assigned: false, matchedUser: null };
   }
 
   const list = Array.isArray(users) ? users : [];
-  const pinnedNorm = normalizeCcpProductIdList(pinnedProductIds);
-  const proProductIds = inferAdobeProProductIdSet(list, adminEmail, pinnedNorm);
-  const strictIdOnly = pinnedNorm.length > 0;
+  const { idSet, authoritativeOnly } = resolveAuthoritativeCcpProductIdSet({
+    verifiedFromProductsApi: extra.verifiedCcpSeatProductIds,
+    pinnedProductIds,
+    users: list,
+    adminEmail,
+  });
   const matchedUser =
     list.find(
       (u) => String(u?.email || "").trim().toLowerCase() === normalizedEmail
@@ -218,8 +252,9 @@ function checkUserAssignedProduct(users, email, adminEmail = "", pinnedProductId
   }
 
   return {
-    assigned: hasAdobeProAccessFromProducts(matchedUser.products, proProductIds, {
-      strictIdOnly,
+    assigned: hasAdobeProAccessFromProducts(matchedUser.products, idSet, {
+      strictIdOnly: authoritativeOnly,
+      authoritativeIdsOnly: authoritativeOnly,
     }),
     matchedUser,
   };
@@ -275,4 +310,8 @@ module.exports = {
   normalizeCcpProductIdList,
   computeCcpProductIdsToPersist,
   hasAdobeProAccessFromProducts,
+  isNonProMembershipProduct,
+  isCcpLikeProduct,
+  extractCcpSeatProductIdsFromOrgProductsList,
+  resolveAuthoritativeCcpProductIdSet,
 };

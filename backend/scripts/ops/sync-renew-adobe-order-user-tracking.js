@@ -43,25 +43,27 @@ function normalizeEmail(value) {
     .toLowerCase();
 }
 
-/** product cột DB có thể boolean / 'true'|'false' / chuỗi CCP — khớp ý nghĩa với UI renew-adobe. */
+/** product cột DB: boolean / 'true'|'false' / chuỗi — chỉ CCP / Creative Cloud Pro mới là có gói (khớp accessChecks). */
 function mappingImpliesHasPackage(productRaw) {
   if (productRaw === false || productRaw === 0) return false;
   if (productRaw === true || productRaw === 1) return true;
   if (typeof productRaw === "string") {
     const n = productRaw.trim().toLowerCase();
-    if (!n) return true;
+    if (!n) return false;
     if (["false", "0", "no"].includes(n)) return false;
     if (["true", "1", "yes"].includes(n)) return true;
+    if (n.includes("miễn phí") || n.includes("mien phi")) return false;
+    if (n.includes("gói thành viên") || n.includes("goi thanh vien")) return false;
+    if (n.includes("thành viên miễn phí") || n.includes("thanh vien mien phi")) return false;
+    if (n.includes("free membership")) return false;
+    if (n.includes("free") && n.includes("member")) return false;
     return (
       n.includes("ccp") ||
       n.includes("creative cloud pro") ||
-      n.includes("creativecloudpro") ||
-      n.includes("all apps") ||
-      n.includes("all-app") ||
-      n.includes("all app")
+      n.includes("creativecloudpro")
     );
   }
-  return true;
+  return Boolean(productRaw);
 }
 
 function resolveRowStatus({ informationOrder, mapping }) {
