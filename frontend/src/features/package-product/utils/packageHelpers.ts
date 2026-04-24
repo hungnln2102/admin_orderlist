@@ -260,6 +260,10 @@ export const normalizeMatchKey = (value: string | null | undefined): string => {
   return trimmed ? trimmed.toLowerCase().replace(/\s+/g, "") : "";
 };
 
+/**
+ * Chuỗi dùng để so khớp đơn (slot / information_order): **chỉ** tài khoản gốc (`informationUser`),
+ * không dùng tài khoản kích hoạt (`accountUser`).
+ */
 export const buildPackageLinkKeys = (row: PackageRow): string[] => {
   const normalized = normalizeMatchKey(row.informationUser || "");
   return normalized ? [normalized] : [];

@@ -95,15 +95,16 @@ export function orderBelongsToPackageByProduct(
 }
 
 /**
- * True if order matches package link (package account vs order slot or information per match column).
+ * True if order matches package link: **tài khoản gốc** (`informationUser`) so với đúng một cột đơn
+ * (slot hoặc information_order theo `slotLinkMode`). Không có tài khoản gốc → không khớp.
  */
 export function orderMatchesPackageLink(
   record: NormalizedOrderRecord,
   item: PackageRow & { slotLinkMode?: "slot" | "information" }
 ): boolean {
   const packageLinkKeys = buildPackageLinkKeys(item);
-  if (packageLinkKeys.length === 0) return true;
   const slotMode = item.slotLinkMode ?? "information";
+  if (packageLinkKeys.length === 0) return false;
   const matchColumn = getMatchColumn(slotMode);
   const linkValue =
     matchColumn === "slot" ? record.slotMatchKey : record.informationMatchKey;
@@ -183,6 +184,7 @@ export function computeAugmentationForPackage(input: ComputeAugmentationInput): 
   const displayColumn = getDisplayColumn(slotMode);
   const matchColumn = getMatchColumn(slotMode);
   const packageLinkKeys = buildPackageLinkKeys(item);
+  const hasRootAccountForLink = packageLinkKeys.length > 0;
   const normalizedProductCodes = item.normalizedProductCodes ?? [];
   const productCodeSet =
     normalizedProductCodes.length > 0 ? new Set(normalizedProductCodes) : null;
@@ -266,7 +268,7 @@ export function computeAugmentationForPackage(input: ComputeAugmentationInput): 
   const slotUsageCount =
     slotAssignments.length > 0
       ? slotAssignments.length
-      : slotUsedRaw !== null
+      : hasRootAccountForLink && slotUsedRaw !== null
         ? Math.max(Math.floor(slotUsedRaw), 0)
         : 0;
   const slotUsed = Math.min(slotUsageCount, slotLimit);

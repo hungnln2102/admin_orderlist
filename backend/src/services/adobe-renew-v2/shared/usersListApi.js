@@ -393,11 +393,12 @@ async function fetchUsersViaApi(page, options = {}) {
   /** @type {{ pageIndex: number, status: number, parsed: unknown }[]} */
   const jilRawPages = [];
 
-  const preferJil =
-    options.usersSource === "jil" ||
-    String(process.env.ADOBE_USERS_SOURCE || "").toLowerCase() === "jil";
+  /** Luồng Admin Console: mặc định JIL users API (bps-il). Chỉ dùng ABP khi bật rõ ràng. */
+  const useAbp =
+    options.usersSource === "abp" ||
+    String(process.env.ADOBE_USERS_SOURCE || "").toLowerCase() === "abp";
 
-  if (!preferJil) {
+  if (useAbp) {
     try {
       const abp = await fetchUsersViaAbpApi(page, orgToken, options);
       if (abp.users.length > 0) {
@@ -426,12 +427,13 @@ async function fetchUsersViaApi(page, options = {}) {
 
   const headers = await captureUsersApiHeaders(page, orgToken);
   const api = page.context().request;
-  const pageSize = Math.max(20, Math.min(200, Number(options.pageSize) || 100));
+  const pageSize = Math.max(20, Math.min(200, Number(options.pageSize) || 20));
   const maxPages = Math.max(1, Math.min(30, Number(options.maxPages) || 10));
 
   const users = [];
   const seenKeys = new Set();
   let probePagesLeft = 0;
+  // Cùng contract query với Admin Console (JIL): …/users/?filter_exclude_domain=…&page=&page_size=&…&include=DOMAIN_ENFORCEMENT_EXCEPTION_INDICATOR
   for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
     const url =
       `https://bps-il.adobe.io/jil-api/v2/organizations/${orgToken}/users/?` +
