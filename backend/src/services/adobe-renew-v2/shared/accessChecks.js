@@ -17,6 +17,8 @@ function normalizeProductName(value) {
 function combinedProductLabel(item) {
   if (!item || typeof item !== "object") return "";
   const parts = [
+    item.longName,
+    item.shortName,
     item.name,
     item.productName,
     item.displayName,

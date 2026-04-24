@@ -6,6 +6,186 @@ const {
   resolveAuthoritativeCcpProductIdSet,
 } = require("./accessChecks");
 
+const ABP_API_ORIGIN = "https://abpapi.adobe.io";
+const ABP_USERS_ATTRS_QUERY =
+  "attributes=account%2CproductAssignments%2Croles%2Cname%2Cemail%2Caccount.type";
+
+function extractOrgTokenFromUrl(url) {
+  const m = String(url || "").match(/\/([A-Fa-f0-9]{20,}@AdobeOrg)/);
+  return m ? m[1] : null;
+}
+
+function normalizeOrgToken(orgIdOrToken) {
+  const raw = String(orgIdOrToken || "").trim();
+  if (!raw) return "";
+  return raw.includes("@AdobeOrg") ? raw : `${raw}@AdobeOrg`;
+}
+
+/**
+ * Gán product từ ABP user (productAssignments hoặc resources[].productId).
+ */
+function extractAbpUserProductRefs(item) {
+  if (!item || typeof item !== "object") return [];
+  const seen = new Set();
+  const out = [];
+  const push = (pid) => {
+    const id = String(pid || "").trim();
+    if (!id) return;
+    const key = id.toUpperCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ id, productId: id });
+  };
+  const tryAssignments = (node) => {
+    if (!node || typeof node !== "object") return;
+    const assignments = node.productAssignments || node.product_assignments;
+    if (Array.isArray(assignments)) {
+      for (const a of assignments) {
+        push(a?.productId ?? a?.product_id ?? a?.id);
+      }
+    }
+    const resources = node.resources;
+    if (Array.isArray(resources)) {
+      for (const r of resources) {
+        push(r?.productId ?? r?.product_id);
+      }
+    }
+  };
+  tryAssignments(item);
+  tryAssignments(item.account);
+  return out;
+}
+
+function flattenAbpUsersPayload(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object") return [];
+  const nested =
+    parsed.users ||
+    parsed.items ||
+    parsed.data ||
+    parsed._embedded?.users ||
+    parsed._embedded?.elements;
+  if (Array.isArray(nested)) return nested;
+  return [];
+}
+
+function mapAbpUserToSnapshotUser(item) {
+  const emailRaw =
+    item?.username ||
+    item?.email ||
+    item?.userName ||
+    item?.primaryEmail ||
+    "";
+  const email = String(emailRaw || "").trim();
+  let name = "";
+  if (item?.name && typeof item.name === "object") {
+    const gn = String(item.name.givenName || item.name.firstName || "").trim();
+    const fn = String(item.name.familyName || item.name.lastName || "").trim();
+    name = `${gn} ${fn}`.trim();
+  } else {
+    name = String(item?.name || "").trim();
+  }
+  const products = extractAbpUserProductRefs(item);
+  return {
+    id: String(item?.id || item?.accountId || item?.userId || "").trim() || null,
+    authenticatingAccountId:
+      String(item?.authenticatingAccount?.id || "").trim() || null,
+    name,
+    email,
+    products,
+    accountStatus: item?.accountStatus || item?.status || null,
+    product: false,
+    hasProduct: false,
+  };
+}
+
+async function captureAbpUsersApiHeaders(page, orgToken) {
+  const token = normalizeOrgToken(orgToken);
+  const orgHex = token.split("@")[0] || "";
+  const reqPromise = page.waitForRequest(
+    (req) => {
+      if (req.method() !== "GET") return false;
+      const u = req.url();
+      if (!u.includes("abpapi.adobe.io/abpapi/organizations/")) return false;
+      if (!u.includes("/users")) return false;
+      return orgHex ? u.includes(orgHex) : true;
+    },
+    { timeout: 35000 }
+  );
+
+  const cur = String(page.url() || "");
+  const usersHref = `https://adminconsole.adobe.com/${token}/users`;
+  const alreadyOnOrgUsers =
+    /adminconsole\.adobe\.com\/[^/]+@AdobeOrg\/users/i.test(cur) &&
+    (orgHex ? cur.includes(orgHex) : false);
+
+  if (alreadyOnOrgUsers) {
+    await page
+      .reload({ waitUntil: "domcontentloaded", timeout: 60000 })
+      .catch(() => {});
+  } else {
+    await page.goto(usersHref, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+  }
+
+  const req = await reqPromise;
+  const headers = req.headers();
+  const authorization = headers.authorization || headers.Authorization || "";
+  const xApiKey = headers["x-api-key"] || headers["X-Api-Key"] || "";
+
+  if (!authorization || !xApiKey) {
+    throw new Error("Thiếu authorization/x-api-key từ request ABP users.");
+  }
+
+  return {
+    accept: "application/json, text/plain, */*",
+    "content-type": "application/json",
+    authorization,
+    "x-api-key": xApiKey,
+    "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
+    "x-jil-feature": headers["x-jil-feature"] || "",
+    origin: "https://adminconsole.adobe.com",
+    referer: usersHref,
+  };
+}
+
+async function fetchUsersViaAbpApi(page, orgToken, options = {}) {
+  const token = normalizeOrgToken(orgToken);
+  const base = `${ABP_API_ORIGIN}/abpapi/organizations/${encodeURIComponent(token)}/users`;
+  const url = `${base}?${ABP_USERS_ATTRS_QUERY}`;
+
+  let headers;
+  try {
+    headers = await captureAbpUsersApiHeaders(page, token);
+  } catch (e) {
+    logger.warn("[adobe-v2] abp-users: không bắt được request ABP, thử header từ JIL users: %s", e.message);
+    headers = await captureUsersApiHeaders(page, orgToken);
+  }
+
+  const api = page.context().request;
+  const resp = await api.get(url, { headers, timeout: 45000 });
+  const text = await resp.text();
+  if (!resp.ok()) {
+    throw new Error(`ABP users API fail ${resp.status()}: ${text.slice(0, 240)}`);
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text || "null");
+  } catch (err) {
+    throw new Error(`ABP users parse fail: ${err.message}`);
+  }
+
+  const arr = flattenAbpUsersPayload(parsed);
+  const users = arr
+    .map(mapAbpUserToSnapshotUser)
+    .filter((u) => u.email);
+
+  logger.info("[adobe-v2] abp-users-api: %d users (org=%s)", users.length, token);
+  return { users, orgToken: token, source: "abp" };
+}
+
 function applyAdobeProFlags(users, adminEmail = "", pinnedProductIds, extra = {}) {
   const list = Array.isArray(users) ? users : [];
   const { idSet, authoritativeOnly } = resolveAuthoritativeCcpProductIdSet({
@@ -25,17 +205,6 @@ function applyAdobeProFlags(users, adminEmail = "", pinnedProductIds, extra = {}
       authoritativeIdsOnly: authoritativeOnly,
     }),
   }));
-}
-
-function extractOrgTokenFromUrl(url) {
-  const m = String(url || "").match(/\/([A-Fa-f0-9]{20,}@AdobeOrg)/);
-  return m ? m[1] : null;
-}
-
-function normalizeOrgToken(orgIdOrToken) {
-  const raw = String(orgIdOrToken || "").trim();
-  if (!raw) return "";
-  return raw.includes("@AdobeOrg") ? raw : `${raw}@AdobeOrg`;
 }
 
 function mapApiUserToSnapshotUser(item) {
@@ -118,6 +287,37 @@ async function fetchUsersViaApi(page, options = {}) {
   /** @type {{ pageIndex: number, status: number, parsed: unknown }[]} */
   const jilRawPages = [];
 
+  const preferJil =
+    options.usersSource === "jil" ||
+    String(process.env.ADOBE_USERS_SOURCE || "").toLowerCase() === "jil";
+
+  if (!preferJil) {
+    try {
+      const abp = await fetchUsersViaAbpApi(page, orgToken, options);
+      if (abp.users.length > 0) {
+        const usersWithProFlags = applyAdobeProFlags(
+          abp.users,
+          options.adminEmail,
+          options.pinnedCcpProductIds,
+          { verifiedCcpSeatProductIds: options.verifiedCcpSeatProductIds }
+        );
+        logger.info(
+          "[adobe-v2] users-api (ABP): %d users (org=%s)",
+          usersWithProFlags.length,
+          orgToken
+        );
+        return {
+          users: usersWithProFlags,
+          orgToken: abp.orgToken,
+          usersSource: "abp",
+        };
+      }
+      logger.warn("[adobe-v2] users-api: ABP trả 0 user (parse?), fallback JIL");
+    } catch (abpErr) {
+      logger.warn("[adobe-v2] users-api: ABP lỗi, fallback JIL — %s", abpErr.message);
+    }
+  }
+
   const headers = await captureUsersApiHeaders(page, orgToken);
   const api = page.context().request;
   const pageSize = Math.max(20, Math.min(200, Number(options.pageSize) || 100));
@@ -181,7 +381,6 @@ async function fetchUsersViaApi(page, options = {}) {
       continue;
     }
 
-    // Adobe API đôi lúc trả x-has-next-page sai ở page đầu; probe thêm vài trang để tránh thiếu user.
     if (probePagesLeft > 0) {
       probePagesLeft -= 1;
       continue;
@@ -200,24 +399,28 @@ async function fetchUsersViaApi(page, options = {}) {
     { verifiedCcpSeatProductIds: options.verifiedCcpSeatProductIds }
   );
   logger.info(
-    "[adobe-v2] users-api: fetched %d users (org=%s)",
+    "[adobe-v2] users-api (JIL): fetched %d users (org=%s)",
     usersWithProFlags.length,
     orgToken
   );
   return {
     users: usersWithProFlags,
     orgToken,
+    usersSource: "jil",
     ...(collectJilRaw && jilRawPages.length ? { jilRawPages } : {}),
   };
 }
 
 module.exports = {
   fetchUsersViaApi,
+  fetchUsersViaAbpApi,
   extractOrgTokenFromUrl,
   normalizeOrgToken,
   checkUserAssignedProduct,
   inferAdobeProProductIdSet,
   applyAdobeProFlags,
   hasAdobeProAccessFromProducts,
+  extractAbpUserProductRefs,
+  mapAbpUserToSnapshotUser,
 };
 

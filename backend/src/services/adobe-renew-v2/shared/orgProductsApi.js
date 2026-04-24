@@ -3,18 +3,19 @@ const { ADMIN_CONSOLE_API_BASE } = require("./constants");
 const { normalizeOrgToken } = require("./usersListApi");
 const { extractCcpSeatProductIdsFromOrgProductsList } = require("./accessChecks");
 
+/** Query đúng Admin Console (JIL products) — tách CCP vs gói member theo longName. */
 const PRODUCTS_LIST_QUERY =
-  "?include_created_date=true&include_expired=true&include_groups_quantity=true" +
-  "&include_inactive=false&include_license_activations=true&include_license_allocation_info=false" +
-  "&includeAcquiredOfferIds=false&includeConfiguredProductArrangementId=false" +
-  "&includeLegacyLSFields=false&license_group_limit=100&processing_instruction_codes=administration,license_data";
+  "?include_created_date=true&include_expired=true&include_groups_quantity=false" +
+  "&include_inactive=false&include_legacy_ls_fields=true&include_license_activations=true" +
+  "&include_license_allocation_info=false&include_pricing_data=false&includeFulfillableItemCodesOnly=true" +
+  "&processing_instruction_codes=administration";
 
 async function captureProductsApiHeaders(page, orgToken) {
   const token = normalizeOrgToken(orgToken);
   const reqPromise = page.waitForRequest(
     (req) =>
       req.method() === "GET" &&
-      req.url().includes(`/jil-api/v2/organizations/${token}/products/`) &&
+      req.url().includes(`/jil-api/v2/organizations/${token}/products`) &&
       !req.url().includes("/users"),
     { timeout: 30000 }
   );
@@ -58,7 +59,7 @@ async function captureProductsApiHeaders(page, orgToken) {
 
 async function fetchOrganizationProductsJson(page, orgToken, headers) {
   const token = normalizeOrgToken(orgToken);
-  const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${token}/products/${PRODUCTS_LIST_QUERY}`;
+  const url = `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${token}/products${PRODUCTS_LIST_QUERY}`;
   const resp = await page.context().request.get(url, { headers, timeout: 30000 });
   const text = await resp.text().catch(() => "");
   if (!resp.ok()) {
