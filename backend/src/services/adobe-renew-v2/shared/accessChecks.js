@@ -2,11 +2,75 @@ function toNormalizedProductId(value) {
   return String(value || "").trim().toUpperCase();
 }
 
-function extractProductId(item) {
-  if (item && typeof item === "object") {
-    return String(item.id || item.productId || item.offerId || "").trim();
+/**
+ * JIL org `/products` hay trả `id` là chỉ số dòng (1, 2, …), không phải mã fulfillable hex từ API (mỗi org khác nhau).
+ */
+function isImplicitSequenceProductId(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return false;
+  return /^\d+$/.test(s) && s.length <= 12;
+}
+
+function firstFulfillableCodeFromArray(value) {
+  if (!Array.isArray(value) || value.length === 0) return "";
+  const first = value[0];
+  if (typeof first === "string") return String(first).trim();
+  if (first && typeof first === "object") {
+    return String(
+      first.fulfillableItemCode ||
+        first.fulfillable_item_code ||
+        first.productId ||
+        first.product_id ||
+        first.code ||
+        first.id ||
+        ""
+    ).trim();
   }
-  return String(item || "").trim();
+  return "";
+}
+
+/**
+ * Mã product để so khớp với user.products / ABP: ưu tiên productId & fulfillable, tránh `id` số nội bộ.
+ */
+function extractProductId(item) {
+  if (!item || typeof item !== "object") {
+    return String(item || "").trim();
+  }
+  const nested = item.product && typeof item.product === "object" ? item.product : null;
+
+  const preferOrdered = [
+    item.productId,
+    item.product_id,
+    nested?.productId,
+    nested?.product_id,
+    item.primaryFulfillableItemCode,
+    item.primary_fulfillable_item_code,
+    item.fulfillableItemCode,
+    item.fulfillable_item_code,
+    firstFulfillableCodeFromArray(item.fulfillableItemCodes),
+    firstFulfillableCodeFromArray(item.fulfillable_item_codes),
+    item.offerId,
+    item.offer_id,
+    item.productCode,
+    item.product_code,
+    item.licensingArtifactProductId,
+  ];
+
+  for (const cand of preferOrdered) {
+    if (cand == null || cand === "") continue;
+    const s = String(cand).trim();
+    if (s) return s;
+  }
+
+  const idCandidates = [item.id, nested?.id];
+  for (const cand of idCandidates) {
+    if (cand == null || cand === "") continue;
+    const s = String(cand).trim();
+    if (!s) continue;
+    if (!isImplicitSequenceProductId(s)) return s;
+  }
+
+  return "";
 }
 
 function normalizeProductName(value) {
@@ -89,10 +153,7 @@ function normalizeCcpProductIdList(value) {
   const out = [];
   const seen = new Set();
   for (const x of arr) {
-    const raw =
-      x && typeof x === "object"
-        ? x.id ?? x.productId ?? x.offerId
-        : x;
+    const raw = x && typeof x === "object" ? extractProductId(x) : x;
     const id = toNormalizedProductId(raw);
     if (!id || seen.has(id)) continue;
     seen.add(id);

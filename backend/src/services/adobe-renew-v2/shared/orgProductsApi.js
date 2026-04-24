@@ -108,9 +108,10 @@ async function fetchVerifiedCcpSeatProductIdsFromOrgProductsApi(page, orgId) {
     const list = await fetchOrganizationProductsJson(page, token, forwardedHeaders);
     const ids = extractCcpSeatProductIdsFromOrgProductsList(list);
     logger.info(
-      "[adobe-v2] products-api: org products=%d, ccp_seat_product_ids=%d",
+      "[adobe-v2] products-api: org products=%d, ccp_seat_count=%d, ccp_seat_product_ids=[%s]",
       list.length,
-      ids.length
+      ids.length,
+      ids.join(", ")
     );
     return ids;
   } catch (e) {
