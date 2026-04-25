@@ -4,11 +4,13 @@ import {
   PencilSquareIcon,
   TrashIcon,
   XMarkIcon,
-  CheckCircleIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
 import { WarehouseItem } from "../types";
+import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
+import { StorageMobileList } from "./StorageItemCard";
+import { warehouseStatusClass } from "./storageItemCardUtils";
 
 type StorageTableProps = {
   items: WarehouseItem[];
@@ -24,23 +26,15 @@ type StorageTableProps = {
 };
 
 const inputCls =
-  "w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-indigo-500/30 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.08] transition-all";
-const NOTE_PREVIEW_MAX_CHARS = 90;
+  "w-full min-w-0 max-w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-indigo-500/30 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.08] transition-all";
 
-const toNotePreview = (value?: string | null) => {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  if (!text) return "—";
-  if (text.length <= NOTE_PREVIEW_MAX_CHARS) return text;
-  return `${text.slice(0, NOTE_PREVIEW_MAX_CHARS)}...`;
-};
+const cellText =
+  "block w-full min-w-0 text-xs text-white/80 truncate [overflow-wrap:normal]";
+const cellMono =
+  "block w-full min-w-0 text-xs text-white/50 font-mono truncate [overflow-wrap:normal]";
+const cellMuted = "block w-full min-w-0 text-xs text-white/40 truncate [overflow-wrap:normal]";
 
-const statusColor = (s?: string | null) => {
-  const v = (s || "").toLowerCase();
-  if (v.includes("tồn")) return "bg-emerald-500/15 text-emerald-400 border-emerald-500/20";
-  if (v.includes("dùng") || v.includes("dung")) return "bg-sky-500/15 text-sky-400 border-sky-500/20";
-  if (v.includes("hết") || v.includes("het")) return "bg-rose-500/15 text-rose-400 border-rose-500/20";
-  return "bg-white/5 text-white/60 border-white/10";
-};
+const tdCls = "min-w-0 px-1.5 sm:px-2.5 py-2 align-middle overflow-hidden";
 
 export const StorageTable: React.FC<StorageTableProps> = ({
   items,
@@ -52,6 +46,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   onDelete,
   onCancel,
   onStartEdit,
+  onStartCreate: _onStartCreate,
 }) => {
   const renderInput = (
     field: keyof WarehouseItem,
@@ -100,37 +95,57 @@ export const StorageTable: React.FC<StorageTableProps> = ({
     </div>
   );
 
-  const thCls = "px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-white/30 text-left whitespace-nowrap";
+  const thCls =
+    "px-1.5 sm:px-2.5 py-2 sm:py-2.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-tight sm:tracking-wider text-white/30 text-left whitespace-nowrap min-w-0";
+
+  const mobileList = (
+    <StorageMobileList
+      items={items}
+      draft={draft}
+      editingId={editingId}
+      loading={loading}
+      onDraftChange={onDraftChange}
+      onSave={onSave}
+      onDelete={onDelete}
+      onCancel={onCancel}
+      onStartEdit={onStartEdit}
+    />
+  );
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-white" style={{ minWidth: 1080 }}>
+    <div className="w-full min-w-0 max-w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+      <ResponsiveTable
+        className="w-full"
+        showCardOnMobile
+        cardView={mobileList}
+      >
+        <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+          <table className="w-full max-w-full table-fixed text-white">
           <thead>
             <tr className="border-b border-white/[0.06]">
-              <th className={thCls} style={{ width: 100 }}>Loại</th>
-              <th className={thCls} style={{ width: 190 }}>Tài khoản</th>
-              <th className={thCls} style={{ width: 110 }}>Mật khẩu</th>
-              <th className={thCls} style={{ width: 190 }}>Mail dự phòng</th>
-              <th className={thCls} style={{ width: 90 }}>2FA</th>
-              <th className={thCls} style={{ width: 100 }}>Trạng thái</th>
-              <th className={thCls} style={{ width: 90 }}>Hạn SD</th>
-              <th className={`${thCls} !text-center`} style={{ width: 50 }}>V</th>
-              <th className={thCls} style={{ width: 320 }}>Ghi chú</th>
-              <th className={`${thCls} !text-right !pr-4`} style={{ width: 90 }}></th>
+              <th className={`${thCls} w-[7%]`}>Loại</th>
+              <th className={`${thCls} w-[15%]`}>Tài khoản</th>
+              <th className={`${thCls} w-[8%]`}>Mật khẩu</th>
+              <th className={`${thCls} w-[15%]`}>Mail dự phòng</th>
+              <th className={`${thCls} w-[6%]`}>2FA</th>
+              <th className={`${thCls} w-[9%]`}>Trạng thái</th>
+              <th className={`${thCls} w-[8%]`}>Hạn SD</th>
+              <th className={`${thCls} w-[4%] !text-center`}>V</th>
+              <th className={`${thCls} w-[19%] min-w-0`}>Ghi chú</th>
+              <th className={`${thCls} w-[9%] !text-right !pr-2 sm:!pr-3`} />
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
             {/* --- New row --- */}
             {editingId === "new" && draft && (
               <tr className="bg-indigo-500/[0.06]">
-                <td className="px-3 py-2.5">{renderInput("category", draft.category, "VD: ADOBE EDU")}</td>
-                <td className="px-3 py-2.5">{renderInput("account", draft.account, "Email / Username")}</td>
-                <td className="px-3 py-2.5">{renderInput("password", draft.password, "••••••")}</td>
-                <td className="px-3 py-2.5">{renderInput("backup_email", draft.backup_email, "Backup mail")}</td>
-                <td className="px-3 py-2.5">{renderInput("two_fa", draft.two_fa, "2FA code")}</td>
-                <td className="px-3 py-2.5">{renderInput("status", draft.status, "Trạng thái")}</td>
-                <td className="px-3 py-2.5">
+                <td className={tdCls}>{renderInput("category", draft.category, "VD: ADOBE EDU")}</td>
+                <td className={tdCls}>{renderInput("account", draft.account, "Email / Username")}</td>
+                <td className={tdCls}>{renderInput("password", draft.password, "••••••")}</td>
+                <td className={tdCls}>{renderInput("backup_email", draft.backup_email, "Backup mail")}</td>
+                <td className={tdCls}>{renderInput("two_fa", draft.two_fa, "2FA code")}</td>
+                <td className={tdCls}>{renderInput("status", draft.status, "Trạng thái")}</td>
+                <td className={tdCls}>
                   <input
                     type="date"
                     className={inputCls}
@@ -138,7 +153,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     onChange={(e) => onDraftChange("expires_at", e.target.value)}
                   />
                 </td>
-                <td className="px-3 py-2.5 text-center">
+                <td className={`${tdCls} text-center`}>
                   <input
                     type="checkbox"
                     className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
@@ -146,8 +161,8 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                     onChange={(e) => onDraftChange("is_verified", e.target.checked ? "true" : "")}
                   />
                 </td>
-                <td className="px-3 py-2.5">{renderInput("note", draft.note, "Ghi chú...")}</td>
-                <td className="px-3 py-2.5 text-right">
+                <td className={tdCls}>{renderInput("note", draft.note, "Ghi chú...")}</td>
+                <td className={`${tdCls} text-right`}>
                   <EditActions isNew />
                 </td>
               </tr>
@@ -182,67 +197,71 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                   }`}
                 >
                   {/* Loại */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("category", cur.category)
                     ) : (
-                      <span className="text-[11px] font-bold text-white/90 uppercase tracking-wide">
+                      <span
+                        className="block w-full min-w-0 text-[10px] sm:text-[11px] font-bold text-white/90 uppercase tracking-wide truncate"
+                        title={item.category || ""}
+                      >
                         {item.category || "—"}
                       </span>
                     )}
                   </td>
 
                   {/* Tài khoản */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("account", cur.account)
                     ) : (
-                      <span className="text-xs text-white/80 break-all leading-relaxed">
+                      <span className={cellText} title={item.account || ""}>
                         {item.account || "—"}
                       </span>
                     )}
                   </td>
 
                   {/* Mật khẩu */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("password", cur.password)
                     ) : (
-                      <span className="text-xs text-white/50 font-mono">
+                      <span className={cellMono} title={item.password || ""}>
                         {item.password || "—"}
                       </span>
                     )}
                   </td>
 
                   {/* Mail dự phòng */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("backup_email", cur.backup_email)
                     ) : (
-                      <span className="text-xs text-white/40 break-all leading-relaxed">
+                      <span className={cellMuted} title={item.backup_email || ""}>
                         {item.backup_email || "—"}
                       </span>
                     )}
                   </td>
 
                   {/* 2FA */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("two_fa", cur.two_fa)
                     ) : (
-                      <span className="text-xs text-white/50">
+                      <span className={cellMono} title={item.two_fa || ""}>
                         {item.two_fa || "—"}
                       </span>
                     )}
                   </td>
 
                   {/* Trạng thái */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("status", cur.status)
                     ) : (
                       <span
-                        className={`inline-flex px-2 py-0.5 rounded-md border text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${statusColor(item.status)}`}
+                        className={`flex w-full min-w-0 max-w-full justify-center px-1.5 sm:px-2 py-0.5 rounded-md border text-[8px] sm:text-[9px] font-semibold uppercase tracking-tight sm:tracking-wide truncate ${warehouseStatusClass(item.status)}`}
+                        title={item.status || ""}
                       >
                         {item.status || "—"}
                       </span>
@@ -250,7 +269,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                   </td>
 
                   {/* Hạn SD */}
-                  <td className="px-3 py-2.5">
+                  <td className={tdCls}>
                     {isEditing ? (
                       <input
                         type="date"
@@ -259,7 +278,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                         onChange={(e) => onDraftChange("expires_at", e.target.value)}
                       />
                     ) : (
-                      <span className="text-xs text-white/50 tabular-nums whitespace-nowrap">
+                      <span className="block w-full min-w-0 text-[10px] sm:text-xs text-white/50 tabular-nums truncate" title={item.expires_at || ""}>
                         {item.expires_at
                           ? new Date(item.expires_at).toLocaleDateString("vi-VN")
                           : "—"}
@@ -268,7 +287,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                   </td>
 
                   {/* Verified */}
-                  <td className="px-3 py-2.5 text-center">
+                  <td className={`${tdCls} text-center`}>
                     {isEditing ? (
                       <input
                         type="checkbox"
@@ -286,21 +305,21 @@ export const StorageTable: React.FC<StorageTableProps> = ({
                   </td>
 
                   {/* Ghi chú */}
-                  <td className="px-3 py-2.5 max-w-[320px]">
+                  <td className={tdCls}>
                     {isEditing ? (
                       renderInput("note", cur.note)
                     ) : (
                       <span
-                        className="block text-[11px] text-white/35 whitespace-nowrap overflow-hidden text-ellipsis"
+                        className="block w-full min-w-0 text-[10px] sm:text-[11px] text-white/35 truncate [overflow-wrap:normal]"
                         title={item.note || ""}
                       >
-                        {toNotePreview(item.note)}
+                        {String(item.note || "").trim() ? item.note : "—"}
                       </span>
                     )}
                   </td>
 
                   {/* Actions */}
-                  <td className="px-3 py-2.5 text-right">
+                  <td className={`${tdCls} text-right`}>
                     {isEditing ? (
                       <EditActions itemId={item.id} />
                     ) : (
@@ -329,7 +348,8 @@ export const StorageTable: React.FC<StorageTableProps> = ({
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      </ResponsiveTable>
     </div>
   );
 };

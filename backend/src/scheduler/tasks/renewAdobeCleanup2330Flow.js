@@ -23,6 +23,9 @@ const {
   mergeRenewAdobeAlertConfig,
   userCountDbValue,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
+const {
+  getMapAccountIdToUserEmailsForTrackingExpiredToday,
+} = require("../../services/renew-adobe/orderUserTrackingService");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCOUNT_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
@@ -163,6 +166,16 @@ async function runRenewAdobeCleanup2330Flow({
           .whereIn(ACCOUNT_COLS.ID, accountIds)
           .where(ACCOUNT_COLS.IS_ACTIVE, true);
 
+  let removeByTrackingToday = new Map();
+  try {
+    removeByTrackingToday = await getMapAccountIdToUserEmailsForTrackingExpiredToday();
+  } catch (e) {
+    logger.warn(
+      "[CRON][cleanup-23-30] getMapAccountIdToUserEmailsForTrackingExpiredToday failed: %s",
+      e.message
+    );
+  }
+
   const failedAccounts = [];
 
   for (const account of accounts) {
@@ -172,12 +185,23 @@ async function runRenewAdobeCleanup2330Flow({
     if (!mappedEmails.length) continue;
 
     const adminEmail = (account[ACCOUNT_COLS.EMAIL] || "").toLowerCase().trim();
-    const toDelete = extractEmailsToDeleteFromMappedUsers({
+    const fromList = extractEmailsToDeleteFromMappedUsers({
       mappedEmails,
       adminEmail,
       activeEmails,
       expiredOrDueEmails,
     });
+    const fromTrack = removeByTrackingToday.get(Number(account[ACCOUNT_COLS.ID])) || null;
+    const merged = new Set(fromList);
+    if (fromTrack) {
+      for (const e of fromTrack) {
+        const l = String(e || "").toLowerCase().trim();
+        if (l && l !== adminEmail) {
+          merged.add(l);
+        }
+      }
+    }
+    const toDelete = [...merged];
 
     if (toDelete.length === 0) continue;
 

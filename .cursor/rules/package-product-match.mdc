@@ -4,16 +4,62 @@ globs:
   - "frontend/src/pages/Product/PackageProduct/**"
   - "backend/src/controllers/PackageController/**"
   - "backend/src/services/packageProductService.js"
+  - "backend/src/services/packageOrderAccountSync.js"
+  - "frontend/src/features/package-product/**"
 ---
 
 # Package Product – Match với đơn hàng
 
-- **Cột Match được chọn khi tạo gói** (và khi sửa gói), không so sánh cả hai cột cùng lúc.
-- **Match với cột Slot**: So sánh **tài khoản gốc** (`informationUser` — không dùng `accountUser`) với **cột slot** của đơn hàng.
-- **Match với cột Information**: So sánh **tài khoản gốc** với **cột information** của đơn (`information_order`).
-- Nếu **không có** `informationUser` (chuỗi rỗng sau chuẩn hóa): **không** coi đơn nào là khớp và **không** tính slot từ fallback `slotUsed` DB — chỉ tính slot khi có khớp thật từ đơn.
-- Chỉ dùng đúng **một** cột theo giá trị `match` đã lưu (`"slot"` hoặc `"information_order"`); frontend map `"information_order"` → mode `"information"`.
-- **Validation**: Khi chọn Match, Thông tin gói (Tài khoản) bắt buộc; backend trả 400 nếu thiếu, frontend disable Lưu và hiển thị cảnh báo.
-- Logic match nằm trong `packageMatchUtils.ts` (`orderBelongsToPackageByProduct`, `orderMatchesPackageLink`, `computeAugmentationForPackage`). Chuẩn hóa link: lowercase, bỏ khoảng trắng; match sản phẩm: product code từ API hoặc prefix 6 ký tự tên gói (normalizeIdentifier).
+## Luồng nghiệp vụ (cùng thứ tự với tư duy DB)
 
-Khi sửa logic Match: giữ đúng rule trên, không so sánh cả slot và information cùng lúc.
+1. **Cùng phạm vi sản phẩm (product) — `id_product` “thuộc” `package_id`**:
+   - **`package_product.package_id`**: chính là **`product.id`** (một sản phẩm, ví dụ Google One).
+   - **`order_list.id_product`**: chính là **`variant.id`** — một trong nhiều **variant** của cái `product` đó (mỗi gói bán/price line là một variant).
+   - Một `product` có nhiều `variant`; đơn luôn gắn **một** variant. Điều kiện đơn “nằm trong phạm vi” cùng product với dòng gói: variant của đơn thuộc product mà bản ghi gói đang trỏ, tức **`variant.product_id` = `package_product.package_id`**. (Không nhầm với `package_product.id` — đó là id bản ghi dòng gói, khác hẳn.)
+   - Trên API: `order.line_product_id` = `variant.product_id` (khi join `variant` đủ), so với `productId` trên từng dòng gói (= `package_id`). Dự phòng nếu thiếu: chuỗi `id_product` hiển thị khớp tên variant nằm trong tập mã thuộc cùng product, hoặc tên gói = chuỗi hiển thị (hạn chế).
+
+2. **Chọn cột trên đơn theo `package_product.match`**: Cột lưu là `"slot"` (ghép theo *vị trí*) hoặc `"information_order"` (ghép theo *thông tin*). Mỗi bản ghi gói chọn **một** cột; không so đủ hai cột cùng lúc.
+
+3. **Hai tài khoản kho, hai vai trò** (đều `product_stocks.account_username` / API đã map):
+   - **`stock_id` → tài khoản gốc** (`informationUser`) — dùng **chỉ** khi `match` = `slot`: so sánh với cột `order_list.slot` (một bên là username đã chuẩn hóa, một bên là nội dung cột đơn).
+   - **`storage_id` → tài khoản kích hoạt** (`accountUser`) — dùng **chỉ** khi `match` = `information_order`: so sánh với cột `order_list.information_order`.
+   - **Không** dùng cột số `package_product.slot` (1,2,3…) để nối chuỗi với đơn; cột đó là **giới hạn số vị trí**.
+
+4. **Cột số `package_product.slot`**: Là **số vị trí tối đa**, không phải khoá join sang `order_list`.
+
+5. Thiếu username sau chuẩn hóa ở phía cần so (gốc khi chế độ vị trí, kích hoạt khi chế độ thông tin): không coi đơn nào khớp; không dùng `slotUsed` DB thay thế khi cần đếm từ đơn.
+
+6. **Validation**: luôn cần `stock_id` khi bật ghép; thêm bắt buộc `storage_id` khi `match` = `information_order` (backend 400, frontend tắt Lưu nếu thiếu kích hoạt).
+
+7. Mã: `packageMatchUtils.ts`, `packageHelpers.buildPackageLinkKeys(row, mode)`, `packageOrderAccountSync.js` (cột cập nhật theo `match`).
+
+8. Trang gói gọi `GET /api/orders?scope=package_match`: **chỉ** đơn trạng thái **Cần Gia Hạn**, **Đã Thanh Toán**, **Đang Xử Lý**; vẫn bỏ đơn mã `import%`. (Khác list đơn mặc định.)
+
+Khi sửa logic match: vẫn **một** cột match mỗi bản ghi gói; cập nhật tài liệu này nếu thay đổi ngữ nghĩa cột.
+
+---
+
+## Ví dụ cụ thể (tư duy “email → kho → gói → product”)
+
+**Input mẫu**
+
+- Variant: tên dòng bán (display) dạng `GoogleOne2000_Add--12m`, **`variant.id` = 45**.
+- Product: **`product.id` = 3** (cùng tất cả variant của dòng sản phẩm này: `variant.product_id = 3`).
+- Trên bản ghi gói: `package_product.match` = `slot` → cần dùng **nội dung cột `order_list.slot`**, giả sử = **`abc@gmail.com`**.
+
+
+**Các bước tư duy theo bảng (cùng kết quả mà bạn mô tả)**
+
+1. Xác định product của đơn: từ `id_product` = 45 (variant) → `variant.product_id` = **3**.
+2. Lấy chuỗi cần so: **`abc@gmail.com`** từ cột **`slot`** (vì chế độ match = slot).
+3. Tìm trong **`product_stocks`** bản ghi mà tài khoản (ví dụ `account_username`) sau chuẩn hóa **khớp** `abc@gmail.com` → lấy **`product_stocks.id`** = *id dòng kho*.
+4. Trong **`package_product`**, tìm các dòng có **`stock_id`** = *id dòng kho* đó (một tài khoản kho có thể dùng cho một bản ghi gói, thường 1:1 theo từng dòng bạn tạo trên UI).
+5. Với từng ứng viên dòng gói, kiểm tra **`package_product.package_id` = 3** (cùng product với variant 45). Nếu **đúng** → đơn hợp lệ cho **bản ghi gói đó**; mỗi cặp (đơn, dòng gói) đó **tính 1 lần dùng vị trí (slot usage)** theo cấu hình, trong giới hạn cột số `package_product.slot` (giới hạn số vị trí).
+
+
+**Tương đương trong mã (admin)**
+
+- API danh sách gói đã **JOIN** `package_product` → `product_stocks` theo `stock_id` nên từng dòng gói đã mang sẵn tài khoản kho (trên giao diện: **Thông tin gói** / `informationUser` từ username kho), không cần gọi lại truy vấn “tìm stock theo email” ở frontend.
+- Ứng dụng: **(A)** cùng product (`line_product_id` với `productId` dòng gói, hoặc tập mã variant / tên gói); **(B)** nếu `match` = slot: `order_list.slot` ↔ `informationUser` (tài khoản gốc); nếu `match` = information_order: `order_list.information_order` ↔ `accountUser` (kích hoạt).
+
+

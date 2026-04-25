@@ -8,10 +8,18 @@ export const buildCategoryRows = (
   mergedProducts.forEach((item) => {
     const packageLabel = (item.packageName || "").trim();
     if (!packageLabel) return;
-    const key = packageLabel;
+    const cid = item.catalogProductId;
+    const key =
+      cid != null && Number.isFinite(Number(cid)) && Number(cid) > 0
+        ? `p-${Number(cid)}`
+        : `name-${packageLabel}`;
     if (!groups.has(key)) {
       groups.set(key, {
         key,
+        catalogProductId:
+          cid != null && Number.isFinite(Number(cid)) && Number(cid) > 0
+            ? Number(cid)
+            : null,
         packageName: packageLabel,
         imageUrl: null,
         categories: [],

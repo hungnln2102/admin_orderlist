@@ -82,32 +82,18 @@ const updateProductPrice = async (req, res) => {
           .status(400)
           .json({ error: "Tên sản phẩm không được để trống." });
       }
-
-      const existingProduct = await db(TABLES.product)
-        .select("id")
-        .where(productSchemaCols.packageName, normalizedPackageName)
-        .first();
-
-      targetProductId = existingProduct?.id ?? existingProduct?.ID ?? null;
-
-      if (!targetProductId) {
-        const insertPayload = {
+      // Luôn đổi tên theo `product.id` gắn với variant — không tìm/merge theo chuỗi tên.
+      if (!productSchemaId) {
+        return res.status(400).json({
+          error: "Không xác định được sản phẩm (product) để đổi tên gói.",
+        });
+      }
+      await db(TABLES.product)
+        .where(productSchemaCols.id, productSchemaId)
+        .update({
           [productSchemaCols.packageName]: normalizedPackageName,
-        };
-        const insertedProduct = await db(TABLES.product)
-          .insert(insertPayload)
-          .returning("id");
-        targetProductId =
-          insertedProduct?.[0]?.id ?? insertedProduct?.[0]?.ID ?? null;
-      }
-
-      if (!targetProductId) {
-        throw new Error("Unable to resolve product id.");
-      }
-
-      if (targetProductId !== productSchemaId) {
-        addVariantUpdate(variantCols.productId, targetProductId);
-      }
+        });
+      targetProductId = productSchemaId;
     }
 
     if (sanPham !== undefined) {

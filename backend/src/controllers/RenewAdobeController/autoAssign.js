@@ -15,7 +15,7 @@ const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 const {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
-  fixUsersOneRoundTightest,
+  fixUsersAllRoundsTightest,
 } = require("./assignmentService");
 const {
   TBL_ORDER,
@@ -38,6 +38,7 @@ const {
 } = require("./usersSnapshotUtils");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
+  getOrderUserTrackingCountByOrgName,
 } = require("../../services/renew-adobe/orderUserTrackingService");
 
 function logAutoAssign(onProgress, data) {
@@ -294,7 +295,10 @@ const fixSingleUser = async (req, res) => {
   }
 };
 
-/** Một vòng Fix All: batch user theo slot tài khoản gần đầy nhất (gọi lặp từ frontend cho tới hết danh sách). */
+/**
+ * Fix All: một lần POST — nội bộ nhiều vòng (tài khoản còn slot + batch theo slot),
+ * kèm tối ưu add user (Playwright) batch PATCH + tạo user song song ở tầng addUsersFlow.
+ */
 const fixUsersRound = async (req, res) => {
   const emailsRaw = req.body?.emails;
   if (!Array.isArray(emailsRaw)) {
@@ -306,7 +310,7 @@ const fixUsersRound = async (req, res) => {
   }
 
   try {
-    const result = await fixUsersOneRoundTightest(emailsRaw);
+    const result = await fixUsersAllRoundsTightest(emailsRaw);
     return res.json(result);
   } catch (err) {
     logger.error("[renew-adobe] fixUsersRound failed", { error: err.message });
@@ -314,8 +318,9 @@ const fixUsersRound = async (req, res) => {
       success: false,
       error: err.message,
       added_count: 0,
+      total_added: 0,
       remaining_emails: emailsRaw,
-      round: null,
+      rounds: [],
     });
   }
 };
@@ -383,23 +388,47 @@ async function runCheckAllAccountsFlow({
       let removedFromDb = false;
       const statusAfterCheck = updated?.[COLS.LICENSE_STATUS] ?? null;
       if (updated && shouldPurgeAdobeAccountByLicenseStatus(statusAfterCheck, updated)) {
-        nonPaidForTelegram.push({
-          id,
-          email,
-          org_name: updated[COLS.ORG_NAME] ?? null,
-          license_status: statusAfterCheck,
-          removed_from_db: false,
+        const orgNameForTrack = updated[COLS.ORG_NAME] ?? null;
+        const adminNorm = (updated[COLS.EMAIL] || "").toLowerCase().trim();
+        const trackingCount = await getOrderUserTrackingCountByOrgName(orgNameForTrack);
+        const mappedEmails = await db(MAP_TABLE)
+          .where(MAP_COLS.ADOBE_ACCOUNT_ID, id)
+          .pluck(MAP_COLS.USER_EMAIL);
+        const hasNonAdminUserInMapping = (mappedEmails || []).some((ue) => {
+          const l = String(ue || "").toLowerCase().trim();
+          return l && l !== adminNorm;
         });
-        const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
-          updated,
-          { logPrefix }
-        );
-        if (deletedFromDb) {
-          removedFromDb = true;
-          updated = null;
-          const last = nonPaidForTelegram[nonPaidForTelegram.length - 1];
-          if (last && last.id === id) {
-            last.removed_from_db = true;
+        /**
+         * order_user_tracking chỉ có email KH (account), không có dòng cho email đăng nhập admin.
+         * - Org chỉ admin (không có end-user trong mapping) + chưa có dòng tracking theo org → không purge (tránh xóa nhầm admin).
+         * - Có end-user trong mapping mà không có bản ghi tracking theo org → vẫn purge (case lệch sync / không phải “chỉ admin”).
+         */
+        if (trackingCount === 0 && !hasNonAdminUserInMapping) {
+          logger.info(
+            "%s Bỏ qua xóa tài khoản admin id=%s (%s): không có order_user_tracking cho org và mapping chỉ admin (hoặc rỗng) — giữ tài khoản admin.",
+            logPrefix,
+            id,
+            email
+          );
+        } else {
+          nonPaidForTelegram.push({
+            id,
+            email,
+            org_name: orgNameForTrack,
+            license_status: statusAfterCheck,
+            removed_from_db: false,
+          });
+          const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
+            updated,
+            { logPrefix }
+          );
+          if (deletedFromDb) {
+            removedFromDb = true;
+            updated = null;
+            const last = nonPaidForTelegram[nonPaidForTelegram.length - 1];
+            if (last && last.id === id) {
+              last.removed_from_db = true;
+            }
           }
         }
       }

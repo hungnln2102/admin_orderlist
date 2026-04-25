@@ -154,7 +154,9 @@ export const usePackageData = (): UsePackageDataResult => {
       try {
         setOrdersLoading(true);
         setOrdersReady(false);
-        const res = await apiFetch(`/api/orders`);
+        const res = await apiFetch(
+          `/api/orders?scope=package_match`
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as OrderListItem[];
         if (!cancelled) {
@@ -187,7 +189,7 @@ export const usePackageData = (): UsePackageDataResult => {
     setOrdersLoading(true);
     setOrdersReady(false);
     try {
-      const res = await apiFetch(`/api/orders`);
+      const res = await apiFetch(`/api/orders?scope=package_match`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as OrderListItem[];
       if (!isMountedRef.current) return;
@@ -256,11 +258,17 @@ export const usePackageData = (): UsePackageDataResult => {
 
   const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
     return orders.map((order) => {
+      const o = order as Record<string, unknown>;
       const idProduct =
         (order.id_product ?? order.idProduct ?? "") as string;
       const informationOrder =
         (order.information_order ?? order.informationOrder ?? "") as string;
       const slot = order.slot;
+      const rawLinePid =
+        o.line_product_id ?? o.lineProductId;
+      const n =
+        rawLinePid != null && rawLinePid !== "" ? Number(rawLinePid) : NaN;
+      const lineProductId = Number.isFinite(n) && n > 0 ? n : null;
       const productKeys = buildIdentifierKeys(idProduct);
       const infoKeys = buildIdentifierKeys(informationOrder);
       return {
@@ -277,6 +285,10 @@ export const usePackageData = (): UsePackageDataResult => {
         informationMatchKey: normalizeMatchKey(informationOrder),
         customerDisplay: toCleanString(order.customer as string | null),
         productCodeNormalized: normalizeProductCodeValue(idProduct),
+        lineProductId:
+          lineProductId != null && Number.isFinite(lineProductId)
+            ? lineProductId
+            : null,
       };
     });
   }, [orders]);

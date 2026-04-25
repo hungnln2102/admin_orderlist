@@ -66,6 +66,7 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
     handleClearStorage,
     handleToggleStorageManual,
     matchRequiresAccountError,
+    matchRequiresActivationError,
     handleSubmit,
     handleSlotLinkModeChange,
   } = usePackageFormState({
@@ -93,7 +94,9 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={Boolean(matchRequiresAccountError)}
+            disabled={Boolean(
+              matchRequiresAccountError || matchRequiresActivationError
+            )}
             className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {mode === "add" ? "Lưu gói" : "Lưu thay đổi"}
@@ -331,6 +334,14 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
                 role="alert"
               >
                 {matchRequiresAccountError}
+              </p>
+            )}
+            {matchRequiresActivationError && (
+              <p
+                className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400"
+                role="alert"
+              >
+                {matchRequiresActivationError}
               </p>
             )}
           </div>

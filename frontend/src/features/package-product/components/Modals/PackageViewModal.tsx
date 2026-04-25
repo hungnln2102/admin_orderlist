@@ -153,10 +153,10 @@ export const PackageViewModal: React.FC<PackageViewModalProps> = ({
 
   const capacityLimit = row.storageTotal || DEFAULT_CAPACITY_LIMIT;
   const capacityUsed = row.capacityUsed || 0;
-  const remainingCapacity = capacityLimit - capacityUsed;
+  const remainingCapacity = Math.max(capacityLimit - capacityUsed, 0);
   const capacityRatio =
     capacityLimit > 0
-      ? Math.min((remainingCapacity / capacityLimit) * 100, 100)
+      ? Math.min((capacityUsed / capacityLimit) * 100, 100)
       : 0;
   const capacityState = getCapacityAvailabilityState(remainingCapacity, capacityLimit);
   const barColor =

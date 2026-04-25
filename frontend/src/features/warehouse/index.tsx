@@ -174,7 +174,7 @@ export default function Storage() {
   }, [items, search]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 max-w-[1400px]">
+    <div className="p-4 lg:p-6 space-y-5 w-full min-w-0 max-w-[1400px]">
       <StorageHeader totalItems={items.length} />
 
       <SearchBar

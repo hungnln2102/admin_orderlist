@@ -339,10 +339,73 @@ async function syncAllRenewAdobeOrderUserTracking() {
   return { upserted };
 }
 
+/**
+ * Số dòng order_user_tracking theo org (khớp lower(trim(org_name))).
+ * Dùng để tránh tự xóa bản ghi tài khoản admin khi chưa có bản ghi tracking cho org nào.
+ */
+async function getOrderUserTrackingCountByOrgName(orgName) {
+  const k = normalizeOrgKeyForTracking(orgName);
+  if (!k) {
+    return 0;
+  }
+  const row = await db(TRACK_TABLE)
+    .whereRaw(`lower(btrim(COALESCE(org_name::text, ''))) = ?`, [k])
+    .count("* as c")
+    .first();
+  return Number(row?.c) || 0;
+}
+
+/**
+ * Cron 23:30: email (account) có expired = hôm nay (Asia/Ho_Chi_Minh), group theo adobe_account_id từ mapping.
+ * @returns {Promise<Map<number, Set<string>>>}
+ */
+async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
+  const rows = await db(TRACK_TABLE)
+    .select("account")
+    .whereNotNull("account")
+    .whereNotNull("expired")
+    .whereRaw(
+      "expired = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date"
+    );
+
+  const emails = [
+    ...new Set(
+      rows
+        .map((r) => normalizeEmail(r.account))
+        .filter(Boolean)
+    ),
+  ];
+  if (emails.length === 0) {
+    return new Map();
+  }
+
+  const mapEmailCol = `${MAP_TABLE}.${MAP_COLS.USER_EMAIL}`;
+  const mappings = await db(MAP_TABLE)
+    .select(MAP_COLS.USER_EMAIL, MAP_COLS.ADOBE_ACCOUNT_ID)
+    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .whereRaw(`lower(btrim(${mapEmailCol}::text)) = ANY(?::text[])`, [emails]);
+
+  const out = new Map();
+  for (const m of mappings) {
+    const id = Number(m[MAP_COLS.ADOBE_ACCOUNT_ID]);
+    const em = normalizeEmail(m[MAP_COLS.USER_EMAIL]);
+    if (!Number.isFinite(id) || id <= 0 || !em) {
+      continue;
+    }
+    if (!out.has(id)) {
+      out.set(id, new Set());
+    }
+    out.get(id).add(em);
+  }
+  return out;
+}
+
 module.exports = {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   upsertRenewAdobeOrderUserTrackingForAccount,
   syncAllRenewAdobeOrderUserTracking,
   getOrderUserTrackingCountsForAdminAccounts,
   normalizeOrgKeyForTracking,
+  getOrderUserTrackingCountByOrgName,
+  getMapAccountIdToUserEmailsForTrackingExpiredToday,
 };

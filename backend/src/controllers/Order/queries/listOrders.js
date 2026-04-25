@@ -17,6 +17,7 @@ const supplierIdCol = PARTNER_SCHEMA.SUPPLIER.COLS.ID;
 const supplierNameCol = "supplier_name";
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
 const variantDisplayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
+const variantProductIdCol = PRODUCT_SCHEMA.VARIANT.COLS.PRODUCT_ID;
 const paymentReceiptOrderCodeCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ORDER_CODE;
 const paymentReceiptAmountCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
 const paymentReceiptPaidDateCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.PAID_DATE;
@@ -96,6 +97,11 @@ const buildOrdersListQuery = async (scope = "") => {
         query = query
             .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED])
             .whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]);
+    } else if (normalizedScope === "package_match" || normalizedScope === "for_packages") {
+        // Gói sản phẩm: chỉ đơn còn xử lý (Cần Gia Hạn, Đã Thanh Toán, Đang Xử Lý); bỏ import.
+        query = query
+            .whereIn(statusCol, [STATUS.RENEWAL, STATUS.PAID, STATUS.PROCESSING])
+            .whereRaw(`NOT (${table}.${idOrderCol}::text ILIKE ?)`, [importPattern]);
     } else {
         query = query
             .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED])
@@ -113,6 +119,7 @@ const buildOrdersListQuery = async (scope = "") => {
         db.raw(
             `COALESCE(${TABLES.variant}.${variantDisplayNameCol}::text, ${table}.${idProductCol}::text) as id_product`
         ),
+        db.raw(`${TABLES.variant}.${variantProductIdCol}::int as line_product_id`),
         db.raw(`${TABLES.supplier}.${supplierNameCol}::text as supply`),
         db.raw(
             `${TABLES.supplier}.${COLS.SUPPLIER.NUMBER_BANK}::text as supplier_number_bank`

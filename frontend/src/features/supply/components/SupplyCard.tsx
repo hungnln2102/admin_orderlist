@@ -37,6 +37,7 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
   const supplierRefundToShop = Number(
     supply.supplierRefundToShop ?? Math.max(0, -rawUnpaid)
   );
+  const netUnpaid = payableToSupplier - supplierRefundToShop;
 
   const statusColor = supply.isActive
     ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
@@ -105,14 +106,27 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
               Công nợ
             </span>
             <div className="flex items-center gap-1.5">
-              <CurrencyDollarIcon className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-xs font-bold text-orange-400">
-                {formatCurrency(payableToSupplier)}
+              <CurrencyDollarIcon
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  netUnpaid === 0
+                    ? "text-white/40"
+                    : netUnpaid > 0
+                      ? "text-emerald-400"
+                      : "text-rose-400"
+                }`}
+              />
+              <span
+                className={`text-xs font-bold tabular-nums ${
+                  netUnpaid === 0
+                    ? "text-white/50"
+                    : netUnpaid > 0
+                      ? "text-emerald-400"
+                      : "text-rose-400"
+                }`}
+              >
+                {formatCurrency(netUnpaid)}
               </span>
             </div>
-            <span className="text-[10px] font-medium text-rose-300/90 mt-0.5 ml-5">
-              NCC hoàn: {formatCurrency(supplierRefundToShop)}
-            </span>
             <span className="text-[10px] font-medium text-white/40 mt-0.5 ml-5">
               Đã trả: {formatCurrency(supply.totalPaidImport)}
             </span>

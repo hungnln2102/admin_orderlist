@@ -1,8 +1,15 @@
 const { fetchUsersViaApi } = require("../../shared/usersListApi");
 const { exportCookies } = require("../login");
 
-async function runUsersSnapshotFlow(page, { adminEmail = "", pinnedCcpProductIds = [] } = {}) {
-  const apiResult = await fetchUsersViaApi(page, { adminEmail, pinnedCcpProductIds });
+async function runUsersSnapshotFlow(
+  page,
+  { adminEmail = "", pinnedCcpProductIds = [], reusableJilHeaders = null } = {}
+) {
+  const apiResult = await fetchUsersViaApi(page, {
+    adminEmail,
+    pinnedCcpProductIds,
+    ...(reusableJilHeaders ? { reusableJilHeaders } : {}),
+  });
   const users = apiResult.users.map((u) => ({
     id: u.id || null,
     authenticatingAccountId: u.authenticatingAccountId || null,
@@ -30,6 +37,7 @@ async function runUsersSnapshotFlow(page, { adminEmail = "", pinnedCcpProductIds
     userCount: manageTeamMembers.length,
     users,
     manageTeamMembers,
+    capturedJilHeaders: apiResult.capturedJilHeaders || null,
   };
 }
 

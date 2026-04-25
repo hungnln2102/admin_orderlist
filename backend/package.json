@@ -9,6 +9,7 @@
         "test:org-name": "node scripts/test-org-name.js",
         "test:manage-team": "node scripts/test-manage-team.js",
         "test:form-info": "node scripts/test-form-info-supertest.js",
+        "test:jil-home-users": "node scripts/tests/jil-home-vs-users-api.js",
         "migrate:category-gradients": "node scripts/migrate-category-colors-to-gradients.js",
         "seed:hero-banners": "node scripts/seeds/run-seed-hero-banners.js",
         "proxy:local": "node scripts/local-proxy.js",

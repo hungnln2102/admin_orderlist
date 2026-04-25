@@ -77,9 +77,11 @@ const summarizePackageInformation = (user, pass, mail) =>
     .filter(Boolean)
     .join(" | ") || null;
 
+const trimStr = (v) => (v == null || v === "" ? null : String(v).trim() || null);
+
 const mapPackageProductRow = (row) => {
   const packageId = getRowId(row, "package_id", "id", "ID");
-  const informationUser = row.package_username ?? null;
+  const informationUser = trimStr(row.package_username);
   const informationPass = row.package_password ?? null;
   const informationMail = row.package_mail_2nd ?? null;
   const informationSummary = summarizePackageInformation(
@@ -108,7 +110,7 @@ const mapPackageProductRow = (row) => {
     import: fromDbNumber(row.package_import),
     storageId: row.storage_id != null ? Number(row.storage_id) : null,
     storageTotal: row.storage_total != null ? Number(row.storage_total) : null,
-    accountUser: row.storage_username ?? null,
+    accountUser: trimStr(row.storage_username),
     accountPass: row.storage_password ?? null,
     accountMail: row.storage_mail ?? null,
     accountTwoFa: row.storage_two_fa ?? null,

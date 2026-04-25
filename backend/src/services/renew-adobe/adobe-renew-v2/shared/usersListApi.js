@@ -425,7 +425,10 @@ async function fetchUsersViaApi(page, options = {}) {
     }
   }
 
-  const headers = await captureUsersApiHeaders(page, orgToken);
+  const headers =
+    options.reusableJilHeaders && Object.keys(options.reusableJilHeaders).length > 0
+      ? options.reusableJilHeaders
+      : await captureUsersApiHeaders(page, orgToken);
   const api = page.context().request;
   const pageSize = Math.max(20, Math.min(200, Number(options.pageSize) || 20));
   const maxPages = Math.max(1, Math.min(30, Number(options.maxPages) || 10));
@@ -515,6 +518,7 @@ async function fetchUsersViaApi(page, options = {}) {
     users: usersWithProFlags,
     orgToken,
     usersSource: "jil",
+    capturedJilHeaders: headers,
     ...(collectJilRaw && jilRawPages.length ? { jilRawPages } : {}),
   };
 }
@@ -522,6 +526,7 @@ async function fetchUsersViaApi(page, options = {}) {
 module.exports = {
   fetchUsersViaApi,
   fetchUsersViaAbpApi,
+  captureUsersApiHeaders,
   extractOrgTokenFromUrl,
   normalizeOrgToken,
   buildForwardHeadersFromCapturedRequest,

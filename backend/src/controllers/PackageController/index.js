@@ -23,7 +23,13 @@ const validateMatchRequiresAccount = (body) => {
   if (matchMode !== "slot" && matchMode !== "information_order") return null;
   const hasStock = body?.stockId != null && body?.stockId !== "";
   if (!hasStock) {
-    return "Khi chọn Match theo Slot hoặc Information, cần liên kết với kho hàng (stock_id).";
+    return "Cần chọn tài khoản gốc (stock_id) khi bật ghép đơn.";
+  }
+  if (matchMode === "information_order") {
+    const hasStorage = body?.storageId != null && body?.storageId !== "";
+    if (!hasStorage) {
+      return "Chế độ theo thông tin đơn cần tài khoản kích hoạt (storage_id).";
+    }
   }
   return null;
 };

@@ -74,7 +74,7 @@ export const API_ENDPOINTS = {
   SCHEDULER_RUN_ADOBE_CHECK: "/api/scheduler/run-adobe-check",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
-  /** Một vòng Fix All: batch theo slot tài khoản gần đầy nhất (lặp cho tới hết emails). */
+  /** Fix All: backend chạy hết vòng (slot + add batch) trong một lần gọi. */
   RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
@@ -197,6 +197,8 @@ export interface Order {
   // id_product: alias hiển thị (display_name); backend đã trả thêm variant_id & product_display_name
   id_product: string;
   variant_id?: number | string | null;
+  /** product.id từ variant (JOIN) — dùng ghép gói khi tên sản phẩm on đơn khác chuỗi variant. */
+  line_product_id?: number | null;
   product_display_name?: string | null;
   information_order: string;
   customer: string;

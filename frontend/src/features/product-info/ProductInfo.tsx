@@ -182,6 +182,7 @@ const ProductInfo: React.FC = () => {
       {editingCategoryGroup && (
         <EditCategoryModal
           open={Boolean(editingCategoryGroup)}
+          catalogProductId={editingCategoryGroup.catalogProductId}
           packageName={categoryPackageName}
           imageUrl={categoryImageUrl}
           categoryOptions={categoryOptions}

@@ -145,8 +145,14 @@ async function runCheckFlow(email, password, options = {}) {
     // Adobe tự redirect adminconsole.adobe.com → auth.services.adobe.com khi chưa login.
     page = await gotoAdobeAdminConsoleB1(page, context, sharedSession || null);
     // Sau khi goto, Adobe có thể redirect sang auth mất vài giây.
-    // Đợi tối đa ~5s để lấy đúng "trang hiện tại" trước khi quyết định bỏ qua login.
-    await page.waitForTimeout(5000);
+    // ADOBE_V2_B1_STABILIZE_MS (mặc định 5000): tùy môi trường có thể hạ (vd. 2500) nếu ổn định.
+    const b1StabilizeMs = (() => {
+      const n = Number.parseInt(process.env.ADOBE_V2_B1_STABILIZE_MS || "", 10);
+      return Number.isFinite(n) && n >= 0 && n <= 30000 ? n : 5000;
+    })();
+    if (b1StabilizeMs > 0) {
+      await page.waitForTimeout(b1StabilizeMs);
+    }
     await page.locator('button[aria-label="Close"], button[aria-label="close"], .dialog-close').first().click({ timeout: 3000 }).then(() => true).catch(() => false);
 
     if (!hasUsableCookies) {

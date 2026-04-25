@@ -273,16 +273,32 @@ export const usePackageFormState = ({
     (values.slotLinkMode === "slot" || values.slotLinkMode === "information") &&
     !values.stockId &&
     !stockManual
-      ? "Khi chọn Match, cần liên kết với kho hàng (stock_id)."
+      ? "Cần chọn tài khoản gốc (kho) để gán gói."
+      : null;
+
+  const hasActivation =
+    values.storageId != null ||
+    (values.storageManual &&
+      Boolean(values.manualStorage?.account && values.manualStorage.account.trim().length > 0));
+
+  const matchRequiresActivationError =
+    values.slotLinkMode === "information" && !hasActivation
+      ? "Chế độ theo thông tin đơn cần chọn tài khoản kích hoạt (kho kích hoạt)."
       : null;
 
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
       if (matchRequiresAccountError) return;
+      if (matchRequiresActivationError) return;
       onSubmit(values);
     },
-    [matchRequiresAccountError, onSubmit, values]
+    [
+      matchRequiresAccountError,
+      matchRequiresActivationError,
+      onSubmit,
+      values,
+    ]
   );
 
   const handleSlotLinkModeChange = useCallback((mode: SlotLinkMode) => {
@@ -319,6 +335,7 @@ export const usePackageFormState = ({
     handleClearStorage,
     handleToggleStorageManual,
     matchRequiresAccountError,
+    matchRequiresActivationError,
     handleSubmit,
     handleSlotLinkModeChange,
   };

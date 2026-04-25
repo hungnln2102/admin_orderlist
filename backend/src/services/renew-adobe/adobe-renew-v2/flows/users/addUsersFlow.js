@@ -2,6 +2,24 @@ const logger = require("../../../../../utils/logger");
 const { TIMEOUTS, ADMIN_CONSOLE_API_BASE } = require("../../shared/constants");
 const { fetchUsersViaApi } = require("../../shared/usersListApi");
 
+const CREATE_USER_CONCURRENCY = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_CREATE_USER_CONCURRENCY || "", 10);
+  return Number.isFinite(n) && n >= 1 && n <= 20 ? n : 6;
+})();
+
+const MAX_PRODUCT_PATCH_PER_REQUEST = (() => {
+  const n = Number.parseInt(process.env.ADOBE_V2_MAX_PRODUCT_PATCH_BATCH || "", 10);
+  return Number.isFinite(n) && n >= 1 && n <= 100 ? n : 40;
+})();
+
+function hasProductId(user, productId) {
+  return (
+    user &&
+    Array.isArray(user.products) &&
+    user.products.some((p) => String(p?.id || p || "").trim() === productId)
+  );
+}
+
 function extractOrgIdFromUrl(url) {
   const m = String(url || "").match(/\/([A-Fa-f0-9]{20,})@AdobeOrg/);
   return m ? m[1] : null;
@@ -112,6 +130,31 @@ function extractApiErrorCode(rawBody) {
   } catch (_) {
     return "";
   }
+}
+
+function isTrialAlreadyConsumedFromPatch(reason, rawBody) {
+  if (String(reason || "").toLowerCase() === "trial_already_consumed") {
+    return true;
+  }
+  if (String(extractApiErrorCode(rawBody) || "").toUpperCase() === "TRIAL_ALREADY_CONSUMED") {
+    return true;
+  }
+  try {
+    const parsed = JSON.parse(rawBody || "null");
+    const arr = Array.isArray(parsed) ? parsed : [];
+    for (const item of arr) {
+      const c = String(item?.response?.errorCode || item?.errorCode || "").toUpperCase();
+      if (c === "TRIAL_ALREADY_CONSUMED") {
+        return true;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  if (String(rawBody || "").toLowerCase().includes("trial_already_consumed")) {
+    return true;
+  }
+  return false;
 }
 
 async function resolveAssignableProductId(page, orgToken, headers, options = {}) {
@@ -228,14 +271,18 @@ async function assignProductViaPatch(page, orgToken, userId, productId, headers)
       ? apiErrorCode.toLowerCase()
       : patchedFailedReason || `http_${status}`;
   if (!(patchParsed.failed.length === 0 && patchParsed.done.length > 0)) {
-    logger.warn("[adobe-v2] assignProductViaPatch failed", {
-      orgToken,
-      userId,
-      productId,
-      status,
-      reason: oneFailedReason,
-      body: safeBodyPreview(rawBody),
-    });
+    if (isTrialAlreadyConsumedFromPatch(oneFailedReason, rawBody)) {
+      logger.info("[adobe-v2] assignProductViaPatch: trial already consumed (bỏ qua Telegram / không cảnh báo): %s", userId);
+    } else {
+      logger.warn("[adobe-v2] assignProductViaPatch failed", {
+        orgToken,
+        userId,
+        productId,
+        status,
+        reason: oneFailedReason,
+        body: safeBodyPreview(rawBody),
+      });
+    }
   }
   return {
     ok: patchParsed.failed.length === 0 && patchParsed.done.length > 0,
@@ -243,6 +290,102 @@ async function assignProductViaPatch(page, orgToken, userId, productId, headers)
     rawBody,
     reason: oneFailedReason,
   };
+}
+
+/**
+ * Một lần PATCH nhiều { op: add, path: /:userId/products/:productId } — tránh gọi tuần từ từng user.
+ */
+async function assignProductBatchViaPatch(page, orgToken, items, productId, headers) {
+  if (!items || items.length === 0) {
+    return { status: 200, rawBody: "[]" };
+  }
+  const payload = items.map((item) => ({
+    op: "add",
+    path: `/${item.userId}/products/${productId}`,
+  }));
+  const apiResponse = await page.context().request.fetch(
+    `${ADMIN_CONSOLE_API_BASE}/jil-api/v2/organizations/${orgToken}/users`,
+    {
+      method: "PATCH",
+      headers: {
+        accept: "application/json, text/plain, */*",
+        "content-type": "application/json",
+        origin: "https://adminconsole.adobe.com",
+        referer: `https://adminconsole.adobe.com/${orgToken}/users`,
+        authorization: headers.authorization || headers.Authorization || "",
+        "x-requested-with": headers["x-requested-with"] || "XMLHttpRequest",
+        "x-api-key": headers["x-api-key"] || headers["X-Api-Key"] || "",
+        "x-jil-feature": headers["x-jil-feature"] || "",
+        "x-current-page": "1",
+        "x-page-size": String(Math.max(items.length, 10)),
+        "x-next-page": "",
+        "x-request-id": headers["x-request-id"] || `renew-adobe-assign-batch-${Date.now()}`,
+      },
+      data: payload,
+      timeout: 60000,
+    }
+  );
+  const status = apiResponse.status();
+  const rawBody = await apiResponse.text().catch(() => "");
+  return { status, rawBody };
+}
+
+async function resolveUserIdOrFail(page, orgToken, orgId, email, headers, preUser) {
+  let userId = String(preUser?.id || "").trim() || null;
+  if (userId) {
+    return { userId, createReason: null };
+  }
+  const createRes = await createUserViaAbpApi(page, orgToken, email, headers);
+  if (createRes.ok) {
+    return { userId: createRes.userId || null, createReason: null };
+  }
+  const refreshed = await fetchUsersViaApi(page, { orgId });
+  const existed = (refreshed.users || []).find(
+    (u) => String(u?.email || "").trim().toLowerCase() === email
+  );
+  if (existed?.id) {
+    logger.info(
+      "[adobe-v2] runAddUsersFlow(API): user already exists after ABP error (%s): %s",
+      createRes.reason,
+      email
+    );
+    return { userId: String(existed.id), createReason: null };
+  }
+  return { userId: null, createReason: `create_user_failed:${createRes.reason}` };
+}
+
+async function applyAssignFallback(
+  page,
+  orgId,
+  orgToken,
+  email,
+  userId,
+  productId,
+  headers
+) {
+  const assignRes = await assignProductViaPatch(page, orgToken, userId, productId, headers);
+  if (assignRes.ok) {
+    return { kind: "done" };
+  }
+  if (String(assignRes.reason || "").toLowerCase() === "trial_already_consumed") {
+    logger.info(
+      "[adobe-v2] runAddUsersFlow(API): user added but product not assigned (trial already consumed): %s",
+      email
+    );
+    return { kind: "noProduct" };
+  }
+  const refreshed = await fetchUsersViaApi(page, { orgId });
+  const existed = (refreshed.users || []).find(
+    (u) => String(u?.email || "").trim().toLowerCase() === email
+  );
+  if (hasProductId(existed, productId)) {
+    logger.info(
+      "[adobe-v2] runAddUsersFlow(API): assign returned error but product already present, treat success: %s",
+      email
+    );
+    return { kind: "done" };
+  }
+  return { kind: "unassigned", reason: `assign_product_failed:${assignRes.reason}` };
 }
 
 async function runAddUsersFlow(page, userEmails = [], options = {}) {
@@ -270,7 +413,18 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
     };
   }
 
-  const headers = await captureAdobeApiHeaders(page, orgId);
+  const preJil = options.precapturedJilHeaders;
+  const usePreJil =
+    preJil &&
+    (preJil.authorization || preJil.Authorization) &&
+    (preJil["x-api-key"] || preJil["X-Api-Key"]);
+  let headers;
+  if (usePreJil) {
+    headers = preJil;
+    logger.info("[adobe-v2] runAddUsersFlow: dùng precaptured JIL headers (bỏ 1x reload captureAdobe + bớt capture trong fetchUsersViaApi)");
+  } else {
+    headers = await captureAdobeApiHeaders(page, orgId);
+  }
   const authorization = headers.authorization || headers.Authorization || "";
   const xApiKey = headers["x-api-key"] || headers["X-Api-Key"] || "";
 
@@ -291,98 +445,127 @@ async function runAddUsersFlow(page, userEmails = [], options = {}) {
 
   const orgToken = `${orgId}@AdobeOrg`;
   const productId = await resolveAssignableProductId(page, orgToken, headers, options);
-  const usersBefore = await fetchUsersViaApi(page, { orgId });
-  const emailToUser = new Map(
-    (usersBefore.users || [])
-      .filter((u) => u?.email)
-      .map((u) => [String(u.email).trim().toLowerCase(), u])
-  );
+  const fetchOpts = { orgId, ...(usePreJil ? { reusableJilHeaders: preJil } : {}) };
+  let usersSnapshot = await fetchUsersViaApi(page, fetchOpts);
+  const buildEmailToUser = (snap) =>
+    new Map(
+      (snap.users || [])
+        .filter((u) => u?.email)
+        .map((u) => [String(u.email).trim().toLowerCase(), u])
+    );
+  let emailToUser = buildEmailToUser(usersSnapshot);
 
   const done = [];
   const noProduct = [];
   const failed = [];
   const unassigned = [];
-  for (const email of list) {
-    const preUser = emailToUser.get(email) || null;
-    let userId = String(preUser?.id || "").trim() || null;
-    if (!userId) {
-      const createRes = await createUserViaAbpApi(page, orgToken, email, headers);
-      if (createRes.ok) {
-        userId = createRes.userId || null;
-      } else {
-        const refreshed = await fetchUsersViaApi(page, { orgId });
-        const existed = (refreshed.users || []).find(
-          (u) => String(u?.email || "").trim().toLowerCase() === email
-        );
-        if (existed?.id) {
-          userId = String(existed.id);
-          logger.info(
-            "[adobe-v2] runAddUsersFlow(API): user already exists after ABP error (%s): %s",
-            createRes.reason,
-            email
-          );
-        } else {
-          failed.push({ email, reason: `create_user_failed:${createRes.reason}` });
-          continue;
-        }
-      }
-    }
 
-    const assignRes = await assignProductViaPatch(page, orgToken, userId, productId, headers);
-    if (assignRes.ok) {
-      done.push(email);
-      continue;
-    }
-
-    if (String(assignRes.reason || "").toLowerCase() === "trial_already_consumed") {
-      done.push(email);
-      noProduct.push(email);
-      logger.info(
-        "[adobe-v2] runAddUsersFlow(API): user added but product not assigned (trial already consumed): %s",
-        email
-      );
-      continue;
-    }
-
-    const refreshed = await fetchUsersViaApi(page, { orgId });
-    const existed = (refreshed.users || []).find(
-      (u) => String(u?.email || "").trim().toLowerCase() === email
+  const toCreate = list.filter((e) => !emailToUser.has(e));
+  for (let i = 0; i < toCreate.length; i += CREATE_USER_CONCURRENCY) {
+    const slice = toCreate.slice(i, i + CREATE_USER_CONCURRENCY);
+    await Promise.all(
+      slice.map((email) => createUserViaAbpApi(page, orgToken, email, headers))
     );
-    const hasAssignedProduct =
-      existed &&
-      Array.isArray(existed.products) &&
-      existed.products.some((p) => String(p?.id || p || "").trim() === productId);
-
-    if (hasAssignedProduct) {
-      done.push(email);
-      logger.info(
-        "[adobe-v2] runAddUsersFlow(API): assign returned error but product already present, treat success: %s",
-        email
-      );
-      continue;
-    }
-
-    // User đã được tạo/thấy trong org nhưng chưa được gán đúng product.
-    done.push(email);
-    unassigned.push({ email, reason: `assign_product_failed:${assignRes.reason}` });
   }
 
+  usersSnapshot = await fetchUsersViaApi(page, fetchOpts);
+  emailToUser = buildEmailToUser(usersSnapshot);
+
+  for (const email of list) {
+    if (emailToUser.has(email)) {
+      continue;
+    }
+    const r = await resolveUserIdOrFail(page, orgToken, orgId, email, headers, null);
+    if (r.userId) {
+      usersSnapshot = await fetchUsersViaApi(page, fetchOpts);
+      emailToUser = buildEmailToUser(usersSnapshot);
+    } else {
+      failed.push({ email, reason: r.createReason || "create_failed" });
+    }
+  }
+
+  const needAssign = [];
+  for (const email of list) {
+    if (failed.some((f) => f.email === email)) {
+      continue;
+    }
+    const u = emailToUser.get(email);
+    if (!u) {
+      failed.push({ email, reason: "user_not_found_after_create" });
+      continue;
+    }
+    if (hasProductId(u, productId)) {
+      done.push(email);
+      continue;
+    }
+    const uid = String(u.id || "").trim();
+    if (!uid) {
+      failed.push({ email, reason: "user_id_missing" });
+      continue;
+    }
+    needAssign.push({ email, userId: uid });
+  }
+
+  for (let i = 0; i < needAssign.length; i += MAX_PRODUCT_PATCH_PER_REQUEST) {
+    const batch = needAssign.slice(i, i + MAX_PRODUCT_PATCH_PER_REQUEST);
+    const { status, rawBody } = await assignProductBatchViaPatch(
+      page,
+      orgToken,
+      batch,
+      productId,
+      headers
+    );
+    const emails = batch.map((b) => b.email);
+    const norm = normalizeBatchResult(emails, status, rawBody);
+    for (const email of norm.done) {
+      done.push(email);
+    }
+    for (const f of norm.failed) {
+      const b = batch.find((x) => x.email === f.email) || null;
+      if (!b) {
+        failed.push(f);
+        continue;
+      }
+      const fb = await applyAssignFallback(
+        page,
+        orgId,
+        orgToken,
+        f.email,
+        b.userId,
+        productId,
+        headers
+      );
+      if (fb.kind === "done") {
+        done.push(f.email);
+      } else if (fb.kind === "noProduct") {
+        done.push(f.email);
+        noProduct.push(f.email);
+      } else {
+        done.push(f.email);
+        unassigned.push({ email: f.email, reason: fb.reason || f.reason });
+      }
+    }
+  }
+
+  const uniqueDone = [...new Set(done)];
+
   logger.info(
-    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d noProduct=%d failed=%d unassigned=%d",
+    "[adobe-v2] runAddUsersFlow(API): org=%s product=%s done=%d noProduct=%d failed=%d unassigned=%d (maxPatch=%d createConcurrency=%d)",
     orgToken,
     productId,
-    done.length,
+    uniqueDone.length,
     noProduct.length,
     failed.length,
-    unassigned.length
+    unassigned.length,
+    MAX_PRODUCT_PATCH_PER_REQUEST,
+    CREATE_USER_CONCURRENCY
   );
 
-  const stoppedByPolicy =
-    options.stopOnError === true && failed.length > 0;
+  const stoppedByPolicy = options.stopOnError === true && failed.length > 0;
 
   return {
-    success: done.length > 0 && !stoppedByPolicy,
-    done,
+    success: uniqueDone.length > 0 && !stoppedByPolicy,
+    done: uniqueDone,
     noProduct,
     failed,
     unassigned,

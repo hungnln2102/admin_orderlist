@@ -134,7 +134,7 @@ const SupplyRow = ({
   const supplierRefundToShop = Number(
     supply.supplierRefundToShop ?? Math.max(0, -Number(supply.totalUnpaidImport ?? 0))
   );
-  const hasTwoFlows = payableToSupplier > 0 || supplierRefundToShop > 0;
+  const netUnpaid = payableToSupplier - supplierRefundToShop;
 
   return (
     <>
@@ -157,19 +157,16 @@ const SupplyRow = ({
         <td className="px-4 py-4 text-white/80 text-sm">{formatDate(supply.lastOrderDate)}</td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatCurrency(supply.totalPaidImport)}</td>
         <td className="px-4 py-4 text-sm">
-          {hasTwoFlows ? (
-            <div className="space-y-0.5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] text-white/45">Trả NCC</span>
-                <span className="font-semibold text-orange-300">{formatCurrency(payableToSupplier)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] text-white/45">NCC hoàn</span>
-                <span className="font-semibold text-rose-400">{formatCurrency(supplierRefundToShop)}</span>
-              </div>
-            </div>
-          ) : (
+          {netUnpaid === 0 ? (
             <span className="text-white/60">0 ₫</span>
+          ) : (
+            <span
+              className={`font-semibold tabular-nums ${
+                netUnpaid > 0 ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {formatCurrency(netUnpaid)}
+            </span>
           )}
         </td>
         <td className="px-4 py-4 text-center">

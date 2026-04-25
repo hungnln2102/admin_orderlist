@@ -373,63 +373,36 @@ export function useRenewAdobeAdmin() {
       setCheckError(null);
       setFixAllProgress({ current: 0, total: unique.length });
 
-      let remaining = [...unique];
-      let processed = 0;
-
       try {
-        while (remaining.length > 0) {
-          const res = await apiFetch(
-            API_ENDPOINTS.RENEW_ADOBE_FIX_USERS_ROUND,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ emails: remaining }),
-            }
-          );
-          const data = (await res.json().catch(() => ({}))) as {
-            success?: boolean;
-            error?: string;
-            added_count?: number;
-            remaining_emails?: string[];
-            round?: { emails?: string[]; accountEmail?: string };
-          };
-
-          if (!data?.success) {
-            const msg =
-              typeof data?.error === "string" ? data.error : "Fix thất bại";
-            throw new Error(msg);
+        const res = await apiFetch(
+          API_ENDPOINTS.RENEW_ADOBE_FIX_USERS_ROUND,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emails: unique }),
           }
+        );
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          error?: string;
+          total_added?: number;
+          added_count?: number;
+        };
 
-          const added = Number(data.added_count) || 0;
-          remaining = Array.isArray(data.remaining_emails)
-            ? data.remaining_emails
-            : [];
-
-          if (added === 0) {
-            if (remaining.length > 0) {
-              throw new Error(
-                data?.error || "Không thêm được user trong vòng này."
-              );
-            }
-            break;
-          }
-
-          processed += added;
-
-          setFixAllProgress({
-            current: Math.min(processed, unique.length),
-            total: unique.length,
-          });
-
-          const lastEmail = data.round?.emails?.[data.round.emails.length - 1];
-          if (lastEmail) setFixingId(lastEmail);
-
-          loadAccounts();
-
-          if (remaining.length === 0) {
-            break;
-          }
+        if (!data?.success) {
+          const msg =
+            typeof data?.error === "string" ? data.error : "Fix thất bại";
+          throw new Error(msg);
         }
+
+        const total =
+          Number(data.total_added) ||
+          Number(data.added_count) ||
+          0;
+        setFixAllProgress({
+          current: Math.min(total, unique.length),
+          total: unique.length,
+        });
       } catch (err) {
         setCheckError(
           err instanceof Error ? err.message : "Lỗi khi fix hàng loạt."

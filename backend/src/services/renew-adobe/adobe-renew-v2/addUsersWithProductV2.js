@@ -9,7 +9,11 @@ const { runCheckFlow } = require("./runCheckFlow");
 const { parseCcpProductIdsFromAlertConfig } = require("./shared/accessChecks");
 const { getPlaywrightProxyOptions } = require("./shared/proxyConfig");
 const { launchSessionFromProfile } = require("./shared/profileSession");
-const { checkUserAssignedProduct } = require("./shared/usersListApi");
+const {
+  checkUserAssignedProduct,
+  extractOrgTokenFromUrl,
+  captureUsersApiHeaders,
+} = require("./shared/usersListApi");
 const {
   runGotoUsersFlow,
   runAddUsersFlow,
@@ -22,6 +26,9 @@ const POST_ADD_REFRESH_DELAY_MS = (() => {
   const n = Number.parseInt(process.env.ADOBE_V2_POST_ADD_REFRESH_DELAY_MS || "", 10);
   return Number.isFinite(n) && n >= 500 ? n : 1500;
 })();
+
+const REUSE_JIL_HEADERS = String(process.env.ADOBE_V2_REUSE_JIL_HEADERS || "1").trim() !== "0";
+const POST_ADD_DOUBLE_SNAPSHOT = String(process.env.ADOBE_V2_POST_ADD_DOUBLE_SNAPSHOT || "1").trim() === "1";
 
 function buildDetailedAddUsersError(addResult) {
   const failed = Array.isArray(addResult?.failed) ? addResult.failed : [];
@@ -120,11 +127,15 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
 
     await runGotoUsersFlow(page);
 
+    let precapturedJilHeaders = null;
     if (Number.isFinite(maxUsers) && maxUsers > 0) {
       const preAddSnapshot = await runUsersSnapshotFlow(page, {
         adminEmail,
         pinnedCcpProductIds,
       });
+      if (REUSE_JIL_HEADERS) {
+        precapturedJilHeaders = preAddSnapshot.capturedJilHeaders || null;
+      }
       const currentMembers = Number.parseInt(preAddSnapshot?.userCount, 10) || 0;
       if (currentMembers >= maxUsers) {
         return {
@@ -134,9 +145,16 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
           snapshot: preAddSnapshot,
         };
       }
+    } else if (REUSE_JIL_HEADERS) {
+      const orgToken = extractOrgTokenFromUrl(page.url());
+      if (orgToken) {
+        precapturedJilHeaders = await captureUsersApiHeaders(page, orgToken);
+      }
     }
 
-    const addResult = await runAddUsersFlow(page, emails);
+    const addResult = await runAddUsersFlow(page, emails, {
+      precapturedJilHeaders: precapturedJilHeaders || undefined,
+    });
     if (!addResult.success) {
       const detailedError = buildDetailedAddUsersError(addResult);
       logger.warn("[adobe-v2] addUsersWithProductV2: add flow failed", {
@@ -158,26 +176,35 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
     }
 
     // Product đã được assign ngay trong runAddUsersFlow (create user + PATCH add product).
+    // Tái dùng JIL headers (không goto/reload) + delay — thay 2x runGotoUsersFlow + 2x capture.
 
-    await runGotoUsersFlow(page);
-    const snapshotAfterAdd = await runUsersSnapshotFlow(page, {
+    const snapshotArgs = {
       adminEmail,
       pinnedCcpProductIds,
-    });
-    let confirmedSnapshot = snapshotAfterAdd;
+      ...(REUSE_JIL_HEADERS && precapturedJilHeaders
+        ? { reusableJilHeaders: precapturedJilHeaders }
+        : {}),
+    };
+
+    let confirmedSnapshot;
     try {
-      // Adobe có độ trễ đồng bộ product theo user, nên re-fetch thêm 1 lần để chốt trạng thái thật.
       await page.waitForTimeout(POST_ADD_REFRESH_DELAY_MS);
-      await runGotoUsersFlow(page);
-      confirmedSnapshot = await runUsersSnapshotFlow(page, {
-        adminEmail,
-        pinnedCcpProductIds,
-      });
+      confirmedSnapshot = await runUsersSnapshotFlow(page, snapshotArgs);
+      if (POST_ADD_DOUBLE_SNAPSHOT) {
+        await page.waitForTimeout(POST_ADD_REFRESH_DELAY_MS);
+        confirmedSnapshot = await runUsersSnapshotFlow(page, snapshotArgs);
+      }
     } catch (refreshErr) {
       logger.warn(
-        "[adobe-v2] addUsersWithProductV2: re-fetch users after add failed, fallback snapshot đầu: %s",
+        "[adobe-v2] addUsersWithProductV2: re-fetch users after add failed: %s",
         refreshErr.message
       );
+      confirmedSnapshot = {
+        userCount: 0,
+        users: [],
+        manageTeamMembers: [],
+        capturedJilHeaders: null,
+      };
     }
 
     const sessionResult = await runPersistUsersSessionFlow(context);

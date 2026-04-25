@@ -389,6 +389,8 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
         accountId,
         accountEmail,
         emails: chunk,
+        slotsLeft,
+        batchSize: chunk.length,
       },
     };
   } catch (err) {
@@ -406,8 +408,125 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
   }
 }
 
+const FIX_ALL_MAX_ROUNDS = 500;
+
+/**
+ * Fix All: lặp nội bộ từng vòng (B1 tài khoản còn add → B2 slot trống → B3 tối đa min(slot, user còn) → B4 add batch),
+ * tới khi hết email hoặc hết tài khoản — một request API thay vì nhiều lần gọi từ client.
+ */
+async function fixUsersAllRoundsTightest(userEmailsRaw) {
+  const initialDistinct = [
+    ...new Set(
+      (Array.isArray(userEmailsRaw) ? userEmailsRaw : [])
+        .map((e) => String(e || "").trim().toLowerCase())
+        .filter(Boolean)
+    ),
+  ];
+
+  if (initialDistinct.length === 0) {
+    return {
+      success: true,
+      total_added: 0,
+      added_count: 0,
+      rounds: [],
+      remaining_emails: [],
+    };
+  }
+
+  let pending = initialDistinct;
+  let totalAdded = 0;
+  const rounds = [];
+  let lastSkipped = 0;
+
+  for (let i = 0; i < FIX_ALL_MAX_ROUNDS; i += 1) {
+    if (pending.length === 0) {
+      break;
+    }
+
+    const r = await fixUsersOneRoundTightest(pending);
+
+    if (r.skipped_already_assigned != null && r.round == null) {
+      lastSkipped = Number(r.skipped_already_assigned) || 0;
+      return {
+        success: true,
+        total_added: 0,
+        added_count: 0,
+        rounds: [],
+        remaining_emails: [],
+        skipped_already_assigned: lastSkipped,
+      };
+    }
+
+    if (!r.success) {
+      return {
+        success: false,
+        error: r.error,
+        total_added: totalAdded,
+        added_count: totalAdded,
+        rounds,
+        remaining_emails: r.remaining_emails || pending,
+      };
+    }
+
+    const added = Number(r.added_count) || 0;
+    const next = Array.isArray(r.remaining_emails) ? r.remaining_emails : [];
+    totalAdded += added;
+
+    if (r.round) {
+      const rr = r.round;
+      rounds.push({
+        accountId: rr.accountId,
+        accountEmail: rr.accountEmail,
+        slotsLeft: rr.slotsLeft,
+        batchSize: rr.batchSize ?? (Array.isArray(rr.emails) ? rr.emails.length : 0),
+        emails: rr.emails || [],
+        added_in_round: added,
+      });
+    }
+
+    if (added === 0) {
+      if (next.length > 0) {
+        return {
+          success: false,
+          error: r.error || "Không thêm được user trong vòng này.",
+          total_added: totalAdded,
+          added_count: totalAdded,
+          rounds,
+          remaining_emails: next,
+        };
+      }
+      break;
+    }
+
+    pending = next;
+    if (pending.length === 0) {
+      break;
+    }
+  }
+
+  if (pending.length > 0) {
+    return {
+      success: false,
+      error: "Fix All vượt số vòng tối đa — tăng hạn mức hoặc giảm danh sách.",
+      total_added: totalAdded,
+      added_count: totalAdded,
+      rounds,
+      remaining_emails: pending,
+    };
+  }
+
+  return {
+    success: true,
+    total_added: totalAdded,
+    added_count: totalAdded,
+    rounds,
+    remaining_emails: [],
+  };
+}
+
 module.exports = {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
   fixUsersOneRoundTightest,
+  fixUsersAllRoundsTightest,
 };

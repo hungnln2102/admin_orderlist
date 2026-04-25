@@ -33,8 +33,10 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   const totalSlots = row.slotLimit || DEFAULT_SLOT_LIMIT;
   const slotUsed = row.slotUsed;
   const remainingSlots = row.remainingSlots;
-  const slotAvailabilityRatio =
-    totalSlots > 0 ? Math.min((remainingSlots / totalSlots) * 100, 100) : 0;
+  const slotUsedFillRatio =
+    totalSlots > 0
+      ? Math.min((Math.min(slotUsed, totalSlots) / totalSlots) * 100, 100)
+      : 0;
   const slotState = getSlotAvailabilityState(remainingSlots);
   const slotColorClass =
     slotState === "out" ? "bg-red-500" : slotState === "low" ? "bg-yellow-500" : "bg-green-500";
@@ -45,8 +47,13 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
   const capacityUsed = row.capacityUsed;
   const remainingCapacity = row.remainingCapacity;
-  const capacityRatio =
-    capacityLimit > 0 ? Math.min((remainingCapacity / capacityLimit) * 100, 100) : 0;
+  const capacityUsedFillRatio =
+    capacityLimit > 0
+      ? Math.min(
+          (Math.min(capacityUsed, capacityLimit) / capacityLimit) * 100,
+          100
+        )
+      : 0;
   const capState = getCapacityAvailabilityState(remainingCapacity, capacityLimit);
   const capColorClass =
     capState === "out" ? "bg-red-500" : capState === "low" ? "bg-yellow-500" : "bg-green-500";
@@ -99,7 +106,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
             <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden border border-white/5">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${slotColorClass} shadow-[0_0_8px_rgba(34,197,94,0.4)]`}
-                style={{ width: `${slotAvailabilityRatio}%` }}
+                style={{ width: `${slotUsedFillRatio}%` }}
               />
             </div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 mt-1.5 whitespace-nowrap">
@@ -121,7 +128,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
               <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden border border-white/5">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${capColorClass} shadow-[0_0_8px_rgba(168,85,247,0.4)]`}
-                  style={{ width: `${capacityRatio}%` }}
+                  style={{ width: `${capacityUsedFillRatio}%` }}
                 />
               </div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 mt-1.5 whitespace-nowrap">

@@ -80,8 +80,16 @@ const mapProductPriceRow = (row = {}) => {
     if (Number.isFinite(n) && n > 0) desc_variant_id = n;
   }
 
+  const catalogProductId = (() => {
+    const raw = row.catalog_product_id ?? row.catalogProductId;
+    if (raw == null || raw === "") return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+
   return {
     id,
+    catalog_product_id: catalogProductId,
     id_product: sanPham,
     san_pham: sanPham,
     package_product:
