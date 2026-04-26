@@ -499,6 +499,8 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     const insertRes = await client.query(sql, insertValues);
     const insertedId = insertRes.rows[0]?.id ?? null;
     await ensureReceiptFinancialState(client, insertedId);
+    // total_revenue tháng (dashboard): cộng dồn bởi trigger DB
+    // (tr_payment_receipt_dashboard_revenue) trên payment_receipt, không tính lại ở API.
 
     if (manageTransaction) {
       await client.query("COMMIT");

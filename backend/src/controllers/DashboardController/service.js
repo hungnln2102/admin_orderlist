@@ -20,8 +20,6 @@ const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
 const {
   buildAlignedMonthlyRows,
-  sumPaymentReceiptsByMonthKeys,
-  sumImportCostByMonthKeys,
   rowToApiShape,
 } = require("./monthlySnapshot");
 
@@ -220,27 +218,24 @@ const fetchDashboardStats = async () => {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const [aggResult, tableRows, availableProfit, sepayMap, importByMonth, monthlyWithdraw] =
-    await Promise.all([
-      db.raw(
-        buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
-      ),
-      db(summaryTableName)
-        .select(
-          summaryCols.MONTH_KEY,
-          summaryCols.TOTAL_ORDERS,
-          summaryCols.TOTAL_REVENUE,
-          summaryCols.TOTAL_PROFIT,
-          summaryCols.TOTAL_REFUND,
-          summaryCols.TOTAL_IMPORT,
-          summaryCols.TOTAL_TAX
-        )
-        .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
-      fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-      sumPaymentReceiptsByMonthKeys([currentMonthKey, previousMonthKey]),
-      sumImportCostByMonthKeys([currentMonthKey, previousMonthKey]),
-      fetchMonthlyWithdrawProfitPair({ monthStartDate }),
-    ]);
+  const [aggResult, tableRows, availableProfit, monthlyWithdraw] = await Promise.all([
+    db.raw(
+      buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
+    ),
+    db(summaryTableName)
+      .select(
+        summaryCols.MONTH_KEY,
+        summaryCols.TOTAL_ORDERS,
+        summaryCols.TOTAL_REVENUE,
+        summaryCols.TOTAL_PROFIT,
+        summaryCols.TOTAL_REFUND,
+        summaryCols.TOTAL_IMPORT,
+        summaryCols.TOTAL_TAX
+      )
+      .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
+    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+    fetchMonthlyWithdrawProfitPair({ monthStartDate }),
+  ]);
 
   const aggMap = new Map(
     (aggResult?.rows || []).map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r])
@@ -252,18 +247,20 @@ const fetchDashboardStats = async () => {
   const curr = kpiForMonth(currentMonthKey, tableMap, aggMap);
   const prev = kpiForMonth(previousMonthKey, tableMap, aggMap);
 
-  const sepayC = sepayMap.get(currentMonthKey) || 0;
-  const sepayP = sepayMap.get(previousMonthKey) || 0;
-  const importC = importByMonth.get(currentMonthKey) || 0;
-  const importP = importByMonth.get(previousMonthKey) || 0;
-  const netC = sepayC - curr.total_refund;
-  const netP = sepayP - prev.total_refund;
+  const trC = tableMap.get(currentMonthKey);
+  const trP = tableMap.get(previousMonthKey);
+  const revC = toNumber(trC?.[summaryCols.TOTAL_REVENUE]);
+  const revP = toNumber(trP?.[summaryCols.TOTAL_REVENUE]);
+  const importC = toNumber(trC?.[summaryCols.TOTAL_IMPORT]);
+  const importP = toNumber(trP?.[summaryCols.TOTAL_IMPORT]);
+  const netC = revC - curr.total_refund;
+  const netP = revP - prev.total_refund;
   const profitC = netC - importC - monthlyWithdraw.current;
   const profitP = netP - importP - monthlyWithdraw.previous;
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
-    totalRevenue: { current: sepayC, previous: sepayP },
+    totalRevenue: { current: revC, previous: revP },
     totalImports: {
       current: importC,
       previous: importP,

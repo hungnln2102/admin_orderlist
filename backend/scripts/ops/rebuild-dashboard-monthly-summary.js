@@ -14,7 +14,7 @@ async function rebuildDashboardMonthlySummary() {
   const trx = await db.transaction();
 
   try {
-    const rows = await buildAlignedMonthlyRows(trx);
+    const rows = await buildAlignedMonthlyRows(trx, { revenueSource: "receipts" });
     const rowsToInsert = rows.map((row) => ({
       ...row,
       [summaryCols.UPDATED_AT]: trx.raw("now()"),

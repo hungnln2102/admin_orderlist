@@ -1,7 +1,7 @@
 /**
- * Cùng một nguồn số: doanh thu = tổng biên lai (Sepay) theo tháng payment_date;
- * hoàn/đếm đơn từ CTE order_list; nhập từ log NCC; lợi nhuận = (sepay - hoàn) - nhập - rút lợi nhuận;
- * thuế trên (sepay - hoàn). Dùng cho API tóm tắt tháng, biểu đồ từ summary, và script rebuild bảng.
+ * Doanh thu: cột total_revenue trên dashboard_monthly_summary (cộng dồn khi chèn biên lai, xem trigger).
+ * Rebuild: revenueSource = 'receipts' tổng từ payment_receipt (sau khi xóa bảng, đối soát lại).
+ * Hoàn/đếm đơn từ CTE order_list; lợi nhuận = (doanh thu - hoàn) - nhập - rút; thuế trên (doanh thu ròng).
  */
 const { db } = require("../../db");
 const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryAggregate");
@@ -34,6 +34,10 @@ const paymentReceiptTable = tableName(
   SCHEMA_RECEIPT
 );
 const paymentReceiptCols = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS;
+const summaryTableName = tableName(
+  FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
+  SCHEMA_FINANCE
+);
 
 const toNumber = (value) => Number(value || 0);
 
@@ -118,11 +122,36 @@ const sumWithdrawProfitByMonthKeys = async (monthKeys, executor = db) => {
   return new Map((r.rows || []).map((r0) => [String(r0.mk || ""), toNumber(r0.w)]));
 };
 
+const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => {
+  const unique = [...new Set((monthKeys || []).map((k) => String(k || "").trim()))].filter(
+    Boolean
+  );
+  if (!unique.length) return new Map();
+  const stored = await executor(summaryTableName)
+    .select(
+      summaryCols.MONTH_KEY,
+      summaryCols.TOTAL_REVENUE,
+      summaryCols.TOTAL_IMPORT
+    )
+    .whereIn(summaryCols.MONTH_KEY, unique);
+  return new Map(
+    (stored || []).map((r) => [
+      String(r[summaryCols.MONTH_KEY] || ""),
+      {
+        revenue: toNumber(r[summaryCols.TOTAL_REVENUE]),
+        importVal: toNumber(r[summaryCols.TOTAL_IMPORT]),
+      },
+    ])
+  );
+};
+
 /**
- * Một dòng tổng hợp theo tháng (cùng logic thẻ KPI + lưu DB sau rebuild).
  * @param {import("knex").Knex|import("knex").Transaction} [executor]
+ * @param {{ revenueSource?: 'table' | 'receipts' }} [options] — rebuild sau TRUNC: 'receipts' (tổng từ biên lai);
+ *   mặc định 'table' (đọc cột cộng dồn từ trigger).
  */
-const buildAlignedMonthlyRows = async (executor = db) => {
+const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
+  const revenueSource = options.revenueSource === "receipts" ? "receipts" : "table";
   const useCreatedAt = await orderListHasCreatedAtColumn();
   const result = await executor.raw(
     buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
@@ -134,29 +163,44 @@ const buildAlignedMonthlyRows = async (executor = db) => {
     .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
     .filter(Boolean);
 
-  const [sepayMap, importMap, withdrawMap] = await Promise.all([
-    sumPaymentReceiptsByMonthKeys(mks, executor),
-    sumImportCostByMonthKeys(mks, executor),
-    sumWithdrawProfitByMonthKeys(mks, executor),
-  ]);
+  const withdrawMapF = await sumWithdrawProfitByMonthKeys(mks, executor);
+  let revImpByMonth;
+  if (revenueSource === "receipts") {
+    const [revMap, impMap] = await Promise.all([
+      sumPaymentReceiptsByMonthKeys(mks, executor),
+      sumImportCostByMonthKeys(mks, executor),
+    ]);
+    revImpByMonth = (mk) => ({
+      rev: revMap.get(mk) || 0,
+      imp: impMap.get(mk) || 0,
+    });
+  } else {
+    const tbl = await sumRevenueAndImportFromSummaryTable(mks, executor);
+    revImpByMonth = (mk) => {
+      const t = tbl.get(mk);
+      return {
+        rev: t ? t.revenue : 0,
+        imp: t ? t.importVal : 0,
+      };
+    };
+  }
 
   return rows.map((row) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
-    const sepay = sepayMap.get(mk) || 0;
+    const { rev, imp: importVal } = revImpByMonth(mk);
     const refund = toNumber(row[summaryCols.TOTAL_REFUND]);
-    const importVal = importMap.get(mk) || 0;
-    const withdraw = withdrawMap.get(mk) || 0;
-    const net = sepay - refund;
+    const withdraw = withdrawMapF.get(mk) || 0;
+    const net = rev - refund;
     const profit = net - importVal - withdraw;
     return {
       [summaryCols.MONTH_KEY]: mk,
       [summaryCols.TOTAL_ORDERS]: toNumber(row[summaryCols.TOTAL_ORDERS]),
       [summaryCols.CANCELED_ORDERS]: toNumber(row[summaryCols.CANCELED_ORDERS]),
-      [summaryCols.TOTAL_REVENUE]: sepay,
+      [summaryCols.TOTAL_REVENUE]: rev,
       [summaryCols.TOTAL_PROFIT]: profit,
       [summaryCols.TOTAL_REFUND]: refund,
       [summaryCols.TOTAL_IMPORT]: importVal,
-      [summaryCols.TOTAL_TAX]: taxOnNet(sepay, refund),
+      [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
     };
   });
 };
@@ -184,6 +228,7 @@ module.exports = {
   buildAlignedMonthlyRows,
   sumPaymentReceiptsByMonthKeys,
   sumImportCostByMonthKeys,
+  sumRevenueAndImportFromSummaryTable,
   sumWithdrawProfitByMonthKeys,
   rowToApiShape,
   toNumber,
