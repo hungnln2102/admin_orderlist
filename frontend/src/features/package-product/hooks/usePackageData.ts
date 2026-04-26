@@ -391,15 +391,16 @@ export const usePackageData = (): UsePackageDataResult => {
       (selectedTemplate?.fields.includes("capacity") ?? false));
   const tableColumnCount = showCapacityColumn ? 9 : 8;
 
+  /** Thống kê cùng phạm vi với bảng: loại gói + tìm kiếm + lọc trạng thái (tránh lệch «Tổng: 1» với 3 dòng bảng). */
   const slotStats = useMemo(() => {
-    const low = scopedRows.reduce(
+    const low = filteredRows.reduce(
       (total, row) =>
         getSlotAvailabilityState(row.remainingSlots) === "low"
           ? total + 1
           : total,
       0
     );
-    const out = scopedRows.reduce(
+    const out = filteredRows.reduce(
       (total, row) =>
         getSlotAvailabilityState(row.remainingSlots) === "out"
           ? total + 1
@@ -407,11 +408,11 @@ export const usePackageData = (): UsePackageDataResult => {
       0
     );
     return {
-      total: scopedRows.length,
+      total: filteredRows.length,
       low,
       out,
     };
-  }, [scopedRows]);
+  }, [filteredRows]);
 
   const allPackageNames = useMemo(() => {
     const names = new Set<string>();
@@ -436,8 +437,11 @@ export const usePackageData = (): UsePackageDataResult => {
     computedRows.forEach((row) => {
       const key = (row.package || "").trim();
       if (!key) return;
-      const entry = stats.get(key);
-      if (!entry) return;
+      let entry = stats.get(key);
+      if (!entry) {
+        entry = { total: 0, low: 0, out: 0 };
+        stats.set(key, entry);
+      }
       entry.total += 1;
       const availability = getSlotAvailabilityState(row.remainingSlots);
       if (availability === "low") entry.low += 1;

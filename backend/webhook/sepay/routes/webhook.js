@@ -531,6 +531,42 @@ router.post("/", async (req, res) => {
           if (!state) continue;
 
           const statusValue = state[ORDER_COLS.status];
+
+          // Giao dịch trùng mã khi đơn đã Đã/Đang xử lý: cộng thêm DT + LN (cùng số, không trừ cost) — chạy *trước* getOrderQrPaymentEligibility vì PAID bị coi là "khoá QR".
+          if (
+            receiptResult?.inserted &&
+            (statusValue === ORDER_STATUS.PAID || statusValue === ORDER_STATUS.PROCESSING) &&
+            transferAmountNormalized > 0
+          ) {
+            const extraVnd = normalizeMoney(transferAmountNormalized);
+            await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+              revenueDelta: extraVnd,
+              profitDelta: extraVnd,
+              ordersDelta: 0,
+            });
+            postedRevenueDelta += extraVnd;
+            postedProfitDelta += extraVnd;
+            if (receiptId) {
+              await insertFinancialAuditLog(client, {
+                payment_receipt_id: receiptId,
+                order_code: code,
+                rule_branch: "POST_PAID_ADDITIONAL_RECEIPT",
+                delta: {
+                  posted_revenue: extraVnd,
+                  posted_profit: extraVnd,
+                  month_key: paidMonthKey,
+                },
+                source: "webhook",
+              });
+            }
+            logger.debug("[Webhook] Ghi thêm doanh thu (biên thêm sau khi đã thu đủ trước đó)", {
+              orderCode: code,
+              status: statusValue,
+              amount: extraVnd,
+            });
+            continue;
+          }
+
           const qrEligibility = getOrderQrPaymentEligibility(statusValue);
           if (!qrEligibility.canPayByQr) {
             logger.info("[Webhook] Skip QR payment posting for locked order", {

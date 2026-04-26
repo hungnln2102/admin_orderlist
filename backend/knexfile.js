@@ -1,4 +1,6 @@
-require("dotenv").config();
+const { loadBackendEnv } = require("./src/config/loadEnv");
+
+loadBackendEnv();
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||

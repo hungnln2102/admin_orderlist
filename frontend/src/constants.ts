@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
   ORDER_REFUND_CREDIT_ENSURE: (id: number) =>
     `/api/orders/canceled/${id}/refund-credit/ensure`,
+  ORDERS_REFUND_CREDITS_AVAILABLE: "/api/orders/refund-credits/available",
 
   SUPPLIES: "/api/supplies",
   SUPPLIES_ORDER_COSTS: "/api/supplies/order-costs",
@@ -219,7 +220,16 @@ export interface Order {
   refund_credit_applied_note_id?: number | string | null;
   refund_credit_applied_amount?: number | string | null;
   refund_credit_applied_at?: string | null;
+  /** Phiếu tạo từ tách số còn (sau khi tách, chọn id này lần sau). */
+  refund_credit_effective_note_id?: number | string | null;
+  refund_credit_effective_code?: string | null;
+  refund_credit_effective_available?: number | string | null;
+  refund_credit_effective_status?: string | null;
   price_before_credit?: number | string | null;
+  gross_selling_price?: number | string | null;
+  refund_credit_code?: string | null;
+  refund_credit_replacement_note_id?: number | string | null;
+  refund_credit_applied_from_note_id?: number | string | null;
   cost: string;
   price: string;
   note: string;

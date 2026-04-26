@@ -8,6 +8,7 @@ const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccou
 const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+const orderDateCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ORDER_DATE;
 const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
 const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
 const expiryCol = ORDERS_SCHEMA.ORDER_LIST.COLS.EXPIRY_DATE;
@@ -50,6 +51,18 @@ const buildOrdersListQuery = async (scope = "") => {
             `
             LEFT JOIN LATERAL (
                 SELECT
+                    COALESCE(SUM(pr_sum.${paymentReceiptAmountCol})::numeric, 0) AS total_webhook_amount
+                FROM ${TABLES.paymentReceipt} pr_sum
+                WHERE COALESCE(${table}.${idOrderCol}::text, '') <> ''
+                  AND LOWER(COALESCE(pr_sum.${paymentReceiptOrderCodeCol}::text, '')) = LOWER(${table}.${idOrderCol}::text)
+                  AND pr_sum.${paymentReceiptPaidDateCol}::date >= COALESCE(${table}.${orderDateCol}::date, '1970-01-01'::date)
+            ) wh_pr_sum ON TRUE
+            `
+        )
+        .joinRaw(
+            `
+            LEFT JOIN LATERAL (
+                SELECT
                     rcn.id AS refund_credit_note_id,
                     rcn.credit_code AS refund_credit_code,
                     rcn.available_amount AS refund_credit_available_amount,
@@ -69,8 +82,16 @@ const buildOrdersListQuery = async (scope = "") => {
                     rca.id AS refund_credit_application_id,
                     rca.credit_note_id AS refund_credit_applied_note_id,
                     rca.applied_amount AS refund_credit_applied_amount,
-                    rca.applied_at AS refund_credit_applied_at
+                    rca.applied_at::text AS refund_credit_applied_at,
+                    c_effective.id AS refund_credit_effective_note_id,
+                    c_effective.credit_code AS refund_credit_effective_code,
+                    c_effective.available_amount::numeric AS refund_credit_effective_available,
+                    c_effective.status::text AS refund_credit_effective_status
                 FROM ${TABLES.refundCreditApplications} rca
+                INNER JOIN ${TABLES.refundCreditNotes} c_applied
+                    ON c_applied.id = rca.credit_note_id
+                INNER JOIN ${TABLES.refundCreditNotes} c_effective
+                    ON c_effective.id = COALESCE(c_applied.succeeded_by_note_id, c_applied.id)
                 WHERE rca.target_order_list_id = ${table}.${idCol}
                 ORDER BY rca.id DESC
                 LIMIT 1
@@ -128,6 +149,7 @@ const buildOrdersListQuery = async (scope = "") => {
         db.raw(`latest_pr.latest_webhook_amount::numeric as latest_webhook_amount`),
         db.raw(`latest_pr.latest_webhook_paid_date::text as latest_webhook_paid_date`),
         db.raw(`latest_pr.latest_webhook_receipt_id::bigint as latest_webhook_receipt_id`),
+        db.raw(`wh_pr_sum.total_webhook_amount::numeric as total_webhook_amount`),
         db.raw(`latest_rcn.refund_credit_note_id::bigint as refund_credit_note_id`),
         db.raw(`latest_rcn.refund_credit_code::text as refund_credit_code`),
         db.raw(`latest_rcn.refund_credit_available_amount::numeric as refund_credit_available_amount`),
@@ -136,8 +158,12 @@ const buildOrdersListQuery = async (scope = "") => {
         db.raw(`latest_rca.refund_credit_applied_note_id::bigint as refund_credit_applied_note_id`),
         db.raw(`latest_rca.refund_credit_applied_amount::numeric as refund_credit_applied_amount`),
         db.raw(`latest_rca.refund_credit_applied_at::text as refund_credit_applied_at`),
+        db.raw(`latest_rca.refund_credit_effective_note_id::bigint as refund_credit_effective_note_id`),
+        db.raw(`latest_rca.refund_credit_effective_code::text as refund_credit_effective_code`),
+        db.raw(`latest_rca.refund_credit_effective_available::numeric as refund_credit_effective_available`),
+        db.raw(`latest_rca.refund_credit_effective_status::text as refund_credit_effective_status`),
         db.raw(
-            `(${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(latest_rca.refund_credit_applied_amount, 0)::numeric) as price_before_credit`
+            `(COALESCE(${table}.${ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE}::numeric, ${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(latest_rca.refund_credit_applied_amount, 0)::numeric)) as price_before_credit`
         ),
         includeAccountHolder
             ? db.raw(

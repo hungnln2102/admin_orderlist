@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckIcon } from "@heroicons/react/24/solid";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
 import { createForm, type InputDto, type CreateFormResponse } from "@/lib/formsApi";
+import { FormInputSelectSection } from "./components/FormInputSelectSection";
 
 interface CreateFormModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export default function CreateFormModal({
 }: CreateFormModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [orderedInputIds, setOrderedInputIds] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,28 +27,11 @@ export default function CreateFormModal({
     if (isOpen) {
       setName("");
       setDescription("");
-      setSelectedIds(new Set());
+      setOrderedInputIds([]);
       setError(null);
       setLoading(false);
     }
   }, [isOpen]);
-
-  const toggleInput = (id: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    if (selectedIds.size === inputItems.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(inputItems.map((i) => i.id)));
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -66,7 +49,7 @@ export default function CreateFormModal({
       const created = await createForm({
         name: trimmedName,
         description: description.trim() || undefined,
-        inputIds: Array.from(selectedIds),
+        inputIds: orderedInputIds,
       });
       onSuccess({
         ...created,
@@ -89,7 +72,7 @@ export default function CreateFormModal({
       role="presentation"
     >
       <div
-        className="glass-panel-dark rounded-[32px] shadow-2xl w-full max-w-lg p-8 border border-white/10 my-8"
+        className="glass-panel-dark rounded-[32px] shadow-2xl w-full max-w-3xl p-6 sm:p-8 border border-white/10 my-8"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -141,58 +124,12 @@ export default function CreateFormModal({
               disabled={loading}
             />
           </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold uppercase tracking-widest text-indigo-300/50 ml-1">
-                Chọn input (nhiều lựa chọn)
-              </label>
-              {inputItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
-                >
-                  {selectedIds.size === inputItems.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-                </button>
-              )}
-            </div>
-            <div className="max-h-48 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-3 space-y-2">
-              {inputItems.length === 0 ? (
-                <p className="text-sm text-white/50 py-2">Chưa có input nào. Tạo input trước.</p>
-              ) : (
-                inputItems.map((item) => {
-                  const isChecked = selectedIds.has(item.id);
-                  return (
-                    <label
-                      key={item.id}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
-                        isChecked ? "bg-indigo-500/20 border border-indigo-500/40" : "hover:bg-white/5"
-                      }`}
-                    >
-                      <span
-                        className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          isChecked ? "border-indigo-400 bg-indigo-500/30" : "border-white/30"
-                        }`}
-                      >
-                        {isChecked && <CheckIcon className="w-3 h-3 text-indigo-400" />}
-                      </span>
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={isChecked}
-                        onChange={() => toggleInput(item.id)}
-                        disabled={loading}
-                      />
-                      <span className="font-medium text-white">{item.name || "Chưa đặt tên"}</span>
-                      <span className="text-xs uppercase tracking-wide text-white/50">
-                        {item.type || "text"}
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <FormInputSelectSection
+            inputItems={inputItems}
+            orderedInputIds={orderedInputIds}
+            setOrderedInputIds={setOrderedInputIds}
+            disabled={loading}
+          />
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"

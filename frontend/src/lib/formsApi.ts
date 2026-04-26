@@ -56,6 +56,27 @@ export interface CreateFormResponse {
   createdAt?: string | null;
 }
 
+export async function updateForm(
+  formId: number,
+  data: CreateFormData
+): Promise<CreateFormResponse> {
+  const res = await apiFetch(`${FORM_INFO_BASE}/forms/${formId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: data.name?.trim() ?? "",
+      description: (data.description ?? "").trim() || null,
+      inputIds: Array.isArray(data.inputIds) ? data.inputIds : [],
+    }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.error ?? "Không thể cập nhật form";
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function createForm(data: CreateFormData): Promise<CreateFormResponse> {
   const res = await apiFetch(`${FORM_INFO_BASE}/forms`, {
     method: "POST",
@@ -94,7 +115,11 @@ export async function fetchInputs(): Promise<InputDto[]> {
   if (!data || !Array.isArray(data.items)) {
     return [];
   }
-  return data.items;
+  // Knex/Postgres đôi khi trả id dạng string; cần số thống nhất (Set, checkbox, v.v.)
+  return data.items.map((it) => ({
+    ...it,
+    id: Number(it.id),
+  }));
 }
 
 export interface CreateInputData {
@@ -116,7 +141,8 @@ export async function createInput(data: CreateInputData): Promise<InputDto> {
     const msg = errData?.error ?? "Không thể tạo input";
     throw new Error(msg);
   }
-  return res.json();
+  const created = (await res.json()) as InputDto;
+  return { ...created, id: Number(created.id) };
 }
 
 export async function fetchFormDetail(

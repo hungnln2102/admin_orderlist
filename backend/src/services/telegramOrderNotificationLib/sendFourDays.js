@@ -16,9 +16,18 @@ const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendFourDaysRemainingNotification(orders = []) {
+  const deduped = [];
+  const seenCodes = new Set();
+  for (const o of orders) {
+    const code = String(o?.id_order ?? o?.idOrder ?? "").trim();
+    if (code && seenCodes.has(code)) continue;
+    if (code) seenCodes.add(code);
+    deduped.push(o);
+  }
 
   logger.info("[Order][Telegram] sendFourDaysRemainingNotification called", {
     ordersCount: orders.length,
+    dedupedCount: deduped.length,
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     FOUR_DAYS_TOPIC_ID,
@@ -37,12 +46,12 @@ async function sendFourDaysRemainingNotification(orders = []) {
     return;
   }
 
-  if (!orders || orders.length === 0) {
+  if (!deduped.length) {
     logger.info("[Order][Telegram] No orders with 4 days remaining to notify");
     return;
   }
 
-  const total = orders.length;
+  const total = deduped.length;
 
   try {
     const headerPayload = {
@@ -59,8 +68,8 @@ async function sendFourDaysRemainingNotification(orders = []) {
     });
   }
 
-  for (let i = 0; i < orders.length; i++) {
-    const order = orders[i];
+  for (let i = 0; i < deduped.length; i++) {
+    const order = deduped[i];
     const index = i + 1;
     const orderCode = toSafeString(
       order.id_order || order.idOrder || order.order_code || order.orderCode
@@ -169,7 +178,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
       },
     });
 
-    if (i < orders.length - 1) {
+    if (i < deduped.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }

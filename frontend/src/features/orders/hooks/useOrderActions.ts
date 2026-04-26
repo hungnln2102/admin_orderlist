@@ -119,24 +119,24 @@ export function useOrderActions(deps: OrderActionsDeps) {
         );
         const basePrice = Math.max(0, Number(order[ORDER_FIELDS.PRICE] || 0) || 0);
         const creditApplyAmount = Math.min(basePrice, creditAvailableAmount);
-        const payablePrice = Math.max(0, basePrice - creditApplyAmount);
+        // Không prefill sản phẩm / nguồn / thông tin sản phẩm: khách có thể mua gói khác; tự chọn rồi tính giá.
 
         const prefill: RefundCreatePrefill = {
           initialFormData: {
-            [ORDER_FIELDS.ID_PRODUCT]: order[ORDER_FIELDS.ID_PRODUCT],
-            [ORDER_FIELDS.INFORMATION_ORDER]:
-              order[ORDER_FIELDS.INFORMATION_ORDER] || "",
+            [ORDER_FIELDS.ID_PRODUCT]: "",
+            [ORDER_FIELDS.INFORMATION_ORDER]: "",
             [ORDER_FIELDS.CUSTOMER]: order[ORDER_FIELDS.CUSTOMER] || "",
             [ORDER_FIELDS.CONTACT]: order[ORDER_FIELDS.CONTACT] || "",
-            [ORDER_FIELDS.SLOT]: order[ORDER_FIELDS.SLOT] || "",
-            [ORDER_FIELDS.SUPPLY]: order[ORDER_FIELDS.SUPPLY] || "",
-            [ORDER_FIELDS.COST]: Number(order[ORDER_FIELDS.COST] ?? 0) || 0,
-            [ORDER_FIELDS.PRICE]: payablePrice,
-            [ORDER_FIELDS.NOTE]: order[ORDER_FIELDS.NOTE] || "",
+            [ORDER_FIELDS.SLOT]: "",
+            [ORDER_FIELDS.SUPPLY]: "",
+            [ORDER_FIELDS.COST]: 0,
+            [ORDER_FIELDS.PRICE]: 0,
+            [ORDER_FIELDS.NOTE]: "",
           },
           creditNoteId,
           creditAvailableAmount,
           creditApplyAmount,
+          sourceOrderListPrice: basePrice,
           creditSourceOrderId: Number(order.id),
           creditSourceOrderCode: String(order[ORDER_FIELDS.ID_ORDER] || "").trim(),
           reservedOrderCode: String(data?.preview_order_code || "").trim() || null,

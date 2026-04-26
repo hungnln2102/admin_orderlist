@@ -159,9 +159,12 @@ const getSupplyInsights = async (_req, res) => {
     // Còn nợ theo đơn: supplier_order_cost_log. Đã trả (UI): SUM(amount_paid) trên supplier_payments.
     const logCols = QUOTED_COLS.supplierOrderCostLog;
     const paidNccLabel = "Đã Thanh Toán";
+    const orderIdCol = quoteIdent(orderCols.id);
+    const orderCostCol = quoteIdent(orderCols.COST);
     const orderCostUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${logCols.orderListId})
+          l.${logCols.orderListId} AS order_list_id,
           l.${logCols.supplyId} AS supply_id,
           l.${logCols.importCost} AS import_cost,
           l.${logCols.refundAmount} AS refund_amount,
@@ -175,10 +178,11 @@ const getSupplyInsights = async (_req, res) => {
           CASE
             WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
             THEN 0
-            ELSE COALESCE(latest.import_cost, 0) - COALESCE(latest.refund_amount, 0)
+            ELSE COALESCE(o.${orderCostCol}, 0) - COALESCE(latest.refund_amount, 0)
           END
         ) AS total_unpaid_import
       FROM latest
+      INNER JOIN ${TABLES.orderList} o ON o.${orderIdCol} = latest.order_list_id
       GROUP BY latest.supply_id
     `;
 

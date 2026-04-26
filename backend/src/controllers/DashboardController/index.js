@@ -81,6 +81,7 @@ const dashboardStats = async (req, res) => {
     logger.error("[dashboard] Query failed (stats)", { error: error.message, stack: error.stack });
     res.status(500).json({
       error: "Không thể tải dữ liệu.",
+      ...(process.env.NODE_ENV === "development" && { detail: error.message }),
     });
   }
 };

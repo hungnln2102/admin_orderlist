@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { apiFetch } from "@/lib/api";
+import { showAppNotification } from "@/lib/notifications";
 import * as Helpers from "@/lib/helpers";
 import {
   MatchableOrder,
@@ -231,6 +232,25 @@ export default function Invoices() {
           message = body?.error || message;
         } catch {}
         throw new Error(message);
+      }
+
+      const reconcileBody = (await response.json()) as {
+        paidAmountCoversOrder?: boolean;
+        orderSellingPriceVnd?: number;
+        totalReceiptsForOrderVnd?: number;
+      };
+      if (reconcileBody.paidAmountCoversOrder === false) {
+        const so = formatCurrencyVndFull(
+          Math.max(0, Number(reconcileBody.totalReceiptsForOrderVnd) || 0)
+        );
+        const gia = formatCurrencyVndFull(
+          Math.max(0, Number(reconcileBody.orderSellingPriceVnd) || 0)
+        );
+        showAppNotification({
+          type: "info",
+          title: "Đã gắn mã, chưa đủ so với giá bán",
+          message: `Tổng biên lai ${so} — giá bán ${gia}. Đơn vẫn ở trạng thái Chưa Thanh Toán; ghi thêm biên khi còn thiếu tiền.`,
+        });
       }
 
       setReceipts((current) =>

@@ -10,9 +10,9 @@
  *   node scheduler.js --run-adobe-once   # chạy một lần job check Adobe giống cron (không đăng ký cron khác)
  *   npm run start:scheduler:adobe-once
  */
-const path = require("path");
-// Cùng file .env với API (backend/.env) — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+// Cùng .env + .env.local với API — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
+const { loadBackendEnv } = require("./src/config/loadEnv");
+loadBackendEnv();
 
 const logger = require("./src/utils/logger");
 const { notifyCritical } = require("./src/utils/telegramErrorNotifier");

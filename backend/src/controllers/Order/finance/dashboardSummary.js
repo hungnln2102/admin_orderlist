@@ -69,10 +69,18 @@ const hasMeaningfulDate = (value) =>
     String(value).trim().toLowerCase() !== "null";
 
 /**
- * Hoàn tiền / đếm hủy gắn với tháng của canceled_at (giống rebuild-dashboard-monthly-summary.js).
- * Doanh thu & đơn vẫn theo order_date.
+ * Tháng «birth» để merge đếm đơn & gross: COALESCE(created_at, order_date), khớp SQL aggregate.
+ * Doanh thu trạng thái hoàn ở aggregate ghi theo tháng canceled_at (refundMonthKey).
  */
-const monthKeyFromOrderRow = (beforeRow, afterRow) => {
+const monthKeyFromBirthRow = (beforeRow, afterRow) => {
+    const createdRaw =
+        (afterRow && hasMeaningfulDate(afterRow?.[COLS.ORDER.CREATED_AT] ?? afterRow?.created_at)
+            ? (afterRow?.[COLS.ORDER.CREATED_AT] ?? afterRow?.created_at)
+            : null) ||
+        (beforeRow && hasMeaningfulDate(beforeRow?.[COLS.ORDER.CREATED_AT] ?? beforeRow?.created_at)
+            ? (beforeRow?.[COLS.ORDER.CREATED_AT] ?? beforeRow?.created_at)
+            : null);
+    if (createdRaw) return getMonthKey(createdRaw);
     const orderDate = afterRow?.order_date || beforeRow?.order_date;
     return orderDate ? getMonthKey(orderDate) : null;
 };
@@ -158,10 +166,10 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 
     if (prevStatus === nextStatus) return;
 
-    const orderMonthKey = monthKeyFromOrderRow(beforeRow, afterRow);
-    const refundMonthKey = monthKeyFromRefundRow(beforeRow, afterRow) || orderMonthKey;
+    const birthMonthKey = monthKeyFromBirthRow(beforeRow, afterRow);
+    const refundMonthKey = monthKeyFromRefundRow(beforeRow, afterRow) || birthMonthKey;
 
-    if (!orderMonthKey && !refundMonthKey) return;
+    if (!birthMonthKey && !refundMonthKey) return;
 
     const revenueUpdates = {};
     const refundUpdates = {};
@@ -203,24 +211,35 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         }
     }
 
-    // Order entered refund lifecycle (e.g. PAID/PROCESSING → PENDING_REFUND)
-    // -> +1 canceled, +refund
-    // -> trừ ngay doanh thu/lợi nhuận đã ghi trước đó cho đơn bán
+    // Vào hoàn: trừ ghi nhận giá đầy đủ ở tháng birth, cộng lại (price−refund) ở tháng canceled_at (khớp aggregate).
     if (isDashboardSalesOrder(afterRow) && !isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
 
         if (isOrderCounted(prevStatus)) {
-            const revenueBaseRow = beforeRow || afterRow;
-            const price = toNullableNumber(revenueBaseRow?.price) || 0;
-            const profit = salesOrderProfitDeltaForDashboard(revenueBaseRow);
-            revenueUpdates.total_revenue = (revenueUpdates.total_revenue || 0) - price;
-            revenueUpdates.total_profit = (revenueUpdates.total_profit || 0) - profit;
+            const base = beforeRow || afterRow;
+            const price = toNullableNumber(base?.price ?? base?.[COLS.ORDER.PRICE]) || 0;
+            const margin = salesOrderProfitDeltaForDashboard(base);
+            const remain = Math.max(0, price - refund);
+            const proRatedProfitInCancel =
+                price > 0 ? margin * (remain / price) : 0;
+            if (birthMonthKey) {
+                await mergeSummaryUpdates(trx, birthMonthKey, {
+                    total_revenue: -price,
+                    total_profit: -margin,
+                });
+            }
+            if (refundMonthKey) {
+                await mergeSummaryUpdates(trx, refundMonthKey, {
+                    total_revenue: remain,
+                    total_profit: proRatedProfitInCancel,
+                });
+            }
         }
     }
 
-    const revenueKey = orderMonthKey;
+    const revenueKey = birthMonthKey;
     const refundKey = refundMonthKey;
 
     if (Object.keys(revenueUpdates).length > 0 && revenueKey) {

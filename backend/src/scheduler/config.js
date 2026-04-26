@@ -1,5 +1,6 @@
-const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
+const { loadBackendEnv } = require("../config/loadEnv");
+
+loadBackendEnv();
 
 const { pool } = require("../config/database");
 

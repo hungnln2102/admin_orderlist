@@ -21,6 +21,8 @@ type ApplyOptions = {
   updateCost?: boolean;
   productNameOverride?: string;
   infoOverride?: string;
+  /** Chỉ cập nhật giá nhập / giá bán (giữ nguyên số ngày, ngày hết hạn) — dùng khi sửa đơn. */
+  onlyPricing?: boolean;
 };
 
 type UsePriceCalculationParams = {
@@ -214,17 +216,20 @@ export const usePriceCalculation = ({
           giaBan = 0;
         }
 
-        return {
+        const next: Partial<Order> = {
           ...prev,
           [ORDER_FIELDS.COST]: giaNhap,
           [ORDER_FIELDS.PRICE]: giaBan,
-          [ORDER_FIELDS.DAYS]:
+        };
+        if (!options?.onlyPricing) {
+          next[ORDER_FIELDS.DAYS] =
             days > 0
               ? String(days)
-              : String(prev[ORDER_FIELDS.DAYS] || "0"),
-          [ORDER_FIELDS.EXPIRY_DATE]:
-            expiry || (prev[ORDER_FIELDS.EXPIRY_DATE] as string) || "",
-        };
+              : String(prev[ORDER_FIELDS.DAYS] || "0");
+          next[ORDER_FIELDS.EXPIRY_DATE] =
+            expiry || (prev[ORDER_FIELDS.EXPIRY_DATE] as string) || "";
+        }
+        return next;
       });
 
       setIsDataLoaded(true);
@@ -239,7 +244,7 @@ export const usePriceCalculation = ({
       orderIdParam: string,
       registerDateParam: string,
       fallbackImport?: number,
-      options?: { updateCost?: boolean }
+      options?: { updateCost?: boolean; onlyPricing?: boolean }
     ) => {
       if (!productNameParam || !orderIdParam || !registerDateParam) return;
       calculatePrice(

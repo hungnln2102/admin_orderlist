@@ -1,5 +1,7 @@
 const { Pool } = require("pg");
-require("dotenv").config();
+const { loadBackendEnv } = require("./loadEnv");
+
+loadBackendEnv();
 
 const isProd = process.env.NODE_ENV === "production";
 

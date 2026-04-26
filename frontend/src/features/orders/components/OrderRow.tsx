@@ -82,9 +82,15 @@ export const OrderRow = React.memo(function OrderRow({
     ? Number(giaTriConLai)
     : 0;
   const orderRecord = order as Record<string, unknown>;
-  const webhookAmountRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
-  const webhookAmount = Number.isFinite(Number(webhookAmountRaw))
-    ? Number(webhookAmountRaw)
+  /** Tổng biên lai từ ngày đăng ký (cùng rule webhook); ưu tiên dùng để "Chênh lệch" không lệch khi 2+ giao dịch. */
+  const totalWhRaw = orderRecord.total_webhook_amount;
+  const latestWhRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
+  const webhookAmountSource =
+    totalWhRaw !== null && totalWhRaw !== undefined && String(totalWhRaw).trim() !== ""
+      ? totalWhRaw
+      : latestWhRaw;
+  const webhookAmount = Number.isFinite(Number(webhookAmountSource))
+    ? Number(webhookAmountSource)
     : null;
   const webhookDelta = webhookAmount !== null ? webhookAmount - priceValue : null;
   const webhookDeltaDisplay =
@@ -97,20 +103,9 @@ export const OrderRow = React.memo(function OrderRow({
       : webhookDelta > 0
       ? "text-amber-300"
       : "text-rose-300";
-  const refundFromRow = Number.isFinite(Number(order.can_hoan))
-    ? Number(order.can_hoan)
-    : null;
-  const refundFromRowAbs =
-    refundFromRow !== null && Number.isFinite(refundFromRow)
-      ? Math.abs(refundFromRow)
-      : null;
+  /** Đã hủy: cột "Giá trị còn lại" = prorata theo giá bán; `refund` trên DB là theo vốn/NCC — không min với cột refund. */
   const giaTriConLaiForCanceled = isCanceled
-    ? Math.max(
-        0,
-        refundFromRowAbs !== null && Number.isFinite(giaTriConLaiSafe)
-          ? Math.min(refundFromRowAbs, Math.abs(giaTriConLaiSafe))
-          : refundFromRowAbs ?? Math.abs(giaTriConLaiSafe)
-      )
+    ? Math.max(0, giaTriConLaiSafe)
     : giaTriConLaiSafe;
 
   const pendingRefundStatus = ORDER_STATUSES.CHO_HOAN;

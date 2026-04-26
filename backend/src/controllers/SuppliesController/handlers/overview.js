@@ -104,9 +104,12 @@ const getSupplyOverview = async (req, res) => {
       ORDER BY month_num ASC, latest.logged_at DESC;
     `;
 
+    const orderIdCol = quoteIdent(orderCols.id);
+    const orderCostCol = quoteIdent(orderCols.COST);
     const orderUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${lc.orderListId})
+          l.${lc.orderListId} AS order_list_id,
           l.${lc.supplyId} AS supply_id,
           l.${lc.importCost} AS import_cost,
           l.${lc.refundAmount} AS refund_amount,
@@ -119,10 +122,11 @@ const getSupplyOverview = async (req, res) => {
         CASE
           WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
           THEN 0::numeric
-          ELSE COALESCE(latest.import_cost, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
+          ELSE COALESCE(o.${orderCostCol}, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
         END
       ), 0)::numeric AS total_unpaid_import
       FROM latest
+      INNER JOIN ${TABLES.orderList} o ON o.${orderIdCol} = latest.order_list_id
     `;
 
     const paidSummarySql = `

@@ -101,9 +101,6 @@ export const PackageSummarySection: React.FC<PackageSummarySectionProps> = ({
                       Loại Gói
                     </p>
                     <h3 className="text-xl font-bold tracking-tight mt-1">{summary.name}</h3>
-                    <p className="mt-1 text-sm font-medium text-white/40">
-                      Số lượng: {summary.total}
-                    </p>
                   </div>
                   {deleteMode ? (
                     <label className="flex items-center gap-2 text-sm font-semibold text-rose-600">
@@ -144,7 +141,7 @@ export const PackageSummarySection: React.FC<PackageSummarySectionProps> = ({
                 <dl className="mt-6 grid grid-cols-3 gap-3 text-sm">
                   <div className="rounded-2xl border border-white/5 bg-white/5 p-3 text-center transition-colors hover:bg-white/10">
                     <dt className="text-[9px] font-bold uppercase tracking-widest text-indigo-300/40">
-                      Tổng
+                      Số gói
                     </dt>
                     <dd className="mt-1 text-xl font-bold text-white">{summary.total}</dd>
                   </div>

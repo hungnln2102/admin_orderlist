@@ -58,7 +58,6 @@ const attachRenewRoutes = (router) => {
                 .whereIn(statusCol, [STATUS.PENDING_REFUND])
                 .update({
                     [statusCol]: STATUS.REFUNDED,
-                    [informationOrderCol]: refundReferenceCode,
                 })
                 .returning(["id", idOrderCol, informationOrderCol, statusCol]);
 

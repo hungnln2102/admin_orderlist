@@ -1,123 +1,21 @@
 const { db } = require("../../src/db");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
+const { buildDashboardSummaryAggregateQuery } = require("../../src/controllers/DashboardController/dashboardSummaryAggregate");
 const {
-  FINANCE_SCHEMA,
-  ORDERS_SCHEMA,
-  SCHEMA_FINANCE,
-  SCHEMA_ORDERS,
-  tableName,
-} = require("../../src/config/dbSchema");
-const { STATUS } = require("../../src/utils/statuses");
-const {
-  createDateNormalization,
-  createNumericExtraction,
-  quoteIdent,
-} = require("../../src/utils/sql");
-const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
+  orderListHasCreatedAtColumn,
+} = require("../../src/controllers/DashboardController/orderListHasCreatedAtColumn");
 
-const salesPrefixEscList = [
-  ORDER_PREFIXES.ctv,
-  ORDER_PREFIXES.customer,
-  ORDER_PREFIXES.promo,
-  ORDER_PREFIXES.student,
-].map((p) => String(p || "").toUpperCase().replace(/'/g, "''"));
-
-const idOrderMatchesSalesSql = `(${salesPrefixEscList
-  .map((p) => `id_order_upper LIKE '${p}%'`)
-  .join(" OR ")})`;
-
-const orderTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const summaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
   SCHEMA_FINANCE
 );
-
-const orderCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
-const o = "o";
-const orderDateExpr = createDateNormalization(`${o}.${quoteIdent(orderCols.ORDER_DATE)}`);
-const canceledAtExpr = createDateNormalization(`${o}.${quoteIdent(orderCols.CANCELED_AT)}`);
-const priceExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.PRICE)}`);
-const costExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.COST)}`);
-const refundExpr = createNumericExtraction(`${o}.${quoteIdent(orderCols.REFUND)}`);
-
-// Order-counted statuses: everything from PROCESSING onwards in the lifecycle
-const orderCountedStatuses = [
-  STATUS.PROCESSING,
-  STATUS.PAID,
-  STATUS.PENDING_REFUND,
-  STATUS.REFUNDED,
-  STATUS.RENEWAL,
-  STATUS.EXPIRED,
-];
-
-const refundCountedStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
-
-const toSqlLiteral = (value) => `'${String(value).replace(/'/g, "''")}'`;
-
-const orderCountedSql = orderCountedStatuses.map(toSqlLiteral).join(", ");
-const refundCountedSql = refundCountedStatuses.map(toSqlLiteral).join(", ");
-
-const aggregateSql = `
-  WITH normalized_orders AS (
-    SELECT
-      ${orderDateExpr} AS order_date,
-      ${canceledAtExpr} AS canceled_at,
-      ${priceExpr} AS price_value,
-      ${costExpr} AS cost_value,
-      ${refundExpr} AS refund_value,
-      TRIM(COALESCE(${o}.${quoteIdent(orderCols.STATUS)}::text, '')) AS status_value,
-      UPPER(TRIM(COALESCE(${o}.${quoteIdent(orderCols.ID_ORDER)}::text, ''))) AS id_order_upper
-    FROM ${orderTable} ${o}
-  ),
-  monthly_orders AS (
-    SELECT
-      TO_CHAR(date_trunc('month', order_date), 'YYYY-MM') AS month_key,
-      COALESCE(SUM(CASE WHEN ${idOrderMatchesSalesSql} THEN 1 ELSE 0 END), 0) AS total_orders,
-      COALESCE(SUM(CASE WHEN ${idOrderMatchesSalesSql} THEN price_value ELSE 0 END), 0) AS total_revenue,
-      COALESCE(SUM(
-        CASE
-          WHEN ${idOrderMatchesSalesSql} THEN
-            price_value - cost_value
-          ELSE 0
-        END
-      ), 0) AS total_profit
-    FROM normalized_orders
-    WHERE order_date IS NOT NULL
-      AND status_value IN (${orderCountedSql})
-    GROUP BY 1
-  ),
-  monthly_cancellations AS (
-    SELECT
-      TO_CHAR(date_trunc('month', canceled_at), 'YYYY-MM') AS month_key,
-      COUNT(*) AS canceled_orders,
-      COALESCE(SUM(refund_value), 0) AS total_refund
-    FROM normalized_orders
-    WHERE canceled_at IS NOT NULL
-      AND status_value IN (${refundCountedSql})
-    GROUP BY 1
-  ),
-  all_months AS (
-    SELECT month_key FROM monthly_orders
-    UNION
-    SELECT month_key FROM monthly_cancellations
-  )
-  SELECT
-    all_months.month_key AS ${quoteIdent(summaryCols.MONTH_KEY)},
-    COALESCE(monthly_orders.total_orders, 0) AS ${quoteIdent(summaryCols.TOTAL_ORDERS)},
-    COALESCE(monthly_cancellations.canceled_orders, 0) AS ${quoteIdent(summaryCols.CANCELED_ORDERS)},
-    COALESCE(monthly_orders.total_revenue, 0) AS ${quoteIdent(summaryCols.TOTAL_REVENUE)},
-    COALESCE(monthly_orders.total_profit, 0) AS ${quoteIdent(summaryCols.TOTAL_PROFIT)},
-    COALESCE(monthly_cancellations.total_refund, 0) AS ${quoteIdent(summaryCols.TOTAL_REFUND)}
-  FROM all_months
-  LEFT JOIN monthly_orders
-    ON monthly_orders.month_key = all_months.month_key
-  LEFT JOIN monthly_cancellations
-    ON monthly_cancellations.month_key = all_months.month_key
-  ORDER BY all_months.month_key ASC
-`;
-
 async function rebuildDashboardMonthlySummary() {
+  const useCreatedAt = await orderListHasCreatedAtColumn();
+  const aggregateSql = buildDashboardSummaryAggregateQuery(summaryCols, {
+    useCreatedAt,
+  });
   const trx = await db.transaction();
 
   try {

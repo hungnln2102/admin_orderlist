@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { ORDER_CODE_PREFIXES } from "@/constants";
 import { apiFetch } from "../api/client";
 
 export interface PricingTier {
@@ -10,6 +11,25 @@ export interface PricingTier {
   base_tier_key: string | null;
   sort_order: number;
   is_active: boolean;
+}
+
+/** Option cho dropdown mã / loại đơn (CreateOrder, v.v.) — kèm key tier để lọc theo nghiệp vụ. */
+export type OrderCodeSelectOption = {
+  value: string;
+  label: string;
+  /** Khóa tier trong bảng pricing: ví dụ `import` = nhập hàng (MAVN), không phụ thuộc cách lưu `prefix`. */
+  tierKey: string;
+};
+
+/** Loại «nhập hàng»: theo `key` tier (ổn định) hoặc prefix MAVN (kể cả lệch hoa thường từ API). */
+export function isImportOrderCodeOption(
+  o: OrderCodeSelectOption
+): boolean {
+  if (o.tierKey === "import") return true;
+  return (
+    String(o.value || "").trim().toUpperCase() ===
+    String(ORDER_CODE_PREFIXES.IMPORT).toUpperCase()
+  );
 }
 
 const STALE_MS = 10 * 60_000;
@@ -65,7 +85,13 @@ export function usePricingTiers() {
     () =>
       tiers
         .filter((t) => t.is_active)
-        .map((t) => ({ value: t.prefix, label: t.label })),
+        .map(
+          (t): OrderCodeSelectOption => ({
+            value: t.prefix,
+            label: t.label,
+            tierKey: t.key,
+          })
+        ),
     [tiers]
   );
 

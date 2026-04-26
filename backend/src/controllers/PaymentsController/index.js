@@ -648,13 +648,33 @@ const reconcilePaymentReceipt = async (req, res) => {
 
       const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
       const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
-      // Mặc định luồng "Sửa mã đơn" sẽ tự mark paid nếu đơn đang Chưa Thanh Toán.
-      // Giúp đảm bảo phát sinh log NCC (trigger DB) và đúng rule nghiệp vụ mới.
-      const effectiveAction =
-        requestedAction === RECONCILE_ACTIONS.ONLY &&
-        statusValueInitial === STATUS.UNPAID
-          ? RECONCILE_ACTIONS.MARK_PAID
-          : requestedAction;
+      const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.PRICE]);
+      const oCodeCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
+      const aAmtCol = PAYMENT_RECEIPT_DEF.columns.AMOUNT;
+      const sumRes = await trx(TABLES.paymentReceipt)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, '')::text)) = LOWER(?)`, [oCodeCol, orderCodeRaw])
+        .sum({ total_receipts: aAmtCol })
+        .first();
+      const totalReceiptsForOrderVnd = normalizeMoney(sumRes?.total_receipts);
+      // Giá bán 0/âm: giữ hành vi cũ (tự nâng mark paid nếu đơn Chưa Thanh Toán với luồng only).
+      const paidAmountCoversOrder =
+        orderSellingPriceVnd <= 0
+          ? true
+          : totalReceiptsForOrderVnd >= orderSellingPriceVnd;
+
+      // Mặc định luồng "Sửa mã đơn" (reconcile_only) tự mark paid nếu đơn Chưa Thanh Toán
+      // *và* tổng biên lai gắn mã (kể cả lần này) >= giá bán. Tránh đưa "Đã Thanh Toán" khi thiếu tiền.
+      let effectiveAction = requestedAction;
+      if (requestedAction === RECONCILE_ACTIONS.ONLY) {
+        if (statusValueInitial === STATUS.UNPAID && paidAmountCoversOrder) {
+          effectiveAction = RECONCILE_ACTIONS.MARK_PAID;
+        }
+      } else if (requestedAction === RECONCILE_ACTIONS.MARK_PAID) {
+        if (statusValueInitial === STATUS.UNPAID && !paidAmountCoversOrder) {
+          // Gắn mã vẫn lưu; không rollback — chỉ bỏ bước chuyển "Đã Thanh Toán" khi thiếu tiền.
+          effectiveAction = RECONCILE_ACTIONS.ONLY;
+        }
+      }
       let statusValue = statusValueInitial;
       let revenueDelta = 0;
       let profitDelta = 0;
@@ -813,6 +833,9 @@ const reconcilePaymentReceipt = async (req, res) => {
         actionResult,
         shouldRunRenewal,
         effectiveAction,
+        orderSellingPriceVnd,
+        totalReceiptsForOrderVnd,
+        paidAmountCoversOrder,
       };
     });
 

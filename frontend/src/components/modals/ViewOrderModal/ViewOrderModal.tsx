@@ -77,11 +77,14 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   if (!isOpen || !order) return null;
 
   const currentPrice = Math.max(0, Number(order?.[ORDER_FIELDS.PRICE]) || 0);
+  const grossFromDb = Number((orderRecord as { gross_selling_price?: unknown }).gross_selling_price);
   const basePriceBeforeCreditRaw = Number(orderRecord.price_before_credit);
   const basePriceBeforeCredit =
-    Number.isFinite(basePriceBeforeCreditRaw) && basePriceBeforeCreditRaw >= 0
-      ? basePriceBeforeCreditRaw
-      : currentPrice + creditAppliedAmount;
+    Number.isFinite(grossFromDb) && grossFromDb >= 0
+      ? grossFromDb
+      : Number.isFinite(basePriceBeforeCreditRaw) && basePriceBeforeCreditRaw >= 0
+        ? basePriceBeforeCreditRaw
+        : currentPrice + creditAppliedAmount;
   const unpaidCreditQrAmount = Math.max(
     0,
     basePriceBeforeCredit - creditAppliedAmount

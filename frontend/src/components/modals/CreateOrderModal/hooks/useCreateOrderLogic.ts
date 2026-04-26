@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
   ORDER_CODE_PREFIXES,
@@ -7,6 +7,7 @@ import {
 import * as Helpers from "../../../../lib/helpers";
 import {
   CreateOrderPrefillContext,
+  CreateOrderCreationKind,
   CustomerType,
   Order,
   UseCreateOrderLogicResult,
@@ -15,6 +16,8 @@ import { useOrderFormState } from "./useOrderFormState";
 import { useOrderInit } from "./useOrderInit";
 import { useOrderPricingSync } from "./useOrderPricingSync";
 import { useOrderSubmit } from "./useOrderSubmit";
+import { fetchAvailableRefundCredits } from "@/lib/refundCreditsApi";
+import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 import { usePriceCalculation } from "./usePriceCalculation";
 import { useProductSelection } from "./useProductSelection";
 import { useSuppliesData } from "./useSuppliesData";
@@ -24,8 +27,17 @@ export const useCreateOrderLogic = (
   isOpen: boolean,
   onSave: (newOrderData: Partial<Order> | Order) => void,
   customMode: boolean,
-  prefillContext?: CreateOrderPrefillContext | null
+  prefillContext?: CreateOrderPrefillContext | null,
+  orderCreationKind: CreateOrderCreationKind = "sales"
 ): UseCreateOrderLogicResult => {
+  const [creditMode, setCreditMode] = useState(false);
+  const [availableCreditNotes, setAvailableCreditNotes] = useState<
+    AvailableRefundCredit[]
+  >([]);
+  const [creditListLoading, setCreditListLoading] = useState(false);
+  const [selectedCreditNote, setSelectedCreditNote] =
+    useState<AvailableRefundCredit | null>(null);
+
   const {
     formData,
     setFormData,
@@ -71,8 +83,90 @@ export const useCreateOrderLogic = (
 
   const todayDate = useMemo(() => Helpers.getTodayDMY(), []);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setCreditMode(false);
+      setSelectedCreditNote(null);
+      setAvailableCreditNotes([]);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !creditMode) return;
+    let cancelled = false;
+    (async () => {
+      setCreditListLoading(true);
+      try {
+        const rows = await fetchAvailableRefundCredits();
+        if (!cancelled) {
+          setAvailableCreditNotes(rows);
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableCreditNotes([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setCreditListLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, creditMode]);
+
+  const selectCreditNoteRow = useCallback(
+    (row: AvailableRefundCredit) => {
+      setSelectedCreditNote(row);
+      setFormData((prev) => ({
+        ...prev,
+        [ORDER_FIELDS.CUSTOMER]: String(row.customer_name || "").trim(),
+      }));
+    },
+    [setFormData]
+  );
+
+  const clearSelectedCreditNote = useCallback(() => {
+    setSelectedCreditNote(null);
+    setFormData((prev) => ({
+      ...prev,
+      [ORDER_FIELDS.CUSTOMER]: "",
+    }));
+  }, [setFormData]);
+
+  const toggleCreditMode = useCallback(() => {
+    setCreditMode((prev) => {
+      if (prev) {
+        setSelectedCreditNote(null);
+        setFormData((f) => ({
+          ...f,
+          [ORDER_FIELDS.CUSTOMER]: "",
+        }));
+      }
+      return !prev;
+    });
+  }, [setFormData]);
+
+  const creditOrderSelection = useMemo(() => {
+    if (prefillContext?.creditNoteId) {
+      return null;
+    }
+    if (!creditMode || !selectedCreditNote) {
+      return null;
+    }
+    return {
+      id: Number(selectedCreditNote.id),
+      availableAmount: Math.max(
+        0,
+        Number(selectedCreditNote.available_amount) || 0
+      ),
+    };
+  }, [prefillContext?.creditNoteId, creditMode, selectedCreditNote]);
+
   useOrderInit({
     isOpen,
+    orderCreationKind,
     customerType,
     setCustomerType,
     setFormData,
@@ -167,6 +261,7 @@ export const useCreateOrderLogic = (
     selectedSupplyId,
     products,
     prefillContext,
+    creditOrderSelection,
   });
 
   return {
@@ -188,6 +283,13 @@ export const useCreateOrderLogic = (
     handleSourceSelect,
     handleCustomerTypeChange,
     handleSubmit,
+    creditMode,
+    toggleCreditMode,
+    availableCreditNotes,
+    creditListLoading,
+    selectedCreditNote,
+    selectCreditNoteRow,
+    clearSelectedCreditNote,
   };
 };
 

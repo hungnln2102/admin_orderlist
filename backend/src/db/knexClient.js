@@ -1,10 +1,7 @@
-const path = require("path");
 const knex = require("knex");
-const dotenv = require("dotenv");
+const { loadBackendEnv } = require("../config/loadEnv");
 
-// Always load env from backend root (so running from /src still works)
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
-dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
+loadBackendEnv();
 
 const {
   SCHEMA_ADMIN,

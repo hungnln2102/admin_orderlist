@@ -5,7 +5,10 @@ import {
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../constants";
-import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
+import {
+  isImportOrderCodeOption,
+  usePricingTiers,
+} from "@/shared/hooks/usePricingTiers";
 import * as Helpers from "../../../lib/helpers";
 import {
   calculateExpirationDate,
@@ -17,6 +20,7 @@ import { CreateOrderPricingSection } from "./components/CreateOrderPricingSectio
 import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { isMavrykShopSupplierName } from "@/shared/utils/supply";
+import { formatCurrency } from "@/features/orders/utils/ordersHelpers";
 
 /** Chỉ coi là đủ khi đúng dd/mm/yyyy (tránh parse lệch khi đang gõ). */
 const isCompleteDMY = (value: string): boolean =>
@@ -27,6 +31,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   onClose,
   prefillContext,
   onSave,
+  orderCreationKind = "sales",
 }) => {
   const [customMode, setCustomMode] = useState(false);
   const { orderCodeOptions } = usePricingTiers();
@@ -47,7 +52,39 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     handleSourceSelect,
     handleCustomerTypeChange,
     handleSubmit,
-  } = useCreateOrderLogic(isOpen, onSave, customMode, prefillContext);
+    creditMode,
+    toggleCreditMode,
+    availableCreditNotes,
+    creditListLoading,
+    selectedCreditNote,
+    selectCreditNoteRow,
+    clearSelectedCreditNote,
+  } = useCreateOrderLogic(isOpen, onSave, customMode, prefillContext, orderCreationKind);
+
+  const hasPrefillCredit = Boolean(
+    prefillContext && Number(prefillContext.creditNoteId) > 0
+  );
+  const manualCreditMoney = useMemo(() => {
+    if (!selectedCreditNote || hasPrefillCredit) return null;
+    const avail = Math.max(0, Number(selectedCreditNote.available_amount) || 0);
+    const refOld = Math.max(0, Number(selectedCreditNote.refund_amount) || 0);
+    const priceNum = Math.max(0, Number(formData[ORDER_FIELDS.PRICE]) || 0);
+    const apply = Math.min(avail, priceNum);
+    const remaining = Math.max(0, priceNum - apply);
+    return { avail, refOld, priceNum, apply, remaining };
+  }, [selectedCreditNote, hasPrefillCredit, formData]);
+  const creditNoteById = useMemo(
+    () => new Map(availableCreditNotes.map((r) => [r.id, r])),
+    [availableCreditNotes]
+  );
+  const availableCreditOptions = useMemo(
+    () =>
+      availableCreditNotes.map((r) => ({
+        value: r.id,
+        label: `${(r.customer_name || "—").trim()} - credit`,
+      })),
+    [availableCreditNotes]
+  );
 
   const reservedOrderCode = String(prefillContext?.reservedOrderCode || "").trim();
 
@@ -122,14 +159,20 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   }, [currentProductPctPromo]);
 
   const filteredCustomerTypeOptions = useMemo(() => {
-    return orderCodeOptions.filter((option) => {
+    const byKind = orderCodeOptions.filter((option) => {
+      if (orderCreationKind === "import") {
+        return isImportOrderCodeOption(option);
+      }
+      return !isImportOrderCodeOption(option);
+    });
+    return byKind.filter((option) => {
       const value = option.value;
       if (hasPromoPrice) {
         return value !== ORDER_CODE_PREFIXES.CUSTOMER;
       }
       return value !== ORDER_CODE_PREFIXES.PROMO;
     });
-  }, [hasPromoPrice, orderCodeOptions]);
+  }, [hasPromoPrice, orderCodeOptions, orderCreationKind]);
 
   useEffect(() => {
     if (hasPromoPrice && customerType === ORDER_CODE_PREFIXES.CUSTOMER) {
@@ -159,6 +202,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     customerType,
     handleCustomerTypeChange,
     hasPromoPrice,
+    orderCreationKind,
   ]);
 
   const handlePriceInput = useCallback(
@@ -315,14 +359,30 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-1 inline-flex items-center justify-center h-11 w-11 rounded-xl border border-slate-500/70 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
+          <div className="mt-1 flex items-center gap-2 shrink-0">
+            {orderCreationKind === "sales" && !hasPrefillCredit ? (
+              <button
+                type="button"
+                onClick={toggleCreditMode}
+                className={`inline-flex items-center justify-center h-11 px-3.5 rounded-xl border text-sm font-bold transition-colors ${
+                  creditMode
+                    ? "border-amber-400/60 bg-amber-500/20 text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
+                    : "border-slate-500/70 bg-slate-800/90 text-slate-200 hover:bg-slate-700 hover:text-white"
+                }`}
+                title="Chuyển đổi: chọn khách từ phiếu credit còn khả dụng"
+              >
+                Credit
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center justify-center h-11 w-11 rounded-xl border border-slate-500/70 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-4 py-3">
@@ -358,6 +418,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               <CreateOrderCustomerSection
                 formData={formData}
                 onFieldChange={handleChange}
+                creditMode={Boolean(creditMode && !hasPrefillCredit)}
+                creditListLoading={creditListLoading}
+                availableCreditOptions={availableCreditOptions}
+                onSelectCreditRow={selectCreditNoteRow}
+                onClearCreditSelection={clearSelectedCreditNote}
+                creditNoteById={creditNoteById}
+                selectedCreditNoteId={selectedCreditNote?.id ?? null}
               />
 
               <CreateOrderPricingSection
@@ -376,6 +443,111 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 onPriceChange={handlePriceInput(ORDER_FIELDS.PRICE)}
               />
             </div>
+
+            {creditMode && !hasPrefillCredit && selectedCreditNote && manualCreditMoney ? (
+              <div
+                className="mt-4 rounded-2xl border border-amber-400/35 bg-amber-950/35 px-3.5 py-3 text-sm text-amber-50/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                role="status"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/90">
+                  Thanh toán bằng credit — đơn nguồn{" "}
+                  <span className="text-amber-50">
+                    {selectedCreditNote.source_order_code || "—"}
+                  </span>
+                </p>
+                <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-200/95 [&_li]:flex [&_li]:justify-between [&_li]:gap-3">
+                  <li>
+                    <span className="text-slate-400">Giá bán tham chiếu (đơn cũ)</span>
+                    <span className="shrink-0 font-semibold text-white">
+                      {manualCreditMoney.refOld > 0
+                        ? formatCurrency(manualCreditMoney.refOld)
+                        : "—"}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="text-slate-400">Credit trừ vào đơn này</span>
+                    <span className="shrink-0 font-semibold text-emerald-200/90">
+                      {formatCurrency(manualCreditMoney.apply)}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="text-slate-400">
+                      Credit khả dụng (phiếu, lúc mở form)
+                    </span>
+                    <span className="shrink-0 font-semibold text-slate-100">
+                      {formatCurrency(manualCreditMoney.avail)}
+                    </span>
+                  </li>
+                  <li className="!block border-t border-amber-500/25 pt-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-amber-100/95">
+                        Khách còn thanh toán (giá bán)
+                      </span>
+                      <span className="shrink-0 text-base font-black text-amber-50">
+                        {formatCurrency(manualCreditMoney.remaining)}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-slate-500/90">
+                      Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, các dòng
+                      credit cập nhật tương ứng. «Giá bán tham chiếu» lấy từ số liệu phiếu (hoàn gốc)
+                      khi có.
+                    </p>
+                  </li>
+                </ul>
+              </div>
+            ) : null}
+
+            {prefillContext && Number(prefillContext.creditNoteId) > 0 ? (
+              <div
+                className="mt-4 rounded-2xl border border-amber-400/35 bg-amber-950/35 px-3.5 py-3 text-sm text-amber-50/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                role="status"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/90">
+                  Thanh toán bằng credit — đơn nguồn{" "}
+                  <span className="text-amber-50">
+                    {prefillContext.creditSourceOrderCode || "—"}
+                  </span>
+                </p>
+                <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-200/95 [&_li]:flex [&_li]:justify-between [&_li]:gap-3">
+                  <li>
+                    <span className="text-slate-400">Giá bán tham chiếu (đơn cũ)</span>
+                    <span className="shrink-0 font-semibold text-white">
+                      {formatCurrency(
+                        Number(prefillContext.sourceOrderListPrice) || 0
+                      )}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="text-slate-400">Credit trừ vào đơn này</span>
+                    <span className="shrink-0 font-semibold text-emerald-200/90">
+                      {formatCurrency(prefillContext.creditApplyAmount || 0)}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="text-slate-400">
+                      Credit khả dụng (phiếu, lúc mở form)
+                    </span>
+                    <span className="shrink-0 font-semibold text-slate-100">
+                      {formatCurrency(prefillContext.creditAvailableAmount || 0)}
+                    </span>
+                  </li>
+                  <li className="!block border-t border-amber-500/25 pt-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-semibold text-amber-100/95">
+                        Khách còn thanh toán (giá bán)
+                      </span>
+                      <span className="shrink-0 text-base font-black text-amber-50">
+                        {formatCurrency(Number(formData[ORDER_FIELDS.PRICE]) || 0)}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-slate-500/90">
+                      Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, số
+                      dòng này cập nhật tương ứng.
+                    </p>
+                  </li>
+                </ul>
+              </div>
+            ) : null}
           </form>
         </div>
 

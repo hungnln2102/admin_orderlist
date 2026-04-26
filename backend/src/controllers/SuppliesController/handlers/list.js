@@ -177,6 +177,7 @@ const listSupplyOrderCosts = async (req, res) => {
   }
 
   const lt = "l";
+  const o = "o";
   const sj = "s";
   const supplyIdCol = quoteIdent(logCols.SUPPLY_ID);
   const idOrderCol = quoteIdent(logCols.ID_ORDER);
@@ -186,6 +187,8 @@ const listSupplyOrderCosts = async (req, res) => {
   const refundAmountCol = quoteIdent(logCols.REFUND_AMOUNT);
   const nccPaymentStatusCol = quoteIdent(logCols.NCC_PAYMENT_STATUS);
   const loggedAtCol = quoteIdent(logCols.LOGGED_AT);
+  const orderIdCol = quoteIdent(orderCols.ID);
+  const orderCostCol = quoteIdent(orderCols.COST);
 
   const whereParts = [];
   const bindings = [];
@@ -227,23 +230,24 @@ const listSupplyOrderCosts = async (req, res) => {
       )
       SELECT
         COUNT(*) FILTER (
-          WHERE TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
+          WHERE TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
         )::bigint AS order_count,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
             THEN 0::numeric
-            ELSE COALESCE(import_cost, 0)::numeric - COALESCE(refund_amount, 0)::numeric
+            ELSE COALESCE(${o}.${orderCostCol}, 0)::numeric - COALESCE(latest.${refundAmountCol}, 0)::numeric
           END
         ), 0) AS total_cost,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
             THEN 0::numeric
-            ELSE COALESCE(refund_amount, 0)::numeric
+            ELSE COALESCE(latest.${refundAmountCol}, 0)::numeric
           END
         ), 0) AS total_refund
       FROM latest
+      INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = latest.${orderListIdCol}
     `;
     const aggResult = await db.raw(aggSql, bindings);
     const aggRow = aggResult.rows?.[0] || {};
@@ -258,12 +262,13 @@ const listSupplyOrderCosts = async (req, res) => {
         ${lt}.${orderListIdCol} AS order_pk,
         ${lt}.${idOrderCol} AS id_order,
         COALESCE(${sj}.${supplierNameIdent}, '') AS supplier_name,
-        COALESCE(${lt}.${importCostCol}, 0)::numeric AS cost_value,
+        COALESCE(NULLIF(${o}.${orderCostCol}, 0), ${lt}.${importCostCol}, 0)::numeric AS cost_value,
         COALESCE(${lt}.${refundAmountCol}, 0)::numeric AS refund_value,
         COALESCE(${lt}.${nccPaymentStatusCol}, '') AS ncc_payment_status,
         ${lt}.${loggedAtCol} AS order_date,
         ${lt}.${loggedAtCol} AS canceled_at
       FROM ${TABLES.supplyOrderCostLog} ${lt}
+      INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = ${lt}.${orderListIdCol}
       INNER JOIN ${supplierTable} ${sj} ON ${sj}.${supIdCol} = ${lt}.${supplyIdCol}
       ${whereSql}
       ORDER BY ${lt}.${logIdCol} DESC

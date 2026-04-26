@@ -6,6 +6,7 @@ import {
   ACCOUNT_NO,
   BANK_DISPLAY_NAME,
   BANK_SHORT_CODE,
+  ORDER_QR_NOTE_PREFIX,
 } from "./constants";
 
 export type ViewOrderPaymentQrBuildInput = {
@@ -50,7 +51,13 @@ export const buildViewOrderPaymentQrPayload = ({
   overrideCustomerQrAmount = null,
 }: ViewOrderPaymentQrBuildInput): ViewOrderPaymentQrPayload => {
   const idOrder = String(order[ORDER_FIELDS.ID_ORDER] ?? "");
-  const qrMessage = idOrder;
+  /** Nội dung CK shop: cùng chuẩn ORDER_QR_NOTE_PREFIX + mã đơn (khớp Telegram / .env). */
+  const shopTransferContent = [ORDER_QR_NOTE_PREFIX, idOrder]
+    .map((s) => String(s || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const qrMessage = shopTransferContent || idOrder;
   const supplyName = String(order[ORDER_FIELDS.SUPPLY] ?? order.supply ?? "").trim();
   const accountHolder = String(order.supplier_account_holder ?? "").trim();
   const holderLabel = accountHolder || supplyName;
@@ -73,7 +80,7 @@ export const buildViewOrderPaymentQrPayload = ({
       return {
         qrCodeImageUrl: "",
         effectiveQrAmount: Helpers.roundGiaBanValue(orderAmountCost),
-        qrMessage,
+        qrMessage: idOrder,
         bankDisplay: "—",
         accountNoDisplay: "—",
         holderDisplay: holderLabel || "—",
@@ -87,11 +94,11 @@ export const buildViewOrderPaymentQrPayload = ({
         accountNumber: supplierAccount,
         bankCode: supplierBin,
         amount: effectiveQrAmount,
-        description: qrMessage,
+        description: idOrder,
         accountName: holderLabel || undefined,
       }),
       effectiveQrAmount,
-      qrMessage,
+      qrMessage: idOrder,
       bankDisplay: `Mã VietQR: ${supplierBin}`,
       accountNoDisplay: supplierAccount,
       holderDisplay: holderLabel || "—",

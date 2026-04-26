@@ -1,8 +1,6 @@
-const path = require("path");
-const dotenv = require("dotenv");
+const { loadBackendEnv } = require("./loadEnv");
 
-// Load env from backend root
-dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
+loadBackendEnv();
 
 const port = Number(process.env.PORT) || 3001;
 const SEPAY_PORT = Number(process.env.SEPAY_PORT) || 5000;

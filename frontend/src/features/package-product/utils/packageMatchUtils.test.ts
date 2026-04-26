@@ -63,6 +63,18 @@ describe("orderMatchesPackageLink", () => {
     const o = baseOrder();
     expect(orderMatchesPackageLink(o, item)).toBe(true);
   });
+
+  it("chế độ information: vẫn khớp khi chỉ có tài khoản kho gói (informationUser), chưa có kho lưu (accountUser)", () => {
+    const item: PackageRow = {
+      id: 1,
+      package: "Netflix",
+      informationUser: "info@x.com",
+      accountUser: null,
+      slotLinkMode: "information",
+    } as PackageRow;
+    const o = baseOrder();
+    expect(orderMatchesPackageLink(o, item)).toBe(true);
+  });
 });
 
 describe("computeAugmentationForPackage", () => {

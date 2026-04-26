@@ -283,7 +283,7 @@ export const usePackageProductPage = () => {
   const slotCards = useMemo(
     () => [
       {
-        name: "Tổng",
+        name: "Số dòng bảng",
         value: String(slotStats.total),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.sky,

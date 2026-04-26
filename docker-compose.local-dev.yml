@@ -1,0 +1,24 @@
+# Chỉ Redis cho dev local (session admin). Postgres: dùng chung container Website
+# (Website/docker-compose.postgres.local.yml — DB my-store trên localhost:5432).
+#
+#   docker compose -f docker-compose.local-dev.yml up -d
+#
+# Trùng port 6379 nếu đã chạy stack admin_orderlist đầy đủ: POSTGRES_DEV_PORT không áp dụng ở đây;
+# dùng REDIS_DEV_PORT=6380 docker compose -f docker-compose.local-dev.yml up -d
+# rồi đặt trong backend/.env.local: REDIS_URL=redis://127.0.0.1:6380
+
+name: admin-orderlist-local
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: admin_orderlist-redis-dev
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "${REDIS_DEV_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

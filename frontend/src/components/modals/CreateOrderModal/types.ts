@@ -3,6 +3,8 @@ import {
   ORDER_CODE_PREFIXES,
 } from "../../../constants";
 
+export type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
+
 export type Order = Omit<ApiOrder, "cost" | "price"> & {
   cost: number | string;
   price: number | string;
@@ -50,11 +52,15 @@ export type RawCalculatedPriceResult = Partial<{
 export type CustomerType =
   (typeof ORDER_CODE_PREFIXES)[keyof typeof ORDER_CODE_PREFIXES];
 
+export type CreateOrderCreationKind = "sales" | "import";
+
 export interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   prefillContext?: CreateOrderPrefillContext | null;
   onSave: (newOrderData: Partial<Order> | Order) => void;
+  /** `sales` = tab Đơn hàng (ẩn Nhập hàng / MAVN). `import` = tab Nhập hàng (chỉ MAVN). */
+  orderCreationKind?: CreateOrderCreationKind;
 }
 
 export type CreateOrderPrefillContext = {
@@ -62,6 +68,8 @@ export type CreateOrderPrefillContext = {
   creditNoteId: number;
   creditAvailableAmount: number;
   creditApplyAmount: number;
+  /** Giá bán đơn nguồn (trước trừ credit). */
+  sourceOrderListPrice?: number;
   creditSourceOrderId: number;
   creditSourceOrderCode: string;
   reservedOrderCode?: string | null;
@@ -90,6 +98,14 @@ export interface UseCreateOrderLogicResult {
   handleSourceSelect: (sourceId: number) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: (e: React.FormEvent) => boolean;
+  /** Chế độ tạo đơn theo phiếu credit (dropdown khách). */
+  creditMode: boolean;
+  toggleCreditMode: () => void;
+  availableCreditNotes: AvailableRefundCredit[];
+  creditListLoading: boolean;
+  selectedCreditNote: AvailableRefundCredit | null;
+  selectCreditNoteRow: (row: AvailableRefundCredit) => void;
+  clearSelectedCreditNote: () => void;
 }
 
 export type SSOption = { value: string | number; label: string };

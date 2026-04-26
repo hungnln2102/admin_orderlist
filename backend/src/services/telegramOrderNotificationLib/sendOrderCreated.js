@@ -12,6 +12,7 @@ const {
   TELEGRAM_IMPORT_ORDER_CHAT_ID,
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
+  SEND_ORDER_COPY_BUTTONS,
   QR_NOTE_PREFIX,
   QR_ACCOUNT_NUMBER,
   QR_BANK_CODE,
@@ -102,7 +103,7 @@ async function sendOrderCreatedNotification(order) {
     } else {
       payload.text = caption;
     }
-    if (includeButtons) {
+    if (includeButtons && SEND_ORDER_COPY_BUTTONS) {
       const keyboard = buildCopyKeyboard({ orderCode, paymentNote });
       if (keyboard) {
         payload.reply_markup = keyboard;

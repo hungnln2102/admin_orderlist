@@ -17,10 +17,14 @@ const ORDERS_SCHEMA = {
       ID_SUPPLY: "supply_id",
       COST: "cost",
       PRICE: "price",
+      /** Giá bán (gross) trước trừ refund credit khi tạo đơn có áp credit. */
+      GROSS_SELLING_PRICE: "gross_selling_price",
       NOTE: "note",
       STATUS: "status",
       REFUND: "refund",
       CANCELED_AT: "canceled_at",
+      /** Mốc tạo bản ghi (dashboard theo thời điểm phát sinh). */
+      CREATED_AT: "created_at",
     },
   },
   PAYMENT_RECEIPT: {

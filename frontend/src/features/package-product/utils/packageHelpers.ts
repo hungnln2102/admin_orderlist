@@ -180,7 +180,7 @@ export const SLOT_LINK_OPTIONS: Array<{
     value: "information",
     label: "Liên kết theo thông tin đơn hàng",
     helper:
-      "So username (account_username) tài khoản kích hoạt với cột information_order; nhãn vị trí lấy từ cột slot trên đơn.",
+      "So cột information_order với username kho lưu trữ (kích hoạt) hoặc kho gói chính (cùng cột «Thông tin gói»); nhãn vị trí lấy từ cột slot trên đơn.",
   },
   {
     value: "slot",
@@ -268,17 +268,24 @@ export const normalizeMatchKey = (value: string | null | undefined): string => {
 /**
  * Một chuỗi duy nhất tùy chế độ ghép:
  * - `slot` (theo vị trí): **tài khoản gốc** `informationUser` ↔ cột `slot` trên đơn.
- * - `information` (theo thông tin đơn): **tài khoản kích hoạt** `accountUser` ↔ cột `information_order` trên đơn.
+ * - `information` (theo thông tin đơn): cột `information_order` trên đơn so với tài khoản kho lưu trữ
+ *   `accountUser` (nếu có) **và** tài khoản kho gói chính `informationUser` (cùng cột «Thông tin gói» trên bảng).
+ *   Cả hai nguồn để tránh mất match khi chỉ một trong hai dòng kho có username.
  */
 export const buildPackageLinkKeys = (
   row: PackageRow,
   mode: SlotLinkMode = "information"
 ): string[] => {
-  const n =
-    mode === "slot"
-      ? normalizeMatchKey(row.informationUser)
-      : normalizeMatchKey(row.accountUser);
-  return n ? [n] : [];
+  if (mode === "slot") {
+    const n = normalizeMatchKey(row.informationUser);
+    return n ? [n] : [];
+  }
+  const keys = new Set<string>();
+  const a = normalizeMatchKey(row.accountUser);
+  const u = normalizeMatchKey(row.informationUser);
+  if (a) keys.add(a);
+  if (u) keys.add(u);
+  return Array.from(keys);
 };
 
 export const resolveOrderDisplayValue = (

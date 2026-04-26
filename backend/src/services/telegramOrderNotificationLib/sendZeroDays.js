@@ -15,8 +15,18 @@ const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendZeroDaysRemainingNotification(orders = []) {
 
+  const deduped = [];
+  const seenCodes = new Set();
+  for (const o of orders) {
+    const code = String(o?.id_order ?? o?.idOrder ?? "").trim();
+    if (code && seenCodes.has(code)) continue;
+    if (code) seenCodes.add(code);
+    deduped.push(o);
+  }
+
   logger.info("[Order][Telegram] sendZeroDaysRemainingNotification called", {
     ordersCount: orders.length,
+    dedupedCount: deduped.length,
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     ZERO_DAYS_TOPIC_ID,
@@ -35,15 +45,15 @@ async function sendZeroDaysRemainingNotification(orders = []) {
     return;
   }
 
-  if (!orders || orders.length === 0) {
+  if (!deduped.length) {
     logger.info("[Order][Telegram] No orders with 0 days remaining to notify");
     return;
   }
 
-  const total = orders.length;
+  const total = deduped.length;
 
-  for (let i = 0; i < orders.length; i++) {
-    const order = orders[i];
+  for (let i = 0; i < deduped.length; i++) {
+    const order = deduped[i];
     const index = i + 1;
     const message = buildExpiredOrderMessage(order, index, total);
 
@@ -124,7 +134,7 @@ async function sendZeroDaysRemainingNotification(orders = []) {
       },
     });
 
-    if (i < orders.length - 1) {
+    if (i < deduped.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }

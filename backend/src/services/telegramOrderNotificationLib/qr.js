@@ -7,6 +7,7 @@ const {
   QR_ACCOUNT_NUMBER,
   QR_BANK_CODE,
   QR_ACCOUNT_NAME,
+  QR_NOTE_PREFIX,
 } = require("./constants");
 
 const VIETQR_IMAGE_TEMPLATE = "compact";
@@ -57,7 +58,10 @@ function buildVietQrUrl({ amount, orderCode }) {
 
   const params = new URLSearchParams();
   params.set("amount", Math.round(numericAmount).toString());
-  params.set("addInfo", `Thanh toan ${orderCode}`);
+  const note = [QR_NOTE_PREFIX, String(orderCode || "").trim()].filter(Boolean).join(" ").trim();
+  if (note) {
+    params.set("addInfo", note);
+  }
   params.set("accountName", QR_ACCOUNT_NAME);
 
   return `https://img.vietqr.io/image/${QR_BANK_CODE}-${QR_ACCOUNT_NUMBER}-${VIETQR_IMAGE_TEMPLATE}.png?${params.toString()}`;

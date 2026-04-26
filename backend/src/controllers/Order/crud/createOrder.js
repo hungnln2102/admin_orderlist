@@ -23,6 +23,9 @@ const {
     normalizeMoney,
 } = require("../finance/refundCredits");
 
+/** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
+const CREDIT_BALANCE_TOLERANCE_VND = 5000;
+
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
         logger.info("[POST] /api/orders");
@@ -36,6 +39,7 @@ const attachCreateOrderRoute = (router) => {
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
         const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
         const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
+        const grossSellingPriceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE;
         const requestedCreditNoteId = Number(req.body?.refund_credit_note_id);
         const requestedCreditApplyAmount = normalizeMoney(req.body?.refund_credit_apply_amount);
         const reservedOrderCodeRaw = String(req.body?.reserved_order_code || "").trim().toUpperCase();
@@ -135,7 +139,20 @@ const attachCreateOrderRoute = (router) => {
                 }
             }
 
-            payload[priceCol] = Math.max(0, rawPriceBeforeCredit - appliedCreditAmount);
+            const remainingToPay = Math.max(0, rawPriceBeforeCredit - appliedCreditAmount);
+            payload[priceCol] = remainingToPay;
+            if (appliedCreditAmount > 0) {
+                payload[grossSellingPriceCol] = rawPriceBeforeCredit;
+            }
+
+            if (!isGiftOrderCreate && !isMavnCreate) {
+                if (appliedCreditAmount > 0 && remainingToPay <= CREDIT_BALANCE_TOLERANCE_VND) {
+                    payload.status = STATUS.PAID;
+                    payload[priceCol] = 0;
+                } else {
+                    payload.status = STATUS.UNPAID;
+                }
+            }
 
             const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
             const detectedPrefix = requestedPrefixFromReserved
@@ -155,9 +172,10 @@ const attachCreateOrderRoute = (router) => {
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
+            let applyRefundResult = null;
             let refundCreditApplication = null;
             if (creditNoteForOrder && appliedCreditAmount > 0) {
-                const result = await applyRefundCreditToTargetOrder(trx, {
+                applyRefundResult = await applyRefundCreditToTargetOrder(trx, {
                     creditNoteId: Number(creditNoteForOrder.id),
                     targetOrderListId: Number(newOrder.id),
                     targetOrderCode: String(newOrder[idOrderCol] || ""),
@@ -165,7 +183,7 @@ const attachCreateOrderRoute = (router) => {
                     note: `Áp credit tự động khi tạo đơn từ đơn hoàn ${creditNoteForOrder.source_order_code || ""}`.trim(),
                     appliedBy: "system-create-order",
                 });
-                refundCreditApplication = result.application;
+                refundCreditApplication = applyRefundResult.application;
             }
 
             await trx.commit();
@@ -223,8 +241,26 @@ const attachCreateOrderRoute = (router) => {
 
             if (refundCreditApplication) {
                 normalized.refund_credit_applied_amount = Number(refundCreditApplication.applied_amount || 0);
-                normalized.refund_credit_note_id = Number(refundCreditApplication.credit_note_id || 0);
+                const consumedNoteId = Number(refundCreditApplication.credit_note_id || 0);
+                normalized.refund_credit_applied_from_note_id = consumedNoteId;
+                if (applyRefundResult?.replacementCreditNote) {
+                    const rep = applyRefundResult.replacementCreditNote;
+                    normalized.refund_credit_replacement_note_id = Number(rep.id);
+                    normalized.refund_credit_note_id = Number(rep.id);
+                    normalized.refund_credit_code = String(rep.credit_code || "");
+                } else {
+                    normalized.refund_credit_note_id = consumedNoteId;
+                    const cn = applyRefundResult?.creditNote;
+                    if (cn?.credit_code) {
+                        normalized.refund_credit_code = String(cn.credit_code);
+                    }
+                }
                 normalized.price_before_credit = rawPriceBeforeCredit;
+                if (newOrder && newOrder[grossSellingPriceCol] != null) {
+                    normalized.gross_selling_price = Number(newOrder[grossSellingPriceCol]);
+                } else {
+                    normalized.gross_selling_price = rawPriceBeforeCredit;
+                }
             }
 
             res.status(201).json(normalized);

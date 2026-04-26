@@ -17,6 +17,8 @@ type UseOrderSubmitParams = {
   selectedSupplyId: number | null;
   products: Product[];
   prefillContext?: CreateOrderPrefillContext | null;
+  /** Tạo đơn từ form Credit (chọn phiếu trong dropdown), không dùng khi đã có prefill credit. */
+  creditOrderSelection: { id: number; availableAmount: number } | null;
 };
 
 export const useOrderSubmit = ({
@@ -27,6 +29,7 @@ export const useOrderSubmit = ({
   selectedSupplyId,
   products,
   prefillContext,
+  creditOrderSelection,
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
@@ -119,6 +122,14 @@ export const useOrderSubmit = ({
           if (prefillContext.reservedOrderCode) {
             record.reserved_order_code = prefillContext.reservedOrderCode;
           }
+        } else if (creditOrderSelection?.id) {
+          const cap = Math.max(0, creditOrderSelection.availableAmount);
+          const apply = Math.min(cap, Math.max(0, sellingPrice));
+          if (apply > 0) {
+            const record = dataToSave as Record<string, unknown>;
+            record.refund_credit_note_id = creditOrderSelection.id;
+            record.refund_credit_apply_amount = apply;
+          }
         }
 
         onSave(dataToSave as Order);
@@ -140,6 +151,7 @@ export const useOrderSubmit = ({
       selectedSupplyId,
       products,
       prefillContext,
+      creditOrderSelection,
     ]
   );
 

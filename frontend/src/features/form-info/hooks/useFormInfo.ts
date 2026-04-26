@@ -28,6 +28,8 @@ export function useFormInfo() {
 
   const [createInputOpen, setCreateInputOpen] = useState(false);
   const [createFormOpen, setCreateFormOpen] = useState(false);
+  const [editFormOpen, setEditFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<FormInfoItem | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,9 +127,33 @@ export function useFormInfo() {
   };
 
   const handleEdit = (item: FormInfoItem) => {
-    // TODO: triển khai logic sửa form
-    // eslint-disable-next-line no-console
-    console.log("Sửa", item);
+    setEditingItem(item);
+    setEditFormOpen(true);
+  };
+
+  const handleEditFormClose = () => {
+    setEditFormOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleEditFormSuccess = (updated: {
+    id: number;
+    name: string | null;
+    description: string | null;
+  }) => {
+    setItems((prev) =>
+      prev.map((p) =>
+        p.id === updated.id
+          ? {
+              ...p,
+              name: (updated.name || "").trim() || "Chưa đặt tên",
+              description: (updated.description || "").trim() || "Không có mô tả",
+            }
+          : p
+      )
+    );
+    setEditFormOpen(false);
+    setEditingItem(null);
   };
 
   const handleDelete = (item: FormInfoItem) => {
@@ -182,6 +208,8 @@ export function useFormInfo() {
     viewError,
     createInputOpen,
     createFormOpen,
+    editFormOpen,
+    editingItem,
     handleView,
     handleCloseView,
     handleEdit,
@@ -189,6 +217,8 @@ export function useFormInfo() {
     handleCreateForm,
     handleCreateFormClose,
     handleCreateFormSuccess,
+    handleEditFormClose,
+    handleEditFormSuccess,
     handleCreateInput,
     handleCreateInputClose,
     handleCreateInputSuccess,
