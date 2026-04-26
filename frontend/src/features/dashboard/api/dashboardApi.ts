@@ -42,6 +42,10 @@ export interface MonthlySummaryData {
   total_revenue: number;
   total_profit: number;
   total_refund: number;
+  /** Tổng nhập hàng (import_cost) theo tháng — đồng bộ từ bảng tổng hợp. */
+  total_import: number;
+  /** Ước tính thuế theo tháng (bảng tổng hợp; % từ DASHBOARD_MONTHLY_TAX_RATE_PERCENT). */
+  total_tax: number;
   updated_at: string | null;
 }
 
@@ -73,6 +77,7 @@ type DashboardMonthRow = Partial<{
   total_sales: number;
   total_profit: number;
   total_refund: number;
+  total_import: number;
   total_tax: number;
 }>;
 

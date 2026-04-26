@@ -12,6 +12,7 @@ const { quoteIdent } = require("../../../utils/sql");
 const {
     isDashboardSalesOrder,
 } = require("../../../utils/orderHelpers");
+const { dashboardMonthlyTaxRatePercent } = require("../../../config/appConfig");
 
 /** MAVC/L/K/S: lợi nhuận = giá bán - cost. */
 const salesOrderProfitDeltaForDashboard = (row) => {
@@ -94,6 +95,29 @@ const monthKeyFromRefundRow = (beforeRow, afterRow) => {
     return anchor ? getMonthKey(anchor) : null;
 };
 
+/**
+ * Tính lại total_tax từ total_revenue hiện tại theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT.
+ * Dùng sau mọi cập nhật tổng hợp; supports Knex transaction (.raw) hoặc node-pg client (.query).
+ */
+const recomputeSummaryMonthTotalTax = async (executor, monthKey) => {
+    if (!monthKey) return;
+    const rate = Number(dashboardMonthlyTaxRatePercent) || 0;
+    const taxCol = quoteIdent(summaryCols.TOTAL_TAX);
+    const revCol = quoteIdent(summaryCols.TOTAL_REVENUE);
+    const mkCol = quoteIdent(summaryCols.MONTH_KEY);
+    if (typeof executor?.raw === "function") {
+        await executor.raw(
+            `UPDATE ${summaryTable} SET ${taxCol} = ROUND((${revCol})::numeric * ? / 100.0) WHERE ${mkCol} = ?`,
+            [rate, monthKey]
+        );
+    } else {
+        await executor.query(
+            `UPDATE ${summaryTable} SET ${taxCol} = ROUND((${revCol})::numeric * $1 / 100.0) WHERE ${mkCol} = $2`,
+            [rate, monthKey]
+        );
+    }
+};
+
 const hasFinancialPostedReceiptForOrder = async(trx, row) => {
     const orderCode = String(row?.id_order || row?.[COLS.ORDER.ID_ORDER] || "").trim();
     if (!orderCode) return false;
@@ -158,6 +182,8 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         .insert(insertData)
         .onConflict(summaryCols.MONTH_KEY)
         .merge(mergeData);
+
+    await recomputeSummaryMonthTotalTax(trx, monthKey);
 };
 
 const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
@@ -253,4 +279,5 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 module.exports = {
     updateDashboardMonthlySummaryOnStatusChange,
     qualifiedSummaryCol,
+    recomputeSummaryMonthTotalTax,
 };

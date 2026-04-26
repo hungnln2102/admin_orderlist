@@ -15,7 +15,10 @@ const {
 const { QUOTED_COLS } = require("../../utils/columns");
 const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
-const { updateDashboardMonthlySummaryOnStatusChange } = require("../Order/finance/dashboardSummary");
+const {
+  updateDashboardMonthlySummaryOnStatusChange,
+  recomputeSummaryMonthTotalTax,
+} = require("../Order/finance/dashboardSummary");
 const { runRenewal } = require("../../../webhook/sepay/renewal");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
@@ -171,6 +174,7 @@ const applyDashboardDelta = async (
     `,
     [monthKey, orders, revenue, profit]
   );
+  await recomputeSummaryMonthTotalTax(trx, monthKey);
 };
 
 const listPaymentReceipts = async (req, res) => {

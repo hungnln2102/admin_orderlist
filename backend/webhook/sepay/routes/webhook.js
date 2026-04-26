@@ -40,7 +40,10 @@ const {
 } = require("../../../src/utils/orderHelpers");
 const { getOrderQrPaymentEligibility } = require("../orderPaymentEligibility");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
-const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
+const {
+  qualifiedSummaryCol,
+  recomputeSummaryMonthTotalTax,
+} = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
 const { withSavepoint } = require("../savepoint");
 const UNDERPAY_TOLERANCE_VND = 5000;
@@ -179,6 +182,7 @@ const incrementDashboardSummaryByDelta = async (
     `,
     [monthKey, orders, revenue, profit]
   );
+  await recomputeSummaryMonthTotalTax(client, monthKey);
 };
 
 const computeWebhookAmountDecision = ({

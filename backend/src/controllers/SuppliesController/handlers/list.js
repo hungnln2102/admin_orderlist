@@ -188,7 +188,6 @@ const listSupplyOrderCosts = async (req, res) => {
   const nccPaymentStatusCol = quoteIdent(logCols.NCC_PAYMENT_STATUS);
   const loggedAtCol = quoteIdent(logCols.LOGGED_AT);
   const orderIdCol = quoteIdent(orderCols.id);
-  const orderCostCol = quoteIdent(orderCols.cost);
 
   const whereParts = [];
   const bindings = [];
@@ -234,7 +233,10 @@ const listSupplyOrderCosts = async (req, res) => {
           CASE
             WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
             THEN 0::numeric
-            ELSE COALESCE(${o}.${orderCostCol}, 0)::numeric - COALESCE(latest.${refundAmountCol}, 0)::numeric
+            ELSE GREATEST(
+              0::numeric,
+              COALESCE(latest.${importCostCol}, 0)::numeric - COALESCE(latest.${refundAmountCol}, 0)::numeric
+            )
           END
         ), 0) AS total_cost,
         COALESCE(SUM(
@@ -245,7 +247,6 @@ const listSupplyOrderCosts = async (req, res) => {
           END
         ), 0) AS total_refund
       FROM latest
-      INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = latest.${orderListIdCol}
     `;
 
     const dataSql = `
@@ -253,7 +254,7 @@ const listSupplyOrderCosts = async (req, res) => {
         ${lt}.${orderListIdCol} AS order_pk,
         ${lt}.${idOrderCol} AS id_order,
         COALESCE(${sj}.${supplierNameIdent}, '') AS supplier_name,
-        COALESCE(NULLIF(${o}.${orderCostCol}, 0), ${lt}.${importCostCol}, 0)::numeric AS cost_value,
+        COALESCE(${lt}.${importCostCol}, 0)::numeric AS cost_value,
         COALESCE(${lt}.${refundAmountCol}, 0)::numeric AS refund_value,
         COALESCE(${lt}.${nccPaymentStatusCol}, '') AS ncc_payment_status,
         ${lt}.${loggedAtCol} AS order_date,

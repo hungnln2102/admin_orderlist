@@ -180,8 +180,6 @@ const fetchDashboardStats = async () => {
     monthlyWithdrawProfit,
     grossCurr,
     grossPrev,
-    importCurr,
-    importPrev,
   ] = await Promise.all([
     db.raw(
       buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
@@ -190,9 +188,19 @@ const fetchDashboardStats = async () => {
     fetchMonthlyWithdrawProfitPair({ monthStartDate }),
     sumGrossSalesByBirthDateRange(currFrom, currTo, useCreatedAt),
     sumGrossSalesByBirthDateRange(prevFrom, prevTo, useCreatedAt),
-    sumImportCostByLoggedAtRange(currFrom, currTo),
-    sumImportCostByLoggedAtRange(prevFrom, prevTo),
   ]);
+
+  const importRowByMonth = await db(summaryTableName)
+    .select(summaryCols.MONTH_KEY, summaryCols.TOTAL_IMPORT)
+    .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]);
+  const importKeyToVal = new Map(
+    (importRowByMonth || []).map((r) => [
+      String(r[summaryCols.MONTH_KEY] || ""),
+      toNumber(r[summaryCols.TOTAL_IMPORT]),
+    ])
+  );
+  const importCurr = importKeyToVal.get(currentMonthKey) || 0;
+  const importPrev = importKeyToVal.get(previousMonthKey) || 0;
 
   const summaryRows = aggResult?.rows || [];
   const byMonth = new Map(
@@ -215,7 +223,7 @@ const fetchDashboardStats = async () => {
     total_refund: Number(previousRow.total_refund || 0),
   };
 
-  // KPI: Doanh thu = tổng giá theo tháng đăng ký − hoàn (tháng hủy cùng kỳ); Nhập = log import; Lợi nhuận = doanh thu thuần − nhập (sau rút lợi nhuận hệ thống)
+  // KPI: Doanh thu = tổng giá theo tháng đăng ký − hoàn (tháng hủy cùng kỳ); Nhập = total_import từ dashboard_monthly_summary (sync từ log NCC qua trigger/rebuild)
   const netRevenueCurr = grossCurr - curr.total_refund;
   const netRevenuePrev = grossPrev - prev.total_refund;
   const profitAfterCostCurr = netRevenueCurr - importCurr;
@@ -354,18 +362,54 @@ const fetchDashboardMonthlySummary = async () => {
     buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
   );
   const rows = (result && result.rows) || [];
-  return rows
+  const sorted = rows
     .slice()
-    .sort((a, b) => String(b[summaryCols.MONTH_KEY]).localeCompare(String(a[summaryCols.MONTH_KEY])))
-    .map((row) => ({
-    month_key: row[summaryCols.MONTH_KEY] || "",
-    total_orders: Number(row[summaryCols.TOTAL_ORDERS] || 0),
-    canceled_orders: Number(row[summaryCols.CANCELED_ORDERS] || 0),
-    total_revenue: Number(row[summaryCols.TOTAL_REVENUE] || 0),
-    total_profit: Number(row[summaryCols.TOTAL_PROFIT] || 0),
-    total_refund: Number(row[summaryCols.TOTAL_REFUND] || 0),
-    updated_at: null,
-  }));
+    .sort((a, b) =>
+      String(b[summaryCols.MONTH_KEY]).localeCompare(String(a[summaryCols.MONTH_KEY]))
+    );
+  const monthKeys = sorted
+    .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
+    .filter(Boolean);
+  let importMeta = new Map();
+  if (monthKeys.length) {
+    const stored = await db(summaryTableName)
+      .select(
+        summaryCols.MONTH_KEY,
+        summaryCols.TOTAL_IMPORT,
+        summaryCols.TOTAL_TAX,
+        summaryCols.UPDATED_AT
+      )
+      .whereIn(summaryCols.MONTH_KEY, monthKeys);
+    importMeta = new Map(
+      (stored || []).map((r) => [
+        String(r[summaryCols.MONTH_KEY] || ""),
+        {
+          total_import: toNumber(r[summaryCols.TOTAL_IMPORT]),
+          total_tax: toNumber(r[summaryCols.TOTAL_TAX]),
+          updated_at: r[summaryCols.UPDATED_AT] ?? null,
+        },
+      ])
+    );
+  }
+  return sorted.map((row) => {
+    const mk = String(row[summaryCols.MONTH_KEY] || "");
+    const meta = importMeta.get(mk);
+    const totalRevenue = Number(row[summaryCols.TOTAL_REVENUE] || 0);
+    const total_tax = meta
+      ? toNumber(meta.total_tax)
+      : taxFromRevenueValue(totalRevenue);
+    return {
+      month_key: mk,
+      total_orders: Number(row[summaryCols.TOTAL_ORDERS] || 0),
+      canceled_orders: Number(row[summaryCols.CANCELED_ORDERS] || 0),
+      total_revenue: totalRevenue,
+      total_profit: Number(row[summaryCols.TOTAL_PROFIT] || 0),
+      total_refund: Number(row[summaryCols.TOTAL_REFUND] || 0),
+      total_import: meta ? meta.total_import : 0,
+      total_tax,
+      updated_at: meta ? meta.updated_at : null,
+    };
+  });
 };
 
 const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
@@ -389,6 +433,33 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
     );
   }
 
+  const monthKeysForImport = yearRows
+    .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
+    .filter(Boolean);
+  let importByMonth = new Map();
+  let taxByMonth = new Map();
+  if (monthKeysForImport.length) {
+    const importRows = await db(summaryTableName)
+      .select(
+        summaryCols.MONTH_KEY,
+        summaryCols.TOTAL_IMPORT,
+        summaryCols.TOTAL_TAX
+      )
+      .whereIn(summaryCols.MONTH_KEY, monthKeysForImport);
+    importByMonth = new Map(
+      (importRows || []).map((r) => [
+        String(r[summaryCols.MONTH_KEY] || ""),
+        toNumber(r[summaryCols.TOTAL_IMPORT]),
+      ])
+    );
+    taxByMonth = new Map(
+      (importRows || []).map((r) => [
+        String(r[summaryCols.MONTH_KEY] || ""),
+        toNumber(r[summaryCols.TOTAL_TAX]),
+      ])
+    );
+  }
+
   const rowMap = new Map();
   for (const row of yearRows) {
     const parts = String(row[summaryCols.MONTH_KEY] || "").split("-");
@@ -408,16 +479,23 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
   for (let m = 1; m <= maxMonth; m++) {
     const row = rowMap.get(m);
     const revenue = row ? Number(row.total_revenue || 0) : 0;
+    const mk = `${yearStr}-${String(m).padStart(2, "0")}`;
+    const storedTax = taxByMonth.get(mk);
+    const total_tax =
+      storedTax != null && !Number.isNaN(storedTax)
+        ? toNumber(storedTax)
+        : taxFromRevenueValue(revenue);
     months.push({
       month: `T${m}`,
       month_num: m,
-      month_key: `${yearStr}-${String(m).padStart(2, '0')}`,
+      month_key: mk,
       total_orders: row ? Number(row.total_orders || 0) : 0,
       total_canceled: row ? Number(row.canceled_orders || 0) : 0,
       total_revenue: revenue,
       total_profit: row ? Number(row.total_profit || 0) : 0,
       total_refund: row ? Number(row.total_refund || 0) : 0,
-      total_tax: taxFromRevenueValue(revenue),
+      total_import: importByMonth.get(mk) || 0,
+      total_tax,
     });
   }
 

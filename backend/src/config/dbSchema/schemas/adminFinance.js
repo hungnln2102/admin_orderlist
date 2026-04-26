@@ -71,6 +71,10 @@ const FINANCE_SCHEMA = {
       TOTAL_REVENUE: "total_revenue",
       TOTAL_PROFIT: "total_profit",
       TOTAL_REFUND: "total_refund",
+      /** Tổng import_cost từ partner.supplier_order_cost_log theo tháng (logged_at). */
+      TOTAL_IMPORT: "total_import",
+      /** Ước tính thuế theo tháng (theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT trên total_revenue). */
+      TOTAL_TAX: "total_tax",
       UPDATED_AT: "updated_at",
     },
   },

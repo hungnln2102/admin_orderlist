@@ -42,6 +42,7 @@ const {
   runRenewalBatch,
 } = require("./renewalQueue");
 
+const { recomputeSummaryMonthTotalTax } = require("../../src/controllers/Order/finance/dashboardSummary");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const VARIANT_ID_COL = VARIANT_COLS.id || VARIANT_COLS.ID || "id";
@@ -387,6 +388,7 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
           `,
           [monthKey, 1, revenue, profit]
         );
+        await recomputeSummaryMonthTotalTax(client, monthKey);
       }
     } else if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && isMavn) {
       logger.info("[Renewal] Bỏ cộng dashboard_monthly_summary (đơn MAVN nhập hàng)", {

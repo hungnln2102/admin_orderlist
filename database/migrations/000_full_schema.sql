@@ -370,6 +370,8 @@ CREATE TABLE IF NOT EXISTS finance.dashboard_monthly_summary (
   total_revenue   NUMERIC(18,2) NOT NULL DEFAULT 0,
   total_profit    NUMERIC(18,2) NOT NULL DEFAULT 0,
   total_refund    NUMERIC(18,2) NOT NULL DEFAULT 0,
+  total_import    NUMERIC(18,2) NOT NULL DEFAULT 0,
+  total_tax       NUMERIC(18,2) NOT NULL DEFAULT 0,
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
