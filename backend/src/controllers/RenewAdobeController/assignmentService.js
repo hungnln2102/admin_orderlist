@@ -138,18 +138,29 @@ async function assignUserToAvailableAccount(userEmail) {
       available.length
     );
 
-    const v2 = await adobeRenewV2.addUsersWithProductV2(
-      accountEmail,
-      accountPassword,
-      [normalizedEmail],
-      {
-        savedCookies,
-        savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
-        mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-        otpSource,
-        maxUsers: target.userLimit,
-      }
-    );
+    let v2;
+    try {
+      v2 = await adobeRenewV2.addUsersWithProductV2(
+        accountEmail,
+        accountPassword,
+        [normalizedEmail],
+        {
+          savedCookies,
+          savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
+          mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+          otpSource,
+          maxUsers: target.userLimit,
+        }
+      );
+    } catch (addErr) {
+      lastAddError = addErr?.message || String(addErr);
+      logger.warn(
+        "[renew-adobe] assignUserToAvailableAccount: addUsersWithProductV2 ném lỗi (id=%s), thử tài khoản khác: %s",
+        accountId,
+        lastAddError
+      );
+      continue;
+    }
 
     if (!v2.success) {
       lastAddError = v2.error || "addUsersWithProductV2 thất bại";
@@ -342,8 +353,9 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
       stillRemaining.length
     );
 
+    let v2;
     try {
-      const v2 = await adobeRenewV2.addUsersWithProductV2(
+      v2 = await adobeRenewV2.addUsersWithProductV2(
         accountEmail,
         accountPassword,
         chunk,
@@ -355,25 +367,35 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
           maxUsers: target.userLimit,
         }
       );
+    } catch (addErr) {
+      lastAddErr = addErr?.message || String(addErr);
+      logger.warn(
+        "[renew-adobe] fixUsersOneRoundTightest: addUsersWithProductV2 ném lỗi (id=%s), thử tài khoản khác: %s",
+        accountId,
+        lastAddErr
+      );
+      continue;
+    }
 
-      if (!v2.success) {
-        lastAddErr = v2.error || "addUsersWithProductV2 thất bại";
-        if (isAdobeSlotFullAddError(lastAddErr)) {
-          logger.warn(
-            "[renew-adobe] fixUsersOneRoundTightest: Adobe đầy slot (id=%s), thử tài khoản khác",
-            accountId
-          );
-          continue;
-        }
-        return {
-          success: false,
-          error: lastAddErr,
-          added_count: 0,
-          remaining_emails: needAdd,
-          round: null,
-        };
+    if (!v2.success) {
+      lastAddErr = v2.error || "addUsersWithProductV2 thất bại";
+      if (isAdobeSlotFullAddError(lastAddErr)) {
+        logger.warn(
+          "[renew-adobe] fixUsersOneRoundTightest: Adobe đầy slot (id=%s), thử tài khoản khác",
+          accountId
+        );
+        continue;
       }
+      return {
+        success: false,
+        error: lastAddErr,
+        added_count: 0,
+        remaining_emails: needAdd,
+        round: null,
+      };
+    }
 
+    try {
       const lisencecount = resolveLisenceCount({
         usersSnapshot: null,
         alertConfig: target[COLS.ALERT_CONFIG],
@@ -420,32 +442,34 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
           error: error.message,
         });
       });
-
-      return {
-        success: true,
-        added_count: addedEmails.length,
-        remaining_emails: stillRemaining,
-        round: {
-          accountId,
-          accountEmail,
-          emails: chunk,
-          slotsLeft,
-          batchSize: chunk.length,
-        },
-      };
-    } catch (err) {
-      logger.error("[renew-adobe] fixUsersOneRoundTightest failed", {
+    } catch (postErr) {
+      logger.error("[renew-adobe] fixUsersOneRoundTightest: đã add trên Adobe nhưng cập nhật DB thất bại", {
         accountId,
-        error: err.message,
+        error: postErr?.message || String(postErr),
       });
       return {
         success: false,
-        error: err.message || "Lỗi khi thêm user batch.",
+        error:
+          (postErr?.message || "Lỗi sau khi thêm user (cần đối chiếu Adobe vs DB).") +
+          " — không thử tài khoản khác để tránh gán trùng user.",
         added_count: 0,
         remaining_emails: needAdd,
         round: null,
       };
     }
+
+    return {
+      success: true,
+      added_count: (v2.addResult?.added?.length > 0 ? v2.addResult.added : chunk).length,
+      remaining_emails: stillRemaining,
+      round: {
+        accountId,
+        accountEmail,
+        emails: chunk,
+        slotsLeft,
+        batchSize: chunk.length,
+      },
+    };
   }
 
   return {

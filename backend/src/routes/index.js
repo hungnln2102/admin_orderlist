@@ -55,7 +55,11 @@ const router = express.Router();
 
 router.use("/auth", authRoutes);
 router.use("/renew-adobe/public", renewAdobePublicRoutes);
-router.use("/test-telegram", testTelegramRoutes);
+const enableTestTelegramInProd =
+  process.env.ENABLE_TEST_TELEGRAM === "true" || process.env.ENABLE_TEST_TELEGRAM === "1";
+if (process.env.NODE_ENV !== "production" || enableTestTelegramInProd) {
+  router.use("/test-telegram", testTelegramRoutes);
+}
 router.use("/", systemRoutes);
 
 /** Tin tức công khai (storefront) — không cần đăng nhập */

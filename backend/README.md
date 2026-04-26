@@ -20,7 +20,7 @@ src/
 ├── middleware/          # authGuard, errorHandler, validateRequest, rateLimiter, csrfProtection
 ├── routes/              # API route definitions
 │   ├── index.js         # Main router (auth, system, then authGuard, then feature routes)
-│   ├── systemRoutes.js  # error-report, run-due-notification (no auth)
+│   ├── systemRoutes.js  # error-report; run-due-notification cần CRON_INVOKE_SECRET
 │   ├── ordersRoutes.js
 │   └── ...
 ├── scheduler/           # Cron jobs (đơn hết hạn, thông báo Telegram)

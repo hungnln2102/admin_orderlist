@@ -160,7 +160,7 @@ const getSupplyInsights = async (_req, res) => {
     const logCols = QUOTED_COLS.supplierOrderCostLog;
     const paidNccLabel = "Đã Thanh Toán";
     const orderIdCol = quoteIdent(orderCols.id);
-    const orderCostCol = quoteIdent(orderCols.COST);
+    const orderCostCol = quoteIdent(orderCols.cost);
     const orderCostUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${logCols.orderListId})
@@ -176,7 +176,7 @@ const getSupplyInsights = async (_req, res) => {
         latest.supply_id AS source_id,
         SUM(
           CASE
-            WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
+            WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = ?
             THEN 0
             ELSE COALESCE(o.${orderCostCol}, 0) - COALESCE(latest.refund_amount, 0)
           END
@@ -215,14 +215,41 @@ const getSupplyInsights = async (_req, res) => {
       ORDER BY s.${supplierNameIdent};
     `;
 
-    const [monthlyRes, summaryRes, productsRes, unpaidRes, paidRes, supplyRes] = await Promise.all([
+    const subqueryNames = [
+      "monthly",
+      "summary",
+      "products",
+      "unpaid_order_cost",
+      "paid_supplier_payments",
+      "supplies",
+    ];
+    const settled = await Promise.allSettled([
       db.raw(monthlySql, [monthStart, nextMonthStart]),
       db.raw(summarySql),
       db.raw(productsSql),
-      db.raw(orderCostUnpaidSql, { paidNccLabel }),
+      db.raw(orderCostUnpaidSql, [paidNccLabel]),
       db.raw(supplyPaidSql),
       db.raw(supplySql),
     ]);
+
+    const pickRaw = (i) => {
+      const s = settled[i];
+      if (s.status === "fulfilled") {
+        return s.value;
+      }
+      logger.error("[GET] /api/supply-insights: subquery failed", {
+        subquery: subqueryNames[i] || i,
+        error: s.reason?.message || String(s.reason),
+      });
+      return { rows: [] };
+    };
+
+    const monthlyRes = pickRaw(0);
+    const summaryRes = pickRaw(1);
+    const productsRes = pickRaw(2);
+    const unpaidRes = pickRaw(3);
+    const paidRes = pickRaw(4);
+    const supplyRes = pickRaw(5);
 
     const makeSourceKey = (value) =>
       String(value || "").trim().replace(/\s+/g, " ").toLowerCase();

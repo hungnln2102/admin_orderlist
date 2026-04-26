@@ -105,7 +105,7 @@ const getSupplyOverview = async (req, res) => {
     `;
 
     const orderIdCol = quoteIdent(orderCols.id);
-    const orderCostCol = quoteIdent(orderCols.COST);
+    const orderCostCol = quoteIdent(orderCols.cost);
     const orderUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${lc.orderListId})

@@ -1,11 +1,13 @@
 const express = require("express");
 const { notifyError } = require("../utils/telegramErrorNotifier");
 const { runFourDaysNotificationNow } = require("../controllers/SchedulerController");
+const { requireCronInvokeSecret } = require("../middleware/secureCronInvoke");
 
 const router = express.Router();
 let lastFrontendReport = 0;
 
-router.get("/run-due-notification", runFourDaysNotificationNow);
+/** Cần `CRON_INVOKE_SECRET` (query ?secret=, header X-Cron-Invoke-Secret, hoặc Bearer) — dùng cho cron/DC. */
+router.get("/run-due-notification", requireCronInvokeSecret, runFourDaysNotificationNow);
 
 router.post("/error-report", (req, res) => {
   const now = Date.now();

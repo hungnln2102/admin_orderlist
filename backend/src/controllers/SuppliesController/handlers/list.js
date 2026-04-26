@@ -187,8 +187,8 @@ const listSupplyOrderCosts = async (req, res) => {
   const refundAmountCol = quoteIdent(logCols.REFUND_AMOUNT);
   const nccPaymentStatusCol = quoteIdent(logCols.NCC_PAYMENT_STATUS);
   const loggedAtCol = quoteIdent(logCols.LOGGED_AT);
-  const orderIdCol = quoteIdent(orderCols.ID);
-  const orderCostCol = quoteIdent(orderCols.COST);
+  const orderIdCol = quoteIdent(orderCols.id);
+  const orderCostCol = quoteIdent(orderCols.cost);
 
   const whereParts = [];
   const bindings = [];
@@ -213,8 +213,6 @@ const listSupplyOrderCosts = async (req, res) => {
       FROM ${TABLES.supplyOrderCostLog} ${lt}
       ${whereSql}
     `;
-    const countResult = await db.raw(countSql, bindings);
-    const total = Number(countResult.rows?.[0]?.c) || 0;
 
     const aggSql = `
       WITH filtered AS (
@@ -249,13 +247,6 @@ const listSupplyOrderCosts = async (req, res) => {
       FROM latest
       INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = latest.${orderListIdCol}
     `;
-    const aggResult = await db.raw(aggSql, bindings);
-    const aggRow = aggResult.rows?.[0] || {};
-    const aggregates = {
-      orderCount: Number(aggRow.order_count) || 0,
-      totalCost: Number(aggRow.total_cost) || 0,
-      totalRefund: Number(aggRow.total_refund) || 0,
-    };
 
     const dataSql = `
       SELECT
@@ -275,18 +266,57 @@ const listSupplyOrderCosts = async (req, res) => {
       OFFSET ?
       LIMIT ?
     `;
-    const dataResult = await db.raw(dataSql, [...bindings, offset, limit]);
-    const rows = (dataResult.rows || []).map((row) => ({
-      orderPk: Number(row.order_pk) || 0,
-      idOrder: row.id_order != null ? String(row.id_order) : "",
-      supplierName: row.supplier_name != null ? String(row.supplier_name) : "",
-      cost: Number(row.cost_value) || 0,
-      refund: Number(row.refund_value) || 0,
-      nccPaymentStatus:
-        row.ncc_payment_status != null ? String(row.ncc_payment_status) : "Chưa Thanh Toán",
-      orderDate: row.order_date,
-      canceledAt: row.canceled_at,
-    }));
+
+    const [countSettled, aggSettled, dataSettled] = await Promise.allSettled([
+      db.raw(countSql, bindings),
+      db.raw(aggSql, bindings),
+      db.raw(dataSql, [...bindings, offset, limit]),
+    ]);
+
+    if (countSettled.status === "rejected") {
+      logger.error("Query failed (GET /api/supplies/order-costs) count", {
+        error: countSettled.reason?.message || String(countSettled.reason),
+      });
+      return res.status(500).json({
+        error:
+          "Không thể đọc bảng chi phí NCC (partner.supplier_order_cost_log). Kiểm tra migration SQL trên DB.",
+      });
+    }
+
+    const total = Number(countSettled.value.rows?.[0]?.c) || 0;
+
+    let aggregates = { orderCount: 0, totalCost: 0, totalRefund: 0 };
+    if (aggSettled.status === "fulfilled") {
+      const aggRow = aggSettled.value.rows?.[0] || {};
+      aggregates = {
+        orderCount: Number(aggRow.order_count) || 0,
+        totalCost: Number(aggRow.total_cost) || 0,
+        totalRefund: Number(aggRow.total_refund) || 0,
+      };
+    } else {
+      logger.error("Query failed (GET /api/supplies/order-costs) aggregates", {
+        error: aggSettled.reason?.message || String(aggSettled.reason),
+      });
+    }
+
+    let rows = [];
+    if (dataSettled.status === "fulfilled") {
+      rows = (dataSettled.value.rows || []).map((row) => ({
+        orderPk: Number(row.order_pk) || 0,
+        idOrder: row.id_order != null ? String(row.id_order) : "",
+        supplierName: row.supplier_name != null ? String(row.supplier_name) : "",
+        cost: Number(row.cost_value) || 0,
+        refund: Number(row.refund_value) || 0,
+        nccPaymentStatus:
+          row.ncc_payment_status != null ? String(row.ncc_payment_status) : "Chưa Thanh Toán",
+        orderDate: row.order_date,
+        canceledAt: row.canceled_at,
+      }));
+    } else {
+      logger.error("Query failed (GET /api/supplies/order-costs) data", {
+        error: dataSettled.reason?.message || String(dataSettled.reason),
+      });
+    }
 
     res.json({
       rows,
