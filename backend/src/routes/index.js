@@ -28,6 +28,7 @@ const accountsRoutes = require("./accountsRoutes");
 const promotionCodesRoutes = require("./promotionCodesRoutes");
 const formInfoRoutes = require("./formInfoRoutes");
 const renewAdobeRoutes = require("./renewAdobeRoutes");
+const { getRenewAdobeProxy } = require("./renewAdobeProxy");
 const renewAdobePublicRoutes = require("./renewAdobePublicRoutes");
 const customerStatusRoutes = require("./customerStatusRoutes");
 const ipWhitelistRoutes = require("./ipWhitelistRoutes");
@@ -42,6 +43,13 @@ const longTimeout = (ms) => (req, res, next) => {
   res.setTimeout(ms);
   next();
 };
+
+/** Tách process: xem `docs/renew-adobe-service.md` + `RENEW_ADOBE_API_BASE_URL`. */
+const renewAdobeMount =
+  (() => {
+    const proxy = getRenewAdobeProxy();
+    return proxy != null ? proxy : renewAdobeRoutes;
+  })();
 
 const router = express.Router();
 
@@ -58,7 +66,7 @@ router.use(authGuard);
 
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
-router.use("/renew-adobe", longTimeout(900_000), renewAdobeRoutes);
+router.use("/renew-adobe", longTimeout(900_000), renewAdobeMount);
 router.use("/ip-whitelists", ipWhitelistRoutes);
 router.use("/site-maintenance", siteMaintenanceRoutes);
 router.use("/", customerStatusRoutes);

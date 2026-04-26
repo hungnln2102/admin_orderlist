@@ -432,6 +432,69 @@ async function syncRenewAdobeMappingFromTeamMembers(
 }
 
 /**
+ * User đã bị gỡ khỏi team Adobe (hoặc crawl không còn thấy) nhưng DB vẫn gắn admin
+ * → bỏ gán (adobe_account_id = null) để số slot / tracking khớp thực tế.
+ * @param {number} adobeAccountId
+ * @param {Array<{ email?: string }>} manageTeamMembers - danh sách từ check account (nguồn thật từ Adobe)
+ * @returns {Promise<{ cleared: number, orderIds: string[] }>}
+ */
+async function clearRenewAdobeMappingForEmailsNotOnTeam(
+  adobeAccountId,
+  manageTeamMembers
+) {
+  const id = Number(adobeAccountId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return { cleared: 0, orderIds: [] };
+  }
+
+  const teamEmails = new Set();
+  for (const m of Array.isArray(manageTeamMembers) ? manageTeamMembers : []) {
+    const e = (m?.email || "").toString().trim().toLowerCase();
+    if (e) teamEmails.add(e);
+  }
+
+  const rows = await db(TABLE)
+    .where(COLS.ADOBE_ACCOUNT_ID, id)
+    .select(COLS.ID, COLS.USER_EMAIL, COLS.ORDER_ID);
+
+  const orderIds = [];
+  let cleared = 0;
+  const now = new Date();
+  const trx = await db.transaction();
+  try {
+    for (const r of rows) {
+      const em = (r[COLS.USER_EMAIL] || "").toString().trim().toLowerCase();
+      if (!em) continue;
+      if (teamEmails.has(em)) continue;
+
+      await trx(TABLE)
+        .where(COLS.ID, r[COLS.ID])
+        .update({
+          [COLS.ADOBE_ACCOUNT_ID]: null,
+          [COLS.PRODUCT]: false,
+          [COLS.UPDATED_AT]: now,
+        });
+      cleared += 1;
+      const oid = String(r[COLS.ORDER_ID] || "").trim();
+      if (oid) orderIds.push(oid);
+    }
+    await trx.commit();
+  } catch (e) {
+    await trx.rollback();
+    throw e;
+  }
+
+  if (cleared > 0) {
+    logger.info(
+      "[Mapping] clearRenewAdobeMappingForEmailsNotOnTeam: adobeAccount=%s cleared=%d (user không còn trên team Adobe so với check)",
+      id,
+      cleared
+    );
+  }
+  return { cleared, orderIds: [...new Set(orderIds)] };
+}
+
+/**
  * Email đã có ít nhất một mapping renew_adobe với adobe_account_id (đã gán admin).
  * @param {string} userEmail
  * @returns {Promise<number|null>} adobe_account_id hoặc null
@@ -500,6 +563,7 @@ async function getMappingCountsByAdobeAccountIds(accountIds) {
 module.exports = {
   syncOrdersToMapping,
   syncRenewAdobeMappingFromTeamMembers,
+  clearRenewAdobeMappingForEmailsNotOnTeam,
   lookupAndRecordIfNeeded,
   markUsersProductFalseByAccount,
   recordUsersAssigned,

@@ -14,10 +14,12 @@ const {
 } = require("./usersSnapshotUtils");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
+  upsertRenewAdobeOrderUserTrackingForOrderIds,
   reconcileOrderUserTrackingWithTeamMembers,
 } = require("../../services/renew-adobe/orderUserTrackingService");
 const {
   syncRenewAdobeMappingFromTeamMembers,
+  clearRenewAdobeMappingForEmailsNotOnTeam,
 } = require("../../services/userAccountMappingService");
 
 const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
@@ -50,17 +52,30 @@ function pickOverflowUserEmails(manageTeamMembers, contractActiveLicenseCount) {
 
 /**
  * 1) Đồng bộ user_account_mapping từ list team (check).
- * 2) Upsert order_user_tracking từ order_list + mapping.
- * 3) So sánh team Adobe với mapping → cập nhật lại status từng dòng tracking (on team / chưa add).
+ * 2) Gỡ gán (adobe_account_id) cho email còn trong DB nhưng không còn trên team Adobe
+ *    (vd. xóa user thủ công trên Adobe) — nếu không, slot/tracking vẫn tính thừa.
+ * 3) Upsert order_user_tracking cho đơn vừa gỡ + còn map vào account.
+ * 4) Reconcile status tracking theo team.
  */
 async function syncMappingAndUpsertTracking(accountId, scrapedData, syncFromTeam) {
   if (syncFromTeam) {
-    await syncRenewAdobeMappingFromTeamMembers(
-      accountId,
-      scrapedData?.manageTeamMembers || []
-    ).catch((err) => {
+    const team = scrapedData?.manageTeamMembers || [];
+    await syncRenewAdobeMappingFromTeamMembers(accountId, team).catch((err) => {
       logger.warn("[renew-adobe] sync mapping từ team Adobe: %s", err.message);
     });
+    const { orderIds: orderIdsCleared } =
+      await clearRenewAdobeMappingForEmailsNotOnTeam(accountId, team).catch((err) => {
+        logger.warn("[renew-adobe] clear mapping (không còn trên team): %s", err.message);
+        return { orderIds: [] };
+      });
+    if (orderIdsCleared.length > 0) {
+      await upsertRenewAdobeOrderUserTrackingForOrderIds(orderIdsCleared).catch((err) => {
+        logger.warn(
+          "[renew-adobe] order_user_tracking (sau gỡ mapping): %s",
+          err.message
+        );
+      });
+    }
   }
   await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((err) => {
     logger.warn("[renew-adobe] order_user_tracking: %s", err.message);
