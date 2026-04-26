@@ -353,12 +353,16 @@ async function reconcileOrderUserTrackingWithTeamMembers(
           ? "có gói"
           : "chưa cấp quyền";
 
+      // "chưa add" = chưa có trên team Adobe: không lưu tên org sản phẩm ở tracking
+      // (tránh UI hiển thị profile trong khi cột tình trạng là Chưa add).
       const patch = {
         status,
-        org_name: orgName,
+        org_name: status === "chưa add" ? null : orgName,
         update_at: trx.fn.now(),
       };
-      if (idProductStr) {
+      if (status === "chưa add") {
+        patch.id_product = null;
+      } else if (idProductStr) {
         patch.id_product = idProductStr;
       }
       const n = await trx(TRACK_TABLE)
@@ -492,8 +496,7 @@ async function getOrderUserTrackingCountByOrgName(orgName) {
 }
 
 /**
- * Cron 23:30: email (account) có expired = hôm nay (Asia/Ho_Chi_Minh), group theo adobe_account_id từ mapping.
- * @returns {Promise<Map<number, Set<string>>>}
+ * @deprecated Dùng {@link getMapAccountIdToUserEmailsFor2330Cleanup} — bản cũ chỉ expired = **đúng hôm nay**, không còn dùng trong cron.
  */
 async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
   const rows = await db(TRACK_TABLE)
@@ -536,6 +539,86 @@ async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
   return out;
 }
 
+/**
+ * Luồng 23:30 (B1): Quét đơn **hết hạn** (theo bảng tracking + bổ sung order_list nếu thiếu dòng tracking),
+ * chỉ tính cặp (order, email) **khớp** `user_account_mapping` gắn `adobe_account_id`.
+ * Không còn rule "không nằm trong activeEmails → xóa" (dễ xóa nhầm).
+ *
+ * @returns {Promise<Map<number, Set<string>>>} adobe_account_id → email (chữ thường, trim)
+ */
+async function getMapAccountIdToUserEmailsFor2330Cleanup() {
+  const variantIds = await getRenewAdobeVariantIds();
+  if (variantIds.length === 0) {
+    return new Map();
+  }
+
+  const out = new Map();
+  const add = (adobeId, em) => {
+    const id = Number(adobeId);
+    const e = normalizeEmail(em);
+    if (!Number.isFinite(id) || id <= 0 || !e) return;
+    if (!out.has(id)) {
+      out.set(id, new Set());
+    }
+    out.get(id).add(e);
+  };
+
+  // B1a: order_user_tracking — hết hạn tính tới hôm nay (VN), join mapping cùng order_id + email
+  const tRows = await db({ t: TRACK_TABLE })
+    .join({ m: MAP_TABLE }, function joinTrMap() {
+      this.on(
+        db.raw("CAST(?? AS TEXT)", [`m.${MAP_COLS.ORDER_ID}`]),
+        "=",
+        "t.order_id"
+      ).andOn(
+        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`m.${MAP_COLS.USER_EMAIL}`]),
+        "=",
+        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`t.account`])
+      );
+    })
+    .whereNotNull(`m.${MAP_COLS.ADOBE_ACCOUNT_ID}`)
+    .whereNotNull("t.expired")
+    .whereNotNull("t.account")
+    .whereRaw(
+      `t.expired::date <= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
+    )
+    .select(
+      `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_id`,
+      db.raw(`LOWER(TRIM(COALESCE(??, ''))) as em`, [`m.${MAP_COLS.USER_EMAIL}`])
+    );
+
+  for (const r of tRows) {
+    add(r.adobe_id, r.em);
+  }
+
+  // B1b: order_list cùng variant renew + đã hết hạn — bắt trường hợp thiếu/ lệch dòng tracking
+  const oRows = await db({ o: TBL_ORDER })
+    .join({ m: MAP_TABLE }, function joinOrdMap() {
+      this.on(`o.${ORD_COLS.ID_ORDER}`, `m.${MAP_COLS.ORDER_ID}`).andOn(
+        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`o.${ORD_COLS.INFORMATION_ORDER}`]),
+        "=",
+        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`m.${MAP_COLS.USER_EMAIL}`])
+      );
+    })
+    .whereIn(`o.${ORD_COLS.ID_PRODUCT}`, variantIds)
+    .whereNotNull(`m.${MAP_COLS.ADOBE_ACCOUNT_ID}`)
+    .whereNotNull(`o.${ORD_COLS.INFORMATION_ORDER}`)
+    .whereNotNull(`o.${ORD_COLS.EXPIRY_DATE}`)
+    .whereRaw(
+      `(o.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh' <= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
+    )
+    .select(
+      `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_id`,
+      db.raw(`LOWER(TRIM(COALESCE(??, ''))) as em`, [`m.${MAP_COLS.USER_EMAIL}`])
+    );
+
+  for (const r of oRows) {
+    add(r.adobe_id, r.em);
+  }
+
+  return out;
+}
+
 module.exports = {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   upsertRenewAdobeOrderUserTrackingForAccount,
@@ -545,4 +628,5 @@ module.exports = {
   normalizeOrgKeyForTracking,
   getOrderUserTrackingCountByOrgName,
   getMapAccountIdToUserEmailsForTrackingExpiredToday,
+  getMapAccountIdToUserEmailsFor2330Cleanup,
 };

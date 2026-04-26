@@ -3,12 +3,9 @@ const { db } = require("../../db");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
-  SCHEMA_ORDERS,
-  ORDERS_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
 const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
-const { STATUS } = require("../../utils/statuses");
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 const { runCheckAllAccountsFlow } = require("../../controllers/RenewAdobeController/autoAssign");
 const { notifyWarn } = require("../../utils/telegramErrorNotifier");
@@ -23,28 +20,14 @@ const {
   mergeRenewAdobeAlertConfig,
   userCountDbValue,
 } = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
-const {
-  getMapAccountIdToUserEmailsForTrackingExpiredToday,
-} = require("../../services/renew-adobe/orderUserTrackingService");
+const { getMapAccountIdToUserEmailsFor2330Cleanup } = require("../../services/renew-adobe/orderUserTrackingService");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACCOUNT_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
-const PRODUCT_SYSTEM_TABLE = tableName(
-  RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE,
-  SCHEMA_RENEW_ADOBE
-);
-const PRODUCT_SYSTEM_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
-
-const ORDER_TABLE = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
-const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
-
 const MAP_SCHEMA = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
 const MAP_TABLE = tableName(MAP_SCHEMA.TABLE, SCHEMA_RENEW_ADOBE);
 const MAP_COLS = MAP_SCHEMA.COLS;
-
-const RENEW_ADOBE_SYSTEM_CODE = "renew_adobe";
-const ACTIVE_ORDER_STATUSES = [STATUS.PAID, STATUS.RENEWAL, STATUS.PROCESSING];
 
 async function retryOnce(taskName, handler) {
   try {
@@ -56,62 +39,11 @@ async function retryOnce(taskName, handler) {
   }
 }
 
-async function getRenewAdobeVariantIds() {
-  const rows = await db(PRODUCT_SYSTEM_TABLE)
-    .where(PRODUCT_SYSTEM_COLS.SYSTEM_CODE, RENEW_ADOBE_SYSTEM_CODE)
-    .select(PRODUCT_SYSTEM_COLS.VARIANT_ID);
-  return rows.map((row) => row[PRODUCT_SYSTEM_COLS.VARIANT_ID]).filter((id) => id != null);
-}
-
-async function getActiveOrderEmails(variantIds) {
-  if (!variantIds || variantIds.length === 0) return new Set();
-  const rows = await db(ORDER_TABLE)
-    .select(ORDER_COLS.INFORMATION_ORDER)
-    .whereIn(ORDER_COLS.ID_PRODUCT, variantIds)
-    .whereIn(ORDER_COLS.STATUS, ACTIVE_ORDER_STATUSES)
-    .whereNotNull(ORDER_COLS.INFORMATION_ORDER)
-    .whereRaw(
-      `(${ORDER_TABLE}.${ORDER_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh' > (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
-    );
-  return new Set(
-    rows
-      .map((row) => (row[ORDER_COLS.INFORMATION_ORDER] || "").toLowerCase().trim())
-      .filter(Boolean)
-  );
-}
-
-async function collectExpiredOrDueUsers(variantIds) {
-  if (!variantIds || variantIds.length === 0) return new Set();
-  const rows = await db(ORDER_TABLE)
-    .select(ORDER_COLS.INFORMATION_ORDER)
-    .whereIn(ORDER_COLS.ID_PRODUCT, variantIds)
-    .whereNotNull(ORDER_COLS.INFORMATION_ORDER)
-    .whereRaw(
-      `(${ORDER_TABLE}.${ORDER_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh' <= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
-    );
-  return new Set(
-    rows
-      .map((row) => (row[ORDER_COLS.INFORMATION_ORDER] || "").toLowerCase().trim())
-      .filter(Boolean)
-  );
-}
-
-function extractEmailsToDeleteFromMappedUsers({
-  mappedEmails,
-  adminEmail,
-  activeEmails,
-  expiredOrDueEmails,
-}) {
-  return (Array.isArray(mappedEmails) ? mappedEmails : [])
-    .map((e) => String(e || "").trim())
-    .filter((email) => {
-      const lower = email.toLowerCase();
-      if (!lower || lower === adminEmail) return false;
-      if (expiredOrDueEmails.has(lower)) return true;
-      return !activeEmails.has(lower);
-    });
-}
-
+/**
+ * B1: Quét order_user_tracking + order_list (bổ sung) → chỉ cặp (đơn, email) khớp mapping.
+ * B2: Map đã group theo admin (adobe_account_id).
+ * (B3–B4) Mỗi admin: mở session / autoDeleteUsers theo list email đó.
+ */
 async function runRenewAdobeCleanup2330Flow({
   trigger = "cron",
   runCheckBeforeCleanup = true,
@@ -138,74 +70,76 @@ async function runRenewAdobeCleanup2330Flow({
     setCounter(jobRun, "check_failed_accounts", Number(checkResult.failed || 0));
   }
 
-  const variantIds = await getRenewAdobeVariantIds();
-  const activeEmails = await getActiveOrderEmails(variantIds);
-  const expiredOrDueEmails = await collectExpiredOrDueUsers(variantIds);
-
-  const accountIdsRaw = await db(MAP_TABLE)
-    .distinct(MAP_COLS.ADOBE_ACCOUNT_ID)
-    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
-    .pluck(MAP_COLS.ADOBE_ACCOUNT_ID);
-  const accountIds = accountIdsRaw
-    .map((x) => Number(x))
-    .filter((n) => Number.isFinite(n) && n > 0);
-
-  const accounts =
-    accountIds.length === 0
-      ? []
-      : await db(ACCOUNT_TABLE)
-          .select(
-            ACCOUNT_COLS.ID,
-            ACCOUNT_COLS.EMAIL,
-            ACCOUNT_COLS.PASSWORD_ENC,
-            ACCOUNT_COLS.IS_ACTIVE,
-            ACCOUNT_COLS.ALERT_CONFIG,
-            ACCOUNT_COLS.MAIL_BACKUP_ID,
-            ...(ACCOUNT_COLS.ID_PRODUCT ? [ACCOUNT_COLS.ID_PRODUCT] : [])
-          )
-          .whereIn(ACCOUNT_COLS.ID, accountIds)
-          .where(ACCOUNT_COLS.IS_ACTIVE, true);
-
-  let removeByTrackingToday = new Map();
+  let removeByAdmin = new Map();
   try {
-    removeByTrackingToday = await getMapAccountIdToUserEmailsForTrackingExpiredToday();
+    removeByAdmin = await getMapAccountIdToUserEmailsFor2330Cleanup();
   } catch (e) {
-    logger.warn(
-      "[CRON][cleanup-23-30] getMapAccountIdToUserEmailsForTrackingExpiredToday failed: %s",
+    logger.error(
+      "[CRON][cleanup-23-30] getMapAccountIdToUserEmailsFor2330Cleanup failed: %s",
       e.message
     );
+    throw e;
   }
 
+  const targetAccountIds = [...removeByAdmin.keys()].filter(
+    (id) => Number.isFinite(Number(id)) && Number(id) > 0
+  );
+  if (targetAccountIds.length === 0) {
+    logger.info(
+      "[CRON][cleanup-23-30] Không có đơn hết hạn (tracking/order + mapping) — bỏ qua xóa user trên Adobe."
+    );
+    const summary = {
+      checkResult,
+      usersToRemove: 0,
+      usersRemoved: 0,
+      failedUsers: 0,
+      failedAccounts: [],
+    };
+    finishJobRun(jobRun);
+    return summary;
+  }
+
+  const accounts = await db(ACCOUNT_TABLE)
+    .select(
+      ACCOUNT_COLS.ID,
+      ACCOUNT_COLS.EMAIL,
+      ACCOUNT_COLS.PASSWORD_ENC,
+      ACCOUNT_COLS.IS_ACTIVE,
+      ACCOUNT_COLS.ALERT_CONFIG,
+      ACCOUNT_COLS.MAIL_BACKUP_ID,
+      ...(ACCOUNT_COLS.ID_PRODUCT ? [ACCOUNT_COLS.ID_PRODUCT] : [])
+    )
+    .whereIn(ACCOUNT_COLS.ID, targetAccountIds)
+    .where(ACCOUNT_COLS.IS_ACTIVE, true);
+
+  const byId = new Map(accounts.map((a) => [Number(a[ACCOUNT_COLS.ID]), a]));
   const failedAccounts = [];
 
-  for (const account of accounts) {
-    const mappedEmails = await db(MAP_TABLE)
-      .where(MAP_COLS.ADOBE_ACCOUNT_ID, account[ACCOUNT_COLS.ID])
-      .pluck(MAP_COLS.USER_EMAIL);
-    if (!mappedEmails.length) continue;
+  for (const accountId of targetAccountIds) {
+    const account = byId.get(Number(accountId));
+    if (!account) {
+      logger.warn(
+        "[CRON][cleanup-23-30] Bỏ qua adobe_account_id=%s (không tìm thấy tài khoản active trong DB).",
+        accountId
+      );
+      continue;
+    }
 
     const adminEmail = (account[ACCOUNT_COLS.EMAIL] || "").toLowerCase().trim();
-    const fromList = extractEmailsToDeleteFromMappedUsers({
-      mappedEmails,
-      adminEmail,
-      activeEmails,
-      expiredOrDueEmails,
-    });
-    const fromTrack = removeByTrackingToday.get(Number(account[ACCOUNT_COLS.ID])) || null;
-    const merged = new Set(fromList);
-    if (fromTrack) {
-      for (const e of fromTrack) {
-        const l = String(e || "").toLowerCase().trim();
-        if (l && l !== adminEmail) {
-          merged.add(l);
-        }
-      }
-    }
-    const toDelete = [...merged];
+    const raw = removeByAdmin.get(Number(accountId)) || new Set();
+    const toDelete = [...raw]
+      .map((e) => String(e || "").toLowerCase().trim())
+      .filter((e) => e && e !== adminEmail);
 
     if (toDelete.length === 0) continue;
 
     addCounter(jobRun, "users_to_remove", toDelete.length);
+    logger.info(
+      "[CRON][cleanup-23-30] admin id=%s email=%s → xóa %d user hết hạn (B3–B4).",
+      account[ACCOUNT_COLS.ID],
+      account[ACCOUNT_COLS.EMAIL],
+      toDelete.length
+    );
 
     try {
       const password = account[ACCOUNT_COLS.PASSWORD_ENC] || "";
@@ -316,7 +250,5 @@ async function runRenewAdobeCleanup2330Flow({
 }
 
 module.exports = {
-  collectExpiredOrDueUsers,
   runRenewAdobeCleanup2330Flow,
 };
-

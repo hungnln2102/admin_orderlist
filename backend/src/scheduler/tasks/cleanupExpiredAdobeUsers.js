@@ -1,8 +1,9 @@
 const logger = require("../../utils/logger");
 const { runRenewAdobeCleanup2330Flow } = require("./renewAdobeCleanup2330Flow");
 const ENABLE_2330_CLEANUP = process.env.RENEW_ADOBE_ENABLE_2330_CLEANUP !== "false";
+/** Tắt mặc định: check-all toàn tài khoản trước cleanup dễ lệch/ nặng session; bật rõ: =true. */
 const ENABLE_2330_CHECK_BEFORE_CLEANUP =
-  process.env.RENEW_ADOBE_ENABLE_2330_CHECK_BEFORE_CLEANUP !== "false";
+  process.env.RENEW_ADOBE_ENABLE_2330_CHECK_BEFORE_CLEANUP === "true";
 let cleanupExpiredAdobeUsersInFlight = false;
 
 function createCleanupExpiredAdobeUsersTask() {

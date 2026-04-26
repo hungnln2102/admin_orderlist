@@ -29,6 +29,11 @@ function hasActivePackageByContractCount(account) {
   return Number.isFinite(n) && n > 0;
 }
 
+/** Lỗi từ addUsersWithProductV2 khi team Adobe đã đủ user (snapshot), có thể lệch số dòng mapping DB. */
+function isAdobeSlotFullAddError(msg) {
+  return String(msg || "").includes("đầy slot");
+}
+
 async function buildAvailableAccounts(accounts) {
   const filtered = accounts.filter((account) => {
     const licenseStatus = normalizeLicenseStatus(account[COLS.LICENSE_STATUS]);
@@ -109,98 +114,117 @@ async function assignUserToAvailableAccount(userEmail) {
     throw new Error("Không có tài khoản nào còn gói và còn slot.");
   }
 
-  const target = available[0];
-  const accountId = target[COLS.ID];
-  const accountEmail = target[COLS.EMAIL];
-  const accountPassword = target[COLS.PASSWORD_ENC] || "";
-  const mailBackupId =
-    target[COLS.MAIL_BACKUP_ID] != null
-      ? Number(target[COLS.MAIL_BACKUP_ID])
-      : null;
-  const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
-  const otpSource =
-    COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
-      ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
-      : "imap";
+  let lastAddError = null;
+  for (let attempt = 0; attempt < available.length; attempt += 1) {
+    const target = available[attempt];
+    const accountId = target[COLS.ID];
+    const accountEmail = target[COLS.EMAIL];
+    const accountPassword = target[COLS.PASSWORD_ENC] || "";
+    const mailBackupId =
+      target[COLS.MAIL_BACKUP_ID] != null
+        ? Number(target[COLS.MAIL_BACKUP_ID])
+        : null;
+    const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+    const otpSource =
+      COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
+        ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
+        : "imap";
 
-  logger.info(
-    "[renew-adobe] assignUserToAvailableAccount: email=%s → account=%s",
-    normalizedEmail,
-    accountId
-  );
-
-  const v2 = await adobeRenewV2.addUsersWithProductV2(
-    accountEmail,
-    accountPassword,
-    [normalizedEmail],
-    {
-      savedCookies,
-      savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
-      mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-      otpSource,
-      maxUsers: target.userLimit,
-    }
-  );
-
-  if (!v2.success) {
-    throw new Error(v2.error || "addUsersWithProductV2 thất bại");
-  }
-
-  const lisencecount = resolveLisenceCount({
-    usersSnapshot: null,
-    alertConfig: target[COLS.ALERT_CONFIG],
-  });
-  const updatePayload = {
-    [COLS.USER_COUNT]: userCountDbValue(
-      lisencecount,
-      v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
-    ),
-  };
-  if (v2.savedCookies) {
-    updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
-      target[COLS.ALERT_CONFIG],
-      v2.savedCookies,
-      null
-    );
-  }
-
-  await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
-
-  const addedEmails =
-    v2.addResult?.added?.length > 0 ? v2.addResult.added : [normalizedEmail];
-  await lookupAndRecordIfNeeded(addedEmails, accountId).catch((error) => {
-    logger.warn("[renew-adobe] assignUserToAvailableAccount mapping failed", {
-      email: normalizedEmail,
+    logger.info(
+      "[renew-adobe] assignUserToAvailableAccount: email=%s → account=%s (thử %d/%d)",
+      normalizedEmail,
       accountId,
-      error: error.message,
+      attempt + 1,
+      available.length
+    );
+
+    const v2 = await adobeRenewV2.addUsersWithProductV2(
+      accountEmail,
+      accountPassword,
+      [normalizedEmail],
+      {
+        savedCookies,
+        savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
+        mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+        otpSource,
+        maxUsers: target.userLimit,
+      }
+    );
+
+    if (!v2.success) {
+      lastAddError = v2.error || "addUsersWithProductV2 thất bại";
+      if (isAdobeSlotFullAddError(lastAddError)) {
+        logger.warn(
+          "[renew-adobe] assignUserToAvailableAccount: Adobe đầy slot (id=%s), thử tài khoản khác: %s",
+          accountId,
+          lastAddError
+        );
+        continue;
+      }
+      throw new Error(lastAddError);
+    }
+
+    const lisencecount = resolveLisenceCount({
+      usersSnapshot: null,
+      alertConfig: target[COLS.ALERT_CONFIG],
     });
-  });
-  const noProductEmails = Array.isArray(v2.addResult?.noProduct)
-    ? v2.addResult.noProduct
-    : [];
-  if (noProductEmails.length > 0) {
-    await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
-      logger.warn("[renew-adobe] assignUserToAvailableAccount mark product=false failed", {
+    const updatePayload = {
+      [COLS.USER_COUNT]: userCountDbValue(
+        lisencecount,
+        v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
+      ),
+    };
+    if (v2.savedCookies) {
+      updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+        target[COLS.ALERT_CONFIG],
+        v2.savedCookies,
+        null
+      );
+    }
+
+    await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
+
+    const addedEmails =
+      v2.addResult?.added?.length > 0 ? v2.addResult.added : [normalizedEmail];
+    await lookupAndRecordIfNeeded(addedEmails, accountId).catch((error) => {
+      logger.warn("[renew-adobe] assignUserToAvailableAccount mapping failed", {
+        email: normalizedEmail,
         accountId,
-        emails: noProductEmails,
         error: error.message,
       });
     });
+    const noProductEmails = Array.isArray(v2.addResult?.noProduct)
+      ? v2.addResult.noProduct
+      : [];
+    if (noProductEmails.length > 0) {
+      await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
+        logger.warn("[renew-adobe] assignUserToAvailableAccount mark product=false failed", {
+          accountId,
+          emails: noProductEmails,
+          error: error.message,
+        });
+      });
+    }
+
+    await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
+      logger.warn("[renew-adobe] assignUserToAvailableAccount order_user_tracking failed", {
+        accountId,
+        error: error.message,
+      });
+    });
+
+    return {
+      accountId,
+      accountEmail,
+      profileName: target[COLS.ORG_NAME] ?? null,
+      userCount: updatePayload[COLS.USER_COUNT],
+    };
   }
 
-  await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
-    logger.warn("[renew-adobe] assignUserToAvailableAccount order_user_tracking failed", {
-      accountId,
-      error: error.message,
-    });
-  });
-
-  return {
-    accountId,
-    accountEmail,
-    profileName: target[COLS.ORG_NAME] ?? null,
-    userCount: updatePayload[COLS.USER_COUNT],
-  };
+  throw new Error(
+    lastAddError ||
+      "Không còn tài khoản thử thêm: mọi tài khoản còn slot theo DB đều báo đầy trên Adobe (nên chạy Check hoặc dọn user ngoài Admin Console)."
+  );
 }
 
 /**
@@ -283,129 +307,156 @@ async function fixUsersOneRoundTightest(userEmailsRaw) {
     };
   }
 
-  const target = available[0];
-  const accountId = target[COLS.ID];
-  const accountEmail = target[COLS.EMAIL];
-  const accountPassword = target[COLS.PASSWORD_ENC] || "";
-  const slotsLeft = Math.max(0, target.userLimit - target.currentCount);
-  const take = Math.min(slotsLeft, needAdd.length);
-  const chunk = needAdd.slice(0, take);
-  const stillRemaining = needAdd.slice(take);
+  let lastAddErr = null;
 
-  const mailBackupId =
-    target[COLS.MAIL_BACKUP_ID] != null
-      ? Number(target[COLS.MAIL_BACKUP_ID])
-      : null;
-  const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
-  const otpSource =
-    COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
-      ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
-      : "imap";
+  for (let ai = 0; ai < available.length; ai += 1) {
+    const target = available[ai];
+    const accountId = target[COLS.ID];
+    const accountEmail = target[COLS.EMAIL];
+    const accountPassword = target[COLS.PASSWORD_ENC] || "";
+    const slotsLeft = Math.max(0, target.userLimit - target.currentCount);
+    const take = Math.min(slotsLeft, needAdd.length);
+    if (take === 0) {
+      continue;
+    }
+    const chunk = needAdd.slice(0, take);
+    const stillRemaining = needAdd.slice(take);
 
-  logger.info(
-    "[renew-adobe] fixUsersOneRoundTightest: account=%s slotsLeft=%s batchSize=%s still=%s",
-    accountId,
-    slotsLeft,
-    chunk.length,
-    stillRemaining.length
-  );
+    const mailBackupId =
+      target[COLS.MAIL_BACKUP_ID] != null
+        ? Number(target[COLS.MAIL_BACKUP_ID])
+        : null;
+    const savedCookies = target[COLS.ALERT_CONFIG]?.cookies || [];
+    const otpSource =
+      COLS.OTP_SOURCE && target[COLS.OTP_SOURCE]
+        ? String(target[COLS.OTP_SOURCE]).trim().toLowerCase()
+        : "imap";
 
-  try {
-    const v2 = await adobeRenewV2.addUsersWithProductV2(
-      accountEmail,
-      accountPassword,
-      chunk,
-      {
-        savedCookies,
-        savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
-        mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
-        otpSource,
-        maxUsers: target.userLimit,
-      }
+    logger.info(
+      "[renew-adobe] fixUsersOneRoundTightest: account=%s (thử %d/%d) slotsLeft=%s batchSize=%s still=%s",
+      accountId,
+      ai + 1,
+      available.length,
+      slotsLeft,
+      chunk.length,
+      stillRemaining.length
     );
 
-    if (!v2.success) {
+    try {
+      const v2 = await adobeRenewV2.addUsersWithProductV2(
+        accountEmail,
+        accountPassword,
+        chunk,
+        {
+          savedCookies,
+          savedCookiesFromDb: target[COLS.ALERT_CONFIG] ?? null,
+          mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
+          otpSource,
+          maxUsers: target.userLimit,
+        }
+      );
+
+      if (!v2.success) {
+        lastAddErr = v2.error || "addUsersWithProductV2 thất bại";
+        if (isAdobeSlotFullAddError(lastAddErr)) {
+          logger.warn(
+            "[renew-adobe] fixUsersOneRoundTightest: Adobe đầy slot (id=%s), thử tài khoản khác",
+            accountId
+          );
+          continue;
+        }
+        return {
+          success: false,
+          error: lastAddErr,
+          added_count: 0,
+          remaining_emails: needAdd,
+          round: null,
+        };
+      }
+
+      const lisencecount = resolveLisenceCount({
+        usersSnapshot: null,
+        alertConfig: target[COLS.ALERT_CONFIG],
+      });
+      const updatePayload = {
+        [COLS.USER_COUNT]: userCountDbValue(
+          lisencecount,
+          v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
+        ),
+      };
+      if (v2.savedCookies) {
+        updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
+          target[COLS.ALERT_CONFIG],
+          v2.savedCookies,
+          null
+        );
+      }
+      await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
+
+      const addedEmails =
+        v2.addResult?.added?.length > 0 ? v2.addResult.added : chunk;
+      await lookupAndRecordIfNeeded(addedEmails, accountId).catch((error) => {
+        logger.warn("[renew-adobe] fixUsersOneRoundTightest mapping failed", {
+          accountId,
+          error: error.message,
+        });
+      });
+      const noProductEmails = Array.isArray(v2.addResult?.noProduct)
+        ? v2.addResult.noProduct
+        : [];
+      if (noProductEmails.length > 0) {
+        await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
+          logger.warn("[renew-adobe] fixUsersOneRoundTightest mark product=false failed", {
+            accountId,
+            emails: noProductEmails,
+            error: error.message,
+          });
+        });
+      }
+
+      await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
+        logger.warn("[renew-adobe] fixUsersOneRoundTightest order_user_tracking failed", {
+          accountId,
+          error: error.message,
+        });
+      });
+
+      return {
+        success: true,
+        added_count: addedEmails.length,
+        remaining_emails: stillRemaining,
+        round: {
+          accountId,
+          accountEmail,
+          emails: chunk,
+          slotsLeft,
+          batchSize: chunk.length,
+        },
+      };
+    } catch (err) {
+      logger.error("[renew-adobe] fixUsersOneRoundTightest failed", {
+        accountId,
+        error: err.message,
+      });
       return {
         success: false,
-        error: v2.error || "addUsersWithProductV2 thất bại",
+        error: err.message || "Lỗi khi thêm user batch.",
         added_count: 0,
         remaining_emails: needAdd,
         round: null,
       };
     }
-
-    const lisencecount = resolveLisenceCount({
-      usersSnapshot: null,
-      alertConfig: target[COLS.ALERT_CONFIG],
-    });
-    const updatePayload = {
-      [COLS.USER_COUNT]: userCountDbValue(
-        lisencecount,
-        v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
-      ),
-    };
-    if (v2.savedCookies) {
-      updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
-        target[COLS.ALERT_CONFIG],
-        v2.savedCookies,
-        null
-      );
-    }
-    await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
-
-    const addedEmails =
-      v2.addResult?.added?.length > 0 ? v2.addResult.added : chunk;
-    await lookupAndRecordIfNeeded(addedEmails, accountId).catch((error) => {
-      logger.warn("[renew-adobe] fixUsersOneRoundTightest mapping failed", {
-        accountId,
-        error: error.message,
-      });
-    });
-    const noProductEmails = Array.isArray(v2.addResult?.noProduct)
-      ? v2.addResult.noProduct
-      : [];
-    if (noProductEmails.length > 0) {
-      await markUsersProductFalseByAccount(noProductEmails, accountId).catch((error) => {
-        logger.warn("[renew-adobe] fixUsersOneRoundTightest mark product=false failed", {
-          accountId,
-          emails: noProductEmails,
-          error: error.message,
-        });
-      });
-    }
-
-    await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
-      logger.warn("[renew-adobe] fixUsersOneRoundTightest order_user_tracking failed", {
-        accountId,
-        error: error.message,
-      });
-    });
-
-    return {
-      success: true,
-      added_count: addedEmails.length,
-      remaining_emails: stillRemaining,
-      round: {
-        accountId,
-        accountEmail,
-        emails: chunk,
-        slotsLeft,
-        batchSize: chunk.length,
-      },
-    };
-  } catch (err) {
-    logger.error("[renew-adobe] fixUsersOneRoundTightest failed", {
-      accountId,
-      error: err.message,
-    });
-    return {
-      success: false,
-      error: err.message || "Lỗi khi thêm user batch.",
-      added_count: 0,
-      remaining_emails: needAdd,
-      round: null,
-    };
   }
+
+  return {
+    success: false,
+    error:
+      lastAddErr ||
+      "Không còn tài khoản thử thêm: hết slot theo DB hoặc mọi tài khoản đều đầy trên Adobe.",
+    added_count: 0,
+    remaining_emails: needAdd,
+    round: null,
+  };
 }
 
 const FIX_ALL_MAX_ROUNDS = 500;

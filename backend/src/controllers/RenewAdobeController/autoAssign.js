@@ -249,6 +249,16 @@ async function autoAssignUsers({ onProgress = null } = {}) {
   return { assigned: totalAssigned, skipped, errors };
 }
 
+/** Lỗi nghiệp vụ (hết slot, không còn account) — trả 409, không 500. */
+function fixUserExpectableErrorMessage(msg) {
+  const s = String(msg || "");
+  return (
+    s.includes("đầy slot") ||
+    s.includes("hết slot") ||
+    s.includes("Không có tài khoản nào còn gói và còn slot")
+  );
+}
+
 const runAutoAssign = async (_req, res) => {
   try {
     const result = await autoAssignUsers();
@@ -287,11 +297,16 @@ const fixSingleUser = async (req, res) => {
       profile: assigned.profileName ?? "—",
     });
   } catch (err) {
-    logger.error("[renew-adobe] fixSingleUser failed", {
+    const msg = err?.message || String(err);
+    const expectable = fixUserExpectableErrorMessage(msg);
+    (expectable ? logger.warn : logger.error)("[renew-adobe] fixSingleUser failed", {
       email: userEmail,
-      error: err.message,
+      error: msg,
     });
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(expectable ? 409 : 500).json({
+      success: false,
+      error: msg,
+    });
   }
 };
 

@@ -140,7 +140,7 @@ async function addUsersWithProductV2(adminEmail, password, userEmails, options =
       if (currentMembers >= maxUsers) {
         return {
           success: false,
-          error: `Account đã đầy slot (${currentMembers}/${maxUsers}), bỏ qua add user.`,
+          error: `Account đã đầy slot (${currentMembers}/${maxUsers}, theo số user trên Adobe Admin; có thể lệch cột SLOT bảng vì cột đó đếm order tracking / giới hạn gói). Bỏ qua add user.`,
           savedCookies: null,
           snapshot: preAddSnapshot,
         };

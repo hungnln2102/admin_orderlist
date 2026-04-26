@@ -74,14 +74,17 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
     const email = (order.information_order || "").trim().toLowerCase();
     if (!email) continue;
     const aid = Number(order.adobe_account_id) || 0;
+    const displayStatus = displayStatusFromOrder(order);
     const profile =
-      (order.tracking_org_name != null &&
-        String(order.tracking_org_name).trim() !== "" &&
-        String(order.tracking_org_name).trim()) ||
-      (order.admin_org_name != null &&
-        String(order.admin_org_name).trim() !== "" &&
-        String(order.admin_org_name).trim()) ||
-      "—";
+      displayStatus === "not_added"
+        ? "—"
+        : (order.tracking_org_name != null &&
+            String(order.tracking_org_name).trim() !== "" &&
+            String(order.tracking_org_name).trim()) ||
+          (order.admin_org_name != null &&
+            String(order.admin_org_name).trim() !== "" &&
+            String(order.admin_org_name).trim()) ||
+          "—";
 
     rows.push({
       id: aid > 0 ? `acc-${aid}-${email}` : `order-${email}`,
@@ -89,7 +92,7 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
       customer_name: order.customer || "—",
       email,
       profile,
-      display_status: displayStatusFromOrder(order),
+      display_status: displayStatus,
       expiry: order.expiry_date
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",
