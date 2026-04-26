@@ -13,9 +13,12 @@ const {
   ORDERS_SCHEMA,
   PARTNER_SCHEMA,
   SCHEMA_PARTNER,
+  SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
 } = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
+const orderListTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
+const orderListCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
 const {
@@ -101,6 +104,36 @@ const sumImportCostByLoggedAtRange = async (from, to) => {
      WHERE ${la} IS NOT NULL
        AND DATE(${la}) >= ?::date
        AND DATE(${la}) <= ?::date`,
+    [from, to]
+  );
+  return toNumber(r.rows?.[0]?.s);
+};
+
+/** Cùng quy tắc tháng: mỗi order_list_id một dòng lãi (log mới nhất trong khoảng ngày). */
+const sumNccOrderMarginByLoggedAtRange = async (from, to) => {
+  if (!from || !to) return 0;
+  const la = quoteIdent(importLogCols.LOGGED_AT);
+  const lid = quoteIdent(importLogCols.ORDER_LIST_ID);
+  const logId = quoteIdent(importLogCols.ID);
+  const olId = quoteIdent(orderListCols.ID);
+  const gsp = quoteIdent(orderListCols.GROSS_SELLING_PRICE);
+  const price = quoteIdent(orderListCols.PRICE);
+  const cost = quoteIdent(orderListCols.COST);
+  const r = await db.raw(
+    `SELECT COALESCE(SUM(m), 0) AS s
+     FROM (
+       SELECT DISTINCT ON (l.${lid})
+         GREATEST(
+           0,
+           COALESCE(ol.${gsp}::numeric, ol.${price}::numeric, 0) - COALESCE(ol.${cost}::numeric, 0)
+         ) AS m
+       FROM ${importLogTable} l
+       INNER JOIN ${orderListTable} ol ON ol.${olId} = l.${lid}
+       WHERE l.${la} IS NOT NULL
+         AND l.${la}::date >= ?::date
+         AND l.${la}::date <= ?::date
+       ORDER BY l.${lid}, l.${logId} DESC
+     ) sub`,
     [from, to]
   );
   return toNumber(r.rows?.[0]?.s);
@@ -255,8 +288,14 @@ const fetchDashboardStats = async () => {
   const importP = toNumber(trP?.[summaryCols.TOTAL_IMPORT]);
   const netC = revC - curr.total_refund;
   const netP = revP - prev.total_refund;
-  const profitC = netC - importC - monthlyWithdraw.current;
-  const profitP = netP - importP - monthlyWithdraw.previous;
+  const marginC = trC
+    ? toNumber(trC[summaryCols.TOTAL_PROFIT])
+    : netC - importC;
+  const marginP = trP
+    ? toNumber(trP[summaryCols.TOTAL_PROFIT])
+    : netP - importP;
+  const profitC = marginC - monthlyWithdraw.current;
+  const profitP = marginP - monthlyWithdraw.previous;
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
@@ -292,6 +331,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     sepayPrev,
     importCurr,
     importPrev,
+    nccMarginCurr,
+    nccMarginPrev,
   ] = await Promise.all([
     db.raw(buildRangeCompareStatsQuery({ useCreatedAt }), [from, to, p0, p1]),
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
@@ -301,6 +342,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     sumPaymentReceiptsByDateRange(p0, p1),
     sumImportCostByLoggedAtRange(from, to),
     sumImportCostByLoggedAtRange(p0, p1),
+    sumNccOrderMarginByLoggedAtRange(from, to),
+    sumNccOrderMarginByLoggedAtRange(p0, p1),
   ]);
   const row = (result.rows && result.rows[0]) || {};
 
@@ -308,8 +351,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const refundPrev = toNumber(row.total_refund_prev);
   const netRcurr = sepayCurr - refundCurr;
   const netRprev = sepayPrev - refundPrev;
-  const currProfit = netRcurr - importCurr - currentRangeWithdraw;
-  const prevProfit = netRprev - importPrev - previousRangeWithdraw;
+  const currProfit = nccMarginCurr - currentRangeWithdraw;
+  const prevProfit = nccMarginPrev - previousRangeWithdraw;
 
   return {
     totalOrders: {

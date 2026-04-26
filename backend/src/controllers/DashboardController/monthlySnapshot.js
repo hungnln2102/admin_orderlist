@@ -1,7 +1,9 @@
 /**
  * Doanh thu: cột total_revenue trên dashboard_monthly_summary (cộng dồn khi chèn biên lai, xem trigger).
  * Rebuild: revenueSource = 'receipts' tổng từ payment_receipt (sau khi xóa bảng, đối soát lại).
- * Hoàn/đếm đơn từ CTE order_list; lợi nhuận = (doanh thu - hoàn) - nhập - rút; thuế trên (doanh thu ròng).
+ * Hoàn/đếm đơn từ CTE order_list. total_import + total_profit (lãi theo từng dòng, sync từ log NCC);
+ * cột total_profit trong DB = tổng lãi (gross) trước rút; bảng tháng/KPI: total_profit − rút theo tháng.
+ * Thuế trên (doanh thu ròng).
  */
 const { db } = require("../../db");
 const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryAggregate");
@@ -15,6 +17,7 @@ const {
   ORDERS_SCHEMA,
   PARTNER_SCHEMA,
   SCHEMA_PARTNER,
+  SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
 } = require("../../config/dbSchema");
 
@@ -29,6 +32,8 @@ const importLogTable = tableName(
   SCHEMA_PARTNER
 );
 const importLogCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
+const orderListTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
+const orderListCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const paymentReceiptTable = tableName(
   ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE,
   SCHEMA_RECEIPT
@@ -97,6 +102,55 @@ const sumImportCostByMonthKeys = async (monthKeys, executor = db) => {
   );
 };
 
+/**
+ * Tổng lãi theo từng dòng tháng (mỗi order_list_id một bản ghi log mới nhất): COALESCE(gross, price) - cost.
+ */
+const sumNccOrderMarginByMonthKeys = async (monthKeys, executor = db) => {
+  const unique = [...new Set((monthKeys || []).map((k) => String(k || "").trim()))].filter(
+    Boolean
+  );
+  if (!unique.length) return new Map();
+  const la = quoteIdent(importLogCols.LOGGED_AT);
+  const lid = quoteIdent(importLogCols.ORDER_LIST_ID);
+  const lId = quoteIdent(importLogCols.ID);
+  const olId = quoteIdent(orderListCols.ID);
+  const gsp = quoteIdent(orderListCols.GROSS_SELLING_PRICE);
+  const price = quoteIdent(orderListCols.PRICE);
+  const cost = quoteIdent(orderListCols.COST);
+  const placeholders = unique.map(() => "?").join(", ");
+  const r = await executor.raw(
+    `
+    SELECT
+      sub.mk,
+      COALESCE(SUM(sub.m), 0) AS ncc_margin
+    FROM (
+      SELECT DISTINCT ON (
+        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM'),
+        l.${lid}
+      )
+        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM') AS mk,
+        GREATEST(
+          0,
+          COALESCE(ol.${gsp}::numeric, ol.${price}::numeric, 0) - COALESCE(ol.${cost}::numeric, 0)
+        ) AS m
+      FROM ${importLogTable} l
+      INNER JOIN ${orderListTable} ol ON ol.${olId} = l.${lid}
+      WHERE l.${la} IS NOT NULL
+        AND TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM') IN (${placeholders})
+      ORDER BY
+        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM'),
+        l.${lid},
+        l.${lId} DESC
+    ) sub
+    GROUP BY sub.mk
+    `,
+    unique
+  );
+  return new Map(
+    (r.rows || []).map((r0) => [String(r0.mk || ""), toNumber(r0.ncc_margin)])
+  );
+};
+
 const sumWithdrawProfitByMonthKeys = async (monthKeys, executor = db) => {
   const unique = [...new Set((monthKeys || []).map((k) => String(k || "").trim()))].filter(
     Boolean
@@ -131,7 +185,8 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
     .select(
       summaryCols.MONTH_KEY,
       summaryCols.TOTAL_REVENUE,
-      summaryCols.TOTAL_IMPORT
+      summaryCols.TOTAL_IMPORT,
+      summaryCols.TOTAL_PROFIT
     )
     .whereIn(summaryCols.MONTH_KEY, unique);
   return new Map(
@@ -140,6 +195,8 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
       {
         revenue: toNumber(r[summaryCols.TOTAL_REVENUE]),
         importVal: toNumber(r[summaryCols.TOTAL_IMPORT]),
+        /** Tổng lãi dòng từ trigger NCC, trước rút lợi nhuận. */
+        margin: toNumber(r[summaryCols.TOTAL_PROFIT]),
       },
     ])
   );
@@ -166,13 +223,15 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
   const withdrawMapF = await sumWithdrawProfitByMonthKeys(mks, executor);
   let revImpByMonth;
   if (revenueSource === "receipts") {
-    const [revMap, impMap] = await Promise.all([
+    const [revMap, impMap, nccMap] = await Promise.all([
       sumPaymentReceiptsByMonthKeys(mks, executor),
       sumImportCostByMonthKeys(mks, executor),
+      sumNccOrderMarginByMonthKeys(mks, executor),
     ]);
     revImpByMonth = (mk) => ({
       rev: revMap.get(mk) || 0,
       imp: impMap.get(mk) || 0,
+      nccMargin: nccMap.get(mk) || 0,
     });
   } else {
     const tbl = await sumRevenueAndImportFromSummaryTable(mks, executor);
@@ -181,23 +240,24 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
       return {
         rev: t ? t.revenue : 0,
         imp: t ? t.importVal : 0,
+        nccMargin: t ? t.margin : 0,
       };
     };
   }
 
   return rows.map((row) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
-    const { rev, imp: importVal } = revImpByMonth(mk);
+    const { rev, imp: importVal, nccMargin } = revImpByMonth(mk);
     const refund = toNumber(row[summaryCols.TOTAL_REFUND]);
     const withdraw = withdrawMapF.get(mk) || 0;
-    const net = rev - refund;
-    const profit = net - importVal - withdraw;
+    const profitGross = nccMargin;
+    const profitForDisplay = profitGross - withdraw;
     return {
       [summaryCols.MONTH_KEY]: mk,
       [summaryCols.TOTAL_ORDERS]: toNumber(row[summaryCols.TOTAL_ORDERS]),
       [summaryCols.CANCELED_ORDERS]: toNumber(row[summaryCols.CANCELED_ORDERS]),
       [summaryCols.TOTAL_REVENUE]: rev,
-      [summaryCols.TOTAL_PROFIT]: profit,
+      [summaryCols.TOTAL_PROFIT]: revenueSource === "receipts" ? profitGross : profitForDisplay,
       [summaryCols.TOTAL_REFUND]: refund,
       [summaryCols.TOTAL_IMPORT]: importVal,
       [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
@@ -228,6 +288,7 @@ module.exports = {
   buildAlignedMonthlyRows,
   sumPaymentReceiptsByMonthKeys,
   sumImportCostByMonthKeys,
+  sumNccOrderMarginByMonthKeys,
   sumRevenueAndImportFromSummaryTable,
   sumWithdrawProfitByMonthKeys,
   rowToApiShape,
