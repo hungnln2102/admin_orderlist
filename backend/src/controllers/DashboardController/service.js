@@ -5,20 +5,25 @@ const {
   buildRangeCompareStatsQuery,
   buildRangeMonthlyChartQuery,
 } = require("./queries");
-const {
-  buildDashboardSummaryAggregateQuery,
-  buildGrossSalesByBirthDateRangeQuery,
-} = require("./dashboardSummaryAggregate");
+const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryAggregate");
 const {
   tableName,
   SCHEMA_FINANCE,
   FINANCE_SCHEMA,
+  ORDERS_SCHEMA,
   PARTNER_SCHEMA,
   SCHEMA_PARTNER,
+  SCHEMA_RECEIPT,
 } = require("../../config/dbSchema");
 const { quoteIdent } = require("../../utils/sql");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
+const {
+  buildAlignedMonthlyRows,
+  sumPaymentReceiptsByMonthKeys,
+  sumImportCostByMonthKeys,
+  rowToApiShape,
+} = require("./monthlySnapshot");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
@@ -65,36 +70,39 @@ const importLogTable = tableName(
   SCHEMA_PARTNER
 );
 const importLogCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
+const paymentReceiptTable = tableName(
+  ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE,
+  SCHEMA_RECEIPT
+);
+const paymentReceiptCols = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS;
 
-/** Ngày đầu / cuối lịch của tháng YYYY-MM (local). */
-const ymdInclusiveRangeForMonthKey = (monthKey) => {
-  const parts = String(monthKey || "").split("-");
-  const y = Number(parts[0]);
-  const m = Number(parts[1]);
-  if (!y || !m || m < 1 || m > 12) return { from: null, to: null };
-  const pad = (n) => String(n).padStart(2, "0");
-  const from = `${y}-${pad(m)}-01`;
-  const lastDay = new Date(y, m, 0).getDate();
-  const to = `${y}-${pad(m)}-${pad(lastDay)}`;
-  return { from, to };
-};
-
-const sumGrossSalesByBirthDateRange = async (from, to, useCreatedAt) => {
+/** Tổng biên lai (Sepay) trong khoảng ngày [from, to] (inclusive). */
+const sumPaymentReceiptsByDateRange = async (from, to) => {
   if (!from || !to) return 0;
+  const cPaid = quoteIdent(paymentReceiptCols.PAID_DATE);
+  const cAmt = quoteIdent(paymentReceiptCols.AMOUNT);
   const r = await db.raw(
-    buildGrossSalesByBirthDateRangeQuery({ useCreatedAt }),
+    `SELECT COALESCE(SUM(pr.${cAmt}::numeric), 0) AS s
+     FROM ${paymentReceiptTable} pr
+     WHERE pr.${cPaid} IS NOT NULL
+       AND pr.${cPaid}::date >= ?::date
+       AND pr.${cPaid}::date <= ?::date`,
     [from, to]
   );
-  return toNumber(r.rows?.[0]?.gross_sales);
+  return toNumber(r.rows?.[0]?.s);
 };
 
-/** Tổng import_cost theo log NCC (chỉ cộng cột import_cost, không lấy refund_amount). */
+/** Tổng import_cost theo log NCC theo khoảng `logged_at`. */
 const sumImportCostByLoggedAtRange = async (from, to) => {
   if (!from || !to) return 0;
   const la = quoteIdent(importLogCols.LOGGED_AT);
   const ic = quoteIdent(importLogCols.IMPORT_COST);
   const r = await db.raw(
-    `SELECT COALESCE(SUM(${ic}), 0) AS s FROM ${importLogTable} WHERE DATE(${la}) >= ?::date AND DATE(${la}) <= ?::date`,
+    `SELECT COALESCE(SUM(${ic}::numeric), 0) AS s
+     FROM ${importLogTable}
+     WHERE ${la} IS NOT NULL
+       AND DATE(${la}) >= ?::date
+       AND DATE(${la}) <= ?::date`,
     [from, to]
   );
   return toNumber(r.rows?.[0]?.s);
@@ -131,6 +139,47 @@ const fetchMonthlyWithdrawProfitPair = async ({ monthStartDate }) => {
     current: currentMonthWithdraw,
     previous: previousMonthWithdraw,
   };
+};
+
+const emptyMonthKpi = () => ({
+  total_orders: 0,
+  total_revenue: 0,
+  total_profit: 0,
+  total_refund: 0,
+  total_import: 0,
+  total_tax: 0,
+});
+
+/**
+ * Từ dashboard_monthly_summary (ưu tiên) hoặc CTE tổng hợp order_list: đếm đơn (mốc birth),
+ * hoàn theo tháng canceled_at, nhập từ cột sync từ log NCC. Doanh thu thẻ KPI dùng biên lai Sepay, không dùng total_revenue ở đây.
+ */
+const kpiForMonth = (monthKey, tableMap, aggMap) => {
+  const mk = String(monthKey || "").trim();
+  const tr = tableMap.get(mk);
+  if (tr) {
+    return {
+      total_orders: toNumber(tr[summaryCols.TOTAL_ORDERS]),
+      total_revenue: toNumber(tr[summaryCols.TOTAL_REVENUE]),
+      total_profit: toNumber(tr[summaryCols.TOTAL_PROFIT]),
+      total_refund: toNumber(tr[summaryCols.TOTAL_REFUND]),
+      total_import: toNumber(tr[summaryCols.TOTAL_IMPORT]),
+      total_tax: toNumber(tr[summaryCols.TOTAL_TAX]),
+    };
+  }
+  const ar = aggMap.get(mk);
+  if (ar) {
+    const rev = toNumber(ar[summaryCols.TOTAL_REVENUE]);
+    return {
+      total_orders: toNumber(ar[summaryCols.TOTAL_ORDERS]),
+      total_revenue: rev,
+      total_profit: toNumber(ar[summaryCols.TOTAL_PROFIT]),
+      total_refund: toNumber(ar[summaryCols.TOTAL_REFUND]),
+      total_import: 0,
+      total_tax: taxFromRevenueValue(rev),
+    };
+  }
+  return emptyMonthKpi();
 };
 
 const fetchAvailableProfitPair = async ({ currentMonthKey, monthStartDate }) => {
@@ -171,80 +220,59 @@ const fetchDashboardStats = async () => {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const { from: currFrom, to: currTo } = ymdInclusiveRangeForMonthKey(currentMonthKey);
-  const { from: prevFrom, to: prevTo } = ymdInclusiveRangeForMonthKey(previousMonthKey);
+  const [aggResult, tableRows, availableProfit, sepayMap, importByMonth, monthlyWithdraw] =
+    await Promise.all([
+      db.raw(
+        buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
+      ),
+      db(summaryTableName)
+        .select(
+          summaryCols.MONTH_KEY,
+          summaryCols.TOTAL_ORDERS,
+          summaryCols.TOTAL_REVENUE,
+          summaryCols.TOTAL_PROFIT,
+          summaryCols.TOTAL_REFUND,
+          summaryCols.TOTAL_IMPORT,
+          summaryCols.TOTAL_TAX
+        )
+        .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
+      fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+      sumPaymentReceiptsByMonthKeys([currentMonthKey, previousMonthKey]),
+      sumImportCostByMonthKeys([currentMonthKey, previousMonthKey]),
+      fetchMonthlyWithdrawProfitPair({ monthStartDate }),
+    ]);
 
-  const [
-    aggResult,
-    availableProfit,
-    monthlyWithdrawProfit,
-    grossCurr,
-    grossPrev,
-  ] = await Promise.all([
-    db.raw(
-      buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
-    ),
-    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-    fetchMonthlyWithdrawProfitPair({ monthStartDate }),
-    sumGrossSalesByBirthDateRange(currFrom, currTo, useCreatedAt),
-    sumGrossSalesByBirthDateRange(prevFrom, prevTo, useCreatedAt),
-  ]);
-
-  const importRowByMonth = await db(summaryTableName)
-    .select(summaryCols.MONTH_KEY, summaryCols.TOTAL_IMPORT)
-    .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]);
-  const importKeyToVal = new Map(
-    (importRowByMonth || []).map((r) => [
-      String(r[summaryCols.MONTH_KEY] || ""),
-      toNumber(r[summaryCols.TOTAL_IMPORT]),
-    ])
+  const aggMap = new Map(
+    (aggResult?.rows || []).map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r])
   );
-  const importCurr = importKeyToVal.get(currentMonthKey) || 0;
-  const importPrev = importKeyToVal.get(previousMonthKey) || 0;
-
-  const summaryRows = aggResult?.rows || [];
-  const byMonth = new Map(
-    summaryRows.map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r])
+  const tableMap = new Map(
+    (tableRows || []).map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r])
   );
-  const currentRow = byMonth.get(currentMonthKey) || {};
-  const previousRow = byMonth.get(previousMonthKey) || {};
 
-  const curr = {
-    total_orders: Number(currentRow.total_orders || 0),
-    total_revenue: Number(currentRow.total_revenue || 0),
-    total_profit: Number(currentRow.total_profit || 0),
-    total_refund: Number(currentRow.total_refund || 0),
-  };
+  const curr = kpiForMonth(currentMonthKey, tableMap, aggMap);
+  const prev = kpiForMonth(previousMonthKey, tableMap, aggMap);
 
-  const prev = {
-    total_orders: Number(previousRow.total_orders || 0),
-    total_revenue: Number(previousRow.total_revenue || 0),
-    total_profit: Number(previousRow.total_profit || 0),
-    total_refund: Number(previousRow.total_refund || 0),
-  };
-
-  // KPI: Doanh thu = tổng giá theo tháng đăng ký − hoàn (tháng hủy cùng kỳ); Nhập = total_import từ dashboard_monthly_summary (sync từ log NCC qua trigger/rebuild)
-  const netRevenueCurr = grossCurr - curr.total_refund;
-  const netRevenuePrev = grossPrev - prev.total_refund;
-  const profitAfterCostCurr = netRevenueCurr - importCurr;
-  const profitAfterCostPrev = netRevenuePrev - importPrev;
-  const currentMonthlyProfit = profitAfterCostCurr - monthlyWithdrawProfit.current;
-  const previousMonthlyProfit = profitAfterCostPrev - monthlyWithdrawProfit.previous;
-
-  const taxFromRevenue = (revenue) => taxFromRevenueValue(revenue);
+  const sepayC = sepayMap.get(currentMonthKey) || 0;
+  const sepayP = sepayMap.get(previousMonthKey) || 0;
+  const importC = importByMonth.get(currentMonthKey) || 0;
+  const importP = importByMonth.get(previousMonthKey) || 0;
+  const netC = sepayC - curr.total_refund;
+  const netP = sepayP - prev.total_refund;
+  const profitC = netC - importC - monthlyWithdraw.current;
+  const profitP = netP - importP - monthlyWithdraw.previous;
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
-    totalRevenue: { current: netRevenueCurr, previous: netRevenuePrev },
+    totalRevenue: { current: sepayC, previous: sepayP },
     totalImports: {
-      current: importCurr,
-      previous: importPrev,
+      current: importC,
+      previous: importP,
     },
     totalRefund: { current: curr.total_refund, previous: prev.total_refund },
-    monthlyProfit: { current: currentMonthlyProfit, previous: previousMonthlyProfit },
+    monthlyProfit: { current: profitC, previous: profitP },
     monthlyTax: {
-      current: taxFromRevenue(netRevenueCurr),
-      previous: taxFromRevenue(netRevenuePrev),
+      current: taxFromRevenueValue(netC),
+      previous: taxFromRevenueValue(netP),
     },
     availableProfit,
   };
@@ -257,13 +285,14 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     new Date().getMonth() + 1
   ).padStart(2, "0")}`;
   const monthStartDate = `${currentMonthKey}-01`;
+
   const [
     result,
     availableProfit,
     currentRangeWithdraw,
     previousRangeWithdraw,
-    grossCurr,
-    grossPrev,
+    sepayCurr,
+    sepayPrev,
     importCurr,
     importPrev,
   ] = await Promise.all([
@@ -271,28 +300,26 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
     sumWithdrawProfitBetweenDates({ from, to }),
     sumWithdrawProfitBetweenDates({ from: p0, to: p1 }),
-    sumGrossSalesByBirthDateRange(from, to, useCreatedAt),
-    sumGrossSalesByBirthDateRange(p0, p1, useCreatedAt),
+    sumPaymentReceiptsByDateRange(from, to),
+    sumPaymentReceiptsByDateRange(p0, p1),
     sumImportCostByLoggedAtRange(from, to),
     sumImportCostByLoggedAtRange(p0, p1),
   ]);
   const row = (result.rows && result.rows[0]) || {};
 
-  const refundCurr = Number(row.total_refund_curr || 0);
-  const refundPrev = Number(row.total_refund_prev || 0);
-  const netRevenueCurr = grossCurr - refundCurr;
-  const netRevenuePrev = grossPrev - refundPrev;
-  const profitAfterCostCurr = netRevenueCurr - importCurr;
-  const profitAfterCostPrev = netRevenuePrev - importPrev;
-  const currProfit = profitAfterCostCurr - currentRangeWithdraw;
-  const prevProfit = profitAfterCostPrev - previousRangeWithdraw;
+  const refundCurr = toNumber(row.total_refund_curr);
+  const refundPrev = toNumber(row.total_refund_prev);
+  const netRcurr = sepayCurr - refundCurr;
+  const netRprev = sepayPrev - refundPrev;
+  const currProfit = netRcurr - importCurr - currentRangeWithdraw;
+  const prevProfit = netRprev - importPrev - previousRangeWithdraw;
 
   return {
     totalOrders: {
-      current: Number(row.total_orders_curr || 0),
-      previous: Number(row.total_orders_prev || 0),
+      current: toNumber(row.total_orders_curr),
+      previous: toNumber(row.total_orders_prev),
     },
-    totalRevenue: { current: netRevenueCurr, previous: netRevenuePrev },
+    totalRevenue: { current: sepayCurr, previous: sepayPrev },
     totalImports: {
       current: importCurr,
       previous: importPrev,
@@ -303,8 +330,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     },
     monthlyProfit: { current: currProfit, previous: prevProfit },
     monthlyTax: {
-      current: taxFromRevenueValue(netRevenueCurr),
-      previous: taxFromRevenueValue(netRevenuePrev),
+      current: taxFromRevenueValue(netRcurr),
+      previous: taxFromRevenueValue(netRprev),
     },
     availableProfit,
     range: { from, to, previousFrom: p0, previousTo: p1 },
@@ -357,12 +384,8 @@ const fetchDashboardCharts = async ({ year, limitToToday }) => {
 };
 
 const fetchDashboardMonthlySummary = async () => {
-  const useCreatedAt = await orderListHasCreatedAtColumn();
-  const result = await db.raw(
-    buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
-  );
-  const rows = (result && result.rows) || [];
-  const sorted = rows
+  const dbRows = await buildAlignedMonthlyRows();
+  const sorted = dbRows
     .slice()
     .sort((a, b) =>
       String(b[summaryCols.MONTH_KEY]).localeCompare(String(a[summaryCols.MONTH_KEY]))
@@ -370,57 +393,28 @@ const fetchDashboardMonthlySummary = async () => {
   const monthKeys = sorted
     .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
     .filter(Boolean);
-  let importMeta = new Map();
+  let updatedMap = new Map();
   if (monthKeys.length) {
     const stored = await db(summaryTableName)
-      .select(
-        summaryCols.MONTH_KEY,
-        summaryCols.TOTAL_IMPORT,
-        summaryCols.TOTAL_TAX,
-        summaryCols.UPDATED_AT
-      )
+      .select(summaryCols.MONTH_KEY, summaryCols.UPDATED_AT)
       .whereIn(summaryCols.MONTH_KEY, monthKeys);
-    importMeta = new Map(
-      (stored || []).map((r) => [
-        String(r[summaryCols.MONTH_KEY] || ""),
-        {
-          total_import: toNumber(r[summaryCols.TOTAL_IMPORT]),
-          total_tax: toNumber(r[summaryCols.TOTAL_TAX]),
-          updated_at: r[summaryCols.UPDATED_AT] ?? null,
-        },
-      ])
+    updatedMap = new Map(
+      (stored || []).map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r[summaryCols.UPDATED_AT] ?? null])
     );
   }
   return sorted.map((row) => {
-    const mk = String(row[summaryCols.MONTH_KEY] || "");
-    const meta = importMeta.get(mk);
-    const totalRevenue = Number(row[summaryCols.TOTAL_REVENUE] || 0);
-    const total_tax = meta
-      ? toNumber(meta.total_tax)
-      : taxFromRevenueValue(totalRevenue);
+    const api = rowToApiShape(row);
     return {
-      month_key: mk,
-      total_orders: Number(row[summaryCols.TOTAL_ORDERS] || 0),
-      canceled_orders: Number(row[summaryCols.CANCELED_ORDERS] || 0),
-      total_revenue: totalRevenue,
-      total_profit: Number(row[summaryCols.TOTAL_PROFIT] || 0),
-      total_refund: Number(row[summaryCols.TOTAL_REFUND] || 0),
-      total_import: meta ? meta.total_import : 0,
-      total_tax,
-      updated_at: meta ? meta.updated_at : null,
+      ...api,
+      updated_at: updatedMap.get(api.month_key) ?? null,
     };
   });
 };
 
 const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
-  const useCreatedAt = await orderListHasCreatedAtColumn();
-  const aggregateResult = await db.raw(
-    buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
-  );
-  const allRows = aggregateResult?.rows || [];
-
+  const allAligned = await buildAlignedMonthlyRows();
   const yearStr = String(year).padStart(4, "0");
-  let yearRows = allRows.filter((row) => {
+  let yearRows = allAligned.filter((row) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
     return mk.length >= 4 && mk.startsWith(yearStr);
   });
@@ -430,33 +424,6 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
     const currentYearMonth = `${yearStr}-${currentMonth}`;
     yearRows = yearRows.filter(
       (row) => String(row[summaryCols.MONTH_KEY] || "") <= currentYearMonth
-    );
-  }
-
-  const monthKeysForImport = yearRows
-    .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
-    .filter(Boolean);
-  let importByMonth = new Map();
-  let taxByMonth = new Map();
-  if (monthKeysForImport.length) {
-    const importRows = await db(summaryTableName)
-      .select(
-        summaryCols.MONTH_KEY,
-        summaryCols.TOTAL_IMPORT,
-        summaryCols.TOTAL_TAX
-      )
-      .whereIn(summaryCols.MONTH_KEY, monthKeysForImport);
-    importByMonth = new Map(
-      (importRows || []).map((r) => [
-        String(r[summaryCols.MONTH_KEY] || ""),
-        toNumber(r[summaryCols.TOTAL_IMPORT]),
-      ])
-    );
-    taxByMonth = new Map(
-      (importRows || []).map((r) => [
-        String(r[summaryCols.MONTH_KEY] || ""),
-        toNumber(r[summaryCols.TOTAL_TAX]),
-      ])
     );
   }
 
@@ -470,32 +437,25 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
     }
   }
 
-  // Determine how many months to show
   const now = new Date();
   const maxMonth = (year === now.getFullYear()) ? (now.getMonth() + 1) : 12;
 
-  // Fill all months from 1 to maxMonth, using 0 for missing months
   const months = [];
   for (let m = 1; m <= maxMonth; m++) {
     const row = rowMap.get(m);
-    const revenue = row ? Number(row.total_revenue || 0) : 0;
+    const api = row ? rowToApiShape(row) : null;
     const mk = `${yearStr}-${String(m).padStart(2, "0")}`;
-    const storedTax = taxByMonth.get(mk);
-    const total_tax =
-      storedTax != null && !Number.isNaN(storedTax)
-        ? toNumber(storedTax)
-        : taxFromRevenueValue(revenue);
     months.push({
       month: `T${m}`,
       month_num: m,
       month_key: mk,
-      total_orders: row ? Number(row.total_orders || 0) : 0,
-      total_canceled: row ? Number(row.canceled_orders || 0) : 0,
-      total_revenue: revenue,
-      total_profit: row ? Number(row.total_profit || 0) : 0,
-      total_refund: row ? Number(row.total_refund || 0) : 0,
-      total_import: importByMonth.get(mk) || 0,
-      total_tax,
+      total_orders: api ? api.total_orders : 0,
+      total_canceled: api ? api.canceled_orders : 0,
+      total_revenue: api ? api.total_revenue : 0,
+      total_profit: api ? api.total_profit : 0,
+      total_refund: api ? api.total_refund : 0,
+      total_import: api ? api.total_import : 0,
+      total_tax: api ? api.total_tax : taxFromRevenueValue(0),
     });
   }
 
