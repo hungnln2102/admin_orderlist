@@ -83,15 +83,14 @@ const buildOrdersListQuery = async (scope = "") => {
                     rca.credit_note_id AS refund_credit_applied_note_id,
                     rca.applied_amount AS refund_credit_applied_amount,
                     rca.applied_at::text AS refund_credit_applied_at,
-                    c_effective.id AS refund_credit_effective_note_id,
-                    c_effective.credit_code AS refund_credit_effective_code,
-                    c_effective.available_amount::numeric AS refund_credit_effective_available,
-                    c_effective.status::text AS refund_credit_effective_status
+                    -- effective_* = cùng phiếu credit_note đã apply (sau migration 085 có thể join thêm phiếu kế thừa qua succeeded_by_note_id)
+                    c_applied.id AS refund_credit_effective_note_id,
+                    c_applied.credit_code AS refund_credit_effective_code,
+                    c_applied.available_amount::numeric AS refund_credit_effective_available,
+                    c_applied.status::text AS refund_credit_effective_status
                 FROM ${TABLES.refundCreditApplications} rca
                 INNER JOIN ${TABLES.refundCreditNotes} c_applied
                     ON c_applied.id = rca.credit_note_id
-                INNER JOIN ${TABLES.refundCreditNotes} c_effective
-                    ON c_effective.id = COALESCE(c_applied.succeeded_by_note_id, c_applied.id)
                 WHERE rca.target_order_list_id = ${table}.${idCol}
                 ORDER BY rca.id DESC
                 LIMIT 1

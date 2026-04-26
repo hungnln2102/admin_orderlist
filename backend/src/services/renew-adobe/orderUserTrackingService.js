@@ -44,17 +44,18 @@ function normalizeOrgKeyForTracking(orgName) {
 }
 
 /**
- * Số dòng trong order_user_tracking theo từng admin: đếm các dòng có org_name
- * trùng (sau chuẩn hóa) với org_name của tài khoản admin.
- * @param {object[]} accountRows - rows có ít nhất id và org_name
+ * Số dòng `order_user_tracking` gắn với từng tài khoản admin: đếm theo
+ * `user_account_mapping` → join `order_user_tracking` trên mã đơn (id_order = order_id),
+ * không còn cộng dồn theo tên org (nhiều tài khoản / dòng cũ cùng org sẽ không làm lệch x).
+ * @param {object[]} accountRows - rows có ít nhất id
  * @param {string} [idCol='id']
- * @param {string} [orgCol='org_name']
+ * @param {string} [_orgCol='org_name'] - giữ tương thích chữ ký; không còn dùng
  * @returns {Promise<Map<number, number>>}
  */
 async function getOrderUserTrackingCountsForAdminAccounts(
   accountRows,
   idCol = "id",
-  orgCol = "org_name"
+  _orgCol = "org_name"
 ) {
   const result = new Map();
   if (!accountRows || accountRows.length === 0) return result;
@@ -64,22 +65,33 @@ async function getOrderUserTrackingCountsForAdminAccounts(
     if (Number.isFinite(id) && id > 0) result.set(id, 0);
   }
 
-  const countsByOrg = await db(TRACK_TABLE)
-    .select(db.raw(`lower(trim(org_name)) as org_key`))
-    .count("* as c")
-    .whereNotNull("org_name")
-    .andWhereRaw("btrim(org_name) <> ''")
-    .groupByRaw("lower(trim(org_name))");
+  const accountIds = [...result.keys()];
+  if (accountIds.length === 0) return result;
 
-  const orgToCount = new Map(
-    countsByOrg.map((row) => [row.org_key, Number(row.c) || 0])
+  const mTable = MAP_TABLE;
+  const tTable = TRACK_TABLE;
+  const colAid = MAP_COLS.ADOBE_ACCOUNT_ID;
+  const colOid = MAP_COLS.ORDER_ID;
+
+  const { rows: joined } = await db.raw(
+    `
+    SELECT
+      m.${colAid} AS adobe_id,
+      COUNT(DISTINCT t.order_id)::int AS c
+    FROM ${mTable} m
+    INNER JOIN ${tTable} t
+      ON lower(btrim(m.${colOid}::text)) = lower(btrim(t.order_id::text))
+    WHERE m.${colAid} IN (${accountIds.map(() => "?").join(",")})
+    GROUP BY m.${colAid}
+    `,
+    accountIds
   );
 
-  for (const r of accountRows) {
-    const id = Number(r[idCol]);
-    if (!Number.isFinite(id) || id <= 0) continue;
-    const k = normalizeOrgKeyForTracking(r[orgCol]);
-    result.set(id, k ? orgToCount.get(k) ?? 0 : 0);
+  for (const ro of joined) {
+    const aid = Number(ro.adobe_id);
+    if (Number.isFinite(aid) && result.has(aid)) {
+      result.set(aid, Number(ro.c) || 0);
+    }
   }
 
   return result;
@@ -247,10 +259,134 @@ async function upsertTrackingRowsFromOrderRows(orders) {
 }
 
 /**
- * Cập nhật tracking cho các mã đơn cụ thể (sau check / đổi mapping).
- * @param {string[]} orderIds
- * @returns {Promise<number>}
+ * Sau khi check tài khoản: so sánh `manageTeamMembers` (Adobe) với mapping của admin,
+ * cập nhật lại từng dòng `order_user_tracking` (status + org + id_product).
+ * - Có trên team + có product → "có gói"
+ * - Có trên team + chưa product → "chưa cấp quyền"
+ * - Mapping còn gắn admin nhưng email không còn trên team → "chưa add"
+ * @param {number} adobeAccountId
+ * @param {Array<{ email?: string, product?: boolean, hasPackage?: boolean }>} manageTeamMembers
+ * @returns {Promise<{ updated: number, onTeam: string[], notOnTeam: string[] }>}
  */
+async function reconcileOrderUserTrackingWithTeamMembers(
+  adobeAccountId,
+  manageTeamMembers
+) {
+  const id = Number(adobeAccountId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return { updated: 0, onTeam: [], notOnTeam: [] };
+  }
+
+  const teamByEmail = new Map();
+  for (const m of Array.isArray(manageTeamMembers) ? manageTeamMembers : []) {
+    const e = normalizeEmail(m?.email);
+    if (!e) continue;
+    const hasP = m?.product === true || m?.hasPackage === true;
+    teamByEmail.set(e, { hasProduct: hasP });
+  }
+
+  const mappingRows = await db(MAP_TABLE)
+    .where(MAP_COLS.ADOBE_ACCOUNT_ID, id)
+    .select(MAP_COLS.ORDER_ID, MAP_COLS.USER_EMAIL);
+
+  if (mappingRows.length === 0) {
+    return { updated: 0, onTeam: [], notOnTeam: [] };
+  }
+
+  const acc = await db(ACC_TABLE)
+    .select(ACC_COLS.ORG_NAME, ACC_COLS.ID_PRODUCT)
+    .where(ACC_COLS.ID, id)
+    .first();
+
+  const orgName = acc?.[ACC_COLS.ORG_NAME] ?? null;
+  const idProductStr =
+    ACC_COLS.ID_PRODUCT && acc?.[ACC_COLS.ID_PRODUCT] != null
+      ? String(acc[ACC_COLS.ID_PRODUCT]).trim()
+      : null;
+
+  const onTeamSet = new Set();
+  const notOnTeamSet = new Set();
+  for (const row of mappingRows) {
+    const em = normalizeEmail(row[MAP_COLS.USER_EMAIL]);
+    if (!em) continue;
+    if (teamByEmail.has(em)) onTeamSet.add(em);
+    else notOnTeamSet.add(em);
+  }
+
+  const orderIds = [
+    ...new Set(
+      mappingRows
+        .map((r) => String(r[MAP_COLS.ORDER_ID] || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (orderIds.length === 0) {
+    return { updated: 0, onTeam: [], notOnTeam: [] };
+  }
+
+  const existing = await db(TRACK_TABLE)
+    .select("order_id")
+    .whereIn(
+      "order_id",
+      orderIds.map((x) => String(x))
+    );
+  const existingSet = new Set(
+    (existing || []).map((r) => String(r.order_id || "").trim())
+  );
+  const missing = orderIds.filter((oid) => !existingSet.has(oid));
+  if (missing.length > 0) {
+    await upsertRenewAdobeOrderUserTrackingForOrderIds(missing);
+  }
+
+  let updated = 0;
+  const trx = await db.transaction();
+  try {
+    for (const row of mappingRows) {
+      const orderId = String(row[MAP_COLS.ORDER_ID] || "").trim();
+      const em = normalizeEmail(row[MAP_COLS.USER_EMAIL]);
+      if (!orderId || !em) continue;
+
+      const member = teamByEmail.get(em);
+      const status = !member
+        ? "chưa add"
+        : member.hasProduct
+          ? "có gói"
+          : "chưa cấp quyền";
+
+      const patch = {
+        status,
+        org_name: orgName,
+        update_at: trx.fn.now(),
+      };
+      if (idProductStr) {
+        patch.id_product = idProductStr;
+      }
+      const n = await trx(TRACK_TABLE)
+        .where("order_id", orderId)
+        .update(patch);
+      updated += n;
+    }
+    await trx.commit();
+  } catch (e) {
+    await trx.rollback();
+    throw e;
+  }
+
+  logger.info(
+    "[order-user-tracking] Reconcile theo team Adobe: adobeAccountId=%s updated=%d onTeam=%d notOnTeam=%d",
+    id,
+    updated,
+    onTeamSet.size,
+    notOnTeamSet.size
+  );
+
+  return {
+    updated,
+    onTeam: [...onTeamSet],
+    notOnTeam: [...notOnTeamSet],
+  };
+}
+
 async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds) {
   const variantIds = await getRenewAdobeVariantIds();
   if (!variantIds.length) return 0;
@@ -403,6 +539,7 @@ async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
 module.exports = {
   upsertRenewAdobeOrderUserTrackingForOrderIds,
   upsertRenewAdobeOrderUserTrackingForAccount,
+  reconcileOrderUserTrackingWithTeamMembers,
   syncAllRenewAdobeOrderUserTracking,
   getOrderUserTrackingCountsForAdminAccounts,
   normalizeOrgKeyForTracking,

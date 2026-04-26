@@ -14,6 +14,7 @@ const {
 } = require("./usersSnapshotUtils");
 const {
   upsertRenewAdobeOrderUserTrackingForAccount,
+  reconcileOrderUserTrackingWithTeamMembers,
 } = require("../../services/renew-adobe/orderUserTrackingService");
 const {
   syncRenewAdobeMappingFromTeamMembers,
@@ -47,6 +48,11 @@ function pickOverflowUserEmails(manageTeamMembers, contractActiveLicenseCount) {
     .map((item) => item.email);
 }
 
+/**
+ * 1) Đồng bộ user_account_mapping từ list team (check).
+ * 2) Upsert order_user_tracking từ order_list + mapping.
+ * 3) So sánh team Adobe với mapping → cập nhật lại status từng dòng tracking (on team / chưa add).
+ */
 async function syncMappingAndUpsertTracking(accountId, scrapedData, syncFromTeam) {
   if (syncFromTeam) {
     await syncRenewAdobeMappingFromTeamMembers(
@@ -59,6 +65,16 @@ async function syncMappingAndUpsertTracking(accountId, scrapedData, syncFromTeam
   await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((err) => {
     logger.warn("[renew-adobe] order_user_tracking: %s", err.message);
   });
+  if (syncFromTeam) {
+    return await reconcileOrderUserTrackingWithTeamMembers(
+      accountId,
+      scrapedData?.manageTeamMembers || []
+    ).catch((err) => {
+      logger.warn("[renew-adobe] reconcile order_user_tracking: %s", err.message);
+      return null;
+    });
+  }
+  return null;
 }
 
 async function markMappingProductFalse(accountId, userEmails) {
@@ -199,8 +215,7 @@ async function runCheckForAccountId(id) {
           scrapedData.licenseStatus,
           contractActiveLicenseCount
         );
-        await syncMappingAndUpsertTracking(id, scrapedData, true);
-        return;
+        return await syncMappingAndUpsertTracking(id, scrapedData, true);
       }
 
       logger.info(
@@ -317,7 +332,11 @@ async function runCheckForAccountId(id) {
     }
   }
 
-  await syncMappingAndUpsertTracking(id, scrapedData, hasActiveLicense);
+  return await syncMappingAndUpsertTracking(
+    id,
+    scrapedData,
+    hasActiveLicense
+  );
 }
 
 const runCheck = async (req, res) => {
@@ -330,7 +349,7 @@ const runCheck = async (req, res) => {
   }
 
   try {
-    await runCheckForAccountId(id);
+    const trackingReconcile = await runCheckForAccountId(id);
     const account = await db(TABLE).where(COLS.ID, id).first();
 
     return res.json({
@@ -340,6 +359,14 @@ const runCheck = async (req, res) => {
       org_name: account?.[COLS.ORG_NAME] ?? null,
       user_count: account?.[COLS.USER_COUNT] ?? 0,
       license_status: account?.[COLS.LICENSE_STATUS] ?? "unknown",
+      tracking_reconcile:
+        trackingReconcile && typeof trackingReconcile === "object"
+          ? {
+              updated: trackingReconcile.updated ?? 0,
+              onTeam: trackingReconcile.onTeam ?? [],
+              notOnTeam: trackingReconcile.notOnTeam ?? [],
+            }
+          : null,
     });
   } catch (err) {
     logger.error("[renew-adobe] Run check failed marker=%s", marker, {

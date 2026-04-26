@@ -395,4 +395,6 @@ module.exports = {
   isCcpLikeProduct,
   extractCcpSeatProductIdsFromOrgProductsList,
   resolveAuthoritativeCcpProductIdSet,
+  /** Dùng B15 (removeProductAdminFlow) + test ABP; trích id gói từ object product/assignment. */
+  extractProductId,
 };
