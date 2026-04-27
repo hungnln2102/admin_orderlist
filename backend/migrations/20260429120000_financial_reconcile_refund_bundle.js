@@ -20,14 +20,18 @@ const readSql = (filename) =>
   );
 
 exports.up = async function up(knex) {
-  const sql066 = readSql("066_payment_receipt_financial_audit_log.sql");
   const sql067 = readSql("067_supplier_order_cost_log_refund_note_only.sql");
   const sql068 = readSql("068_refund_columns_force_positive.sql");
   const sql069 = readSql("069_order_list_refund_force_positive.sql");
   const sql070 = readSql("070_fix_zero_import_when_no_refund.sql");
 
   // Consolidated execution for financial reconcile/refund rule pack.
-  await knex.raw(sql066);
+  const hasLegacyReceiptTable = await knex.schema
+    .withSchema("orders")
+    .hasTable("payment_receipt");
+  if (hasLegacyReceiptTable) {
+    await knex.raw(readSql("066_payment_receipt_financial_audit_log.sql"));
+  }
   await knex.raw(sql067);
   await knex.raw(sql068);
   await knex.raw(sql069);

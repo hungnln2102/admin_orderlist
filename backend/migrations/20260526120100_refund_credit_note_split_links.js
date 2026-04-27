@@ -7,17 +7,16 @@
 const fs = require("fs");
 const path = require("path");
 
-exports.up = async function up(knex) {
-  const sqlPath = path.join(
-    __dirname,
-    "..",
-    "..",
-    "database",
-    "migrations",
-    "085_refund_credit_note_split_links.sql"
+const readSql = (filename) =>
+  fs.readFileSync(
+    path.join(__dirname, "..", "..", "database", "migrations", filename),
+    "utf8"
   );
-  const sql = fs.readFileSync(sqlPath, "utf8");
-  await knex.raw(sql);
+
+exports.up = async function up(knex) {
+  await knex.raw(readSql("080_create_refund_credit_notes.sql"));
+  await knex.raw(readSql("081_create_refund_credit_applications.sql"));
+  await knex.raw(readSql("085_refund_credit_note_split_links.sql"));
 };
 
 exports.down = async function down() {

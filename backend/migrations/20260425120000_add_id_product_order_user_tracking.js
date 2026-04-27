@@ -9,6 +9,10 @@ exports.up = async function up(knex) {
         WHERE table_schema = 'system_automation'
           AND table_name = 'order_user_tracking'
           AND column_name = 'id_product'
+      ) AND EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'system_automation'
+          AND table_name = 'order_user_tracking'
       ) THEN
         ALTER TABLE ${TABLE}
           ADD COLUMN "id_product" TEXT NULL;

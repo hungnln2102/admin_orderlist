@@ -1,8 +1,7 @@
 const { EventEmitter } = require("events");
 
-describe("webhook sepay notifications", () => {
+describe("telegramOrderNotificationLib httpClient", () => {
   const originalFetch = global.fetch;
-  const originalAbortSignal = global.AbortSignal;
 
   afterEach(() => {
     jest.resetModules();
@@ -13,15 +12,9 @@ describe("webhook sepay notifications", () => {
     } else {
       global.fetch = originalFetch;
     }
-
-    if (typeof originalAbortSignal === "undefined") {
-      delete global.AbortSignal;
-    } else {
-      global.AbortSignal = originalAbortSignal;
-    }
   });
 
-  it("uses one https request and does not retry a Telegram payload through fetch", async () => {
+  it("sends a Telegram payload once through https and does not call fetch", async () => {
     const httpsRequest = jest.fn((options, callback) => {
       const req = new EventEmitter();
       req.setTimeout = jest.fn();
@@ -46,19 +39,10 @@ describe("webhook sepay notifications", () => {
     jest.doMock("dns", () => ({
       lookup: jest.fn((_hostname, _options, cb) => cb(null, "127.0.0.1", 4)),
     }));
-    jest.doMock("../../utils/logger", () => ({
-      warn: jest.fn(),
-      error: jest.fn(),
-      info: jest.fn(),
-      debug: jest.fn(),
-    }));
 
     global.fetch = jest.fn();
-    global.AbortSignal = {
-      timeout: jest.fn(() => ({ aborted: true })),
-    };
 
-    const { postJson } = require("../../../webhook/sepay/notifications");
+    const { postJson } = require("../../services/telegramOrderNotificationLib/httpClient");
     const response = await postJson("https://api.telegram.org/botTOKEN/sendMessage", {
       text: "test",
     });

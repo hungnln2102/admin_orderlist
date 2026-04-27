@@ -4,7 +4,6 @@
 
 const https = require("https");
 const dns = require("dns");
-const logger = require("../../utils/logger");
 const { HTTP_TIMEOUT_MS } = require("./constants");
 const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ABORT_ERR",
@@ -137,46 +136,13 @@ const sendWithHttps = (
   });
 
 /**
- * POST JSON; dùng fetch nếu có, fallback sendWithHttps khi lỗi tạm thời.
+ * POST JSON with one transport only.
+ * Telegram sendMessage/sendPhoto is not idempotent; retrying the same payload
+ * after a client timeout can create duplicate messages.
  */
 const postJson = async (url, data) => {
   const payload = JSON.stringify(data);
   const headers = { "Content-Type": "application/json" };
-
-  const timeoutSignal =
-    typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-      ? AbortSignal.timeout(HTTP_TIMEOUT_MS)
-      : undefined;
-
-  if (typeof fetch === "function") {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: payload,
-        signal: timeoutSignal,
-      });
-      if (!res.ok) {
-        const err = new Error(`Request failed with status ${res.status}`);
-        err.status = res.status;
-        err.body = await res.text().catch(() => "");
-        throw err;
-      }
-      return await res.text();
-    } catch (err) {
-      const code = getErrorCode(err);
-      if (!isTransientFetchError(err, timeoutSignal)) {
-        throw err;
-      }
-      logger.warn("[Order][Telegram] Fetch failed, retrying with https client", {
-        name: err?.name,
-        code,
-        status: err?.status,
-        message: err?.message,
-      });
-    }
-  }
-
   return sendWithHttps(url, payload, headers);
 };
 
