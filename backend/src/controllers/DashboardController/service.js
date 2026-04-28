@@ -139,39 +139,6 @@ const sumNccOrderMarginByLoggedAtRange = async (from, to) => {
   return toNumber(r.rows?.[0]?.s);
 };
 
-const sumWithdrawProfitBetweenDates = async ({ from, to }) => {
-  const row = await db(expenseTableName)
-    .where(expenseCols.EXPENSE_TYPE, "withdraw_profit")
-    .whereRaw(`DATE(${expenseCols.CREATED_AT}) >= ?`, [from])
-    .whereRaw(`DATE(${expenseCols.CREATED_AT}) <= ?`, [to])
-    .sum({ total: expenseCols.AMOUNT })
-    .first();
-  return toNumber(row?.total);
-};
-
-const fetchMonthlyWithdrawProfitPair = async ({ monthStartDate }) => {
-  const monthStart = parseYMDLocal(monthStartDate);
-  const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
-  const prevMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
-  const prevMonthEnd = new Date(monthStart.getTime() - MS_PER_DAY);
-
-  const [currentMonthWithdraw, previousMonthWithdraw] = await Promise.all([
-    sumWithdrawProfitBetweenDates({
-      from: toYMDDate(monthStart),
-      to: toYMDDate(new Date(nextMonthStart.getTime() - MS_PER_DAY)),
-    }),
-    sumWithdrawProfitBetweenDates({
-      from: toYMDDate(prevMonthStart),
-      to: toYMDDate(prevMonthEnd),
-    }),
-  ]);
-
-  return {
-    current: currentMonthWithdraw,
-    previous: previousMonthWithdraw,
-  };
-};
-
 const emptyMonthKpi = () => ({
   total_orders: 0,
   total_revenue: 0,
@@ -251,7 +218,7 @@ const fetchDashboardStats = async () => {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const [aggResult, tableRows, availableProfit, monthlyWithdraw] = await Promise.all([
+  const [aggResult, tableRows, availableProfit] = await Promise.all([
     db.raw(
       buildDashboardSummaryAggregateQuery(summaryCols, { useCreatedAt })
     ),
@@ -267,7 +234,6 @@ const fetchDashboardStats = async () => {
       )
       .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-    fetchMonthlyWithdrawProfitPair({ monthStartDate }),
   ]);
 
   const aggMap = new Map(
@@ -294,8 +260,6 @@ const fetchDashboardStats = async () => {
   const marginP = trP
     ? toNumber(trP[summaryCols.TOTAL_PROFIT])
     : netP - importP;
-  const profitC = marginC - monthlyWithdraw.current;
-  const profitP = marginP - monthlyWithdraw.previous;
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
@@ -305,7 +269,7 @@ const fetchDashboardStats = async () => {
       previous: importP,
     },
     totalRefund: { current: curr.total_refund, previous: prev.total_refund },
-    monthlyProfit: { current: profitC, previous: profitP },
+    monthlyProfit: { current: marginC, previous: marginP },
     monthlyTax: {
       current: taxFromRevenueValue(netC),
       previous: taxFromRevenueValue(netP),
@@ -325,8 +289,6 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const [
     result,
     availableProfit,
-    currentRangeWithdraw,
-    previousRangeWithdraw,
     sepayCurr,
     sepayPrev,
     importCurr,
@@ -336,8 +298,6 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   ] = await Promise.all([
     db.raw(buildRangeCompareStatsQuery({ useCreatedAt }), [from, to, p0, p1]),
     fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-    sumWithdrawProfitBetweenDates({ from, to }),
-    sumWithdrawProfitBetweenDates({ from: p0, to: p1 }),
     sumPaymentReceiptsByDateRange(from, to),
     sumPaymentReceiptsByDateRange(p0, p1),
     sumImportCostByLoggedAtRange(from, to),
@@ -351,8 +311,6 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const refundPrev = toNumber(row.total_refund_prev);
   const netRcurr = sepayCurr - refundCurr;
   const netRprev = sepayPrev - refundPrev;
-  const currProfit = nccMarginCurr - currentRangeWithdraw;
-  const prevProfit = nccMarginPrev - previousRangeWithdraw;
 
   return {
     totalOrders: {
@@ -368,7 +326,7 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
       current: refundCurr,
       previous: refundPrev,
     },
-    monthlyProfit: { current: currProfit, previous: prevProfit },
+    monthlyProfit: { current: nccMarginCurr, previous: nccMarginPrev },
     monthlyTax: {
       current: taxFromRevenueValue(netRcurr),
       previous: taxFromRevenueValue(netRprev),

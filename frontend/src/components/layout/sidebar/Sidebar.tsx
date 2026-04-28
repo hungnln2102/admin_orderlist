@@ -23,9 +23,7 @@ const getActiveSectionId = (currentPath: string, currentSearch: string) =>
   )?.id ?? null;
 
 const getDefaultOpenSectionId = () =>
-  menuSections.find(
-    (section) => section.id !== "overview" && section.defaultOpen
-  )?.id ?? null;
+  menuSections.find((section) => section.defaultOpen)?.id ?? null;
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
@@ -36,7 +34,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   );
   const [openSectionId, setOpenSectionId] = useState<string | null>(
     () =>
-      (activeSectionId && activeSectionId !== "overview"
+      (activeSectionId
         ? activeSectionId
         : getDefaultOpenSectionId()) ?? null
   );
@@ -47,7 +45,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       return;
     }
 
-    setOpenSectionId(activeSectionId === "overview" ? null : activeSectionId);
+    setOpenSectionId(activeSectionId);
   }, [activeSectionId]);
 
   const toggleSection = (sectionId: string) => {
@@ -122,7 +120,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <SidebarMenuSection
                     key={section.id}
                     section={section}
-                    isStaticSection={section.id === "overview"}
+                    isStaticSection={section.items.length === 1}
                     isOpenSection={openSectionId === section.id}
                     currentPath={location.pathname}
                     currentSearch={location.search}

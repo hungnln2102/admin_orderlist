@@ -4,6 +4,7 @@
 
 const https = require("https");
 const dns = require("dns");
+const net = require("net");
 const { HTTP_TIMEOUT_MS } = require("./constants");
 const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ABORT_ERR",
@@ -31,6 +32,26 @@ const dnsLookupOpts = (options, overrides) => {
   return out;
 };
 
+const normalizeLookupAddress = (address, family) => {
+  if (Array.isArray(address)) {
+    const normalized = address
+      .map((item) => normalizeLookupAddress(item))
+      .filter(Boolean);
+    return normalized.find((item) => item.family === 4) || normalized[0] || null;
+  }
+
+  const rawAddress = address && typeof address === "object" ? address.address : address;
+  const ip = typeof rawAddress === "string" ? rawAddress.trim() : "";
+  const detectedFamily = net.isIP(ip);
+
+  if (!detectedFamily) return null;
+
+  return {
+    address: ip,
+    family: detectedFamily || Number(family) || 4,
+  };
+};
+
 const preferIpv4Lookup = (hostname, options, cb) => {
   if (typeof hostname !== "string" || !hostname.trim()) {
     process.nextTick(() => cb(new TypeError("Invalid hostname for DNS lookup")));
@@ -41,18 +62,20 @@ const preferIpv4Lookup = (hostname, options, cb) => {
       cb(err);
       return;
     }
-    if (address == null || address === "") {
-      cb(new Error("DNS lookup returned no address"));
+    const resolved = normalizeLookupAddress(address, family);
+    if (!resolved) {
+      cb(new Error(`DNS lookup returned no valid address for ${hostname}`));
       return;
     }
-    cb(null, String(address), Number(family) || 4);
+    cb(null, resolved.address, resolved.family);
   };
 
   dns.lookup(hostname, dnsLookupOpts(options, { family: 4, all: false }), (err, address, family) => {
-    if (err || address == null || address === "") {
-      return dns.lookup(hostname, dnsLookupOpts(options, { all: false }), tryCb);
+    const resolved = normalizeLookupAddress(address, family);
+    if (err || !resolved) {
+      return dns.lookup(hostname, dnsLookupOpts(options, { all: true }), tryCb);
     }
-    tryCb(null, address, family);
+    tryCb(null, resolved.address, resolved.family);
   });
 };
 

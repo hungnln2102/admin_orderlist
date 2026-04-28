@@ -4,6 +4,7 @@ import {
   ArrowPathIcon,
   BanknotesIcon,
   ChartBarIcon,
+  CalculatorIcon,
   ClipboardDocumentIcon,
   CubeIcon,
   CurrencyDollarIcon,
@@ -15,6 +16,7 @@ import {
   NewspaperIcon,
   PencilSquareIcon,
   PhotoIcon,
+  ReceiptPercentIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   TicketIcon,
@@ -52,7 +54,11 @@ export const menuSections: MenuSection[] = [
     icon: ChartBarIcon,
     tone: "indigo",
     defaultOpen: true,
-    items: [{ name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon }],
+    items: [
+      { name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon },
+      { name: "Thuế", href: "/dashboard?tab=tax", icon: ReceiptPercentIcon },
+      { name: "Chi phí", href: "/dashboard?tab=expenses", icon: CalculatorIcon },
+    ],
   },
   {
     id: "sales",

@@ -51,4 +51,98 @@ describe("telegramOrderNotificationLib httpClient", () => {
     expect(global.fetch).not.toHaveBeenCalled();
     expect(httpsRequest).toHaveBeenCalledTimes(1);
   });
+
+  it("does not pass undefined DNS results to https lookup callback", async () => {
+    const dnsLookup = jest
+      .fn()
+      .mockImplementationOnce((_hostname, _options, cb) =>
+        cb(null, undefined, undefined)
+      )
+      .mockImplementationOnce((_hostname, _options, cb) =>
+        cb(null, [{ address: "149.154.167.220", family: 4 }], undefined)
+      );
+
+    const httpsRequest = jest.fn((options, callback) => {
+      const req = new EventEmitter();
+      req.setTimeout = jest.fn();
+      req.write = jest.fn();
+      req.destroy = jest.fn((err) => req.emit("error", err));
+      req.end = jest.fn(() => {
+        options.agent.lookup("api.telegram.org", {}, (err, address, family) => {
+          if (err) {
+            req.emit("error", err);
+            return;
+          }
+
+          expect(address).toBe("149.154.167.220");
+          expect(family).toBe(4);
+
+          const res = new EventEmitter();
+          res.statusCode = 200;
+          callback(res);
+          process.nextTick(() => {
+            res.emit("data", "ok");
+            res.emit("end");
+          });
+        });
+      });
+      return req;
+    });
+
+    jest.doMock("https", () => ({
+      request: httpsRequest,
+      Agent: jest.fn((options) => ({ lookup: options.lookup })),
+    }));
+    jest.doMock("dns", () => ({
+      lookup: dnsLookup,
+    }));
+
+    const { postJson } = require("../../services/telegramOrderNotificationLib/httpClient");
+    const response = await postJson("https://api.telegram.org/botTOKEN/sendMessage", {
+      text: "test",
+    });
+
+    expect(response).toBe("ok");
+    expect(dnsLookup).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects with a DNS error when lookup returns no valid IP address", async () => {
+    const dnsLookup = jest
+      .fn()
+      .mockImplementationOnce((_hostname, _options, cb) =>
+        cb(null, undefined, undefined)
+      )
+      .mockImplementationOnce((_hostname, _options, cb) =>
+        cb(null, [{ address: undefined, family: 4 }], undefined)
+      );
+
+    const httpsRequest = jest.fn((options) => {
+      const req = new EventEmitter();
+      req.setTimeout = jest.fn();
+      req.write = jest.fn();
+      req.destroy = jest.fn((err) => req.emit("error", err));
+      req.end = jest.fn(() => {
+        options.agent.lookup("api.telegram.org", {}, (err) => {
+          if (err) req.emit("error", err);
+        });
+      });
+      return req;
+    });
+
+    jest.doMock("https", () => ({
+      request: httpsRequest,
+      Agent: jest.fn((options) => ({ lookup: options.lookup })),
+    }));
+    jest.doMock("dns", () => ({
+      lookup: dnsLookup,
+    }));
+
+    const { postJson } = require("../../services/telegramOrderNotificationLib/httpClient");
+
+    await expect(
+      postJson("https://api.telegram.org/botTOKEN/sendMessage", {
+        text: "test",
+      })
+    ).rejects.toThrow("DNS lookup returned no valid address");
+  });
 });

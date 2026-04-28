@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
@@ -10,7 +11,15 @@ import { useMonthlySummary } from "../hooks/useMonthlySummary";
 import { useWalletBalances } from "../hooks/useWalletBalances";
 import { useSavingGoals } from "../hooks/useSavingGoals";
 
+type DashboardSection = "overview" | "finance";
+
+const getDashboardSectionFromSearch = (search: string): DashboardSection => {
+  const tab = new URLSearchParams(search).get("tab");
+  return tab === "expenses" ? "finance" : "overview";
+};
+
 const Dashboard: React.FC = () => {
+  const location = useLocation();
   const {
     statsData,
     revenueChartData,
@@ -32,7 +41,13 @@ const Dashboard: React.FC = () => {
   const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
   const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
-  const [activeSection, setActiveSection] = useState<"overview" | "finance">("overview");
+  const [activeSection, setActiveSection] = useState<DashboardSection>(() =>
+    getDashboardSectionFromSearch(location.search)
+  );
+
+  useEffect(() => {
+    setActiveSection(getDashboardSectionFromSearch(location.search));
+  }, [location.search]);
 
   if (loading) {
     return (
