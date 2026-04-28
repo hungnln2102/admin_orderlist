@@ -9,6 +9,7 @@ const idSupplyCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
 const idProductCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
 const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
 const orderDateCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ORDER_DATE;
+const createdAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CREATED_AT;
 const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
 const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
 const expiryCol = ORDERS_SCHEMA.ORDER_LIST.COLS.EXPIRY_DATE;
@@ -23,8 +24,9 @@ const paymentReceiptOrderCodeCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ORDER_CODE
 const paymentReceiptAmountCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
 const paymentReceiptPaidDateCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.PAID_DATE;
 const paymentReceiptIdCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ID;
+const taxOrderPatterns = ["MAVC%", "MAVL%", "MAVK%", "MAVS%"];
 
-const buildOrdersListQuery = async (scope = "") => {
+const buildOrdersListQuery = async (scope = "", options = {}) => {
     const normalizedScope = String(scope || "").toLowerCase();
     const table = TABLES.orderList;
     const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
@@ -113,10 +115,26 @@ const buildOrdersListQuery = async (scope = "") => {
                 });
             })
         );
+    } else if (normalizedScope === "mavn_paid" || normalizedScope === "mavn_expense") {
+        query = query
+            .where(statusCol, STATUS.PAID)
+            .whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]);
     } else if (normalizedScope === "import" || normalizedScope === "nhap") {
         query = query
             .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED])
             .whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]);
+    } else if (normalizedScope === "tax") {
+        query = query.where((qb) => {
+            taxOrderPatterns.forEach((pattern) => {
+                qb.orWhereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [pattern]);
+            });
+        });
+        if (options.from) {
+            query = query.whereRaw(
+                `COALESCE(${table}.${createdAtCol}::date, ${table}.${orderDateCol}::date) >= ?::date`,
+                [options.from]
+            );
+        }
     } else if (normalizedScope === "package_match" || normalizedScope === "for_packages") {
         // Gói sản phẩm: chỉ đơn còn xử lý (Cần Gia Hạn, Đã Thanh Toán, Đang Xử Lý); bỏ import.
         query = query
@@ -131,6 +149,7 @@ const buildOrdersListQuery = async (scope = "") => {
     const selectQuery = query.select(
         `${table}.*`,
         db.raw(`${table}.order_date::text as order_date_raw`),
+        db.raw(`${table}.${createdAtCol}::text as created_at_raw`),
         db.raw(`${table}.${expiryCol}::text as expiry_date_raw`),
         db.raw(`${table}.${idProductCol}::text as variant_id`),
         db.raw(
@@ -174,6 +193,18 @@ const buildOrdersListQuery = async (scope = "") => {
     if (normalizedScope === "canceled" || normalizedScope === "cancelled") {
         return selectQuery
             .orderByRaw(`${table}.${canceledAtCol} DESC NULLS LAST`)
+            .orderBy(`${table}.${idCol}`, "desc");
+    }
+
+    if (normalizedScope === "tax") {
+        return selectQuery
+            .orderByRaw(`COALESCE(${table}.${createdAtCol}::date, ${table}.${orderDateCol}::date) ASC NULLS LAST`)
+            .orderBy(`${table}.${idCol}`, "asc");
+    }
+
+    if (normalizedScope === "mavn_paid" || normalizedScope === "mavn_expense") {
+        return selectQuery
+            .orderByRaw(`COALESCE(${table}.${createdAtCol}::timestamptz, ${table}.${orderDateCol}::timestamptz) DESC NULLS LAST`)
             .orderBy(`${table}.${idCol}`, "desc");
     }
 

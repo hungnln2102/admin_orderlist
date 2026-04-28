@@ -19,6 +19,7 @@ const {
   updateDashboardMonthlySummaryOnStatusChange,
   recomputeSummaryMonthTotalTax,
 } = require("../Order/finance/dashboardSummary");
+const { syncMavnStoreProfitExpense } = require("../Order/orderFinanceHelpers");
 const { runRenewal } = require("../../../webhook/sepay/renewal");
 
 const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
@@ -785,6 +786,7 @@ const reconcilePaymentReceipt = async (req, res) => {
         }
 
         await updateDashboardMonthlySummaryOnStatusChange(trx, orderRow, updatedOrder);
+        await syncMavnStoreProfitExpense(trx, orderRow, updatedOrder);
         statusValue = STATUS.PAID;
         actionResult.statusAfterAction = statusValue;
 

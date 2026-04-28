@@ -8,6 +8,10 @@ const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   FOUR_DAYS_TOPIC_ID,
+  QR_ACCOUNT_NUMBER,
+  QR_BANK_CODE,
+  QR_ACCOUNT_NAME,
+  QR_NOTE_PREFIX,
 } = require("./constants");
 const { toSafeString } = require("./formatters");
 const { buildDueOrderMessage } = require("./messageBuilders");
@@ -31,6 +35,13 @@ async function sendFourDaysRemainingNotification(orders = []) {
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     FOUR_DAYS_TOPIC_ID,
+  });
+  logger.info("[Order][Telegram] QR runtime config", {
+    accountNumber: QR_ACCOUNT_NUMBER,
+    bankCode: QR_BANK_CODE,
+    accountName: QR_ACCOUNT_NAME,
+    notePrefix: QR_NOTE_PREFIX,
+    pid: process.pid,
   });
 
   if (!SEND_ORDER_NOTIFICATION || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {

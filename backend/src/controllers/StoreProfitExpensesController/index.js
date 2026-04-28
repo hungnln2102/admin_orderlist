@@ -10,7 +10,11 @@ const VN_DATE_FROM_CREATED_AT_SQL =
 
 const normalizeExpenseType = (value) => {
   const normalized = normalizeTextInput(value || "").toLowerCase();
-  if (normalized === "withdraw_profit" || normalized === "external_import") {
+  if (
+    normalized === "withdraw_profit" ||
+    normalized === "external_import" ||
+    normalized === "mavn_import"
+  ) {
     return normalized;
   }
   return "";
@@ -27,6 +31,8 @@ const mapExpenseRow = (row) => ({
   reason: row.reason || "",
   expenseDate: row.expense_date || null,
   expenseType: row.expense_type || "",
+  linkedOrderCode: row.linked_order_code ?? null,
+  expenseMeta: row.expense_meta ?? null,
   createdAt: row.created_at || null,
 });
 
@@ -49,6 +55,8 @@ const listStoreProfitExpenses = async (req, res) => {
           COLS.AMOUNT,
           COLS.REASON,
           COLS.EXPENSE_TYPE,
+          COLS.LINKED_ORDER_CODE,
+          COLS.EXPENSE_META,
           COLS.CREATED_AT,
           db.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
         )
@@ -83,6 +91,12 @@ const createStoreProfitExpense = async (req, res) => {
   const expenseType =
     normalizeExpenseType(req.body?.expense_type) || "withdraw_profit";
 
+  if (expenseType === "mavn_import") {
+    return res.status(400).json({
+      error: "Loại mavn_import chỉ được tạo tự động từ đơn MAVN Đã Thanh Toán.",
+    });
+  }
+
   try {
     const [created] = await db(TABLE)
       .insert({
@@ -98,6 +112,8 @@ const createStoreProfitExpense = async (req, res) => {
         COLS.AMOUNT,
         COLS.REASON,
         COLS.EXPENSE_TYPE,
+        COLS.LINKED_ORDER_CODE,
+        COLS.EXPENSE_META,
         COLS.CREATED_AT,
         db.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
       )

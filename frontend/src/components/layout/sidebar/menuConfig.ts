@@ -6,6 +6,8 @@ import {
   ChartBarIcon,
   CalculatorIcon,
   ClipboardDocumentIcon,
+  MagnifyingGlassIcon,
+  QueueListIcon,
   CubeIcon,
   CurrencyDollarIcon,
   DocumentIcon,
@@ -56,8 +58,8 @@ export const menuSections: MenuSection[] = [
     defaultOpen: true,
     items: [
       { name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon },
-      { name: "Thuế", href: "/dashboard?tab=tax", icon: ReceiptPercentIcon },
-      { name: "Chi phí", href: "/dashboard?tab=expenses", icon: CalculatorIcon },
+      { name: "Thuế", href: "/tax", icon: ReceiptPercentIcon },
+      { name: "Chi phí", href: "/expenses", icon: CalculatorIcon },
     ],
   },
   {
@@ -152,6 +154,16 @@ export const menuSections: MenuSection[] = [
         name: "Danh sách Admin Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
+      },
+      {
+        name: "Đơn Renew Adobe",
+        href: "/renew-orders",
+        icon: QueueListIcon,
+      },
+      {
+        name: "Kiểm tra Renew (storefront)",
+        href: "/renew-adobe-check",
+        icon: MagnifyingGlassIcon,
       },
       {
         name: "Sản phẩm hệ thống",

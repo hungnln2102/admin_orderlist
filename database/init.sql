@@ -42,6 +42,8 @@
 \i /docker-entrypoint-initdb.d/migrations/084_order_list_gross_selling_price.sql
 \i /docker-entrypoint-initdb.d/migrations/085_refund_credit_note_split_links.sql
 \i /docker-entrypoint-initdb.d/migrations/086_webhook_finance_processing_paid_flow.sql
+\i /docker-entrypoint-initdb.d/migrations/087_mavn_preserve_logged_at_on_cost_update.sql
+\i /docker-entrypoint-initdb.d/migrations/088_store_profit_expenses_mavn_import.sql
 
 -- 3. Default seed data.
 \i /docker-entrypoint-initdb.d/seeds/seed_hero_banners_website_defaults.sql

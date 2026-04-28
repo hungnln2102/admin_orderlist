@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
@@ -15,10 +15,10 @@ type DashboardSection = "overview" | "finance";
 
 const getDashboardSectionFromSearch = (search: string): DashboardSection => {
   const tab = new URLSearchParams(search).get("tab");
-  return tab === "expenses" ? "finance" : "overview";
+  return tab === "finance" ? "finance" : "overview";
 };
 
-const Dashboard: React.FC = () => {
+const DashboardContent: React.FC = () => {
   const location = useLocation();
   const {
     statsData,
@@ -115,6 +115,17 @@ const Dashboard: React.FC = () => {
       )}
     </div>
   );
+};
+
+const Dashboard: React.FC = () => {
+  const location = useLocation();
+  const tab = new URLSearchParams(location.search).get("tab");
+
+  if (tab === "tax" || tab === "expenses") {
+    return <Navigate to={tab === "tax" ? "/tax" : "/expenses"} replace />;
+  }
+
+  return <DashboardContent />;
 };
 
 export default Dashboard;

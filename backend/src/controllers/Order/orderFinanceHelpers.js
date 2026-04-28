@@ -8,6 +8,7 @@ const {
     recordSupplierPaymentOnCompletion,
 } = require("./finance/supplierDebt");
 const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
+const { syncMavnStoreProfitExpense } = require("./finance/mavnStoreExpenseSync");
 
 module.exports = {
     ceilToThousands,
@@ -20,4 +21,5 @@ module.exports = {
     addSupplierImportOnProcessing,
     recordSupplierPaymentOnCompletion,
     updateDashboardMonthlySummaryOnStatusChange,
+    syncMavnStoreProfitExpense,
 };

@@ -99,11 +99,17 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
 }) => {
   const theme = SECTION_THEME_MAP[section.tone];
   const SectionIcon = section.icon;
-  const isSectionActive = section.items.some(
-    (item) =>
-      currentPath === item.href ||
-      matchesHref(currentPath, currentSearch, item.href)
-  );
+  const isItemActive = (href: string) => {
+    const [itemPath] = href.split("?");
+    const hasQueryVariantForPath = section.items.some(
+      (item) => item.href.startsWith(`${itemPath}?`)
+    );
+    if (hasQueryVariantForPath || href.includes("?")) {
+      return matchesHref(currentPath, currentSearch, href);
+    }
+    return currentPath === href || matchesHref(currentPath, currentSearch, href);
+  };
+  const isSectionActive = section.items.some((item) => isItemActive(item.href));
   const rowStateClass =
     isSectionActive || isOpenSection
       ? `${theme.rowGlow} shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]`
@@ -111,9 +117,7 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
 
   if (isStaticSection) {
     const item = section.items[0];
-    const isActive =
-      currentPath === item.href ||
-      matchesHref(currentPath, currentSearch, item.href);
+    const isActive = isItemActive(item.href);
 
     return (
       <Link
@@ -204,9 +208,7 @@ const SidebarMenuSection: React.FC<SidebarMenuSectionProps> = ({
               />
               <div className="relative space-y-1.5">
                 {section.items.map((item) => {
-                  const isActive =
-                    currentPath === item.href ||
-                    matchesHref(currentPath, currentSearch, item.href);
+                  const isActive = isItemActive(item.href);
 
                   return (
                     <Link

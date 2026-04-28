@@ -6,6 +6,8 @@ const deleteOrderWithArchive = async ({
 }) => {
     const { TABLES, ORDERS_SCHEMA, STATUS } = helpers;
     const { adjustSupplierDebtIfNeeded } = require("./orderFinanceHelpers");
+    const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
+    const { isMavnImportOrder } = require("../../utils/orderHelpers");
     const { calcRemainingRefund } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
@@ -53,6 +55,17 @@ const deleteOrderWithArchive = async ({
         normalizedStatus === STATUS.EXPIRED;
 
     if (isHardDelete) {
+        const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
+        const eCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+        if (isMavnImportOrder(order)) {
+            const code = String(order?.[idOrderCol] ?? "").trim();
+            if (code) {
+                await trx(expenseTable)
+                    .where(eCols.EXPENSE_TYPE, "mavn_import")
+                    .where(eCols.LINKED_ORDER_CODE, code)
+                    .del();
+            }
+        }
         await trx(TABLES.orderList).where({ id: orderId }).del();
         await trx.commit();
         return { success: true, movedTo: "deleted", deletedOrder: normalized };

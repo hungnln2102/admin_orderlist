@@ -85,6 +85,8 @@ const FINANCE_SCHEMA = {
       AMOUNT: "amount",
       REASON: "reason",
       EXPENSE_TYPE: "expense_type",
+      LINKED_ORDER_CODE: "linked_order_code",
+      EXPENSE_META: "expense_meta",
       CREATED_AT: "created_at",
     },
   },

@@ -8,6 +8,8 @@ const PageLoader = () => (
 );
 
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
+const TaxPage = lazy(() => import("@/features/tax/pages/TaxPage"));
+const ExpensesPage = lazy(() => import("@/features/expenses/pages/ExpensesPage"));
 const Orders = lazy(() => import("@/features/orders/index.tsx"));
 const PackageProduct = lazy(() => import("@/features/package-product/index.tsx"));
 const ProductInfo = lazy(() => import("@/features/product-info/index.ts"));
@@ -24,6 +26,10 @@ const AddMcoin = lazy(() => import("@/features/add-mcoin/index.tsx"));
 const ActiveKeys = lazy(() => import("@/features/active-keys/index.tsx"));
 const IpWhitelistPage = lazy(() => import("@/features/ip-whitelist/pages/IpWhitelistPage").then(m => ({ default: m.IpWhitelistPage })));
 const RenewAdobeAdminPage = lazy(() => import("@/features/renew-adobe/pages/RenewAdobeAdminPage"));
+const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/RenewOrdersDeskPage"));
+const RenewProfileCheckDeskPage = lazy(
+  () => import("@/features/renew-adobe/storefront-check/RenewProfileCheckDeskPage"),
+);
 const ProductSystem = lazy(() => import("@/features/product-system/index.tsx"));
 const ArticlesPage = lazy(() => import("@/features/content/pages/ArticlesPage"));
 const CreateArticlePage = lazy(() => import("@/features/content/pages/CreateArticlePage"));
@@ -36,6 +42,8 @@ export function AppRoutes() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/tax" element={<TaxPage />} />
+        <Route path="/expenses" element={<ExpensesPage />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/package-products" element={<PackageProduct />} />
         <Route path="/product-info" element={<ProductInfo />} />
@@ -52,6 +60,8 @@ export function AppRoutes() {
         <Route path="/active-keys" element={<ActiveKeys />} />
         <Route path="/ip-whitelist" element={<IpWhitelistPage />} />
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
+        <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
+        <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
         <Route path="/product-system" element={<ProductSystem />} />
         <Route path="/content/articles" element={<ArticlesPage />} />
         <Route path="/content/create" element={<CreateArticlePage />} />

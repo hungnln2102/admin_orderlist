@@ -40,14 +40,16 @@ const fromEnv = rawFrontends
  * 127.0.0.1 khác origin với localhost nên thêm cả hai.
  */
 const devOriginExtras = isProd
-  ? []
-  : [
+    ? []
+    : [
       "http://localhost:4001",
       "http://127.0.0.1:4001",
       "http://localhost:5173",
       "http://127.0.0.1:5173",
       "http://localhost:4000",
       "http://127.0.0.1:4000",
+      "http://localhost:6001",
+      "http://127.0.0.1:6001",
     ]
       .map(normalizeOrigin)
       .filter(Boolean);

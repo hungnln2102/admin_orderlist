@@ -22,6 +22,7 @@ const {
     applyRefundCreditToTargetOrder,
     normalizeMoney,
 } = require("../finance/refundCredits");
+const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
@@ -184,6 +185,10 @@ const attachCreateOrderRoute = (router) => {
                     appliedBy: "system-create-order",
                 });
                 refundCreditApplication = applyRefundResult.application;
+            }
+
+            if (isMavnCreate && newOrder.status === STATUS.PAID) {
+                await syncMavnStoreProfitExpense(trx, null, newOrder);
             }
 
             await trx.commit();

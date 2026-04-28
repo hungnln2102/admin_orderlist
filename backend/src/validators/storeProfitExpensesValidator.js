@@ -1,6 +1,9 @@
 const { body, param, query, validate } = require("../middleware/validateRequest");
 
-const EXPENSE_TYPES = ["withdraw_profit", "external_import"];
+/** Lọc GET — bao gồm mavn_import (đồng bộ đơn nhập). */
+const EXPENSE_TYPES = ["withdraw_profit", "external_import", "mavn_import"];
+/** POST — không cho tạo tay mavn_import (chỉ tự động). */
+const EXPENSE_TYPES_CREATABLE = ["withdraw_profit", "external_import"];
 
 const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,7 +33,7 @@ const createStoreProfitExpenseRules = [
     .withMessage("reason không hợp lệ."),
   body("expense_type")
     .optional()
-    .isIn(EXPENSE_TYPES)
+    .isIn(EXPENSE_TYPES_CREATABLE)
     .withMessage("expense_type phải là withdraw_profit hoặc external_import."),
   validate,
 ];

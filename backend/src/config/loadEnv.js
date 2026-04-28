@@ -16,16 +16,19 @@ const configEnvFile = (fileName, options = {}) =>
   });
 
 function loadBackendEnv() {
-  const explicitPath = process.env.BACKEND_ENV_FILE || process.env.DOTENV_CONFIG_PATH;
-  if (explicitPath) {
-    dotenv.config({ path: explicitPath, override: true, quiet: true });
-    return;
-  }
-
   configEnvFile(".env");
 
   if (isProductionLike()) {
     configEnvFile(".env.docker", { override: true });
+    return;
+  }
+
+  const explicitPath = (process.env.BACKEND_ENV_FILE || process.env.DOTENV_CONFIG_PATH || "").trim();
+  if (explicitPath) {
+    const resolved = path.isAbsolute(explicitPath)
+      ? explicitPath
+      : path.resolve(backendRoot, explicitPath);
+    dotenv.config({ path: resolved, override: true, quiet: true });
     return;
   }
 

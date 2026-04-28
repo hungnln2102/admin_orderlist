@@ -18,7 +18,12 @@ const updateOrderWithFinance = async ({
         normalizeTextInput,
         resolveProductToVariantId,
     } = helpers;
-    const { addSupplierImportOnProcessing, recordSupplierPaymentOnCompletion, updateDashboardMonthlySummaryOnStatusChange } = require("./orderFinanceHelpers");
+    const {
+        addSupplierImportOnProcessing,
+        recordSupplierPaymentOnCompletion,
+        updateDashboardMonthlySummaryOnStatusChange,
+        syncMavnStoreProfitExpense,
+    } = require("./orderFinanceHelpers");
     const logger = require("../../utils/logger");
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
@@ -86,6 +91,7 @@ const updateOrderWithFinance = async ({
         await addSupplierImportOnProcessing(trx, beforeOrder, updatedOrder);
         await recordSupplierPaymentOnCompletion(trx, beforeOrder, updatedOrder);
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
+        await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
     } catch (debtErr) {
         logger.error("Lỗi cập nhật công nợ NCC", {
             id,
