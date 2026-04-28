@@ -52,6 +52,14 @@ const normalizeLookupAddress = (address, family) => {
   };
 };
 
+const completeLookup = (options, cb, resolved) => {
+  if (options?.all === true) {
+    cb(null, [resolved]);
+    return;
+  }
+  cb(null, resolved.address, resolved.family);
+};
+
 const preferIpv4Lookup = (hostname, options, cb) => {
   if (typeof hostname !== "string" || !hostname.trim()) {
     process.nextTick(() => cb(new TypeError("Invalid hostname for DNS lookup")));
@@ -67,7 +75,7 @@ const preferIpv4Lookup = (hostname, options, cb) => {
       cb(new Error(`DNS lookup returned no valid address for ${hostname}`));
       return;
     }
-    cb(null, resolved.address, resolved.family);
+    completeLookup(options, cb, resolved);
   };
 
   dns.lookup(hostname, dnsLookupOpts(options, { family: 4, all: false }), (err, address, family) => {

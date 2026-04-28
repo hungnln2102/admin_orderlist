@@ -106,6 +106,53 @@ describe("telegramOrderNotificationLib httpClient", () => {
     expect(dnsLookup).toHaveBeenCalledTimes(2);
   });
 
+  it("returns address arrays when Node requests lookup with all=true", async () => {
+    const dnsLookup = jest.fn((_hostname, _options, cb) =>
+      cb(null, "149.154.167.220", 4)
+    );
+
+    const httpsRequest = jest.fn((options, callback) => {
+      const req = new EventEmitter();
+      req.setTimeout = jest.fn();
+      req.write = jest.fn();
+      req.destroy = jest.fn((err) => req.emit("error", err));
+      req.end = jest.fn(() => {
+        options.agent.lookup("api.telegram.org", { all: true }, (err, addresses) => {
+          if (err) {
+            req.emit("error", err);
+            return;
+          }
+
+          expect(addresses).toEqual([{ address: "149.154.167.220", family: 4 }]);
+
+          const res = new EventEmitter();
+          res.statusCode = 200;
+          callback(res);
+          process.nextTick(() => {
+            res.emit("data", "ok");
+            res.emit("end");
+          });
+        });
+      });
+      return req;
+    });
+
+    jest.doMock("https", () => ({
+      request: httpsRequest,
+      Agent: jest.fn((options) => ({ lookup: options.lookup })),
+    }));
+    jest.doMock("dns", () => ({
+      lookup: dnsLookup,
+    }));
+
+    const { postJson } = require("../../services/telegramOrderNotificationLib/httpClient");
+    const response = await postJson("https://api.telegram.org/botTOKEN/sendMessage", {
+      text: "test",
+    });
+
+    expect(response).toBe("ok");
+  });
+
   it("rejects with a DNS error when lookup returns no valid IP address", async () => {
     const dnsLookup = jest
       .fn()
