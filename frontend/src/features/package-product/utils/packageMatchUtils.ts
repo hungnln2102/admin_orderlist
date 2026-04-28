@@ -281,6 +281,7 @@ export function computeAugmentationForPackage(input: ComputeAugmentationInput): 
           sourceOrderId: orderRecord.base?.id ?? null,
           sourceOrderCode:
             (orderRecord.base?.id_order as string | number | null) ?? null,
+          sourceOrderStartYmd: orderRecord.registrationDateYmd ?? null,
           displayColumn,
           matchColumn,
           capacityUnits,

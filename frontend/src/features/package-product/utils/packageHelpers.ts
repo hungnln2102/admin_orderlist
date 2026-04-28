@@ -51,6 +51,7 @@ export type PackageSlotAssignment = {
   matchValue?: string | null;
   sourceOrderId?: number | string | null;
   sourceOrderCode?: string | number | null;
+  sourceOrderStartYmd?: string | null;
   /** Giá trị cột thông tin đối nghĩa với chế độ match: hiển thị trên thẻ vị trí. */
   displayColumn: "slot" | "information";
   matchColumn: "slot" | "information";
@@ -87,6 +88,7 @@ export type NormalizedOrderRecord = {
   informationMatchKey: string;
   customerDisplay: string;
   productCodeNormalized: string;
+  registrationDateYmd?: string | null;
   /** product.id từ variant; khớp với packageRow.productId để gán đơn cùng dòng sản phẩm. */
   lineProductId: number | null;
 };

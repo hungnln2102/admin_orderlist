@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { CheckIcon } from "@heroicons/react/24/solid";
 import { apiFetch } from "@/shared/api/client";
 import {
-  getAllocatedTotal,
+  addDaysUtc,
   getCostPeriodAmount,
   type PeriodColumn as AllocPeriodColumn,
 } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
@@ -20,7 +21,10 @@ import {
   type OrderListItem,
   type PackageRow,
 } from "@/features/package-product/utils/packageHelpers";
-import { computeAugmentationForPackage } from "@/features/package-product/utils/packageMatchUtils";
+import {
+  computeAugmentationForPackage,
+  orderBelongsToPackageByProduct,
+} from "@/features/package-product/utils/packageMatchUtils";
 
 type ViewMode = "day" | "month";
 type FixedColumnKey =
@@ -66,15 +70,17 @@ type ExpenseFormRow = {
   term: string;
   startDate: string;
   slotLabel: string;
+  slotStartYmd?: string | null;
+  slotEndYmd?: string | null;
   totalCost: number;
   termDays: number;
   startDateYmd: string;
+  endDateYmd?: string | null;
 };
 
-const START_DATE = new Date(2026, 3, 22);
+const START_DATE = new Date(2026, 3, 23);
 const DATE_COLUMN_WIDTH = 102;
 const MONTH_COLUMN_WIDTH = 124;
-const REMAINING_COLUMN_WIDTH = 136;
 const DATA_ROW_HEIGHT = 37;
 const DATA_VISIBLE_ROWS = 10;
 
@@ -110,6 +116,25 @@ const normalizeYmd = (value: string | null | undefined) => {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return match ? `${match[1]}-${match[2]}-${match[3]}` : String(value);
 };
+
+const doesRangeOverlapColumn = (
+  startYmd: string | null | undefined,
+  endYmd: string | null | undefined,
+  column: PeriodColumn,
+) => {
+  if (!startYmd) return false;
+  const end = endYmd || startYmd;
+  if (end < startYmd) return false;
+  return startYmd <= column.endKey && end >= column.startKey;
+};
+
+const hasSlotInPeriod = (row: ExpenseFormRow, column: PeriodColumn) =>
+  Boolean(row.slotLabel) &&
+  doesRangeOverlapColumn(
+    row.slotStartYmd || row.startDateYmd,
+    row.slotEndYmd,
+    column,
+  );
 
 const buildDateColumns = (): PeriodColumn[] => {
   const today = new Date();
@@ -175,6 +200,14 @@ const buildPackageOrderRecord = (order: OrderListItem): NormalizedOrderRecord =>
   const idProduct = (order.id_product ?? o.idProduct ?? "") as string;
   const informationOrder =
     (order.information_order ?? o.informationOrder ?? "") as string;
+  const registrationDateYmd = normalizeYmd(
+    (o.registration_date as string | null | undefined) ??
+      (o.order_date_raw as string | null | undefined) ??
+      (o.order_date as string | null | undefined) ??
+      (o.created_at_raw as string | null | undefined) ??
+      (o.created_at as string | null | undefined) ??
+      "",
+  );
   const rawLinePid = o.line_product_id ?? o.lineProductId;
   const parsedLineProductId =
     rawLinePid != null && rawLinePid !== "" ? Number(rawLinePid) : NaN;
@@ -199,6 +232,7 @@ const buildPackageOrderRecord = (order: OrderListItem): NormalizedOrderRecord =>
     informationMatchKey: normalizeMatchKey(informationOrder),
     customerDisplay: toCleanString(order.customer as string | null),
     productCodeNormalized: normalizeProductCodeValue(idProduct),
+    registrationDateYmd: registrationDateYmd || null,
     lineProductId,
   };
 };
@@ -237,12 +271,6 @@ const buildComputedPackages = (
   }));
 };
 
-const getImportOrderProductId = (order: OrderListRow) => {
-  const raw = order.line_product_id ?? order.lineProductId;
-  const value = raw != null && raw !== "" ? Number(raw) : NaN;
-  return Number.isFinite(value) && value > 0 ? value : null;
-};
-
 const getImportOrderAccountKeys = (order: OrderListRow) =>
   [
     normalizeMatchKey(order.slot == null ? "" : String(order.slot)),
@@ -263,11 +291,12 @@ const findPackageForImportOrder = (
   order: OrderListRow,
   packages: AugmentedRow[],
 ) => {
-  const productId = getImportOrderProductId(order);
-  const productCandidates =
-    productId != null
-      ? packages.filter((pkg) => Number(pkg.productId) === productId)
-      : packages;
+  const orderRecord = buildPackageOrderRecord(order as OrderListItem);
+  const productCandidates = packages.filter((pkg) =>
+    orderBelongsToPackageByProduct(orderRecord, pkg),
+  );
+  if (productCandidates.length === 0) return null;
+
   const accountKeys = getImportOrderAccountKeys(order);
 
   if (accountKeys.length > 0) {
@@ -280,7 +309,7 @@ const findPackageForImportOrder = (
     if (accountMatched) return accountMatched;
   }
 
-  return productCandidates[0] ?? null;
+  return null;
 };
 
 const buildSlotRowsForImportOrder = (
@@ -320,23 +349,29 @@ const buildSlotRowsForImportOrder = (
   };
 
   if (!matchedPackage) {
-    return [
-      {
-        key: `ol-${order.id ?? 0}-${orderCode}-slot-1`,
-        ...baseRow,
-        slotLabel: toCleanString(order.slot),
-        totalCost,
-      },
-    ];
+    return [];
   }
 
   return Array.from({ length: slotLimit }, (_, index) => {
     const assignment = slotAssignments[index] ?? null;
+    const assignedStartYmd = normalizeYmd(assignment?.sourceOrderStartYmd ?? "");
+    const scheduledSlotEndYmd =
+      baseRow.startDateYmd && baseRow.termDays > 0
+        ? addDaysUtc(baseRow.startDateYmd, baseRow.termDays - 1)
+        : null;
+    const endDateYmd = assignment
+      ? assignedStartYmd
+        ? addDaysUtc(assignedStartYmd, -1)
+        : addDaysUtc(baseRow.startDateYmd, -1)
+      : null;
     return {
       key: `ol-${order.id ?? 0}-${orderCode}-slot-${index + 1}`,
       ...baseRow,
       slotLabel: assignment?.slotLabel ? String(assignment.slotLabel).trim() : "",
+      slotStartYmd: assignment ? assignedStartYmd || baseRow.startDateYmd : null,
+      slotEndYmd: assignment ? scheduledSlotEndYmd : null,
       totalCost: slotCost,
+      endDateYmd,
     };
   });
 };
@@ -350,16 +385,6 @@ const ordersFromOrderList = (
     if (!orderCode) return [];
     return buildSlotRowsForImportOrder(order, packages);
   });
-
-const remainderLabel = (
-  row: ExpenseFormRow,
-  columns: AllocPeriodColumn[],
-): string => {
-  const allocation = row.totalCost || 0;
-  if (!(allocation > 0)) return "";
-  const allocated = getAllocatedTotal(row, columns);
-  return formatMoney(Math.max(0, allocation - allocated));
-};
 
 export const ExpenseCostAllocationTable: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -434,9 +459,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
     return years.length > 0 ? years.join(" - ") : "2026";
   }, [periodColumns]);
   const tableMinWidth =
-    FIXED_COLUMNS_WIDTH +
-    periodColumns.length * periodColumnWidth +
-    REMAINING_COLUMN_WIDTH;
+    FIXED_COLUMNS_WIDTH + periodColumns.length * periodColumnWidth;
   const columnKeys = periodColumns.map((column) => column.key).join("|");
   const fixedDisplayRows = useMemo(() => orders.slice(0, 120), [orders]);
 
@@ -500,7 +523,6 @@ export const ExpenseCostAllocationTable: React.FC = () => {
               {periodColumns.map((column) => (
                 <col key={column.key} style={{ width: periodColumnWidth }} />
               ))}
-              <col style={{ width: REMAINING_COLUMN_WIDTH }} />
             </colgroup>
 
             <thead className="text-slate-100">
@@ -526,7 +548,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                 ))}
                 <th
                   scope="col"
-                  colSpan={periodColumns.length + 1}
+                  colSpan={periodColumns.length}
                   className="sticky top-0 z-[10] border-b border-r border-indigo-300/25 bg-slate-950 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.1em]"
                 >
                   {yearLabel}
@@ -546,16 +568,6 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                     {column.label}
                   </th>
                 ))}
-                <th
-                  scope="col"
-                  className="sticky top-[45px] z-[10] border-b border-r border-indigo-300/25 bg-slate-950 px-3 py-3 text-center text-xs font-semibold"
-                  style={{
-                    width: REMAINING_COLUMN_WIDTH,
-                    minWidth: REMAINING_COLUMN_WIDTH,
-                  }}
-                >
-                  Còn lại
-                </th>
               </tr>
             </thead>
 
@@ -593,29 +605,36 @@ export const ExpenseCostAllocationTable: React.FC = () => {
 
                   {periodColumns.map((column) => {
                     const value = getCostPeriodAmount(order, column);
+                    const slotInPeriod = hasSlotInPeriod(order, column);
                     return (
                       <td
                         key={column.key}
-                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-cyan-100 transition-colors group-hover:bg-slate-900"
+                        className={`relative z-0 border-b border-r border-indigo-300/15 px-3 py-2 text-sm font-semibold transition-colors ${
+                          slotInPeriod
+                            ? "bg-emerald-500/12 text-center text-emerald-100 group-hover:bg-emerald-500/18"
+                            : "bg-slate-950 text-right text-cyan-100 group-hover:bg-slate-900"
+                        }`}
                         style={{
                           width: periodColumnWidth,
                           minWidth: periodColumnWidth,
                         }}
                       >
-                        {value != null ? formatMoney(value) : ""}
+                        {slotInPeriod ? (
+                          <span
+                            className="mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-400/20 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.35)]"
+                            title="Đã có slot"
+                          >
+                            <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                            <span className="sr-only">Đã có slot</span>
+                          </span>
+                        ) : value != null ? (
+                          formatMoney(value)
+                        ) : (
+                          ""
+                        )}
                       </td>
                     );
                   })}
-
-                  <td
-                    className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2 text-right text-sm font-semibold text-emerald-200 transition-colors group-hover:bg-slate-900"
-                    style={{
-                      width: REMAINING_COLUMN_WIDTH,
-                      minWidth: REMAINING_COLUMN_WIDTH,
-                    }}
-                  >
-                    {remainderLabel(order, periodColumns)}
-                  </td>
                 </tr>
               ))}
 
@@ -623,7 +642,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                 <tr>
                   <td
                     className="border-b border-indigo-300/15 bg-[#020617] px-3 py-4 text-sm text-slate-400"
-                    colSpan={FIXED_COLUMNS.length + periodColumns.length + 1}
+                    colSpan={FIXED_COLUMNS.length + periodColumns.length}
                   >
                     Chưa có đơn MAVN trạng thái Đã Thanh Toán trong order_list.
                     Thêm đơn nhập hoặc kiểm tra trạng thái đơn.
@@ -663,13 +682,6 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                           }}
                         />
                       ))}
-                      <td
-                        className="relative z-0 border-b border-r border-indigo-300/15 bg-slate-950 px-3 py-2"
-                        style={{
-                          width: REMAINING_COLUMN_WIDTH,
-                          minWidth: REMAINING_COLUMN_WIDTH,
-                        }}
-                      />
                     </tr>
                   ),
                 )}
@@ -721,8 +733,6 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                     </td>
                   );
                 })}
-
-                <td className="sticky bottom-0 z-[20] border-t border-r border-indigo-300/25 bg-slate-950 px-3 py-4 text-right text-sm font-black text-emerald-200" />
               </tr>
             </tfoot>
           </table>

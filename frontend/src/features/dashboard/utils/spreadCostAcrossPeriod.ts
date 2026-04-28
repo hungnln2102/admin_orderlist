@@ -38,6 +38,7 @@ export function getCostPeriodAmount(
     totalCost: number;
     termDays: number;
     startDateYmd: string;
+    endDateYmd?: string | null;
   },
   column: PeriodColumn,
 ): number | null {
@@ -47,11 +48,17 @@ export function getCostPeriodAmount(
   if (!row.startDateYmd || row.termDays <= 0) {
     const anchor = row.startDateYmd;
     if (!anchor) return null;
+    if (row.endDateYmd && row.endDateYmd < anchor) return null;
     return isDateInPeriod(anchor, column) ? Math.abs(amount) : null;
   }
 
-  const endDate = addDaysUtc(row.startDateYmd, row.termDays - 1);
+  const scheduledEndDate = addDaysUtc(row.startDateYmd, row.termDays - 1);
+  const endDate =
+    row.endDateYmd && row.endDateYmd < scheduledEndDate
+      ? row.endDateYmd
+      : scheduledEndDate;
   if (!endDate) return null;
+  if (endDate < row.startDateYmd) return null;
 
   const overlapStart =
     column.startKey > row.startDateYmd ? column.startKey : row.startDateYmd;
@@ -60,6 +67,31 @@ export function getCostPeriodAmount(
   if (daysInPeriod <= 0) return null;
 
   return (Math.abs(amount) / row.termDays) * daysInPeriod;
+}
+
+export function getCostAllocationTotal(
+  row: Parameters<typeof getCostPeriodAmount>[0],
+): number {
+  const amount = row.totalCost;
+  if (!(amount !== 0) || Number.isNaN(amount)) return 0;
+
+  if (!row.startDateYmd || row.termDays <= 0) {
+    if (!row.startDateYmd) return 0;
+    if (row.endDateYmd && row.endDateYmd < row.startDateYmd) return 0;
+    return Math.abs(amount);
+  }
+
+  const scheduledEndDate = addDaysUtc(row.startDateYmd, row.termDays - 1);
+  const endDate =
+    row.endDateYmd && row.endDateYmd < scheduledEndDate
+      ? row.endDateYmd
+      : scheduledEndDate;
+  if (!endDate || endDate < row.startDateYmd) return 0;
+
+  const days = countDaysInclusive(row.startDateYmd, endDate);
+  if (days <= 0) return 0;
+
+  return (Math.abs(amount) / row.termDays) * days;
 }
 
 export function getAllocatedTotal(
