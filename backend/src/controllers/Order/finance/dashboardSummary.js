@@ -201,7 +201,7 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     const refundUpdates = {};
 
     // Order left counted lifecycle → trừ theo rule dashboard chỉ cho MAVC/MAVL/MAVK/MAVS.
-    if (isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
+    if (false && isOrderCounted(prevStatus) && !isOrderCounted(nextStatus)) {
         if (isDashboardSalesOrder(beforeRow)) {
             const price = toNullableNumber(beforeRow?.price) || 0;
             const profit = salesOrderProfitDeltaForDashboard(beforeRow);
@@ -220,6 +220,7 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
 
     // Vào vòng đời đếm doanh thu: Chưa TT → ĐXL, hoặc Chưa TT → Đã TT (chỉ MAVC/MAVL/MAVK/MAVS).
     if (
+        false &&
         !isOrderCounted(prevStatus) &&
         isDashboardSalesOrder(afterRow) &&
         (
@@ -238,7 +239,7 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     }
 
     // Vào hoàn: trừ ghi nhận giá đầy đủ ở tháng birth, cộng lại (price−refund) ở tháng canceled_at (khớp aggregate).
-    if (isDashboardSalesOrder(afterRow) && !isRefundCounted(prevStatus) && isRefundCounted(nextStatus)) {
+    if (isDashboardSalesOrder(afterRow) && prevStatus === STATUS.PAID && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;

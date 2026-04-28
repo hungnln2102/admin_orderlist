@@ -41,6 +41,7 @@
 \i /docker-entrypoint-initdb.d/migrations/083_order_list_created_at_event_bucketing.sql
 \i /docker-entrypoint-initdb.d/migrations/084_order_list_gross_selling_price.sql
 \i /docker-entrypoint-initdb.d/migrations/085_refund_credit_note_split_links.sql
+\i /docker-entrypoint-initdb.d/migrations/086_webhook_finance_processing_paid_flow.sql
 
 -- 3. Default seed data.
 \i /docker-entrypoint-initdb.d/seeds/seed_hero_banners_website_defaults.sql

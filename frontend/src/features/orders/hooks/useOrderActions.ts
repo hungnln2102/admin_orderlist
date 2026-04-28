@@ -164,12 +164,38 @@ export function useOrderActions(deps: OrderActionsDeps) {
       let payload: Partial<Order> | null = null;
       if (statusText === ORDER_STATUSES.CHUA_THANH_TOAN) {
         payload = {
-          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
+          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DANG_XU_LY,
         };
-      } else if (statusText === ORDER_STATUSES.DANG_XU_LY) {
-        payload = {
-          [ORDER_FIELDS.STATUS]: ORDER_STATUSES.DA_THANH_TOAN,
-        };
+      } else if (statusText === ORDER_STATUSES.CAN_GIA_HAN) {
+        const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+        if (!orderCode) return;
+        setRenewingOrderCode(orderCode);
+        try {
+          const response = await apiFetch(API_ENDPOINTS.ORDER_RENEW(orderCode), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ forceRenewal: true }),
+          });
+          if (!response.ok) {
+            const errorMessage = await parseErrorResponse(response);
+            throw new Error(
+              errorMessage || "KhÃ´ng thá»ƒ gia háº¡n thá»§ cÃ´ng cho Ä‘Æ¡n hÃ ng."
+            );
+          }
+          await fetchOrders();
+          emitRefresh(["orders", "dashboard"]);
+        } catch (error) {
+          showAppNotification({
+            type: "error",
+            title: "Lá»—i gia háº¡n",
+            message: `KhÃ´ng thá»ƒ gia háº¡n Ä‘Æ¡n hÃ ng: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          });
+        } finally {
+          setRenewingOrderCode(null);
+        }
+        return;
       }
 
       if (!payload) return;

@@ -26,7 +26,11 @@ const {
   addMonthsClamped,
   addDays,
 } = require("./utils");
-const { updatePaymentSupplyBalance } = require("./payments");
+const {
+  updatePaymentSupplyBalance,
+  updateReceiptFinancialState,
+  insertFinancialAuditLog,
+} = require("./payments");
 const logger = require("../../src/utils/logger");
 
 const { calculateRenewalPricing, computeOrderCurrentPrice } = require("./renewalPricing");
@@ -126,7 +130,16 @@ const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
   return res.rows.length > 0;
 };
 
-const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" } = {}) => {
+const runRenewal = async (
+  orderCode,
+  {
+    forceRenewal = false,
+    source = "webhook",
+    paymentAmount = 0,
+    paymentMonthKey = null,
+    paymentReceiptId = null,
+  } = {}
+) => {
   if (!orderCode) {
     return { success: false, details: "Thiếu mã đơn hàng", processType: "error" };
   }
@@ -328,7 +341,8 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
     // MAVN không dùng NCC Mavryk — luôn cộng NCC khi gia hạn. Đơn khác + NCC Mavryk/Shop: không cộng NCC.
     const skipNccLedger = !isMavn && isMavrykShopSupplierName(supplierNameForNcc);
     // Rule mới: gia hạn thành công chuyển Đã Thanh Toán cho tất cả mã đơn.
-    const renewalNextStatus = ORDER_STATUS.PAID;
+    const isManualRenewal = source === "manual";
+    const renewalNextStatus = isManualRenewal ? ORDER_STATUS.PROCESSING : ORDER_STATUS.PAID;
 
     const updateSql = `
       UPDATE ${ORDER_TABLE}
@@ -354,7 +368,8 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
 
     // Renewal: gia hạn thành công đều chuyển Đã Thanh Toán.
     if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && !isMavn) {
-      const shouldSkipSummaryForManual = source === "manual" && (
+      const shouldSkipSummaryForManual = isManualRenewal || (
+        source === "manual" &&
         await hasPostedReceiptForOrder(client, orderCode, order[ORDER_COLS.orderDate])
       );
       if (shouldSkipSummaryForManual) {
@@ -364,8 +379,9 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
         });
       }
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
-      if (monthKey && !shouldSkipSummaryForManual) {
-        const revenue = normalizeMoney(finalGiaBan);
+      const effectiveMonthKey = paymentMonthKey || monthKey;
+      if (effectiveMonthKey && !shouldSkipSummaryForManual && normalizeMoney(paymentAmount) > 0) {
+        const revenue = normalizeMoney(paymentAmount);
         const cost = normalizeMoney(finalGiaNhap);
         // NCC Mavryk/Shop: không ghi nhận cost vào profit khi renewal.
         const profit = skipNccLedger ? revenue : (revenue - cost);
@@ -386,16 +402,40 @@ const runRenewal = async (orderCode, { forceRenewal = false, source = "webhook" 
               ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
               ${summaryCols.UPDATED_AT} = NOW()
           `,
-          [monthKey, 1, revenue, profit]
+          [effectiveMonthKey, 1, revenue, profit]
         );
-        await recomputeSummaryMonthTotalTax(client, monthKey);
+        await recomputeSummaryMonthTotalTax(client, effectiveMonthKey);
+        if (paymentReceiptId) {
+          await updateReceiptFinancialState(client, paymentReceiptId, {
+            is_financial_posted: true,
+            posted_revenue: revenue,
+            posted_profit: profit,
+          });
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: paymentReceiptId,
+            order_code: orderCode,
+            rule_branch: "RENEWAL_WEBHOOK_POST",
+            delta: {
+              posted_revenue: revenue,
+              posted_profit: profit,
+              month_key: effectiveMonthKey,
+            },
+            source: "webhook",
+          });
+        }
       }
     } else if (order[ORDER_COLS.status] === ORDER_STATUS.RENEWAL && isMavn) {
       logger.info("[Renewal] Bỏ cộng dashboard_monthly_summary (đơn MAVN nhập hàng)", {
         orderCode,
       });
     }
-    if (supplierId && Number.isFinite(finalGiaNhap) && finalGiaNhap > 0 && !skipNccLedger) {
+    if (
+      !isManualRenewal &&
+      supplierId &&
+      Number.isFinite(finalGiaNhap) &&
+      finalGiaNhap > 0 &&
+      !skipNccLedger
+    ) {
       try {
         await updatePaymentSupplyBalance(supplierId, finalGiaNhap, ngayBatDauMoi);
       } catch (balanceErr) {

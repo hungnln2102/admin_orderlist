@@ -84,10 +84,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const orderTheme = getOrderCodeTheme(orderCodeText);
   const canRenew =
     canRenewOrder &&
-    (statusText === ORDER_STATUSES.CAN_GIA_HAN ||
-      statusText === ORDER_STATUSES.ORDER_EXPIRED);
-  const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
-  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
+    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+  const canStartProcessing =
+    statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
+    statusText === ORDER_STATUSES.CAN_GIA_HAN;
+  const canMarkPaid = false;
   const isRenewing = renewingOrderCode === orderCodeText;
 
   return (
