@@ -3,13 +3,33 @@ const dotenv = require("dotenv");
 
 const backendRoot = path.join(__dirname, "..", "..");
 
-/**
- * Nạp backend/.env rồi backend/.env.local (ghi đè) — dùng .env.local cho Postgres/Redis
- * trên máy dev, không sửa .env bản copy production.
- */
+const isProductionLike = () =>
+  process.env.NODE_ENV === "production" ||
+  process.env.APP_ENV === "production" ||
+  process.env.APP_ENV === "docker";
+
+const configEnvFile = (fileName, options = {}) =>
+  dotenv.config({
+    path: path.join(backendRoot, fileName),
+    quiet: true,
+    ...options,
+  });
+
 function loadBackendEnv() {
-  dotenv.config({ path: path.join(backendRoot, ".env") });
-  dotenv.config({ path: path.join(backendRoot, ".env.local"), override: true });
+  const explicitPath = process.env.BACKEND_ENV_FILE || process.env.DOTENV_CONFIG_PATH;
+  if (explicitPath) {
+    dotenv.config({ path: explicitPath, override: true, quiet: true });
+    return;
+  }
+
+  configEnvFile(".env");
+
+  if (isProductionLike()) {
+    configEnvFile(".env.docker", { override: true });
+    return;
+  }
+
+  configEnvFile(".env.local", { override: true });
 }
 
 module.exports = { loadBackendEnv, backendRoot };

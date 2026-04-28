@@ -70,6 +70,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     ports:
       - "3001:3001"   # Main API
     volumes:
@@ -106,6 +109,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     command: ["node", "webhook-server.js"]
     ports:
       - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
@@ -136,6 +142,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     command: ["node", "scheduler.js"]
     networks:
       - app-network
