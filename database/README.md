@@ -1,9 +1,11 @@
 Database
 ========
 
-## Docker volume (Postgres 18+)
+## Docker volume (Postgres 16 — compose hiện tại)
 
-Gắn **một** volume tại `/var/lib/postgresql` (không mount trực tiếp `/var/lib/postgresql/data` — entrypoint 18+ sẽ từ chối). Ví dụ: `-v tên_volume:/var/lib/postgresql`.
+Image `postgres:16-alpine` dùng **PGDATA** mặc định `/var/lib/postgresql/data`. Compose gắn volume tại đúng path đó.
+
+*(Nếu sau này nâng lên Postgres 18+, đọc changelog image: layout volume có thể khác; cần migrate dữ liệu, không chỉ đổi tag.)*
 
 ## Structure
 - `init.sql`: bootstrap entrypoint for a brand-new PostgreSQL volume.

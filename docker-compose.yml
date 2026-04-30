@@ -12,19 +12,20 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASS:-postgres}
       POSTGRES_DB: ${DB_NAME:-mydtbmav}
-    # Postgres 18+ image: mount thư mục cha (xem database/README.md)
+    # Postgres 16 (image chính thức): PGDATA = /var/lib/postgresql/data
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
       - app-network
+    # Dùng $$POSTGRES_* để shell trong container đọc đúng user/db do image set (tránh lệch với .env host).
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-mydtbmav}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 12
+      start_period: 90s
     deploy:
       resources:
         limits:
