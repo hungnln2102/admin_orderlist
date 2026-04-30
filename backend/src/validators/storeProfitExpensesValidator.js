@@ -19,7 +19,9 @@ const listStoreProfitExpensesRules = [
   query("expense_type")
     .optional()
     .isIn(EXPENSE_TYPES)
-    .withMessage("expense_type phải là withdraw_profit hoặc external_import."),
+    .withMessage(
+      "expense_type phải là withdraw_profit, external_import hoặc mavn_import."
+    ),
   validate,
 ];
 

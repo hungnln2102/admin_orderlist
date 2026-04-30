@@ -1,11 +1,9 @@
 const { db } = require("../../../db");
 const { TABLES, STATUS } = require("../constants");
 const { normalizeOrderRow } = require("../helpers");
-const { adjustSupplierDebtIfNeeded, calcRemainingRefund } = require("../orderFinanceHelpers");
-const { todayYMDInVietnam } = require("../../../utils/normalizers");
 const { ORDERS_SCHEMA } = require("../../../config/dbSchema");
-const { nextId } = require("../../../services/idService");
 const { deleteOrderWithArchive } = require("../orderDeletionService");
+const { todayYMDInVietnam } = require("../../../utils/normalizers");
 const logger = require("../../../utils/logger");
 
 const { orderIdParam } = require("../../../validators/orderValidator");
@@ -47,9 +45,6 @@ const attachDeleteOrderRoute = (router) => {
                     TABLES,
                     ORDERS_SCHEMA,
                     STATUS,
-                    nextId,
-                    adjustSupplierDebtIfNeeded,
-                    calcRemainingRefund,
                 },
             });
 

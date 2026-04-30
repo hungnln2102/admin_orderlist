@@ -148,6 +148,15 @@ function isMavrykShopSupplierName(name) {
   return raw === "mavryk" || raw === "shop";
 }
 
+/**
+ * Khớp `partner.fn_supplier_order_cost_log_on_success` (v_is_mavryk): chỉ
+ * `LOWER(TRIM(supplier_name)) = 'mavryk'`. Tên `'shop'` **không** vào nhánh này trên DB —
+ * vẫn INSERT log khi Đã TT; app không được cộng `importDelta` thêm.
+ */
+function isMavrykSupplierStrictForNccLog(name) {
+  return String(name ?? "").trim().toLowerCase() === "mavryk";
+}
+
 /** Đơn mã MAVN (nhập hàng). */
 function isMavnImportOrder(row) {
   const prefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
@@ -186,4 +195,5 @@ module.exports = {
   isGiftOrder,
   isDashboardSalesOrder,
   isMavrykShopSupplierName,
+  isMavrykSupplierStrictForNccLog,
 };

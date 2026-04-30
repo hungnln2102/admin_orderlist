@@ -1,6 +1,11 @@
 const { db } = require("../../../db");
 const { TABLES, COLS } = require("../constants");
-const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../../config/dbSchema");
+const {
+    ORDERS_SCHEMA,
+    RECEIPT_SCHEMA,
+    PARTNER_SCHEMA,
+    PRODUCT_SCHEMA,
+} = require("../../../config/dbSchema");
 const { STATUS } = require("../../../utils/statuses");
 const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
 const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
@@ -20,16 +25,20 @@ const supplierNameCol = "supplier_name";
 const variantIdCol = PRODUCT_SCHEMA.VARIANT.COLS.ID;
 const variantDisplayNameCol = PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME;
 const variantProductIdCol = PRODUCT_SCHEMA.VARIANT.COLS.PRODUCT_ID;
-const paymentReceiptOrderCodeCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ORDER_CODE;
-const paymentReceiptAmountCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
-const paymentReceiptPaidDateCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.PAID_DATE;
-const paymentReceiptIdCol = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS.ID;
+const paymentReceiptOrderCodeCol = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.ORDER_CODE;
+const paymentReceiptAmountCol = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
+const paymentReceiptPaidDateCol = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.PAID_DATE;
+const paymentReceiptIdCol = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.ID;
 const taxOrderPatterns = ["MAVC%", "MAVL%", "MAVK%", "MAVS%"];
+const RCN = RECEIPT_SCHEMA.REFUND_CREDIT_NOTES.COLS;
+const RCA = RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.COLS;
 
 const buildOrdersListQuery = async (scope = "", options = {}) => {
     const normalizedScope = String(scope || "").toLowerCase();
     const table = TABLES.orderList;
-    const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
+    const includeAccountHolder =
+        Boolean(COLS.SUPPLIER.ACCOUNT_HOLDER) &&
+        await supplierHasAccountHolderColumn(db, TABLES.supplier);
 
     let query = db(table)
         .leftJoin(TABLES.variant, `${table}.${idProductCol}`, `${TABLES.variant}.${variantIdCol}`)
@@ -65,14 +74,14 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
             `
             LEFT JOIN LATERAL (
                 SELECT
-                    rcn.id AS refund_credit_note_id,
-                    rcn.credit_code AS refund_credit_code,
-                    rcn.available_amount AS refund_credit_available_amount,
-                    rcn.status AS refund_credit_status
+                    rcn.${RCN.ID} AS refund_credit_note_id,
+                    rcn.${RCN.CREDIT_CODE} AS refund_credit_code,
+                    rcn.${RCN.AVAILABLE_AMOUNT} AS refund_credit_available_amount,
+                    rcn.${RCN.STATUS} AS refund_credit_status
                 FROM ${TABLES.refundCreditNotes} rcn
-                WHERE rcn.source_order_list_id = ${table}.${idCol}
-                  AND UPPER(COALESCE(rcn.status::text, '')) <> 'VOID'
-                ORDER BY rcn.id DESC
+                WHERE rcn.${RCN.SOURCE_ORDER_LIST_ID} = ${table}.${idCol}
+                  AND UPPER(COALESCE(rcn.${RCN.STATUS}::text, '')) <> 'VOID'
+                ORDER BY rcn.${RCN.ID} DESC
                 LIMIT 1
             ) latest_rcn ON TRUE
             `
@@ -81,20 +90,20 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
             `
             LEFT JOIN LATERAL (
                 SELECT
-                    rca.id AS refund_credit_application_id,
-                    rca.credit_note_id AS refund_credit_applied_note_id,
-                    rca.applied_amount AS refund_credit_applied_amount,
-                    rca.applied_at::text AS refund_credit_applied_at,
+                    rca.${RCA.ID} AS refund_credit_application_id,
+                    rca.${RCA.CREDIT_NOTE_ID} AS refund_credit_applied_note_id,
+                    rca.${RCA.APPLIED_AMOUNT} AS refund_credit_applied_amount,
+                    rca.${RCA.APPLIED_AT}::text AS refund_credit_applied_at,
                     -- effective_* = cùng phiếu credit_note đã apply (sau migration 085 có thể join thêm phiếu kế thừa qua succeeded_by_note_id)
-                    c_applied.id AS refund_credit_effective_note_id,
-                    c_applied.credit_code AS refund_credit_effective_code,
-                    c_applied.available_amount::numeric AS refund_credit_effective_available,
-                    c_applied.status::text AS refund_credit_effective_status
+                    c_applied.${RCN.ID} AS refund_credit_effective_note_id,
+                    c_applied.${RCN.CREDIT_CODE} AS refund_credit_effective_code,
+                    c_applied.${RCN.AVAILABLE_AMOUNT}::numeric AS refund_credit_effective_available,
+                    c_applied.${RCN.STATUS}::text AS refund_credit_effective_status
                 FROM ${TABLES.refundCreditApplications} rca
                 INNER JOIN ${TABLES.refundCreditNotes} c_applied
-                    ON c_applied.id = rca.credit_note_id
-                WHERE rca.target_order_list_id = ${table}.${idCol}
-                ORDER BY rca.id DESC
+                    ON c_applied.${RCN.ID} = rca.${RCA.CREDIT_NOTE_ID}
+                WHERE rca.${RCA.TARGET_ORDER_LIST_ID} = ${table}.${idCol}
+                ORDER BY rca.${RCA.ID} DESC
                 LIMIT 1
             ) latest_rca ON TRUE
             `
@@ -183,7 +192,7 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
         db.raw(
             `(COALESCE(${table}.${ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE}::numeric, ${table}.${COLS.ORDER.PRICE}::numeric + COALESCE(latest_rca.refund_credit_applied_amount, 0)::numeric)) as price_before_credit`
         ),
-        includeAccountHolder
+        includeAccountHolder && COLS.SUPPLIER.ACCOUNT_HOLDER
             ? db.raw(
                 `${TABLES.supplier}.${COLS.SUPPLIER.ACCOUNT_HOLDER}::text as supplier_account_holder`
             )

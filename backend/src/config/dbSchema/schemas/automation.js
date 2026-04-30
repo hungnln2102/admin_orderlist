@@ -42,18 +42,25 @@ const RENEW_ADOBE_SCHEMA = {
       URL_ACTIVE: "url_active",
     },
   },
-};
-
-const KEY_ACTIVE_SCHEMA = {
-  ORDER_AUTO_KEYS: {
-    TABLE: "order_auto_keys",
+  ORDER_USER_TRACKING: {
+    TABLE: "order_user_tracking",
     COLS: {
-      ORDER_CODE: "order_code",
-      AUTO_KEY: "auto_key",
-      CREATED_AT: "created_at",
-      SYSTEM_CODE: "system_code",
+      ID: "id",
+      ORDER_ID: "order_id",
+      CUSTOMER: "customer",
+      ACCOUNT: "account",
+      ORG_NAME: "org_name",
+      EXPIRED: "expired",
+      STATUS: "status",
+      UPDATED_AT: "update_at",
+      ID_PRODUCT: "id_product",
     },
   },
+};
+
+/** Domain key kích hoạt (Key active): dữ liệu nằm trong schema PostgreSQL `system_automation`
+ * — `order_list_keys`, `systems`. Đây là bảng “key active” sau merge (078); không còn bảng trong schema DB `key_active`. */
+const KEY_ACTIVE_SCHEMA = {
   /** Key kích hoạt ánh xạ orders.order_list (FK order_list_id); expires_at đồng bộ expired_at. */
   ORDER_LIST_KEYS: {
     TABLE: "order_list_keys",

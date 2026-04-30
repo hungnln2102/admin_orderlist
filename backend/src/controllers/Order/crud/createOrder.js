@@ -132,10 +132,19 @@ const attachCreateOrderRoute = (router) => {
             if (Number.isFinite(requestedCreditNoteId) && requestedCreditNoteId > 0) {
                 creditNoteForOrder = await lockRefundCreditNoteById(trx, requestedCreditNoteId);
                 if (creditNoteForOrder) {
+                    const noteAvailable = normalizeMoney(creditNoteForOrder.available_amount);
+                    let effectiveApplyRequest = requestedCreditApplyAmount;
+                    if (
+                        !Number.isFinite(effectiveApplyRequest) ||
+                        effectiveApplyRequest <= 0
+                    ) {
+                        /** Không gửi số áp dụng → mặc định áp tối đa đủ trừ giá đơn (min(dư phiếu, giá)), và PAID khi dư ≥ giá. */
+                        effectiveApplyRequest = Math.min(noteAvailable, rawPriceBeforeCredit);
+                    }
                     appliedCreditAmount = Math.min(
-                        requestedCreditApplyAmount,
+                        effectiveApplyRequest,
                         rawPriceBeforeCredit,
-                        normalizeMoney(creditNoteForOrder.available_amount)
+                        noteAvailable
                     );
                 }
             }
@@ -206,7 +215,9 @@ const attachCreateOrderRoute = (router) => {
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {
                 const sCols = PARTNER_SCHEMA.SUPPLIER.COLS;
-                const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
+                const includeAccountHolder =
+                    Boolean(sCols.ACCOUNT_HOLDER) &&
+                    await supplierHasAccountHolderColumn(db, TABLES.supplier);
                 const selectCols = [
                     sCols.SUPPLIER_NAME,
                     sCols.NUMBER_BANK,

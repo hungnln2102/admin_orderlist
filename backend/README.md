@@ -37,7 +37,8 @@ src/
 ```
 
 Root-level (backend/):
-- `index.js` → requires `src/server`
+- `src/server.js` → entry mặc định (`npm start`, `npm run dev`)
+- `index.js` → shim tương thích (`require("./src/server")`) nếu deploy vẫn gọi `node index.js`
 - `helpers.js` → re-exports `src/utils/orderHelpers`
 - `scheduler.js` → re-exports `src/scheduler`
 - `webhook/` → Sepay webhook server
@@ -187,7 +188,7 @@ npm run format    # Format with Prettier
 ### Debugging
 Set breakpoints và sử dụng:
 ```bash
-node --inspect index.js
+node --inspect src/server.js
 ```
 
 ## Common Tasks

@@ -12,7 +12,11 @@ const {
   getRenewAdobeVariantIds,
 } = require("./orderAccess");
 
-const TRACK_TABLE = "system_automation.order_user_tracking";
+const TRACK_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const TRACK_COLS = RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS;
 const MAP_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
   SCHEMA_RENEW_ADOBE
@@ -37,7 +41,7 @@ const listUserOrders = async (_req, res) => {
         this.on(
           db.raw("CAST(?? AS TEXT)", [`o.${ORD_COLS.ID_ORDER}`]),
           "=",
-          "t.order_id"
+          `t.${TRACK_COLS.ORDER_ID}`
         );
       })
       .leftJoin({ m: MAP_TABLE }, function joinMap() {
@@ -57,9 +61,9 @@ const listUserOrders = async (_req, res) => {
           `TO_CHAR((o.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as expiry_date`
         ),
         `o.${ORD_COLS.STATUS} as status`,
-        `t.org_name as tracking_org_name`,
-        `t.status as tracking_status`,
-        `t.id_product as tracking_id_product`,
+        `t.${TRACK_COLS.ORG_NAME} as tracking_org_name`,
+        `t.${TRACK_COLS.STATUS} as tracking_status`,
+        `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
         `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_account_id`,
         `acc.${ACC_COLS.LICENSE_STATUS} as admin_license_status`,
         `acc.${ACC_COLS.ORG_NAME} as admin_org_name`

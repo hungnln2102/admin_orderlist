@@ -5,17 +5,16 @@
  */
 module.exports = {
   testEnvironment: "node",
-  roots: ["<rootDir>/src"],
-  testMatch: ["**/__tests__/**/*.test.js", "**/?(*.)+(spec|test).js"],
+  roots: ["<rootDir>/tests/jest"],
+  testMatch: ["**/*.test.js"],
   collectCoverageFrom: [
     "src/**/*.js",
     "!src/**/*.test.js",
-    "!src/__tests__/**",
     "!src/**/index.js",
   ],
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov", "html"],
-  setupFilesAfterEnv: ["<rootDir>/src/__tests__/setup.js"],
+  setupFilesAfterEnv: ["<rootDir>/tests/jest/setup.js"],
   testTimeout: 30000,
   verbose: true,
 };

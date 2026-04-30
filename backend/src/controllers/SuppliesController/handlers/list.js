@@ -14,7 +14,9 @@ const listSupplies = async (_req, res) => {
     const rows = await supplierCache.getOrSet("all", async () => {
       const supplierTable = await resolveSupplierTableName();
       const supplierNameCol = await resolveSupplierNameColumn();
-      const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+      const includeAccountHolder =
+        Boolean(QUOTED_COLS.supplier.accountHolder) &&
+        await supplierHasAccountHolderColumn(db, supplierTable);
       const baseSelect = {
         id: "id",
         source_name: supplierNameCol,

@@ -1,5 +1,6 @@
 const { SUPPLIER_COST_DEF } = require("../shared");
 
+/** Chỉ bảng thuộc PostgreSQL schema `orders` (xem `000_consolidated_schema.sql`). */
 const ORDERS_SCHEMA = {
   ORDER_LIST: {
     TABLE: "order_list",
@@ -27,55 +28,15 @@ const ORDERS_SCHEMA = {
       CREATED_AT: "created_at",
     },
   },
-  PAYMENT_RECEIPT: {
-    TABLE: "payment_receipt",
+  ORDER_CUSTOMER: {
+    TABLE: "order_customer",
     COLS: {
-      ID: "id",
-      ORDER_CODE: "id_order",
-      PAID_DATE: "payment_date",
-      AMOUNT: "amount",
-      RECEIVER: "receiver",
-      NOTE: "note",
-      SENDER: "sender",
-      SEPAY_TRANSACTION_ID: "sepay_transaction_id",
-      REFERENCE_CODE: "reference_code",
-      TRANSFER_TYPE: "transfer_type",
-      GATEWAY: "gateway",
-    },
-  },
-  PAYMENT_RECEIPT_FINANCIAL_STATE: {
-    TABLE: "payment_receipt_financial_state",
-    COLS: {
-      ID: "id",
-      PAYMENT_RECEIPT_ID: "payment_receipt_id",
-      IS_FINANCIAL_POSTED: "is_financial_posted",
-      POSTED_REVENUE: "posted_revenue",
-      POSTED_PROFIT: "posted_profit",
-      RECONCILED_AT: "reconciled_at",
-      ADJUSTMENT_APPLIED: "adjustment_applied",
+      ID_ORDER: "id_order",
+      ACCOUNT_ID: "account_id",
+      STATUS: "status",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
-    },
-  },
-  PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG: {
-    TABLE: "payment_receipt_financial_audit_log",
-    COLS: {
-      ID: "id",
-      PAYMENT_RECEIPT_ID: "payment_receipt_id",
-      ORDER_CODE: "order_code",
-      RULE_BRANCH: "rule_branch",
-      DELTA: "delta",
-      SOURCE: "source",
-      CREATED_AT: "created_at",
-    },
-  },
-  REFUND: {
-    TABLE: "refund",
-    COLS: {
-      ID: "id",
-      ORDER_CODE: "ma_don_hang",
-      PAID_DATE: "ngay_thanh_toan",
-      AMOUNT: "so_tien",
+      PAYMENT_ID: "payment_id",
     },
   },
 };
@@ -190,7 +151,6 @@ const PARTNER_SCHEMA = {
       SUPPLIER_NAME: "supplier_name",
       NUMBER_BANK: "number_bank",
       BIN_BANK: "bin_bank",
-      ACCOUNT_HOLDER: "account_holder",
       ACTIVE_SUPPLY: "active_supply",
     },
   },

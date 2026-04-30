@@ -35,7 +35,9 @@ const getSupplyOverview = async (req, res) => {
     const statusColumnName = await resolveSupplyStatusColumn();
     const supplyStatusColumn = statusColumnName || null;
 
-    const includeAccountHolder = await supplierHasAccountHolderColumn(client, supplierTable);
+    const includeAccountHolder =
+      Boolean(QUOTED_COLS.supplier.accountHolder) &&
+      await supplierHasAccountHolderColumn(client, supplierTable);
     const accountHolderSelect = includeAccountHolder
       ? `s.${QUOTED_COLS.supplier.accountHolder} AS account_holder`
       : `NULL::text AS account_holder`;

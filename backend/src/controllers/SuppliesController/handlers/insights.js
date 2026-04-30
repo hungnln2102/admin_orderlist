@@ -6,6 +6,7 @@ const {
   orderCols,
   variantCols,
   supplyPriceCols,
+  supplyCols,
 } = require("../constants");
 const {
   createDateNormalization,
@@ -18,25 +19,12 @@ const { resolveSupplyStatusColumn } = require("../helpers");
 const logger = require("../../../utils/logger");
 const { supplierHasAccountHolderColumn } = require("../../../utils/supplierAccountHolderColumn");
 
-// Explicit supplier tables (prefer configured supplier schema, fallback to product/partner for legacy DBs)
-const { SCHEMA_SUPPLIER, SCHEMA_SUPPLIER_COST } = require("../../../config/dbSchema");
-const SUPPLIER_COST_TABLE = `${SCHEMA_SUPPLIER_COST}.supplier_cost`;
-const SUPPLIER_PRODUCT_TABLE = `${SCHEMA_SUPPLIER}.supplier`;
-const SUPPLIER_PARTNER_TABLE = "partner.supplier";
+const SUPPLIER_COST_TABLE = TABLES.supplyPrice;
 let supplierTableNameCache = null;
 let supplierNameColumnCache = null;
 const resolveSupplierTableName = async () => {
   if (supplierTableNameCache) return supplierTableNameCache;
-  try {
-    const exists = await db("information_schema.tables")
-      .select("table_name")
-      .where({ table_schema: "product", table_name: "supplier" })
-      .first();
-    supplierTableNameCache = exists ? SUPPLIER_PRODUCT_TABLE : SUPPLIER_PARTNER_TABLE;
-  } catch (err) {
-    logger.warn("[insights] Could not resolve supplier table, defaulting to partner.supplier", { error: err?.message || err });
-    supplierTableNameCache = SUPPLIER_PRODUCT_TABLE;
-  }
+  supplierTableNameCache = TABLES.supply;
   return supplierTableNameCache;
 };
 const resolveSupplierNameColumn = async () => {
@@ -47,13 +35,13 @@ const resolveSupplierNameColumn = async () => {
     const res = await db("information_schema.columns")
       .select("column_name")
       .where({ table_schema: schema, table_name: table })
-      .whereIn("column_name", ["supplier_name", "source_name"])
+      .whereIn("column_name", [supplyCols.supplierName, "source_name"].filter(Boolean))
       .orderByRaw(`CASE column_name WHEN 'supplier_name' THEN 1 WHEN 'source_name' THEN 2 ELSE 3 END`)
       .first();
-    supplierNameColumnCache = res?.column_name || "supplier_name";
+    supplierNameColumnCache = res?.column_name || supplyCols.supplierName;
   } catch (err) {
     logger.warn("[insights] Could not resolve supplier name column, defaulting to supplier_name", { error: err?.message || err });
-    supplierNameColumnCache = "supplier_name";
+    supplierNameColumnCache = supplyCols.supplierName;
   }
   return supplierNameColumnCache;
 };
@@ -198,7 +186,9 @@ const getSupplyInsights = async (_req, res) => {
     const supplierTableName = await resolveSupplierTableName();
     const supplierNameCol = await resolveSupplierNameColumn();
     const supplierNameIdent = quoteIdent(supplierNameCol);
-    const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTableName);
+    const includeAccountHolder =
+      Boolean(QUOTED_COLS.supplier.accountHolder) &&
+      await supplierHasAccountHolderColumn(db, supplierTableName);
     const accountHolderSelect = includeAccountHolder
       ? `s.${QUOTED_COLS.supplier.accountHolder} AS account_holder`
       : `NULL::text AS account_holder`;

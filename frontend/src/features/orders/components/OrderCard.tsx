@@ -28,6 +28,7 @@ type OrderCardProps = {
   canEdit: boolean;
   canRenewOrder: boolean;
   renewingOrderCode: string | null;
+  completingOrderCode: string | null;
   onView: (order: Order) => void;
   onEdit: (order: Order) => void;
   onDelete: (order: Order) => void;
@@ -46,6 +47,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   canEdit,
   canRenewOrder,
   renewingOrderCode,
+  completingOrderCode,
   onView,
   onEdit,
   onDelete,
@@ -88,8 +90,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const canStartProcessing =
     statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
     statusText === ORDER_STATUSES.CAN_GIA_HAN;
-  const canMarkPaid = false;
+  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
   const isRenewing = renewingOrderCode === orderCodeText;
+  const isCompleting = completingOrderCode === orderCodeText;
 
   return (
     <div className={`order-card relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl ${orderTheme.cardSurfaceClass}`}>
@@ -136,10 +139,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 )}
                 {canMarkPaid && onMarkPaid && (
                   <button
-                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold text-amber-300 uppercase tracking-wide transition-all hover:bg-amber-500/30 active:scale-95 shadow-lg"
-                    onClick={(e) => { e.stopPropagation(); onMarkPaid(order); }}
+                    className="inline-flex whitespace-nowrap px-2.5 py-0.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-[10px] font-bold text-amber-300 uppercase tracking-wide transition-all hover:bg-amber-500/30 active:scale-95 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={isCompleting}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isCompleting) onMarkPaid(order);
+                    }}
                   >
-                    Hoàn Thành
+                    {isCompleting ? "Đang Hoàn Thành..." : "Hoàn Thành"}
                   </button>
                 )}
                 {canRenew && onRenew && (

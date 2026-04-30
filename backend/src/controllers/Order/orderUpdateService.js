@@ -10,7 +10,6 @@ const updateOrderWithFinance = async ({
 }) => {
     const {
         TABLES,
-        STATUS,
         sanitizeOrderWritePayload,
         normalizeOrderRow,
         todayYMDInVietnam,
@@ -19,8 +18,6 @@ const updateOrderWithFinance = async ({
         resolveProductToVariantId,
     } = helpers;
     const {
-        addSupplierImportOnProcessing,
-        recordSupplierPaymentOnCompletion,
         updateDashboardMonthlySummaryOnStatusChange,
         syncMavnStoreProfitExpense,
     } = require("./orderFinanceHelpers");
@@ -88,12 +85,10 @@ const updateOrderWithFinance = async ({
     }
 
     try {
-        await addSupplierImportOnProcessing(trx, beforeOrder, updatedOrder);
-        await recordSupplierPaymentOnCompletion(trx, beforeOrder, updatedOrder);
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
         await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
     } catch (debtErr) {
-        logger.error("Lỗi cập nhật công nợ NCC", {
+        logger.error("Lỗi cập nhật finance/dashboard sau khi sửa đơn", {
             id,
             supply_id: updatedOrder?.[supplyIdCol],
             cost: updatedOrder?.cost,

@@ -85,9 +85,10 @@ const FINANCE_SCHEMA = {
       AMOUNT: "amount",
       REASON: "reason",
       EXPENSE_TYPE: "expense_type",
+      CREATED_AT: "created_at",
+      /** Gắn mã đơn MAVN khi `expense_type = mavn_import` (migration 088). */
       LINKED_ORDER_CODE: "linked_order_code",
       EXPENSE_META: "expense_meta",
-      CREATED_AT: "created_at",
     },
   },
 };

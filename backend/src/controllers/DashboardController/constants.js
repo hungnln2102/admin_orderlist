@@ -1,5 +1,6 @@
 const {
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   tableName,
   SCHEMA_ORDERS,
   SCHEMA_RECEIPT,
@@ -8,7 +9,7 @@ const {
 const { createYearExtraction } = require("../../utils/sql");
 
 const ORDER_DEF = ORDERS_SCHEMA.ORDER_LIST;
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 
 const TABLES = {
   orderList: tableName(ORDER_DEF.TABLE, SCHEMA_ORDERS),

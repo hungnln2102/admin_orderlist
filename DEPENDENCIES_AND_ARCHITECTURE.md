@@ -75,7 +75,7 @@ Không khai báo `dependencies` / `devDependencies` trong file hiện tại — 
 
 | Đường dẫn | Nội dung |
 |-----------|----------|
-| `backend/index.js`, `backend/src/server.js` | Khởi động API (tùy script) |
+| `backend/src/server.js` (default: `npm start`), `backend/index.js` (shim) | Khởi động API |
 | `backend/src/app.js` | Cấu hình Express |
 | `backend/src/routes/index.js` | **Gắn mọi route** protected (sau `authGuard`) |
 | `backend/src/routes/*.js` | Nhóm route theo domain |

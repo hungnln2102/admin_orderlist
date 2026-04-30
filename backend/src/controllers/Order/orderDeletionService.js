@@ -5,16 +5,12 @@ const deleteOrderWithArchive = async ({
     helpers,
 }) => {
     const { TABLES, ORDERS_SCHEMA, STATUS } = helpers;
-    const { adjustSupplierDebtIfNeeded } = require("./orderFinanceHelpers");
     const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
-    const { isMavnImportOrder } = require("../../utils/orderHelpers");
+    const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
     const { calcRemainingRefund } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
     const { todayYMDInVietnam } = require("../../utils/normalizers");
-    const { isGiftOrder } = require("../../utils/orderHelpers");
-    const logger = require("../../utils/logger");
-
     const orderId = order?.id;
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
     const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
@@ -30,20 +26,6 @@ const deleteOrderWithArchive = async ({
         return Math.abs(Math.round(num));
     };
 
-    try {
-        await adjustSupplierDebtIfNeeded(trx, order, normalized);
-    } catch (debtErr) {
-        const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-        logger.warn("Lỗi khi trừ/cộng công nợ NCC", {
-            id: orderId,
-            supply_id: order?.[supplyIdCol],
-            cost: order?.cost,
-            status: order?.status,
-            error: debtErr?.message || String(debtErr),
-            stack: debtErr?.stack,
-        });
-    }
-
     const normalizedStatus = String(
         normalized?.status ||
         normalized?.status_auto ||
@@ -57,7 +39,7 @@ const deleteOrderWithArchive = async ({
     if (isHardDelete) {
         const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
         const eCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
-        if (isMavnImportOrder(order)) {
+        if (isMavnImportOrder(order) && eCols.LINKED_ORDER_CODE) {
             const code = String(order?.[idOrderCol] ?? "").trim();
             if (code) {
                 await trx(expenseTable)

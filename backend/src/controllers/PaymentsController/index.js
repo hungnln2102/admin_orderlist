@@ -10,6 +10,7 @@ const {
   SCHEMA_RECEIPT,
   SCHEMA_FINANCE,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
@@ -22,14 +23,14 @@ const {
 const { syncMavnStoreProfitExpense } = require("../Order/orderFinanceHelpers");
 const { runRenewal } = require("../../../webhook/sepay/renewal");
 
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 const PAYMENT_RECEIPT_STATE_DEF = getDefinition(
   "PAYMENT_RECEIPT_FINANCIAL_STATE",
-  ORDERS_SCHEMA
+  RECEIPT_SCHEMA
 );
 const PAYMENT_RECEIPT_AUDIT_DEF = getDefinition(
   "PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG",
-  ORDERS_SCHEMA
+  RECEIPT_SCHEMA
 );
 const ORDER_LIST_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const DASHBOARD_SUMMARY_DEF = getDefinition(
@@ -37,29 +38,8 @@ const DASHBOARD_SUMMARY_DEF = getDefinition(
   FINANCE_SCHEMA
 );
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
-const PAYMENT_RECEIPT_BATCH_COLS = {
-  ID: "id",
-  BATCH_CODE: "batch_code",
-  TOTAL_AMOUNT: "total_amount",
-  ORDER_COUNT: "order_count",
-  STATUS: "status",
-  SOURCE: "source",
-  NOTE: "note",
-  PAID_RECEIPT_ID: "paid_receipt_id",
-  PAID_AT: "paid_at",
-  CREATED_AT: "created_at",
-  UPDATED_AT: "updated_at",
-};
-const PAYMENT_RECEIPT_BATCH_ITEM_COLS = {
-  ID: "id",
-  BATCH_ID: "batch_id",
-  BATCH_CODE: "batch_code",
-  ORDER_CODE: "order_code",
-  ORDER_LIST_ID: "order_list_id",
-  AMOUNT: "amount",
-  STATUS: "status",
-  CREATED_AT: "created_at",
-};
+const PAYMENT_RECEIPT_BATCH_COLS = RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.COLS;
+const PAYMENT_RECEIPT_BATCH_ITEM_COLS = RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH_ITEM.COLS;
 const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_RECEIPT),
   paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_RECEIPT),
@@ -67,8 +47,8 @@ const TABLES = {
   orderList: tableName(ORDER_LIST_DEF.tableName, SCHEMA_ORDERS),
   dashboardSummary: tableName(DASHBOARD_SUMMARY_DEF.tableName, SCHEMA_FINANCE),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
-  paymentReceiptBatch: tableName("payment_receipt_batch", SCHEMA_RECEIPT),
-  paymentReceiptBatchItem: tableName("payment_receipt_batch_item", SCHEMA_RECEIPT),
+  paymentReceiptBatch: tableName(RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.TABLE, SCHEMA_RECEIPT),
+  paymentReceiptBatchItem: tableName(RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH_ITEM.TABLE, SCHEMA_RECEIPT),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   supplyOrderCostLog: tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER),
 };
@@ -655,7 +635,7 @@ const reconcilePaymentReceipt = async (req, res) => {
       const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
       const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.PRICE]);
       const oCodeCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
-      const aAmtCol = PAYMENT_RECEIPT_DEF.columns.AMOUNT;
+      const aAmtCol = PAYMENT_RECEIPT_DEF.columns.amount;
       const sumRes = await trx(TABLES.paymentReceipt)
         .whereRaw(`LOWER(TRIM(COALESCE(??, '')::text)) = LOWER(?)`, [oCodeCol, orderCodeRaw])
         .sum({ total_receipts: aAmtCol })
@@ -1013,7 +993,7 @@ const confirmPaymentSupply = async (req, res) => {
       const addAmount = isSupplierRefundToShop
         ? -Math.abs(expectedPaidAmount)
         : Math.abs(expectedPaidAmount);
-      await trx.raw("DROP INDEX IF EXISTS partner.uq_supplier_payments_supplier_id;");
+      await trx.raw(`DROP INDEX IF EXISTS ${SCHEMA_PARTNER}.uq_supplier_payments_supplier_id;`);
       const insertResult = await trx.raw(
         `
         INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})

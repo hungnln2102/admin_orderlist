@@ -18,6 +18,7 @@ type OrdersTableSectionProps = {
   totalColumns: number;
   remainingLabel: string;
   renewingOrderCode: string | null;
+  completingOrderCode: string | null;
   totalPages: number;
   currentPage: number;
   rowsPerPage: number;
@@ -56,6 +57,7 @@ export function OrdersTableSection({
   totalColumns,
   remainingLabel,
   renewingOrderCode,
+  completingOrderCode,
   totalPages,
   currentPage,
   rowsPerPage,
@@ -91,6 +93,7 @@ export function OrdersTableSection({
                   canEdit={canEditOrder}
                   canRenewOrder={canRenewOrder}
                   renewingOrderCode={renewingOrderCode}
+                  completingOrderCode={completingOrderCode}
                   onView={onView}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -144,6 +147,7 @@ export function OrdersTableSection({
                   canRenewOrder={canRenewOrder}
                   totalColumns={totalColumns}
                   renewingOrderCode={renewingOrderCode}
+                  completingOrderCode={completingOrderCode}
                   onToggleDetails={onToggleDetails}
                   onView={onView}
                   onEdit={onEdit}

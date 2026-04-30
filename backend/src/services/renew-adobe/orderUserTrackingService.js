@@ -17,7 +17,11 @@ const {
   getRenewAdobeVariantIds,
 } = require("../../controllers/RenewAdobeController/orderAccess");
 
-const TRACK_TABLE = "system_automation.order_user_tracking";
+const TRACK_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const TRACK_COLS = RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS;
 
 const MAP_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
@@ -72,15 +76,16 @@ async function getOrderUserTrackingCountsForAdminAccounts(
   const tTable = TRACK_TABLE;
   const colAid = MAP_COLS.ADOBE_ACCOUNT_ID;
   const colOid = MAP_COLS.ORDER_ID;
+  const trackOrderIdCol = TRACK_COLS.ORDER_ID;
 
   const { rows: joined } = await db.raw(
     `
     SELECT
       m.${colAid} AS adobe_id,
-      COUNT(DISTINCT t.order_id)::int AS c
+      COUNT(DISTINCT t.${trackOrderIdCol})::int AS c
     FROM ${mTable} m
     INNER JOIN ${tTable} t
-      ON lower(btrim(m.${colOid}::text)) = lower(btrim(t.order_id::text))
+      ON lower(btrim(m.${colOid}::text)) = lower(btrim(t.${trackOrderIdCol}::text))
     WHERE m.${colAid} IN (${accountIds.map(() => "?").join(",")})
     GROUP BY m.${colAid}
     `,
@@ -224,28 +229,28 @@ async function upsertTrackingRowsFromOrderRows(orders) {
       const account = emailKey || null;
 
       const insertRow = {
-        order_id: orderId,
-        customer,
-        account,
-        org_name: orgName,
-        expired,
-        status,
-        update_at: trx.fn.now(),
+        [TRACK_COLS.ORDER_ID]: orderId,
+        [TRACK_COLS.CUSTOMER]: customer,
+        [TRACK_COLS.ACCOUNT]: account,
+        [TRACK_COLS.ORG_NAME]: orgName,
+        [TRACK_COLS.EXPIRED]: expired,
+        [TRACK_COLS.STATUS]: status,
+        [TRACK_COLS.UPDATED_AT]: trx.fn.now(),
       };
       const mergeRow = {
-        customer,
-        account,
-        org_name: orgName,
-        expired,
-        status,
-        update_at: trx.fn.now(),
+        [TRACK_COLS.CUSTOMER]: customer,
+        [TRACK_COLS.ACCOUNT]: account,
+        [TRACK_COLS.ORG_NAME]: orgName,
+        [TRACK_COLS.EXPIRED]: expired,
+        [TRACK_COLS.STATUS]: status,
+        [TRACK_COLS.UPDATED_AT]: trx.fn.now(),
       };
       if (idProductStr) {
-        insertRow.id_product = idProductStr;
-        mergeRow.id_product = idProductStr;
+        insertRow[TRACK_COLS.ID_PRODUCT] = idProductStr;
+        mergeRow[TRACK_COLS.ID_PRODUCT] = idProductStr;
       }
 
-      await trx(TRACK_TABLE).insert(insertRow).onConflict("order_id").merge(mergeRow);
+      await trx(TRACK_TABLE).insert(insertRow).onConflict(TRACK_COLS.ORDER_ID).merge(mergeRow);
 
       upserted += 1;
     }
@@ -325,13 +330,13 @@ async function reconcileOrderUserTrackingWithTeamMembers(
   }
 
   const existing = await db(TRACK_TABLE)
-    .select("order_id")
+    .select(TRACK_COLS.ORDER_ID)
     .whereIn(
-      "order_id",
+      TRACK_COLS.ORDER_ID,
       orderIds.map((x) => String(x))
     );
   const existingSet = new Set(
-    (existing || []).map((r) => String(r.order_id || "").trim())
+    (existing || []).map((r) => String(r[TRACK_COLS.ORDER_ID] || "").trim())
   );
   const missing = orderIds.filter((oid) => !existingSet.has(oid));
   if (missing.length > 0) {
@@ -356,17 +361,17 @@ async function reconcileOrderUserTrackingWithTeamMembers(
       // "chưa add" = chưa có trên team Adobe: không lưu tên org sản phẩm ở tracking
       // (tránh UI hiển thị profile trong khi cột tình trạng là Chưa add).
       const patch = {
-        status,
-        org_name: status === "chưa add" ? null : orgName,
-        update_at: trx.fn.now(),
+        [TRACK_COLS.STATUS]: status,
+        [TRACK_COLS.ORG_NAME]: status === "chưa add" ? null : orgName,
+        [TRACK_COLS.UPDATED_AT]: trx.fn.now(),
       };
       if (status === "chưa add") {
-        patch.id_product = null;
+        patch[TRACK_COLS.ID_PRODUCT] = null;
       } else if (idProductStr) {
-        patch.id_product = idProductStr;
+        patch[TRACK_COLS.ID_PRODUCT] = idProductStr;
       }
       const n = await trx(TRACK_TABLE)
-        .where("order_id", orderId)
+        .where(TRACK_COLS.ORDER_ID, orderId)
         .update(patch);
       updated += n;
     }
@@ -489,7 +494,7 @@ async function getOrderUserTrackingCountByOrgName(orgName) {
     return 0;
   }
   const row = await db(TRACK_TABLE)
-    .whereRaw(`lower(btrim(COALESCE(org_name::text, ''))) = ?`, [k])
+    .whereRaw(`lower(btrim(COALESCE(${TRACK_COLS.ORG_NAME}::text, ''))) = ?`, [k])
     .count("* as c")
     .first();
   return Number(row?.c) || 0;
@@ -500,9 +505,9 @@ async function getOrderUserTrackingCountByOrgName(orgName) {
  */
 async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
   const rows = await db(TRACK_TABLE)
-    .select("account")
-    .whereNotNull("account")
-    .whereNotNull("expired")
+    .select(TRACK_COLS.ACCOUNT)
+    .whereNotNull(TRACK_COLS.ACCOUNT)
+    .whereNotNull(TRACK_COLS.EXPIRED)
     .whereRaw(
       "expired = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date"
     );
@@ -510,7 +515,7 @@ async function getMapAccountIdToUserEmailsForTrackingExpiredToday() {
   const emails = [
     ...new Set(
       rows
-        .map((r) => normalizeEmail(r.account))
+        .map((r) => normalizeEmail(r[TRACK_COLS.ACCOUNT]))
         .filter(Boolean)
     ),
   ];
@@ -569,18 +574,18 @@ async function getMapAccountIdToUserEmailsFor2330Cleanup() {
       this.on(
         db.raw("CAST(?? AS TEXT)", [`m.${MAP_COLS.ORDER_ID}`]),
         "=",
-        "t.order_id"
+        `t.${TRACK_COLS.ORDER_ID}`
       ).andOn(
         db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`m.${MAP_COLS.USER_EMAIL}`]),
         "=",
-        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`t.account`])
+        db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`t.${TRACK_COLS.ACCOUNT}`])
       );
     })
     .whereNotNull(`m.${MAP_COLS.ADOBE_ACCOUNT_ID}`)
-    .whereNotNull("t.expired")
-    .whereNotNull("t.account")
+    .whereNotNull(`t.${TRACK_COLS.EXPIRED}`)
+    .whereNotNull(`t.${TRACK_COLS.ACCOUNT}`)
     .whereRaw(
-      `t.expired::date <= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
+      `t.${TRACK_COLS.EXPIRED}::date <= (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`
     )
     .select(
       `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_id`,

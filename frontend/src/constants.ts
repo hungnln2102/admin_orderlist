@@ -21,6 +21,8 @@ export const API_ENDPOINTS = {
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
   ORDER_RENEW: (orderCode: string) =>
     `/api/orders/${encodeURIComponent(orderCode)}/renew`,
+  ORDER_COMPLETE_MANUAL_WEBHOOK: (id: number) =>
+    `/api/orders/${id}/complete-manual-webhook`,
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",

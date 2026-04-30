@@ -35,6 +35,7 @@ type OrderRowProps = {
   canRenewOrder: boolean;
   totalColumns: number;
   renewingOrderCode: string | null;
+  completingOrderCode: string | null;
   onToggleDetails: (orderId: number) => void;
   onView: (order: Order) => void;
   onEdit: (order: Order) => void;
@@ -56,6 +57,7 @@ export const OrderRow = React.memo(function OrderRow({
   canRenewOrder,
   totalColumns,
   renewingOrderCode,
+  completingOrderCode,
   onToggleDetails,
   onView,
   onEdit,
@@ -117,7 +119,7 @@ export const OrderRow = React.memo(function OrderRow({
   const canStartProcessing =
     statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
     statusText === ORDER_STATUSES.CAN_GIA_HAN;
-  const canMarkPaid = false;
+  const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
   const expiryDateDisplay = order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] || "";
@@ -125,6 +127,7 @@ export const OrderRow = React.memo(function OrderRow({
   const orderCodeDisplay = formatOrderCodeShort(orderCodeText);
   const orderTheme = getOrderCodeTheme(orderCodeText);
   const isRenewing = renewingOrderCode === orderCodeText;
+  const isCompleting = completingOrderCode === orderCodeText;
 
   const remainingValue = Number.isFinite(Number(soNgayConLai))
     ? Number(soNgayConLai)
@@ -331,9 +334,15 @@ export const OrderRow = React.memo(function OrderRow({
                     {canMarkPaid && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-md shadow-amber-900/40"
-                        onClick={stopPropagation(onMarkPaid)}
+                        disabled={isCompleting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isCompleting) {
+                            onMarkPaid(order);
+                          }
+                        }}
                       >
-                        Hoàn Thành
+                        {isCompleting ? "Đang Hoàn Thành..." : "Hoàn Thành"}
                       </button>
                     )}
                     {canRenew && (

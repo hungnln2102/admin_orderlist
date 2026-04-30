@@ -1,15 +1,15 @@
 const { db } = require("../../db");
-const { TABLES, STATUS } = require("./constants");
+const { TABLES, STATUS, COLS } = require("./constants");
 const { orderIdParam } = require("../../validators/orderValidator");
 const logger = require("../../utils/logger");
-const { SCHEMA_RECEIPT, tableName } = require("../../config/dbSchema");
 const {
     createOrGetRefundCreditNoteForOrder,
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
     CREDIT_STATUS,
+    REFUND_CREDIT_NOTES_TABLE,
+    REFUND_CREDIT_NOTE_COLS: RCN,
 } = require("./finance/refundCredits");
-const REFUND_CREDIT_NOTES_TABLE = tableName("refund_credit_notes", SCHEMA_RECEIPT);
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../services/orderCodeService");
 const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 
@@ -24,24 +24,45 @@ const detectPreviewPrefix = (orderCodeRaw) => {
 const attachRefundCreditRoutes = (router) => {
     /**
      * GET /api/orders/refund-credits/available
-     * Danh sách phiếu credit còn số dư (tạo đơn theo credit — chọn khách trong form).
+     * Phiếu credit **khả dụng** cho form tạo đơn: còn số dư, trạng thái OPEN/PARTIALLY_APPLIED,
+     * không bị tuyến thay thế (succeeded_by), và nếu gắn đơn nguồn thì đơn nguồn vẫn ở trạng thái hoàn.
      */
     router.get("/refund-credits/available", async (req, res) => {
         try {
-            const rows = await db(REFUND_CREDIT_NOTES_TABLE)
-                .where("available_amount", ">", 0)
-                .whereNot("status", CREDIT_STATUS.VOID)
-                .orderBy("id", "desc")
+            const orderIdCol = COLS.ORDER.ID;
+            const orderStatusCol = COLS.ORDER.STATUS;
+            const orderTable = TABLES.orderList;
+            const rcn = REFUND_CREDIT_NOTES_TABLE;
+
+            const rows = await db(`${rcn} as rcn_row`)
+                .leftJoin(
+                    `${orderTable} as src_order`,
+                    `src_order.${orderIdCol}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_LIST_ID}`
+                )
+                .where(`rcn_row.${RCN.AVAILABLE_AMOUNT}`, ">", 0)
+                .whereIn(`rcn_row.${RCN.STATUS}`, [
+                    CREDIT_STATUS.OPEN,
+                    CREDIT_STATUS.PARTIALLY_APPLIED,
+                ])
+                .whereNull(`rcn_row.${RCN.SUCCEEDED_BY_NOTE_ID}`)
+                .where((qb) => {
+                    qb.whereNull(`rcn_row.${RCN.SOURCE_ORDER_LIST_ID}`).orWhereIn(
+                        `src_order.${orderStatusCol}`,
+                        [STATUS.PENDING_REFUND, STATUS.REFUNDED]
+                    );
+                })
+                .orderBy(`rcn_row.${RCN.ID}`, "desc")
                 .select(
-                    "id",
-                    "credit_code",
-                    "customer_name",
-                    "customer_contact",
-                    "available_amount",
-                    "refund_amount",
-                    "source_order_code",
-                    "source_order_list_id",
-                    "status"
+                    `rcn_row.${RCN.ID} as ${RCN.ID}`,
+                    `rcn_row.${RCN.CREDIT_CODE} as ${RCN.CREDIT_CODE}`,
+                    `rcn_row.${RCN.CUSTOMER_NAME} as ${RCN.CUSTOMER_NAME}`,
+                    `rcn_row.${RCN.CUSTOMER_CONTACT} as ${RCN.CUSTOMER_CONTACT}`,
+                    `rcn_row.${RCN.AVAILABLE_AMOUNT} as ${RCN.AVAILABLE_AMOUNT}`,
+                    `rcn_row.${RCN.REFUND_AMOUNT} as ${RCN.REFUND_AMOUNT}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_CODE} as ${RCN.SOURCE_ORDER_CODE}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_LIST_ID} as ${RCN.SOURCE_ORDER_LIST_ID}`,
+                    `rcn_row.${RCN.STATUS} as ${RCN.STATUS}`
                 );
             return res.json({ data: rows });
         } catch (error) {

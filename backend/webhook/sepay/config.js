@@ -13,6 +13,7 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   PRICING_TIER_SCHEMA,
 } = require("../../src/config/dbSchema");
 
@@ -49,7 +50,7 @@ const { pool } = require("../../src/config/database");
 // GET table and column definitions
 // --------------------------------
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const SUPPLIER_DEF = getDefinition("SUPPLIER", PARTNER_SCHEMA);

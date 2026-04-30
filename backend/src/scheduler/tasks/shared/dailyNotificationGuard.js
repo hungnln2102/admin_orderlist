@@ -1,7 +1,15 @@
 const crypto = require("crypto");
 const logger = require("../../../utils/logger");
+const {
+  ADMIN_SCHEMA,
+  SCHEMA_ADMIN,
+  tableName,
+} = require("../../../config/dbSchema");
 
-const SITE_SETTINGS_TABLE = "admin.site_settings";
+const SITE_SETTINGS_TABLE = tableName(
+  ADMIN_SCHEMA.SITE_SETTINGS.TABLE,
+  SCHEMA_ADMIN
+);
 /** Khóa site_settings.varchar(50) — không vượt quá. */
 const MAX_KEY_LEN = 50;
 

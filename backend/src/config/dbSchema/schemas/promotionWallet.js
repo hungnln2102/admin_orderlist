@@ -43,10 +43,10 @@ const WALLET_SCHEMA = {
       AMOUNT: "amount",
       BALANCE_BEFORE: "balance_before",
       BALANCE_AFTER: "balance_after",
-      PROMO_CODE: "promo_code",
       CREATED_AT: "created_at",
       METHOD: "method",
       PROMOTION_ID: "promotion_id",
+      BONUS_APPLIED: "bonus_applied",
     },
   },
   WALLETS: {

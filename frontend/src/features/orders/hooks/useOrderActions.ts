@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+﻿import { useCallback, useRef, useState } from "react";
 import {
   API_ENDPOINTS,
   ORDER_FIELDS,
@@ -9,7 +9,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
-import { parseErrorResponse } from "../utils/ordersHelpers";
+import { parseErrorResponse, formatCurrency } from "../utils/ordersHelpers";
 import type { EditableOrder } from "../types";
 import type { RefundCreatePrefill } from "./useOrdersModals";
 
@@ -39,6 +39,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
   } = deps;
 
   const [renewingOrderCode, setRenewingOrderCode] = useState<string | null>(null);
+  const [completingOrderCode, setCompletingOrderCode] = useState<string | null>(null);
 
   /** Chống double-submit: nếu đã gọi tạo đơn thì bỏ qua lần gọi tiếp theo (tránh 2 đơn trùng mã) */
   const isCreatingOrderRef = useRef(false);
@@ -52,11 +53,19 @@ export function useOrderActions(deps: OrderActionsDeps) {
 
       closeCreateModal();
 
+      const outgoing: Record<string, unknown> = {
+        ...(newOrderData as unknown as Record<string, unknown>),
+      };
+      const creditSnap = Math.max(0, Number(outgoing.__credit_avail_snapshot) || 0);
+      const creditApply = Math.max(0, Number(outgoing.refund_credit_apply_amount) || 0);
+      const creditNoteId = Number(outgoing.refund_credit_note_id) || 0;
+      delete outgoing.__credit_avail_snapshot;
+
       try {
         const response = await apiFetch(API_ENDPOINTS.ORDERS, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newOrderData),
+          body: JSON.stringify(outgoing),
         });
         if (!response.ok) {
           const errorData = await response.json();
@@ -68,6 +77,21 @@ export function useOrderActions(deps: OrderActionsDeps) {
         await fetchOrders();
         handleViewOrder(createdOrder, "create");
         emitRefresh(["orders", "dashboard"]);
+        if (creditNoteId > 0 && creditApply > 0) {
+          const remaining = Math.max(0, creditSnap - creditApply);
+          showAppNotification({
+            type: "success",
+            title: "Đã tạo đơn",
+            message:
+              creditSnap > 0
+                ? `Đã áp dụng ${formatCurrency(
+                    creditApply
+                  )} credit. Dư trên phiếu (ước tính khi gửi form): ${formatCurrency(
+                    remaining
+                  )}.`
+                : `Đã áp dụng ${formatCurrency(creditApply)} credit vào đơn.`,
+          });
+        }
       } catch (error) {
         console.error("Lỗi khi tạo đơn hàng:", error);
         showAppNotification({
@@ -179,7 +203,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
           if (!response.ok) {
             const errorMessage = await parseErrorResponse(response);
             throw new Error(
-              errorMessage || "KhÃ´ng thá»ƒ gia háº¡n thá»§ cÃ´ng cho Ä‘Æ¡n hÃ ng."
+              errorMessage || "Không thể gia hạn thủ công cho đơn hàng."
             );
           }
           await fetchOrders();
@@ -187,13 +211,50 @@ export function useOrderActions(deps: OrderActionsDeps) {
         } catch (error) {
           showAppNotification({
             type: "error",
-            title: "Lá»—i gia háº¡n",
-            message: `KhÃ´ng thá»ƒ gia háº¡n Ä‘Æ¡n hÃ ng: ${
+            title: "Lỗi gia hạn",
+            message: `Không thể gia hạn đơn hàng: ${
               error instanceof Error ? error.message : String(error)
             }`,
           });
         } finally {
           setRenewingOrderCode(null);
+        }
+        return;
+      } else if (statusText === ORDER_STATUSES.DANG_XU_LY) {
+        const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
+        setCompletingOrderCode(orderCode || String(order.id));
+        try {
+          const response = await apiFetch(
+            API_ENDPOINTS.ORDER_COMPLETE_MANUAL_WEBHOOK(order.id),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+          if (!response.ok) {
+            const errorMessage = await parseErrorResponse(response);
+            throw new Error(
+              errorMessage || "Không thể hoàn thành đơn bằng webhook thủ công."
+            );
+          }
+          await fetchOrders();
+          emitRefresh(["orders", "dashboard", "payments", "supplies"]);
+          showAppNotification({
+            type: "success",
+            title: "Hoàn thành đơn",
+            message:
+              "Đã tạo receipt và hoàn thành đơn bằng webhook thủ công.",
+          });
+        } catch (error) {
+          showAppNotification({
+            type: "error",
+            title: "Lỗi hoàn thành đơn",
+            message: `Không thể hoàn thành đơn hàng: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          });
+        } finally {
+          setCompletingOrderCode(null);
         }
         return;
       }
@@ -410,5 +471,6 @@ export function useOrderActions(deps: OrderActionsDeps) {
     handleSaveEdit,
     confirmDelete,
     renewingOrderCode,
+    completingOrderCode,
   };
 }

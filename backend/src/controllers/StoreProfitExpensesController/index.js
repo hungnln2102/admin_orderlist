@@ -2,6 +2,10 @@ const { db } = require("../../db");
 const logger = require("../../utils/logger");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
 const { normalizeDateInput, normalizeTextInput } = require("../../utils/normalizers");
+const {
+  monthKeyVietnamFromDbTimestamp,
+  applyExternalImportProfitDelta,
+} = require("../Order/finance/dashboardSummary");
 
 const TABLE = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
@@ -98,27 +102,43 @@ const createStoreProfitExpense = async (req, res) => {
   }
 
   try {
-    const [created] = await db(TABLE)
-      .insert({
-        [COLS.AMOUNT]: amount,
-        [COLS.REASON]: reason || null,
-        [COLS.EXPENSE_TYPE]: expenseType,
-      })
-      .returning([COLS.ID]);
-    const createdId = Number(created?.id || 0);
-    const row = await db(TABLE)
-      .select(
-        COLS.ID,
-        COLS.AMOUNT,
-        COLS.REASON,
-        COLS.EXPENSE_TYPE,
-        COLS.LINKED_ORDER_CODE,
-        COLS.EXPENSE_META,
-        COLS.CREATED_AT,
-        db.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
-      )
-      .where(COLS.ID, createdId)
-      .first();
+    const row = await db.transaction(async (trx) => {
+      const [created] = await trx(TABLE)
+        .insert({
+          [COLS.AMOUNT]: amount,
+          [COLS.REASON]: reason || null,
+          [COLS.EXPENSE_TYPE]: expenseType,
+        })
+        .returning([COLS.ID]);
+      const createdId = Number(created?.id ?? created?.[COLS.ID] ?? 0);
+      const inserted = await trx(TABLE)
+        .select(
+          COLS.ID,
+          COLS.AMOUNT,
+          COLS.REASON,
+          COLS.EXPENSE_TYPE,
+          COLS.LINKED_ORDER_CODE,
+          COLS.EXPENSE_META,
+          COLS.CREATED_AT,
+          trx.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
+        )
+        .where(COLS.ID, createdId)
+        .first();
+
+      if (
+        expenseType === "external_import" &&
+        amount > 0 &&
+        inserted?.[COLS.CREATED_AT]
+      ) {
+        const mk = await monthKeyVietnamFromDbTimestamp(
+          trx,
+          inserted[COLS.CREATED_AT]
+        );
+        if (mk) await applyExternalImportProfitDelta(trx, mk, -amount);
+      }
+
+      return inserted;
+    });
 
     res.status(201).json({ item: mapExpenseRow(row || {}) });
   } catch (error) {
@@ -134,8 +154,28 @@ const deleteStoreProfitExpense = async (req, res) => {
   const id = Number(req.params.id);
 
   try {
-    const deletedCount = await db(TABLE).where(COLS.ID, id).del();
-    if (!deletedCount) {
+    const deleted = await db.transaction(async (trx) => {
+      const row = await trx(TABLE).select("*").where(COLS.ID, id).first();
+      if (!row) return 0;
+      const expType = String(row[COLS.EXPENSE_TYPE] || "");
+      const amt = parseAmount(row[COLS.AMOUNT]);
+      const n = await trx(TABLE).where(COLS.ID, id).del();
+      if (
+        n &&
+        expType === "external_import" &&
+        amt > 0 &&
+        row[COLS.CREATED_AT]
+      ) {
+        const mk = await monthKeyVietnamFromDbTimestamp(
+          trx,
+          row[COLS.CREATED_AT]
+        );
+        if (mk) await applyExternalImportProfitDelta(trx, mk, amt);
+      }
+      return n;
+    });
+
+    if (!deleted) {
       return res.status(404).json({ error: "Không tìm thấy chi phí ngoài luồng." });
     }
     res.json({ ok: true, id });

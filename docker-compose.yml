@@ -1,4 +1,5 @@
 services:
+  # Biến môi trường Node: local → backend/.env.local (+ .env tùy chọn); stack Docker → backend/.env.docker (xem backend/env.*.example).
   # ==========================================
   # 1. DATABASE SERVICE (PostgreSQL)
   # ==========================================
@@ -11,8 +12,9 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASS:-postgres}
       POSTGRES_DB: ${DB_NAME:-mydtbmav}
+    # Postgres 18+ image: mount thư mục cha (xem database/README.md)
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     ports:
       - "5432:5432"
     networks:

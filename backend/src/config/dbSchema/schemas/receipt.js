@@ -1,0 +1,113 @@
+/**
+ * Schema PostgreSQL `receipt.*` — tách khỏi `orders` (đồng bộ consolidated_schema / pg_dump).
+ */
+const RECEIPT_SCHEMA = {
+  PAYMENT_RECEIPT: {
+    TABLE: "payment_receipt",
+    COLS: {
+      ID: "id",
+      ORDER_CODE: "id_order",
+      PAID_DATE: "payment_date",
+      AMOUNT: "amount",
+      RECEIVER: "receiver",
+      NOTE: "note",
+      SENDER: "sender",
+      SEPAY_TRANSACTION_ID: "sepay_transaction_id",
+      REFERENCE_CODE: "reference_code",
+      TRANSFER_TYPE: "transfer_type",
+      GATEWAY: "gateway",
+    },
+  },
+  PAYMENT_RECEIPT_FINANCIAL_STATE: {
+    TABLE: "payment_receipt_financial_state",
+    COLS: {
+      ID: "id",
+      PAYMENT_RECEIPT_ID: "payment_receipt_id",
+      IS_FINANCIAL_POSTED: "is_financial_posted",
+      POSTED_REVENUE: "posted_revenue",
+      POSTED_PROFIT: "posted_profit",
+      RECONCILED_AT: "reconciled_at",
+      ADJUSTMENT_APPLIED: "adjustment_applied",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG: {
+    TABLE: "payment_receipt_financial_audit_log",
+    COLS: {
+      ID: "id",
+      PAYMENT_RECEIPT_ID: "payment_receipt_id",
+      ORDER_CODE: "order_code",
+      RULE_BRANCH: "rule_branch",
+      DELTA: "delta",
+      SOURCE: "source",
+      CREATED_AT: "created_at",
+    },
+  },
+  PAYMENT_RECEIPT_BATCH: {
+    TABLE: "payment_receipt_batch",
+    COLS: {
+      ID: "id",
+      BATCH_CODE: "batch_code",
+      TOTAL_AMOUNT: "total_amount",
+      ORDER_COUNT: "order_count",
+      STATUS: "status",
+      SOURCE: "source",
+      NOTE: "note",
+      PAID_RECEIPT_ID: "paid_receipt_id",
+      PAID_AT: "paid_at",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  PAYMENT_RECEIPT_BATCH_ITEM: {
+    TABLE: "payment_receipt_batch_item",
+    COLS: {
+      ID: "id",
+      BATCH_ID: "batch_id",
+      BATCH_CODE: "batch_code",
+      ORDER_CODE: "order_code",
+      ORDER_LIST_ID: "order_list_id",
+      AMOUNT: "amount",
+      STATUS: "status",
+      CREATED_AT: "created_at",
+    },
+  },
+  REFUND_CREDIT_NOTES: {
+    TABLE: "refund_credit_notes",
+    COLS: {
+      ID: "id",
+      CREDIT_CODE: "credit_code",
+      SOURCE_ORDER_LIST_ID: "source_order_list_id",
+      SOURCE_ORDER_CODE: "source_order_code",
+      CUSTOMER_NAME: "customer_name",
+      CUSTOMER_CONTACT: "customer_contact",
+      REFUND_AMOUNT: "refund_amount",
+      AVAILABLE_AMOUNT: "available_amount",
+      STATUS: "status",
+      NOTE: "note",
+      ISSUED_AT: "issued_at",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+      SPLIT_FROM_NOTE_ID: "split_from_note_id",
+      SUCCEEDED_BY_NOTE_ID: "succeeded_by_note_id",
+    },
+  },
+  REFUND_CREDIT_APPLICATIONS: {
+    TABLE: "refund_credit_applications",
+    COLS: {
+      ID: "id",
+      CREDIT_NOTE_ID: "credit_note_id",
+      TARGET_ORDER_LIST_ID: "target_order_list_id",
+      TARGET_ORDER_CODE: "target_order_code",
+      PAYMENT_RECEIPT_ID: "payment_receipt_id",
+      APPLIED_AMOUNT: "applied_amount",
+      NOTE: "note",
+      APPLIED_BY: "applied_by",
+      APPLIED_AT: "applied_at",
+      CREATED_AT: "created_at",
+    },
+  },
+};
+
+module.exports = { RECEIPT_SCHEMA };

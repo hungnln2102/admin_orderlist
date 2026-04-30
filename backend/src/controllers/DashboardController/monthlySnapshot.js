@@ -1,9 +1,9 @@
 /**
  * Doanh thu: cột total_revenue trên dashboard_monthly_summary (cộng dồn khi chèn biên lai, xem trigger).
  * Rebuild: revenueSource = 'receipts' tổng từ payment_receipt (sau khi xóa bảng, đối soát lại).
- * Hoàn/đếm đơn từ CTE order_list. total_import + total_profit (lãi theo từng dòng, sync từ log NCC);
- * cột total_profit trong DB = tổng lãi (gross) trước rút; bảng tháng/KPI: total_profit − rút theo tháng.
- * Thuế trên (doanh thu ròng).
+ * Hoàn/đếm đơn từ CTE order_list. total_import: SUM **một dòng log mới nhất / đơn / tháng** (`sumImportCostByMonthKeys`);
+ * total_profit MAVN (âm cost) từ trigger NCC; nhập ngoài luồng điều chỉnh `total_profit` khi ghi `store_profit_expenses.external_import`.
+ * Hiển thị API: dùng `total_profit` như trong DB. Thuế trên (doanh thu ròng).
  */
 const { db } = require("../../db");
 const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryAggregate");
@@ -15,6 +15,7 @@ const {
   FINANCE_SCHEMA,
   SCHEMA_FINANCE,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   PARTNER_SCHEMA,
   SCHEMA_PARTNER,
   SCHEMA_ORDERS,
@@ -22,11 +23,6 @@ const {
 } = require("../../config/dbSchema");
 
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
-const expenseTableName = tableName(
-  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
-  SCHEMA_FINANCE
-);
-const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 const importLogTable = tableName(
   PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
   SCHEMA_PARTNER
@@ -35,16 +31,20 @@ const importLogCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
 const orderListTable = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
 const orderListCols = ORDERS_SCHEMA.ORDER_LIST.COLS;
 const paymentReceiptTable = tableName(
-  ORDERS_SCHEMA.PAYMENT_RECEIPT.TABLE,
+  RECEIPT_SCHEMA.PAYMENT_RECEIPT.TABLE,
   SCHEMA_RECEIPT
 );
-const paymentReceiptCols = ORDERS_SCHEMA.PAYMENT_RECEIPT.COLS;
+const paymentReceiptCols = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS;
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
   SCHEMA_FINANCE
 );
 
 const toNumber = (value) => Number(value || 0);
+
+/** Khớp `fn_recalc_dashboard_total_import` (bucket tháng Asia/Ho_Chi_Minh). */
+const importLoggedAtMonthKeySql = (alias, loggedAtIdent) =>
+  `to_char(timezone('Asia/Ho_Chi_Minh', ${alias}.${loggedAtIdent}), 'YYYY-MM')`;
 
 const taxOnNet = (sepay, refund) =>
   Math.round(
@@ -84,16 +84,28 @@ const sumImportCostByMonthKeys = async (monthKeys, executor = db) => {
   if (!unique.length) return new Map();
   const la = quoteIdent(importLogCols.LOGGED_AT);
   const ic = quoteIdent(importLogCols.IMPORT_COST);
+  const oid = quoteIdent(importLogCols.ORDER_LIST_ID);
+  const iid = quoteIdent(importLogCols.ID);
   const placeholders = unique.map(() => "?").join(", ");
   const r = await executor.raw(
     `
     SELECT
-      TO_CHAR(DATE_TRUNC('month', ${la}::timestamptz), 'YYYY-MM') AS mk,
-      COALESCE(SUM(${ic}::numeric), 0) AS total_import
-    FROM ${importLogTable}
-    WHERE ${la} IS NOT NULL
-      AND TO_CHAR(DATE_TRUNC('month', ${la}::timestamptz), 'YYYY-MM') IN (${placeholders})
-    GROUP BY 1
+      mk,
+      COALESCE(SUM(import_cost_num::numeric), 0) AS total_import
+    FROM (
+      SELECT
+        ${importLoggedAtMonthKeySql("d", la)} AS mk,
+        d.${ic} AS import_cost_num,
+        ROW_NUMBER() OVER (
+          PARTITION BY ${importLoggedAtMonthKeySql("d", la)}, d.${oid}
+          ORDER BY d.${iid} DESC
+        ) AS rn
+      FROM ${importLogTable} d
+      WHERE d.${la} IS NOT NULL
+        AND ${importLoggedAtMonthKeySql("d", la)} IN (${placeholders})
+    ) ranked
+    WHERE ranked.rn = 1
+    GROUP BY mk
     `,
     unique
   );
@@ -125,10 +137,10 @@ const sumNccOrderMarginByMonthKeys = async (monthKeys, executor = db) => {
       COALESCE(SUM(sub.m), 0) AS ncc_margin
     FROM (
       SELECT DISTINCT ON (
-        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM'),
+        ${importLoggedAtMonthKeySql("l", la)},
         l.${lid}
       )
-        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM') AS mk,
+        ${importLoggedAtMonthKeySql("l", la)} AS mk,
         GREATEST(
           0,
           COALESCE(ol.${gsp}::numeric, ol.${price}::numeric, 0) - COALESCE(ol.${cost}::numeric, 0)
@@ -136,9 +148,9 @@ const sumNccOrderMarginByMonthKeys = async (monthKeys, executor = db) => {
       FROM ${importLogTable} l
       INNER JOIN ${orderListTable} ol ON ol.${olId} = l.${lid}
       WHERE l.${la} IS NOT NULL
-        AND TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM') IN (${placeholders})
+        AND ${importLoggedAtMonthKeySql("l", la)} IN (${placeholders})
       ORDER BY
-        TO_CHAR(DATE_TRUNC('month', l.${la}::timestamptz), 'YYYY-MM'),
+        ${importLoggedAtMonthKeySql("l", la)},
         l.${lid},
         l.${lId} DESC
     ) sub
@@ -149,31 +161,6 @@ const sumNccOrderMarginByMonthKeys = async (monthKeys, executor = db) => {
   return new Map(
     (r.rows || []).map((r0) => [String(r0.mk || ""), toNumber(r0.ncc_margin)])
   );
-};
-
-const sumWithdrawProfitByMonthKeys = async (monthKeys, executor = db) => {
-  const unique = [...new Set((monthKeys || []).map((k) => String(k || "").trim()))].filter(
-    Boolean
-  );
-  if (!unique.length) return new Map();
-  const cAt = quoteIdent(expenseCols.CREATED_AT);
-  const cAmt = quoteIdent(expenseCols.AMOUNT);
-  const cType = quoteIdent(expenseCols.EXPENSE_TYPE);
-  const placeholders = unique.map(() => "?").join(", ");
-  const r = await executor.raw(
-    `
-    SELECT
-      TO_CHAR(DATE_TRUNC('month', e.${cAt}::date), 'YYYY-MM') AS mk,
-      COALESCE(SUM(e.${cAmt}::numeric), 0) AS w
-    FROM ${expenseTableName} e
-    WHERE e.${cType} = 'withdraw_profit'
-      AND e.${cAt} IS NOT NULL
-      AND TO_CHAR(DATE_TRUNC('month', e.${cAt}::date), 'YYYY-MM') IN (${placeholders})
-    GROUP BY 1
-    `,
-    unique
-  );
-  return new Map((r.rows || []).map((r0) => [String(r0.mk || ""), toNumber(r0.w)]));
 };
 
 const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => {
@@ -220,7 +207,6 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
     .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
     .filter(Boolean);
 
-  const withdrawMapF = await sumWithdrawProfitByMonthKeys(mks, executor);
   let revImpByMonth;
   if (revenueSource === "receipts") {
     const [revMap, impMap, nccMap] = await Promise.all([
@@ -249,15 +235,13 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
     const { rev, imp: importVal, nccMargin } = revImpByMonth(mk);
     const refund = toNumber(row[summaryCols.TOTAL_REFUND]);
-    const withdraw = withdrawMapF.get(mk) || 0;
-    const profitGross = nccMargin;
-    const profitForDisplay = profitGross - withdraw;
+    const profitForDisplay = nccMargin;
     return {
       [summaryCols.MONTH_KEY]: mk,
       [summaryCols.TOTAL_ORDERS]: toNumber(row[summaryCols.TOTAL_ORDERS]),
       [summaryCols.CANCELED_ORDERS]: toNumber(row[summaryCols.CANCELED_ORDERS]),
       [summaryCols.TOTAL_REVENUE]: rev,
-      [summaryCols.TOTAL_PROFIT]: revenueSource === "receipts" ? profitGross : profitForDisplay,
+      [summaryCols.TOTAL_PROFIT]: profitForDisplay,
       [summaryCols.TOTAL_REFUND]: refund,
       [summaryCols.TOTAL_IMPORT]: importVal,
       [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
@@ -290,7 +274,6 @@ module.exports = {
   sumImportCostByMonthKeys,
   sumNccOrderMarginByMonthKeys,
   sumRevenueAndImportFromSummaryTable,
-  sumWithdrawProfitByMonthKeys,
   rowToApiShape,
   toNumber,
   taxOnNet,

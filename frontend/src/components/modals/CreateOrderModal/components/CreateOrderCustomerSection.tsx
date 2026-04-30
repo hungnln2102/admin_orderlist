@@ -10,6 +10,7 @@ import {
 import type { Order, SSOption } from "../types";
 import SearchableSelect from "../SearchableSelect";
 import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
+import { formatCurrency } from "@/features/orders/utils/ordersHelpers";
 
 type CreateOrderCustomerSectionProps = {
   formData: Partial<Order>;
@@ -40,6 +41,8 @@ export const CreateOrderCustomerSection = ({
   selectedCreditNoteId,
 }: CreateOrderCustomerSectionProps) => {
   const selectedId = selectedCreditNoteId;
+  const selectedCreditRow =
+    selectedId != null ? creditNoteById.get(selectedId) : undefined;
 
   return (
     <section className={panelClass}>
@@ -47,7 +50,7 @@ export const CreateOrderCustomerSection = ({
         <h4 className={panelTitleClass}>Thông tin khách hàng & đơn hàng</h4>
         <p className={panelSubtitleClass}>
           {creditMode
-            ? "Chọn phiếu ở dropdown (hiển thị «Tên - credit»); tên khách điền ở ô bên dưới, có thể sửa. Link liên hệ nhập tay."
+            ? "Chọn phiếu trong danh sách (mỗi dòng có «Tên — số dư credit»); ô bên dưới nhập tên khách, có thể sửa."
             : "Nhập thông tin liên hệ và mô tả đơn hàng cần xử lý."}
         </p>
       </div>
@@ -63,7 +66,7 @@ export const CreateOrderCustomerSection = ({
               placeholder={
                 creditListLoading
                   ? "Đang tải danh sách…"
-                  : "Chọn «Tên - credit»…"
+                  : "Chọn «Tên — số dư»…"
               }
               disabled={creditListLoading}
               onChange={(val) => {
@@ -72,6 +75,18 @@ export const CreateOrderCustomerSection = ({
               }}
               onClear={onClearCreditSelection}
             />
+            {creditMode && selectedCreditRow ? (
+              <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-emerald-500/25 bg-emerald-950/30 px-3 py-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200/85">
+                  Số dư credit (phiếu này)
+                </span>
+                <span className="text-base font-black tabular-nums text-emerald-100">
+                  {formatCurrency(
+                    Math.max(0, Number(selectedCreditRow.available_amount) || 0)
+                  )}
+                </span>
+              </div>
+            ) : null}
             {!creditListLoading && availableCreditOptions.length === 0 ? (
               <p className="mt-1.5 text-xs text-amber-200/80">
                 Không có phiếu credit còn số dư. Tắt chế độ «Credit» để nhập tay.

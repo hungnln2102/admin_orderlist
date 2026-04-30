@@ -276,10 +276,13 @@ const insertFinancialAuditLog = async (
 const insertPaymentReceipt = async (transaction, options = {}) => {
   if (!transaction) return { inserted: false, skipped: true, reason: "missing_transaction" };
 
+  const explicitOrderCodeRaw =
+    options.orderCode !== undefined && options.orderCode !== null
+      ? String(options.orderCode || "")
+      : "";
+  const normalizedExplicitOrderCode = normalizeOrderCode(explicitOrderCodeRaw);
   const orderCode =
-    normalizeOrderCode(
-      options.orderCode !== undefined ? String(options.orderCode || "") : ""
-    ) ||
+    normalizedExplicitOrderCode ||
     normalizeOrderCode(
       extractOrderCodeFromText(
       transaction.transaction_content,
@@ -312,7 +315,9 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     transaction.transfer_type || transaction.transferType
   );
   const gateway = normalizeOptionalText(transaction.gateway);
-  const noteValue = transaction.note || transaction.description || "";
+  /** Giao dịch gốc. Cột `note` DB: khi có `options.orderCode` (mã đơn đã resolve, thường là đơn mới) thì ghi đúng mã đó — khớp `id_order`; ngược lại giữ text CK. */
+  const transferNote = transaction.note || transaction.description || "";
+  const noteValue = normalizedExplicitOrderCode ? normalizedExplicitOrderCode : transferNote;
 
   const orderCodeColumn =
     (await getPaymentReceiptOrderColumn()) ||
@@ -499,8 +504,9 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     const insertRes = await client.query(sql, insertValues);
     const insertedId = insertRes.rows[0]?.id ?? null;
     await ensureReceiptFinancialState(client, insertedId);
-    // total_revenue tháng (dashboard): cộng dồn bởi trigger DB
-    // (tr_payment_receipt_dashboard_revenue) trên payment_receipt, không tính lại ở API.
+    // INSERT chỉ tạo biên lai + payment_receipt_financial_state (chưa posted).
+    // Cập nhật total_revenue / total_profit trên dashboard_monthly_summary do luồng ứng dụng
+    // (webhook Sepay, manual webhook, reconcile, renewal, …), không còn trigger receipt→dashboard.
 
     if (manageTransaction) {
       await client.query("COMMIT");
@@ -728,6 +734,21 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
   }
 };
 
+const countPaymentReceiptsForOrderCode = async (client, orderCode) => {
+  const normalized = normalizeOrderCode(String(orderCode || "").trim());
+  if (!normalized) return 0;
+  const orderCodeColumn = (await getPaymentReceiptOrderColumn()) || "id_order";
+  const { rows } = await client.query(
+    `
+      SELECT COUNT(*)::int AS c
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED}
+      WHERE LOWER(TRIM(COALESCE(${safeIdent(orderCodeColumn)}::text, ''))) = LOWER($1)
+    `,
+    [normalized]
+  );
+  return Number(rows[0]?.c) || 0;
+};
+
 const calculateSalePrice = ({
   orderCode,
   giaNhap,
@@ -762,4 +783,5 @@ module.exports = {
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
   calculateSalePrice,
+  countPaymentReceiptsForOrderCode,
 };

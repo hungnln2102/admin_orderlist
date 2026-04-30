@@ -4,6 +4,7 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   getDefinition,
 } = require("../config/dbSchema");
 const { quoteIdent } = require("./sql");
@@ -37,6 +38,7 @@ const QUOTED_COLS = Object.fromEntries([
   ...makeEntries(PRODUCT_SCHEMA),
   ...makeEntries(PARTNER_SCHEMA),
   ...makeEntries(ORDERS_SCHEMA),
+  ...makeEntries(RECEIPT_SCHEMA),
 ]);
 
 module.exports = {

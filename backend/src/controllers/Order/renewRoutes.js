@@ -3,6 +3,7 @@ const { db } = require("../../db");
 const { TABLES, STATUS } = require("./constants");
 const logger = require("../../utils/logger");
 const { orderCodeParam, orderIdParam } = require("../../validators/orderValidator");
+const { voidOpenRefundCreditNotesForSourceOrder } = require("./finance/refundCredits");
 
 const attachRenewRoutes = (router) => {
     router.post("/:orderCode/renew", ...orderCodeParam, async(req, res) => {
@@ -53,16 +54,33 @@ const attachRenewRoutes = (router) => {
                 currentOrder?.[idOrderCol] ?? currentOrder?.id_order
             );
 
-            const [updated] = await db(TABLES.orderList)
-                .where({ id })
-                .whereIn(statusCol, [STATUS.PENDING_REFUND])
-                .update({
-                    [statusCol]: STATUS.REFUNDED,
-                })
-                .returning(["id", idOrderCol, informationOrderCol, statusCol]);
+            const trx = await db.transaction();
+            try {
+                const [updated] = await trx(TABLES.orderList)
+                    .where({ id })
+                    .whereIn(statusCol, [STATUS.PENDING_REFUND])
+                    .update({
+                        [statusCol]: STATUS.REFUNDED,
+                    })
+                    .returning(["id", idOrderCol, informationOrderCol, statusCol]);
 
-            if (!updated) return res.status(404).json({ error: "Không tìm thấy đơn hàng hoặc đã hoàn tiền" });
-            res.json({ success: true, refundReferenceCode, ...updated });
+                if (!updated) {
+                    await trx.rollback();
+                    return res.status(404).json({ error: "Không tìm thấy đơn hàng hoặc đã hoàn tiền" });
+                }
+
+                const { voided } = await voidOpenRefundCreditNotesForSourceOrder(
+                    trx,
+                    id,
+                    `Xác nhận hoàn CK (${refundReferenceCode}) — hủy credit còn lại.`
+                );
+
+                await trx.commit();
+                return res.json({ success: true, refundReferenceCode, voided_credit_notes: voided, ...updated });
+            } catch (inner) {
+                await trx.rollback();
+                throw inner;
+            }
         } catch (error) {
             logger.error("Lỗi hoàn tiền", { id, error: error.message, stack: error.stack });
             res.status(500).json({ error: "Không thể đánh dấu hoàn tiền." });

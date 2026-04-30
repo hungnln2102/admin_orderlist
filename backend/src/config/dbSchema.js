@@ -42,6 +42,7 @@ const {
   PARTNER_SCHEMA,
   PRICING_TIER_SCHEMA,
 } = require("./dbSchema/schemas/ordersProductPartner");
+const { RECEIPT_SCHEMA } = require("./dbSchema/schemas/receipt");
 const {
   RENEW_ADOBE_SCHEMA,
   KEY_ACTIVE_SCHEMA,
@@ -79,6 +80,7 @@ module.exports = {
   WALLET_SCHEMA,
   FORM_DESC_SCHEMA,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   PRODUCT_SCHEMA,
   SCHEMA_PARTNER,
   PARTNER_SCHEMA,

@@ -13,7 +13,8 @@ description: >
 ```
 admin_orderlist/backend/src/
   config/
-    dbSchema.js       ← ĐỌC TRƯỚC: toàn bộ table/column constants của mọi schema DB
+    dbSchema.js       ← Entry: ORDERS_SCHEMA, RECEIPT_SCHEMA, … (định nghĩa tách file trong config/dbSchema/schemas/, khớp PostgreSQL schema)
+                      ← Quy tắc: .agents/software-engineering/skills/db-schema-source-of-truth/SKILL.md
   utils/
     statuses.js       ← ORDER_STATUS constants — LUÔN DÙNG STATUS.* thay vì string literal
     logger.js         ← Winston logger dùng chung

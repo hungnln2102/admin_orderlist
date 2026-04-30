@@ -14,7 +14,7 @@ Mục tiêu: **Orderlist** chỉ ủy quyển (HTTP) tới dịch vụ Renew Ado
 - Xoay khóa: `node backend/scripts/append-renew-adobe-env.js --rotate`
 - File mẫu (commit được): `backend/.env.renew-adobe.example`
 
-`loadEnv` chỉ nạp `backend/.env` và `backend/.env.local` — không dùng `.env` ở thư mục gốc repo nếu không tự cấu hình thêm.
+`loadEnv` (xem `backend/src/config/loadEnv.js`): nạp `backend/.env` (tùy chọn), rồi **production/docker** → `backend/.env.docker`, **local** → `backend/.env.local`. File mẫu: `env.docker.example`, `env.local.example`.
 
 **Docker Compose:** `docker-compose.yml` dùng `backend/.env.docker` cho `backend`, `webhook`, `scheduler`. Cùng block biến Renew Adobe đã được thêm vào file đó; khi chưa có container `renew-adobe-api`, giữ `RENEW_ADOBE_API_BASE_URL` comment — API vẫn chạy Renew Adobe in-process trong container backend.
 

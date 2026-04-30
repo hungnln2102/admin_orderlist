@@ -83,10 +83,13 @@ export const useOrderSubmit = ({
         const variantId = matchedProduct?.id;
 
         const orderTypePrefix = String(formData[ORDER_FIELDS.ID_ORDER] || "");
+        const rawSelling = Number(formData[ORDER_FIELDS.PRICE]);
         const sellingPrice =
           orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
             ? 0
-            : Number(formData[ORDER_FIELDS.PRICE]);
+            : Number.isFinite(rawSelling)
+              ? Math.max(0, rawSelling)
+              : 0;
 
         const dataToSave: Partial<ApiOrder> = {
           ...formData,
@@ -122,14 +125,21 @@ export const useOrderSubmit = ({
           if (prefillContext.reservedOrderCode) {
             record.reserved_order_code = prefillContext.reservedOrderCode;
           }
+          record.__credit_avail_snapshot = Math.max(
+            0,
+            Number(prefillContext.creditAvailableAmount) || 0
+          );
         } else if (creditOrderSelection?.id) {
+          /** Luôn gửi id phiếu + số áp; nếu `apply` = 0 backend vẫn gán min(dư phiếu, giá) (createOrder). Trước đây `if (apply > 0)` bỏ hết payload khi giá là NaN → không có application. */
+          const record = dataToSave as Record<string, unknown>;
+          record.refund_credit_note_id = creditOrderSelection.id;
           const cap = Math.max(0, creditOrderSelection.availableAmount);
-          const apply = Math.min(cap, Math.max(0, sellingPrice));
-          if (apply > 0) {
-            const record = dataToSave as Record<string, unknown>;
-            record.refund_credit_note_id = creditOrderSelection.id;
-            record.refund_credit_apply_amount = apply;
-          }
+          const apply =
+            orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
+              ? 0
+              : Math.min(cap, sellingPrice);
+          record.refund_credit_apply_amount = apply;
+          record.__credit_avail_snapshot = cap;
         }
 
         onSave(dataToSave as Order);

@@ -64,6 +64,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const hasPrefillCredit = Boolean(
     prefillContext && Number(prefillContext.creditNoteId) > 0
   );
+  /** Dư trên phiếu sau khi trừ (theo số credit apply trong prefill). */
+  const prefillCreditNoteRemaining = useMemo(() => {
+    if (!prefillContext || !Number(prefillContext.creditNoteId)) return null;
+    const avail = Math.max(0, Number(prefillContext.creditAvailableAmount) || 0);
+    const apply = Math.max(0, Number(prefillContext.creditApplyAmount) || 0);
+    return Math.max(0, avail - apply);
+  }, [prefillContext]);
   const manualCreditMoney = useMemo(() => {
     if (!selectedCreditNote || hasPrefillCredit) return null;
     const avail = Math.max(0, Number(selectedCreditNote.available_amount) || 0);
@@ -71,18 +78,29 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const priceNum = Math.max(0, Number(formData[ORDER_FIELDS.PRICE]) || 0);
     const apply = Math.min(avail, priceNum);
     const remaining = Math.max(0, priceNum - apply);
-    return { avail, refOld, priceNum, apply, remaining };
+    const noteRemainingAfter = Math.max(0, avail - apply);
+    return { avail, refOld, priceNum, apply, remaining, noteRemainingAfter };
   }, [selectedCreditNote, hasPrefillCredit, formData]);
-  const creditNoteById = useMemo(
-    () => new Map(availableCreditNotes.map((r) => [r.id, r])),
-    [availableCreditNotes]
-  );
+  const creditNoteById = useMemo(() => {
+    const m = new Map<number, (typeof availableCreditNotes)[0]>();
+    for (const r of availableCreditNotes) {
+      const id = Number(r.id);
+      if (Number.isFinite(id) && id > 0) {
+        m.set(id, r);
+      }
+    }
+    return m;
+  }, [availableCreditNotes]);
   const availableCreditOptions = useMemo(
     () =>
-      availableCreditNotes.map((r) => ({
-        value: r.id,
-        label: `${(r.customer_name || "—").trim()} - credit`,
-      })),
+      availableCreditNotes.map((r) => {
+        const name = (r.customer_name || "—").trim();
+        const avail = Math.max(0, Number(r.available_amount) || 0);
+        return {
+          value: Number(r.id),
+          label: `${name} — ${formatCurrency(avail)}`,
+        };
+      }),
     [availableCreditNotes]
   );
 
@@ -424,7 +442,12 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 onSelectCreditRow={selectCreditNoteRow}
                 onClearCreditSelection={clearSelectedCreditNote}
                 creditNoteById={creditNoteById}
-                selectedCreditNoteId={selectedCreditNote?.id ?? null}
+                selectedCreditNoteId={
+                  selectedCreditNote?.id != null &&
+                  Number.isFinite(Number(selectedCreditNote.id))
+                    ? Number(selectedCreditNote.id)
+                    : null
+                }
               />
 
               <CreateOrderPricingSection
@@ -478,6 +501,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       {formatCurrency(manualCreditMoney.avail)}
                     </span>
                   </li>
+                  <li>
+                    <span className="text-slate-400">
+                      Credit còn lại trên phiếu (sau đơn này)
+                    </span>
+                    <span className="shrink-0 font-semibold text-amber-100/95">
+                      {formatCurrency(manualCreditMoney.noteRemainingAfter)}
+                    </span>
+                  </li>
                   <li className="!block border-t border-amber-500/25 pt-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold text-amber-100/95">
@@ -529,6 +560,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     </span>
                     <span className="shrink-0 font-semibold text-slate-100">
                       {formatCurrency(prefillContext.creditAvailableAmount || 0)}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="text-slate-400">
+                      Credit còn lại trên phiếu (sau đơn này)
+                    </span>
+                    <span className="shrink-0 font-semibold text-amber-100/95">
+                      {formatCurrency(prefillCreditNoteRemaining ?? 0)}
                     </span>
                   </li>
                   <li className="!block border-t border-amber-500/25 pt-2.5">

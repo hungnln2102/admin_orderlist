@@ -6,8 +6,6 @@ import {
   ChartBarIcon,
   CalculatorIcon,
   ClipboardDocumentIcon,
-  MagnifyingGlassIcon,
-  QueueListIcon,
   CubeIcon,
   CurrencyDollarIcon,
   DocumentIcon,
@@ -154,16 +152,6 @@ export const menuSections: MenuSection[] = [
         name: "Danh sách Admin Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
-      },
-      {
-        name: "Đơn Renew Adobe",
-        href: "/renew-orders",
-        icon: QueueListIcon,
-      },
-      {
-        name: "Kiểm tra Renew (storefront)",
-        href: "/renew-adobe-check",
-        icon: MagnifyingGlassIcon,
       },
       {
         name: "Sản phẩm hệ thống",
