@@ -14,7 +14,7 @@ require("dotenv").config({ path: path.join(backendRoot, ".env") });
 const renewAdobeInternalAuth = require(
   path.join(backendRoot, "src/middleware/renewAdobeInternalAuth")
 ).renewAdobeInternalAuth;
-const renewAdobeRoutes = require(path.join(backendRoot, "src/routes/renewAdobeRoutes"));
+const renewAdobeRoutes = require(path.join(backendRoot, "src/domains/renew-adobe/routes"));
 
 const app = express();
 app.set("trust proxy", 1);

@@ -33,7 +33,7 @@ export function PricingRatiosSection({
           </div>
         </div>
         <div>
-          <label className={labelBase}>Tỷ Giá CTV</label>
+          <label className={labelBase}>Giá CTV</label>
           <input
             type="number"
             step="0.01"
@@ -45,7 +45,7 @@ export function PricingRatiosSection({
           />
         </div>
         <div>
-          <label className={labelBase}>Tỷ Giá Khách</label>
+          <label className={labelBase}>Giá Khách</label>
           <input
             type="number"
             step="0.01"
@@ -57,7 +57,7 @@ export function PricingRatiosSection({
           />
         </div>
         <div>
-          <label className={labelBase}>Tỷ Giá Khuyến Mãi</label>
+          <label className={labelBase}>Giá Khuyến Mãi</label>
           <input
             type="number"
             step="0.01"
@@ -69,7 +69,7 @@ export function PricingRatiosSection({
           />
         </div>
         <div>
-          <label className={labelBase}>Giá Sinh Viên → pct_stu</label>
+          <label className={labelBase}>Giá Sinh Viên</label>
           <input
             type="number"
             step="0.01"
@@ -80,9 +80,6 @@ export function PricingRatiosSection({
             value={createForm.pctStu}
             onChange={(event) => onFormChange("pctStu", event.target.value)}
           />
-          <p className="mt-1 text-[11px] text-slate-400">
-            Cùng định dạng Giá Khách; để trống = NULL trong DB.
-          </p>
         </div>
       </div>
     </div>

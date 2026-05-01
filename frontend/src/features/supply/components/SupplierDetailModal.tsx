@@ -6,15 +6,7 @@ import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
 import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "@/components/modals/ViewOrderModal/constants";
-
-const formatCompactDate = (date = new Date()) => {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = String(date.getFullYear());
-  return `${day}${month}${year}`;
-};
-const buildPaymentContent = (supplierName: string) =>
-  `TT ${supplierName || "NCC"} kỳ ${formatCompactDate()}`;
+import { buildNccTransferContentByBalance } from "../utils/supplierPaymentContent";
 
 interface Props {
   isOpen: boolean;
@@ -58,8 +50,11 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
     const supplierName = String(supply.sourceName || "").trim() || "NCC";
-    const desc = buildPaymentContent(supplierName);
     const isNegative = raw < 0;
+    const desc = buildNccTransferContentByBalance({
+      balanceSigned: raw,
+      supplierName,
+    });
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
     if (isNegative) {
@@ -88,12 +83,28 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     return Math.max(0, raw - paid);
   };
 
-  const handleConfirmPayment = async (p: { id: number; totalImport?: number; import_value?: number; paid?: number }) => {
-    if (p.id == null || !Number.isFinite(Number(p.id))) return;
+  const paymentContentForConfirm = (p: {
+    totalImport?: number;
+    import_value?: number;
+  }) => {
+    const raw = Number(p.totalImport ?? p.import_value ?? 0);
     const supplierName = String(supply?.sourceName || "").trim() || "NCC";
+    return buildNccTransferContentByBalance({
+      balanceSigned: raw,
+      supplierName,
+    });
+  };
+
+  const handleConfirmPayment = async (p: {
+    id: number;
+    totalImport?: number;
+    import_value?: number;
+    paid?: number;
+  }) => {
+    if (p.id == null || !Number.isFinite(Number(p.id))) return;
     const result = await confirmPayment(p.id, {
       paidAmount: amountDueForPayment(p),
-      paymentContent: buildPaymentContent(supplierName),
+      paymentContent: paymentContentForConfirm(p),
       supplyId: supply?.id,
     });
     if (!result.success) {

@@ -145,6 +145,7 @@ export const usePricingData = () => {
     setRowsPerPage,
     totalRows,
     filteredPricing,
+    productPrices,
     pricingStats,
     isLoading,
     error,

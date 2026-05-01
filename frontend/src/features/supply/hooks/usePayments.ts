@@ -6,6 +6,7 @@ import {
   ACCOUNT_NO,
   BANK_SHORT_CODE,
 } from "@/components/modals/ViewOrderModal/constants";
+import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
 export interface QrPayment {
   id: number;
@@ -88,24 +89,22 @@ export const usePayments = ({
     const diff = (payment.totalImport || 0) - (payment.paid || 0);
     const amount = Math.abs(diff);
     const isPositive = diff > 0;
-    const compactDate = (() => {
-      const now = new Date();
-      const day = String(now.getDate()).padStart(2, "0");
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const year = now.getFullYear();
-      return `${day}${month}${year}`;
-    })();
     const supplierName = String(supply?.sourceName || "").trim() || "NCC";
 
     const accountNumber = isPositive ? supply?.numberBank || "" : ACCOUNT_NO;
     const bankCode = isPositive ? supply?.binBank || "" : BANK_SHORT_CODE; // VietQR short code
     const accountName = isPositive ? supply?.nameBank || "" : ACCOUNT_NAME;
 
+    const description = buildNccTransferContentByBalance({
+      balanceSigned: diff,
+      supplierName,
+    });
+
     const url = buildSepayQrUrl({
       accountNumber,
       bankCode,
       amount,
-      description: `TT ${supplierName} kỳ ${compactDate}`,
+      description,
       accountName,
     });
 

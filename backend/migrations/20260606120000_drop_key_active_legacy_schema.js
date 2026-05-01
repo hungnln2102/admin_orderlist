@@ -1,12 +1,54 @@
 /**
- * Sau merge `078_merge_key_active_into_system_automation`, bảng/key nằm ở `system_automation`.
- * Schema `key_active` còn sót (chỉ function/trống) gây nhầm — xóa nếu không còn bảng và không còn
- * trigger trên `orders.order_list` trỏ tới function trong `key_active`.
+ * Gỡ schema `key_active` còn sót sau khi baseline đã có `system_automation.order_list_keys`.
  *
- * @see database/legacy_sql_migrations/078_merge_key_active_into_system_automation.sql
- * @see backend/scripts/ops/verify-key-active-legacy-deps.js
+ * Luồng lỗi cũ: `078` không ALTER SCHEMA được khi bảng trùng tên đã có trong `system_automation`;
+ * migration `20260412200000` lại tạo trigger trên `orders.order_list` trỏ `key_active.*`.
+ *
+ * Cách xử lý: luôn repoint trigger theo `082`, rồi DROP SCHEMA `key_active` (dữ liệu trong bản
+ * trùng lặp từ `key_active` bị bỏ — với DB mới hai bản thường rỗng; production đã merge 078 từ trước).
+ *
+ * @see database/migrations/082_fix_order_list_keys_trigger_to_system_automation.sql
  */
+const fs = require("fs");
+const path = require("path");
+
 exports.up = async function up(knex) {
+  const exists = await knex.raw(
+    `SELECT 1 AS x FROM pg_namespace WHERE nspname = 'key_active' LIMIT 1`
+  );
+  if (!exists.rows?.length) return;
+
+  const hasSaKeys = await knex.raw(
+    `SELECT 1 AS x
+     FROM information_schema.tables
+     WHERE table_schema = 'system_automation' AND table_name = 'order_list_keys'
+     LIMIT 1`
+  );
+
+  if (hasSaKeys.rows?.length) {
+    const p082 = path.join(
+      __dirname,
+      "..",
+      "..",
+      "database",
+      "migrations",
+      "082_fix_order_list_keys_trigger_to_system_automation.sql"
+    );
+    await knex.raw(fs.readFileSync(p082, "utf8"));
+    await knex.raw(`DROP SCHEMA IF EXISTS key_active CASCADE`);
+    return;
+  }
+
+  const sql078 = path.join(
+    __dirname,
+    "..",
+    "..",
+    "database",
+    "migrations",
+    "078_merge_key_active_into_system_automation.sql"
+  );
+  await knex.raw(fs.readFileSync(sql078, "utf8"));
+
   await knex.raw(`
     DO $drop_legacy$
     DECLARE
@@ -24,7 +66,7 @@ exports.up = async function up(knex) {
 
       IF tbl_count > 0 THEN
         RAISE EXCEPTION
-          'key_active still has % table(s): run data migration (078) or drop tables manually before this migration',
+          'key_active still has % table(s): migrate manually (078 + repoint triggers)',
           tbl_count;
       END IF;
 
@@ -41,7 +83,7 @@ exports.up = async function up(knex) {
 
       IF trig_count > 0 THEN
         RAISE EXCEPTION
-          'orders.order_list still has % trigger(s) calling key_active functions; repoint to system_automation first',
+          'orders.order_list still has % trigger(s) calling key_active functions',
           trig_count;
       END IF;
 
@@ -51,5 +93,4 @@ exports.up = async function up(knex) {
   `);
 };
 
-/** Không tái tạo schema legacy trong down. */
 exports.down = async function down() {};

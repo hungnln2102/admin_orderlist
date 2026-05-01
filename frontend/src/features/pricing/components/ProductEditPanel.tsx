@@ -84,17 +84,8 @@ export function ProductEditPanel({
   }, [availableProductNameOptions, currentEditForm.packageName]);
 
   useEffect(() => {
-    const currentName = currentEditForm.packageName.trim();
-    if (!currentName) {
-      setIsCustomProductName(false);
-      return;
-    }
-
-    const existsInAvailable = availableProductNameOptions.some(
-      (option) => option.toLowerCase() === currentName.toLowerCase()
-    );
-    setIsCustomProductName(!existsInAvailable);
-  }, [productId, currentEditForm.packageName, availableProductNameOptions]);
+    setIsCustomProductName(false);
+  }, [productId]);
 
   const handleUseDropdownProductName = () => {
     const fallbackName = availableProductNameOptions[0] ?? "";

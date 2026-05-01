@@ -12,6 +12,7 @@ import {
   formatVndDisplay,
   getDiscountRatioInput,
   getMarginRatioInput,
+  normalizeProductKey,
   parseRatioInput,
 } from "../utils";
 
@@ -62,6 +63,33 @@ type CreateProductValidationResult =
 
 const formatPercent = (ratio: number): string =>
   `${(ratio * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+
+/** Trùng cặp (tên sản phẩm + gói) với một dòng đã có trên hệ thống. */
+export function isExistingProductPackagePair(
+  existingRows: ProductPricingRow[],
+  packageName: string,
+  packageProduct: string
+): boolean {
+  const p = (packageName || "").trim().toLowerCase();
+  const g = (packageProduct || "").trim().toLowerCase();
+  if (!p || !g) return false;
+  return existingRows.some(
+    (row) =>
+      (row.packageName || "").trim().toLowerCase() === p &&
+      (row.packageProduct || "").trim().toLowerCase() === g
+  );
+}
+
+export function isExistingSanPhamCode(
+  existingRows: ProductPricingRow[],
+  sanPham: string
+): boolean {
+  const code = normalizeProductKey(sanPham);
+  if (!code) return false;
+  return existingRows.some(
+    (row) => normalizeProductKey(row.sanPhamRaw) === code
+  );
+}
 
 const parseCurrencyInput = (value: string): number | null => {
   const digits = String(value ?? "").replace(/\D+/g, "");
@@ -389,7 +417,8 @@ export function validateProductEditForm(
 
 export function validateCreateProductForm(
   form: CreateProductFormState,
-  suppliers: CreateSupplierEntry[]
+  suppliers: CreateSupplierEntry[],
+  existingRows: ProductPricingRow[] = []
 ): CreateProductValidationResult {
   const trimmedPackage = form.packageName.trim();
   const trimmedProduct = form.packageProduct.trim();
@@ -434,6 +463,25 @@ export function validateCreateProductForm(
     return {
       ok: false,
       error: "Vui lòng nhập mã sản phẩm",
+    };
+  }
+
+  if (isExistingSanPhamCode(existingRows, trimmedSanPham)) {
+    return {
+      ok: false,
+      error: "Mã sản phẩm đã tồn tại.",
+    };
+  }
+
+  if (
+    trimmedPackage &&
+    trimmedProduct &&
+    isExistingProductPackagePair(existingRows, trimmedPackage, trimmedProduct)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Tên sản phẩm và gói sản phẩm này đã tồn tại. Hãy đổi tên hoặc gói.",
     };
   }
 

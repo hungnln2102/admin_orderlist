@@ -30,14 +30,7 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const rawUnpaid = Number(supply.totalUnpaidImport || 0);
-  const payableToSupplier = Number(
-    supply.payableToSupplier ?? Math.max(0, rawUnpaid)
-  );
-  const supplierRefundToShop = Number(
-    supply.supplierRefundToShop ?? Math.max(0, -rawUnpaid)
-  );
-  const netUnpaid = payableToSupplier - supplierRefundToShop;
+  const netUnpaid = Number(supply.totalUnpaidImport ?? 0);
 
   const statusColor = supply.isActive
     ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"

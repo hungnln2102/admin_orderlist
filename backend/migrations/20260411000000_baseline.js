@@ -1,37 +1,23 @@
 /**
  * Baseline migration.
  *
- * Fresh database: bootstrap the consolidated schema from
- * database/migrations/000_full_schema.sql.
+ * Fresh database: chạy snapshot DDL `database/migrations/000_consolidated_schema.sql`
+ * (tạo `admin.users`, `orders`, v.v.).
  *
- * Existing database: do nothing once the baseline schema is already present,
- * then let later incremental migrations run normally.
+ * DB đã có schema `orders`: bỏ qua (coi như đã bootstrap), các migration sau ch runs bình thường.
  */
 
 const fs = require("fs");
 const path = require("path");
 
-const readMigrationSql = (filename) =>
-  fs.readFileSync(
-    path.join(__dirname, "..", "..", "database", "migrations", filename),
-    "utf8"
-  );
-
-const freshBootstrapSqlFiles = [
-  "000_full_schema.sql",
-  "063_payment_receipt_sepay_dedupe.sql",
-  "064_payment_receipt_drop_sub_account.sql",
-  "065_payment_receipt_financial_state.sql",
-  "066_payment_receipt_financial_audit_log.sql",
-  "071_move_identity_and_audit_to_customer_web.sql",
-  "072_move_customer_to_customer_info.sql",
-  "073_move_receipt_tables_to_receipt_schema.sql",
-  "074_move_reviews_to_product_schema.sql",
-  "075_move_finance_to_dashboard_schema.sql",
-  "076_move_tier_cycles_to_customer_web.sql",
-  "077_merge_customer_info_into_customer_web.sql",
-  "078_merge_key_active_into_system_automation.sql",
-];
+const CONSOLIDATED_SCHEMA = path.join(
+  __dirname,
+  "..",
+  "..",
+  "database",
+  "migrations",
+  "000_consolidated_schema.sql"
+);
 
 exports.up = async function up(knex) {
   const hasOrderSchema = await knex.raw(
@@ -42,9 +28,8 @@ exports.up = async function up(knex) {
     return;
   }
 
-  for (const filename of freshBootstrapSqlFiles) {
-    await knex.raw(readMigrationSql(filename));
-  }
+  const sql = fs.readFileSync(CONSOLIDATED_SCHEMA, "utf8");
+  await knex.raw(sql);
 };
 
 exports.down = async function down() {

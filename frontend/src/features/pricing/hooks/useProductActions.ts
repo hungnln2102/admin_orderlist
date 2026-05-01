@@ -363,7 +363,11 @@ export const useProductActions = ({
   };
 
   const handleSubmitCreateProduct = async () => {
-    const validation = validateCreateProductForm(createForm, createSuppliers);
+    const validation = validateCreateProductForm(
+      createForm,
+      createSuppliers,
+      productPrices
+    );
     if (!validation.ok) {
       setCreateError(validation.error);
       return;

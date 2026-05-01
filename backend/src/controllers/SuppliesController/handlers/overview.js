@@ -107,7 +107,6 @@ const getSupplyOverview = async (req, res) => {
     `;
 
     const orderIdCol = quoteIdent(orderCols.id);
-    const orderCostCol = quoteIdent(orderCols.cost);
     const orderUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${lc.orderListId})
@@ -124,7 +123,7 @@ const getSupplyOverview = async (req, res) => {
         CASE
           WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = :paidNccLabel
           THEN 0::numeric
-          ELSE COALESCE(o.${orderCostCol}, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
+          ELSE COALESCE(latest.import_cost, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
         END
       ), 0)::numeric AS total_unpaid_import
       FROM latest
@@ -189,6 +188,7 @@ const getSupplyOverview = async (req, res) => {
     }));
 
     const orderUnpaidImport = Number(orderUnpaidRes.rows?.[0]?.total_unpaid_import) || 0;
+
     const unpaidPayments = [];
     if (orderUnpaidImport !== 0) {
       unpaidPayments.push({

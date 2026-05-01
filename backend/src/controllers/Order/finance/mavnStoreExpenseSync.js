@@ -16,9 +16,7 @@ const {
 const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 const variantTable = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT);
-const hasMavnExpenseColumns = Boolean(
-  expenseCols.LINKED_ORDER_CODE && expenseCols.EXPENSE_META
-);
+const { storeProfitExpensesHasMavnColumns } = require("./storeProfitExpensesHasMavnColumns");
 
 const normalizeMoney = (value) => {
   const n = Number(value);
@@ -76,7 +74,7 @@ async function applyMavnDashboardProfitDelta(trx, rowForMonth, profitDelta) {
  */
 async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
   if (!afterRow) return;
-  if (!hasMavnExpenseColumns) return;
+  if (!(await storeProfitExpensesHasMavnColumns())) return;
 
   const idOrderCol = COLS.ORDER.ID_ORDER;
   const costCol = COLS.ORDER.COST;

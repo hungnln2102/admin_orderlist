@@ -6,6 +6,7 @@ const deleteOrderWithArchive = async ({
 }) => {
     const { TABLES, ORDERS_SCHEMA, STATUS } = helpers;
     const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
+    const { storeProfitExpensesHasMavnColumns } = require("./finance/storeProfitExpensesHasMavnColumns");
     const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
     const { calcRemainingRefund } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
@@ -39,7 +40,7 @@ const deleteOrderWithArchive = async ({
     if (isHardDelete) {
         const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
         const eCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
-        if (isMavnImportOrder(order) && eCols.LINKED_ORDER_CODE) {
+        if (isMavnImportOrder(order) && (await storeProfitExpensesHasMavnColumns())) {
             const code = String(order?.[idOrderCol] ?? "").trim();
             if (code) {
                 await trx(expenseTable)

@@ -21,6 +21,7 @@ function Pricing() {
     setRowsPerPage,
     pricingStats,
     filteredPricing,
+    productPrices,
     isLoading,
     error,
     isRefreshing,
@@ -92,6 +93,7 @@ function Pricing() {
       <CreateProductModal
         isOpen={isCreateModalOpen}
         createForm={createForm}
+        existingProductRows={productPrices}
         productNameOptions={productNameOptions}
         productPackageOptionsByName={productPackageOptionsByName}
         createSuppliers={createSuppliers}

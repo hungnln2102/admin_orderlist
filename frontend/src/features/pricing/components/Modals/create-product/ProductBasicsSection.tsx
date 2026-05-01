@@ -1,10 +1,15 @@
 import { PlusIcon } from "@heroicons/react/24/outline";
-import { useEffect, useMemo, useState } from "react";
-import type { CreateProductFormState } from "../../../types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CreateProductFormState, ProductPricingRow } from "../../../types";
+import {
+  isExistingProductPackagePair,
+  isExistingSanPhamCode,
+} from "../../../hooks/productActionHelpers";
 import { inputBase, labelBase } from "./shared";
 
 type ProductBasicsSectionProps = {
   createForm: CreateProductFormState;
+  existingProductRows: ProductPricingRow[];
   productNameOptions: string[];
   productPackageOptionsByName: Record<string, string[]>;
   onFormChange: (field: keyof CreateProductFormState, value: string) => void;
@@ -26,12 +31,19 @@ const buildNextLabel = (baseLabel: string, usedLabels: string[]) => {
 
 export function ProductBasicsSection({
   createForm,
+  existingProductRows,
   productNameOptions,
   productPackageOptionsByName,
   onFormChange,
 }: ProductBasicsSectionProps) {
   const [isCustomProductName, setIsCustomProductName] = useState(false);
   const [isCustomPackage, setIsCustomPackage] = useState(false);
+  const [duplicatePairHint, setDuplicatePairHint] = useState<string | null>(
+    null
+  );
+  const [duplicateSanPhamHint, setDuplicateSanPhamHint] = useState<
+    string | null
+  >(null);
 
   const availableProductNameOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -92,28 +104,44 @@ export function ProductBasicsSection({
   }, [availablePackageOptions, createForm.packageProduct]);
 
   useEffect(() => {
-    const currentName = createForm.packageName.trim();
-    if (!currentName) {
-      setIsCustomProductName(false);
-      return;
-    }
-    const exists = availableProductNameOptions.some(
-      (option) => option.toLowerCase() === currentName.toLowerCase()
-    );
-    setIsCustomProductName(!exists);
-  }, [createForm.packageName, availableProductNameOptions]);
+    setDuplicatePairHint(null);
+  }, [createForm.packageName, createForm.packageProduct]);
 
   useEffect(() => {
-    const currentPackage = createForm.packageProduct.trim();
-    if (!currentPackage) {
-      setIsCustomPackage(false);
+    setDuplicateSanPhamHint(null);
+  }, [createForm.sanPham]);
+
+  const validatePairOnBlur = useCallback(() => {
+    const name = createForm.packageName.trim();
+    const pkg = createForm.packageProduct.trim();
+    if (!name || !pkg) {
+      setDuplicatePairHint(null);
       return;
     }
-    const exists = availablePackageOptions.some(
-      (option) => option.toLowerCase() === currentPackage.toLowerCase()
-    );
-    setIsCustomPackage(!exists);
-  }, [createForm.packageProduct, availablePackageOptions]);
+    if (isExistingProductPackagePair(existingProductRows, name, pkg)) {
+      setDuplicatePairHint(
+        "Tên sản phẩm và gói sản phẩm này đã tồn tại. Hãy đổi tên hoặc gói."
+      );
+    } else {
+      setDuplicatePairHint(null);
+    }
+  }, [createForm.packageName, createForm.packageProduct, existingProductRows]);
+
+  const validateSanPhamOnBlur = useCallback(() => {
+    const code = createForm.sanPham.trim();
+    if (!code) {
+      setDuplicateSanPhamHint(null);
+      return;
+    }
+    if (isExistingSanPhamCode(existingProductRows, code)) {
+      setDuplicateSanPhamHint("Mã sản phẩm đã tồn tại.");
+    } else {
+      setDuplicateSanPhamHint(null);
+    }
+  }, [createForm.sanPham, existingProductRows]);
+
+  /** Chế độ ô text / dropdown chỉ đổi khi bấm "Mới" hoặc "Chọn sẵn".
+   *  Không tự về dropdown khi xóa trống — user thường xóa để gõ tên mới. */
 
   const handleUseDropdownProductName = () => {
     const fallbackName = availableProductNameOptions[0] ?? "";
@@ -216,7 +244,10 @@ export function ProductBasicsSection({
               className={inputBase}
               placeholder="Nhập tên sản phẩm mới"
               value={createForm.packageName}
-              onChange={(event) => onFormChange("packageName", event.target.value)}
+              onChange={(event) =>
+                onFormChange("packageName", event.target.value)
+              }
+              onBlur={validatePairOnBlur}
             />
           ) : (
             <select
@@ -225,6 +256,7 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 handleProductNameSelectChange(event.target.value)
               }
+              onBlur={validatePairOnBlur}
             >
               <option value="" className="bg-slate-900 text-white">
                 Chọn sản phẩm có sẵn
@@ -276,6 +308,7 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 onFormChange("packageProduct", event.target.value)
               }
+              onBlur={validatePairOnBlur}
             />
           ) : (
             <select
@@ -284,6 +317,7 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 onFormChange("packageProduct", event.target.value)
               }
+              onBlur={validatePairOnBlur}
             >
               <option value="" className="bg-slate-900 text-white">
                 Chọn gói theo sản phẩm
@@ -302,6 +336,14 @@ export function ProductBasicsSection({
             </select>
           )}
         </div>
+        {duplicatePairHint ? (
+          <p
+            className="md:col-span-2 text-xs text-red-300 -mt-1"
+            role="status"
+          >
+            {duplicatePairHint}
+          </p>
+        ) : null}
         <div className="md:col-span-2">
           <label className={labelBase}>Mã Sản Phẩm</label>
           <input
@@ -310,7 +352,13 @@ export function ProductBasicsSection({
             placeholder="Nhập mã sản phẩm"
             value={createForm.sanPham}
             onChange={(event) => onFormChange("sanPham", event.target.value)}
+            onBlur={validateSanPhamOnBlur}
           />
+          {duplicateSanPhamHint ? (
+            <p className="mt-1 text-xs text-red-300" role="status">
+              {duplicateSanPhamHint}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

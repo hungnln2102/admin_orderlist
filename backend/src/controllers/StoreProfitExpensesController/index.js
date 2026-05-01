@@ -6,6 +6,9 @@ const {
   monthKeyVietnamFromDbTimestamp,
   applyExternalImportProfitDelta,
 } = require("../Order/finance/dashboardSummary");
+const {
+  storeProfitExpensesHasMavnColumns,
+} = require("../Order/finance/storeProfitExpensesHasMavnColumns");
 
 const TABLE = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
@@ -46,6 +49,15 @@ const listStoreProfitExpenses = async (req, res) => {
   const expenseType = normalizeExpenseType(req.query?.expense_type);
 
   try {
+    const hasMavnCols = await storeProfitExpensesHasMavnColumns();
+    const baseCols = [
+      COLS.ID,
+      COLS.AMOUNT,
+      COLS.REASON,
+      COLS.EXPENSE_TYPE,
+      ...(hasMavnCols ? [COLS.LINKED_ORDER_CODE, COLS.EXPENSE_META] : []),
+      COLS.CREATED_AT,
+    ];
     const baseQuery = db(TABLE);
     if (from) baseQuery.whereRaw(`DATE(${COLS.CREATED_AT}) >= ?`, [from]);
     if (to) baseQuery.whereRaw(`DATE(${COLS.CREATED_AT}) <= ?`, [to]);
@@ -55,13 +67,7 @@ const listStoreProfitExpenses = async (req, res) => {
       baseQuery
         .clone()
         .select(
-          COLS.ID,
-          COLS.AMOUNT,
-          COLS.REASON,
-          COLS.EXPENSE_TYPE,
-          COLS.LINKED_ORDER_CODE,
-          COLS.EXPENSE_META,
-          COLS.CREATED_AT,
+          ...baseCols,
           db.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
         )
         .orderBy(COLS.CREATED_AT, "desc")
@@ -102,6 +108,7 @@ const createStoreProfitExpense = async (req, res) => {
   }
 
   try {
+    const hasMavnCols = await storeProfitExpensesHasMavnColumns();
     const row = await db.transaction(async (trx) => {
       const [created] = await trx(TABLE)
         .insert({
@@ -117,8 +124,7 @@ const createStoreProfitExpense = async (req, res) => {
           COLS.AMOUNT,
           COLS.REASON,
           COLS.EXPENSE_TYPE,
-          COLS.LINKED_ORDER_CODE,
-          COLS.EXPENSE_META,
+          ...(hasMavnCols ? [COLS.LINKED_ORDER_CODE, COLS.EXPENSE_META] : []),
           COLS.CREATED_AT,
           trx.raw(`${VN_DATE_FROM_CREATED_AT_SQL} AS expense_date`)
         )

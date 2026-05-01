@@ -128,13 +128,7 @@ const SupplyRow = ({
   onToggleStatus: (supply: Supply) => void;
   onRefreshSupplies: () => void;
 }) => {
-  const payableToSupplier = Number(
-    supply.payableToSupplier ?? Math.max(0, Number(supply.totalUnpaidImport ?? 0))
-  );
-  const supplierRefundToShop = Number(
-    supply.supplierRefundToShop ?? Math.max(0, -Number(supply.totalUnpaidImport ?? 0))
-  );
-  const netUnpaid = payableToSupplier - supplierRefundToShop;
+  const netUnpaid = Number(supply.totalUnpaidImport ?? 0);
 
   return (
     <>

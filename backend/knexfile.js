@@ -1,11 +1,9 @@
 const { loadBackendEnv } = require("./src/config/loadEnv");
+const { getPostgresConnectionUrl } = require("./src/config/postgresConnectionUrl");
 
 loadBackendEnv();
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  "";
+const DATABASE_URL = getPostgresConnectionUrl();
 
 module.exports = {
   development: {

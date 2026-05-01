@@ -148,7 +148,6 @@ const getSupplyInsights = async (_req, res) => {
     const logCols = QUOTED_COLS.supplierOrderCostLog;
     const paidNccLabel = "Đã Thanh Toán";
     const orderIdCol = quoteIdent(orderCols.id);
-    const orderCostCol = quoteIdent(orderCols.cost);
     const orderCostUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${logCols.orderListId})
@@ -166,7 +165,7 @@ const getSupplyInsights = async (_req, res) => {
           CASE
             WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = ?
             THEN 0
-            ELSE COALESCE(o.${orderCostCol}, 0) - COALESCE(latest.refund_amount, 0)
+            ELSE COALESCE(latest.import_cost, 0) - COALESCE(latest.refund_amount, 0)
           END
         ) AS total_unpaid_import
       FROM latest

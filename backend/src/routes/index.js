@@ -1,43 +1,49 @@
+/**
+ * API router trung tâm.
+ *
+ * Các bounded context đã migrate mount trực tiếp từ `src/domains/<domain>/routes.js`.
+ * Xem `src/domains/README.md`, `docs/STRUCTURE-SINGLE-DIRECTION.md`.
+ */
 const express = require("express");
-const authRoutes = require("./authRoutes");
-const systemRoutes = require("./systemRoutes");
-const dashboardRoutes = require("./dashboardRoutes");
-const ordersRoutes = require("./ordersRoutes");
-const suppliesRoutes = require("./suppliesRoutes");
-const suppliesController = require("../controllers/SuppliesController");
-const paymentsRoutes = require("./paymentsRoutes");
-const productsRoutes = require("./productsRoutes");
-const productPricesRoutes = require("./productPricesRoutes");
-const productDescriptionsRoutes = require("./productDescriptionsRoutes");
-const productImagesRoutes = require("./productImagesRoutes");
-const variantImagesRoutes = require("./variantImagesRoutes");
-const contentMediaRoutes = require("./contentMediaRoutes");
-const contentRoutes = require("./contentRoutes");
-const categoriesRoutes = require("./categoriesRoutes");
-const banksRoutes = require("./banksRoutes");
-const packagesRoutes = require("./packagesRoutes");
-const walletRoutes = require("./walletRoutes");
-const keyActiveRoutes = require("./keyActiveRoutes");
-const warehouseRoutes = require("./warehouseRoutes");
-const schedulerRoutes = require("./schedulerRoutes");
-const savingGoalsController = require("../controllers/SavingGoalsController");
 const { runSchedulerNow } = require("../controllers/SchedulerController");
 const { authGuard } = require("../middleware/authGuard");
-const testTelegramRoutes = require("./testTelegram");
-const accountsRoutes = require("./accountsRoutes");
-const promotionCodesRoutes = require("./promotionCodesRoutes");
-const formInfoRoutes = require("./formInfoRoutes");
-const renewAdobeRoutes = require("./renewAdobeRoutes");
-const { getRenewAdobeProxy } = require("./renewAdobeProxy");
-const renewAdobePublicRoutes = require("./renewAdobePublicRoutes");
-const customerStatusRoutes = require("./customerStatusRoutes");
-const ipWhitelistRoutes = require("./ipWhitelistRoutes");
-const pricingTierRoutes = require("./pricingTierRoutes");
-const siteMaintenanceRoutes = require("./siteMaintenanceRoutes");
-const publicContentRoutes = require("./publicContentRoutes");
-const publicPricingRoutes = require("./publicPricingRoutes");
-const storeProfitExpensesRoutes = require("./storeProfitExpensesRoutes");
 
+const authRoutes = require("../domains/auth/routes");
+const systemRoutes = require("../domains/system/routes");
+const schedulerRoutes = require("../domains/scheduler/routes");
+const testTelegramRoutes = require("../domains/test-telegram/routes");
+const renewAdobeRoutes = require("../domains/renew-adobe/routes");
+const { getRenewAdobeProxy } = require("../domains/renew-adobe/proxy");
+const renewAdobePublicRoutes = require("../domains/renew-adobe/publicRoutes");
+
+const dashboardRoutes = require("../domains/dashboard/routes");
+const ordersRoutes = require("../domains/orders/routes");
+const suppliesRoutes = require("../domains/supplies/routes");
+const paymentsRoutes = require("../domains/payments/routes");
+const productsRoutes = require("../domains/products/routes");
+const productPricesRoutes = require("../domains/product-prices/routes");
+const productDescriptionsRoutes = require("../domains/product-descriptions/routes");
+const productImagesRoutes = require("../domains/product-images/routes");
+const variantImagesRoutes = require("../domains/variant-images/routes");
+const contentRoutes = require("../domains/content/routes");
+const packagesRoutes = require("../domains/package-products/routes");
+const walletRoutes = require("../domains/wallet/routes");
+const publicContentRoutes = require("../domains/public-content/routes");
+const publicPricingRoutes = require("../domains/public-pricing/routes");
+
+const banksRoutes = require("../domains/banks/routes");
+const categoriesRoutes = require("../domains/categories/routes");
+const promotionCodesRoutes = require("../domains/promotion-codes/routes");
+const formInfoRoutes = require("../domains/form-info/routes");
+const customerStatusRoutes = require("../domains/customer-status/routes");
+const accountsRoutes = require("../domains/accounts/routes");
+const keyActiveRoutes = require("../domains/key-active/routes");
+const warehouseRoutes = require("../domains/warehouse/routes");
+const savingGoalsRoutes = require("../domains/saving-goals/routes");
+const pricingTierRoutes = require("../domains/pricing-tiers/routes");
+const storeProfitExpensesRoutes = require("../domains/store-profit-expenses/routes");
+const ipWhitelistRoutes = require("../domains/ip-whitelist/routes");
+const siteMaintenanceRoutes = require("../domains/site-maintenance/routes");
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
   res.setTimeout(ms);
@@ -84,7 +90,6 @@ router.use("/product-prices", productPricesRoutes);
 router.use("/product-descriptions", productDescriptionsRoutes);
 router.use("/product-images", productImagesRoutes);
 router.use("/variant-images", variantImagesRoutes);
-router.use("/content", contentMediaRoutes);
 router.use("/content", contentRoutes);
 router.use("/categories", categoriesRoutes);
 router.use("/banks", banksRoutes);
@@ -95,8 +100,8 @@ router.use("/warehouse", warehouseRoutes);
 router.use("/warehouses", warehouseRoutes);
 router.use("/scheduler", longTimeout(900_000), schedulerRoutes);
 router.get("/run-scheduler", runSchedulerNow);
-router.get("/supply-insights", suppliesController.getSupplyInsights);
-router.use("/saving-goals", savingGoalsController);
+router.get("/supply-insights", suppliesRoutes.getSupplyInsights);
+router.use("/saving-goals", savingGoalsRoutes);
 router.use("/pricing-tiers", pricingTierRoutes);
 router.use("/store-profit-expenses", storeProfitExpensesRoutes);
 
