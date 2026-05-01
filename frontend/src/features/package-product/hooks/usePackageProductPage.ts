@@ -272,12 +272,20 @@ export const usePackageProductPage = () => {
     [templates]
   );
 
+  /** Hiển thị khối «Tài khoản kích hoạt»: nếu chỉ .some(storageTotal) thì gói đầu tiên của product bị ẩn → không chọn được storage → không lưu khi match = information_order. */
   const productHasStorage = useMemo(() => {
     if (!selectedTemplate?.productId) return false;
 
-    return rows
-      .filter((row) => row.productId === selectedTemplate.productId)
-      .some((row) => row.storageTotal != null);
+    const sameProduct = rows.filter(
+      (row) => row.productId === selectedTemplate.productId
+    );
+    if (sameProduct.length === 0) return true;
+    return sameProduct.some(
+      (row) =>
+        row.storageTotal != null ||
+        row.storageId != null ||
+        Boolean(row.accountUser && String(row.accountUser).trim())
+    );
   }, [rows, selectedTemplate]);
 
   const slotCards = useMemo(

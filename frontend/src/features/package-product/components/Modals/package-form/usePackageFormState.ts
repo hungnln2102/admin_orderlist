@@ -276,9 +276,10 @@ export const usePackageFormState = ({
       ? "Cần chọn tài khoản gốc (kho) để gán gói."
       : null;
 
+  // `storageManual` là state UI (không nằm trong values); trước đây nhầm `values.storageManual` → luôn falsy → không bao giờ lưu được khi nhập tay kích hoạt.
   const hasActivation =
     values.storageId != null ||
-    (values.storageManual &&
+    (storageManual &&
       Boolean(values.manualStorage?.account && values.manualStorage.account.trim().length > 0));
 
   const matchRequiresActivationError =
