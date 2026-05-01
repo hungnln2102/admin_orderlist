@@ -161,6 +161,12 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         );
     }
 
+    if (updates.total_off_flow_bank_receipt !== undefined) {
+        mergeData[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT] = trx.raw(
+            `${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + ${updates.total_off_flow_bank_receipt}`
+        );
+    }
+
     await trx(summaryTable)
         .insert(insertData)
         .onConflict(summaryCols.MONTH_KEY)

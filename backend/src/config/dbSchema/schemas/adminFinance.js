@@ -75,6 +75,10 @@ const FINANCE_SCHEMA = {
       TOTAL_IMPORT: "total_import",
       /** Ước tính thuế theo tháng (theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT trên total_revenue). */
       TOTAL_TAX: "total_tax",
+      /**
+       * Tiền NH nhận ngoài luồng doanh thu: webhook không mã đơn, và tiền thừa sau khi đơn đã PAID.
+       */
+      TOTAL_OFF_FLOW_BANK_RECEIPT: "total_off_flow_bank_receipt",
       UPDATED_AT: "updated_at",
     },
   },

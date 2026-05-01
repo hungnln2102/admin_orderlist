@@ -51,6 +51,7 @@ const applyReversePostedReceiptDashboard = async (trx, orderRow) => {
             paid_date: `r.${prCols.PAID_DATE}`,
             posted_revenue: `fs.${fsCols.POSTED_REVENUE}`,
             posted_profit: `fs.${fsCols.POSTED_PROFIT}`,
+            posted_off_flow_bank_receipt: `fs.${fsCols.POSTED_OFF_FLOW_BANK_RECEIPT}`,
         });
 
     if (!rows.length) return false;
@@ -63,6 +64,7 @@ const applyReversePostedReceiptDashboard = async (trx, orderRow) => {
         if (!mk) continue;
         const rev = normalizeMoney(row.posted_revenue);
         const prof = normalizeMoney(row.posted_profit);
+        const offFlow = normalizeMoney(row.posted_off_flow_bank_receipt);
         let imp = 0;
         if (cost > 0) {
             imp = await resolveDashboardImportDeltaOnPaid(
@@ -78,11 +80,13 @@ const applyReversePostedReceiptDashboard = async (trx, orderRow) => {
             profit: 0,
             orders: 0,
             import: 0,
+            off_flow_bank_receipt: 0,
         };
         cur.revenue += rev;
         cur.profit += prof;
         cur.orders += 1;
         cur.import += imp;
+        cur.off_flow_bank_receipt += offFlow;
         byMonth.set(mk, cur);
     }
 
@@ -95,10 +99,12 @@ const applyReversePostedReceiptDashboard = async (trx, orderRow) => {
         const prof = Number(a.profit) || 0;
         const ord = Number(a.orders) || 0;
         const imp = Number(a.import) || 0;
+        const offFlow = Number(a.off_flow_bank_receipt) || 0;
         if (rev !== 0) updates.total_revenue = -rev;
         if (prof !== 0) updates.total_profit = -prof;
         if (ord !== 0) updates.total_orders = -ord;
         if (imp !== 0) updates.total_import = -imp;
+        if (offFlow !== 0) updates.total_off_flow_bank_receipt = -offFlow;
         if (Object.keys(updates).length) {
             await mergeSummaryUpdates(trx, mk, updates);
             appliedReverseMerge = true;

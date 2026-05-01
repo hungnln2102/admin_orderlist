@@ -173,7 +173,8 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
       summaryCols.MONTH_KEY,
       summaryCols.TOTAL_REVENUE,
       summaryCols.TOTAL_IMPORT,
-      summaryCols.TOTAL_PROFIT
+      summaryCols.TOTAL_PROFIT,
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT
     )
     .whereIn(summaryCols.MONTH_KEY, unique);
   return new Map(
@@ -184,6 +185,7 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
         importVal: toNumber(r[summaryCols.TOTAL_IMPORT]),
         /** Tổng lãi dòng từ trigger NCC, trước rút lợi nhuận. */
         margin: toNumber(r[summaryCols.TOTAL_PROFIT]),
+        offFlowBankReceipt: toNumber(r[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
       },
     ])
   );
@@ -207,6 +209,8 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
     .map((row) => String(row[summaryCols.MONTH_KEY] || "").trim())
     .filter(Boolean);
 
+  const tbl = await sumRevenueAndImportFromSummaryTable(mks, executor);
+
   let revImpByMonth;
   if (revenueSource === "receipts") {
     const [revMap, impMap, nccMap] = await Promise.all([
@@ -218,22 +222,23 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
       rev: revMap.get(mk) || 0,
       imp: impMap.get(mk) || 0,
       nccMargin: nccMap.get(mk) || 0,
+      offFlow: (tbl.get(mk)?.offFlowBankReceipt ?? 0) || 0,
     });
   } else {
-    const tbl = await sumRevenueAndImportFromSummaryTable(mks, executor);
     revImpByMonth = (mk) => {
       const t = tbl.get(mk);
       return {
         rev: t ? t.revenue : 0,
         imp: t ? t.importVal : 0,
         nccMargin: t ? t.margin : 0,
+        offFlow: t ? t.offFlowBankReceipt || 0 : 0,
       };
     };
   }
 
   return rows.map((row) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
-    const { rev, imp: importVal, nccMargin } = revImpByMonth(mk);
+    const { rev, imp: importVal, nccMargin, offFlow } = revImpByMonth(mk);
     const refund = toNumber(row[summaryCols.TOTAL_REFUND]);
     const profitForDisplay = nccMargin;
     return {
@@ -244,6 +249,7 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
       [summaryCols.TOTAL_PROFIT]: profitForDisplay,
       [summaryCols.TOTAL_REFUND]: refund,
       [summaryCols.TOTAL_IMPORT]: importVal,
+      [summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]: offFlow,
       [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
     };
   });
@@ -265,6 +271,7 @@ const rowToApiShape = (dbRow) => {
     total_refund: refund,
     total_import: toNumber(dbRow[summaryCols.TOTAL_IMPORT]),
     total_tax: toNumber(dbRow[summaryCols.TOTAL_TAX]),
+    total_off_flow_bank_receipt: toNumber(dbRow[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
   };
 };
 

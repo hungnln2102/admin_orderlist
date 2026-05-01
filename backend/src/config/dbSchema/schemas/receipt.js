@@ -26,6 +26,8 @@ const RECEIPT_SCHEMA = {
       IS_FINANCIAL_POSTED: "is_financial_posted",
       POSTED_REVENUE: "posted_revenue",
       POSTED_PROFIT: "posted_profit",
+      /** Phần đã cộng vào dashboard total_off_flow_bank_receipt (không vào DT/LN). */
+      POSTED_OFF_FLOW_BANK_RECEIPT: "posted_off_flow_bank_receipt",
       RECONCILED_AT: "reconciled_at",
       ADJUSTMENT_APPLIED: "adjustment_applied",
       CREATED_AT: "created_at",

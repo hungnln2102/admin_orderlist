@@ -1,5 +1,4 @@
 const https = require("https");
-const dns = require("dns");
 const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
@@ -27,13 +26,8 @@ const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ECONNABORTED",
 ]);
 
-const preferIpv4Lookup = (hostname, options, cb) =>
-  dns.lookup(hostname, { ...options, family: 4, all: false }, (err, address, family) => {
-    if (err || !address) {
-      return dns.lookup(hostname, { ...options, all: false }, cb);
-    }
-    cb(null, address, family);
-  });
+/** IPv4 cho Telegram API; tránh custom dns.lookup (Node 20+ autoSelectFamily / options không tương thích → IP undefined). */
+const httpsAgentPreferIpv4 = new https.Agent({ keepAlive: true, family: 4 });
 
 const getErrorCode = (err) =>
   String(err?.code || err?.cause?.code || "")
@@ -76,7 +70,7 @@ const sendWithHttps = (url, payload, headers = { "Content-Type": "application/js
           ...headers,
           "Content-Length": Buffer.byteLength(body),
         },
-        agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
+        agent: httpsAgentPreferIpv4,
       },
       (res) => {
         let responseBody = "";

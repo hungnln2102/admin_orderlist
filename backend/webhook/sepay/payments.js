@@ -46,6 +46,7 @@ const RECEIPT_STATE_COLS = {
   IS_FINANCIAL_POSTED: "is_financial_posted",
   POSTED_REVENUE: "posted_revenue",
   POSTED_PROFIT: "posted_profit",
+  POSTED_OFF_FLOW_BANK_RECEIPT: "posted_off_flow_bank_receipt",
   RECONCILED_AT: "reconciled_at",
   ADJUSTMENT_APPLIED: "adjustment_applied",
   CREATED_AT: "created_at",
@@ -181,6 +182,7 @@ const getReceiptFinancialState = async (client, receiptId) => {
         ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT)}::numeric, 0) AS posted_off_flow_bank_receipt,
         ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
         ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
       FROM ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE}
@@ -213,6 +215,12 @@ const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
   if (Object.prototype.hasOwnProperty.call(patch, "posted_profit")) {
     push(RECEIPT_STATE_COLS.POSTED_PROFIT, Number(patch.posted_profit) || 0);
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "posted_off_flow_bank_receipt")) {
+    push(
+      RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT,
+      Number(patch.posted_off_flow_bank_receipt) || 0
+    );
+  }
   if (Object.prototype.hasOwnProperty.call(patch, "reconciled_at")) {
     push(RECEIPT_STATE_COLS.RECONCILED_AT, patch.reconciled_at);
   }
@@ -234,6 +242,7 @@ const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
         ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT)}::numeric, 0) AS posted_off_flow_bank_receipt,
         ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
         ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
     `,

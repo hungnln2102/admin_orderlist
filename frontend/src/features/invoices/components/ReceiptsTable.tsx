@@ -201,6 +201,15 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                               </option>
                             ))}
                           </select>
+                          {String(receipt.orderCode || "").trim() ? (
+                            <p className="text-[10px] text-white/55 font-medium leading-snug">
+                              CK đã gắn mã parse{" "}
+                              <span className="font-bold text-indigo-200/95">
+                                {String(receipt.orderCode).trim().toUpperCase()}
+                              </span>
+                              . Ghép sang đơn khả dụng để đưa vào tab Biên nhận.
+                            </p>
+                          ) : null}
                           {isManualInput && (
                             <div className="flex items-center gap-2">
                               <input

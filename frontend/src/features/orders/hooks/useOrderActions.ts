@@ -1,6 +1,7 @@
 ﻿import { useCallback, useRef, useState } from "react";
 import {
   API_ENDPOINTS,
+  ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
   ORDER_STATUSES,
   VIRTUAL_FIELDS,
@@ -208,6 +209,15 @@ export function useOrderActions(deps: OrderActionsDeps) {
           }
           await fetchOrders();
           emitRefresh(["orders", "dashboard"]);
+          const upperCode = orderCode.trim().toUpperCase();
+          if (upperCode.startsWith(ORDER_CODE_PREFIXES.IMPORT)) {
+            showAppNotification({
+              type: "success",
+              title: "Đã thanh toán (nhập hàng)",
+              message:
+                "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Chi phí nhập đã đồng bộ dashboard (không qua webhook ngân hàng).",
+            });
+          }
         } catch (error) {
           showAppNotification({
             type: "error",
@@ -237,13 +247,17 @@ export function useOrderActions(deps: OrderActionsDeps) {
               errorMessage || "Không thể hoàn thành đơn bằng webhook thủ công."
             );
           }
+          const data = (await response.json().catch(() => ({}))) as {
+            mavn_import_only?: boolean;
+          };
           await fetchOrders();
           emitRefresh(["orders", "dashboard", "payments", "supplies"]);
           showAppNotification({
             type: "success",
             title: "Hoàn thành đơn",
-            message:
-              "Đã tạo receipt và hoàn thành đơn bằng webhook thủ công.",
+            message: data?.mavn_import_only
+              ? "Đơn MAVN nhập hàng đã chuyển Đã thanh toán (không tạo receipt / không qua webhook)."
+              : "Đã tạo receipt và hoàn thành đơn bằng webhook thủ công.",
           });
         } catch (error) {
           showAppNotification({
@@ -319,11 +333,14 @@ export function useOrderActions(deps: OrderActionsDeps) {
 
         await fetchOrders();
         emitRefresh(["orders", "dashboard"]);
+        const upperRenewCode = orderCode.trim().toUpperCase();
         showAppNotification({
           type: "success",
           title: "Gia hạn thành công",
           message:
-            "Gia hạn đơn hàng thành công.\nĐơn đã được xử lý renewal thủ công.",
+            upperRenewCode.startsWith(ORDER_CODE_PREFIXES.IMPORT)
+              ? "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Chi phí nhập đã đồng bộ (không qua webhook ngân hàng)."
+              : "Gia hạn đơn hàng thành công.\nĐơn đã được xử lý renewal thủ công.",
         });
       } catch (error) {
         console.error("Lỗi khi chạy gia hạn thủ công:", error);

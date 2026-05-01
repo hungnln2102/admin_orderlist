@@ -57,18 +57,21 @@ async function getSummary(monthKey) {
       SELECT
         COALESCE(total_revenue::numeric, 0) AS total_revenue,
         COALESCE(total_profit::numeric, 0) AS total_profit,
-        COALESCE(total_import::numeric, 0) AS total_import
+        COALESCE(total_import::numeric, 0) AS total_import,
+        COALESCE(total_off_flow_bank_receipt::numeric, 0) AS total_off_flow_bank_receipt
       FROM dashboard.dashboard_monthly_summary
       WHERE month_key = $1
       LIMIT 1
     `,
     [monthKey]
   );
-  if (!res.rows.length) return { revenue: 0, profit: 0, importVal: 0 };
+  if (!res.rows.length)
+    return { revenue: 0, profit: 0, importVal: 0, off_flow_bank_receipt: 0 };
   return {
     revenue: Number(res.rows[0].total_revenue) || 0,
     profit: Number(res.rows[0].total_profit) || 0,
     importVal: Number(res.rows[0].total_import) || 0,
+    off_flow_bank_receipt: Number(res.rows[0].total_off_flow_bank_receipt) || 0,
   };
 }
 
@@ -316,40 +319,40 @@ async function run() {
     });
   }
 
-  // P4: ba webhook; hai đầu đủ giá; webhook 3 cộng DT + LN thẳng
+  // P4: đơn Đã TT sau 1 webhook đủ giá; webhook sau chỉ vào total_off_flow_bank_receipt (không DT/LN thêm)
   {
     const code = makeOrderCode("P4");
     await createOrder({ idOrder: code, status: STATUS.UNPAID });
     const before = await getSummary(TEST_MONTH_KEY);
-    const w1 = 100_000;
-    const w2 = 100_000;
+    const w1 = PRICE;
     const w3 = 30_000;
     const r1 = await callWebhook(buildWebhookPayload("P4a", "P4A", w1, code));
-    const r2 = await callWebhook(buildWebhookPayload("P4b", "P4B", w2, code));
     const midSt = await getOrderStatus(code);
     const r3 = await callWebhook(buildWebhookPayload("P4c", "P4C", w3, code));
     const after = await getSummary(TEST_MONTH_KEY);
     const st = await getOrderStatus(code);
-    const recvTotal = w1 + w2 + w3;
-    const expProfitTotal = PRICE - COST + w3;
+    const recvSales = w1;
+    const expProfit = PRICE - COST;
     results.push({
       id: "P4",
-      name: "3 webhook: 2 đầu đủ giá → TT; webhook 3 +DT +LN",
+      name: "Webhook 1 đủ giá → TT; webhook 2 chỉ total_off_flow_bank_receipt",
       ok:
         r1.status === 200 &&
-        r2.status === 200 &&
         r3.status === 200 &&
         midSt === STATUS.PAID &&
         st === STATUS.PAID &&
-        after.revenue - before.revenue === recvTotal &&
-        after.profit - before.profit === expProfitTotal,
+        after.revenue - before.revenue === recvSales &&
+        after.profit - before.profit === expProfit &&
+        after.off_flow_bank_receipt - before.off_flow_bank_receipt === w3,
       detail: {
-        statusAfterSecond: midSt,
+        statusAfterFirst: midSt,
         status: st,
         revenueDelta: after.revenue - before.revenue,
         profitDelta: after.profit - before.profit,
-        expectRevenue: recvTotal,
-        expectProfit: expProfitTotal,
+        offFlowDelta: after.off_flow_bank_receipt - before.off_flow_bank_receipt,
+        expectRevenue: recvSales,
+        expectProfit: expProfit,
+        expectOffFlow: w3,
       },
     });
   }

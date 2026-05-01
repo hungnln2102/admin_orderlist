@@ -25,6 +25,9 @@ const {
   recomputeSummaryMonthTotalTax,
   monthKeyFromPaidDateYmd,
 } = require("./finance/dashboardSummary");
+const {
+  completeMavnProcessingOrderPaidWithoutWebhook,
+} = require("./finance/mavnCompleteProcessingPaidWithoutWebhook");
 const logger = require("../../utils/logger");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
@@ -41,14 +44,15 @@ const toMonthKey = (value) => {
 const incrementDashboardSummaryByDelta = async (
   client,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, importDelta = 0 } = {}
+  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, importDelta = 0, offFlowDelta = 0 } = {}
 ) => {
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
   const imp = normalizeMoney(importDelta);
+  const offFlow = normalizeMoney(offFlowDelta);
   if (!monthKey) return;
-  if (!revenue && !profit && !orders && !imp) return;
+  if (!revenue && !profit && !orders && !imp && !offFlow) return;
 
   await client.query(
     `
@@ -58,18 +62,20 @@ const incrementDashboardSummaryByDelta = async (
         ${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT},
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
         ${summaryCols.UPDATED_AT}
       )
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (${summaryCols.MONTH_KEY})
       DO UPDATE SET
         ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
         ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_IMPORT)} + EXCLUDED.${summaryCols.TOTAL_IMPORT}),
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT} = ${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + EXCLUDED.${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
         ${summaryCols.UPDATED_AT} = NOW()
     `,
-    [monthKey, orders, revenue, profit, imp]
+    [monthKey, orders, revenue, profit, imp, offFlow]
   );
   await recomputeSummaryMonthTotalTax(client, monthKey);
 };
@@ -135,6 +141,16 @@ const completeProcessingOrderWithManualWebhook = async (orderId) => {
 
     const orderCode = String(state[ORDER_COLS.idOrder] || "").trim().toUpperCase();
     const currentStatus = state[ORDER_COLS.status];
+
+    // MAVN nhập hàng: không có tiền vào bank / không giả lập webhook — chỉ PAID + đồng bộ chi phí MAVN.
+    if (
+      currentStatus === ORDER_STATUS.PROCESSING &&
+      isMavnImportOrder({ id_order: orderCode })
+    ) {
+      await client.query("ROLLBACK");
+      return completeMavnProcessingOrderPaidWithoutWebhook(normalizedId);
+    }
+
     if (currentStatus !== ORDER_STATUS.PROCESSING) {
       await client.query("ROLLBACK");
       return {

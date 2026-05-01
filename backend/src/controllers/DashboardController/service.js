@@ -309,6 +309,7 @@ const fetchDashboardMonthlySummary = async () => {
       summaryCols.TOTAL_REFUND,
       summaryCols.TOTAL_IMPORT,
       summaryCols.TOTAL_TAX,
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
       summaryCols.UPDATED_AT
     )
     .orderBy(summaryCols.MONTH_KEY, "desc");
@@ -327,6 +328,7 @@ const fetchDashboardMonthlySummary = async () => {
       total_refund: toNumber(row[summaryCols.TOTAL_REFUND]),
       total_import: toNumber(row[summaryCols.TOTAL_IMPORT]),
       total_tax: toNumber(row[summaryCols.TOTAL_TAX]),
+      total_off_flow_bank_receipt: toNumber(row[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
       updated_at: row[summaryCols.UPDATED_AT] ?? null,
     };
   });
@@ -353,7 +355,8 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       summaryCols.TOTAL_PROFIT,
       summaryCols.TOTAL_REFUND,
       summaryCols.TOTAL_IMPORT,
-      summaryCols.TOTAL_TAX
+      summaryCols.TOTAL_TAX,
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT
     );
 
   const rowByMk = new Map(
@@ -377,6 +380,9 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       total_profit: profitGross,
       total_refund: refund,
       total_import: r ? toNumber(r[summaryCols.TOTAL_IMPORT]) : 0,
+      total_off_flow_bank_receipt: r
+        ? toNumber(r[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT])
+        : 0,
       total_tax:
         taxStored != null && Number.isFinite(taxStored)
           ? taxStored

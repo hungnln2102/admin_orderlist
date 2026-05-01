@@ -128,13 +128,14 @@ const toMonthKey = (value) => {
 const applyDashboardDelta = async (
   trx,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0 } = {}
+  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, offFlowDelta = 0 } = {}
 ) => {
   if (!monthKey) return;
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
-  if (!revenue && !profit && !orders) return;
+  const offFlow = normalizeMoney(offFlowDelta);
+  if (!revenue && !profit && !orders && !offFlow) return;
 
   await trx.raw(
     `
@@ -143,17 +144,19 @@ const applyDashboardDelta = async (
         ${SUMMARY_COLS.totalOrders},
         ${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalOffFlowBankReceipt},
         ${SUMMARY_COLS.updatedAt}
       )
-      VALUES (?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, NOW())
       ON CONFLICT (${SUMMARY_COLS.monthKey})
       DO UPDATE SET
         ${SUMMARY_COLS.totalOrders} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOrders} + EXCLUDED.${SUMMARY_COLS.totalOrders}),
         ${SUMMARY_COLS.totalRevenue} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalRevenue} + EXCLUDED.${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalProfit} + EXCLUDED.${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalOffFlowBankReceipt} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOffFlowBankReceipt} + EXCLUDED.${SUMMARY_COLS.totalOffFlowBankReceipt},
         ${SUMMARY_COLS.updatedAt} = NOW();
     `,
-    [monthKey, orders, revenue, profit]
+    [monthKey, orders, revenue, profit, offFlow]
   );
   await recomputeSummaryMonthTotalTax(trx, monthKey);
 };
@@ -191,6 +194,7 @@ const listPaymentReceipts = async (req, res) => {
         isFinancialPosted: `fs.${RECEIPT_STATE_COLS.isFinancialPosted}`,
         postedRevenue: `fs.${RECEIPT_STATE_COLS.postedRevenue}`,
         postedProfit: `fs.${RECEIPT_STATE_COLS.postedProfit}`,
+        postedOffFlowBankReceipt: `fs.${RECEIPT_STATE_COLS.postedOffFlowBankReceipt}`,
         reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
         adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
       })
@@ -213,6 +217,7 @@ const listPaymentReceipts = async (req, res) => {
       isFinancialPosted: !!row.isFinancialPosted,
       postedRevenue: Number(row.postedRevenue) || 0,
       postedProfit: Number(row.postedProfit) || 0,
+      postedOffFlowBankReceipt: Number(row.postedOffFlowBankReceipt) || 0,
       reconciledAt: row.reconciledAt || null,
       adjustmentApplied: !!row.adjustmentApplied,
     }));
@@ -257,6 +262,7 @@ const listPaymentReceipts = async (req, res) => {
           isFinancialPosted: false,
           postedRevenue: 0,
           postedProfit: 0,
+          postedOffFlowBankReceipt: 0,
           reconciledAt: null,
           adjustmentApplied: false,
         }));
@@ -663,8 +669,11 @@ const reconcilePaymentReceipt = async (req, res) => {
       let statusValue = statusValueInitial;
       let revenueDelta = 0;
       let profitDelta = 0;
+      let offFlowDelta = 0;
       let nextPostedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
       let nextPostedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
+      let nextPostedOffFlowBankReceipt =
+        Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
 
       if (adjustmentApplied) {
         await trx.raw(
@@ -684,25 +693,37 @@ const reconcilePaymentReceipt = async (req, res) => {
         const receiptMonthKey = toMonthKey(receiptRes[PAYMENT_RECEIPT_DEF.columns.paidDate]);
         const postedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
         const postedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
+        const postedOffFlowBankReceipt =
+          Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
+        const receiptAmt = normalizeMoney(receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]);
 
         if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
-          // Đơn đã được xử lý trước đó: trừ lại phần đã cộng trước ở receipt không mã.
+          // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
           revenueDelta = -postedRevenue;
           profitDelta = -postedProfit;
+          offFlowDelta = -postedOffFlowBankReceipt;
         } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
-          // Chỉ điều chỉnh lợi nhuận về đúng amount - cost.
           const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
-          profitDelta = -cost;
+          if (postedOffFlowBankReceipt > 0) {
+            revenueDelta = receiptAmt;
+            profitDelta = receiptAmt - cost;
+            offFlowDelta = -postedOffFlowBankReceipt;
+          } else {
+            // Legacy: receipt không mã đã cộng thẳng DT/LN — chỉ chỉnh LN − cost.
+            profitDelta = -cost;
+          }
         }
 
         await applyDashboardDelta(trx, receiptMonthKey, {
           revenueDelta,
           profitDelta,
           ordersDelta: 0,
+          offFlowDelta,
         });
 
         nextPostedRevenue = postedRevenue + revenueDelta;
         nextPostedProfit = postedProfit + profitDelta;
+        nextPostedOffFlowBankReceipt = postedOffFlowBankReceipt + offFlowDelta;
 
         await trx(TABLES.paymentReceiptState)
           .where(RECEIPT_STATE_COLS.paymentReceiptId, receiptId)
@@ -710,6 +731,7 @@ const reconcilePaymentReceipt = async (req, res) => {
             [RECEIPT_STATE_COLS.isFinancialPosted]: true,
             [RECEIPT_STATE_COLS.postedRevenue]: nextPostedRevenue,
             [RECEIPT_STATE_COLS.postedProfit]: nextPostedProfit,
+            [RECEIPT_STATE_COLS.postedOffFlowBankReceipt]: nextPostedOffFlowBankReceipt,
             [RECEIPT_STATE_COLS.reconciledAt]: new Date(),
             [RECEIPT_STATE_COLS.adjustmentApplied]: true,
             [RECEIPT_STATE_COLS.updatedAt]: new Date(),
@@ -728,8 +750,10 @@ const reconcilePaymentReceipt = async (req, res) => {
             JSON.stringify({
               revenueDelta,
               profitDelta,
+              offFlowDelta,
               postedRevenue: nextPostedRevenue,
               postedProfit: nextPostedProfit,
+              postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
               orderStatus: statusValue,
               action: effectiveAction,
             }),
@@ -811,8 +835,10 @@ const reconcilePaymentReceipt = async (req, res) => {
         status: statusValue,
         revenueDelta,
         profitDelta,
+        offFlowDelta,
         postedRevenue: nextPostedRevenue,
         postedProfit: nextPostedProfit,
+        postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
         reconciledAt: new Date().toISOString(),
         skipped: adjustmentApplied,
         reason: adjustmentApplied ? "adjustment already applied" : null,
@@ -853,7 +879,8 @@ const reconcilePaymentReceipt = async (req, res) => {
   } catch (error) {
     const statusCode = Number(error?.status) || 500;
     if (statusCode >= 400 && statusCode < 500) {
-      logger.warn("[payments] Từ chối reconcile biên lai theo rule nghiệp vụ", {
+      // 4xx = rule nghiệp vụ / idempotent (vd: đơn đã đổi trạng thái) — không gửi Telegram warn.
+      logger.debug("[payments] Từ chối reconcile biên lai (HTTP client/rule)", {
         receiptId,
         orderCode: orderCodeRaw,
         action: requestedAction,

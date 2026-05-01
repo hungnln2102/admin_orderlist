@@ -102,7 +102,7 @@ export default function Invoices() {
     const endTime = parseDMYDate(dateEnd);
 
     return receipts.filter((item) => {
-      const recordCategory = determineReceiptCategory(item.orderCode);
+      const recordCategory = determineReceiptCategory(item);
       const matchesSearch =
         !normalized ||
         [item.orderCode, item.note, resolveSender(item)]
@@ -127,17 +127,20 @@ export default function Invoices() {
   }, [receipts, searchTerm, dateStart, dateEnd, categoryFilter]);
 
   const stats = useMemo(() => {
-    const totalAmount = receipts.reduce((sum, item) => {
-      return (item.orderCode || "").toUpperCase().startsWith("MAV")
-        ? sum + item.amount
-        : sum;
-    }, 0);
-    const latestPaidAt = receipts.length > 0 ? receipts[0].paidAt ?? "" : "";
+    const mavFlowReceipts = receipts.filter(
+      (item) => determineReceiptCategory(item) === "receipt"
+    );
+    const totalAmount = mavFlowReceipts.reduce((sum, item) => sum + item.amount, 0);
+    let latestPaidAt = "";
+    for (const item of mavFlowReceipts) {
+      const t = item.paidAt ?? "";
+      if (t && (!latestPaidAt || t > latestPaidAt)) latestPaidAt = t;
+    }
 
     return [
       {
         name: "Tổng Biên Nhận",
-        value: receipts.length.toString(),
+        value: mavFlowReceipts.length.toString(),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.sky,
       },
@@ -161,11 +164,11 @@ export default function Invoices() {
   const categoryCounts = useMemo(() => {
     return receipts.reduce(
       (acc, item) => {
-        const category = determineReceiptCategory(item.orderCode);
+        const category = determineReceiptCategory(item);
         acc[category] += 1;
         return acc;
       },
-      { receipt: 0, refund: 0 } as Record<ReceiptCategory, number>
+      { receipt: 0, "out-of-flow": 0 } as Record<ReceiptCategory, number>
     );
   }, [receipts]);
 
@@ -333,12 +336,12 @@ export default function Invoices() {
           matchableOrders={matchableOrders}
           matchingReceiptId={matchingReceiptId}
           onMatchReceipt={handleMatchReceipt}
-          enableMatching={categoryFilter === "refund"}
+          enableMatching={categoryFilter === "out-of-flow"}
           enableOrderCodeEdit={categoryFilter === "receipt"}
           expandedReceiptId={expandedReceiptId}
           onToggle={toggleRowDetails}
           onSelectReceipt={handleSelectReceipt}
-          showOrderCode={categoryFilter !== "refund"}
+          showOrderCode={categoryFilter !== "out-of-flow"}
         />
 
         {!loading && filteredReceipts.length === 0 && (

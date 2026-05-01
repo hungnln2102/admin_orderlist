@@ -166,14 +166,15 @@ const toMonthKey = (value) => {
 const incrementDashboardSummaryByDelta = async (
   client,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, importDelta = 0 } = {}
+  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, importDelta = 0, offFlowDelta = 0 } = {}
 ) => {
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
   const imp = normalizeMoney(importDelta);
+  const offFlow = normalizeMoney(offFlowDelta);
   if (!monthKey) return;
-  if (!revenue && !profit && !orders && !imp) return;
+  if (!revenue && !profit && !orders && !imp && !offFlow) return;
 
   await client.query(
     `
@@ -183,18 +184,20 @@ const incrementDashboardSummaryByDelta = async (
         ${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT},
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
         ${summaryCols.UPDATED_AT}
       )
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (${summaryCols.MONTH_KEY})
       DO UPDATE SET
         ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
         ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_IMPORT)} + EXCLUDED.${summaryCols.TOTAL_IMPORT}),
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT} = ${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + EXCLUDED.${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
         ${summaryCols.UPDATED_AT} = NOW()
     `,
-    [monthKey, orders, revenue, profit, imp]
+    [monthKey, orders, revenue, profit, imp, offFlow]
   );
   await recomputeSummaryMonthTotalTax(client, monthKey);
 };
@@ -570,6 +573,7 @@ router.post("/", async (req, res) => {
         toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
       let postedRevenueDelta = 0;
       let postedProfitDelta = 0;
+      let postedOffFlowBankReceiptDelta = 0;
 
       if (receiptId && alreadyFinancialPosted) {
         await insertFinancialAuditLog(client, {
@@ -603,7 +607,7 @@ router.post("/", async (req, res) => {
 
           const statusValue = state[ORDER_COLS.status];
 
-          // Đơn đã Đã Thanh Toán + biên lai mới: cộng DT+LN thêm; payment_supply / NCC chỉ bù một lần (xử lý ở khối supplier sau).
+          // Đơn đã Đã Thanh Toán + biên lai mới: tiền vào NH không ghi DT/LN (ngoài luồng kế toán).
           if (
             receiptResult?.inserted &&
             transferAmountNormalized > 0 &&
@@ -611,26 +615,23 @@ router.post("/", async (req, res) => {
           ) {
             const extraVnd = normalizeMoney(transferAmountNormalized);
             await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-              revenueDelta: extraVnd,
-              profitDelta: extraVnd,
+              offFlowDelta: extraVnd,
               ordersDelta: 0,
             });
-            postedRevenueDelta += extraVnd;
-            postedProfitDelta += extraVnd;
+            postedOffFlowBankReceiptDelta += extraVnd;
             if (receiptId) {
               await insertFinancialAuditLog(client, {
                 payment_receipt_id: receiptId,
                 order_code: code,
-                rule_branch: "POST_PAID_ADDITIONAL_RECEIPT",
+                rule_branch: "POST_PAID_ADDITIONAL_OFF_FLOW_BANK_RECEIPT",
                 delta: {
-                  posted_revenue: extraVnd,
-                  posted_profit: extraVnd,
+                  posted_off_flow_bank_receipt: extraVnd,
                   month_key: paidMonthKey,
                 },
                 source: "webhook",
               });
             }
-            logger.debug("[Webhook] Ghi thêm doanh thu (biên thêm sau khi đã thu đủ trước đó)", {
+            logger.debug("[Webhook] Ghi nhận tiền NH ngoài luồng DT/LN (biên thêm sau Đã TT)", {
               orderCode: code,
               status: statusValue,
               amount: extraVnd,
@@ -786,20 +787,17 @@ router.post("/", async (req, res) => {
         !supplierSettlementTransfer
       ) {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-          revenueDelta: transferAmountNormalized,
-          profitDelta: transferAmountNormalized,
+          offFlowDelta: transferAmountNormalized,
           ordersDelta: 0,
         });
-        postedRevenueDelta += transferAmountNormalized;
-        postedProfitDelta += transferAmountNormalized;
+        postedOffFlowBankReceiptDelta += transferAmountNormalized;
         if (receiptId) {
           await insertFinancialAuditLog(client, {
             payment_receipt_id: receiptId,
             order_code: "",
-            rule_branch: "NO_ORDER_CODE_AMOUNT_POST",
+            rule_branch: "NO_ORDER_CODE_OFF_FLOW_BANK_RECEIPT",
             delta: {
-              posted_revenue: transferAmountNormalized,
-              posted_profit: transferAmountNormalized,
+              posted_off_flow_bank_receipt: transferAmountNormalized,
               month_key: paidMonthKey,
             },
             source: "webhook",
@@ -903,17 +901,24 @@ router.post("/", async (req, res) => {
       }
 
       if (receiptId) {
-        if (!alreadyFinancialPosted && (postedRevenueDelta !== 0 || postedProfitDelta !== 0)) {
+        if (
+          !alreadyFinancialPosted &&
+          (postedRevenueDelta !== 0 ||
+            postedProfitDelta !== 0 ||
+            postedOffFlowBankReceiptDelta !== 0)
+        ) {
           await updateReceiptFinancialState(client, receiptId, {
             is_financial_posted: true,
             posted_revenue: postedRevenueDelta,
             posted_profit: postedProfitDelta,
+            posted_off_flow_bank_receipt: postedOffFlowBankReceiptDelta,
           });
         } else if (!alreadyFinancialPosted) {
           await updateReceiptFinancialState(client, receiptId, {
             is_financial_posted: false,
             posted_revenue: 0,
             posted_profit: 0,
+            posted_off_flow_bank_receipt: 0,
           });
           await insertFinancialAuditLog(client, {
             payment_receipt_id: receiptId,
@@ -922,6 +927,7 @@ router.post("/", async (req, res) => {
             delta: {
               posted_revenue: 0,
               posted_profit: 0,
+              posted_off_flow_bank_receipt: 0,
               is_financial_posted: false,
             },
             source: "webhook",
@@ -987,7 +993,7 @@ router.post("/", async (req, res) => {
             }
           }
           if (amountDecision && !amountDecision.complete) {
-            logger.warn("[Webhook] Skip renewal, waiting topup by amount rule", {
+            logger.debug("[Webhook] Skip renewal, chờ đủ tiền theo rule (chưa complete)", {
               orderCode: code,
               receivedCurrent: amountDecision.receivedCurrent,
               receivedAccumulated: amountDecision.receivedAccumulated,

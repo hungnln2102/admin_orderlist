@@ -44,17 +44,20 @@ async function getSummary(monthKey) {
     `
       SELECT
         COALESCE(total_revenue::numeric, 0) AS total_revenue,
-        COALESCE(total_profit::numeric, 0) AS total_profit
+        COALESCE(total_profit::numeric, 0) AS total_profit,
+        COALESCE(total_off_flow_bank_receipt::numeric, 0) AS total_off_flow_bank_receipt
       FROM dashboard.dashboard_monthly_summary
       WHERE month_key = $1
       LIMIT 1
     `,
     [monthKey]
   );
-  if (!res.rows.length) return { revenue: 0, profit: 0 };
+  if (!res.rows.length)
+    return { revenue: 0, profit: 0, off_flow_bank_receipt: 0 };
   return {
     revenue: Number(res.rows[0].total_revenue) || 0,
     profit: Number(res.rows[0].total_profit) || 0,
+    off_flow_bank_receipt: Number(res.rows[0].total_off_flow_bank_receipt) || 0,
   };
 }
 
@@ -90,7 +93,9 @@ async function getReceiptByMarkerAndEmptyOrder(marker) {
 async function getReceiptState(receiptId) {
   const res = await pool.query(
     `
-      SELECT payment_receipt_id, is_financial_posted, posted_revenue, posted_profit, reconciled_at, adjustment_applied
+      SELECT payment_receipt_id, is_financial_posted, posted_revenue, posted_profit,
+             COALESCE(posted_off_flow_bank_receipt::numeric, 0) AS posted_off_flow_bank_receipt,
+             reconciled_at, adjustment_applied
       FROM receipt.payment_receipt_financial_state
       WHERE payment_receipt_id = $1
       LIMIT 1
@@ -290,7 +295,7 @@ async function run() {
     },
   });
 
-  // Case 2: PAID with prior receipt -> add revenue + profit (cùng số tiền biên lai bổ sung)
+  // Case 2: PAID + đã có receipt trước — webhook thêm chỉ ghi total_off_flow_bank_receipt (không DT/LN)
   const c2OrderCode = makeOrderCode("A2");
   await createOrder({
     idOrder: c2OrderCode,
@@ -323,18 +328,23 @@ async function run() {
     name: "Webhook co ma don PAID da co receipt truoc do",
     ok:
       c2Res.status === 200 &&
-      c2After.revenue - c2Before.revenue === 250000 &&
-      c2After.profit - c2Before.profit === 250000 &&
-      !!c2State?.is_financial_posted,
+      c2After.revenue - c2Before.revenue === 0 &&
+      c2After.profit - c2Before.profit === 0 &&
+      c2After.off_flow_bank_receipt - c2Before.off_flow_bank_receipt === 250000 &&
+      !!c2State?.is_financial_posted &&
+      Number(c2State?.posted_off_flow_bank_receipt || 0) === 250000 &&
+      Number(c2State?.posted_revenue || 0) === 0 &&
+      Number(c2State?.posted_profit || 0) === 0,
     detail: {
       httpStatus: c2Res.status,
       revenueDelta: c2After.revenue - c2Before.revenue,
       profitDelta: c2After.profit - c2Before.profit,
+      offFlowDelta: c2After.off_flow_bank_receipt - c2Before.off_flow_bank_receipt,
       state: c2State,
     },
   });
 
-  // Case 3: PAID without prior receipt -> no financial posting
+  // Case 3: PAID chưa có receipt trước — webhook chỉ bucket ngoài luồng (vẫn posted financial_state)
   const c3OrderCode = makeOrderCode("A3");
   await createOrder({
     idOrder: c3OrderCode,
@@ -362,11 +372,16 @@ async function run() {
       c3Res.status === 200 &&
       c3After.revenue - c3Before.revenue === 0 &&
       c3After.profit - c3Before.profit === 0 &&
-      !c3State?.is_financial_posted,
+      c3After.off_flow_bank_receipt - c3Before.off_flow_bank_receipt === 260000 &&
+      !!c3State?.is_financial_posted &&
+      Number(c3State?.posted_off_flow_bank_receipt || 0) === 260000 &&
+      Number(c3State?.posted_revenue || 0) === 0 &&
+      Number(c3State?.posted_profit || 0) === 0,
     detail: {
       httpStatus: c3Res.status,
       revenueDelta: c3After.revenue - c3Before.revenue,
       profitDelta: c3After.profit - c3Before.profit,
+      offFlowDelta: c3After.off_flow_bank_receipt - c3Before.off_flow_bank_receipt,
       state: c3State,
     },
   });
@@ -390,13 +405,16 @@ async function run() {
     name: "Webhook khong ma don",
     ok:
       c4Res.status === 200 &&
-      c4After.revenue - c4Before.revenue === 270000 &&
-      c4After.profit - c4Before.profit === 270000 &&
-      !!c4State?.is_financial_posted,
+      c4After.revenue - c4Before.revenue === 0 &&
+      c4After.profit - c4Before.profit === 0 &&
+      c4After.off_flow_bank_receipt - c4Before.off_flow_bank_receipt === 270000 &&
+      !!c4State?.is_financial_posted &&
+      Number(c4State?.posted_off_flow_bank_receipt || 0) === 270000,
     detail: {
       httpStatus: c4Res.status,
       revenueDelta: c4After.revenue - c4Before.revenue,
       profitDelta: c4After.profit - c4Before.profit,
+      offFlowDelta: c4After.off_flow_bank_receipt - c4Before.off_flow_bank_receipt,
       state: c4State,
     },
   });
@@ -411,13 +429,15 @@ async function run() {
     name: "Reconcile receipt khong ma vao don PAID",
     ok:
       c5Recon.statusCode === 200 &&
-      c5After.revenue - c5Before.revenue === -270000 &&
-      c5After.profit - c5Before.profit === -270000 &&
+      c5After.revenue - c5Before.revenue === 0 &&
+      c5After.profit - c5Before.profit === 0 &&
+      c5After.off_flow_bank_receipt - c5Before.off_flow_bank_receipt === -270000 &&
       !!c5State?.adjustment_applied,
     detail: {
       httpStatus: c5Recon.statusCode,
       revenueDelta: c5After.revenue - c5Before.revenue,
       profitDelta: c5After.profit - c5Before.profit,
+      offFlowDelta: c5After.off_flow_bank_receipt - c5Before.off_flow_bank_receipt,
       state: c5State,
     },
   });
@@ -448,13 +468,15 @@ async function run() {
     name: "Reconcile receipt khong ma vao don UNPAID",
     ok:
       c6Recon.statusCode === 200 &&
-      c6After.revenue - c6Before.revenue === 0 &&
-      c6After.profit - c6Before.profit === -50000 &&
+      c6After.revenue - c6Before.revenue === 280000 &&
+      c6After.profit - c6Before.profit === 230000 &&
+      c6After.off_flow_bank_receipt - c6Before.off_flow_bank_receipt === -280000 &&
       !!c6State?.adjustment_applied,
     detail: {
       httpStatus: c6Recon.statusCode,
       revenueDelta: c6After.revenue - c6Before.revenue,
       profitDelta: c6After.profit - c6Before.profit,
+      offFlowDelta: c6After.off_flow_bank_receipt - c6Before.off_flow_bank_receipt,
       state: c6State,
     },
   });
@@ -557,13 +579,15 @@ async function run() {
     name: "Reconcile + mark paid cho don UNPAID",
     ok:
       c10Recon.statusCode === 200 &&
-      c10After.revenue - c10Before.revenue === 0 &&
-      c10After.profit - c10Before.profit === -80000 &&
+      c10After.revenue - c10Before.revenue === 300000 &&
+      c10After.profit - c10Before.profit === 220000 &&
+      c10After.off_flow_bank_receipt - c10Before.off_flow_bank_receipt === -300000 &&
       String(c10OrderRow.rows?.[0]?.status || "") === STATUS.PAID,
     detail: {
       httpStatus: c10Recon.statusCode,
       revenueDelta: c10After.revenue - c10Before.revenue,
       profitDelta: c10After.profit - c10Before.profit,
+      offFlowDelta: c10After.off_flow_bank_receipt - c10Before.off_flow_bank_receipt,
       orderStatus: c10OrderRow.rows?.[0]?.status || null,
       actionResult: c10Recon.body?.actionResult || null,
     },
@@ -599,14 +623,16 @@ async function run() {
     ok:
       c11Recon.statusCode === 200 &&
       !!c11Recon.body?.renewalSuccess &&
-      c11After.revenue - c11Before.revenue === 0 &&
-      c11After.profit - c11Before.profit === -90000 &&
-      String(c11OrderRow.rows?.[0]?.status || "") === STATUS.PAID,
+      c11After.revenue - c11Before.revenue === 320000 &&
+      c11After.profit - c11Before.profit === 230000 &&
+      c11After.off_flow_bank_receipt - c11Before.off_flow_bank_receipt === -320000 &&
+      String(c11OrderRow.rows?.[0]?.status || "") === STATUS.PROCESSING,
     detail: {
       httpStatus: c11Recon.statusCode,
       renewalSuccess: c11Recon.body?.renewalSuccess || false,
       revenueDelta: c11After.revenue - c11Before.revenue,
       profitDelta: c11After.profit - c11Before.profit,
+      offFlowDelta: c11After.off_flow_bank_receipt - c11Before.off_flow_bank_receipt,
       orderStatus: c11OrderRow.rows?.[0]?.status || null,
       actionResult: c11Recon.body?.actionResult || null,
     },
