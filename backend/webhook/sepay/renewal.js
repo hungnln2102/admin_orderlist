@@ -367,6 +367,23 @@ const runRenewal = async (
       orderCode,
     ]);
 
+    if (isMavn) {
+      try {
+        const {
+          syncMavnStockExpiryAfterOrderRenewal,
+        } = require("../../src/services/mavnRenewalStockExpirySync");
+        await syncMavnStockExpiryAfterOrderRenewal(client, {
+          orderCode,
+          newExpiryDate: ngayHetHanMoi,
+        });
+      } catch (stockSyncErr) {
+        logger.warn("[Renewal] MAVN đồng bộ expires_at kho thất bại (không chặn gia hạn)", {
+          orderCode,
+          error: stockSyncErr.message,
+        });
+      }
+    }
+
     if (isMavn && renewalNextStatus === ORDER_STATUS.PAID) {
       const {
         syncMavnFinanceAfterRenewalOrderPaid,
