@@ -20,6 +20,7 @@ import {
   toCleanString,
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
+  syncActivationFieldInTemplateFields,
 } from "../utils/packageHelpers";
 import { computeAugmentationForPackage } from "../utils/packageMatchUtils";
 import { onRefresh } from "@/lib/refreshBus";
@@ -230,21 +231,51 @@ export const usePackageData = (): UsePackageDataResult => {
         if (!name) return;
         const firstRow = rows.find((row) => row.package === name);
         const productId = firstRow?.productId ?? null;
-        const hasCapacityConfigured = rows.some(
-          (row) => row.package === name && row.hasCapacityField
-        );
+        const serverActivation = firstRow?.productRequiresActivation === true;
         const existing = map.get(name);
         if (!existing) {
           map.set(name, {
             name,
             productId,
-            fields: defaultTemplateFields,
+            fields: syncActivationFieldInTemplateFields(
+              defaultTemplateFields,
+              serverActivation
+            ),
             isCustom: false,
           });
           changed = true;
           return;
         }
-        if (existing.isCustom !== true && existing.productId == null && productId != null) {
+        const baseFields =
+          existing.fields && existing.fields.length > 0
+            ? existing.fields
+            : defaultTemplateFields;
+        const mergedFields = syncActivationFieldInTemplateFields(
+          baseFields,
+          serverActivation
+        );
+        const prevFields =
+          existing.fields && existing.fields.length > 0
+            ? existing.fields
+            : defaultTemplateFields;
+        const fieldsEqual =
+          mergedFields.length === prevFields.length &&
+          mergedFields.every((f, i) => f === prevFields[i]);
+
+        if (!fieldsEqual) {
+          map.set(name, {
+            ...existing,
+            fields: mergedFields,
+            productId: existing.productId ?? productId,
+          });
+          changed = true;
+          return;
+        }
+        if (
+          existing.isCustom !== true &&
+          existing.productId == null &&
+          productId != null
+        ) {
           map.set(name, { ...existing, productId });
           changed = true;
         }

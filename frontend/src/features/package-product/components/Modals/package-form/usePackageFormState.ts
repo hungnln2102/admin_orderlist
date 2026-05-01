@@ -21,12 +21,15 @@ type UsePackageFormStateParams = {
   open: boolean;
   initialValues?: PackageFormValues;
   onSubmit: (values: PackageFormValues) => void;
+  /** Bật khi loại gói có trường «activation» — khi false, không bắt buộc kích hoạt dù chọn match theo thông tin đơn. */
+  requireActivationForInformation: boolean;
 };
 
 export const usePackageFormState = ({
   open,
   initialValues,
   onSubmit,
+  requireActivationForInformation,
 }: UsePackageFormStateParams) => {
   const mergedInitialValues = useMemo(
     () => ({ ...EMPTY_FORM_VALUES, ...(initialValues ?? {}) }),
@@ -276,14 +279,15 @@ export const usePackageFormState = ({
       ? "Cần chọn tài khoản gốc (kho) để gán gói."
       : null;
 
-  // `storageManual` là state UI (không nằm trong values); trước đây nhầm `values.storageManual` → luôn falsy → không bao giờ lưu được khi nhập tay kích hoạt.
+  // Khớp với mutation: có storageId hoặc account nhập tay (POST kho khi submit). Không phụ thuộc cờ storageManual để tránh lệch validation vs dữ liệu gửi đi.
   const hasActivation =
     values.storageId != null ||
-    (storageManual &&
-      Boolean(values.manualStorage?.account && values.manualStorage.account.trim().length > 0));
+    Boolean(values.manualStorage?.account?.trim());
 
   const matchRequiresActivationError =
-    values.slotLinkMode === "information" && !hasActivation
+    values.slotLinkMode === "information" &&
+    requireActivationForInformation &&
+    !hasActivation
       ? "Chế độ theo thông tin đơn cần chọn tài khoản kích hoạt (kho kích hoạt)."
       : null;
 

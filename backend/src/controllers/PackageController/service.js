@@ -9,7 +9,8 @@ const {
 } = require("../../services/packageProductService");
 const { syncOrdersMatchingPackageAccount } = require("../../services/packageOrderAccountSync");
 const logger = require("../../utils/logger");
-const { pkgCols, TABLES } = require("./constants");
+const { pkgCols, TABLES, productCols } = require("./constants");
+
 
 const normalizeMatchMode = (matchMode) =>
   matchMode === "slot" ? "slot" : "information_order";
@@ -186,10 +187,36 @@ const bulkDeletePackages = async (productIds) =>
     return deleteResult || [];
   });
 
+/** @see database/migrations/092_product_package_requires_activation.sql */
+const updateProductPackageOptions = async (productId, payload) => {
+  const idNum = Number(productId);
+  if (!Number.isFinite(idNum) || idNum < 1) {
+    throw new Error("productId không hợp lệ.");
+  }
+  const raw = payload?.requiresActivation ?? payload?.package_requires_activation;
+  const requiresActivation = Boolean(raw);
+
+  const updatedCount = await db(TABLES.product)
+    .where(productCols.id, idNum)
+    .update({
+      [productCols.packageRequiresActivation]: requiresActivation,
+    });
+
+  if (!updatedCount) {
+    return null;
+  }
+
+  return {
+    productId: idNum,
+    packageRequiresActivation: requiresActivation,
+  };
+};
+
 module.exports = {
   listPackageProducts,
   createPackageProduct,
   updatePackageProduct,
   deletePackageProduct,
   bulkDeletePackages,
+  updateProductPackageOptions,
 };

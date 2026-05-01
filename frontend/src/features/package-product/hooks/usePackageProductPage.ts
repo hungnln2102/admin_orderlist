@@ -258,8 +258,9 @@ export const usePackageProductPage = () => {
     closeEditModal,
   });
 
-  const { handleCreateTemplate } = usePackageTemplateActions({
+  const { handleTemplateModalSubmit } = usePackageTemplateActions({
     setRows,
+    setTemplates,
     closeCreateModal,
     handleCategorySelect,
   });
@@ -272,21 +273,10 @@ export const usePackageProductPage = () => {
     [templates]
   );
 
-  /** Hiển thị khối «Tài khoản kích hoạt»: nếu chỉ .some(storageTotal) thì gói đầu tiên của product bị ẩn → không chọn được storage → không lưu khi match = information_order. */
-  const productHasStorage = useMemo(() => {
-    if (!selectedTemplate?.productId) return false;
-
-    const sameProduct = rows.filter(
-      (row) => row.productId === selectedTemplate.productId
-    );
-    if (sameProduct.length === 0) return true;
-    return sameProduct.some(
-      (row) =>
-        row.storageTotal != null ||
-        row.storageId != null ||
-        Boolean(row.accountUser && String(row.accountUser).trim())
-    );
-  }, [rows, selectedTemplate]);
+  /** Theo cấu hình loại gói (checkbox «Tài khoản kích hoạt»). */
+  const productHasStorage = Boolean(
+    selectedTemplate?.fields.includes("activation")
+  );
 
   const slotCards = useMemo(
     () => [
@@ -361,7 +351,7 @@ export const usePackageProductPage = () => {
       closeAddModal,
       closeEditModal,
       closeViewModal,
-      handleCreateTemplate,
+      handleTemplateModalSubmit,
       handleAddSubmit,
       handleEditSubmit,
     },

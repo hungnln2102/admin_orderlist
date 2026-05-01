@@ -4,6 +4,7 @@ const {
   updatePackageProduct,
   deletePackageProduct,
   bulkDeletePackages,
+  updateProductPackageOptions,
 } = require("./service");
 const { pkgCols } = require("./constants");
 const logger = require("../../utils/logger");
@@ -126,10 +127,31 @@ const bulkDeleteHandler = async (req, res) => {
   }
 };
 
+const patchProductOptionsHandler = async (req, res) => {
+  const productId = req.params.productId ?? req.params.packageId;
+  try {
+    const result = await updateProductPackageOptions(productId, req.body || {});
+    if (!result) {
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm (product)." });
+    }
+    res.json(result);
+  } catch (error) {
+    logger.error("[packages] Cập nhật tuỳ chọn product thất bại", {
+      productId,
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Không thể cập nhật.",
+    });
+  }
+};
+
 module.exports = {
   listPackageProducts: listHandler,
   createPackageProduct: createHandler,
   updatePackageProduct: updateHandler,
   deletePackageProduct: deleteHandler,
   bulkDeletePackages: bulkDeleteHandler,
+  patchProductPackageOptions: patchProductOptionsHandler,
 };

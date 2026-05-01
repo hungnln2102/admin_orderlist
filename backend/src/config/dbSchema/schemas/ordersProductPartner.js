@@ -66,6 +66,8 @@ const PRODUCT_SCHEMA = {
       IMAGE_URL: "image_url",
       UPDATED_AT: "updated_at",
       IS_ACTIVE: "is_active",
+      /** Form quản lý gói: có trường tài khoản kích hoạt / storage */
+      PACKAGE_REQUIRES_ACTIVATION: "package_requires_activation",
     },
   },
   DESC_VARIANT: {

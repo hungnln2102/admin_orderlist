@@ -3,7 +3,9 @@ import * as Helpers from "@/lib/helpers";
 
 export type PackageField =
   | "supplier"
-  | "import";
+  | "import"
+  /** Kho / tài khoản kích hoạt + dung lượng trên form thêm–sửa gói */
+  | "activation";
 export type SlotLinkMode = "information" | "slot";
 export type PackageRow = {
   id: number;
@@ -36,6 +38,8 @@ export type PackageRow = {
   normalizedProductCodes?: string[];
   matchModeValue?: string | null;
   stockId?: number | null;
+  /** Từ product.package_requires_activation (JOIN API package-products). */
+  productRequiresActivation?: boolean;
 };
 export type OrderListItem = {
   id?: number | string | null;
@@ -165,7 +169,19 @@ export const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }
   [
     { value: "supplier", label: "Nhà cung cấp" },
     { value: "import", label: "Giá nhập (VND)" },
+    { value: "activation", label: "Tài khoản kích hoạt" },
   ];
+
+/** Đồng bộ cờ activation trong `fields` template với DB (`productRequiresActivation`). */
+export function syncActivationFieldInTemplateFields(
+  fields: PackageField[],
+  serverRequiresActivation: boolean
+): PackageField[] {
+  const set = new Set(fields);
+  if (serverRequiresActivation) set.add("activation");
+  else set.delete("activation");
+  return PACKAGE_FIELD_OPTIONS.map((o) => o.value).filter((v) => set.has(v));
+}
 
 export const DEFAULT_SLOT_LIMIT = 5;
 export const DEFAULT_CAPACITY_LIMIT = 2000;

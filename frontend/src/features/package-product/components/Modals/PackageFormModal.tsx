@@ -73,6 +73,7 @@ export const PackageFormModal: React.FC<PackageFormModalProps> = ({
     open,
     initialValues,
     onSubmit,
+    requireActivationForInformation: hasStorage,
   });
 
   const showSupplierBlock = template.fields.includes("supplier");

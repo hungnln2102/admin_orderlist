@@ -30,6 +30,7 @@ const PACKAGE_PRODUCTS_SELECT = `
     pp.${QUOTED_COLS.packageProduct.id} AS package_id,
     pp.${QUOTED_COLS.packageProduct.packageId} AS product_id,
     p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageName)} AS package_name,
+    p.${quoteIdent(PRODUCT_SCHEMA_COLS.packageRequiresActivation)} AS product_requires_activation,
     stk.${quoteIdent(STOCK_COLS.accountUsername)} AS package_username,
     stk.${quoteIdent(STOCK_COLS.passwordEncrypted)} AS package_password,
     stk.${quoteIdent(STOCK_COLS.backupEmail)} AS package_mail_2nd,
@@ -121,6 +122,10 @@ const mapPackageProductRow = (row) => {
     capacityUsed: null,
     match: row.package_match ?? null,
     productCodes,
+    productRequiresActivation:
+      row.product_requires_activation === true ||
+      row.product_requires_activation === "true" ||
+      row.product_requires_activation === 1,
     hasCapacityField: row.storage_id != null || row.storage_total != null,
     stockId: row.stock_id != null ? Number(row.stock_id) : null,
   };

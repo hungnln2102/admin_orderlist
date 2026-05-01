@@ -86,15 +86,15 @@ export const PackageSummarySection: React.FC<PackageSummarySectionProps> = ({
             return (
               <div
                 key={summary.name}
-                className={`relative isolate rounded-[28px] border ${accent.border} bg-white/5 p-6 text-white shadow-xl backdrop-blur-xl transition-all duration-300 hover:scale-[1.02] ${
+                className={`relative isolate rounded-[28px] border ${accent.border} bg-white/5 p-6 text-white shadow-xl backdrop-blur-xl transition-[box-shadow,background-color,border-color] duration-300 ${
                   isSelected
                     ? "ring-2 ring-indigo-500/50 shadow-indigo-500/20"
-                    : "hover:bg-white/10 border-white/10"
+                    : "hover:bg-white/10 border-white/10 hover:shadow-lg hover:shadow-black/20"
                 }`}
               >
                 <div
-                  className={`absolute -right-8 -top-8 h-24 w-24 rounded-full blur-[40px] opacity-10 ${accent.glow}`}
-                ></div>
+                  className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-[40px] opacity-10 ${accent.glow}`}
+                />
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-300/50">
@@ -114,25 +114,31 @@ export const PackageSummarySection: React.FC<PackageSummarySectionProps> = ({
                       Chọn để xóa
                     </label>
                   ) : (
-                    <div className="flex flex-col items-end gap-1 text-sm font-semibold">
-                      <div className="flex items-center gap-2">
+                    <div className="relative z-10 flex shrink-0 flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => onCategorySelect(summary.name)}
-                          className={`p-2 rounded-full hover:bg-blue-50 transition ${
-                            isSelected ? "text-blue-300" : "text-white/80"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCategorySelect(summary.name);
+                          }}
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-white/80 outline-none transition hover:border-white/20 hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
+                            isSelected ? "text-sky-300" : ""
                           }`}
                           title="Xem chi tiết"
                         >
-                          <EyeIcon className="h-5 w-5" />
+                          <EyeIcon className="h-4 w-4" aria-hidden />
                         </button>
                         <button
                           type="button"
-                          onClick={() => onEditTemplateFields(summary.name)}
-                          className="p-2 rounded-full hover:bg-indigo-50 text-indigo-500 transition"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditTemplateFields(summary.name);
+                          }}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-indigo-200 outline-none transition hover:border-indigo-400/40 hover:bg-indigo-500/25 hover:text-white focus-visible:ring-2 focus-visible:ring-indigo-500/60"
                           title="Chỉnh sửa Loại Gói"
                         >
-                          <PencilIcon className="h-5 w-5" />
+                          <PencilIcon className="h-4 w-4" aria-hidden />
                         </button>
                       </div>
                     </div>
