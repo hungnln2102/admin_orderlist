@@ -14,10 +14,11 @@
  * revenue_reversed — tổng refund đơn Chưa Hoàn / Đã Hoàn theo ngày canceled_at (VN).
  *
  * total_shop_cost — chỉ chi phí nhập (không gồm rút lợi nhuận):
+ *   - Đơn MAVC/L/K/S/T và MAVT (không gồm MAVN nhập kho): NCC không phải tên mavryk/shop
+ *     thì mỗi ngày cộng order.cost / days trên [start, start+days-1] (cùng mốc với earned).
+ *   - mavn_import: chỉ khi chưa tính qua cost đơn (không link, link MAVN, hoặc link đơn bán mà cost = 0);
+ *     trải amount/cost như trước. Link đơn bán + cost > 0 → bỏ (tránh double).
  *   - external_import (ngoài luồng): cả amount vào đúng ngày created_at (VN).
- *   - mavn_import (theo đơn): số trải = COALESCE(order.cost khác 0, amount dòng expense);
- *     mỗi ngày D ∈ [order_date, order_date+days-1] cộng số trải / days.
- *     Không khớp đơn: vẫn trải ex.amount trên --import-spread-days từ created_at.
  *
  * Mặc định --from: ngày 22 (VN); --tax-from=2026-04-22; --import-spread-days=30.
  *
@@ -33,6 +34,8 @@ const {
   SCHEMA_FINANCE,
   SCHEMA_ORDERS,
   FINANCE_SCHEMA,
+  PARTNER_SCHEMA,
+  SCHEMA_SUPPLIER,
   tableName,
 } = require("../../src/config/dbSchema");
 const { STATUS } = require("../../src/utils/statuses");
@@ -99,6 +102,7 @@ function parseArgs(argv) {
 function buildBackfillSql({
   summaryTable,
   orderTable,
+  supplierTable,
   expenseTable,
   refundStatuses,
 }) {
@@ -109,6 +113,9 @@ function buildBackfillSql({
   const cGross = ident("gross_selling_price");
   const cIdOrder = ident("id_order");
   const cCost = ident("cost");
+  const cSupplyId = ident("supply_id");
+  const supId = ident("id");
+  const supName = ident("supplier_name");
   const exAmount = ident("amount");
   const exCreated = ident("created_at");
   const exType = ident("expense_type");
@@ -200,6 +207,63 @@ daily_refund AS (
     AND TRIM(COALESCE(ol.status::text, '')) IN (${refundStatuses.map(() => "?").join(", ")})
   GROUP BY 1
 ),
+shop_cost_sales_orders AS (
+  SELECT
+    COALESCE(
+      ol.${cOrderDate},
+      (ol.${cCreated} AT TIME ZONE '${TZ}')::date
+    ) AS start_date,
+    COALESCE(
+      NULLIF(
+        TRIM(REGEXP_REPLACE(COALESCE(ol.${cDays}::text, ''), '[^0-9]', '', 'g')),
+        ''
+      )::int,
+      0
+    ) AS term_days,
+    COALESCE(ol.${cCost}::numeric, 0) AS cost_amt
+  FROM ${orderTable} ol
+  LEFT JOIN ${supplierTable} s ON s.${supId} = ol.${cSupplyId}
+  CROSS JOIN params p
+  WHERE (
+        ol.${cIdOrder}::text ILIKE 'MAVC%'
+     OR ol.${cIdOrder}::text ILIKE 'MAVL%'
+     OR ol.${cIdOrder}::text ILIKE 'MAVK%'
+     OR ol.${cIdOrder}::text ILIKE 'MAVS%'
+     OR ol.${cIdOrder}::text ILIKE 'MAVT%'
+  )
+    AND NOT (ol.${cIdOrder}::text ILIKE 'MAVN%')
+    AND COALESCE(
+      (ol.${cCreated} AT TIME ZONE '${TZ}')::date,
+      ol.${cOrderDate}
+    ) >= p.tax_from
+    AND COALESCE(ol.${cCost}::numeric, 0) > 0
+    AND LOWER(TRIM(COALESCE(s.${supName}::text, ''))) NOT IN ('mavryk', 'shop')
+),
+shop_cost_sales_ext AS (
+  SELECT
+    start_date,
+    term_days,
+    cost_amt,
+    CASE
+      WHEN term_days > 0 AND start_date IS NOT NULL
+      THEN (start_date + (term_days - 1) * interval '1 day')::date
+      ELSE NULL
+    END AS end_date
+  FROM shop_cost_sales_orders
+  WHERE cost_amt > 0
+    AND term_days > 0
+    AND start_date IS NOT NULL
+),
+daily_sales_order_cost_spread AS (
+  SELECT
+    d.d AS day,
+    SUM(t.cost_amt / NULLIF(t.term_days, 0)) AS amt
+  FROM days d
+  INNER JOIN shop_cost_sales_ext t
+    ON t.end_date IS NOT NULL
+   AND d.d BETWEEN t.start_date AND t.end_date
+  GROUP BY d.d
+),
 expense_mavn_lines AS (
   SELECT
     COALESCE(
@@ -232,6 +296,11 @@ expense_mavn_lines AS (
     LIMIT 1
   ) olm ON TRUE
   WHERE TRIM(COALESCE(ex.${exType}::text, '')) = 'mavn_import'
+    AND (
+      TRIM(COALESCE(ex.${exLinked}::text, '')) = ''
+      OR LOWER(TRIM(ex.${exLinked}::text)) LIKE 'mavn%'
+      OR COALESCE(olm.ocost::numeric, 0) = 0
+    )
 ),
 expense_mavn_spread_params AS (
   SELECT
@@ -280,13 +349,14 @@ merged AS (
     ROUND(COALESCE(de.amt, 0), 2)::numeric AS earned_revenue,
     ROUND(COALESCE(ue.amt, 0), 2)::numeric AS unearned_revenue_end,
     COALESCE(dr.amt, 0)::numeric AS revenue_reversed,
-    ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0), 2)::numeric AS total_shop_cost
+    ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0) + COALESCE(dsc.amt, 0), 2)::numeric AS total_shop_cost
   FROM days d
   LEFT JOIN daily_earned de ON de.day = d.d
   LEFT JOIN unearned_end ue ON ue.day = d.d
   LEFT JOIN daily_refund dr ON dr.day = d.d
   LEFT JOIN daily_mavn_import_spread dm ON dm.day = d.d
   LEFT JOIN daily_external_import dx ON dx.day = d.d
+  LEFT JOIN daily_sales_order_cost_spread dsc ON dsc.day = d.d
 )
 INSERT INTO ${summaryTable} (
   summary_date,
@@ -352,9 +422,12 @@ async function main() {
 
   const refundStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
 
+  const supplierTable = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER);
+
   const sql = buildBackfillSql({
     summaryTable,
     orderTable,
+    supplierTable,
     expenseTable,
     refundStatuses,
   });
