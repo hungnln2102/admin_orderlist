@@ -13,11 +13,11 @@
  *
  * revenue_reversed — tổng refund đơn Chưa Hoàn / Đã Hoàn theo ngày canceled_at (VN).
  *
- * total_shop_cost —
- *   - mavn_import / external_import: phân bổ đều amount/term trên [start, start+term-1].
- *     start/term lấy từ đơn khi có linked_order_code khớp id_order; không khớp thì
- *     start = ngày created_at (VN), term = --import-spread-days (mặc định 30).
- *   - withdraw_profit: cả amount vào đúng ngày created_at (VN), không trải.
+ * total_shop_cost — chỉ chi phí nhập (không gồm rút lợi nhuận):
+ *   - external_import (ngoài luồng): cả amount vào đúng ngày created_at (VN).
+ *   - mavn_import (theo đơn): số trải = COALESCE(order.cost khác 0, amount dòng expense);
+ *     mỗi ngày D ∈ [order_date, order_date+days-1] cộng số trải / days.
+ *     Không khớp đơn: vẫn trải ex.amount trên --import-spread-days từ created_at.
  *
  * Mặc định --from: ngày 22 (VN); --tax-from=2026-04-22; --import-spread-days=30.
  *
@@ -108,6 +108,7 @@ function buildBackfillSql({
   const cPrice = ident("price");
   const cGross = ident("gross_selling_price");
   const cIdOrder = ident("id_order");
+  const cCost = ident("cost");
   const exAmount = ident("amount");
   const exCreated = ident("created_at");
   const exType = ident("expense_type");
@@ -199,9 +200,12 @@ daily_refund AS (
     AND TRIM(COALESCE(ol.status::text, '')) IN (${refundStatuses.map(() => "?").join(", ")})
   GROUP BY 1
 ),
-expense_import_lines AS (
+expense_mavn_lines AS (
   SELECT
-    ex.${exAmount}::numeric AS amt,
+    COALESCE(
+      NULLIF(olm.ocost::numeric, 0),
+      ex.${exAmount}::numeric
+    ) AS amt,
     (ex.${exCreated} AT TIME ZONE '${TZ}')::date AS ex_created,
     COALESCE(
       olm.od,
@@ -219,16 +223,17 @@ expense_import_lines AS (
     SELECT
       ol.${cOrderDate} AS od,
       ol.${cCreated} AS ca,
-      ol.${cDays} AS dy
+      ol.${cDays} AS dy,
+      ol.${cCost} AS ocost
     FROM ${orderTable} ol
     WHERE TRIM(COALESCE(ex.${exLinked}::text, '')) <> ''
       AND LOWER(TRIM(ol.${cIdOrder}::text)) = LOWER(TRIM(ex.${exLinked}::text))
     ORDER BY ol.${ident("id")} DESC NULLS LAST
     LIMIT 1
   ) olm ON TRUE
-  WHERE TRIM(COALESCE(ex.${exType}::text, '')) IN ('mavn_import', 'external_import')
+  WHERE TRIM(COALESCE(ex.${exType}::text, '')) = 'mavn_import'
 ),
-expense_spread_params AS (
+expense_mavn_spread_params AS (
   SELECT
     amt,
     CASE
@@ -239,34 +244,35 @@ expense_spread_params AS (
       WHEN ord_term > 0 AND ord_start IS NOT NULL THEN ord_term
       ELSE GREATEST(1, (SELECT import_spread_fallback_days FROM params))
     END AS spread_term
-  FROM expense_import_lines
+  FROM expense_mavn_lines
   WHERE amt > 0
 ),
-expense_spread_ext AS (
+expense_mavn_spread_ext AS (
   SELECT
     amt,
     spread_start,
     spread_term,
     (spread_start + (spread_term - 1) * interval '1 day')::date AS spread_end
-  FROM expense_spread_params
+  FROM expense_mavn_spread_params
   WHERE spread_term > 0 AND spread_start IS NOT NULL
 ),
-daily_import_spread AS (
+daily_mavn_import_spread AS (
   SELECT
     d.d AS day,
     SUM(e.amt / NULLIF(e.spread_term, 0)) AS amt
   FROM days d
-  INNER JOIN expense_spread_ext e
+  INNER JOIN expense_mavn_spread_ext e
     ON d.d BETWEEN e.spread_start AND e.spread_end
   GROUP BY d.d
 ),
-daily_withdraw AS (
+daily_external_import AS (
   SELECT
     (ex.${exCreated} AT TIME ZONE '${TZ}')::date AS day,
     SUM(COALESCE(ex.${exAmount}::numeric, 0)) AS amt
   FROM ${expenseTable} ex
-  WHERE TRIM(COALESCE(ex.${exType}::text, '')) = 'withdraw_profit'
+  WHERE TRIM(COALESCE(ex.${exType}::text, '')) = 'external_import'
   GROUP BY 1
+  HAVING SUM(COALESCE(ex.${exAmount}::numeric, 0)) > 0
 ),
 merged AS (
   SELECT
@@ -274,13 +280,13 @@ merged AS (
     ROUND(COALESCE(de.amt, 0), 2)::numeric AS earned_revenue,
     ROUND(COALESCE(ue.amt, 0), 2)::numeric AS unearned_revenue_end,
     COALESCE(dr.amt, 0)::numeric AS revenue_reversed,
-    ROUND(COALESCE(di.amt, 0) + COALESCE(dw.amt, 0), 2)::numeric AS total_shop_cost
+    ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0), 2)::numeric AS total_shop_cost
   FROM days d
   LEFT JOIN daily_earned de ON de.day = d.d
   LEFT JOIN unearned_end ue ON ue.day = d.d
   LEFT JOIN daily_refund dr ON dr.day = d.d
-  LEFT JOIN daily_import_spread di ON di.day = d.d
-  LEFT JOIN daily_withdraw dw ON dw.day = d.d
+  LEFT JOIN daily_mavn_import_spread dm ON dm.day = d.d
+  LEFT JOIN daily_external_import dx ON dx.day = d.d
 )
 INSERT INTO ${summaryTable} (
   summary_date,
