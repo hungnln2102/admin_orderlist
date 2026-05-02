@@ -26,7 +26,7 @@
         "test:webhook-profit": "node tests/manual/run-webhook-profit-scenarios-tests.js",
         "test:webhook-scenarios": "node tests/manual/run-scenario-webhook-validation-suite.js",
         "start:scheduler": "node scheduler.js",
-        "start:scheduler:adobe-once": "node scheduler.js --run-adobe-once",
+        "start:scheduler:cron-once": "node scheduler.js --run-cron-once",
         "dev": "nodemon src/server.js",
         "dev:api": "nodemon src/server.js",
         "start:new": "node src/server.js",

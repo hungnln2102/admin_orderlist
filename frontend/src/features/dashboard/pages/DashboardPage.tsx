@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
+import { DashboardCyclePresetButtons } from "../components/DashboardCyclePresetButtons";
 import { DashboardDateRangeFilter } from "../components/DashboardDateRangeFilter";
 import { DashboardHero } from "../components/DashboardHero";
 import { budgets, currencyFormatter, financeSummary } from "../constants";
@@ -31,6 +32,7 @@ const DashboardContent: React.FC = () => {
     selectedYear,
     setSelectedYear,
     dashboardRange,
+    chartGranularity,
     setDashboardRange,
     loading,
     errorMessage,
@@ -38,7 +40,7 @@ const DashboardContent: React.FC = () => {
     refetchDashboardStats,
   } = useDashboardStats();
 
-  const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
+  useMonthlySummary();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
   const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
   const [activeSection, setActiveSection] = useState<DashboardSection>(() =>
@@ -62,11 +64,19 @@ const DashboardContent: React.FC = () => {
       <DashboardHero
         rightSlot={
           activeSection === "overview" ? (
-            <DashboardDateRangeFilter
-              value={dashboardRange}
-              onChange={setDashboardRange}
-              className="w-full shrink-0"
-            />
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-end sm:gap-2 md:gap-3">
+              <DashboardCyclePresetButtons
+                range={dashboardRange}
+                onChange={setDashboardRange}
+                summaryYear={selectedYear}
+                className="justify-start sm:justify-end"
+              />
+              <DashboardDateRangeFilter
+                value={dashboardRange}
+                onChange={setDashboardRange}
+                className="w-full min-w-0 sm:min-w-[260px] sm:flex-1 sm:max-w-[320px]"
+              />
+            </div>
           ) : undefined
         }
       />
@@ -92,6 +102,7 @@ const DashboardContent: React.FC = () => {
             selectedYear={selectedYear}
             onYearChange={setSelectedYear}
             isRangeMode={dashboardRange !== null}
+            chartGranularity={chartGranularity}
           />
           {/* Monthly summary table intentionally hidden by UI request */}
         </>

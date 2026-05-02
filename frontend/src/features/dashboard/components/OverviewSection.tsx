@@ -8,6 +8,7 @@ import type {
   ProfitData,
   RefundData,
   TaxData,
+  DashboardChartGranularity,
 } from "@/features/dashboard/api/dashboardApi";
 
 type OverviewSectionProps = {
@@ -21,6 +22,7 @@ type OverviewSectionProps = {
   selectedYear: number;
   onYearChange: (year: number) => void;
   isRangeMode?: boolean;
+  chartGranularity?: DashboardChartGranularity;
 };
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({
@@ -34,6 +36,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   selectedYear,
   onYearChange,
   isRangeMode = false,
+  chartGranularity = "month",
 }) => {
   return (
     <div className="overview-section">
@@ -49,8 +52,9 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           selectedYear={selectedYear}
           onYearChange={onYearChange}
           isRangeMode={isRangeMode}
+          chartGranularity={chartGranularity}
         />
-        <OrderChartCard data={orderData} />
+        <OrderChartCard data={orderData} chartGranularity={chartGranularity} />
       </div>
     </div>
   );

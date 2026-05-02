@@ -9,10 +9,14 @@ import {
   YAxis,
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
-import type { OrderStatusData } from "@/features/dashboard/api/dashboardApi";
+import type {
+  DashboardChartGranularity,
+  OrderStatusData,
+} from "@/features/dashboard/api/dashboardApi";
 
 type OrderChartCardProps = {
   data: OrderStatusData[];
+  chartGranularity?: DashboardChartGranularity;
 };
 
 const LEGEND_ITEMS = [
@@ -28,20 +32,28 @@ const LEGEND_ITEMS = [
   },
 ] as const;
 
-export const OrderChartCard: React.FC<OrderChartCardProps> = ({ data }) => {
+export const OrderChartCard: React.FC<OrderChartCardProps> = ({
+  data,
+  chartGranularity = "month",
+}) => {
+  const tiltX = chartGranularity === "day" && data.length > 12;
+
   return (
     <section className="relative flex h-full min-h-[540px] flex-col overflow-hidden rounded-[32px] border border-rose-500/30 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.14),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.09),transparent_28%),linear-gradient(135deg,rgba(2,6,23,0.96),rgba(10,15,33,0.94))] p-5 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.85)] backdrop-blur-xl sm:p-6 lg:p-7">
       <div className="border-b border-white/8 pb-5">
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-300/85">
-            Đơn hàng theo tháng
+            {chartGranularity === "day" ? "Đơn hàng theo ngày" : "Đơn hàng theo tháng"}
           </p>
           <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
-            Tổng đơn và đơn hủy theo tháng
+            {chartGranularity === "day"
+              ? "Tổng đơn và đơn hủy theo ngày"
+              : "Tổng đơn và đơn hủy theo tháng"}
           </h3>
           <p className="mt-2 text-sm text-slate-300/80">
-            So sánh lượng đơn phát sinh và số đơn bị hủy trên cùng một trục thời gian để
-            nhìn nhanh biến động từng tháng.
+            {chartGranularity === "day"
+              ? "So sánh lượng đơn phát sinh và số đơn bị hủy theo từng ngày trong chu kỳ đã chọn."
+              : "So sánh lượng đơn phát sinh và số đơn bị hủy trên cùng một trục thời gian để nhìn nhanh biến động từng tháng."}
           </p>
         </div>
 
@@ -66,9 +78,12 @@ export const OrderChartCard: React.FC<OrderChartCardProps> = ({ data }) => {
             <XAxis
               dataKey="month"
               stroke="#a5b4fc"
-              tick={{ fill: "#a5b4fc", fontSize: 11 }}
+              tick={{ fill: "#a5b4fc", fontSize: tiltX ? 10 : 11 }}
               axisLine={false}
               tickLine={false}
+              angle={tiltX ? -32 : 0}
+              textAnchor={tiltX ? "end" : "middle"}
+              height={tiltX ? 52 : 24}
             />
             <YAxis
               stroke="#a5b4fc"

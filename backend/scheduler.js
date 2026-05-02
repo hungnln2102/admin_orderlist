@@ -9,6 +9,8 @@
  *   npm run start:scheduler
  *   node scheduler.js --run-adobe-once   # chạy một lần job check Adobe giống cron (không đăng ký cron khác)
  *   npm run start:scheduler:adobe-once
+ *   node scheduler.js --run-cron-once   # một lần: cập nhật EXPIRED/RENEWAL + backup DB (nếu ENABLE_DB_BACKUP=true)
+ *   npm run start:scheduler:cron-once
  */
 // Cùng .env + .env.local với API — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
 const { loadBackendEnv } = require("./src/config/loadEnv");
@@ -37,7 +39,24 @@ process.on("unhandledRejection", (reason) => {
   notifyCritical({ message: `[Scheduler] unhandledRejection: ${msg}`, stack });
 });
 
-if (process.argv.includes("--run-adobe-once")) {
+if (process.argv.includes("--run-cron-once")) {
+  const { updateDatabaseTask } = require("./src/scheduler/taskInstances");
+  logger.info(
+    "[Scheduler] CLI --run-cron-once: cùng tác vụ CRON_SCHEDULE (EXPIRED/RENEWAL + backup nếu ENABLE_DB_BACKUP=true)"
+  );
+  updateDatabaseTask("manual")
+    .then(() => {
+      logger.info("[Scheduler] CLI --run-cron-once hoàn thành.");
+      process.exit(0);
+    })
+    .catch((err) => {
+      logger.error("[Scheduler] CLI --run-cron-once thất bại", {
+        error: err.message,
+        stack: err.stack,
+      });
+      process.exit(1);
+    });
+} else if (process.argv.includes("--run-adobe-once")) {
   const { renewAdobeCheckAndNotifyTask } = require("./src/scheduler/taskInstances");
   logger.info(
     "[Scheduler] CLI --run-adobe-once: chạy job check tài khoản Adobe (cùng logic trigger=cron, dùng backend/.env hiện tại)"

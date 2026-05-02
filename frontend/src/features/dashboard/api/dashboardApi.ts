@@ -26,6 +26,8 @@ export interface TaxData {
   total_tax: number;
 }
 
+export type DashboardChartGranularity = "day" | "month";
+
 export interface ChartsApiResponse {
   revenueData: RevenueData[];
   orderStatusData: OrderStatusData[];
@@ -33,6 +35,8 @@ export interface ChartsApiResponse {
   refundData: RefundData[];
   taxData: TaxData[];
   year?: number;
+  /** Backend: bucket biểu đồ theo ngày (khoảng ngắn) hoặc theo tháng. */
+  chartGranularity?: DashboardChartGranularity;
 }
 
 export interface MonthlySummaryData {
@@ -84,6 +88,7 @@ type DashboardMonthRow = Partial<{
 type DashboardChartsResponse = Partial<{
   months: DashboardMonthRow[];
   year: number;
+  granularity: string;
 }>;
 
 export type DashboardStatsQueryRange = { from: string; to: string };
@@ -123,6 +128,9 @@ const normalizeChartsPayload = (
     return String(label || "").trim();
   };
 
+  const chartGranularity: DashboardChartGranularity =
+    String(payload.granularity || "").toLowerCase() === "day" ? "day" : "month";
+
   return {
     revenueData: months.map((row) => ({
       month: normalizeMonthLabel(row),
@@ -146,6 +154,7 @@ const normalizeChartsPayload = (
       total_tax: Number(row.total_tax) || 0,
     })),
     year: Number.isFinite(payload.year) ? Number(payload.year) : undefined,
+    chartGranularity,
   };
 };
 

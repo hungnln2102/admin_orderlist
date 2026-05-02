@@ -6,6 +6,8 @@ const {
 } = require("../../config/dbSchema");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 const { fetchAvailableProfitPair } = require("./availableProfitFromSummary");
+const { buildRangeDailyChartQuery } = require("./dashboardSummaryAggregate");
+const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
@@ -14,6 +16,21 @@ const summaryTableName = tableName(
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 
 const MS_PER_DAY = 86400000;
+/** Khoảng ≤ số ngày này: biểu đồ dashboard bucket theo **ngày** (khớp preset ngày/tháng ngắn). */
+const DASHBOARD_CHART_RANGE_DAY_MAX = 120;
+
+const inclusiveDaySpan = (fromStr, toStr) => {
+  const from = parseYMDLocal(fromStr);
+  const to = parseYMDLocal(toStr);
+  return Math.round((to - from) / MS_PER_DAY) + 1;
+};
+
+const formatChartDayLabel = (isoYmd) => {
+  const s = String(isoYmd || "").slice(0, 10);
+  const [y, m, d] = s.split("-");
+  if (!y || !m || !d) return s;
+  return `${d}/${m}/${y}`;
+};
 
 /** `month_key` lịch hiện tại (clock server) — chỉ để chọn hàng đọc, không auto-seed. */
 const currentCalendarMonthKey = (d = new Date()) =>
@@ -226,14 +243,51 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
 };
 
 const fetchDashboardChartsForDateRange = async ({ from, to }) => {
-  const monthKeys = monthKeysSpanned(from, to);
   const startYear = parseInt(String(from).slice(0, 4), 10);
+  const daySpan = inclusiveDaySpan(from, to);
+
+  if (daySpan > 0 && daySpan <= DASHBOARD_CHART_RANGE_DAY_MAX) {
+    let useCreatedAt = true;
+    try {
+      useCreatedAt = await orderListHasCreatedAtColumn();
+    } catch (_) {
+      useCreatedAt = true;
+    }
+    const sql = buildRangeDailyChartQuery({ useCreatedAt });
+    const r = await db.raw(sql, [from, to]);
+    const months = (r.rows || []).map((row) => {
+      const dayIso = String(row.day_iso || "").trim().slice(0, 10);
+      const revenue = toNumber(row.total_revenue);
+      const refund = toNumber(row.total_refund);
+      return {
+        month: formatChartDayLabel(dayIso),
+        month_num: 0,
+        month_key: dayIso,
+        total_orders: toNumber(row.total_orders),
+        total_canceled: toNumber(row.total_canceled),
+        total_revenue: revenue,
+        total_profit: toNumber(row.total_profit),
+        total_refund: refund,
+        total_import: 0,
+        total_tax: taxFromRevenueValue(revenue - refund),
+      };
+    });
+    return {
+      year: Number.isFinite(startYear) ? startYear : null,
+      months,
+      range: { from, to },
+      granularity: "day",
+    };
+  }
+
+  const monthKeys = monthKeysSpanned(from, to);
 
   if (!monthKeys.length) {
     return {
       year: Number.isFinite(startYear) ? startYear : null,
       months: [],
       range: { from, to },
+      granularity: "month",
     };
   }
 
@@ -282,6 +336,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to }) => {
     year: Number.isFinite(startYear) ? startYear : null,
     months,
     range: { from, to },
+    granularity: "month",
   };
 };
 
@@ -390,7 +445,7 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
     });
   }
 
-  return { year, months };
+  return { year, months, granularity: "month" };
 };
 
 module.exports = {

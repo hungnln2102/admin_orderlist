@@ -13,6 +13,7 @@ import {
   fetchChartDataRange,
   fetchDashboardStats,
   type ChartsApiResponse,
+  type DashboardChartGranularity,
   type OrderStatusData,
   type RevenueData,
   type ProfitData,
@@ -122,6 +123,8 @@ export const useDashboardStats = () => {
   const [profitChartData, setProfitChartData] = useState<ProfitData[]>([]);
   const [refundChartData, setRefundChartData] = useState<RefundData[]>([]);
   const [taxChartData, setTaxChartData] = useState<TaxData[]>([]);
+  const [chartGranularity, setChartGranularity] =
+    useState<DashboardChartGranularity>("month");
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [dashboardRange, setDashboardRange] = useState<DashboardDateRange | null>(
@@ -155,6 +158,7 @@ export const useDashboardStats = () => {
       setProfitChartData(charts.profitData);
       setRefundChartData(charts.refundData);
       setTaxChartData(charts.taxData ?? []);
+      setChartGranularity(charts.chartGranularity ?? "month");
 
       if (!dashboardRange) {
         const monthLimit = selectedYear === currentYear ? currentMonth : 12;
@@ -238,6 +242,7 @@ export const useDashboardStats = () => {
     profitChartData,
     refundChartData,
     taxChartData,
+    chartGranularity,
     availableYears,
     selectedYear,
     setSelectedYear,
