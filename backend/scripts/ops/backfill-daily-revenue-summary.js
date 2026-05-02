@@ -21,9 +21,11 @@
  *
  * Mặc định --from: ngày 22 (VN); --tax-from=2026-04-22; --import-spread-days=30.
  *
- * Usage:
+ * Usage (từ thư mục backend, cần .env có DATABASE_URL hoặc DB_* giống app / Knex):
  *   node scripts/ops/backfill-daily-revenue-summary.js
  *   node scripts/ops/backfill-daily-revenue-summary.js --from=2026-04-22 --to=2026-05-02 --import-spread-days=30
+ *   npm run sync:daily-revenue-summary -- --from=2026-04-22 --to=2026-05-02
+ *   BACKEND_ENV_FILE=/path/.env node scripts/ops/backfill-daily-revenue-summary.js --from=...
  */
 
 const { db } = require("../../src/db");

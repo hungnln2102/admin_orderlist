@@ -1,8 +1,5 @@
 const knex = require("knex");
-const { loadBackendEnv } = require("../config/loadEnv");
-const { getPostgresConnectionUrl } = require("../config/postgresConnectionUrl");
-
-loadBackendEnv();
+const { loadPostgresEnvForCli } = require("../config/loadPostgresEnvForCli");
 
 const {
   SCHEMA_ADMIN,
@@ -21,7 +18,7 @@ const {
   SCHEMA_RENEW_ADOBE,
 } = require("../config/dbSchema");
 
-const DATABASE_URL = getPostgresConnectionUrl();
+const DATABASE_URL = loadPostgresEnvForCli().trim();
 
 if (!DATABASE_URL) {
   // Use require here to avoid circular dependency
