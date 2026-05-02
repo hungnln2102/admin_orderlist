@@ -14,7 +14,9 @@ function getPostgresConnectionUrl() {
   if (direct) return direct;
 
   const user = (process.env.DB_USER || "").trim();
-  const pass = process.env.DB_PASS ?? "";
+  const passRaw =
+    process.env.DB_PASS ?? process.env.DB_PASSWORD ?? process.env.PGPASSWORD ?? "";
+  const pass = passRaw === undefined || passRaw === null ? "" : String(passRaw);
   const host = (process.env.DB_HOST || "127.0.0.1").trim();
   const port = (process.env.DB_PORT || "5432").trim();
   const name = (process.env.DB_NAME || "").trim();
