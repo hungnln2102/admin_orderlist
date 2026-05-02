@@ -1,5 +1,6 @@
 import React from "react";
 import type { DashboardDateRangeValue } from "./DashboardDateRangeFilter";
+import { TAX_ORDER_START_DATE } from "@/features/tax/api/taxApi";
 
 const VN_TZ = "Asia/Ho_Chi_Minh";
 
@@ -25,17 +26,41 @@ function vnTodayYmd(): string {
   return vnCalendarParts().ymd;
 }
 
-function vnCurrentMonthRange(): DashboardDateRangeValue {
-  const { y, m } = vnCalendarParts();
-  const mm = String(m).padStart(2, "0");
-  const from = `${y}-${mm}-01`;
-  const lastDay = new Date(y, m, 0).getDate();
-  const to = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`;
+/** 10 ngày gần nhất theo lịch VN, `to` = hôm nay (ngày cuối). */
+function vnLastNDaysEndingToday(n: number): DashboardDateRangeValue {
+  const to = vnTodayYmd();
+  const toMid = new Date(`${to}T12:00:00+07:00`);
+  const fromMid = new Date(toMid.getTime() - (n - 1) * 86400000);
+  const from = vnCalendarParts(fromMid).ymd;
   return { from, to };
 }
 
-function yearRange(year: number): DashboardDateRangeValue {
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
+const DAY_PRESET_DAYS = 10;
+
+/** Mốc 22/04 (form thuế) → cuối tháng hiện tại (VN): mỗi tháng một cột trên biểu đồ «Tháng». */
+function vnTaxStartThroughCurrentMonthEnd(): DashboardDateRangeValue {
+  const { y, m } = vnCalendarParts();
+  const mm = String(m).padStart(2, "0");
+  const lastDay = new Date(y, m, 0).getDate();
+  const to = `${y}-${mm}-${String(lastDay).padStart(2, "0")}`;
+  const from = TAX_ORDER_START_DATE;
+  if (from > to) {
+    return { from: `${y}-${mm}-01`, to };
+  }
+  return { from, to };
+}
+
+/** Năm: từ năm liền trước mốc form thuế (vd. 2025 vs 2026…) → 31/12 năm hiện tại (VN); mỗi năm một cột. */
+function vnTaxStartYearThroughCurrentYearEnd(): DashboardDateRangeValue {
+  const taxY = Number(TAX_ORDER_START_DATE.slice(0, 4));
+  const { y: curY } = vnCalendarParts();
+  const baselineYear = Math.max(1970, taxY - 1);
+  const from = `${baselineYear}-01-01`;
+  const to = `${curY}-12-31`;
+  if (from > to) {
+    return { from: `${curY}-01-01`, to, chartBucket: "year" };
+  }
+  return { from, to, chartBucket: "year" };
 }
 
 function rangesEqual(
@@ -51,24 +76,21 @@ type Preset = "day" | "month" | "year" | "total";
 type Props = {
   range: DashboardDateRangeValue | null;
   onChange: (next: DashboardDateRangeValue | null) => void;
-  /** Dùng cho preset «Năm» (khớp năm đang xem trên biểu đồ). */
-  summaryYear: number;
   className?: string;
 };
 
 export const DashboardCyclePresetButtons: React.FC<Props> = ({
   range,
   onChange,
-  summaryYear,
   className = "",
 }) => {
-  const todayYmd = vnTodayYmd();
-  const monthRange = vnCurrentMonthRange();
-  const annualRange = yearRange(summaryYear);
+  const dayRange = vnLastNDaysEndingToday(DAY_PRESET_DAYS);
+  const monthRange = vnTaxStartThroughCurrentMonthEnd();
+  const annualRange = vnTaxStartYearThroughCurrentYearEnd();
 
   let activePreset: Preset | null = null;
   if (range === null) activePreset = "total";
-  else if (range.from === range.to && range.from === todayYmd) activePreset = "day";
+  else if (rangesEqual(range, dayRange)) activePreset = "day";
   else if (rangesEqual(range, monthRange)) activePreset = "month";
   else if (rangesEqual(range, annualRange)) activePreset = "year";
 
@@ -98,21 +120,26 @@ export const DashboardCyclePresetButtons: React.FC<Props> = ({
       <button
         type="button"
         className={mkClass("day")}
-        onClick={() => onChange({ from: todayYmd, to: todayYmd })}
+        onClick={() =>
+          onChange({
+            ...vnLastNDaysEndingToday(DAY_PRESET_DAYS),
+            chartBucket: "day",
+          })
+        }
       >
         Ngày
       </button>
       <button
         type="button"
         className={mkClass("month")}
-        onClick={() => onChange(monthRange)}
+        onClick={() => onChange({ ...monthRange, chartBucket: "month" })}
       >
         Tháng
       </button>
       <button
         type="button"
         className={mkClass("year")}
-        onClick={() => onChange(annualRange)}
+        onClick={() => onChange({ ...annualRange, chartBucket: "year" })}
       >
         Năm
       </button>

@@ -10,6 +10,8 @@ const { timezoneCandidate } = require("./constants");
 const logger = require("../../utils/logger");
 
 const MAX_DASHBOARD_RANGE_DAYS = 732;
+/** Preset «Năm» (gom theo năm dương lịch) có thể trải nhiều năm. */
+const MAX_DASHBOARD_RANGE_DAYS_YEAR_BUCKET = 366 * 40;
 
 const parseISODateParam = (value) => {
   if (value === undefined || value === null || typeof value !== "string") {
@@ -62,9 +64,14 @@ const dashboardStats = async (req, res) => {
         });
       }
       const days = inclusiveDaysBetweenYMD(from, to);
-      if (days > MAX_DASHBOARD_RANGE_DAYS) {
+      const rawBk = req.query.chartBucket ?? req.query.bucket;
+      const bk =
+        typeof rawBk === "string" ? rawBk.trim().toLowerCase() : "";
+      const maxDays =
+        bk === "year" ? MAX_DASHBOARD_RANGE_DAYS_YEAR_BUCKET : MAX_DASHBOARD_RANGE_DAYS;
+      if (days > maxDays) {
         return res.status(400).json({
-          error: `Khoảng thời gian không được vượt quá ${MAX_DASHBOARD_RANGE_DAYS} ngày.`,
+          error: `Khoảng thời gian không được vượt quá ${maxDays} ngày.`,
         });
       }
       const payload = await fetchDashboardStatsForDateRange({ from, to });
@@ -111,12 +118,27 @@ const dashboardCharts = async (req, res) => {
         });
       }
       const days = inclusiveDaysBetweenYMD(from, to);
-      if (days > MAX_DASHBOARD_RANGE_DAYS) {
+      const rawBucket = req.query.chartBucket ?? req.query.bucket;
+      const chartBucketPre =
+        typeof rawBucket === "string" ? rawBucket.trim().toLowerCase() : "";
+      const maxDaysChart =
+        chartBucketPre === "year"
+          ? MAX_DASHBOARD_RANGE_DAYS_YEAR_BUCKET
+          : MAX_DASHBOARD_RANGE_DAYS;
+      if (days > maxDaysChart) {
         return res.status(400).json({
-          error: `Khoảng thời gian không được vượt quá ${MAX_DASHBOARD_RANGE_DAYS} ngày.`,
+          error: `Khoảng thời gian không được vượt quá ${maxDaysChart} ngày.`,
         });
       }
-      const result = await fetchDashboardChartsForDateRange({ from, to });
+      const chartBucket =
+        chartBucketPre === "day" || chartBucketPre === "month" || chartBucketPre === "year"
+          ? chartBucketPre
+          : null;
+      const result = await fetchDashboardChartsForDateRange({
+        from,
+        to,
+        chartBucket,
+      });
       return res.json(result);
     }
     if ((from && !to) || (!from && to)) {

@@ -43,17 +43,25 @@ export const OrderChartCard: React.FC<OrderChartCardProps> = ({
       <div className="border-b border-white/8 pb-5">
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-300/85">
-            {chartGranularity === "day" ? "Đơn hàng theo ngày" : "Đơn hàng theo tháng"}
+            {chartGranularity === "day"
+              ? "Đơn hàng theo ngày"
+              : chartGranularity === "year"
+                ? "Đơn hàng theo năm"
+                : "Đơn hàng theo tháng"}
           </p>
           <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
             {chartGranularity === "day"
               ? "Tổng đơn và đơn hủy theo ngày"
-              : "Tổng đơn và đơn hủy theo tháng"}
+              : chartGranularity === "year"
+                ? "Tổng đơn và đơn hủy theo năm"
+                : "Tổng đơn và đơn hủy theo tháng"}
           </h3>
           <p className="mt-2 text-sm text-slate-300/80">
             {chartGranularity === "day"
               ? "So sánh lượng đơn phát sinh và số đơn bị hủy theo từng ngày trong chu kỳ đã chọn."
-              : "So sánh lượng đơn phát sinh và số đơn bị hủy trên cùng một trục thời gian để nhìn nhanh biến động từng tháng."}
+              : chartGranularity === "year"
+                ? "So sánh lượng đơn phát sinh và đơn hủy theo từng năm dương lịch (mỗi năm một cột)."
+                : "So sánh lượng đơn phát sinh và số đơn bị hủy trên cùng một trục thời gian để nhìn nhanh biến động từng tháng."}
           </p>
         </div>
 

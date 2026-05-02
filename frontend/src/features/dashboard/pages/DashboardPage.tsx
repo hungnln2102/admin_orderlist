@@ -68,7 +68,6 @@ const DashboardContent: React.FC = () => {
               <DashboardCyclePresetButtons
                 range={dashboardRange}
                 onChange={setDashboardRange}
-                summaryYear={selectedYear}
                 className="justify-start sm:justify-end"
               />
               <DashboardDateRangeFilter

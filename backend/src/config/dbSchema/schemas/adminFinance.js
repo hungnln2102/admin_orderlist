@@ -92,6 +92,8 @@ const FINANCE_SCHEMA = {
       REVENUE_REVERSED: "revenue_reversed",
       /** Nhập (mavn/external): phân bổ amount/term theo đơn hoặc N ngày từ created_at; withdraw_profit: cả khoản vào ngày created_at. */
       TOTAL_SHOP_COST: "total_shop_cost",
+      /** Σ((price−cost)/term) đơn MAVC/L/K/S — khớp TaxDailyFormTable metric «profit». */
+      ALLOCATED_PROFIT_TAX: "allocated_profit_tax",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
     },

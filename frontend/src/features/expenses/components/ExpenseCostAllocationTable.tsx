@@ -4,7 +4,6 @@ import { CheckIcon } from "@heroicons/react/24/solid";
 import { apiFetch } from "@/shared/api/client";
 import {
   addDaysUtc,
-  getAllocatedTotal,
   getCostPeriodAmount,
   type PeriodColumn as AllocPeriodColumn,
 } from "@/features/dashboard/utils/spreadCostAcrossPeriod";
@@ -107,11 +106,11 @@ const SLOT_COLUMN = FIXED_COLUMNS.find((c) => c.key === "slot")!;
 const FIXED_MERGE_COLUMNS = FIXED_COLUMNS.filter((c) => c.key !== "slot");
 
 const totalColCell =
-  "sticky right-0 z-[45] border-l-2 border-amber-400/35 bg-gradient-to-b from-amber-950/92 via-amber-950/88 to-slate-950/90 text-amber-50 shadow-[-14px_0_28px_-10px_rgba(245,158,11,0.22)]";
+  "sticky right-0 z-[45] border-l-2 border-sky-500/35 bg-[#020617] text-sky-100 shadow-[-12px_0_24px_-12px_rgba(56,189,248,0.12)] transition-colors group-hover:bg-slate-900";
 const totalColHead =
-  "sticky right-0 z-[88] border-l-2 border-amber-400/45 bg-gradient-to-b from-amber-950/95 to-amber-950/88 text-amber-50 shadow-[-14px_0_28px_-10px_rgba(245,158,11,0.28)]";
+  "sticky right-0 z-[100] border-l-2 border-sky-400/40 bg-[#020617] text-sky-100 shadow-[-12px_0_28px_-12px_rgba(56,189,248,0.18)]";
 const totalColFoot =
-  "sticky right-0 z-[78] border-l-2 border-amber-400/45 bg-gradient-to-b from-amber-950/95 to-slate-950/92 text-amber-100 shadow-[-14px_0_28px_-10px_rgba(245,158,11,0.25)]";
+  "sticky right-0 z-[78] border-l-2 border-sky-400/40 bg-[#020617] text-sky-50 shadow-[-12px_0_28px_-12px_rgba(56,189,248,0.15)]";
 
 const moneyFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -149,6 +148,18 @@ const hasSlotInPeriod = (row: ExpenseFormRow, column: PeriodColumn) =>
     row.slotEndYmd,
     column,
   );
+
+/**
+ * Phần tiền góp vào ô tổng / footer: ngày hiển thị ✓ (slot) không cộng,
+ * khớp với tổng các ô đang hiện số (tránh Tổng >> tổng các cột ngày).
+ */
+const amountForTotals = (row: ExpenseFormRow, column: PeriodColumn): number => {
+  if (hasSlotInPeriod(row, column)) return 0;
+  return getCostPeriodAmount(row, column) ?? 0;
+};
+
+const rowTotalDisplayed = (row: ExpenseFormRow, columns: PeriodColumn[]) =>
+  columns.reduce((s, col) => s + amountForTotals(row, col), 0);
 
 const buildDateColumns = (): PeriodColumn[] => {
   const today = new Date();
@@ -604,13 +615,16 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                 <th
                   rowSpan={2}
                   scope="col"
-                  className={`${totalColHead} sticky top-0 border-b border-indigo-300/25 px-3 py-4 text-center align-middle text-xs font-bold uppercase tracking-[0.12em] text-amber-200`}
+                  className={`${totalColHead} sticky top-0 z-[100] border-b border-indigo-300/25 px-3 py-4 text-center align-middle text-xs font-bold uppercase tracking-[0.12em] text-sky-200`}
                   style={{
                     width: TOTAL_COLUMN_WIDTH,
                     minWidth: TOTAL_COLUMN_WIDTH,
                   }}
                 >
-                  Tổng
+                  <span className="block leading-tight">Tổng</span>
+                  <span className="mt-1 block text-[10px] font-semibold normal-case tracking-normal text-sky-300/75">
+                    (Trong kỳ hiển thị)
+                  </span>
                 </th>
               </tr>
               <tr>
@@ -709,13 +723,13 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                     );
                   })}
                   <td
-                    className={`${totalColCell} border-b border-indigo-300/15 px-3 py-2 text-right text-sm font-bold tabular-nums text-amber-100 transition-[filter] group-hover:brightness-110`}
+                    className={`${totalColCell} border-b border-indigo-300/15 px-3 py-2 text-right text-sm font-bold tabular-nums text-sky-100`}
                     style={{
                       width: TOTAL_COLUMN_WIDTH,
                       minWidth: TOTAL_COLUMN_WIDTH,
                     }}
                   >
-                    {formatMoney(getAllocatedTotal(order, periodColumns))}
+                    {formatMoney(rowTotalDisplayed(order, periodColumns))}
                   </td>
                 </tr>
               ))}
@@ -806,10 +820,10 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                 ))}
 
                 {periodColumns.map((column) => {
-                  const sumCol = fixedDisplayRows.reduce((sum, order) => {
-                    const piece = getCostPeriodAmount(order, column);
-                    return sum + (piece ?? 0);
-                  }, 0);
+                  const sumCol = fixedDisplayRows.reduce(
+                    (sum, order) => sum + amountForTotals(order, column),
+                    0,
+                  );
 
                   return (
                     <td
@@ -825,7 +839,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                   );
                 })}
                 <td
-                  className={`${totalColFoot} sticky bottom-0 border-t border-indigo-300/25 px-3 py-4 text-right text-sm font-black tabular-nums`}
+                  className={`${totalColFoot} sticky bottom-0 border-t border-indigo-300/25 px-3 py-4 text-right text-sm font-black tabular-nums text-cyan-100`}
                   style={{
                     width: TOTAL_COLUMN_WIDTH,
                     minWidth: TOTAL_COLUMN_WIDTH,
@@ -834,7 +848,7 @@ export const ExpenseCostAllocationTable: React.FC = () => {
                   {formatMoney(
                     fixedDisplayRows.reduce(
                       (sum, order) =>
-                        sum + getAllocatedTotal(order, periodColumns),
+                        sum + rowTotalDisplayed(order, periodColumns),
                       0,
                     ),
                   )}

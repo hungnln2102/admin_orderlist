@@ -26,7 +26,7 @@ export interface TaxData {
   total_tax: number;
 }
 
-export type DashboardChartGranularity = "day" | "month";
+export type DashboardChartGranularity = "day" | "month" | "year";
 
 export interface ChartsApiResponse {
   revenueData: RevenueData[];
@@ -91,15 +91,30 @@ type DashboardChartsResponse = Partial<{
   granularity: string;
 }>;
 
-export type DashboardStatsQueryRange = { from: string; to: string };
+export type DashboardStatsQueryRange = {
+  from: string;
+  to: string;
+  chartBucket?: "day" | "month" | "year";
+};
 
 export async function fetchDashboardStats(
   range?: DashboardStatsQueryRange | null
 ): Promise<DashboardStatsResponse> {
-  const qs =
-    range?.from && range?.to
-      ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
-      : "";
+  let qs = "";
+  if (range?.from && range?.to) {
+    const p = new URLSearchParams({
+      from: range.from,
+      to: range.to,
+    });
+    if (
+      range.chartBucket === "day" ||
+      range.chartBucket === "month" ||
+      range.chartBucket === "year"
+    ) {
+      p.set("chartBucket", range.chartBucket);
+    }
+    qs = `?${p.toString()}`;
+  }
   const response = await apiFetch(`/api/dashboard/stats${qs}`);
   if (!response.ok) {
     const raw = await response.text().catch(() => "");
@@ -129,7 +144,11 @@ const normalizeChartsPayload = (
   };
 
   const chartGranularity: DashboardChartGranularity =
-    String(payload.granularity || "").toLowerCase() === "day" ? "day" : "month";
+    String(payload.granularity || "").toLowerCase() === "day"
+      ? "day"
+      : String(payload.granularity || "").toLowerCase() === "year"
+        ? "year"
+        : "month";
 
   return {
     revenueData: months.map((row) => ({
@@ -173,10 +192,15 @@ export async function fetchChartData(
 
 export async function fetchChartDataRange(
   from: string,
-  to: string
+  to: string,
+  chartBucket?: "day" | "month" | "year"
 ): Promise<ChartsApiResponse> {
+  const bucketQs =
+    chartBucket === "day" || chartBucket === "month" || chartBucket === "year"
+      ? `&chartBucket=${encodeURIComponent(chartBucket)}`
+      : "";
   const response = await apiFetch(
-    `/api/dashboard/charts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    `/api/dashboard/charts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${bucketQs}`
   );
   if (!response.ok) {
     const raw = await response.text().catch(() => "");

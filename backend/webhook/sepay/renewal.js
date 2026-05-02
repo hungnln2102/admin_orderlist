@@ -379,20 +379,33 @@ const runRenewal = async (
       orderCode,
     ]);
 
+    let mavnStockSync = null;
     if (isMavn) {
       try {
         const {
           syncMavnStockExpiryAfterOrderRenewal,
         } = require("../../src/services/mavnRenewalStockExpirySync");
-        await syncMavnStockExpiryAfterOrderRenewal(client, {
+        mavnStockSync = await syncMavnStockExpiryAfterOrderRenewal(client, {
           orderCode,
           newExpiryDate: ngayHetHanMoi,
         });
+        if (
+          mavnStockSync &&
+          !mavnStockSync.skipped &&
+          Number(mavnStockSync.updated || 0) === 0
+        ) {
+          logger.warn("[Renewal] MAVN gia hạn OK nhưng không cập nhật được expires_at kho", {
+            orderCode,
+            reason: mavnStockSync.reason,
+            packageId: mavnStockSync.packageId,
+          });
+        }
       } catch (stockSyncErr) {
         logger.warn("[Renewal] MAVN đồng bộ expires_at kho thất bại (không chặn gia hạn)", {
           orderCode,
           error: stockSyncErr.message,
         });
+        mavnStockSync = { updated: 0, error: stockSyncErr.message };
       }
     }
 
@@ -505,6 +518,16 @@ const runRenewal = async (
       GIA_BAN: finalGiaBan,
       TINH_TRANG: renewalNextStatus,
     };
+
+    if (mavnStockSync != null) {
+      details.MAVN_STOCK_SYNC = {
+        updated: mavnStockSync.updated ?? 0,
+        reason: mavnStockSync.reason ?? null,
+        stock_ids: mavnStockSync.stockIds ?? null,
+        expires_at: mavnStockSync.expiresAt ?? null,
+        error: mavnStockSync.error ?? null,
+      };
+    }
 
     return { success: true, details, processType: "renewal" };
   } catch (err) {

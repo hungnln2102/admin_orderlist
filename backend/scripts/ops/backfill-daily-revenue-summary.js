@@ -20,6 +20,9 @@
  *     trải amount/cost như trước. Link đơn bán + cost > 0 → bỏ (tránh double).
  *   - external_import (ngoài luồng): cả amount vào đúng ngày created_at (VN).
  *
+ * allocated_profit_tax — Σ((price−cost)/term) đơn MAVC/L/K/S; khớp tab «Lợi nhuận» trên Form phân bổ thuế
+ *   (TaxDailyFormTable metric profit). Không trừ MAVN/external (chỉ có trên total_shop_cost và thẻ «Tổng nhập hàng»).
+ *
  * Mặc định --from: ngày 22 (VN); --tax-from=2026-04-22; --import-spread-days=30.
  *
  * Usage (từ thư mục backend, cần .env có DATABASE_URL hoặc DB_* giống app / Knex):
@@ -145,7 +148,8 @@ tax_orders AS (
       )::int,
       0
     ) AS term_days,
-    COALESCE(ol.${cGross}::numeric, ol.${cPrice}::numeric, 0) AS price_amt
+    COALESCE(ol.${cGross}::numeric, ol.${cPrice}::numeric, 0) AS price_amt,
+    COALESCE(ol.${cCost}::numeric, 0) AS cost_amt
   FROM ${orderTable} ol
   CROSS JOIN params p
   WHERE (
@@ -164,6 +168,7 @@ tax_orders_ext AS (
     start_date,
     term_days,
     price_amt,
+    cost_amt,
     CASE
       WHEN term_days > 0 AND start_date IS NOT NULL
       THEN (start_date + (term_days - 1) * interval '1 day')::date
@@ -176,6 +181,20 @@ daily_earned AS (
   SELECT
     d.d AS day,
     SUM(t.price_amt / NULLIF(t.term_days, 0)) AS amt
+  FROM days d
+  INNER JOIN tax_orders_ext t
+    ON t.term_days > 0
+   AND t.end_date IS NOT NULL
+   AND d.d BETWEEN t.start_date AND t.end_date
+  GROUP BY d.d
+),
+daily_tax_form_profit AS (
+  SELECT
+    d.d AS day,
+    SUM(
+      t.price_amt / NULLIF(t.term_days, 0)
+      - t.cost_amt / NULLIF(t.term_days, 0)
+    ) AS amt
   FROM days d
   INNER JOIN tax_orders_ext t
     ON t.term_days > 0
@@ -349,7 +368,8 @@ merged AS (
     ROUND(COALESCE(de.amt, 0), 2)::numeric AS earned_revenue,
     ROUND(COALESCE(ue.amt, 0), 2)::numeric AS unearned_revenue_end,
     COALESCE(dr.amt, 0)::numeric AS revenue_reversed,
-    ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0) + COALESCE(dsc.amt, 0), 2)::numeric AS total_shop_cost
+    ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0) + COALESCE(dsc.amt, 0), 2)::numeric AS total_shop_cost,
+    ROUND(COALESCE(dtp.amt, 0), 2)::numeric AS allocated_profit_tax
   FROM days d
   LEFT JOIN daily_earned de ON de.day = d.d
   LEFT JOIN unearned_end ue ON ue.day = d.d
@@ -357,6 +377,7 @@ merged AS (
   LEFT JOIN daily_mavn_import_spread dm ON dm.day = d.d
   LEFT JOIN daily_external_import dx ON dx.day = d.d
   LEFT JOIN daily_sales_order_cost_spread dsc ON dsc.day = d.d
+  LEFT JOIN daily_tax_form_profit dtp ON dtp.day = d.d
 )
 INSERT INTO ${summaryTable} (
   summary_date,
@@ -364,6 +385,7 @@ INSERT INTO ${summaryTable} (
   unearned_revenue_end,
   revenue_reversed,
   total_shop_cost,
+  allocated_profit_tax,
   created_at,
   updated_at
 )
@@ -373,6 +395,7 @@ SELECT
   m.unearned_revenue_end,
   m.revenue_reversed,
   m.total_shop_cost,
+  m.allocated_profit_tax,
   now(),
   now()
 FROM merged m
@@ -381,6 +404,7 @@ ON CONFLICT (summary_date) DO UPDATE SET
   unearned_revenue_end = EXCLUDED.unearned_revenue_end,
   revenue_reversed = EXCLUDED.revenue_reversed,
   total_shop_cost = EXCLUDED.total_shop_cost,
+  allocated_profit_tax = EXCLUDED.allocated_profit_tax,
   updated_at = now();
 `;
 }

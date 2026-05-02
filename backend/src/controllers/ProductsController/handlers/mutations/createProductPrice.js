@@ -1,4 +1,5 @@
 const { db } = require("../../../../db");
+const { quoteIdent } = require("../../../../utils/sql");
 const {
   normalizeTextInput,
   toNullableNumber,
@@ -84,6 +85,7 @@ const createProductPrice = async (req, res) => {
           if (!productId) {
             const productPayload = {
               [productSchemaCols.packageName]: normalizedPackageName,
+              [productSchemaCols.updatedAt]: trx.fn.now(),
             };
             const productInsert = await trx(TABLES.product)
               .insert(productPayload)
@@ -117,15 +119,21 @@ const createProductPrice = async (req, res) => {
               .ignore();
           }
 
-          const descRows = await trx(TABLES.productDesc)
-            .insert({
-              [productDescCols.rules]: null,
-              [productDescCols.description]: null,
-              [productDescCols.shortDesc]: null,
-            })
-            .returning("id");
+          const descRows = await trx.raw(
+            `
+            INSERT INTO ${TABLES.productDesc} (
+              ${quoteIdent(productDescCols.rules)},
+              ${quoteIdent(productDescCols.description)},
+              ${quoteIdent(productDescCols.shortDesc)},
+              ${quoteIdent(productDescCols.createdAt)},
+              ${quoteIdent(productDescCols.updatedAt)}
+            ) VALUES (?, ?, ?, NOW(), NOW())
+            RETURNING ${quoteIdent(productDescCols.id)} AS id;
+          `,
+            [null, null, null]
+          );
           const descVariantId =
-            descRows?.[0]?.id ?? descRows?.[0]?.ID ?? null;
+            descRows?.rows?.[0]?.id ?? descRows?.rows?.[0]?.ID ?? null;
           if (!descVariantId) {
             throw new Error("Unable to create desc_variant row.");
           }
@@ -138,6 +146,8 @@ const createProductPrice = async (req, res) => {
               [variantCols.isActive]: isActive,
               [variantCols.descVariantId]: descVariantId,
               [variantCols.basePrice]: basePriceVal,
+              [variantCols.createdAt]: trx.fn.now(),
+              [variantCols.updatedAt]: trx.fn.now(),
             })
             .returning("id");
           const variantId = variantInsert?.[0]?.id || variantInsert?.[0]?.ID;

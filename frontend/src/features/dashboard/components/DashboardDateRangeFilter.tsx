@@ -4,7 +4,12 @@ import { CalendarDaysIcon } from "@heroicons/react/24/outline";
 import * as Helpers from "@/lib/helpers";
 import { toDisplayDate, toISODate } from "@/features/invoices/helpers";
 
-export type DashboardDateRangeValue = { from: string; to: string };
+/** chartBucket: preset — day | month | year (một cột mỗi năm dương lịch). */
+export type DashboardDateRangeValue = {
+  from: string;
+  to: string;
+  chartBucket?: "day" | "month" | "year";
+};
 
 type Props = {
   value: DashboardDateRangeValue | null;

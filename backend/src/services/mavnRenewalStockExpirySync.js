@@ -1,8 +1,11 @@
 "use strict";
 
 /**
- * Đơn MAVN gia hạn (renewal.js): đồng bộ `product_stocks.expires_at` với ngày hết hạn mới trên đơn,
- * theo quy tắc ghép slot / information_order giống package-product (tài khoản gốc vs kích hoạt).
+ * Đơn MAVN gia hạn (renewal.js): đồng bộ `product_stocks.expires_at` với ngày hết hạn mới trên đơn.
+ *
+ * Quy tắc khớp kho (nghiệp vụ nhập hàng): `order_list.information_order` luôn = `account_username`
+ * của tài khoản trong kho → chỉ đối chiếu hai giá trị này trên các dòng kho gắn với gói (`package_product`
+ * cùng `package_id` với sản phẩm của đơn).
  */
 
 const {
@@ -55,14 +58,11 @@ const linkMatches = (packageKeys, linkValue) => {
   );
 };
 
-function orderMatchesStockUsername(matchMode, orderRow, linkUsername) {
-  const packageKeys = buildPackageLinkKeys(linkUsername);
-  if (packageKeys.length === 0) return false;
-  const slot = toCleanString(orderRow[O.slot]);
-  const info = toCleanString(orderRow[O.informationOrder]);
-  const linkValue =
-    matchMode === "slot" ? normalizeMatchKey(slot) : normalizeMatchKey(info);
-  return linkMatches(packageKeys, linkValue);
+/** `information_order` trên đơn ↔ `account_username` trên kho (cùng kiểu chuẩn hóa như package-product). */
+function informationOrderMatchesAccountUsername(informationOrder, accountUsername) {
+  const infoValue = normalizeMatchKey(informationOrder);
+  const packageKeys = buildPackageLinkKeys(accountUsername);
+  return linkMatches(packageKeys, infoValue);
 }
 
 async function resolvePackageIdFromOrderProduct(client, idProductRaw) {
@@ -116,7 +116,7 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
 
   const orderRes = await client.query(
     `
-      SELECT ${O.idProduct}, ${O.informationOrder}, ${O.slot}
+      SELECT ${O.idProduct}, ${O.informationOrder}
       FROM ${ORDER_TABLE}
       WHERE LOWER(${O.idOrder}::text) = LOWER($1::text)
       LIMIT 1
@@ -127,6 +127,14 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
     return { updated: 0, reason: "order_not_found" };
   }
   const orderRow = orderRes.rows[0];
+  const informationOrder = orderRow[O.informationOrder];
+
+  if (!toCleanString(informationOrder)) {
+    logger.warn("[MAVN renewal stock sync] Đơn thiếu information_order, không đối chiếu kho", {
+      orderCode: normalizedCode,
+    });
+    return { updated: 0, reason: "missing_information_order" };
+  }
 
   const packageId = await resolvePackageIdFromOrderProduct(client, orderRow[O.idProduct]);
   if (!packageId) {
@@ -140,8 +148,6 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
   const ppRes = await client.query(
     `
       SELECT
-        pp.${PP.id} AS pp_id,
-        pp.${PP.match} AS match_mode,
         pp.${PP.stockId} AS stock_id,
         pp.${PP.storageId} AS storage_id,
         s.${S.accountUsername} AS stock_username,
@@ -156,34 +162,28 @@ async function syncMavnStockExpiryAfterOrderRenewal(client, { orderCode, newExpi
 
   const stockIds = new Set();
   for (const row of ppRes.rows) {
-    const mm = row.match_mode === "slot" ? "slot" : "information_order";
-    if (mm === "slot") {
-      if (
-        row.stock_id &&
-        orderMatchesStockUsername("slot", orderRow, row.stock_username)
-      ) {
-        stockIds.add(Number(row.stock_id));
-      }
-    } else {
-      if (
-        row.storage_id &&
-        orderMatchesStockUsername("information_order", orderRow, row.storage_username)
-      ) {
-        stockIds.add(Number(row.storage_id));
-      }
-      if (
-        row.stock_id &&
-        orderMatchesStockUsername("information_order", orderRow, row.stock_username)
-      ) {
-        stockIds.add(Number(row.stock_id));
-      }
+    if (
+      row.stock_id &&
+      row.stock_username &&
+      informationOrderMatchesAccountUsername(informationOrder, row.stock_username)
+    ) {
+      stockIds.add(Number(row.stock_id));
+    }
+    if (
+      row.storage_id &&
+      row.storage_username &&
+      informationOrderMatchesAccountUsername(informationOrder, row.storage_username)
+    ) {
+      stockIds.add(Number(row.storage_id));
     }
   }
 
   if (!stockIds.size) {
-    logger.info("[MAVN renewal stock sync] Không có dòng kho khớp đơn", {
+    logger.warn("[MAVN renewal stock sync] Không có dòng kho khớp information_order = account_username", {
       orderCode: normalizedCode,
       packageId,
+      idProduct: orderRow[O.idProduct],
+      infoSample: toCleanString(informationOrder).slice(0, 80),
     });
     return { updated: 0, packageId, reason: "no_matching_stock" };
   }

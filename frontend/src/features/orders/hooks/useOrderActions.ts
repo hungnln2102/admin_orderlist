@@ -207,15 +207,24 @@ export function useOrderActions(deps: OrderActionsDeps) {
               errorMessage || "Không thể gia hạn thủ công cho đơn hàng."
             );
           }
+          const renewBody = (await response.json().catch(() => ({}))) as {
+            details?: { MAVN_STOCK_SYNC?: { updated?: number; reason?: string | null } };
+          };
           await fetchOrders();
-          emitRefresh(["orders", "dashboard"]);
+          emitRefresh(["orders", "dashboard", "warehouse", "package-product"]);
           const upperCode = orderCode.trim().toUpperCase();
           if (upperCode.startsWith(ORDER_CODE_PREFIXES.IMPORT)) {
+            const sync = renewBody?.details?.MAVN_STOCK_SYNC;
+            const stockUpdated = Number(sync?.updated ?? 0);
             showAppNotification({
-              type: "success",
+              type: stockUpdated > 0 ? "success" : "warning",
               title: "Đã thanh toán (nhập hàng)",
               message:
-                "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Chi phí nhập đã đồng bộ dashboard (không qua webhook ngân hàng).",
+                stockUpdated > 0
+                  ? "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Đã đồng bộ ngày hết hạn trên kho."
+                  : `Đơn MAVN đã gia hạn (Đã thanh toán) nhưng không cập nhật được expires_at kho${
+                      sync?.reason ? ` (${sync.reason}).` : ". "
+                    } Kiểm tra information_order trên đơn trùng account_username trên kho (cùng gói).`,
             });
           }
         } catch (error) {
@@ -331,17 +340,34 @@ export function useOrderActions(deps: OrderActionsDeps) {
           );
         }
 
+        const renewBody = (await response.json().catch(() => ({}))) as {
+          details?: { MAVN_STOCK_SYNC?: { updated?: number; reason?: string | null } };
+        };
+
         await fetchOrders();
-        emitRefresh(["orders", "dashboard"]);
+        emitRefresh(["orders", "dashboard", "warehouse", "package-product"]);
         const upperRenewCode = orderCode.trim().toUpperCase();
-        showAppNotification({
-          type: "success",
-          title: "Gia hạn thành công",
-          message:
-            upperRenewCode.startsWith(ORDER_CODE_PREFIXES.IMPORT)
-              ? "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Chi phí nhập đã đồng bộ (không qua webhook ngân hàng)."
-              : "Gia hạn đơn hàng thành công.\nĐơn đã được xử lý renewal thủ công.",
-        });
+        if (upperRenewCode.startsWith(ORDER_CODE_PREFIXES.IMPORT)) {
+          const sync = renewBody?.details?.MAVN_STOCK_SYNC;
+          const stockUpdated = Number(sync?.updated ?? 0);
+          showAppNotification({
+            type: stockUpdated > 0 ? "success" : "warning",
+            title: "Gia hạn thành công",
+            message:
+              stockUpdated > 0
+                ? "Đơn MAVN đã gia hạn và chuyển Đã thanh toán. Đã đồng bộ ngày hết hạn trên kho."
+                : `Đơn MAVN đã gia hạn (Đã thanh toán) nhưng không cập nhật được expires_at kho${
+                    sync?.reason ? ` (${sync.reason}).` : ". "
+                  } Kiểm tra information_order trên đơn trùng account_username trên kho (cùng gói).`,
+          });
+        } else {
+          showAppNotification({
+            type: "success",
+            title: "Gia hạn thành công",
+            message:
+              "Gia hạn đơn hàng thành công.\nĐơn đã được xử lý renewal thủ công.",
+          });
+        }
       } catch (error) {
         console.error("Lỗi khi chạy gia hạn thủ công:", error);
         showAppNotification({

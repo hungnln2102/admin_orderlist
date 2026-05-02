@@ -1,10 +1,7 @@
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CreateProductFormState, ProductPricingRow } from "../../../types";
-import {
-  isExistingProductPackagePair,
-  isExistingSanPhamCode,
-} from "../../../hooks/productActionHelpers";
+import { isExistingSanPhamCode } from "../../../hooks/productActionHelpers";
 import { inputBase, labelBase } from "./shared";
 
 type ProductBasicsSectionProps = {
@@ -38,9 +35,6 @@ export function ProductBasicsSection({
 }: ProductBasicsSectionProps) {
   const [isCustomProductName, setIsCustomProductName] = useState(false);
   const [isCustomPackage, setIsCustomPackage] = useState(false);
-  const [duplicatePairHint, setDuplicatePairHint] = useState<string | null>(
-    null
-  );
   const [duplicateSanPhamHint, setDuplicateSanPhamHint] = useState<
     string | null
   >(null);
@@ -104,28 +98,8 @@ export function ProductBasicsSection({
   }, [availablePackageOptions, createForm.packageProduct]);
 
   useEffect(() => {
-    setDuplicatePairHint(null);
-  }, [createForm.packageName, createForm.packageProduct]);
-
-  useEffect(() => {
     setDuplicateSanPhamHint(null);
   }, [createForm.sanPham]);
-
-  const validatePairOnBlur = useCallback(() => {
-    const name = createForm.packageName.trim();
-    const pkg = createForm.packageProduct.trim();
-    if (!name || !pkg) {
-      setDuplicatePairHint(null);
-      return;
-    }
-    if (isExistingProductPackagePair(existingProductRows, name, pkg)) {
-      setDuplicatePairHint(
-        "Tên sản phẩm và gói sản phẩm này đã tồn tại. Hãy đổi tên hoặc gói."
-      );
-    } else {
-      setDuplicatePairHint(null);
-    }
-  }, [createForm.packageName, createForm.packageProduct, existingProductRows]);
 
   const validateSanPhamOnBlur = useCallback(() => {
     const code = createForm.sanPham.trim();
@@ -247,7 +221,6 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 onFormChange("packageName", event.target.value)
               }
-              onBlur={validatePairOnBlur}
             />
           ) : (
             <select
@@ -256,7 +229,6 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 handleProductNameSelectChange(event.target.value)
               }
-              onBlur={validatePairOnBlur}
             >
               <option value="" className="bg-slate-900 text-white">
                 Chọn sản phẩm có sẵn
@@ -308,7 +280,6 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 onFormChange("packageProduct", event.target.value)
               }
-              onBlur={validatePairOnBlur}
             />
           ) : (
             <select
@@ -317,7 +288,6 @@ export function ProductBasicsSection({
               onChange={(event) =>
                 onFormChange("packageProduct", event.target.value)
               }
-              onBlur={validatePairOnBlur}
             >
               <option value="" className="bg-slate-900 text-white">
                 Chọn gói theo sản phẩm
@@ -336,14 +306,6 @@ export function ProductBasicsSection({
             </select>
           )}
         </div>
-        {duplicatePairHint ? (
-          <p
-            className="md:col-span-2 text-xs text-red-300 -mt-1"
-            role="status"
-          >
-            {duplicatePairHint}
-          </p>
-        ) : null}
         <div className="md:col-span-2">
           <label className={labelBase}>Mã Sản Phẩm</label>
           <input

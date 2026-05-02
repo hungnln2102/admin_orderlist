@@ -64,22 +64,6 @@ type CreateProductValidationResult =
 const formatPercent = (ratio: number): string =>
   `${(ratio * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
 
-/** Trùng cặp (tên sản phẩm + gói) với một dòng đã có trên hệ thống. */
-export function isExistingProductPackagePair(
-  existingRows: ProductPricingRow[],
-  packageName: string,
-  packageProduct: string
-): boolean {
-  const p = (packageName || "").trim().toLowerCase();
-  const g = (packageProduct || "").trim().toLowerCase();
-  if (!p || !g) return false;
-  return existingRows.some(
-    (row) =>
-      (row.packageName || "").trim().toLowerCase() === p &&
-      (row.packageProduct || "").trim().toLowerCase() === g
-  );
-}
-
 export function isExistingSanPhamCode(
   existingRows: ProductPricingRow[],
   sanPham: string
@@ -470,18 +454,6 @@ export function validateCreateProductForm(
     return {
       ok: false,
       error: "Mã sản phẩm đã tồn tại.",
-    };
-  }
-
-  if (
-    trimmedPackage &&
-    trimmedProduct &&
-    isExistingProductPackagePair(existingRows, trimmedPackage, trimmedProduct)
-  ) {
-    return {
-      ok: false,
-      error:
-        "Tên sản phẩm và gói sản phẩm này đã tồn tại. Hãy đổi tên hoặc gói.",
     };
   }
 

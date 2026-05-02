@@ -28,7 +28,7 @@ type FinancialChartsPanelProps = {
   onYearChange: (year: number) => void;
   /** Khi true, ẩn chọn năm vì biểu đồ đang theo khoảng ngày tùy chọn */
   isRangeMode?: boolean;
-  /** Bucket trục X: ngày (khoảng ngắn) hoặc tháng (năm / khoảng dài). */
+  /** Bucket trục X: ngày | tháng | năm (dương lịch). */
   chartGranularity?: DashboardChartGranularity;
 };
 
@@ -188,7 +188,8 @@ export const FinancialChartsPanel: React.FC<FinancialChartsPanelProps> = ({
     tax: taxData[index]?.total_tax ?? 0,
   }));
 
-  const tiltX = chartGranularity === "day" && chartData.length > 12;
+  const tiltX =
+    chartGranularity === "day" && chartData.length > 12;
 
   return (
     <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.15),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(244,63,94,0.12),transparent_30%),linear-gradient(135deg,rgba(2,6,23,0.96),rgba(10,15,33,0.94))] p-5 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.85)] backdrop-blur-xl sm:p-6 lg:p-7">
@@ -196,7 +197,11 @@ export const FinancialChartsPanel: React.FC<FinancialChartsPanelProps> = ({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-300/90">
-              {chartGranularity === "day" ? "Tài chính theo ngày" : "Tài chính theo tháng"}
+              {chartGranularity === "day"
+                ? "Tài chính theo ngày"
+                : chartGranularity === "year"
+                  ? "Tài chính theo năm"
+                  : "Tài chính theo tháng"}
             </p>
             <h3 className="mt-2 text-xl font-bold text-white sm:text-2xl">
               Doanh thu, lợi nhuận, hoàn tiền và thuế
@@ -208,7 +213,9 @@ export const FinancialChartsPanel: React.FC<FinancialChartsPanelProps> = ({
             <div className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-white/75 shadow-lg">
               {chartGranularity === "day"
                 ? "Theo từng ngày trong chu kỳ"
-                : "Theo từng tháng trong chu kỳ"}
+                : chartGranularity === "year"
+                  ? "Theo từng năm dương lịch trong chu kỳ"
+                  : "Theo từng tháng trong chu kỳ"}
             </div>
           ) : (
             <select
