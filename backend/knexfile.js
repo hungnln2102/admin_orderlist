@@ -1,13 +1,17 @@
-const { loadBackendEnv } = require("./src/config/loadEnv");
-const { getPostgresConnectionUrl } = require("./src/config/postgresConnectionUrl");
+const {
+  loadPostgresEnvForCli,
+  getPostgresCliFallbackPathsForHelp,
+} = require("./src/config/loadPostgresEnvForCli");
 
-loadBackendEnv();
-
-const DATABASE_URL = getPostgresConnectionUrl().trim();
+const DATABASE_URL = loadPostgresEnvForCli().trim();
 if (!DATABASE_URL) {
   console.error(
-    "[knex] Không có chuỗi kết nối Postgres. Đặt DATABASE_URL (hoặc POSTGRES_URL / PG_URL), hoặc DB_USER + DB_NAME + DB_PASS/DB_PASSWORD, trong backend/.env / .env.docker / .env.local."
+    "[knex] Không có chuỗi kết nối Postgres. Đặt DATABASE_URL (hoặc POSTGRES_URL / PG_URL), hoặc DB_USER + DB_NAME + DB_PASS/DB_PASSWORD."
   );
+  console.error("  Đã thử loadBackendEnv và các file (nếu tồn tại):");
+  for (const [label, p] of getPostgresCliFallbackPathsForHelp()) {
+    console.error(`    - ${label}: ${p}`);
+  }
   console.error(
     "  Hoặc: BACKEND_ENV_FILE=/đường/dẫn/.env npx knex migrate:latest"
   );
