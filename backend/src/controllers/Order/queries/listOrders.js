@@ -32,6 +32,9 @@ const paymentReceiptIdCol = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.ID;
 const taxOrderPatterns = ["MAVC%", "MAVL%", "MAVK%", "MAVS%"];
 const RCN = RECEIPT_SCHEMA.REFUND_CREDIT_NOTES.COLS;
 const RCA = RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.COLS;
+const {
+    WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
+} = require("./webhookReceiptOrderDateWindow");
 
 const buildOrdersListQuery = async (scope = "", options = {}) => {
     const normalizedScope = String(scope || "").toLowerCase();
@@ -66,7 +69,16 @@ const buildOrdersListQuery = async (scope = "", options = {}) => {
                 FROM ${TABLES.paymentReceipt} pr_sum
                 WHERE COALESCE(${table}.${idOrderCol}::text, '') <> ''
                   AND LOWER(COALESCE(pr_sum.${paymentReceiptOrderCodeCol}::text, '')) = LOWER(${table}.${idOrderCol}::text)
-                  AND pr_sum.${paymentReceiptPaidDateCol}::date >= COALESCE(${table}.${orderDateCol}::date, '1970-01-01'::date)
+                  AND (
+                    pr_sum.${paymentReceiptPaidDateCol}::date >= COALESCE(${table}.${orderDateCol}::date, '1970-01-01'::date)
+                    OR (
+                      pr_sum.${paymentReceiptPaidDateCol}::date < COALESCE(${table}.${orderDateCol}::date, 'infinity'::date)
+                      AND pr_sum.${paymentReceiptPaidDateCol}::date >= (
+                        COALESCE(${table}.${orderDateCol}::date, CURRENT_DATE)
+                        - INTERVAL '${WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS} days'
+                      )
+                    )
+                  )
             ) wh_pr_sum ON TRUE
             `
         )

@@ -84,16 +84,27 @@ export const OrderRow = React.memo(function OrderRow({
     ? Number(giaTriConLai)
     : 0;
   const orderRecord = order as Record<string, unknown>;
-  /** Tổng biên lai từ ngày đăng ký (cùng rule webhook); ưu tiên dùng để "Chênh lệch" không lệch khi 2+ giao dịch. */
+  /** Tổng biên lai từ ngày đăng ký (SUM receipt có paid_date >= order_date); ưu tiên khi > 0 (2+ giao dịch cùng chu kỳ). */
   const totalWhRaw = orderRecord.total_webhook_amount;
   const latestWhRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
-  const webhookAmountSource =
-    totalWhRaw !== null && totalWhRaw !== undefined && String(totalWhRaw).trim() !== ""
-      ? totalWhRaw
-      : latestWhRaw;
-  const webhookAmount = Number.isFinite(Number(webhookAmountSource))
-    ? Number(webhookAmountSource)
-    : null;
+  const parseWebhookMoney = (v: unknown): number | null => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string" && v.trim() === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const totalWh = parseWebhookMoney(totalWhRaw);
+  const latestWh = parseWebhookMoney(latestWhRaw);
+  /**
+   * Sau gia hạn, order_date thường được kéo về sau; receipt cũ có paid_date < order_date mới
+   * → total_webhook_amount = 0 dù webhook đã về. Trước đây UI ưu tiên total nên 0 − giá bán = chênh âm sai.
+   */
+  let webhookAmount: number | null = null;
+  if (totalWh !== null && totalWh > 0) {
+    webhookAmount = totalWh;
+  } else if (latestWh !== null) {
+    webhookAmount = latestWh;
+  }
   const webhookDelta = webhookAmount !== null ? webhookAmount - priceValue : null;
   const webhookDeltaDisplay =
     webhookDelta !== null ? formatCurrency(webhookDelta) : "Chưa có webhook";

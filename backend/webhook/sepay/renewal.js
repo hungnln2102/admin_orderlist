@@ -32,6 +32,9 @@ const {
   insertFinancialAuditLog,
 } = require("./payments");
 const logger = require("../../src/utils/logger");
+const {
+  WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
+} = require("../../src/controllers/Order/queries/webhookReceiptOrderDateWindow");
 
 const { calculateRenewalPricing, computeOrderCurrentPrice } = require("./renewalPricing");
 const {
@@ -121,7 +124,15 @@ const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
       INNER JOIN ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE} fs
         ON fs.payment_receipt_id = pr.${PAYMENT_RECEIPT_COLS.id}
       WHERE LOWER(COALESCE(pr.${PAYMENT_RECEIPT_COLS.orderCode}::text, '')) = LOWER($1)
-        AND pr.${PAYMENT_RECEIPT_COLS.paidDate} >= $2::date
+        AND (
+          pr.${PAYMENT_RECEIPT_COLS.paidDate}::date >= $2::date
+          OR (
+            pr.${PAYMENT_RECEIPT_COLS.paidDate}::date < $2::date
+            AND pr.${PAYMENT_RECEIPT_COLS.paidDate}::date >= (
+              $2::date - INTERVAL '${WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS} days'
+            )
+          )
+        )
         AND fs.is_financial_posted = TRUE
       LIMIT 1
     `,
@@ -345,6 +356,7 @@ const runRenewal = async (
     const renewalNextStatus =
       isManualRenewal && !isMavn ? ORDER_STATUS.PROCESSING : ORDER_STATUS.PAID;
 
+    // order_date = đầu kỳ mới (ngày sau hết hạn cũ); paid_date webhook có thể trước mốc này — tổng receipt / đối soát dùng cửa sổ đệm (xem webhookReceiptOrderDateWindow).
     const updateSql = `
       UPDATE ${ORDER_TABLE}
       SET
