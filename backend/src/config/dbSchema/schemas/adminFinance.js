@@ -82,6 +82,20 @@ const FINANCE_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  /** Tổng hợp theo ngày: earned / unearned cuối ngày / đảo chiều — nguồn ghi do job hoặc sync sau này. */
+  DAILY_REVENUE_SUMMARY: {
+    TABLE: "daily_revenue_summary",
+    COLS: {
+      SUMMARY_DATE: "summary_date",
+      EARNED_REVENUE: "earned_revenue",
+      UNEARNED_REVENUE_END: "unearned_revenue_end",
+      REVENUE_REVERSED: "revenue_reversed",
+      /** Nhập (mavn/external): phân bổ amount/term theo đơn hoặc N ngày từ created_at; withdraw_profit: cả khoản vào ngày created_at. */
+      TOTAL_SHOP_COST: "total_shop_cost",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
   STORE_PROFIT_EXPENSES: {
     TABLE: "store_profit_expenses",
     COLS: {

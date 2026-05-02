@@ -814,6 +814,16 @@ CREATE TABLE dashboard.dashboard_monthly_summary (
     CONSTRAINT dashboard_monthly_summary_month_key_format CHECK (((month_key)::text ~ '^[0-9]{4}-[0-9]{2}$'::text))
 );
 
+CREATE TABLE dashboard.daily_revenue_summary (
+    summary_date date NOT NULL,
+    earned_revenue numeric(18,2) DEFAULT 0 NOT NULL,
+    unearned_revenue_end numeric(18,2) DEFAULT 0 NOT NULL,
+    revenue_reversed numeric(18,2) DEFAULT 0 NOT NULL,
+    total_shop_cost numeric(18,2) DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE dashboard.master_wallettypes (
     id integer NOT NULL,
     wallet_name character varying(100) NOT NULL,
@@ -1872,6 +1882,9 @@ ALTER TABLE ONLY customer_web.tier_cycles
 ALTER TABLE ONLY dashboard.dashboard_monthly_summary
     ADD CONSTRAINT dashboard_monthly_summary_pkey PRIMARY KEY (month_key);
 
+ALTER TABLE ONLY dashboard.daily_revenue_summary
+    ADD CONSTRAINT daily_revenue_summary_pkey PRIMARY KEY (summary_date);
+
 ALTER TABLE ONLY dashboard.master_wallettypes
     ADD CONSTRAINT master_wallettypes_pkey PRIMARY KEY (id);
 
@@ -2100,6 +2113,8 @@ CREATE INDEX idx_tier_cycles_time_range ON customer_web.tier_cycles USING btree 
 CREATE UNIQUE INDEX uq_tier_cycles_start_end ON customer_web.tier_cycles USING btree (cycle_start_at, cycle_end_at);
 
 CREATE INDEX idx_dashboard_monthly_summary_updated_at ON dashboard.dashboard_monthly_summary USING btree (updated_at DESC);
+
+CREATE INDEX idx_daily_revenue_summary_updated_at ON dashboard.daily_revenue_summary USING btree (updated_at DESC);
 
 CREATE INDEX idx_order_customer_customer ON orders.order_customer USING btree (account_id, created_at DESC);
 

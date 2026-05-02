@@ -49,6 +49,7 @@ const {
   monthKeyFromPaidDateYmd,
 } = require("../../../src/controllers/Order/finance/dashboardSummary");
 const logger = require("../../../src/utils/logger");
+const { computeOrderCurrentPrice } = require("../renewalPricing");
 const { withSavepoint } = require("../savepoint");
 const UNDERPAY_TOLERANCE_VND = 5000;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
@@ -382,6 +383,37 @@ const computeWebhookAmountDecision = ({
   };
 };
 
+const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, statusValue) => {
+  const stored = normalizeMoney(state?.[ORDER_COLS.price]);
+  if (statusValue !== ORDER_STATUS.RENEWAL || !state) {
+    return stored;
+  }
+  const row = {
+    ...state,
+    [ORDER_COLS.idOrder]: state[ORDER_COLS.idOrder] ?? orderCode,
+  };
+  try {
+    const { price } = await computeOrderCurrentPrice(client, row);
+    const current = normalizeMoney(price);
+    if (current > 0 && current !== stored) {
+      logger.info("[Webhook] Gia hạn: so khớp CK theo giá bảng hiện tại (không snapshot đơn)", {
+        orderCode,
+        storedPrice: stored,
+        currentPrice: current,
+      });
+    }
+    if (current > 0) {
+      return current;
+    }
+  } catch (e) {
+    logger.warn("[Webhook] Không tính được giá hiện tại khi gia hạn, dùng giá trên đơn", {
+      orderCode,
+      error: e?.message,
+    });
+  }
+  return stored;
+};
+
 const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
   const normalizedCode = String(orderCode || "").trim();
   if (!normalizedCode) return 0;
@@ -532,6 +564,8 @@ router.post("/", async (req, res) => {
         const stateRes = await client.query(
           `SELECT
             ${ORDER_COLS.id},
+            ${ORDER_COLS.idOrder},
+            ${ORDER_COLS.idProduct},
             ${ORDER_COLS.status},
             ${ORDER_COLS.expiryDate},
             ${ORDER_COLS.orderDate},
@@ -670,14 +704,19 @@ router.post("/", async (req, res) => {
               statusValue === ORDER_STATUS.PROCESSING
             )
           ) {
-            // Must evaluate after receipt has been inserted to include current webhook.
             const accumulatedAmount = await getAccumulatedReceiptAmount(
               client,
               code,
               state[ORDER_COLS.orderDate]
             );
+            const orderPriceForWebhook = await resolveOrderPriceForWebhookMatch(
+              client,
+              code,
+              state,
+              statusValue
+            );
             amountDecision = computeWebhookAmountDecision({
-              orderPrice: state[ORDER_COLS.price],
+              orderPrice: orderPriceForWebhook,
               currentAmount: transferAmountNormalized,
               accumulatedAmount,
               creditAppliedAmount: state.credit_applied_amount,
@@ -983,8 +1022,14 @@ router.post("/", async (req, res) => {
                 code,
                 state[ORDER_COLS.orderDate]
               );
+              const orderPriceForWebhook = await resolveOrderPriceForWebhookMatch(
+                client,
+                code,
+                state,
+                statusValue
+              );
               amountDecision = computeWebhookAmountDecision({
-                orderPrice: state[ORDER_COLS.price],
+                orderPrice: orderPriceForWebhook,
                 currentAmount: transferAmountNormalized,
                 accumulatedAmount,
                 creditAppliedAmount: state.credit_applied_amount,
