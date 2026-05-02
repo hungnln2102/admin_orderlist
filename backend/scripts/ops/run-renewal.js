@@ -1,13 +1,13 @@
 /**
  * Chạy gia hạn thủ công cho một đơn (vd. đơn chỉ mới đổi status chưa chạy renewal).
- * Chạy từ thư mục backend: node scripts/run-renewal.js [ORDER_CODE]
- * Ví dụ: node scripts/run-renewal.js MAVLSP7RH
+ * Chạy từ thư mục backend: node scripts/ops/run-renewal.js [ORDER_CODE]
+ * Ví dụ: node scripts/ops/run-renewal.js MAVLSP7RH
  */
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
 const orderCode = process.argv[2] || "MAVLSP7RH";
-const { runRenewal } = require("../webhook/sepay/renewal");
+const { runRenewal } = require("../../webhook/sepay/renewal");
 
 (async () => {
   console.log("Chạy gia hạn đơn:", orderCode, "(forceRenewal: true)\n");
