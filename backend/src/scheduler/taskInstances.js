@@ -15,6 +15,9 @@ const { createCleanupExpiredAdobeUsersTask } = require("./tasks/cleanupExpiredAd
 const {
   createCleanupAdobeProfileGarbageTask,
 } = require("./tasks/cleanupAdobeProfileGarbage");
+const {
+  syncDailyRevenueSummaryTask,
+} = require("./tasks/syncDailyRevenueSummaryTask");
 
 const {
   pool,
@@ -58,6 +61,7 @@ module.exports = {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  syncDailyRevenueSummaryTask,
   getSchedulerStatus,
   schedulerTimezone,
   cronExpression,

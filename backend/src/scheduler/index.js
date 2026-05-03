@@ -14,11 +14,15 @@ const {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  syncDailyRevenueSummaryTask,
   getSchedulerStatus,
   schedulerTimezone,
   cronExpression,
   runOnStart,
 } = require("./taskInstances");
+
+const dailyRevenueSummaryCron =
+  process.env.DAILY_REVENUE_SUMMARY_CRON || "15 0 * * *";
 
 const runCronSafe = (source) =>
   updateDatabaseTask(source).catch((err) =>
@@ -63,6 +67,14 @@ const runCleanupExpiredAdobeUsersSafe = (source) =>
 const runCleanupAdobeProfileGarbageSafe = (source) =>
   cleanupAdobeProfileGarbageTask(source).catch((err) =>
     logger.error(`[CRON] Cleanup Adobe profile garbage failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
+const runDailyRevenueSummarySafe = (source) =>
+  syncDailyRevenueSummaryTask(source).catch((err) =>
+    logger.error(`[CRON] daily_revenue_summary failed during ${source}`, {
       error: err.message,
       stack: err.stack,
     })
@@ -128,12 +140,30 @@ cron.schedule(
   { scheduled: true, timezone: schedulerTimezone }
 );
 
+if (process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON !== "false") {
+  cron.schedule(
+    dailyRevenueSummaryCron,
+    async () => {
+      logger.info("[Scheduler] Cron daily_revenue_summary", {
+        cron: dailyRevenueSummaryCron,
+        timezone: schedulerTimezone,
+      });
+      await runDailyRevenueSummarySafe("cron");
+    },
+    { scheduled: true, timezone: schedulerTimezone }
+  );
+}
+
 logger.info(`[Scheduler] Đã khởi động`, {
   cronExpression,
   /** Job update DB / backup — không phải Renew Adobe. */
   cronExpressionNote: "CRON_SCHEDULE (vd. 1 0 * * * = 00:01 mỗi ngày)",
   renewAdobeCron: "0 * * * *",
   renewAdobeNote: "Mỗi giờ phút 0 (timezone scheduler) — check tài khoản Adobe",
+  dailyRevenueSummaryCron:
+    process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON === "false"
+      ? "(tắt)"
+      : dailyRevenueSummaryCron,
   schedulerTimezone,
   runOnStart,
 });
@@ -145,5 +175,6 @@ module.exports = {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  syncDailyRevenueSummaryTask,
   getSchedulerStatus,
 };

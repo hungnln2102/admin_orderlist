@@ -27,6 +27,7 @@
         "test:webhook-scenarios": "node tests/manual/run-scenario-webhook-validation-suite.js",
         "start:scheduler": "node scheduler.js",
         "start:scheduler:cron-once": "node scheduler.js --run-cron-once",
+        "start:scheduler:daily-revenue-once": "node scheduler.js --run-daily-revenue-once",
         "dev": "nodemon src/server.js",
         "dev:api": "nodemon src/server.js",
         "start:new": "node src/server.js",

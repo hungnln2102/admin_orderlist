@@ -1,7 +1,7 @@
 /**
  * Gộp KPI / biểu đồ từ {SCHEMA_FINANCE}.daily_revenue_summary (đồng bộ backfill form thuế).
  * @see database/migrations/093_dashboard_daily_revenue_summary.sql
- * @see scripts/ops/backfill-daily-revenue-summary.js
+ * @see ../../services/dashboard/dailyRevenueSummaryBackfill.js (scripts/ops/backfill-daily-revenue-summary.js)
  */
 const { db } = require("../../db");
 const {
@@ -18,19 +18,50 @@ const col = FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.COLS;
 
 const toNumber = (value) => Number(value || 0);
 
+/** Sau khi migration 095 / Knex 20260630220200 — cột có trên mọi môi trường mới. */
+let cachedHasAllocatedProfitTax;
+
+async function hasAllocatedProfitTaxColumn() {
+  if (cachedHasAllocatedProfitTax !== undefined) {
+    return cachedHasAllocatedProfitTax;
+  }
+  const row = await db("information_schema.columns")
+    .where({
+      table_schema: SCHEMA_FINANCE,
+      table_name: FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.TABLE,
+      column_name: col.ALLOCATED_PROFIT_TAX,
+    })
+    .first("column_name");
+  cachedHasAllocatedProfitTax = !!row;
+  return cachedHasAllocatedProfitTax;
+}
+
+function selectAllocatedProfitSum(hasCol) {
+  if (hasCol) {
+    return db.raw(`COALESCE(SUM(??), 0) AS allocated_profit_tax`, [
+      col.ALLOCATED_PROFIT_TAX,
+    ]);
+  }
+  return db.raw(`0::numeric AS allocated_profit_tax`);
+}
+
+function selectAllocatedProfitScalar(hasCol) {
+  if (hasCol) return col.ALLOCATED_PROFIT_TAX;
+  return db.raw(`0::numeric AS allocated_profit_tax`);
+}
+
 /**
  * @returns {Promise<{ earned: number, reversed: number, shopCost: number, allocatedProfitTax: number }>}
  */
 async function sumDailyKpisForRange(fromYmd, toYmd) {
+  const hasAlloc = await hasAllocatedProfitTaxColumn();
   const row = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
       db.raw(`COALESCE(SUM(??), 0) AS earned`, [col.EARNED_REVENUE]),
       db.raw(`COALESCE(SUM(??), 0) AS reversed`, [col.REVENUE_REVERSED]),
       db.raw(`COALESCE(SUM(??), 0) AS shop_cost`, [col.TOTAL_SHOP_COST]),
-      db.raw(`COALESCE(SUM(??), 0) AS allocated_profit_tax`, [
-        col.ALLOCATED_PROFIT_TAX,
-      ])
+      selectAllocatedProfitSum(hasAlloc)
     )
     .first();
   return {
@@ -46,6 +77,7 @@ async function sumDailyKpisForRange(fromYmd, toYmd) {
  * @returns {Promise<Map<string, Record<string, unknown>>>} key YYYY-MM-DD
  */
 async function dailyRowMapBetween(fromYmd, toYmd) {
+  const hasAlloc = await hasAllocatedProfitTaxColumn();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -54,7 +86,7 @@ async function dailyRowMapBetween(fromYmd, toYmd) {
       col.EARNED_REVENUE,
       col.REVENUE_REVERSED,
       col.TOTAL_SHOP_COST,
-      col.ALLOCATED_PROFIT_TAX
+      selectAllocatedProfitScalar(hasAlloc)
     );
   const map = new Map();
   for (const r of rows || []) {
@@ -71,6 +103,7 @@ async function dailyRowMapBetween(fromYmd, toYmd) {
  * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number }>>}
  */
 async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
+  const hasAlloc = await hasAllocatedProfitTaxColumn();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -78,9 +111,7 @@ async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
       db.raw(`COALESCE(SUM(??), 0) AS earned`, [col.EARNED_REVENUE]),
       db.raw(`COALESCE(SUM(??), 0) AS reversed`, [col.REVENUE_REVERSED]),
       db.raw(`COALESCE(SUM(??), 0) AS shop_cost`, [col.TOTAL_SHOP_COST]),
-      db.raw(`COALESCE(SUM(??), 0) AS allocated_profit_tax`, [
-        col.ALLOCATED_PROFIT_TAX,
-      ])
+      selectAllocatedProfitSum(hasAlloc)
     )
     .groupByRaw(`to_char(??::date, 'YYYY-MM')`, [col.SUMMARY_DATE]);
 
@@ -103,6 +134,7 @@ async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
  * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number }>>}
  */
 async function sumDailyByYearKeyBetween(fromYmd, toYmd) {
+  const hasAlloc = await hasAllocatedProfitTaxColumn();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -110,9 +142,7 @@ async function sumDailyByYearKeyBetween(fromYmd, toYmd) {
       db.raw(`COALESCE(SUM(??), 0) AS earned`, [col.EARNED_REVENUE]),
       db.raw(`COALESCE(SUM(??), 0) AS reversed`, [col.REVENUE_REVERSED]),
       db.raw(`COALESCE(SUM(??), 0) AS shop_cost`, [col.TOTAL_SHOP_COST]),
-      db.raw(`COALESCE(SUM(??), 0) AS allocated_profit_tax`, [
-        col.ALLOCATED_PROFIT_TAX,
-      ])
+      selectAllocatedProfitSum(hasAlloc)
     )
     .groupByRaw(`to_char(??::date, 'YYYY')`, [col.SUMMARY_DATE]);
 
