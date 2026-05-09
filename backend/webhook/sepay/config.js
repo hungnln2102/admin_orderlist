@@ -27,12 +27,8 @@ const PORT = Number(process.env.SEPAY_PORT) || 5000;
 // All sensitive values must come from environment variables
 // No hardcoded defaults for security reasons
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_CHAT_ID =
-  process.env.RENEWAL_GROUP_ID ||
-  process.env.NOTIFICATION_CHAT_ID ||
-  process.env.TELEGRAM_CHAT_ID ||
-  process.env.ORDER_NOTIFICATION_CHAT_ID ||
-  "";
+// Quy ước mới: toàn bộ Telegram dùng 1 chat ID duy nhất.
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const TELEGRAM_TOPIC_ID = Number.parseInt(
   process.env.RENEWAL_TOPIC_ID || 
   process.env.TELEGRAM_TOPIC_ID || 

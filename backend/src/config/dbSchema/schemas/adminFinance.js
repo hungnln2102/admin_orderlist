@@ -94,6 +94,12 @@ const FINANCE_SCHEMA = {
       TOTAL_SHOP_COST: "total_shop_cost",
       /** Σ((price−cost)/term) đơn MAVC/L/K/S — khớp TaxDailyFormTable metric «profit». */
       ALLOCATED_PROFIT_TAX: "allocated_profit_tax",
+      /**
+       * Đơn đếm trên biểu đồ dashboard: birth_date = ngày, status trong nhóm «đang trong sổ bán», birth ≥ tax_from (backfill).
+       */
+      DASHBOARD_ORDERS_COUNT: "dashboard_orders_count",
+      /** Đơn hủy/hoàn: canceled_at ngày, status Chưa/Đã hoàn, canceled ≥ tax_from. */
+      DASHBOARD_CANCELED_COUNT: "dashboard_canceled_count",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
     },

@@ -26,6 +26,9 @@ const {
   monthKeyFromPaidDateYmd,
 } = require("./finance/dashboardSummary");
 const {
+  notifyFinanceMonthlyDelta,
+} = require("../../services/telegramFinanceDeltaNotifier");
+const {
   completeMavnProcessingOrderPaidWithoutWebhook,
 } = require("./finance/mavnCompleteProcessingPaidWithoutWebhook");
 const logger = require("../../utils/logger");
@@ -78,6 +81,15 @@ const incrementDashboardSummaryByDelta = async (
     [monthKey, orders, revenue, profit, imp, offFlow]
   );
   await recomputeSummaryMonthTotalTax(client, monthKey);
+  await notifyFinanceMonthlyDelta({
+    monthKey,
+    revenueDelta: revenue,
+    profitDelta: profit,
+    importDelta: imp,
+    refundDelta: 0,
+    context: "manualWebhook.incrementDashboardSummaryByDelta",
+    executor: client,
+  });
 };
 
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {

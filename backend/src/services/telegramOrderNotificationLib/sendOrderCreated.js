@@ -9,7 +9,6 @@ const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   TELEGRAM_ORDER_TOPIC_ID,
-  TELEGRAM_IMPORT_ORDER_CHAT_ID,
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
   SEND_ORDER_COPY_BUTTONS,
@@ -30,9 +29,7 @@ const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendOrderCreatedNotification(order) {
   const isImport = isMavnImportOrder(order);
-  const targetChatId = isImport
-    ? TELEGRAM_IMPORT_ORDER_CHAT_ID
-    : TELEGRAM_CHAT_ID;
+  const targetChatId = TELEGRAM_CHAT_ID;
 
   logger.info("[Order][Telegram] sendOrderCreatedNotification called", {
     hasOrder: !!order,
@@ -56,7 +53,7 @@ async function sendOrderCreatedNotification(order) {
           : !TELEGRAM_BOT_TOKEN
             ? "No bot token"
             : !targetChatId
-              ? "No chat ID (TELEGRAM_CHAT_ID / TELEGRAM_IMPORT_ORDER_CHAT_ID)"
+              ? "No chat ID (TELEGRAM_CHAT_ID)"
               : "Unknown",
       SEND_ORDER_NOTIFICATION,
       hasOrder: !!order,

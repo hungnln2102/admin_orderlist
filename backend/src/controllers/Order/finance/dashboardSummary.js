@@ -4,12 +4,14 @@ const {
     tableName,
 } = require("../../../config/dbSchema");
 const { STATUS, COLS } = require("../constants");
-const { toNullableNumber } = require("../../../utils/normalizers");
+const { toNullableNumber, todayYMDInVietnam } = require("../../../utils/normalizers");
 const { quoteIdent } = require("../../../utils/sql");
 const {
     isDashboardSalesOrder,
 } = require("../../../utils/orderHelpers");
 const { dashboardMonthlyTaxRatePercent } = require("../../../config/appConfig");
+const { addDailyRevenueReversed } = require("./dailyRevenueSummaryAdjustments");
+const { notifyFinanceMonthlyDelta } = require("../../../services/telegramFinanceDeltaNotifier");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
@@ -46,16 +48,9 @@ const getMonthKey = (date) => {
     return `${year}-${month}`;
 };
 
-// Statuses that count the order as "successful" (entered lifecycle from PROCESSING onwards)
-const ORDER_COUNTED_STATUSES = [
-    STATUS.PROCESSING, STATUS.PAID, STATUS.PENDING_REFUND,
-    STATUS.REFUNDED, STATUS.EXPIRED, STATUS.RENEWAL,
-];
-
 // Statuses that count the order as a refund
 const REFUND_COUNTED_STATUSES = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
 
-const isOrderCounted = (status) => ORDER_COUNTED_STATUSES.includes(status);
 const isRefundCounted = (status) => REFUND_COUNTED_STATUSES.includes(status);
 
 const hasMeaningfulDate = (value) =>
@@ -81,14 +76,7 @@ const monthKeyFromBirthRow = (beforeRow, afterRow) => {
     return orderDate ? getMonthKey(orderDate) : null;
 };
 
-const monthKeyFromRefundRow = (beforeRow, afterRow) => {
-    const canceledRaw =
-        (afterRow && hasMeaningfulDate(afterRow.canceled_at) ? afterRow.canceled_at : null) ||
-        (beforeRow && hasMeaningfulDate(beforeRow.canceled_at) ? beforeRow.canceled_at : null);
-    const fallback = afterRow?.order_date || beforeRow?.order_date;
-    const anchor = canceledRaw || fallback;
-    return anchor ? getMonthKey(anchor) : null;
-};
+const monthKeyCurrentVietnam = () => getMonthKey(todayYMDInVietnam());
 
 /**
  * Tính lại total_tax từ total_revenue hiện tại theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT.
@@ -173,6 +161,15 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         .merge(mergeData);
 
     await recomputeSummaryMonthTotalTax(trx, monthKey);
+    await notifyFinanceMonthlyDelta({
+        monthKey,
+        revenueDelta: updates.total_revenue || 0,
+        profitDelta: updates.total_profit || 0,
+        importDelta: updates.total_import || 0,
+        refundDelta: updates.total_refund || 0,
+        context: "dashboardSummary.mergeSummaryUpdates",
+        executor: trx,
+    });
 };
 
 /**
@@ -198,14 +195,14 @@ const applyExternalImportProfitDelta = async (trx, monthKey, profitDelta) => {
 };
 
 /**
- * Cập nhật `dashboard_monthly_summary` khi đổi trạng thái đơn: **đếm hoàn / canceled** và **doanh thu**
- * khi vào luồng hoàn (Đã TT → Chưa Hoàn / Đã Hoàn), prorata `total_revenue` theo refund.
+ * Cập nhật `dashboard_monthly_summary` khi đổi trạng thái đơn:
+ * - Vào luồng hoàn (Đã TT → Chưa Hoàn / Đã Hoàn): ghi delta ngay tháng hiện tại (Model A).
+ * - `total_refund` là chỉ số tracking; doanh thu tháng đã bị trừ trực tiếp theo delta refund.
  *
  * **`total_import` (theo NCC):** `partner.fn_recalc_dashboard_total_import` sau khi `supplier_order_cost_log` thay đổi
  * (migration import-only). Webhook/manual khi Đã TT: `importDelta` chỉ khi **không** có log NCC trong
  * **tháng** `paidMonthKey` và NCC tên `mavryk` (khớp SQL); còn lại tổng ledger. **`total_profit`:** webhook Sepay / manual webhook
  * (chuyển Đã TT), chi phí MAVN (`syncMavnStoreProfitExpense`), `external_import`, v.v.
- * Khi thoát Đã TT vào luồng hoàn: hoàn tác theo `payment_receipt_financial_state` (xem `reversePostedReceiptFinancialDashboard.js`).
  */
 const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
     const prevStatus = beforeRow?.status || STATUS.UNPAID;
@@ -214,21 +211,11 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     if (prevStatus === nextStatus) return;
 
     const birthMonthKey = monthKeyFromBirthRow(beforeRow, afterRow);
-    const refundMonthKey = monthKeyFromRefundRow(beforeRow, afterRow) || birthMonthKey;
+    const refundMonthKey = monthKeyCurrentVietnam() || birthMonthKey;
 
     if (!birthMonthKey && !refundMonthKey) return;
 
     const refundUpdates = {};
-
-    let reversedPostedReceiptFinancial = false;
-    if (
-        isDashboardSalesOrder(beforeRow) &&
-        prevStatus === STATUS.PAID &&
-        isRefundCounted(nextStatus)
-    ) {
-        const { applyReversePostedReceiptDashboard } = require("./reversePostedReceiptFinancialDashboard");
-        reversedPostedReceiptFinancial = await applyReversePostedReceiptDashboard(trx, beforeRow);
-    }
 
     // Order left refund lifecycle → -1 canceled, -refund (chỉ MAVC/MAVL/MAVK/MAVS)
     if (isDashboardSalesOrder(beforeRow) && isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
@@ -237,27 +224,12 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
     }
 
-    // Vào hoàn: trừ ghi nhận giá đầy đủ ở tháng birth, cộng lại (price−refund) ở tháng canceled_at (khớp aggregate).
+    // Vào hoàn (Model A): ghi tháng hiện tại, trừ thẳng doanh thu theo refund và cộng tracking total_refund.
     if (isDashboardSalesOrder(afterRow) && prevStatus === STATUS.PAID && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
-
-        if (isOrderCounted(prevStatus) && !reversedPostedReceiptFinancial) {
-            const base = beforeRow || afterRow;
-            const price = toNullableNumber(base?.price ?? base?.[COLS.ORDER.PRICE]) || 0;
-            const remain = Math.max(0, price - refund);
-            if (birthMonthKey) {
-                await mergeSummaryUpdates(trx, birthMonthKey, {
-                    total_revenue: -price,
-                });
-            }
-            if (refundMonthKey) {
-                await mergeSummaryUpdates(trx, refundMonthKey, {
-                    total_revenue: remain,
-                });
-            }
-        }
+        refundUpdates.total_revenue = (refundUpdates.total_revenue || 0) - refund;
     }
 
     if (Object.keys(refundUpdates).length > 0 && refundMonthKey) {
@@ -268,11 +240,18 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         isDashboardSalesOrder(afterRow) &&
         prevStatus === STATUS.PAID &&
         isRefundCounted(nextStatus) &&
-        !reversedPostedReceiptFinancial &&
         refundMonthKey
     ) {
         const { applyPendingRefundProfitMinusCustomerOverNcc } = require("./pendingRefundDashboardProfitFallback");
         await applyPendingRefundProfitMinusCustomerOverNcc(trx, beforeRow, afterRow, refundMonthKey);
+
+        const refund = toNullableNumber(afterRow?.[COLS.ORDER.REFUND] ?? afterRow?.refund) || 0;
+        if (refund > 0) {
+            await addDailyRevenueReversed(trx, {
+                summaryDate: afterRow?.canceled_at || todayYMDInVietnam(),
+                amount: refund,
+            });
+        }
     }
 };
 

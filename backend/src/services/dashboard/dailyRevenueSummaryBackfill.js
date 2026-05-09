@@ -18,6 +18,20 @@ const TZ = "Asia/Ho_Chi_Minh";
 const TAX_ORDER_LIST_FROM_DEFAULT = "2026-04-22";
 const IMPORT_SPREAD_FALLBACK_DAYS_DEFAULT = 30;
 
+const orderCountedStatuses = [
+  STATUS.PROCESSING,
+  STATUS.PAID,
+  STATUS.PENDING_REFUND,
+  STATUS.REFUNDED,
+  STATUS.RENEWAL,
+  STATUS.EXPIRED,
+];
+const refundCountedStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
+
+const toSqlLiteral = (value) => `'${String(value).replace(/'/g, "''")}'`;
+const orderCountedSql = orderCountedStatuses.map(toSqlLiteral).join(", ");
+const refundCountedSql = refundCountedStatuses.map(toSqlLiteral).join(", ");
+
 const ident = (name) => {
   const s = String(name || "").trim();
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(s)) {
@@ -78,6 +92,8 @@ function buildBackfillSql({
   const exCreated = ident("created_at");
   const exType = ident("expense_type");
   const exLinked = ident("linked_order_code");
+  const cStatus = ident("status");
+  const cCanceledAt = ident("canceled_at");
 
   return `
 WITH params AS (
@@ -317,6 +333,43 @@ daily_external_import AS (
   GROUP BY 1
   HAVING SUM(COALESCE(ex.${exAmount}::numeric, 0)) > 0
 ),
+daily_dashboard_orders AS (
+  SELECT
+    no.birth_date AS day,
+    COUNT(*)::bigint AS c
+  FROM (
+    SELECT
+      COALESCE(
+        NULLIF((ol.${cCreated} AT TIME ZONE '${TZ}')::date, NULL),
+        ol.${cOrderDate}::date
+      ) AS birth_date,
+      TRIM(COALESCE(ol.${cStatus}::text, '')) AS status_value
+    FROM ${orderTable} ol
+  ) no
+  CROSS JOIN params p
+  WHERE no.birth_date IS NOT NULL
+    AND no.birth_date BETWEEN (SELECT d_from FROM params) AND (SELECT d_to FROM params)
+    AND no.birth_date >= p.tax_from
+    AND no.status_value IN (${orderCountedSql})
+  GROUP BY no.birth_date
+),
+daily_dashboard_canceled AS (
+  SELECT
+    no.cancel_day AS day,
+    COUNT(*)::bigint AS c
+  FROM (
+    SELECT
+      (ol.${cCanceledAt} AT TIME ZONE '${TZ}')::date AS cancel_day,
+      TRIM(COALESCE(ol.${cStatus}::text, '')) AS status_value
+    FROM ${orderTable} ol
+    WHERE ol.${cCanceledAt} IS NOT NULL
+  ) no
+  CROSS JOIN params p
+  WHERE no.cancel_day BETWEEN (SELECT d_from FROM params) AND (SELECT d_to FROM params)
+    AND no.cancel_day >= p.tax_from
+    AND no.status_value IN (${refundCountedSql})
+  GROUP BY no.cancel_day
+),
 merged AS (
   SELECT
     d.d AS summary_date,
@@ -324,7 +377,9 @@ merged AS (
     ROUND(COALESCE(ue.amt, 0), 2)::numeric AS unearned_revenue_end,
     COALESCE(dr.amt, 0)::numeric AS revenue_reversed,
     ROUND(COALESCE(dm.amt, 0) + COALESCE(dx.amt, 0) + COALESCE(dsc.amt, 0), 2)::numeric AS total_shop_cost,
-    ROUND(COALESCE(dtp.amt, 0), 2)::numeric AS allocated_profit_tax
+    ROUND(COALESCE(dtp.amt, 0), 2)::numeric AS allocated_profit_tax,
+    COALESCE(dob.c, 0)::bigint AS dashboard_orders_count,
+    COALESCE(dcx.c, 0)::bigint AS dashboard_canceled_count
   FROM days d
   LEFT JOIN daily_earned de ON de.day = d.d
   LEFT JOIN unearned_end ue ON ue.day = d.d
@@ -333,6 +388,8 @@ merged AS (
   LEFT JOIN daily_external_import dx ON dx.day = d.d
   LEFT JOIN daily_sales_order_cost_spread dsc ON dsc.day = d.d
   LEFT JOIN daily_tax_form_profit dtp ON dtp.day = d.d
+  LEFT JOIN daily_dashboard_orders dob ON dob.day = d.d
+  LEFT JOIN daily_dashboard_canceled dcx ON dcx.day = d.d
 )
 INSERT INTO ${summaryTable} (
   summary_date,
@@ -341,6 +398,8 @@ INSERT INTO ${summaryTable} (
   revenue_reversed,
   total_shop_cost,
   allocated_profit_tax,
+  dashboard_orders_count,
+  dashboard_canceled_count,
   created_at,
   updated_at
 )
@@ -351,6 +410,8 @@ SELECT
   m.revenue_reversed,
   m.total_shop_cost,
   m.allocated_profit_tax,
+  m.dashboard_orders_count,
+  m.dashboard_canceled_count,
   now(),
   now()
 FROM merged m
@@ -360,6 +421,8 @@ ON CONFLICT (summary_date) DO UPDATE SET
   revenue_reversed = EXCLUDED.revenue_reversed,
   total_shop_cost = EXCLUDED.total_shop_cost,
   allocated_profit_tax = EXCLUDED.allocated_profit_tax,
+  dashboard_orders_count = EXCLUDED.dashboard_orders_count,
+  dashboard_canceled_count = EXCLUDED.dashboard_canceled_count,
   updated_at = now();
 `;
 }

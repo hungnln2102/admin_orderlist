@@ -4,9 +4,10 @@
  *    hoặc: node tests/manual/run-webhook-profit-scenarios-tests.js
  * Cần: DATABASE_URL, SEPAY_API_KEY hoặc SEPAY_WEBHOOK_SECRET
  *
- * P2: hai webhook (tổng = giá − 5k) — sau webhook 1 bảng dashboard_monthly_summary
+ * P2: hai webhook (tổng = giá − 4.999) — sau webhook 1 bảng dashboard_monthly_summary
  *     phải cộng doanh thu và lợi nhuận (đúng bằng tiền lần 1, chưa trừ cost).
- * P6/P7: webhook 1 < giá; webhook 2 = 2× hoặc 3× giá — `total_import` chỉ tăng `cost` một lần.
+ * P3/P6/P7: phần chuyển khoản vượt giá bán đi vào `total_off_flow_bank_receipt`;
+ *     `total_import` chỉ tăng `cost` một lần.
  */
 require("dotenv").config();
 
@@ -213,7 +214,7 @@ async function run() {
   );
   nextOrderId = Number(maxOrderIdRes.rows[0]?.max_id || 0) + 5000;
 
-  const requiredMin = Math.max(0, PRICE - 5000);
+  const requiredMin = Math.max(0, PRICE - 4999);
 
   // P1: một webhook đúng giá bán
   {
@@ -244,7 +245,7 @@ async function run() {
     });
   }
 
-  // P2: hai webhook, cộng lại = giá − 5k (đủ requiredMin)
+  // P2: hai webhook, cộng lại = giá − 4.999 (đủ requiredMin)
   {
     const code = makeOrderCode("P2");
     await createOrder({ idOrder: code, status: STATUS.UNPAID });
@@ -263,7 +264,7 @@ async function run() {
     const deltaProfAfterFirst = afterFirst.profit - before.profit;
     results.push({
       id: "P2",
-      name: "2 webhook thiếu trong 5k (tổng = giá−5k) → sau webhook 1 đã cộng DT/LN; webhook 2 → Đã TT",
+      name: "2 webhook thiếu dưới 5k (tổng = giá−4.999) → sau webhook 1 đã cộng DT/LN; webhook 2 → Đã TT",
       ok:
         r1.status === 200 &&
         r2.status === 200 &&
@@ -298,23 +299,27 @@ async function run() {
     const r2 = await callWebhook(buildWebhookPayload("P3b", "P3B", w2, code));
     const after = await getSummary(TEST_MONTH_KEY);
     const st = await getOrderStatus(code);
-    const recv = w1 + w2;
-    const expProfit = recv - COST;
+    const recvSales = PRICE;
+    const overpay = w1 + w2 - PRICE;
+    const expProfit = recvSales - COST;
     results.push({
       id: "P3",
-      name: "2 webhook thừa 5k → Đã TT; LN = tiền nhận − giá nhập",
+      name: "2 webhook thừa 5k → Đã TT; chênh vào off-flow",
       ok:
         r1.status === 200 &&
         r2.status === 200 &&
         st === STATUS.PAID &&
-        after.revenue - before.revenue === recv &&
-        after.profit - before.profit === expProfit,
+        after.revenue - before.revenue === recvSales &&
+        after.profit - before.profit === expProfit &&
+        after.off_flow_bank_receipt - before.off_flow_bank_receipt === overpay,
       detail: {
         status: st,
         revenueDelta: after.revenue - before.revenue,
         profitDelta: after.profit - before.profit,
-        expectRevenue: recv,
+        offFlowDelta: after.off_flow_bank_receipt - before.off_flow_bank_receipt,
+        expectRevenue: recvSales,
         expectProfit: expProfit,
+        expectOffFlow: overpay,
       },
     });
   }
@@ -374,21 +379,27 @@ async function run() {
     const after = await getSummary(monthKeyLiveVN);
     const st = await getOrderStatus(code);
     const impDelta = after.importVal - before.importVal;
+    const expectedOffFlow = w1 + w2 - PRICE;
     results.push({
       id: "P6",
-      name: "Webhook 1 < giá; webhook 2 = 2× giá → TT; total_import chỉ +cost 1 lần",
+      name: "Webhook 1 < giá; webhook 2 = 2× giá → TT; chênh off-flow, total_import chỉ +cost 1 lần",
       ok:
         r1.status === 200 &&
         r2.status === 200 &&
         mid === STATUS.UNPAID &&
         st === STATUS.PAID &&
-        impDelta === COST,
+        impDelta === COST &&
+        after.revenue - before.revenue === PRICE &&
+        after.off_flow_bank_receipt - before.off_flow_bank_receipt === expectedOffFlow,
       detail: {
         statusAfterFirst: mid,
         totalImportDelta: impDelta,
         expectImportDelta: COST,
         revenueDelta: after.revenue - before.revenue,
         profitDelta: after.profit - before.profit,
+        offFlowDelta: after.off_flow_bank_receipt - before.off_flow_bank_receipt,
+        expectRevenue: PRICE,
+        expectOffFlow: expectedOffFlow,
       },
     });
   }
@@ -409,18 +420,25 @@ async function run() {
     const after = await getSummary(monthKeyLiveVN);
     const st = await getOrderStatus(code);
     const impDelta = after.importVal - before.importVal;
+    const expectedOffFlow = w1 + w2 - PRICE;
     results.push({
       id: "P7",
-      name: "Webhook 1 nhỏ; webhook 2 = 3× giá → TT; total_import chỉ +cost 1 lần",
+      name: "Webhook 1 nhỏ; webhook 2 = 3× giá → TT; chênh off-flow, total_import chỉ +cost 1 lần",
       ok:
         r1.status === 200 &&
         r2.status === 200 &&
         st === STATUS.PAID &&
-        impDelta === COST,
+        impDelta === COST &&
+        after.revenue - before.revenue === PRICE &&
+        after.off_flow_bank_receipt - before.off_flow_bank_receipt === expectedOffFlow,
       detail: {
         totalImportDelta: impDelta,
         expectImportDelta: COST,
         status: st,
+        revenueDelta: after.revenue - before.revenue,
+        offFlowDelta: after.off_flow_bank_receipt - before.off_flow_bank_receipt,
+        expectRevenue: PRICE,
+        expectOffFlow: expectedOffFlow,
       },
     });
   }

@@ -1,6 +1,7 @@
 const { db } = require("../../db");
 const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
 const { isGiftOrder } = require("../../utils/orderHelpers");
+const { STATUS, COLS } = require("./constants");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -87,6 +88,27 @@ const updateOrderWithFinance = async ({
     try {
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
         await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
+
+        const prevStatus = String(beforeOrder?.[COLS.ORDER.STATUS] ?? beforeOrder?.status ?? "").trim();
+        const nextStatus = String(updatedOrder?.[COLS.ORDER.STATUS] ?? updatedOrder?.status ?? "").trim();
+        const enteredRefundLifecycle =
+            prevStatus !== STATUS.PENDING_REFUND &&
+            prevStatus !== STATUS.REFUNDED &&
+            (nextStatus === STATUS.PENDING_REFUND || nextStatus === STATUS.REFUNDED);
+        if (enteredRefundLifecycle) {
+            const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
+            const refundAmount = Number(updatedOrder?.[COLS.ORDER.REFUND] ?? updatedOrder?.refund) || 0;
+            if (refundAmount > 0) {
+                await createOrGetRefundCreditNoteForOrder(trx, {
+                    sourceOrderListId: updatedOrder?.[COLS.ORDER.ID] ?? updatedOrder?.id,
+                    sourceOrderCode: updatedOrder?.[COLS.ORDER.ID_ORDER] ?? updatedOrder?.id_order,
+                    customerName: updatedOrder?.[COLS.ORDER.CUSTOMER] ?? updatedOrder?.customer,
+                    customerContact: updatedOrder?.[COLS.ORDER.CONTACT] ?? updatedOrder?.contact,
+                    refundAmount,
+                    note: `Tạo tự động khi đơn chuyển ${nextStatus}`,
+                });
+            }
+        }
     } catch (debtErr) {
         logger.error("Lỗi cập nhật finance/dashboard sau khi sửa đơn", {
             id,

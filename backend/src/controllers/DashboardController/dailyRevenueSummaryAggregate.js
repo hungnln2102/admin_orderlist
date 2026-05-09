@@ -36,6 +36,52 @@ async function hasAllocatedProfitTaxColumn() {
   return cachedHasAllocatedProfitTax;
 }
 
+/** Migration 098 — đếm đơn biểu đồ từ snapshot (mốc ≥ tax trong backfill). */
+let cachedHasDashboardOrderCounts;
+
+async function hasDashboardOrderCountColumns() {
+  if (cachedHasDashboardOrderCounts !== undefined) {
+    return cachedHasDashboardOrderCounts;
+  }
+  const row = await db("information_schema.columns")
+    .where({
+      table_schema: SCHEMA_FINANCE,
+      table_name: FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.TABLE,
+      column_name: col.DASHBOARD_ORDERS_COUNT,
+    })
+    .first("column_name");
+  cachedHasDashboardOrderCounts = !!row;
+  return cachedHasDashboardOrderCounts;
+}
+
+function selectDashboardOrdersSum(hasCol) {
+  if (hasCol) {
+    return db.raw(`COALESCE(SUM(??), 0)::bigint AS dashboard_orders`, [
+      col.DASHBOARD_ORDERS_COUNT,
+    ]);
+  }
+  return db.raw(`0::bigint AS dashboard_orders`);
+}
+
+function selectDashboardCanceledSum(hasCol) {
+  if (hasCol) {
+    return db.raw(`COALESCE(SUM(??), 0)::bigint AS dashboard_canceled`, [
+      col.DASHBOARD_CANCELED_COUNT,
+    ]);
+  }
+  return db.raw(`0::bigint AS dashboard_canceled`);
+}
+
+function selectDashboardOrdersScalar(hasCol) {
+  if (hasCol) return col.DASHBOARD_ORDERS_COUNT;
+  return db.raw(`0::bigint AS dashboard_orders_count`);
+}
+
+function selectDashboardCanceledScalar(hasCol) {
+  if (hasCol) return col.DASHBOARD_CANCELED_COUNT;
+  return db.raw(`0::bigint AS dashboard_canceled_count`);
+}
+
 function selectAllocatedProfitSum(hasCol) {
   if (hasCol) {
     return db.raw(`COALESCE(SUM(??), 0) AS allocated_profit_tax`, [
@@ -78,6 +124,7 @@ async function sumDailyKpisForRange(fromYmd, toYmd) {
  */
 async function dailyRowMapBetween(fromYmd, toYmd) {
   const hasAlloc = await hasAllocatedProfitTaxColumn();
+  const hasDash = await hasDashboardOrderCountColumns();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -86,7 +133,9 @@ async function dailyRowMapBetween(fromYmd, toYmd) {
       col.EARNED_REVENUE,
       col.REVENUE_REVERSED,
       col.TOTAL_SHOP_COST,
-      selectAllocatedProfitScalar(hasAlloc)
+      selectAllocatedProfitScalar(hasAlloc),
+      selectDashboardOrdersScalar(hasDash),
+      selectDashboardCanceledScalar(hasDash)
     );
   const map = new Map();
   for (const r of rows || []) {
@@ -100,10 +149,11 @@ async function dailyRowMapBetween(fromYmd, toYmd) {
 
 /**
  * Gộp theo tháng lịch (YYYY-MM) trong [from, to].
- * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number }>>}
+ * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number, dashboardOrders: number, dashboardCanceled: number }>>}
  */
 async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
   const hasAlloc = await hasAllocatedProfitTaxColumn();
+  const hasDash = await hasDashboardOrderCountColumns();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -111,7 +161,9 @@ async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
       db.raw(`COALESCE(SUM(??), 0) AS earned`, [col.EARNED_REVENUE]),
       db.raw(`COALESCE(SUM(??), 0) AS reversed`, [col.REVENUE_REVERSED]),
       db.raw(`COALESCE(SUM(??), 0) AS shop_cost`, [col.TOTAL_SHOP_COST]),
-      selectAllocatedProfitSum(hasAlloc)
+      selectAllocatedProfitSum(hasAlloc),
+      selectDashboardOrdersSum(hasDash),
+      selectDashboardCanceledSum(hasDash)
     )
     .groupByRaw(`to_char(??::date, 'YYYY-MM')`, [col.SUMMARY_DATE]);
 
@@ -124,6 +176,8 @@ async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
       reversed: toNumber(r.reversed),
       shopCost: toNumber(r.shop_cost),
       allocatedProfitTax: toNumber(r.allocated_profit_tax),
+      dashboardOrders: toNumber(r.dashboard_orders),
+      dashboardCanceled: toNumber(r.dashboard_canceled),
     });
   }
   return map;
@@ -131,10 +185,11 @@ async function sumDailyByMonthKeyBetween(fromYmd, toYmd) {
 
 /**
  * Gộp theo năm lịch (YYYY) trong [from, to].
- * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number }>>}
+ * @returns {Promise<Map<string, { earned: number, reversed: number, shopCost: number, allocatedProfitTax: number, dashboardOrders: number, dashboardCanceled: number }>>}
  */
 async function sumDailyByYearKeyBetween(fromYmd, toYmd) {
   const hasAlloc = await hasAllocatedProfitTaxColumn();
+  const hasDash = await hasDashboardOrderCountColumns();
   const rows = await db(dailyTableName)
     .whereBetween(col.SUMMARY_DATE, [fromYmd, toYmd])
     .select(
@@ -142,7 +197,9 @@ async function sumDailyByYearKeyBetween(fromYmd, toYmd) {
       db.raw(`COALESCE(SUM(??), 0) AS earned`, [col.EARNED_REVENUE]),
       db.raw(`COALESCE(SUM(??), 0) AS reversed`, [col.REVENUE_REVERSED]),
       db.raw(`COALESCE(SUM(??), 0) AS shop_cost`, [col.TOTAL_SHOP_COST]),
-      selectAllocatedProfitSum(hasAlloc)
+      selectAllocatedProfitSum(hasAlloc),
+      selectDashboardOrdersSum(hasDash),
+      selectDashboardCanceledSum(hasDash)
     )
     .groupByRaw(`to_char(??::date, 'YYYY')`, [col.SUMMARY_DATE]);
 
@@ -155,6 +212,8 @@ async function sumDailyByYearKeyBetween(fromYmd, toYmd) {
       reversed: toNumber(r.reversed),
       shopCost: toNumber(r.shop_cost),
       allocatedProfitTax: toNumber(r.allocated_profit_tax),
+      dashboardOrders: toNumber(r.dashboard_orders),
+      dashboardCanceled: toNumber(r.dashboard_canceled),
     });
   }
   return map;

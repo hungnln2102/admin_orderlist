@@ -18,15 +18,16 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const TELEGRAM_ORDER_TOPIC_ID = parseOptionalTopicId(
   process.env.TELEGRAM_ORDER_TOPIC_ID
 );
-/** MAVN: chat riêng (vd https://t.me/c/2934465528/4187 → -1002934465528). Trống = dùng TELEGRAM_CHAT_ID. */
-const TELEGRAM_IMPORT_ORDER_CHAT_ID_RAW = (
-  process.env.TELEGRAM_IMPORT_ORDER_CHAT_ID || ""
-).trim();
-const TELEGRAM_IMPORT_ORDER_CHAT_ID =
-  TELEGRAM_IMPORT_ORDER_CHAT_ID_RAW || TELEGRAM_CHAT_ID;
 const TELEGRAM_IMPORT_ORDER_TOPIC_ID = parseOptionalTopicId(
   process.env.TELEGRAM_IMPORT_ORDER_TOPIC_ID
 );
+/** Topic tài chính dashboard: link dạng https://t.me/c/<chat-id>/<topic-id>. */
+const TELEGRAM_FINANCE_TOPIC_ID = parseOptionalTopicId(
+  process.env.TELEGRAM_FINANCE_TOPIC_ID || "7009"
+);
+const SEND_FINANCE_DELTA_NOTIFICATION =
+  String(process.env.SEND_FINANCE_DELTA_NOTIFICATION ?? "true").toLowerCase() !==
+  "false";
 const SEND_ORDER_NOTIFICATION =
   String(process.env.SEND_ORDER_NOTIFICATION || "true").toLowerCase() !== "false";
 /** Gửi đơn mới vào topic forum (message_thread_id). Tách khỏi SEND_ORDER_NOTIFICATION. */
@@ -54,8 +55,9 @@ module.exports = {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   TELEGRAM_ORDER_TOPIC_ID,
-  TELEGRAM_IMPORT_ORDER_CHAT_ID,
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
+  TELEGRAM_FINANCE_TOPIC_ID,
+  SEND_FINANCE_DELTA_NOTIFICATION,
   SEND_ORDER_NOTIFICATION,
   SEND_ORDER_TO_TOPIC,
   QR_ACCOUNT_NUMBER,

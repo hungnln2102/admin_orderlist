@@ -7,12 +7,7 @@ const {
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
 const { fetchAvailableProfitPair } = require("./availableProfitFromSummary");
 const {
-  buildRangeDailyChartQuery,
   buildOrderCountBirthInRangeQuery,
-  buildOrderCountsByBirthYmInRangeQuery,
-  buildOrderCountsByBirthYearInRangeQuery,
-  buildCanceledCountsByCanceledYmInRangeQuery,
-  buildCanceledCountsByCanceledYearInRangeQuery,
 } = require("./dashboardSummaryAggregate");
 const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
 const {
@@ -37,6 +32,17 @@ const inclusiveDaySpan = (fromStr, toStr) => {
   const from = parseYMDLocal(fromStr);
   const to = parseYMDLocal(toStr);
   return Math.round((to - from) / MS_PER_DAY) + 1;
+};
+
+const listIsoDaysInclusive = (fromStr, toStr) => {
+  const out = [];
+  const start = parseYMDLocal(fromStr);
+  const end = parseYMDLocal(toStr);
+  if (start > end) return out;
+  for (let t = start.getTime(); t <= end.getTime(); t += MS_PER_DAY) {
+    out.push(toYMDDate(new Date(t)));
+  }
+  return out;
 };
 
 /** Khoảng [from,to] trùng đúng một tháng lịch (01 → ngày cuối tháng) — gom biểu đồ theo tháng, không tách từng ngày. */
@@ -276,17 +282,9 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       daySpan <= DASHBOARD_CHART_RANGE_DAY_MAX);
 
   if (useDailyBuckets) {
-    let useCreatedAt = true;
-    try {
-      useCreatedAt = await orderListHasCreatedAtColumn();
-    } catch {
-      useCreatedAt = true;
-    }
-    const sql = buildRangeDailyChartQuery({ useCreatedAt });
-    const r = await db.raw(sql, [from, to]);
     const drMap = await dailyRowMapBetween(from, to);
-    const months = (r.rows || []).map((row) => {
-      const dayIso = String(row.day_iso || "").trim().slice(0, 10);
+    const daysList = listIsoDaysInclusive(from, to);
+    const months = daysList.map((dayIso) => {
       const dr = drMap.get(dayIso);
       const earned = dr ? toNumber(dr[dailyRevCols.EARNED_REVENUE]) : 0;
       const rev = dr ? toNumber(dr[dailyRevCols.REVENUE_REVERSED]) : 0;
@@ -299,8 +297,12 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
         month: formatChartDayLabel(dayIso),
         month_num: 0,
         month_key: dayIso,
-        total_orders: toNumber(row.total_orders),
-        total_canceled: toNumber(row.total_canceled),
+        total_orders: dr
+          ? toNumber(dr[dailyRevCols.DASHBOARD_ORDERS_COUNT])
+          : 0,
+        total_canceled: dr
+          ? toNumber(dr[dailyRevCols.DASHBOARD_CANCELED_COUNT])
+          : 0,
         total_revenue: earned,
         total_profit: allocProfit,
         total_refund: rev,
@@ -327,27 +329,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       };
     }
 
-    let useCreatedAtY = true;
-    try {
-      useCreatedAtY = await orderListHasCreatedAtColumn();
-    } catch {
-      useCreatedAtY = true;
-    }
-
-    const [ordY, canY, finByYk] = await Promise.all([
-      db.raw(buildOrderCountsByBirthYearInRangeQuery({ useCreatedAt: useCreatedAtY }), [
-        from,
-        to,
-      ]),
-      db.raw(buildCanceledCountsByCanceledYearInRangeQuery(), [from, to]),
-      sumDailyByYearKeyBetween(from, to),
-    ]);
-    const ordByYk = new Map(
-      (ordY.rows || []).map((r) => [String(r.yk || "").trim(), toNumber(r.c)])
-    );
-    const canByYk = new Map(
-      (canY.rows || []).map((r) => [String(r.yk || "").trim(), toNumber(r.c)])
-    );
+    const finByYk = await sumDailyByYearKeyBetween(from, to);
 
     const months = yearKeys.map((yk) => {
       const f = finByYk.get(yk) || {
@@ -355,6 +337,8 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
         reversed: 0,
         shopCost: 0,
         allocatedProfitTax: 0,
+        dashboardOrders: 0,
+        dashboardCanceled: 0,
       };
       const yn = parseInt(yk, 10);
       const earned = f.earned;
@@ -365,8 +349,8 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
         month: yk,
         month_num: Number.isFinite(yn) ? yn : 0,
         month_key: yk,
-        total_orders: ordByYk.get(yk) || 0,
-        total_canceled: canByYk.get(yk) || 0,
+        total_orders: f.dashboardOrders,
+        total_canceled: f.dashboardCanceled,
         total_revenue: earned,
         total_profit: f.allocatedProfitTax,
         total_refund: rev,
@@ -394,27 +378,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
     };
   }
 
-  let useCreatedAtChart = true;
-  try {
-    useCreatedAtChart = await orderListHasCreatedAtColumn();
-  } catch {
-    useCreatedAtChart = true;
-  }
-
-  const [ordRows, canRows, finByMk] = await Promise.all([
-    db.raw(buildOrderCountsByBirthYmInRangeQuery({ useCreatedAt: useCreatedAtChart }), [
-      from,
-      to,
-    ]),
-    db.raw(buildCanceledCountsByCanceledYmInRangeQuery(), [from, to]),
-    sumDailyByMonthKeyBetween(from, to),
-  ]);
-  const ordByMk = new Map(
-    (ordRows.rows || []).map((r) => [String(r.mk || "").trim(), toNumber(r.c)])
-  );
-  const canByMk = new Map(
-    (canRows.rows || []).map((r) => [String(r.mk || "").trim(), toNumber(r.c)])
-  );
+  const finByMk = await sumDailyByMonthKeyBetween(from, to);
 
   const months = monthKeys.map((mk) => {
     const f = finByMk.get(mk) || {
@@ -422,6 +386,8 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       reversed: 0,
       shopCost: 0,
       allocatedProfitTax: 0,
+      dashboardOrders: 0,
+      dashboardCanceled: 0,
     };
     const [ys, ms] = mk.split("-");
     const monthNum = parseInt(ms, 10);
@@ -434,8 +400,8 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       month: `T${monthNum}/${yearNum}`,
       month_num: monthNum,
       month_key: mk,
-      total_orders: ordByMk.get(mk) || 0,
-      total_canceled: canByMk.get(mk) || 0,
+      total_orders: f.dashboardOrders,
+      total_canceled: f.dashboardCanceled,
       total_revenue: earned,
       total_profit: f.allocatedProfitTax,
       total_refund: rev,

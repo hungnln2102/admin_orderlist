@@ -20,8 +20,9 @@ const sumNccRefundAmountForOrder = async (trx, orderListId) => {
 };
 
 /**
- * Khi đơn Đã TT → Chưa hoàn mà **không** hoàn tác được qua `payment_receipt_financial_state`
- * (legacy / thiếu posted): trừ `total_profit` tháng hoàn theo LN phải gánh: hoàn khách − tổng hoàn NCC trên log.
+ * Profit delta khi đơn chuyển hoàn theo công thức:
+ *   profit_delta_refund = -(refund_amount - ncc_refund_amount)
+ *                       = ncc_refund_amount - refund_amount
  */
 const applyPendingRefundProfitMinusCustomerOverNcc = async (
     trx,
@@ -37,10 +38,9 @@ const applyPendingRefundProfitMinusCustomerOverNcc = async (
 
     const orderId = beforeRow?.[COLS.ORDER.ID] ?? beforeRow?.id;
     const nccSum = await sumNccRefundAmountForOrder(trx, orderId);
-    const delta = Math.max(0, customerRef - nccSum);
-    if (delta <= 0) return;
-
-    await mergeSummaryUpdates(trx, refundMonthKey, { total_profit: -delta });
+    const profitDeltaRefund = Number(nccSum) - Number(customerRef);
+    if (!Number.isFinite(profitDeltaRefund) || profitDeltaRefund === 0) return;
+    await mergeSummaryUpdates(trx, refundMonthKey, { total_profit: profitDeltaRefund });
 };
 
 module.exports = {

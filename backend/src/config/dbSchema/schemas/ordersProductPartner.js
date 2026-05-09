@@ -153,6 +153,8 @@ const PARTNER_SCHEMA = {
       SUPPLIER_NAME: "supplier_name",
       NUMBER_BANK: "number_bank",
       BIN_BANK: "bin_bank",
+      /** Chủ TK (VietQR); runtime vẫn kiểm tra information_schema trước khi SELECT/INSERT */
+      ACCOUNT_HOLDER: "account_holder",
       ACTIVE_SUPPLY: "active_supply",
     },
   },

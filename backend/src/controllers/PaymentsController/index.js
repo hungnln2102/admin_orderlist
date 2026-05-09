@@ -20,6 +20,12 @@ const {
   updateDashboardMonthlySummaryOnStatusChange,
   recomputeSummaryMonthTotalTax,
 } = require("../Order/finance/dashboardSummary");
+const {
+  notifyFinanceMonthlyDelta,
+} = require("../../services/telegramFinanceDeltaNotifier");
+const {
+  computeDashboardPaymentDecision,
+} = require("../Order/finance/dashboardPaymentPostingPolicy");
 const { syncMavnStoreProfitExpense } = require("../Order/orderFinanceHelpers");
 const { runRenewal } = require("../../../webhook/sepay/renewal");
 
@@ -159,6 +165,15 @@ const applyDashboardDelta = async (
     [monthKey, orders, revenue, profit, offFlow]
   );
   await recomputeSummaryMonthTotalTax(trx, monthKey);
+  await notifyFinanceMonthlyDelta({
+    monthKey,
+    revenueDelta: revenue,
+    profitDelta: profit,
+    importDelta: 0,
+    refundDelta: 0,
+    context: "payments.applyDashboardDelta",
+    executor: trx,
+  });
 };
 
 const listPaymentReceipts = async (req, res) => {
@@ -647,14 +662,22 @@ const reconcilePaymentReceipt = async (req, res) => {
         .sum({ total_receipts: aAmtCol })
         .first();
       const totalReceiptsForOrderVnd = normalizeMoney(sumRes?.total_receipts);
+      const receiptAmtForDecision = normalizeMoney(
+        receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]
+      );
+      const paymentDecision = computeDashboardPaymentDecision({
+        orderPrice: orderSellingPriceVnd,
+        currentAmount: receiptAmtForDecision,
+        accumulatedAmount: totalReceiptsForOrderVnd,
+        creditAppliedAmount: 0,
+      });
       // Giá bán 0/âm: giữ hành vi cũ (tự nâng mark paid nếu đơn Chưa Thanh Toán với luồng only).
       const paidAmountCoversOrder =
-        orderSellingPriceVnd <= 0
-          ? true
-          : totalReceiptsForOrderVnd >= orderSellingPriceVnd;
+        orderSellingPriceVnd <= 0 ? true : paymentDecision.complete;
 
       // Mặc định luồng "Sửa mã đơn" (reconcile_only) tự mark paid nếu đơn Chưa Thanh Toán
-      // *và* tổng biên lai gắn mã (kể cả lần này) >= giá bán. Tránh đưa "Đã Thanh Toán" khi thiếu tiền.
+      // và tổng biên lai gắn mã đủ theo policy thiếu < 5.000 VND. Tránh đưa "Đã Thanh Toán"
+      // khi thiếu đúng 5.000 VND trở lên.
       let effectiveAction = requestedAction;
       if (requestedAction === RECONCILE_ACTIONS.ONLY) {
         if (statusValueInitial === STATUS.UNPAID && paidAmountCoversOrder) {
@@ -696,6 +719,10 @@ const reconcilePaymentReceipt = async (req, res) => {
         const postedOffFlowBankReceipt =
           Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
         const receiptAmt = normalizeMoney(receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]);
+        const recognizedRevenue = normalizeMoney(
+          paymentDecision.recognizedRevenueCurrent
+        );
+        const offFlowForReceipt = normalizeMoney(paymentDecision.offFlowCurrent);
 
         if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
           // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
@@ -705,9 +732,9 @@ const reconcilePaymentReceipt = async (req, res) => {
         } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
           const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
           if (postedOffFlowBankReceipt > 0) {
-            revenueDelta = receiptAmt;
-            profitDelta = receiptAmt - cost;
-            offFlowDelta = -postedOffFlowBankReceipt;
+            revenueDelta = recognizedRevenue;
+            profitDelta = recognizedRevenue - cost;
+            offFlowDelta = offFlowForReceipt - postedOffFlowBankReceipt;
           } else {
             // Legacy: receipt không mã đã cộng thẳng DT/LN — chỉ chỉnh LN − cost.
             profitDelta = -cost;
@@ -754,6 +781,16 @@ const reconcilePaymentReceipt = async (req, res) => {
               postedRevenue: nextPostedRevenue,
               postedProfit: nextPostedProfit,
               postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
+              orderSellingPriceVnd,
+              receiptAmount: receiptAmt,
+              totalReceiptsForOrderVnd,
+              requiredMin: paymentDecision.requiredMin,
+              maxAcceptedShortfall: paymentDecision.maxAcceptedShortfall,
+              shortfallAmount: paymentDecision.shortfallAmount,
+              recognized_revenue_current: recognizedRevenue,
+              off_flow_current: offFlowForReceipt,
+              off_flow_source_order_code:
+                offFlowForReceipt > 0 ? orderCodeRaw : undefined,
               orderStatus: statusValue,
               action: effectiveAction,
             }),

@@ -44,6 +44,7 @@ const pricingTierRoutes = require("../domains/pricing-tiers/routes");
 const storeProfitExpensesRoutes = require("../domains/store-profit-expenses/routes");
 const ipWhitelistRoutes = require("../domains/ip-whitelist/routes");
 const siteMaintenanceRoutes = require("../domains/site-maintenance/routes");
+const ninerouterRoutes = require("../domains/ninerouter/routes");
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
   res.setTimeout(ms);
@@ -74,6 +75,8 @@ router.use("/public/pricing", publicPricingRoutes);
 
 router.use(authGuard);
 
+/** Proxy OpenAI-compatible tới 9Router — cần NINEROUTER_URL (+ NINEROUTER_KEY nếu bật API key). */
+router.use("/ninerouter", longTimeout(600_000), ninerouterRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
 router.use("/renew-adobe", longTimeout(900_000), renewAdobeMount);

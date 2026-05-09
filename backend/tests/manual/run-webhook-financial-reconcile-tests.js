@@ -465,12 +465,12 @@ async function run() {
   const c6State = await getReceiptState(c6Receipt.id);
   results.push({
     id: "C6",
-    name: "Reconcile receipt khong ma vao don UNPAID",
+    name: "Reconcile receipt khong ma vao don UNPAID: chi gia ban vao DT/LN, chenhlech off-flow",
     ok:
       c6Recon.statusCode === 200 &&
-      c6After.revenue - c6Before.revenue === 280000 &&
-      c6After.profit - c6Before.profit === 230000 &&
-      c6After.off_flow_bank_receipt - c6Before.off_flow_bank_receipt === -280000 &&
+      c6After.revenue - c6Before.revenue === 130000 &&
+      c6After.profit - c6Before.profit === 80000 &&
+      c6After.off_flow_bank_receipt - c6Before.off_flow_bank_receipt === -130000 &&
       !!c6State?.adjustment_applied,
     detail: {
       httpStatus: c6Recon.statusCode,
@@ -579,9 +579,9 @@ async function run() {
     name: "Reconcile + mark paid cho don UNPAID",
     ok:
       c10Recon.statusCode === 200 &&
-      c10After.revenue - c10Before.revenue === 300000 &&
-      c10After.profit - c10Before.profit === 220000 &&
-      c10After.off_flow_bank_receipt - c10Before.off_flow_bank_receipt === -300000 &&
+      c10After.revenue - c10Before.revenue === 210000 &&
+      c10After.profit - c10Before.profit === 130000 &&
+      c10After.off_flow_bank_receipt - c10Before.off_flow_bank_receipt === -210000 &&
       String(c10OrderRow.rows?.[0]?.status || "") === STATUS.PAID,
     detail: {
       httpStatus: c10Recon.statusCode,
@@ -623,9 +623,9 @@ async function run() {
     ok:
       c11Recon.statusCode === 200 &&
       !!c11Recon.body?.renewalSuccess &&
-      c11After.revenue - c11Before.revenue === 320000 &&
-      c11After.profit - c11Before.profit === 230000 &&
-      c11After.off_flow_bank_receipt - c11Before.off_flow_bank_receipt === -320000 &&
+      c11After.revenue - c11Before.revenue === 220000 &&
+      c11After.profit - c11Before.profit === 130000 &&
+      c11After.off_flow_bank_receipt - c11Before.off_flow_bank_receipt === -220000 &&
       String(c11OrderRow.rows?.[0]?.status || "") === STATUS.PROCESSING,
     detail: {
       httpStatus: c11Recon.statusCode,
