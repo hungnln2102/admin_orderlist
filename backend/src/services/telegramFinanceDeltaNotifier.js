@@ -50,19 +50,30 @@ const buildFinanceDeltaMessage = ({
   profitDelta = 0,
   importDelta = 0,
   refundDelta = 0,
+  taxMonth = null,
+  offFlowMonth = null,
   availableProfit = null,
   context = "",
 }) => {
   const lines = [
-    `--------------Biến Động Tháng ${String(monthKey || "")}-------------------`,
-    `Doanh Thu Tháng: ${formatVnd(revenueDelta)}`,
-    `Lợi Nhuận Tháng: ${formatVnd(profitDelta)}`,
-    `Nhập Hàng Tháng: ${formatVnd(importDelta)}`,
-    `Hoàn Tiền Tháng: ${formatVnd(refundDelta)}`,
-    "-------------------Tiền Banking---------------------",
-    `Lợi Nhuận Khả Dụng: ${
+    `━━━━━━━━━━━━ BIẾN ĐỘNG THÁNG ${String(monthKey || "")} ━━━━━━━━━━━━`,
+    ``,
+    `📊 Doanh Thu Tháng      : ${formatVnd(revenueDelta)}`,
+    `💰 Lợi Nhuận Tháng     : ${formatVnd(profitDelta)}`,
+    `📦 Nhập Hàng Tháng     : ${formatVnd(importDelta)}`,
+    `↩️ Hoàn Tiền Tháng     : ${formatVnd(refundDelta)}`,
+    `🧾 Tiền Thuế Tháng     : ${taxMonth == null ? "N/A" : formatVnd(taxMonth)}`,
+    ``,
+    `━━━━━━━━━━━━ TIỀN BANKING ━━━━━━━━━━━━`,
+    ``,
+    `💸 Tiền Ngoài Luồng     : ${
+      offFlowMonth == null ? "N/A" : formatVnd(offFlowMonth)
+    }`,
+    `🏦 Lợi Nhuận Khả Dụng  : ${
       availableProfit == null ? "N/A" : formatVnd(availableProfit)
     }`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
   ];
   if (context) lines.push(`Nguồn: ${String(context).trim()}`);
   return lines.join("\n");
@@ -81,6 +92,20 @@ const fetchAvailableProfit = async (executor) => {
     ["withdraw_profit"]
   );
   return toNumber(profitRow?.total_profit) - toNumber(withdrawRow?.total_withdraw);
+};
+
+const fetchMonthlySnapshot = async (executor, monthKey) => {
+  if (!monthKey) return null;
+  return queryOne(
+    executor,
+    `SELECT
+      COALESCE(${monthlyCols.TOTAL_TAX}::numeric, 0) AS total_tax,
+      COALESCE(${monthlyCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt
+     FROM ${monthlySummaryTable}
+     WHERE ${monthlyCols.MONTH_KEY} = $1
+     LIMIT 1`,
+    [monthKey]
+  );
 };
 
 const notifyFinanceMonthlyDelta = async ({
@@ -102,7 +127,10 @@ const notifyFinanceMonthlyDelta = async ({
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
 
   try {
-    const availableProfit = await fetchAvailableProfit(executor).catch(() => null);
+    const [availableProfit, monthlySnapshot] = await Promise.all([
+      fetchAvailableProfit(executor).catch(() => null),
+      fetchMonthlySnapshot(executor, monthKey).catch(() => null),
+    ]);
     const payload = {
       chat_id: TELEGRAM_CHAT_ID,
       text: buildFinanceDeltaMessage({
@@ -111,6 +139,8 @@ const notifyFinanceMonthlyDelta = async ({
         profitDelta: profit,
         importDelta: imp,
         refundDelta: refund,
+        taxMonth: toNumber(monthlySnapshot?.total_tax),
+        offFlowMonth: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
         availableProfit,
         context,
       }),
