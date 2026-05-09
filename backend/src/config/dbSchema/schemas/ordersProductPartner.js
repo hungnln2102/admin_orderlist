@@ -203,11 +203,12 @@ const PRICING_TIER_SCHEMA = {
     },
   },
   VARIANT_MARGIN: {
-    TABLE: "variant_margin",
+    TABLE: "variant_price",
     COLS: {
       VARIANT_ID: "variant_id",
       TIER_ID: "tier_id",
       MARGIN_RATIO: "margin_ratio",
+      PRICE: "price",
     },
   },
 };
