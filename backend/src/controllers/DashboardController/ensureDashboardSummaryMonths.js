@@ -52,7 +52,7 @@ const buildMinimalMonthRowFromReceipts = async (executor, monthKey) => {
     [summaryCols.TOTAL_PROFIT]: Number(nccMap.get(monthKey)) || 0,
     [summaryCols.TOTAL_REFUND]: refund,
     [summaryCols.TOTAL_IMPORT]: Number(impMap.get(monthKey)) || 0,
-    [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
+    [summaryCols.TOTAL_TAX]: taxOnNet(rev),
     [summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]: 0,
     [summaryCols.UPDATED_AT]: executor.raw("now()"),
   };

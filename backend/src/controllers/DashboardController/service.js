@@ -189,16 +189,14 @@ const fetchDashboardStats = async () => {
   const revP = toNumber(trP?.[summaryCols.TOTAL_REVENUE]);
   const importC = toNumber(trC?.[summaryCols.TOTAL_IMPORT]);
   const importP = toNumber(trP?.[summaryCols.TOTAL_IMPORT]);
-  const netC = revC - curr.total_refund;
-  const netP = revP - prev.total_refund;
   const marginC = trC
     ? toNumber(trC[summaryCols.TOTAL_PROFIT])
-    : netC - importC;
+    : revC - importC;
   const marginP = trP
     ? toNumber(trP[summaryCols.TOTAL_PROFIT])
-    : netP - importP;
-  const taxC = trC ? toNumber(trC[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(netC);
-  const taxP = trP ? toNumber(trP[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(netP);
+    : revP - importP;
+  const taxC = trC ? toNumber(trC[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(revC);
+  const taxP = trP ? toNumber(trP[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(revP);
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
@@ -259,8 +257,8 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
       previous: prevKpi.allocatedProfitTax,
     },
     monthlyTax: {
-      current: taxFromRevenueValue(currKpi.earned - currKpi.reversed),
-      previous: taxFromRevenueValue(prevKpi.earned - prevKpi.reversed),
+      current: taxFromRevenueValue(currKpi.earned),
+      previous: taxFromRevenueValue(prevKpi.earned),
     },
     availableProfit,
     range: { from, to, previousFrom: p0, previousTo: p1 },
@@ -292,7 +290,6 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       const allocProfit = dr
         ? toNumber(dr[dailyRevCols.ALLOCATED_PROFIT_TAX])
         : 0;
-      const net = earned - rev;
       return {
         month: formatChartDayLabel(dayIso),
         month_num: 0,
@@ -307,7 +304,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
         total_profit: allocProfit,
         total_refund: rev,
         total_import: cost,
-        total_tax: taxFromRevenueValue(net),
+        total_tax: taxFromRevenueValue(earned),
       };
     });
     return {
@@ -344,7 +341,6 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       const earned = f.earned;
       const rev = f.reversed;
       const cost = f.shopCost;
-      const net = earned - rev;
       return {
         month: yk,
         month_num: Number.isFinite(yn) ? yn : 0,
@@ -355,7 +351,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
         total_profit: f.allocatedProfitTax,
         total_refund: rev,
         total_import: cost,
-        total_tax: taxFromRevenueValue(net),
+        total_tax: taxFromRevenueValue(earned),
       };
     });
 
@@ -395,7 +391,6 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
     const earned = f.earned;
     const rev = f.reversed;
     const cost = f.shopCost;
-    const net = earned - rev;
     return {
       month: `T${monthNum}/${yearNum}`,
       month_num: monthNum,
@@ -406,7 +401,7 @@ const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
       total_profit: f.allocatedProfitTax,
       total_refund: rev,
       total_import: cost,
-      total_tax: taxFromRevenueValue(net),
+      total_tax: taxFromRevenueValue(earned),
     };
   });
 
@@ -516,7 +511,7 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       total_tax:
         taxStored != null && Number.isFinite(taxStored)
           ? taxStored
-          : taxFromRevenueValue(revenue - refund),
+          : taxFromRevenueValue(revenue),
     });
   }
 

@@ -46,9 +46,10 @@ const toNumber = (value) => Number(value || 0);
 const importLoggedAtMonthKeySql = (alias, loggedAtIdent) =>
   `to_char(timezone('Asia/Ho_Chi_Minh', ${alias}.${loggedAtIdent}), 'YYYY-MM')`;
 
-const taxOnNet = (sepay, refund) =>
+// Tên export giữ tương thích; `total_revenue` đã là net theo ledger Model A.
+const taxOnNet = (recognizedRevenue) =>
   Math.round(
-    (toNumber(sepay) - toNumber(refund)) *
+    toNumber(recognizedRevenue) *
       (Number(dashboardMonthlyTaxRatePercent) / 100)
   );
 
@@ -239,7 +240,6 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
   return rows.map((row) => {
     const mk = String(row[summaryCols.MONTH_KEY] || "");
     const { rev, imp: importVal, nccMargin, offFlow } = revImpByMonth(mk);
-    const refund = toNumber(row[summaryCols.TOTAL_REFUND]);
     const profitForDisplay = nccMargin;
     return {
       [summaryCols.MONTH_KEY]: mk,
@@ -247,10 +247,10 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
       [summaryCols.CANCELED_ORDERS]: toNumber(row[summaryCols.CANCELED_ORDERS]),
       [summaryCols.TOTAL_REVENUE]: rev,
       [summaryCols.TOTAL_PROFIT]: profitForDisplay,
-      [summaryCols.TOTAL_REFUND]: refund,
+      [summaryCols.TOTAL_REFUND]: toNumber(row[summaryCols.TOTAL_REFUND]),
       [summaryCols.TOTAL_IMPORT]: importVal,
       [summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]: offFlow,
-      [summaryCols.TOTAL_TAX]: taxOnNet(rev, refund),
+      [summaryCols.TOTAL_TAX]: taxOnNet(rev),
     };
   });
 };

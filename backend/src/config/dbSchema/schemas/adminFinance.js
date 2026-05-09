@@ -104,6 +104,24 @@ const FINANCE_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  /** Log biến động tài chính dashboard theo tháng (append-only, phục vụ đối soát/audit). */
+  DASHBOARD_FINANCIAL_CHANGE_LOG: {
+    TABLE: "dashboard_financial_change_log",
+    COLS: {
+      ID: "id",
+      MONTH_KEY: "month_key",
+      REVENUE_DELTA: "revenue_delta",
+      PROFIT_DELTA: "profit_delta",
+      IMPORT_DELTA: "import_delta",
+      REFUND_DELTA: "refund_delta",
+      OFF_FLOW_DELTA: "off_flow_delta",
+      TAX_SNAPSHOT: "tax_snapshot",
+      OFF_FLOW_SNAPSHOT: "off_flow_snapshot",
+      AVAILABLE_PROFIT_SNAPSHOT: "available_profit_snapshot",
+      CONTEXT: "context",
+      CREATED_AT: "created_at",
+    },
+  },
   STORE_PROFIT_EXPENSES: {
     TABLE: "store_profit_expenses",
     COLS: {

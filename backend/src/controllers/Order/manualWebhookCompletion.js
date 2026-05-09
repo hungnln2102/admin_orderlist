@@ -87,6 +87,7 @@ const incrementDashboardSummaryByDelta = async (
     profitDelta: profit,
     importDelta: imp,
     refundDelta: 0,
+    offFlowDelta: offFlow,
     context: "manualWebhook.incrementDashboardSummaryByDelta",
     executor: client,
   });

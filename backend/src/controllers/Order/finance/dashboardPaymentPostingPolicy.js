@@ -67,6 +67,7 @@ const computeDashboardPaymentDecision = ({
   );
   const priorReceived = Math.max(0, receivedAccumulated - receivedCurrent);
   const bankPayableForOrder = Math.max(0, normalizedPrice - creditedAmount);
+  const receivedForOrder = Math.max(receivedAccumulated, receivedCurrent);
   const priorBankRevenueForOrder = Math.min(priorReceived, bankPayableForOrder);
   const remainingBankRevenueForOrder = Math.max(
     0,
@@ -76,8 +77,14 @@ const computeDashboardPaymentDecision = ({
   const recognizedRevenueCurrent = complete
     ? Math.min(receivedCurrent, remainingBankRevenueForOrder)
     : 0;
+  const recognizedRevenueForOrder = complete
+    ? Math.min(receivedForOrder, bankPayableForOrder)
+    : 0;
   const offFlowCurrent = complete
     ? Math.max(0, receivedCurrent - recognizedRevenueCurrent)
+    : 0;
+  const offFlowForOrder = complete
+    ? Math.max(0, receivedForOrder - bankPayableForOrder)
     : 0;
   const acceptedShortfall = complete
     ? Math.max(
@@ -124,7 +131,9 @@ const computeDashboardPaymentDecision = ({
     maxAcceptedShortfall: maxAcceptedShortfall(),
     webhookAmountFlow,
     recognizedRevenueCurrent,
+    recognizedRevenueForOrder,
     offFlowCurrent,
+    offFlowForOrder,
     postedAmount: recognizedRevenueCurrent,
     bankPayableForOrder,
     priorBankRevenueForOrder,

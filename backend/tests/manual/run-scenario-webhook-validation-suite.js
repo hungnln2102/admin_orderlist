@@ -457,7 +457,7 @@ async function run() {
       r1.status === 200 &&
       r2.status === 409 &&
       v2RevDeltaOnce === 165000 &&
-      v2ProfDeltaOnce === 55000 &&
+      v2ProfDeltaOnce === 110000 &&
       v2b2.revenue === v2b1.revenue &&
       v2b2.profit === v2b1.profit,
   });

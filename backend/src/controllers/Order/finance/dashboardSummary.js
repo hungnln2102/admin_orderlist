@@ -167,6 +167,7 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         profitDelta: updates.total_profit || 0,
         importDelta: updates.total_import || 0,
         refundDelta: updates.total_refund || 0,
+        offFlowDelta: updates.total_off_flow_bank_receipt || 0,
         context: "dashboardSummary.mergeSummaryUpdates",
         executor: trx,
     });

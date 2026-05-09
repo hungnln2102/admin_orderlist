@@ -171,6 +171,7 @@ const applyDashboardDelta = async (
     profitDelta: profit,
     importDelta: 0,
     refundDelta: 0,
+    offFlowDelta: offFlow,
     context: "payments.applyDashboardDelta",
     executor: trx,
   });
@@ -654,7 +655,7 @@ const reconcilePaymentReceipt = async (req, res) => {
 
       const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
       const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
-      const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.PRICE]);
+      const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.price]);
       const oCodeCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
       const aAmtCol = PAYMENT_RECEIPT_DEF.columns.amount;
       const sumRes = await trx(TABLES.paymentReceipt)
@@ -720,9 +721,12 @@ const reconcilePaymentReceipt = async (req, res) => {
           Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
         const receiptAmt = normalizeMoney(receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]);
         const recognizedRevenue = normalizeMoney(
-          paymentDecision.recognizedRevenueCurrent
+          paymentDecision.recognizedRevenueForOrder ??
+            paymentDecision.recognizedRevenueCurrent
         );
-        const offFlowForReceipt = normalizeMoney(paymentDecision.offFlowCurrent);
+        const offFlowForReceipt = normalizeMoney(
+          paymentDecision.offFlowForOrder ?? paymentDecision.offFlowCurrent
+        );
 
         if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
           // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
@@ -787,8 +791,11 @@ const reconcilePaymentReceipt = async (req, res) => {
               requiredMin: paymentDecision.requiredMin,
               maxAcceptedShortfall: paymentDecision.maxAcceptedShortfall,
               shortfallAmount: paymentDecision.shortfallAmount,
-              recognized_revenue_current: recognizedRevenue,
+              recognized_revenue_current:
+                normalizeMoney(paymentDecision.recognizedRevenueCurrent),
+              recognized_revenue_for_order: recognizedRevenue,
               off_flow_current: offFlowForReceipt,
+              off_flow_for_order: offFlowForReceipt,
               off_flow_source_order_code:
                 offFlowForReceipt > 0 ? orderCodeRaw : undefined,
               orderStatus: statusValue,

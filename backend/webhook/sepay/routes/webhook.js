@@ -253,6 +253,7 @@ const incrementDashboardSummaryByDelta = async (
     profitDelta: profit,
     importDelta: imp,
     refundDelta: 0,
+    offFlowDelta: offFlow,
     context: "webhook.incrementDashboardSummaryByDelta",
     executor: client,
   });
@@ -283,7 +284,9 @@ const postWebhookPaymentForOrder = async (
   }
 ) => {
   const wire = normalizeMoney(revenueAmount);
-  const offFlow = normalizeMoney(amountDecision?.offFlowCurrent);
+  const offFlow = normalizeMoney(
+    amountDecision?.offFlowForOrder ?? amountDecision?.offFlowCurrent
+  );
   if ((!wire && !offFlow && !ordersDelta) || !state) {
     return { revenue: 0, profit: 0, offFlow: 0 };
   }
@@ -369,7 +372,11 @@ const postWebhookPaymentForOrder = async (
         max_accepted_shortfall:
           amountDecision?.maxAcceptedShortfall ?? UNDERPAY_TOLERANCE_VND - 1,
         recognized_revenue_current: amountDecision?.recognizedRevenueCurrent ?? wire,
+        recognized_revenue_for_order:
+          amountDecision?.recognizedRevenueForOrder ?? wire,
         off_flow_current: amountDecision?.offFlowCurrent ?? 0,
+        off_flow_for_order:
+          amountDecision?.offFlowForOrder ?? offFlow,
         off_flow_source_order_code: offFlow > 0 ? code : undefined,
         webhook_amount_flow: amountDecision?.webhookAmountFlow ?? "WEBHOOK_AMOUNT",
       },
@@ -417,8 +424,11 @@ const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
   const normalizedCode = String(orderCode || "").trim();
   if (!normalizedCode) return 0;
   const parsedOrderDate = parseFlexibleDate(orderDateRaw);
+  const now = new Date();
   const fromDate = parsedOrderDate
-    ? parsedOrderDate.toISOString().slice(0, 10)
+    ? parsedOrderDate > now
+      ? "1900-01-01"
+      : parsedOrderDate.toISOString().slice(0, 10)
     : "1900-01-01";
 
   const res = await client.query(
@@ -789,9 +799,11 @@ router.post("/", async (req, res) => {
             );
             if (statusUpdateResult.rowCount > 0) {
               const wireNow =
-                amountDecision?.recognizedRevenueCurrent !== undefined
-                  ? normalizeMoney(amountDecision.recognizedRevenueCurrent)
-                  : currentAmountForCode;
+                amountDecision?.recognizedRevenueForOrder !== undefined
+                  ? normalizeMoney(amountDecision.recognizedRevenueForOrder)
+                  : amountDecision?.recognizedRevenueCurrent !== undefined
+                    ? normalizeMoney(amountDecision.recognizedRevenueCurrent)
+                    : currentAmountForCode;
               const {
                 revenue: rev,
                 profit: prof,

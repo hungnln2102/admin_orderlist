@@ -4,8 +4,8 @@
  *    hoặc: node tests/manual/run-webhook-profit-scenarios-tests.js
  * Cần: DATABASE_URL, SEPAY_API_KEY hoặc SEPAY_WEBHOOK_SECRET
  *
- * P2: hai webhook (tổng = giá − 4.999) — sau webhook 1 bảng dashboard_monthly_summary
- *     phải cộng doanh thu và lợi nhuận (đúng bằng tiền lần 1, chưa trừ cost).
+ * P2: hai webhook (tổng = giá − 4.999) — webhook 1 thiếu tiền thì chưa cộng DT/LN;
+ *     khi webhook 2 đủ điều kiện mới ghi nhận tổng DT/LN.
  * P3/P6/P7: phần chuyển khoản vượt giá bán đi vào `total_off_flow_bank_receipt`;
  *     `total_import` chỉ tăng `cost` một lần.
  */
@@ -264,21 +264,21 @@ async function run() {
     const deltaProfAfterFirst = afterFirst.profit - before.profit;
     results.push({
       id: "P2",
-      name: "2 webhook thiếu dưới 5k (tổng = giá−4.999) → sau webhook 1 đã cộng DT/LN; webhook 2 → Đã TT",
+      name: "2 webhook thiếu dưới 5k (tổng = giá−4.999) → webhook 1 chưa cộng DT/LN; webhook 2 đủ thì cộng tổng",
       ok:
         r1.status === 200 &&
         r2.status === 200 &&
         mid === STATUS.UNPAID &&
         st === STATUS.PAID &&
-        deltaRevAfterFirst === w1 &&
-        deltaProfAfterFirst === w1 &&
+        deltaRevAfterFirst === 0 &&
+        deltaProfAfterFirst === 0 &&
         after.revenue - before.revenue === recv &&
         after.profit - before.profit === expProfit,
       detail: {
         afterFirstStatus: mid,
         deltaRevenueAfterFirstWebhook: deltaRevAfterFirst,
         deltaProfitAfterFirstWebhook: deltaProfAfterFirst,
-        expectDeltaAfterFirst: w1,
+        expectDeltaAfterFirst: 0,
         status: st,
         revenueDelta: after.revenue - before.revenue,
         profitDelta: after.profit - before.profit,
