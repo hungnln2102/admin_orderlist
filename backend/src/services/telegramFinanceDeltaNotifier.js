@@ -24,11 +24,6 @@ const financeLogTable = tableName(
   SCHEMA_FINANCE
 );
 const financeLogCols = FINANCE_SCHEMA.DASHBOARD_FINANCIAL_CHANGE_LOG.COLS;
-const expenseTable = tableName(
-  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
-  SCHEMA_FINANCE
-);
-const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 
 const toNumber = (value) => {
   const n = Number(value);
@@ -78,21 +73,6 @@ const buildFinanceDeltaMessage = ({ monthKey, rows = [], context = "" }) => {
   return lines.join("\n");
 };
 
-const fetchAvailableProfit = async (executor) => {
-  const profitRow = await queryOne(
-    executor,
-    `SELECT COALESCE(SUM(${monthlyCols.TOTAL_PROFIT}::numeric), 0) AS total_profit FROM ${monthlySummaryTable}`
-  );
-  const withdrawRow = await queryOne(
-    executor,
-    `SELECT COALESCE(SUM(${expenseCols.AMOUNT}::numeric), 0) AS total_withdraw
-     FROM ${expenseTable}
-     WHERE ${expenseCols.EXPENSE_TYPE} = $1`,
-    ["withdraw_profit"]
-  );
-  return toNumber(profitRow?.total_profit) - toNumber(withdrawRow?.total_withdraw);
-};
-
 const fetchMonthlySnapshot = async (executor, monthKey) => {
   if (!monthKey) return null;
   return queryOne(
@@ -103,7 +83,8 @@ const fetchMonthlySnapshot = async (executor, monthKey) => {
       COALESCE(${monthlyCols.TOTAL_IMPORT}::numeric, 0) AS total_import,
       COALESCE(${monthlyCols.TOTAL_REFUND}::numeric, 0) AS total_refund,
       COALESCE(${monthlyCols.TOTAL_TAX}::numeric, 0) AS total_tax,
-      COALESCE(${monthlyCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt
+      COALESCE(${monthlyCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt,
+      COALESCE(${monthlyCols.ESTIMATED_BANK_BALANCE}::numeric, 0) AS estimated_bank_balance
      FROM ${monthlySummaryTable}
      WHERE ${monthlyCols.MONTH_KEY} = $1
      LIMIT 1`,
@@ -118,7 +99,7 @@ const fetchPreviousFinanceLogSnapshot = async (executor, monthKey) => {
     `SELECT
       COALESCE(${financeLogCols.TAX_SNAPSHOT}::numeric, 0) AS tax_snapshot,
       COALESCE(${financeLogCols.OFF_FLOW_SNAPSHOT}::numeric, 0) AS off_flow_snapshot,
-      COALESCE(${financeLogCols.AVAILABLE_PROFIT_SNAPSHOT}::numeric, 0) AS available_profit_snapshot
+      COALESCE(${financeLogCols.BANK_BALANCE_SNAPSHOT}::numeric, 0) AS bank_balance_snapshot
      FROM ${financeLogTable}
      WHERE ${financeLogCols.MONTH_KEY} = $1
      ORDER BY ${financeLogCols.ID} DESC
@@ -136,9 +117,10 @@ const appendFinanceChangeLog = async (
     importDelta = 0,
     refundDelta = 0,
     offFlowDelta = 0,
+    bankBalanceDelta = 0,
     taxSnapshot = 0,
     offFlowSnapshot = 0,
-    availableProfitSnapshot = 0,
+    bankBalanceSnapshot = 0,
     context = "",
   }
 ) => {
@@ -152,12 +134,13 @@ const appendFinanceChangeLog = async (
         ${financeLogCols.IMPORT_DELTA},
         ${financeLogCols.REFUND_DELTA},
         ${financeLogCols.OFF_FLOW_DELTA},
+        ${financeLogCols.BANK_BALANCE_DELTA},
         ${financeLogCols.TAX_SNAPSHOT},
         ${financeLogCols.OFF_FLOW_SNAPSHOT},
-        ${financeLogCols.AVAILABLE_PROFIT_SNAPSHOT},
+        ${financeLogCols.BANK_BALANCE_SNAPSHOT},
         ${financeLogCols.CONTEXT}
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         monthKey,
         revenueDelta,
@@ -165,9 +148,10 @@ const appendFinanceChangeLog = async (
         importDelta,
         refundDelta,
         offFlowDelta,
+        bankBalanceDelta,
         taxSnapshot,
         offFlowSnapshot,
-        availableProfitSnapshot,
+        bankBalanceSnapshot,
         context || null,
       ]
     );
@@ -182,12 +166,13 @@ const appendFinanceChangeLog = async (
         ${financeLogCols.IMPORT_DELTA},
         ${financeLogCols.REFUND_DELTA},
         ${financeLogCols.OFF_FLOW_DELTA},
+        ${financeLogCols.BANK_BALANCE_DELTA},
         ${financeLogCols.TAX_SNAPSHOT},
         ${financeLogCols.OFF_FLOW_SNAPSHOT},
-        ${financeLogCols.AVAILABLE_PROFIT_SNAPSHOT},
+        ${financeLogCols.BANK_BALANCE_SNAPSHOT},
         ${financeLogCols.CONTEXT}
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
       [
         monthKey,
         revenueDelta,
@@ -195,9 +180,10 @@ const appendFinanceChangeLog = async (
         importDelta,
         refundDelta,
         offFlowDelta,
+        bankBalanceDelta,
         taxSnapshot,
         offFlowSnapshot,
-        availableProfitSnapshot,
+        bankBalanceSnapshot,
         context || null,
       ]
     );
@@ -211,6 +197,7 @@ const notifyFinanceMonthlyDelta = async ({
   importDelta = 0,
   refundDelta = 0,
   offFlowDelta = 0,
+  bankBalanceDelta = 0,
   context = "",
   executor = null,
 }) => {
@@ -219,12 +206,12 @@ const notifyFinanceMonthlyDelta = async ({
   const imp = toNumber(importDelta);
   const refund = toNumber(refundDelta);
   const offFlow = toNumber(offFlowDelta);
+  const bankBalance = toNumber(bankBalanceDelta);
   if (!monthKey) return;
-  if (!revenue && !profit && !imp && !refund && !offFlow) return;
+  if (!revenue && !profit && !imp && !refund && !offFlow && !bankBalance) return;
 
   try {
-    const [availableProfit, monthlySnapshot, previousLogSnapshot] = await Promise.all([
-      fetchAvailableProfit(executor).catch(() => null),
+    const [monthlySnapshot, previousLogSnapshot] = await Promise.all([
       fetchMonthlySnapshot(executor, monthKey).catch(() => null),
       fetchPreviousFinanceLogSnapshot(executor, monthKey).catch(() => null),
     ]);
@@ -235,7 +222,7 @@ const notifyFinanceMonthlyDelta = async ({
       refund: toNumber(monthlySnapshot?.total_refund),
       tax: toNumber(monthlySnapshot?.total_tax),
       offFlow: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
-      availableProfit: availableProfit == null ? 0 : toNumber(availableProfit),
+      bankBalance: toNumber(monthlySnapshot?.estimated_bank_balance),
     };
     const snapshotBefore = {
       revenue: snapshotAfter.revenue - revenue,
@@ -247,14 +234,14 @@ const notifyFinanceMonthlyDelta = async ({
         previousLogSnapshot == null
           ? snapshotAfter.tax
           : toNumber(previousLogSnapshot.tax_snapshot),
-      availableProfit:
+      bankBalance:
         previousLogSnapshot == null
-          ? snapshotAfter.availableProfit - profit
-          : toNumber(previousLogSnapshot.available_profit_snapshot),
+          ? snapshotAfter.bankBalance - bankBalance
+          : toNumber(previousLogSnapshot.bank_balance_snapshot),
     };
     const taxDelta = snapshotAfter.tax - snapshotBefore.tax;
-    const availableProfitDelta =
-      snapshotAfter.availableProfit - snapshotBefore.availableProfit;
+    const bankBalanceDeltaEffective =
+      snapshotAfter.bankBalance - snapshotBefore.bankBalance;
     await appendFinanceChangeLog(executor, {
       monthKey,
       revenueDelta: revenue,
@@ -262,9 +249,10 @@ const notifyFinanceMonthlyDelta = async ({
       importDelta: imp,
       refundDelta: refund,
       offFlowDelta: offFlow,
+      bankBalanceDelta: bankBalance,
       taxSnapshot: toNumber(monthlySnapshot?.total_tax),
       offFlowSnapshot: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
-      availableProfitSnapshot: availableProfit == null ? 0 : toNumber(availableProfit),
+      bankBalanceSnapshot: toNumber(monthlySnapshot?.estimated_bank_balance),
       context,
     });
     if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
@@ -282,10 +270,10 @@ const notifyFinanceMonthlyDelta = async ({
         offFlow
       ),
       buildFlowLine(
-        "🏦 Lợi nhuận khả dụng",
-        snapshotBefore.availableProfit,
-        snapshotAfter.availableProfit,
-        availableProfitDelta
+        "🏦 Số dư bank ước tính",
+        snapshotBefore.bankBalance,
+        snapshotAfter.bankBalance,
+        bankBalanceDeltaEffective
       ),
     ];
     const payload = {

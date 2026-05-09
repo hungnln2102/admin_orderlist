@@ -5,6 +5,7 @@ const { normalizeDateInput, normalizeTextInput } = require("../../utils/normaliz
 const {
   monthKeyVietnamFromDbTimestamp,
   applyExternalImportProfitDelta,
+  applyEstimatedBankBalanceDelta,
 } = require("../Order/finance/dashboardSummary");
 const {
   storeProfitExpensesHasMavnColumns,
@@ -132,6 +133,18 @@ const createStoreProfitExpense = async (req, res) => {
         .first();
 
       if (
+        (expenseType === "external_import" || expenseType === "withdraw_profit") &&
+        amount > 0 &&
+        inserted?.[COLS.CREATED_AT]
+      ) {
+        const mk = await monthKeyVietnamFromDbTimestamp(
+          trx,
+          inserted[COLS.CREATED_AT]
+        );
+        if (mk) await applyEstimatedBankBalanceDelta(trx, mk, -amount);
+      }
+
+      if (
         expenseType === "external_import" &&
         amount > 0 &&
         inserted?.[COLS.CREATED_AT]
@@ -166,6 +179,19 @@ const deleteStoreProfitExpense = async (req, res) => {
       const expType = String(row[COLS.EXPENSE_TYPE] || "");
       const amt = parseAmount(row[COLS.AMOUNT]);
       const n = await trx(TABLE).where(COLS.ID, id).del();
+      if (
+        n &&
+        (expType === "external_import" || expType === "withdraw_profit") &&
+        amt > 0 &&
+        row[COLS.CREATED_AT]
+      ) {
+        const mk = await monthKeyVietnamFromDbTimestamp(
+          trx,
+          row[COLS.CREATED_AT]
+        );
+        if (mk) await applyEstimatedBankBalanceDelta(trx, mk, amt);
+      }
+
       if (
         n &&
         expType === "external_import" &&

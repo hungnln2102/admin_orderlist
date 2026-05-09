@@ -155,6 +155,13 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         );
     }
 
+    if (updates.estimated_bank_balance !== undefined) {
+        insertData[summaryCols.ESTIMATED_BANK_BALANCE] = updates.estimated_bank_balance;
+        mergeData[summaryCols.ESTIMATED_BANK_BALANCE] = trx.raw(
+            `${qualifiedSummaryCol(summaryCols.ESTIMATED_BANK_BALANCE)} + ${updates.estimated_bank_balance}`
+        );
+    }
+
     await trx(summaryTable)
         .insert(insertData)
         .onConflict(summaryCols.MONTH_KEY)
@@ -168,6 +175,7 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         importDelta: updates.total_import || 0,
         refundDelta: updates.total_refund || 0,
         offFlowDelta: updates.total_off_flow_bank_receipt || 0,
+        bankBalanceDelta: updates.estimated_bank_balance || 0,
         context: "dashboardSummary.mergeSummaryUpdates",
         executor: trx,
     });
@@ -196,6 +204,16 @@ const applyExternalImportProfitDelta = async (trx, monthKey, profitDelta) => {
 };
 
 /**
+ * Điều chỉnh số dư bank ước tính theo tháng.
+ * Dương = tiền vào bank, âm = tiền ra bank.
+ */
+const applyEstimatedBankBalanceDelta = async (trx, monthKey, bankBalanceDelta) => {
+    const d = Number(bankBalanceDelta);
+    if (!monthKey || !Number.isFinite(d) || d === 0) return;
+    await mergeSummaryUpdates(trx, monthKey, { estimated_bank_balance: d });
+};
+
+/**
  * Cập nhật `dashboard_monthly_summary` khi đổi trạng thái đơn:
  * - Vào luồng hoàn (Đã TT → Chưa Hoàn / Đã Hoàn): ghi delta ngay tháng hiện tại (Model A).
  * - `total_refund` là chỉ số tracking; doanh thu tháng đã bị trừ trực tiếp theo delta refund.
@@ -217,12 +235,14 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     if (!birthMonthKey && !refundMonthKey) return;
 
     const refundUpdates = {};
+    let bankBalanceDelta = 0;
 
     // Order left refund lifecycle → -1 canceled, -refund (chỉ MAVC/MAVL/MAVK/MAVS)
     if (isDashboardSalesOrder(beforeRow) && isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(beforeRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) - 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
+        bankBalanceDelta += refund;
     }
 
     // Vào hoàn (Model A): ghi tháng hiện tại, trừ thẳng doanh thu theo refund và cộng tracking total_refund.
@@ -231,10 +251,15 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
         refundUpdates.total_revenue = (refundUpdates.total_revenue || 0) - refund;
+        bankBalanceDelta -= refund;
     }
 
     if (Object.keys(refundUpdates).length > 0 && refundMonthKey) {
         await mergeSummaryUpdates(trx, refundMonthKey, refundUpdates);
+    }
+
+    if (refundMonthKey && bankBalanceDelta !== 0) {
+        await applyEstimatedBankBalanceDelta(trx, refundMonthKey, bankBalanceDelta);
     }
 
     if (
@@ -264,4 +289,5 @@ module.exports = {
     monthKeyFromPaidDateYmd,
     monthKeyVietnamFromDbTimestamp,
     applyExternalImportProfitDelta,
+    applyEstimatedBankBalanceDelta,
 };

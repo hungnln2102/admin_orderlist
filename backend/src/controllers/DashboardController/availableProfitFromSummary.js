@@ -4,10 +4,6 @@ const {
   SCHEMA_FINANCE,
   FINANCE_SCHEMA,
 } = require("../../config/dbSchema");
-const {
-  sumWithdrawAllTime,
-  sumWithdrawBeforeYmd,
-} = require("./dashboardStoreExpenseDeductions");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
@@ -18,33 +14,30 @@ const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const toNumber = (value) => Number(value || 0);
 
 /**
- * Lợi nhuận khả dụng (Tổng quan): `SUM(total_profit)` trên `dashboard_monthly_summary`
- * trừ **duy nhất** các khoản `withdraw_profit` trong `store_profit_expenses`
- * (`sumWithdrawAllTime` / `sumWithdrawBeforeYmd`).
- *
- * MAVN (âm cost) và `external_import` đã phản ánh trong `total_profit`; không trừ lại ở đây.
+ * Số dư bank ước tính: đọc trực tiếp từ cột `estimated_bank_balance`
+ * trong `dashboard_monthly_summary` theo tháng hiện tại/tháng trước.
  */
-const fetchAvailableProfitPair = async ({ currentMonthKey, monthStartDate }) => {
-  const [profitAllRow, profitBeforeRow, withdrawAll, withdrawBefore] =
-    await Promise.all([
-      db(summaryTableName)
-        .sum({ total: summaryCols.TOTAL_PROFIT })
-        .first(),
-      db(summaryTableName)
-        .where(summaryCols.MONTH_KEY, "<", currentMonthKey)
-        .sum({ total: summaryCols.TOTAL_PROFIT })
-        .first(),
-      sumWithdrawAllTime(),
-      sumWithdrawBeforeYmd(monthStartDate),
-    ]);
-
-  const profitAll = toNumber(profitAllRow?.total);
-  const profitBefore = toNumber(profitBeforeRow?.total);
-
+const fetchEstimatedBankBalancePair = async ({ currentMonthKey, previousMonthKey }) => {
+  if (!currentMonthKey || !previousMonthKey) {
+    return { current: 0, previous: 0 };
+  }
+  const rows = await db(summaryTableName)
+    .select(summaryCols.MONTH_KEY, summaryCols.ESTIMATED_BANK_BALANCE)
+    .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]);
+  const byMonth = new Map(
+    (rows || []).map((row) => [
+      String(row?.[summaryCols.MONTH_KEY] || "").trim(),
+      toNumber(row?.[summaryCols.ESTIMATED_BANK_BALANCE]),
+    ])
+  );
   return {
-    current: profitAll - withdrawAll,
-    previous: profitBefore - withdrawBefore,
+    current: byMonth.get(currentMonthKey) || 0,
+    previous: byMonth.get(previousMonthKey) || 0,
   };
 };
 
-module.exports = { fetchAvailableProfitPair };
+module.exports = {
+  fetchEstimatedBankBalancePair,
+  // Backward-compatible alias (old name).
+  fetchAvailableProfitPair: fetchEstimatedBankBalancePair,
+};

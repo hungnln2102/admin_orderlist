@@ -175,7 +175,8 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
       summaryCols.TOTAL_REVENUE,
       summaryCols.TOTAL_IMPORT,
       summaryCols.TOTAL_PROFIT,
-      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
+      summaryCols.ESTIMATED_BANK_BALANCE
     )
     .whereIn(summaryCols.MONTH_KEY, unique);
   return new Map(
@@ -187,6 +188,7 @@ const sumRevenueAndImportFromSummaryTable = async (monthKeys, executor = db) => 
         /** Tổng lãi dòng từ trigger NCC, trước rút lợi nhuận. */
         margin: toNumber(r[summaryCols.TOTAL_PROFIT]),
         offFlowBankReceipt: toNumber(r[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
+        estimatedBankBalance: toNumber(r[summaryCols.ESTIMATED_BANK_BALANCE]),
       },
     ])
   );
@@ -250,6 +252,8 @@ const buildAlignedMonthlyRows = async (executor = db, options = {}) => {
       [summaryCols.TOTAL_REFUND]: toNumber(row[summaryCols.TOTAL_REFUND]),
       [summaryCols.TOTAL_IMPORT]: importVal,
       [summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]: offFlow,
+      [summaryCols.ESTIMATED_BANK_BALANCE]:
+        tbl.get(mk)?.estimatedBankBalance || 0,
       [summaryCols.TOTAL_TAX]: taxOnNet(rev),
     };
   });
@@ -272,6 +276,7 @@ const rowToApiShape = (dbRow) => {
     total_import: toNumber(dbRow[summaryCols.TOTAL_IMPORT]),
     total_tax: toNumber(dbRow[summaryCols.TOTAL_TAX]),
     total_off_flow_bank_receipt: toNumber(dbRow[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
+    estimated_bank_balance: toNumber(dbRow[summaryCols.ESTIMATED_BANK_BALANCE]),
   };
 };
 

@@ -79,6 +79,10 @@ const FINANCE_SCHEMA = {
        * Tiền NH nhận ngoài luồng doanh thu: webhook không mã đơn, và tiền thừa sau khi đơn đã PAID.
        */
       TOTAL_OFF_FLOW_BANK_RECEIPT: "total_off_flow_bank_receipt",
+      /**
+       * Số dư bank ước tính (tiền lưu động): cộng/trừ trực tiếp theo luồng in/out thực tế.
+       */
+      ESTIMATED_BANK_BALANCE: "estimated_bank_balance",
       UPDATED_AT: "updated_at",
     },
   },
@@ -115,8 +119,11 @@ const FINANCE_SCHEMA = {
       IMPORT_DELTA: "import_delta",
       REFUND_DELTA: "refund_delta",
       OFF_FLOW_DELTA: "off_flow_delta",
+      BANK_BALANCE_DELTA: "bank_balance_delta",
       TAX_SNAPSHOT: "tax_snapshot",
       OFF_FLOW_SNAPSHOT: "off_flow_snapshot",
+      BANK_BALANCE_SNAPSHOT: "bank_balance_snapshot",
+      // Legacy column kept for backward compatibility with old migrations/data.
       AVAILABLE_PROFIT_SNAPSHOT: "available_profit_snapshot",
       CONTEXT: "context",
       CREATED_AT: "created_at",

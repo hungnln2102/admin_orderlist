@@ -5,7 +5,7 @@ const {
   FINANCE_SCHEMA,
 } = require("../../config/dbSchema");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
-const { fetchAvailableProfitPair } = require("./availableProfitFromSummary");
+const { fetchEstimatedBankBalancePair } = require("./availableProfitFromSummary");
 const {
   buildOrderCountBirthInRangeQuery,
 } = require("./dashboardSummaryAggregate");
@@ -157,11 +157,10 @@ const kpiFromSummaryOnly = (monthKey, tableMap) => {
 const fetchDashboardStats = async () => {
   const now = new Date();
   const currentMonthKey = currentCalendarMonthKey(now);
-  const monthStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const [tableRows, availableProfit] = await Promise.all([
+  const [tableRows, estimatedBankBalance] = await Promise.all([
     db(summaryTableName)
       .select(
         summaryCols.MONTH_KEY,
@@ -170,10 +169,11 @@ const fetchDashboardStats = async () => {
         summaryCols.TOTAL_PROFIT,
         summaryCols.TOTAL_REFUND,
         summaryCols.TOTAL_IMPORT,
-        summaryCols.TOTAL_TAX
+        summaryCols.TOTAL_TAX,
+        summaryCols.ESTIMATED_BANK_BALANCE
       )
       .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
-    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+    fetchEstimatedBankBalancePair({ currentMonthKey, previousMonthKey }),
   ]);
 
   const tableMap = new Map(
@@ -211,14 +211,18 @@ const fetchDashboardStats = async () => {
       current: taxC,
       previous: taxP,
     },
-    availableProfit,
+    estimatedBankBalance,
+    // Backward-compatible field for old clients.
+    availableProfit: estimatedBankBalance,
   };
 };
 
 const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const { p0, p1 } = computePreviousRange(from, to);
   const currentMonthKey = currentCalendarMonthKey();
-  const monthStartDate = `${currentMonthKey}-01`;
+  const [cy, cm] = String(currentMonthKey).split("-").map(Number);
+  const prevDate = new Date(cy, (cm || 1) - 2, 1);
+  const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
   let useCreatedAt = true;
   try {
@@ -227,12 +231,12 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
     useCreatedAt = true;
   }
 
-  const [currKpi, prevKpi, currOrd, prevOrd, availableProfit] = await Promise.all([
+  const [currKpi, prevKpi, currOrd, prevOrd, estimatedBankBalance] = await Promise.all([
     sumDailyKpisForRange(from, to),
     sumDailyKpisForRange(p0, p1),
     db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [from, to]),
     db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [p0, p1]),
-    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
+    fetchEstimatedBankBalancePair({ currentMonthKey, previousMonthKey }),
   ]);
 
   return {
@@ -260,7 +264,9 @@ const fetchDashboardStatsForDateRange = async ({ from, to }) => {
       current: taxFromRevenueValue(currKpi.earned),
       previous: taxFromRevenueValue(prevKpi.earned),
     },
-    availableProfit,
+    estimatedBankBalance,
+    // Backward-compatible field for old clients.
+    availableProfit: estimatedBankBalance,
     range: { from, to, previousFrom: p0, previousTo: p1 },
   };
 };
@@ -438,6 +444,7 @@ const fetchDashboardMonthlySummary = async () => {
       summaryCols.TOTAL_IMPORT,
       summaryCols.TOTAL_TAX,
       summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
+      summaryCols.ESTIMATED_BANK_BALANCE,
       summaryCols.UPDATED_AT
     )
     .orderBy(summaryCols.MONTH_KEY, "desc");
@@ -454,6 +461,7 @@ const fetchDashboardMonthlySummary = async () => {
       total_import: toNumber(row[summaryCols.TOTAL_IMPORT]),
       total_tax: toNumber(row[summaryCols.TOTAL_TAX]),
       total_off_flow_bank_receipt: toNumber(row[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
+      estimated_bank_balance: toNumber(row[summaryCols.ESTIMATED_BANK_BALANCE]),
       updated_at: row[summaryCols.UPDATED_AT] ?? null,
     };
   });
@@ -481,7 +489,8 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       summaryCols.TOTAL_REFUND,
       summaryCols.TOTAL_IMPORT,
       summaryCols.TOTAL_TAX,
-      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
+      summaryCols.ESTIMATED_BANK_BALANCE
     );
 
   const rowByMk = new Map(
@@ -507,6 +516,9 @@ const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
       total_import: r ? toNumber(r[summaryCols.TOTAL_IMPORT]) : 0,
       total_off_flow_bank_receipt: r
         ? toNumber(r[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT])
+        : 0,
+      estimated_bank_balance: r
+        ? toNumber(r[summaryCols.ESTIMATED_BANK_BALANCE])
         : 0,
       total_tax:
         taxStored != null && Number.isFinite(taxStored)
