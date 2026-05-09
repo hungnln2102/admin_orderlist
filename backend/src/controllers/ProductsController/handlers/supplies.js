@@ -7,6 +7,7 @@ const {
   resolveSupplierTableName,
   resolveSupplierNameColumn,
 } = require("../../SuppliesController/helpers");
+const { isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
 const { updateOrderCostsOnSupplyPriceChange } = require("../../../services/updateOrderCostsOnSupplyPriceChange");
 const logger = require("../../../utils/logger");
 const { pricingCache, supplierCache } = require("../../../utils/cache");
@@ -41,7 +42,37 @@ const getSuppliesByProductName = async (req, res) => {
         id: Number(row.source_id) || null,
         source_name: row.source_name || "",
       })) || [];
-    res.json(rows);
+
+    const mavrykRows = await db(supplierTable)
+      .select(
+        db.raw(`${quoteIdent("id")} AS id`),
+        db.raw(`${supplierNameIdent} AS source_name`)
+      )
+      .whereRaw(`LOWER(TRIM(COALESCE(${supplierNameIdent}::text, ''))) IN ('mavryk', 'shop')`);
+
+    const merged = [...rows];
+    for (const row of mavrykRows) {
+      const parsedId = Number(row.id) || null;
+      const name = String(row.source_name || "").trim();
+      if (!parsedId || !name) continue;
+      const exists = merged.some((item) => Number(item.id) === parsedId);
+      if (!exists) {
+        merged.push({ id: parsedId, source_name: name });
+      }
+    }
+
+    merged.sort((a, b) => {
+      const aName = String(a.source_name || "");
+      const bName = String(b.source_name || "");
+      const aIsMavryk = isMavrykShopSupplierName(aName);
+      const bIsMavryk = isMavrykShopSupplierName(bName);
+      if (aIsMavryk !== bIsMavryk) {
+        return aIsMavryk ? -1 : 1;
+      }
+      return aName.localeCompare(bName, "vi");
+    });
+
+    res.json(merged);
   } catch (error) {
     logger.error("Query failed (GET /api/products/supplies-by-name/:productName)", { productName, error: error.message, stack: error.stack });
     res.status(500).json({ error: "Không thể tải nhà cung cấp cho sản phẩm." });

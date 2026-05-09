@@ -165,6 +165,18 @@ export const useProductActions = ({
         };
       }
 
+      if (
+        field === "pctCtv" ||
+        field === "pctKhach" ||
+        field === "pctPromo" ||
+        field === "pctStu"
+      ) {
+        return {
+          ...prev,
+          [field]: formatVndInput(value),
+        };
+      }
+
       if (field === "basePriceCurrency") {
         const nextCurrency = (value ||
           "VND") as ProductEditFormState["basePriceCurrency"];
@@ -297,7 +309,14 @@ export const useProductActions = ({
     field: keyof CreateProductFormState,
     value: string
   ) => {
-    const nextValue = field === "basePrice" ? formatVndInput(value) : value;
+    const nextValue =
+      field === "basePrice" ||
+      field === "pctCtv" ||
+      field === "pctKhach" ||
+      field === "pctPromo" ||
+      field === "pctStu"
+        ? formatVndInput(value)
+        : value;
     setCreateForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 

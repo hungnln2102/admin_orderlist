@@ -1,7 +1,5 @@
 import { VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import {
-  calculateSellingPriceFromMarginInput,
-  formatNormalizedPercent,
   getDiscountRatioInput,
   getMarginRatioInput,
 } from "@/shared/utils/pricing";
@@ -17,8 +15,6 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
   maximumFractionDigits: 0,
 });
-
-export const MIN_PROMO_RATIO = 0;
 
 export const createSupplierEntry = (): CreateSupplierEntry => {
   const globalCrypto =
@@ -94,25 +90,12 @@ export const parseBoolean = (value: unknown): boolean => {
 
 export { getMarginRatioInput, getDiscountRatioInput };
 
-const resolvePromoMultiplier = (pctPromo?: number | null): number | null => {
-  const promo = getDiscountRatioInput(pctPromo);
-  if (promo === null) return null;
-  return 1 - promo;
-};
-
 export const hasValidPromoRatio = (
   value?: number | null,
-  pctKhach?: number | null,
-  pctCtv?: number | null
+  _pctKhach?: number | null,
+  _pctCtv?: number | null
 ): boolean => {
-  const promoRatio = getDiscountRatioInput(value);
-  if (promoRatio === null || promoRatio < MIN_PROMO_RATIO) {
-    return false;
-  }
-  if (getMarginRatioInput(pctKhach) === null || getMarginRatioInput(pctCtv) === null) {
-    return false;
-  }
-  return resolvePromoMultiplier(value) !== null;
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 };
 
 const normalizeSupplyName = (value: string | null | undefined): string => {
@@ -164,7 +147,11 @@ export const sortSupplyItems = (items: SupplyPriceItem[]): SupplyPriceItem[] => 
 export const buildSupplyRowKey = (productId: number, sourceId: number): string => `${productId}-${sourceId}`;
 
 export const multiplyValue = (value?: number | null, ratio?: number | null): number | null => {
-  return calculateSellingPriceFromMarginInput(value, ratio);
+  const direct = toNumberOrNull(ratio);
+  if (typeof direct === "number" && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+  return toNumberOrNull(value);
 };
 
 export const multiplyBasePrice = (ratio?: number | null, basePrice?: number | null): number | null =>
@@ -187,49 +174,23 @@ export const effectiveStudentMarginPct = (
 };
 
 export const computeStudentPrice = (
-  wholesalePrice?: number | null,
+  _wholesalePrice?: number | null,
   pctStu?: number | null,
-  pctKhach?: number | null
+  _pctKhach?: number | null
 ): number | null => {
-  const mult = effectiveStudentMarginPct(pctStu, pctKhach);
-  return multiplyValue(wholesalePrice, mult);
+  const direct = toNumberOrNull(pctStu);
+  return typeof direct === "number" && direct > 0 ? direct : null;
 };
 
 export const calculatePromoPrice = (
-  pctKhach?: number | null,
+  _pctKhach?: number | null,
   pctPromo?: number | null,
-  pctCtv?: number | null,
-  wholesalePrice?: number | null,
-  fallbackBasePrice?: number | null
+  _pctCtv?: number | null,
+  _wholesalePrice?: number | null,
+  _fallbackBasePrice?: number | null
 ): number | null => {
-  const baseValue =
-    (typeof wholesalePrice === "number" &&
-      Number.isFinite(wholesalePrice) &&
-      wholesalePrice > 0 &&
-      wholesalePrice) ||
-    (typeof fallbackBasePrice === "number" &&
-      Number.isFinite(fallbackBasePrice) &&
-      fallbackBasePrice > 0 &&
-      fallbackBasePrice) ||
-    null;
-
-  if (baseValue === null || pctPromo === null || pctPromo === undefined || typeof pctPromo !== "number" || !Number.isFinite(pctPromo)) {
-    return null;
-  }
-
-  if (!hasValidPromoRatio(pctPromo, pctKhach, pctCtv)) {
-    return null;
-  }
-
-  const promoRatio = getDiscountRatioInput(pctPromo);
-  const retailPrice = calculateSellingPriceFromMarginInput(baseValue, pctKhach);
-  if (promoRatio === null || retailPrice === null) {
-    return null;
-  }
-  const promoPriceRaw = retailPrice - retailPrice * promoRatio;
-  const promoPriceClamped = Math.min(retailPrice, Math.max(baseValue, promoPriceRaw));
-
-  return promoPriceClamped;
+  const direct = toNumberOrNull(pctPromo);
+  return typeof direct === "number" && direct > 0 ? direct : null;
 };
 
 export const applyBasePriceToProduct = (product: ProductPricingRow, basePrice: number | null): ProductPricingRow => {
@@ -237,54 +198,9 @@ export const applyBasePriceToProduct = (product: ProductPricingRow, basePrice: n
     return product;
   }
 
-  const wholesaleCandidate = multiplyBasePrice(product.pctCtv, basePrice);
-  const resolvedWholesale =
-    typeof wholesaleCandidate === "number" && Number.isFinite(wholesaleCandidate) && wholesaleCandidate > 0
-      ? wholesaleCandidate
-      : product.wholesalePrice;
-
-  const retailCandidate = multiplyValue(resolvedWholesale ?? basePrice, product.pctKhach);
-
-  const promoCandidate = calculatePromoPrice(
-    product.pctKhach,
-    product.pctPromo,
-    product.pctCtv,
-    resolvedWholesale ?? basePrice,
-    basePrice
-  );
-
-  const wholesaleForStudent =
-    typeof resolvedWholesale === "number" && Number.isFinite(resolvedWholesale) && resolvedWholesale > 0
-      ? resolvedWholesale
-      : basePrice;
-  const studentCandidate = computeStudentPrice(wholesaleForStudent, product.pctStu, product.pctKhach);
-  const hasStudentMargin =
-    typeof product.pctStu === "number" &&
-    Number.isFinite(product.pctStu) &&
-    product.pctStu > 0;
-
   return {
     ...product,
     baseSupplyPrice: basePrice,
-    wholesalePrice:
-      typeof resolvedWholesale === "number" && Number.isFinite(resolvedWholesale) && resolvedWholesale > 0
-        ? resolvedWholesale
-        : product.wholesalePrice,
-    retailPrice:
-      typeof retailCandidate === "number" && Number.isFinite(retailCandidate) && retailCandidate > 0
-        ? retailCandidate
-        : product.retailPrice,
-    studentPrice:
-      hasStudentMargin &&
-      typeof studentCandidate === "number" &&
-      Number.isFinite(studentCandidate) &&
-      studentCandidate > 0
-        ? studentCandidate
-        : null,
-    promoPrice:
-      typeof promoCandidate === "number" && Number.isFinite(promoCandidate) && promoCandidate > 0
-        ? promoCandidate
-        : product.promoPrice,
   };
 };
 
@@ -311,14 +227,61 @@ export const formatVndDisplay = (value: string | number): string => {
 
 export const parseRatioInput = (value: string): number | null => {
   if (value === undefined || value === null) return null;
-  const normalized = value.toString().replace(",", ".").trim();
-  if (!normalized) return null;
-  return toNumberOrNull(normalized);
+  const digits = String(value).replace(/\D+/g, "");
+  if (!digits) return null;
+  const numeric = Number(digits);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+export const calculateProfitPercentBySale = (
+  sellingPrice?: number | null,
+  costPrice?: number | null
+): number | null => {
+  if (
+    typeof sellingPrice !== "number" ||
+    !Number.isFinite(sellingPrice) ||
+    sellingPrice <= 0
+  ) {
+    return null;
+  }
+  if (
+    typeof costPrice !== "number" ||
+    !Number.isFinite(costPrice) ||
+    costPrice < 0
+  ) {
+    return null;
+  }
+
+  return ((sellingPrice - costPrice) / sellingPrice) * 100;
+};
+
+export const formatProfitPercentBySale = (
+  sellingPrice?: number | null,
+  costPrice?: number | null,
+  mode: "short" | "full" = "short"
+): string | null => {
+  const percent = calculateProfitPercentBySale(sellingPrice, costPrice);
+  if (percent === null) return null;
+
+  const rounded = Math.round(percent * 10) / 10;
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : "";
+  const abs = Math.abs(rounded);
+  const hasDecimal = Math.abs(abs - Math.trunc(abs)) > 0;
+  const formatted = abs.toLocaleString("vi-VN", {
+    minimumFractionDigits: hasDecimal ? 1 : 0,
+    maximumFractionDigits: 1,
+  });
+
+  if (mode === "full") {
+    return `${sign}${formatted}% lợi nhuận theo giá bán`;
+  }
+
+  return `${sign}${formatted}%`;
 };
 
 export const formatRateDescription = ({ multiplier, price, basePrice }: RateDescriptionInput): string => {
-  // Hide percentage display while keeping layout spacing intact.
-  return "";
+  void multiplier;
+  return formatProfitPercentBySale(price, basePrice, "short") ?? "Chưa có % LN";
 };
 
 export const formatCurrencyValue = (value?: number | null): string => {
@@ -330,7 +293,8 @@ export const formatCurrencyValue = (value?: number | null): string => {
 };
 
 export const formatPromoPercent = (value?: number | null): string | null => {
-  return formatNormalizedPercent(getDiscountRatioInput(value));
+  void value;
+  return null;
 };
 
 export const formatDateLabel = (value?: string | null): string => {
@@ -412,14 +376,29 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
   const packageProduct = cleanupLabel(row?.[VARIANT_PRICING_COLS.variantName] ?? row?.package_product_label);
   const sanPhamRaw = (row?.[VARIANT_PRICING_COLS.code] ?? row?.id_product_label ?? row?.id_product ?? "").toString().trim();
 
-  const pctKhach = toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctKhach]);
-  const pctStuRaw = toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctStu] ?? row?.pct_stu);
-  const pctStu =
-    typeof pctStuRaw === "number" && Number.isFinite(pctStuRaw) && pctStuRaw > 0
-      ? pctStuRaw
-      : null;
   const wholesalePrice = toNumberOrNull(
-    row?.computed_wholesale_price ?? row?.wholesale_price ?? row?.gia_si ?? row?.gia_ctv
+    row?.[VARIANT_PRICING_COLS.pctCtv] ??
+      row?.computed_wholesale_price ??
+      row?.wholesale_price ??
+      row?.gia_si ??
+      row?.gia_ctv
+  );
+  const pctKhach = toNumberOrNull(
+    row?.[VARIANT_PRICING_COLS.pctKhach] ??
+      row?.computed_retail_price ??
+      row?.retail_price ??
+      row?.gia_le
+  );
+  const pctPromo = toNumberOrNull(
+    row?.[VARIANT_PRICING_COLS.pctPromo] ??
+      row?.computed_promo_price ??
+      row?.promo_price ??
+      row?.gia_khuyen_mai ??
+      row?.gia_km
+  );
+  const pctStu = toNumberOrNull(
+    row?.[VARIANT_PRICING_COLS.pctStu] ??
+      row?.student_price
   );
 
   return {
@@ -430,7 +409,7 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
     variantLabel: buildVariantLabel(packageProduct, sanPhamRaw),
     pctCtv: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctCtv]),
     pctKhach,
-    pctPromo: toNumberOrNull(row?.[VARIANT_PRICING_COLS.pctPromo]),
+    pctPromo,
     pctStu,
     isActive: parseBoolean(row?.[VARIANT_PRICING_COLS.isActive]),
     basePrice: toNumberOrNull(
@@ -438,11 +417,9 @@ export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricing
     ),
     baseSupplyPrice: toNumberOrNull(row?.max_supply_price),
     wholesalePrice,
-    retailPrice: toNumberOrNull(row?.computed_retail_price ?? row?.retail_price ?? row?.gia_le),
-    studentPrice: computeStudentPrice(wholesalePrice, pctStu, pctKhach),
-    promoPrice: toNumberOrNull(
-      row?.computed_promo_price ?? row?.promo_price ?? row?.gia_khuyen_mai ?? row?.gia_km
-    ),
+    retailPrice: pctKhach,
+    studentPrice: pctStu,
+    promoPrice: pctPromo,
     lastUpdated:
       typeof row?.[VARIANT_PRICING_COLS.updatedAt] === "string"
         ? row[VARIANT_PRICING_COLS.updatedAt]

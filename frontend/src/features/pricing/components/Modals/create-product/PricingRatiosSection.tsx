@@ -13,7 +13,7 @@ export function PricingRatiosSection({
   return (
     <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300 mb-4">
-        Tỷ Giá
+        Bảng Giá
       </p>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <div>
@@ -35,9 +35,8 @@ export function PricingRatiosSection({
         <div>
           <label className={labelBase}>Giá CTV</label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="numeric"
             className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
             placeholder="0.00"
             value={createForm.pctCtv}
@@ -47,9 +46,8 @@ export function PricingRatiosSection({
         <div>
           <label className={labelBase}>Giá Khách</label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="numeric"
             className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
             placeholder="0.00"
             value={createForm.pctKhach}
@@ -59,9 +57,8 @@ export function PricingRatiosSection({
         <div>
           <label className={labelBase}>Giá Khuyến Mãi</label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="numeric"
             className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
             placeholder="0.00"
             value={createForm.pctPromo}
@@ -71,10 +68,8 @@ export function PricingRatiosSection({
         <div>
           <label className={labelBase}>Giá Sinh Viên</label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
+            type="text"
+            inputMode="numeric"
             className={`${inputBase} appearance-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
             placeholder="Để trống = mặc định server"
             value={createForm.pctStu}

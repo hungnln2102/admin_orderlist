@@ -1,13 +1,9 @@
 const { db } = require("../db");
-const {
-  calculateOrderPricingFromResolvedValues,
-  roundToThousands,
-} = require("../services/pricing/core");
+const { roundToThousands } = require("../services/pricing/core");
 const {
   TABLES,
   variantCols,
   supplyPriceCols,
-  MARGIN_PIVOT_SQL,
 } = require("./ProductsController/constants");
 const { quoteIdent } = require("../utils/sql");
 
@@ -57,19 +53,24 @@ async function postVariantsPricing(req, res, next) {
     const query = `
       SELECT
         v.${vid} AS id,
-        COALESCE(margins.pct_ctv, 0) AS pct_ctv,
-        COALESCE(margins.pct_khach, 0) AS pct_khach,
-        margins.pct_promo AS pct_promo,
-        margins.pct_stu AS pct_stu,
+        MAX(CASE WHEN pt.key = 'ctv' THEN vp.price END) AS ctv_price,
+        MAX(CASE WHEN pt.key = 'customer' THEN vp.price END) AS customer_price,
+        MAX(CASE WHEN pt.key = 'promo' THEN vp.price END) AS promo_price,
+        MAX(CASE WHEN pt.key = 'student' THEN vp.price END) AS student_price,
+        MAX(CASE WHEN pt.key = 'import' THEN vp.price END) AS import_price,
         COALESCE(spagg.max_supply_price, 0) AS max_supply_price
       FROM ${TABLES.variant} v
-      LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE
+      LEFT JOIN ${TABLES.variantMargin} vp
+        ON vp.variant_id = v.${vid}
+      LEFT JOIN ${TABLES.pricingTier} pt
+        ON pt.id = vp.tier_id
       LEFT JOIN LATERAL (
         SELECT MAX(sp.${spPrice}) AS max_supply_price
         FROM ${TABLES.supplyPrice} sp
         WHERE sp.${spVid} = v.${vid}
       ) spagg ON TRUE
       WHERE v.${vid} IN (${placeholders})
+      GROUP BY v.${vid}, spagg.max_supply_price
     `;
 
     const result = await db.raw(query, ids);
@@ -82,29 +83,22 @@ async function postVariantsPricing(req, res, next) {
       if (!row) return null;
 
       const pricingBase = toNum(row.max_supply_price);
-      const pctCtv = toNum(row.pct_ctv);
-      const pctKhach = toNum(row.pct_khach);
-      const pctPromo = row.pct_promo == null ? null : toNum(row.pct_promo);
-      const pctStu = row.pct_stu == null ? null : toNum(row.pct_stu);
-
-      const r = calculateOrderPricingFromResolvedValues({
-        pricingBase,
-        importPrice: pricingBase,
-        pctCtv,
-        pctKhach,
-        pctPromo,
-        pctStu,
-      });
+      const ctvPrice = toNum(row.ctv_price);
+      const retailPrice = toNum(row.customer_price);
+      const promoPrice = toNum(row.promo_price);
+      const studentPrice = toNum(row.student_price);
+      const importPrice = toNum(row.import_price);
 
       const costRounded = Math.max(0, roundToThousands(Math.round(pricingBase)));
+      const cost = importPrice > 0 ? importPrice : pricingBase;
 
       return {
         variantId: id,
-        ctvPrice: r.resellPrice,
-        retailPrice: r.customerPrice,
-        promoPrice: r.promoPrice,
-        studentPrice: r.meta?.studentPrice ?? r.customerPrice,
-        cost: r.cost,
+        ctvPrice: ctvPrice > 0 ? ctvPrice : retailPrice,
+        retailPrice,
+        promoPrice: promoPrice > 0 ? promoPrice : retailPrice,
+        studentPrice: studentPrice > 0 ? studentPrice : retailPrice,
+        cost,
         costRounded,
       };
     };

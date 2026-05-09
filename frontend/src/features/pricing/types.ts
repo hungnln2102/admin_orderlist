@@ -1,7 +1,7 @@
 import { CurrencyDollarIcon } from "@heroicons/react/24/outline";
 import type { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 
-export type StatusFilter = "all" | "active" | "inactive";
+export type StatusFilter = "all" | "active" | "inactive" | "promo";
 
 export type StatAccent = keyof typeof STAT_CARD_ACCENTS;
 

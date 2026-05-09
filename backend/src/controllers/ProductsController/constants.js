@@ -41,16 +41,17 @@ const TABLES = {
 };
 
 /**
- * SQL fragment: pivot variant_margin rows into pct_ctv / pct_khach / pct_promo / pct_stu columns.
+ * SQL fragment: pivot variant_price rows into pct_ctv / pct_khach / pct_promo / pct_stu columns.
+ * NOTE: giữ alias cũ để tương thích payload frontend, nhưng giá trị giờ là "price" tuyệt đối.
  * Usage: `LEFT JOIN LATERAL (${MARGIN_PIVOT_SQL}) margins ON TRUE`
  * Produces: margins.pct_ctv, margins.pct_khach, margins.pct_promo, margins.pct_stu
  */
 const MARGIN_PIVOT_SQL = `
   SELECT
-    MAX(CASE WHEN pt.key = 'ctv'      THEN vm.margin_ratio END) AS pct_ctv,
-    MAX(CASE WHEN pt.key = 'customer'  THEN vm.margin_ratio END) AS pct_khach,
-    MAX(CASE WHEN pt.key = 'promo'     THEN vm.margin_ratio END) AS pct_promo,
-    MAX(CASE WHEN pt.key = 'student'   THEN vm.margin_ratio END) AS pct_stu
+    MAX(CASE WHEN pt.key = 'ctv'      THEN vm.price END) AS pct_ctv,
+    MAX(CASE WHEN pt.key = 'customer'  THEN vm.price END) AS pct_khach,
+    MAX(CASE WHEN pt.key = 'promo'     THEN vm.price END) AS pct_promo,
+    MAX(CASE WHEN pt.key = 'student'   THEN vm.price END) AS pct_stu
   FROM ${tableName(PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE, SCHEMA_PRODUCT)} vm
   JOIN ${tableName(PRICING_TIER_SCHEMA.PRICING_TIER.TABLE, SCHEMA_PRODUCT)} pt ON pt.id = vm.tier_id
   WHERE vm.variant_id = v.id

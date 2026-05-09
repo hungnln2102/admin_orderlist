@@ -122,10 +122,14 @@ function Pricing() {
         />
         <PricingFilters
           searchTerm={searchTerm}
+          statusFilter={statusFilter}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
           error={error}
           onSearchChange={setSearchTerm}
+          onPromoFilterToggle={() =>
+            setStatusFilter(statusFilter === "promo" ? "all" : "promo")
+          }
           onRefresh={handleRefreshAll}
           onAddProduct={handleOpenCreateModal}
         />

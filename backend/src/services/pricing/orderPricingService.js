@@ -2,9 +2,11 @@ const { db } = require("../../db");
 const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { TABLES, COLS } = require("../../controllers/Order/constants");
 const {
-  calculateOrderPricingFromResolvedValues,
   normalizeMoney,
+  roundToThousands,
+  resolveOrderKind,
 } = require("./core");
+const { getTiers } = require("./tierCache");
 const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../utils/orderHelpers");
 
 class PricingHttpError extends Error {
@@ -38,13 +40,21 @@ const fetchVariantPricing = async (productNameOrId) => {
   const row = await baseQuery.first();
   if (!row) return null;
 
-  const margins = await db(TABLES.variantMargin)
+  const rows = await db(TABLES.variantMargin)
     .join(TABLES.pricingTier, `${TABLES.pricingTier}.id`, `${TABLES.variantMargin}.tier_id`)
     .where(`${TABLES.variantMargin}.variant_id`, row.variant_id)
-    .select(`${TABLES.pricingTier}.key as tier_key`, `${TABLES.variantMargin}.margin_ratio`);
+    .select(
+      `${TABLES.pricingTier}.key as tier_key`,
+      `${TABLES.variantMargin}.margin_ratio`,
+      `${TABLES.variantMargin}.price`
+    );
 
   const marginMap = {};
-  for (const m of margins) marginMap[m.tier_key] = m.margin_ratio;
+  const priceMap = {};
+  for (const item of rows) {
+    marginMap[item.tier_key] = item.margin_ratio;
+    priceMap[item.tier_key] = item.price;
+  }
 
   return {
     variantId: row.variant_id,
@@ -52,6 +62,7 @@ const fetchVariantPricing = async (productNameOrId) => {
     pctKhach: marginMap.customer ?? null,
     pctPromo: marginMap.promo ?? null,
     pctStu: marginMap.student ?? null,
+    tierPrices: priceMap,
   };
 };
 
@@ -159,27 +170,85 @@ const calculateOrderPricing = async ({
     throw new PricingHttpError(400, "Không có giá NCC");
   }
 
-  const importPriceForFormula = isMavrykProfit
+  const tierPrices = variantPricing.tierPrices || {};
+  const toPrice = (value) => {
+    const numeric = normalizeMoney(value);
+    return numeric > 0 ? numeric : 0;
+  };
+  const ctvPrice = toPrice(tierPrices.ctv);
+  const customerPrice = toPrice(tierPrices.customer);
+  const promoPriceRaw = toPrice(tierPrices.promo);
+  const studentPrice = toPrice(tierPrices.student);
+  const importTierPrice = toPrice(tierPrices.import);
+
+  const orderKind = await resolveOrderKind({
+    orderId: normalizedOrderId,
+    customerType,
+  });
+  const matchedTierKey = orderKind?.matchedTier?.key || null;
+  const activeTiers = await getTiers();
+  const hasCustomerTier = activeTiers.some((tier) => tier.key === "customer");
+  const defaultTierKey = hasCustomerTier
+    ? "customer"
+    : (activeTiers[0]?.key || "customer");
+  const selectedTierKey = matchedTierKey || defaultTierKey;
+  const selectedTierPrice = toPrice(tierPrices[selectedTierKey]);
+
+  const fallbackTierPrice = customerPrice || ctvPrice || promoPriceRaw || studentPrice || importTierPrice;
+  const fallbackOrderPrice = normalizeMoney(orderRow?.price);
+  const importFallbackPrice = importBySource > 0 ? importBySource : importTierPrice > 0 ? importTierPrice : maxSupplyPrice;
+  const resolvedPrice = selectedTierPrice > 0
+    ? selectedTierPrice
+    : selectedTierKey === "gift"
+      ? 0
+    : selectedTierKey === "import" && importFallbackPrice > 0
+      ? importFallbackPrice
+    : fallbackTierPrice > 0
+      ? fallbackTierPrice
+    : fallbackOrderPrice > 0
+      ? fallbackOrderPrice
+      : 0;
+  if (resolvedPrice <= 0 && selectedTierKey !== "gift") {
+    throw new PricingHttpError(
+      400,
+      `Chưa cấu hình giá (price) cho tier '${selectedTierKey}' của variant ${variantPricing.variantId}.`
+    );
+  }
+
+  const resolvedCostRaw = isMavrykProfit
     ? 0
     : importBySource > 0
       ? importBySource
-      : maxSupplyPrice;
+      : importTierPrice > 0
+        ? importTierPrice
+        : maxSupplyPrice;
+  const resolvedCost = isMavrykProfit
+    ? 0
+    : Math.max(0, roundToThousands(Math.round(resolvedCostRaw)));
 
-  const pricingResult = calculateOrderPricingFromResolvedValues({
-    orderId: normalizedOrderId,
-    customerType,
-    pricingBase: maxSupplyPrice > 0 ? maxSupplyPrice : importBySource,
-    importPrice: importPriceForFormula,
-    fallbackPrice: normalizeMoney(orderRow?.price),
-    fallbackCost: isMavrykProfit ? 0 : normalizeMoney(orderRow?.cost),
-    pctCtv: variantPricing.pctCtv,
-    pctKhach: variantPricing.pctKhach,
-    pctPromo: variantPricing.pctPromo,
-    pctStu: variantPricing.pctStu,
-    roundCostToThousands: !isMavrykProfit,
+  const retailPrice = customerPrice > 0 ? customerPrice : resolvedPrice;
+  const promoPrice = promoPriceRaw > 0 ? promoPriceRaw : retailPrice;
+  const resellPrice = ctvPrice > 0 ? ctvPrice : resolvedPrice;
+  const promoAmount = Math.max(0, retailPrice - promoPrice);
+
+  const pricingResult = {
+    cost: resolvedCost,
+    price: resolvedPrice,
+    promoPrice,
+    pricePromo: promoPrice,
+    promo: promoAmount,
+    resellPrice,
+    customerPrice: retailPrice,
+    totalPrice: resolvedPrice,
     days: 30,
-    expiryDate: "",
-  });
+    expiry_date: "",
+    meta: {
+      source: "variant_price",
+      selectedTierKey,
+      matchedTierKey,
+      studentPrice: studentPrice > 0 ? studentPrice : retailPrice,
+    },
+  };
 
   if (isMavrykProfit) {
     return {
@@ -191,7 +260,10 @@ const calculateOrderPricing = async ({
     };
   }
 
-  return pricingResult;
+  return {
+    ...pricingResult,
+    gia_nhap: pricingResult.cost,
+  };
 };
 
 module.exports = {

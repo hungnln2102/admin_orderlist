@@ -166,7 +166,7 @@ const createProductPrice = async (req, res) => {
             await trx(TABLES.variantMargin).insert({
               variant_id: variantId,
               tier_id: tier.id,
-              margin_ratio: value,
+              price: value,
             });
           }
 

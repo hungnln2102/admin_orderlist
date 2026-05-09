@@ -1,5 +1,3 @@
-const { calculateOrderPricingFromResolvedValues } = require("../services/pricing/core");
-
 const MAX_BATCH = 200;
 
 function toFiniteNumber(value, fallback = 0) {
@@ -14,48 +12,39 @@ function normalizeItem(raw, index) {
     throw err;
   }
 
-  const pricingBase = toFiniteNumber(
-    raw.pricingBase ?? raw.priceMax ?? raw.price_max,
-    NaN,
-  );
-  if (!Number.isFinite(pricingBase) || pricingBase < 0) {
-    const err = new Error(`Invalid pricingBase / priceMax at index ${index}`);
-    err.status = 400;
-    throw err;
-  }
-
-  const pctCtv = raw.pctCtv ?? raw.pct_ctv;
-  const pctKhach = raw.pctKhach ?? raw.pct_khach;
-  const pctPromo = raw.pctPromo ?? raw.pct_promo ?? null;
-  const pctStu = raw.pctStu ?? raw.pct_stu ?? null;
-
   return {
-    pricingBase,
-    importPrice: raw.importPrice ?? raw.import_price,
-    pctCtv,
-    pctKhach,
-    pctPromo,
-    pctStu,
-    orderId: raw.orderId ?? raw.order_id ?? "",
-    customerType: raw.customerType ?? raw.customer_type ?? "",
-    forceKhachLe: Boolean(raw.forceKhachLe ?? raw.force_khach_le),
+    ctvPrice: toFiniteNumber(raw.ctvPrice ?? raw.ctv_price ?? raw.resellPrice ?? raw.resell_price),
+    retailPrice: toFiniteNumber(
+      raw.retailPrice ??
+      raw.retail_price ??
+      raw.customerPrice ??
+      raw.customer_price ??
+      raw.price
+    ),
+    promoPrice: toFiniteNumber(raw.promoPrice ?? raw.promo_price),
+    cost: toFiniteNumber(raw.cost ?? raw.importPrice ?? raw.import_price),
+    totalPrice: toFiniteNumber(raw.totalPrice ?? raw.total_price ?? raw.price),
   };
 }
 
 function mapResult(r) {
+  const retail = r.retailPrice > 0 ? r.retailPrice : r.totalPrice;
+  const promo = r.promoPrice > 0 ? r.promoPrice : retail;
+  const ctv = r.ctvPrice > 0 ? r.ctvPrice : retail;
+  const total = r.totalPrice > 0 ? r.totalPrice : retail;
   return {
-    ctvPrice: r.resellPrice,
-    retailPrice: r.customerPrice,
-    promoPrice: r.promoPrice,
+    ctvPrice: ctv,
+    retailPrice: retail,
+    promoPrice: promo,
     cost: r.cost,
-    totalPrice: r.totalPrice,
+    totalPrice: total,
   };
 }
 
 /**
  * POST /api/public/pricing/calculate
- * Body: { items: [ { pricingBase|priceMax, pctCtv, pctKhach, pctPromo?, ... } ] }
- * Or single row: { pricingBase, pctCtv, pctKhach, ... } without `items`
+ * Body: { items: [ { retailPrice, promoPrice?, ctvPrice?, cost? } ] }
+ * Or single row without `items`.
  */
 function postCalculate(req, res, next) {
   try {
@@ -71,37 +60,15 @@ function postCalculate(req, res, next) {
 
       const results = body.items.map((raw, i) => {
         const item = normalizeItem(raw, i);
-        const r = calculateOrderPricingFromResolvedValues({
-          pricingBase: item.pricingBase,
-          importPrice: item.importPrice,
-          pctCtv: item.pctCtv,
-          pctKhach: item.pctKhach,
-          pctPromo: item.pctPromo,
-          pctStu: item.pctStu,
-          orderId: item.orderId,
-          customerType: item.customerType,
-          forceKhachLe: item.forceKhachLe,
-        });
-        return mapResult(r);
+        return mapResult(item);
       });
 
       return res.json({ ok: true, results });
     }
 
     const item = normalizeItem(body, 0);
-    const r = calculateOrderPricingFromResolvedValues({
-      pricingBase: item.pricingBase,
-      importPrice: item.importPrice,
-      pctCtv: item.pctCtv,
-      pctKhach: item.pctKhach,
-      pctPromo: item.pctPromo,
-      pctStu: item.pctStu,
-      orderId: item.orderId,
-      customerType: item.customerType,
-      forceKhachLe: item.forceKhachLe,
-    });
 
-    return res.json({ ok: true, result: mapResult(r) });
+    return res.json({ ok: true, result: mapResult(item) });
   } catch (e) {
     if (e.status === 400) {
       return res.status(400).json({ error: "INVALID_INPUT", message: e.message });

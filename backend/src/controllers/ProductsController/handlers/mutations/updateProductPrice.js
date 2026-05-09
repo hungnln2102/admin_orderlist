@@ -161,10 +161,10 @@ const updateProductPrice = async (req, res) => {
         if (!tier) continue;
         const ratio = toNullableNumber(value);
         await db.raw(
-          `INSERT INTO ${TABLES.variantMargin} (variant_id, tier_id, margin_ratio)
+          `INSERT INTO ${TABLES.variantMargin} (variant_id, tier_id, price)
            VALUES (?, ?, ?)
            ON CONFLICT (variant_id, tier_id)
-           DO UPDATE SET margin_ratio = EXCLUDED.margin_ratio`,
+           DO UPDATE SET price = EXCLUDED.price`,
           [parsedId, tier.id, ratio]
         );
       }

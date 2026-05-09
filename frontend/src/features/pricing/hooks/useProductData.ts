@@ -131,8 +131,13 @@ export const useProductData = (): UseProductDataResult => {
     return productPrices
       .filter((item) => {
         const resolvedIsActive = statusOverrides[item.id] ?? item.isActive;
+        const hasPromo =
+          typeof item.promoPrice === "number" &&
+          Number.isFinite(item.promoPrice) &&
+          item.promoPrice > 0;
         if (statusFilter === "active" && !resolvedIsActive) return false;
         if (statusFilter === "inactive" && resolvedIsActive) return false;
+        if (statusFilter === "promo" && !hasPromo) return false;
         if (!searchTokens.length) return true;
 
         const haystack = normalizeSearchText(
