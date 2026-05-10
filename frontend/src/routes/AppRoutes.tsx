@@ -30,7 +30,6 @@ const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/Renew
 const RenewProfileCheckDeskPage = lazy(
   () => import("@/features/renew-adobe/storefront-check/RenewProfileCheckDeskPage"),
 );
-const ProductSystem = lazy(() => import("@/features/product-system/index.tsx"));
 const ArticlesPage = lazy(() => import("@/features/content/pages/ArticlesPage"));
 const CreateArticlePage = lazy(() => import("@/features/content/pages/CreateArticlePage"));
 const ArticleCategoriesPage = lazy(() => import("@/features/content/pages/ArticleCategoriesPage"));
@@ -62,7 +61,6 @@ export function AppRoutes() {
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
-        <Route path="/product-system" element={<ProductSystem />} />
         <Route path="/content/articles" element={<ArticlesPage />} />
         <Route path="/content/create" element={<CreateArticlePage />} />
         <Route path="/content/edit/:id" element={<CreateArticlePage />} />

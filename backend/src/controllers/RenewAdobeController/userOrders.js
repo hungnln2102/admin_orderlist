@@ -5,12 +5,7 @@ const {
   RENEW_ADOBE_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
-const {
-  TBL_ORDER,
-  ORD_COLS,
-  ALLOWED_ORDER_STATUSES,
-  getRenewAdobeVariantIds,
-} = require("./orderAccess");
+const { TBL_ORDER, ORD_COLS } = require("./orderAccess");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
@@ -25,19 +20,19 @@ const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 const ACC_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACC_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
+/**
+ * Nguồn dữ liệu là `order_user_tracking` (bảng tracking) — không lọc renew_adobe variant
+ * để đơn admin tự thêm tay (không thuộc nhóm renew_adobe) vẫn hiển thị.
+ *
+ * Các bảng JOIN bổ sung:
+ * - order_list (o): lấy customer/contact/status/expiry hiện tại (fallback về tracking nếu thiếu).
+ * - user_account_mapping (m): map email ↔ adobe_account_id theo cặp (order_id, email).
+ * - accounts_admin (acc): tên org & license_status của admin Adobe.
+ */
 const listUserOrders = async (_req, res) => {
   try {
-    const variantIds = await getRenewAdobeVariantIds();
-
-    if (variantIds.length === 0) {
-      logger.info(
-        "[renew-adobe] user-orders: 0 rows (chưa có variant nào thuộc renew_adobe)"
-      );
-      return res.json([]);
-    }
-
-    const rows = await db({ o: TBL_ORDER })
-      .leftJoin({ t: TRACK_TABLE }, function joinTracking() {
+    const rows = await db({ t: TRACK_TABLE })
+      .leftJoin({ o: TBL_ORDER }, function joinOrder() {
         this.on(
           db.raw("CAST(?? AS TEXT)", [`o.${ORD_COLS.ID_ORDER}`]),
           "=",
@@ -45,43 +40,46 @@ const listUserOrders = async (_req, res) => {
         );
       })
       .leftJoin({ m: MAP_TABLE }, function joinMap() {
-        this.on(`o.${ORD_COLS.ID_ORDER}`, "=", `m.${MAP_COLS.ORDER_ID}`).andOn(
-          db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`o.${ORD_COLS.INFORMATION_ORDER}`]),
+        this.on(
+          `t.${TRACK_COLS.ORDER_ID}`,
           "=",
-          db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`m.${MAP_COLS.USER_EMAIL}`])
+          db.raw("CAST(?? AS TEXT)", [`m.${MAP_COLS.ORDER_ID}`])
+        ).andOn(
+          db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`m.${MAP_COLS.USER_EMAIL}`]),
+          "=",
+          db.raw(`LOWER(TRIM(COALESCE(??, '')))`, [`t.${TRACK_COLS.ACCOUNT}`])
         );
       })
       .leftJoin({ acc: ACC_TABLE }, `acc.${ACC_COLS.ID}`, `m.${MAP_COLS.ADOBE_ACCOUNT_ID}`)
       .select(
-        `o.${ORD_COLS.ID_ORDER} as order_code`,
-        `o.${ORD_COLS.INFORMATION_ORDER} as information_order`,
-        `o.${ORD_COLS.CUSTOMER} as customer`,
+        `t.${TRACK_COLS.ORDER_ID} as order_code`,
+        db.raw(
+          `COALESCE(o.${ORD_COLS.INFORMATION_ORDER}, t.${TRACK_COLS.ACCOUNT}) as information_order`
+        ),
+        db.raw(
+          `COALESCE(o.${ORD_COLS.CUSTOMER}, t.${TRACK_COLS.CUSTOMER}) as customer`
+        ),
         `o.${ORD_COLS.CONTACT} as contact`,
         db.raw(
-          `TO_CHAR((o.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as expiry_date`
+          `TO_CHAR(COALESCE((o.${ORD_COLS.EXPIRY_DATE})::timestamptz, (t.${TRACK_COLS.EXPIRED})::timestamptz) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as expiry_date`
         ),
         `o.${ORD_COLS.STATUS} as status`,
         `t.${TRACK_COLS.ORG_NAME} as tracking_org_name`,
         `t.${TRACK_COLS.STATUS} as tracking_status`,
         `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
+        `t.${TRACK_COLS.SYSTEM_NOTE} as system_note`,
         `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_account_id`,
         `acc.${ACC_COLS.LICENSE_STATUS} as admin_license_status`,
         `acc.${ACC_COLS.ORG_NAME} as admin_org_name`
       )
-      .whereIn(`o.${ORD_COLS.ID_PRODUCT}`, variantIds)
-      .whereIn(`o.${ORD_COLS.STATUS}`, ALLOWED_ORDER_STATUSES)
-      .whereNotNull(`o.${ORD_COLS.INFORMATION_ORDER}`)
-      .orderBy(`o.${ORD_COLS.ID_ORDER}`, "asc");
+      .orderBy(`t.${TRACK_COLS.ORDER_ID}`, "asc");
 
-    logger.info(
-      "[renew-adobe] user-orders: %d rows (variant_ids: %s)",
-      rows.length,
-      variantIds.join(", ")
-    );
+    logger.info("[renew-adobe] user-orders (from tracking): %d rows", rows.length);
     return res.json(rows);
   } catch (error) {
     logger.error("[renew-adobe] user-orders failed", {
       error: error.message,
+      stack: error.stack,
     });
     return res
       .status(500)

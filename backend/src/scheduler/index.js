@@ -14,6 +14,7 @@ const {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  cleanupExpiredTrackingTask,
   syncDailyRevenueSummaryTask,
   getSchedulerStatus,
   schedulerTimezone,
@@ -80,6 +81,14 @@ const runDailyRevenueSummarySafe = (source) =>
     })
   );
 
+const runCleanupExpiredTrackingSafe = (source) =>
+  cleanupExpiredTrackingTask(source).catch((err) =>
+    logger.error(`[CRON] cleanup expired tracking failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
 if (require.main === module && process.argv.includes("--run-once")) {
   runCronSafe("manual");
 }
@@ -89,6 +98,8 @@ cron.schedule(
   async () => {
     logger.info("[Scheduler] Cron 00:01 triggered", { cronExpression, timezone: schedulerTimezone });
     await runCronSafe("cron");
+    // Cleanup tracking ngay sau update DB — tránh giữ row hết hạn trong UI Renew Adobe.
+    await runCleanupExpiredTrackingSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }
 );
@@ -175,6 +186,7 @@ module.exports = {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  cleanupExpiredTrackingTask,
   syncDailyRevenueSummaryTask,
   getSchedulerStatus,
 };

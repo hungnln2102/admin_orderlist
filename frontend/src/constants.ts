@@ -76,15 +76,17 @@ export const API_ENDPOINTS = {
   /** Cùng hàm với job cron hàng giờ (`renewAdobeCheckAndNotifyTask`), chạy trong process API (không phải process `scheduler.js`). */
   SCHEDULER_RUN_ADOBE_CHECK: "/api/scheduler/run-adobe-check",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
+  RENEW_ADOBE_USER_ORDERS_TRACK: "/api/renew-adobe/user-orders/track",
+  RENEW_ADOBE_USER_ORDERS_BY_CODE: (orderCode: string) =>
+    `/api/renew-adobe/user-orders/${encodeURIComponent(orderCode)}`,
+  RENEW_ADOBE_ORDER_LIST_MATCH: "/api/renew-adobe/order-list/match",
+  FIX_ADES_CHECK: "/api/fix-ades/check",
+  FIX_ADES_RENEW: "/api/fix-ades/renew",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
   /** Fix All: backend chạy hết vòng (slot + add batch) trong một lần gọi. */
   RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
-  RENEW_ADOBE_VARIANTS: "/api/renew-adobe/variants",
-  RENEW_ADOBE_PRODUCT_SYSTEM: "/api/renew-adobe/product-system",
-  RENEW_ADOBE_PRODUCT_SYSTEM_DELETE: (id: number) =>
-    `/api/renew-adobe/product-system/${id}`,
 
   CUSTOMER_STATUS: "/api/customer-status",
   IP_WHITELISTS: "/api/ip-whitelists",

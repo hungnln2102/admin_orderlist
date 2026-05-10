@@ -45,6 +45,7 @@ const storeProfitExpensesRoutes = require("../domains/store-profit-expenses/rout
 const ipWhitelistRoutes = require("../domains/ip-whitelist/routes");
 const siteMaintenanceRoutes = require("../domains/site-maintenance/routes");
 const ninerouterRoutes = require("../domains/ninerouter/routes");
+const fixAdesRoutes = require("../domains/fix-ades/routes");
 const longTimeout = (ms) => (req, res, next) => {
   req.setTimeout(ms);
   res.setTimeout(ms);
@@ -80,6 +81,7 @@ router.use("/ninerouter", longTimeout(600_000), ninerouterRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/form-info", formInfoRoutes);
 router.use("/renew-adobe", longTimeout(900_000), renewAdobeMount);
+router.use("/fix-ades", fixAdesRoutes);
 router.use("/ip-whitelists", ipWhitelistRoutes);
 router.use("/site-maintenance", siteMaintenanceRoutes);
 router.use("/", customerStatusRoutes);

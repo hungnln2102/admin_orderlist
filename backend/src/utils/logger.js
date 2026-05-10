@@ -42,6 +42,27 @@ const logFormat = winston.format.combine(
   winston.format.json()
 );
 
+/**
+ * Safe JSON.stringify — bỏ qua circular refs để các log meta chứa Knex Raw,
+ * Promise, EventEmitter… không làm crash printf formatter của Winston.
+ */
+function safeStringify(obj) {
+  const seen = new WeakSet();
+  try {
+    return JSON.stringify(obj, (_key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return "[Circular]";
+        seen.add(value);
+      }
+      if (typeof value === "function") return "[Function]";
+      if (typeof value === "bigint") return value.toString();
+      return value;
+    });
+  } catch (err) {
+    return `[Unserializable: ${err?.message || "unknown"}]`;
+  }
+}
+
 // Console format (more readable)
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
@@ -50,7 +71,7 @@ const consoleFormat = winston.format.combine(
     const { timestamp, level, message, ...meta } = info;
     let metaStr = "";
     if (Object.keys(meta).length > 0 && meta.stack === undefined) {
-      metaStr = ` ${JSON.stringify(meta)}`;
+      metaStr = ` ${safeStringify(meta)}`;
     }
     if (meta.stack) {
       metaStr = `\n${meta.stack}`;
@@ -107,6 +128,26 @@ try {
   const { notifyError, notifyWarn } = require("./telegramErrorNotifier");
   const splatKey = Symbol.for("splat");
 
+  /**
+   * Bỏ qua các log thuộc nhánh gửi Telegram nội bộ — nếu forward lại lên Telegram,
+   * khi chính API Telegram timeout/đứng sẽ tạo vòng lặp + spam (warn + error + retry log
+   * cho cùng 1 lần fail, mỗi lần lại push 1 message).
+   */
+  const SUPPRESS_FORWARD_PATTERNS = [
+    /\[ErrorNotifier\]/i,
+    /\[Order\]\[Telegram\]/i,
+    /\[Renewal\]\[Telegram\]/i,
+    /\[Telegram\]\[/i,
+    /sendRenewalNotification/i,
+    /TelegramFinanceDeltaNotifier/i,
+  ];
+
+  const shouldSuppressForward = (info) => {
+    const msg = String(info?.message || "");
+    if (!msg) return false;
+    return SUPPRESS_FORWARD_PATTERNS.some((re) => re.test(msg));
+  };
+
   const extractPayload = (info) => {
     const splat = info[splatKey]?.[0] || {};
     const status = info.status ?? info.statusCode ?? splat.status;
@@ -131,7 +172,7 @@ try {
   const TelegramErrorTransport = class extends winston.Transport {
     log(info, callback) {
       setImmediate(() => {
-        if (String(info.message || "").includes("[ErrorNotifier]")) return;
+        if (shouldSuppressForward(info)) return;
         notifyError(extractPayload(info));
       });
       callback();
@@ -141,7 +182,7 @@ try {
   const TelegramWarnTransport = class extends winston.Transport {
     log(info, callback) {
       setImmediate(() => {
-        if (String(info.message || "").includes("[ErrorNotifier]")) return;
+        if (shouldSuppressForward(info)) return;
         notifyWarn(extractPayload(info));
       });
       callback();

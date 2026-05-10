@@ -2,7 +2,16 @@
  * Cấu hình Telegram và QR từ env. Không hardcode giá trị nhạy cảm.
  */
 
-const HTTP_TIMEOUT_MS = 10_000;
+/**
+ * Timeout HTTP request tới Telegram API. Mặc định 20s — Telegram đôi khi
+ * chậm 10–15s khi mạng đứng (đặc biệt sendPhoto), 10s cũ dễ false-positive timeout.
+ * Có thể chỉnh qua env `TELEGRAM_HTTP_TIMEOUT_MS`.
+ */
+const HTTP_TIMEOUT_MS = (() => {
+  const raw = Number.parseInt(process.env.TELEGRAM_HTTP_TIMEOUT_MS || "", 10);
+  if (Number.isFinite(raw) && raw >= 5_000 && raw <= 120_000) return raw;
+  return 20_000;
+})();
 
 // message_thread_id only when TELEGRAM_ORDER_TOPIC_ID is set to a valid integer (no default "1").
 function parseOptionalTopicId(raw) {

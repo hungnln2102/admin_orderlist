@@ -1,6 +1,11 @@
 import * as Helpers from "@/lib/helpers";
 import type { LicenseStatus } from "../types";
 import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
+import {
+  DEFAULT_ADOBE_SYSTEM_CODE,
+  isAdobeSystemCode,
+  type AdobeSystemCode,
+} from "./system-options";
 import type { DisplayStatus, OrderInfo, UserOrderRow } from "./types";
 
 /**
@@ -57,14 +62,26 @@ export function buildEmailOrderMap(
 
 /** Trạng thái hiển thị từ order_user_tracking + admin (API user-orders đã join). */
 function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
-  const aid = Number(order.adobe_account_id) || 0;
-  if (aid <= 0) return "not_added";
   const ts = (order.tracking_status || "").trim().toLowerCase();
-  if (ts.includes("chưa cấp")) return "no_product";
-  if (ts.includes("chưa add")) return "not_added";
+  // "hết gói" / "hết hạn" — set bởi luồng Fix Ades khi check trả error/expired.
+  // Bypass require accountId vì Ades không gắn admin Adobe.
+  if (ts.includes("hết gói") || ts.includes("hết hạn") || ts === "expired") {
+    return "expired";
+  }
+  // Fix Ades / hệ thống dùng tracking_status="có gói" trực tiếp (không cần adobe_account_id).
   if (ts.includes("có gói")) {
+    if (
+      order.system_note === "fix_ades" ||
+      order.system_note === "fix_adobe_edu"
+    ) {
+      return "active";
+    }
     return normalizeIncomingLicenseStatus(order.admin_license_status);
   }
+  const aid = Number(order.adobe_account_id) || 0;
+  if (aid <= 0) return "not_added";
+  if (ts.includes("chưa cấp")) return "no_product";
+  if (ts.includes("chưa add")) return "not_added";
   return "not_added";
 }
 
@@ -86,6 +103,9 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
             String(order.admin_org_name).trim()) ||
           "—";
 
+    const systemNote: AdobeSystemCode = isAdobeSystemCode(order.system_note)
+      ? order.system_note
+      : DEFAULT_ADOBE_SYSTEM_CODE;
     rows.push({
       id: aid > 0 ? `acc-${aid}-${email}` : `order-${email}`,
       order_code: order.order_code ?? "—",
@@ -97,6 +117,7 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",
       accountId: aid,
+      systemNote,
     });
   }
   return rows;

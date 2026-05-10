@@ -54,6 +54,8 @@ const RENEW_ADOBE_SCHEMA = {
       STATUS: "status",
       UPDATED_AT: "update_at",
       ID_PRODUCT: "id_product",
+      /** Hệ thống fix tương ứng (renew_adobe, fix_adobe_edu, ...). Default 'renew_adobe'. */
+      SYSTEM_NOTE: "system_note",
     },
   },
 };

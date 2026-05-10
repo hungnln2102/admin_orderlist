@@ -267,6 +267,25 @@ async function reassignUsersToAvailableAccounts(emailsToReassign, jobRun) {
 }
 
 async function runRenewAdobePostCheckFlow({ trigger = "cron" } = {}) {
+  const {
+    ensureAdminAccountsExist,
+  } = require("./shared/adminAccountsGuard");
+  if (
+    !(await ensureAdminAccountsExist({
+      taskName: "runRenewAdobePostCheckFlow",
+      trigger,
+    }))
+  ) {
+    return {
+      usersToFix: 0,
+      usersFixed: 0,
+      remainingUnfixed: 0,
+      failedAccounts: [],
+      syncResult: { inserted: 0, removed: 0 },
+      skipped: true,
+    };
+  }
+
   const jobRun = startJobRun("renew-adobe-post-check-fix", { trigger });
   setCounter(jobRun, "users_to_fix", 0);
   setCounter(jobRun, "users_fixed", 0);

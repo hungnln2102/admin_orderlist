@@ -144,7 +144,7 @@ export const menuSections: MenuSection[] = [
   {
     id: "renew",
     title: "Hệ thống Renew",
-    description: "Quản trị Adobe admin và nhóm sản phẩm hệ thống.",
+    description: "Quản trị Adobe admin và đơn được tracking.",
     icon: ArrowPathIcon,
     tone: "amber",
     items: [
@@ -152,11 +152,6 @@ export const menuSections: MenuSection[] = [
         name: "Danh sách Admin Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
-      },
-      {
-        name: "Sản phẩm hệ thống",
-        href: "/product-system",
-        icon: CubeIcon,
       },
       {
         name: "IP whitelist",

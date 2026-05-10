@@ -140,10 +140,18 @@ function resolveRowStatus({ informationOrder, mapping }) {
 /**
  * Upsert các đơn đã lấy từ order_list (đã lọc renew_adobe nếu cần ở caller).
  * @param {object[]} orders - rows có ORD_COLS + expired_vn
+ * @param {{ systemNote?: string }} [options]
+ *   - systemNote: gắn vào `order_user_tracking.system_note` cho đơn mới.
+ *     Khi MERGE (đơn đã tồn tại) chỉ ghi đè nếu caller truyền `systemNote` rõ ràng,
+ *     để cron auto không vô tình đổi system_note do admin gán tay.
  * @returns {Promise<number>} số đơn đã upsert
  */
-async function upsertTrackingRowsFromOrderRows(orders) {
+async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
   if (!orders || orders.length === 0) return 0;
+  const explicitSystemNote =
+    options && typeof options.systemNote === "string"
+      ? options.systemNote.trim()
+      : "";
 
   const orderCodes = orders
     .map((o) => String(o[ORD_COLS.ID_ORDER] || "").trim())
@@ -248,6 +256,11 @@ async function upsertTrackingRowsFromOrderRows(orders) {
       if (idProductStr) {
         insertRow[TRACK_COLS.ID_PRODUCT] = idProductStr;
         mergeRow[TRACK_COLS.ID_PRODUCT] = idProductStr;
+      }
+
+      if (TRACK_COLS.SYSTEM_NOTE && explicitSystemNote) {
+        insertRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
+        mergeRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
       }
 
       await trx(TRACK_TABLE).insert(insertRow).onConflict(TRACK_COLS.ORDER_ID).merge(mergeRow);
@@ -396,9 +409,20 @@ async function reconcileOrderUserTrackingWithTeamMembers(
   };
 }
 
-async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds) {
-  const variantIds = await getRenewAdobeVariantIds();
-  if (!variantIds.length) return 0;
+/**
+ * Upsert tracking theo danh sách order_id.
+ * @param {string[]} orderIds
+ * @param {{ enforceRenewAdobeVariant?: boolean, systemNote?: string }} [options]
+ *   - enforceRenewAdobeVariant=true (mặc định): chỉ chấp nhận đơn thuộc variant `renew_adobe`
+ *     (dùng cho cron / luồng tự động).
+ *   - enforceRenewAdobeVariant=false: thêm tay từ UI admin — chỉ kiểm tra mã đơn tồn tại
+ *     trong order_list, bỏ qua check variant.
+ *   - systemNote: gắn vào cột `order_user_tracking.system_note` (mặc định không ghi đè).
+ */
+async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds, options) {
+  const enforceVariant = options?.enforceRenewAdobeVariant !== false;
+  const systemNote =
+    typeof options?.systemNote === "string" ? options.systemNote.trim() : "";
 
   const ids = [
     ...new Set(
@@ -409,7 +433,13 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds) {
   ];
   if (ids.length === 0) return 0;
 
-  const orders = await db(TBL_ORDER)
+  let variantIds = [];
+  if (enforceVariant) {
+    variantIds = await getRenewAdobeVariantIds();
+    if (!variantIds.length) return 0;
+  }
+
+  const query = db(TBL_ORDER)
     .select(
       ORD_COLS.ID_ORDER,
       ORD_COLS.CUSTOMER,
@@ -418,13 +448,25 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds) {
         `((${TBL_ORDER}.${ORD_COLS.EXPIRY_DATE})::timestamptz AT TIME ZONE 'Asia/Ho_Chi_Minh')::date as expired_vn`
       )
     )
-    .whereIn(ORD_COLS.ID_ORDER, ids)
-    .whereIn(ORD_COLS.ID_PRODUCT, variantIds)
-    .orderBy(ORD_COLS.ID_ORDER, "asc");
+    .whereIn(ORD_COLS.ID_ORDER, ids);
 
-  const n = await upsertTrackingRowsFromOrderRows(orders);
+  if (enforceVariant) {
+    query.whereIn(ORD_COLS.ID_PRODUCT, variantIds);
+  }
+
+  const orders = await query.orderBy(ORD_COLS.ID_ORDER, "asc");
+
+  const n = await upsertTrackingRowsFromOrderRows(
+    orders,
+    systemNote ? { systemNote } : undefined
+  );
   if (n > 0) {
-    logger.info("[order-user-tracking] Đã upsert %d đơn (theo danh sách order_id).", n);
+    logger.info(
+      "[order-user-tracking] Đã upsert %d đơn (theo danh sách order_id, enforceVariant=%s, systemNote=%s).",
+      n,
+      String(enforceVariant),
+      systemNote || "(default)"
+    );
   }
   return n;
 }

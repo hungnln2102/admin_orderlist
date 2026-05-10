@@ -1,5 +1,5 @@
 const express = require("express");
-const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../../controllers/RenewAdobeController");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("../../controllers/RenewAdobeController");
 
 const router = express.Router();
 
@@ -12,6 +12,10 @@ router.delete("/accounts/:id", deleteAccount);
 router.get("/accounts/lookup", lookupAccountByEmail);
 router.get("/accounts/check-all", checkAllAccounts);
 router.get("/user-orders", listUserOrders);
+router.get("/order-list/match", listMatchableOrders);
+router.post("/user-orders/track", addOrdersToTracking);
+router.patch("/user-orders/:orderCode", updateTrackingOrder);
+router.delete("/user-orders/:orderCode", deleteTrackingOrder);
 router.post("/check-with-cookies", runCheckWithCookies);
 router.post("/accounts/:id/check", runCheck);
 router.post("/accounts/add-users-batch", runAddUsersBatch);

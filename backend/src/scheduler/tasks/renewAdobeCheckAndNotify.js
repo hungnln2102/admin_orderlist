@@ -7,6 +7,9 @@ const logger = require("../../utils/logger");
 const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
 const { runCheckAllAccountsFlow } = require("../../controllers/RenewAdobeController/autoAssign");
 const { runRenewAdobePostCheckFlow } = require("./renewAdobePostCheckFlow");
+const {
+  ensureAdminAccountsExist,
+} = require("./shared/adminAccountsGuard");
 
 const ENABLE_POST_CHECK_FIX = process.env.RENEW_ADOBE_ENABLE_POST_CHECK_FIX === "true";
 
@@ -20,6 +23,14 @@ function createRenewAdobeCheckAndNotifyTask() {
         "[CRON] Job Renew Adobe (check all) vẫn đang chạy — bỏ qua lần gọi trùng",
         { trigger, pid: process.pid }
       );
+      return;
+    }
+    if (
+      !(await ensureAdminAccountsExist({
+        taskName: "renewAdobeCheckAndNotifyTask",
+        trigger,
+      }))
+    ) {
       return;
     }
     const includeAutoAssign = trigger !== "cron";
