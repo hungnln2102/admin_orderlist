@@ -26,6 +26,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
 }) => {
   const [amountInput, setAmountInput] = useState("");
   const [reason, setReason] = useState("");
+  const [linkedOrderCode, setLinkedOrderCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
     if (loading) return;
     setAmountInput("");
     setReason("");
+    setLinkedOrderCode("");
     setError(null);
     onClose();
   };
@@ -59,6 +61,13 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
           amount: amountValue,
           reason: reason.trim() || null,
           expense_type: "external_import",
+          linked_order_code: linkedOrderCode.trim() || null,
+          expense_meta: linkedOrderCode.trim()
+            ? {
+                source: "manual_external_import",
+                flow: "mavryk_renewal_manual",
+              }
+            : null,
         }),
       });
       if (!response.ok) {
@@ -103,6 +112,20 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
                   setAmountInput(Helpers.formatNumberOnTyping(e.target.value))
                 }
                 placeholder="0"
+                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white/80">
+                Mã đơn liên kết (tuỳ chọn)
+              </label>
+              <input
+                type="text"
+                value={linkedOrderCode}
+                onChange={(e) => setLinkedOrderCode(e.target.value)}
+                placeholder="Ví dụ: MAVN7JH42C1M"
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 disabled={loading}
               />

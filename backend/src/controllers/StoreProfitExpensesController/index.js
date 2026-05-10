@@ -16,21 +16,40 @@ const COLS = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 const VN_DATE_FROM_CREATED_AT_SQL =
   "to_char((created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date, 'YYYY-MM-DD')";
 
+const ALLOWED_EXPENSE_TYPES = new Set([
+  "withdraw_profit",
+  "external_import",
+  "mavn_import",
+]);
+
 const normalizeExpenseType = (value) => {
   const normalized = normalizeTextInput(value || "").toLowerCase();
-  if (
-    normalized === "withdraw_profit" ||
-    normalized === "external_import" ||
-    normalized === "mavn_import"
-  ) {
+  if (ALLOWED_EXPENSE_TYPES.has(normalized)) {
     return normalized;
   }
   return "";
 };
 
+/** Hỗ trợ nhiều loại trong 1 query (`?expense_type=external_import,mavn_import`). */
+const normalizeExpenseTypeList = (value) => {
+  if (value === undefined || value === null) return [];
+  const raw = String(value).trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => ALLOWED_EXPENSE_TYPES.has(part));
+};
+
 const parseAmount = (value) => {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : 0;
+};
+
+const normalizeExpenseMetaInput = (value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
 };
 
 const mapExpenseRow = (row) => ({
@@ -47,7 +66,7 @@ const mapExpenseRow = (row) => ({
 const listStoreProfitExpenses = async (req, res) => {
   const from = normalizeDateInput(req.query?.from);
   const to = normalizeDateInput(req.query?.to);
-  const expenseType = normalizeExpenseType(req.query?.expense_type);
+  const expenseTypeList = normalizeExpenseTypeList(req.query?.expense_type);
 
   try {
     const hasMavnCols = await storeProfitExpensesHasMavnColumns();
@@ -62,7 +81,11 @@ const listStoreProfitExpenses = async (req, res) => {
     const baseQuery = db(TABLE);
     if (from) baseQuery.whereRaw(`DATE(${COLS.CREATED_AT}) >= ?`, [from]);
     if (to) baseQuery.whereRaw(`DATE(${COLS.CREATED_AT}) <= ?`, [to]);
-    if (expenseType) baseQuery.where(COLS.EXPENSE_TYPE, expenseType);
+    if (expenseTypeList.length === 1) {
+      baseQuery.where(COLS.EXPENSE_TYPE, expenseTypeList[0]);
+    } else if (expenseTypeList.length > 1) {
+      baseQuery.whereIn(COLS.EXPENSE_TYPE, expenseTypeList);
+    }
 
     const [rows, summaryRow] = await Promise.all([
       baseQuery
@@ -101,6 +124,13 @@ const createStoreProfitExpense = async (req, res) => {
   const reason = normalizeTextInput(req.body?.reason || "");
   const expenseType =
     normalizeExpenseType(req.body?.expense_type) || "withdraw_profit";
+  const linkedOrderCodeRaw = normalizeTextInput(
+    req.body?.linked_order_code || req.body?.linkedOrderCode || ""
+  );
+  const linkedOrderCode = linkedOrderCodeRaw
+    ? linkedOrderCodeRaw.slice(0, 64)
+    : "";
+  const metaInput = normalizeExpenseMetaInput(req.body?.expense_meta);
 
   if (expenseType === "mavn_import") {
     return res.status(400).json({
@@ -111,12 +141,26 @@ const createStoreProfitExpense = async (req, res) => {
   try {
     const hasMavnCols = await storeProfitExpensesHasMavnColumns();
     const row = await db.transaction(async (trx) => {
+      const insertPayload = {
+        [COLS.AMOUNT]: amount,
+        [COLS.REASON]: reason || null,
+        [COLS.EXPENSE_TYPE]: expenseType,
+      };
+
+      if (hasMavnCols) {
+        insertPayload[COLS.LINKED_ORDER_CODE] = linkedOrderCode || null;
+        insertPayload[COLS.EXPENSE_META] =
+          metaInput ||
+          (expenseType === "external_import" && linkedOrderCode
+            ? {
+                source: "manual_external_import",
+                flow: "mavryk_renewal_manual",
+              }
+            : null);
+      }
+
       const [created] = await trx(TABLE)
-        .insert({
-          [COLS.AMOUNT]: amount,
-          [COLS.REASON]: reason || null,
-          [COLS.EXPENSE_TYPE]: expenseType,
-        })
+        .insert(insertPayload)
         .returning([COLS.ID]);
       const createdId = Number(created?.id ?? created?.[COLS.ID] ?? 0);
       const inserted = await trx(TABLE)

@@ -65,7 +65,14 @@ async function applyMavnDashboardProfitDelta(trx, rowForMonth, profitDelta) {
   if (!d) return;
   const mk = await monthKeyMavnDashboard(trx, rowForMonth);
   if (!mk) return;
-  await mergeSummaryUpdates(trx, mk, { total_profit: d });
+  // MAVN nhập hàng (NCC nội bộ Mavryk): cùng delta cho total_profit và estimated_bank_balance
+  // — khớp luồng "Nhập hàng ngoài luồng" (external_import) để đối chiếu.
+  await mergeSummaryUpdates(
+    trx,
+    mk,
+    { total_profit: d, estimated_bank_balance: d },
+    { context: "mavnStoreExpenseSync.applyMavnDashboardProfitDelta" }
+  );
 }
 
 /**

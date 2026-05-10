@@ -101,7 +101,15 @@ const recomputeSummaryMonthTotalTax = async (executor, monthKey) => {
     }
 };
 
-const mergeSummaryUpdates = async (trx, monthKey, updates) => {
+const mergeSummaryUpdates = async (
+    trx,
+    monthKey,
+    updates,
+    {
+        notify = true,
+        context = "dashboardSummary.mergeSummaryUpdates",
+    } = {}
+) => {
     if (!monthKey || Object.keys(updates).length === 0) return;
 
     const insertData = {
@@ -168,6 +176,7 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         .merge(mergeData);
 
     await recomputeSummaryMonthTotalTax(trx, monthKey);
+    if (!notify) return;
     await notifyFinanceMonthlyDelta({
         monthKey,
         revenueDelta: updates.total_revenue || 0,
@@ -176,7 +185,7 @@ const mergeSummaryUpdates = async (trx, monthKey, updates) => {
         refundDelta: updates.total_refund || 0,
         offFlowDelta: updates.total_off_flow_bank_receipt || 0,
         bankBalanceDelta: updates.estimated_bank_balance || 0,
-        context: "dashboardSummary.mergeSummaryUpdates",
+        context,
         executor: trx,
     });
 };
@@ -207,10 +216,15 @@ const applyExternalImportProfitDelta = async (trx, monthKey, profitDelta) => {
  * Điều chỉnh số dư bank ước tính theo tháng.
  * Dương = tiền vào bank, âm = tiền ra bank.
  */
-const applyEstimatedBankBalanceDelta = async (trx, monthKey, bankBalanceDelta) => {
+const applyEstimatedBankBalanceDelta = async (
+    trx,
+    monthKey,
+    bankBalanceDelta,
+    options = undefined
+) => {
     const d = Number(bankBalanceDelta);
     if (!monthKey || !Number.isFinite(d) || d === 0) return;
-    await mergeSummaryUpdates(trx, monthKey, { estimated_bank_balance: d });
+    await mergeSummaryUpdates(trx, monthKey, { estimated_bank_balance: d }, options);
 };
 
 /**
@@ -255,12 +269,14 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
     }
 
     if (Object.keys(refundUpdates).length > 0 && refundMonthKey) {
-        await mergeSummaryUpdates(trx, refundMonthKey, refundUpdates);
+        await mergeSummaryUpdates(trx, refundMonthKey, refundUpdates, { notify: false });
     }
 
     if (refundMonthKey && bankBalanceDelta !== 0) {
-        await applyEstimatedBankBalanceDelta(trx, refundMonthKey, bankBalanceDelta);
+        await applyEstimatedBankBalanceDelta(trx, refundMonthKey, bankBalanceDelta, { notify: false });
     }
+
+    let refundProfitDelta = 0;
 
     if (
         isDashboardSalesOrder(afterRow) &&
@@ -269,7 +285,13 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundMonthKey
     ) {
         const { applyPendingRefundProfitMinusCustomerOverNcc } = require("./pendingRefundDashboardProfitFallback");
-        await applyPendingRefundProfitMinusCustomerOverNcc(trx, beforeRow, afterRow, refundMonthKey);
+        refundProfitDelta = await applyPendingRefundProfitMinusCustomerOverNcc(
+            trx,
+            beforeRow,
+            afterRow,
+            refundMonthKey,
+            { notify: false }
+        );
 
         const refund = toNullableNumber(afterRow?.[COLS.ORDER.REFUND] ?? afterRow?.refund) || 0;
         if (refund > 0) {
@@ -278,6 +300,30 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
                 amount: refund,
             });
         }
+    }
+
+    if (!refundMonthKey) return;
+    const notifyRevenueDelta = Number(refundUpdates.total_revenue || 0);
+    const notifyRefundDelta = Number(refundUpdates.total_refund || 0);
+    const notifyBankBalanceDelta = Number(bankBalanceDelta || 0);
+    const notifyProfitDelta = Number(refundProfitDelta || 0);
+    if (
+        notifyRevenueDelta !== 0 ||
+        notifyRefundDelta !== 0 ||
+        notifyBankBalanceDelta !== 0 ||
+        notifyProfitDelta !== 0
+    ) {
+        await notifyFinanceMonthlyDelta({
+            monthKey: refundMonthKey,
+            revenueDelta: notifyRevenueDelta,
+            profitDelta: notifyProfitDelta,
+            importDelta: 0,
+            refundDelta: notifyRefundDelta,
+            offFlowDelta: 0,
+            bankBalanceDelta: notifyBankBalanceDelta,
+            context: "dashboardSummary.refund.statusChange",
+            executor: trx,
+        });
     }
 };
 

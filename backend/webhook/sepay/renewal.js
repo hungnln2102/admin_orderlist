@@ -36,6 +36,9 @@ const {
 } = require("../../src/services/telegramFinanceDeltaNotifier");
 const logger = require("../../src/utils/logger");
 const {
+  storeProfitExpensesHasMavnColumns,
+} = require("../../src/controllers/Order/finance/storeProfitExpensesHasMavnColumns");
+const {
   WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
 } = require("../../src/controllers/Order/queries/webhookReceiptOrderDateWindow");
 
@@ -55,6 +58,11 @@ const {
 const { recomputeSummaryMonthTotalTax } = require("../../src/controllers/Order/finance/dashboardSummary");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
+const storeExpenseTable = tableName(
+  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
+  SCHEMA_FINANCE
+);
+const storeExpenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 const VARIANT_ID_COL = VARIANT_COLS.id || VARIANT_COLS.ID || "id";
 const VARIANT_DISPLAY_NAME_COL =
   VARIANT_COLS.displayName || VARIANT_COLS.DISPLAY_NAME || "display_name";
@@ -111,6 +119,126 @@ const toMonthKey = (value) => {
   const year = parsedDate.getFullYear();
   const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
+};
+
+const createAutoMavrykExternalImportLog = async ({
+  client,
+  orderCode,
+  amount,
+  supplierName,
+  renewalStartDate,
+  renewalEndDate,
+}) => {
+  const normalizedAmount = normalizeMoney(amount);
+  if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    return { created: false, reason: "invalid_amount" };
+  }
+
+  const startYmd = String(renewalStartDate || "").trim();
+  const endYmd = String(renewalEndDate || "").trim();
+  const marker = `[AUTO_MAVRYK_RENEW:${orderCode}:${startYmd}]`;
+  const reason = `${marker} Gia hạn NCC Mavryk/Shop (${supplierName || "Mavryk"}) ${startYmd || "?"} -> ${endYmd || "?"}`;
+
+  const hasMetaCols = await storeProfitExpensesHasMavnColumns();
+  const expenseType = "external_import";
+
+  if (hasMetaCols) {
+    const existsRes = await client.query(
+      `
+        SELECT 1
+        FROM ${storeExpenseTable}
+        WHERE ${storeExpenseCols.EXPENSE_TYPE} = $1
+          AND ${storeExpenseCols.LINKED_ORDER_CODE} = $2
+          AND COALESCE(${storeExpenseCols.EXPENSE_META}->>'flow', '') = 'mavryk_renewal_auto'
+          AND COALESCE(${storeExpenseCols.EXPENSE_META}->>'renewal_start_date', '') = $3
+        LIMIT 1
+      `,
+      [expenseType, orderCode, startYmd]
+    );
+    if (existsRes.rows.length > 0) {
+      return { created: false, reason: "already_exists" };
+    }
+  } else {
+    const existsRes = await client.query(
+      `
+        SELECT 1
+        FROM ${storeExpenseTable}
+        WHERE ${storeExpenseCols.EXPENSE_TYPE} = $1
+          AND ${storeExpenseCols.REASON} = $2
+        LIMIT 1
+      `,
+      [expenseType, reason]
+    );
+    if (existsRes.rows.length > 0) {
+      return { created: false, reason: "already_exists" };
+    }
+  }
+
+  if (hasMetaCols) {
+    await client.query(
+      `
+        INSERT INTO ${storeExpenseTable}
+          (${storeExpenseCols.AMOUNT}, ${storeExpenseCols.REASON}, ${storeExpenseCols.EXPENSE_TYPE}, ${storeExpenseCols.LINKED_ORDER_CODE}, ${storeExpenseCols.EXPENSE_META})
+        VALUES ($1, $2, $3, $4, $5::jsonb)
+      `,
+      [
+        normalizedAmount,
+        reason,
+        expenseType,
+        orderCode,
+        JSON.stringify({
+          flow: "mavryk_renewal_auto",
+          source: "renewal.runRenewal",
+          renewal_start_date: startYmd || null,
+          renewal_end_date: endYmd || null,
+          supplier_name: supplierName || null,
+        }),
+      ]
+    );
+  } else {
+    await client.query(
+      `
+        INSERT INTO ${storeExpenseTable}
+          (${storeExpenseCols.AMOUNT}, ${storeExpenseCols.REASON}, ${storeExpenseCols.EXPENSE_TYPE})
+        VALUES ($1, $2, $3)
+      `,
+      [normalizedAmount, reason, expenseType]
+    );
+  }
+
+  const mkRes = await client.query(
+    `SELECT TO_CHAR(DATE_TRUNC('month', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh'), 'YYYY-MM') AS mk`
+  );
+  const monthKey = String(mkRes.rows?.[0]?.mk || "").trim();
+  if (monthKey) {
+    await client.query(
+      `
+        INSERT INTO ${summaryTable}
+          (${summaryCols.MONTH_KEY}, ${summaryCols.TOTAL_PROFIT}, ${summaryCols.ESTIMATED_BANK_BALANCE}, ${summaryCols.UPDATED_AT})
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (${summaryCols.MONTH_KEY})
+        DO UPDATE SET
+          ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+          ${summaryCols.ESTIMATED_BANK_BALANCE} = ${summaryTable}.${summaryCols.ESTIMATED_BANK_BALANCE} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
+          ${summaryCols.UPDATED_AT} = NOW()
+      `,
+      [monthKey, -normalizedAmount, -normalizedAmount]
+    );
+
+    await notifyFinanceMonthlyDelta({
+      monthKey,
+      revenueDelta: 0,
+      profitDelta: -normalizedAmount,
+      importDelta: 0,
+      refundDelta: 0,
+      offFlowDelta: 0,
+      bankBalanceDelta: -normalizedAmount,
+      context: `renewal.mavryk.external_import:${orderCode}`,
+      executor: client,
+    });
+  }
+
+  return { created: true, reason: "inserted" };
 };
 
 const fetchMonthlySummarySnapshot = async (client, monthKey) => {
@@ -559,6 +687,28 @@ const runRenewal = async (
       });
     }
 
+    let mavrykExternalImportLog = null;
+    if (skipNccLedger && finalGiaNhap > 0) {
+      try {
+        mavrykExternalImportLog = await createAutoMavrykExternalImportLog({
+          client,
+          orderCode,
+          amount: finalGiaNhap,
+          supplierName: supplierNameForNcc,
+          renewalStartDate: formatDateDB(ngayBatDauMoi),
+          renewalEndDate: formatDateDB(ngayHetHanMoi),
+        });
+      } catch (autoLogErr) {
+        logger.error("[Renewal] Không thể tự tạo external_import log cho NCC Mavryk/Shop", {
+          orderCode,
+          supplierId,
+          finalGiaNhap,
+          error: autoLogErr.message,
+          stack: autoLogErr.stack,
+        });
+      }
+    }
+
     const details = {
       ID_DON_HANG: orderCode,
       SAN_PHAM: String(productDisplayLabel || productLabel || sanPham || "").trim(),
@@ -580,6 +730,9 @@ const runRenewal = async (
         expires_at: mavnStockSync.expiresAt ?? null,
         error: mavnStockSync.error ?? null,
       };
+    }
+    if (mavrykExternalImportLog) {
+      details.MAVRYK_EXTERNAL_IMPORT_LOG = mavrykExternalImportLog;
     }
 
     return { success: true, details, processType: "renewal" };

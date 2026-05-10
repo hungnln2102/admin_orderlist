@@ -7,6 +7,10 @@ const EXPENSE_TYPES_CREATABLE = ["withdraw_profit", "external_import"];
 
 const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+const expenseTypeListRegex = new RegExp(
+  `^(?:${EXPENSE_TYPES.join("|")})(?:,(?:${EXPENSE_TYPES.join("|")}))*$`
+);
+
 const listStoreProfitExpensesRules = [
   query("from")
     .optional()
@@ -18,9 +22,9 @@ const listStoreProfitExpensesRules = [
     .withMessage("to phải đúng định dạng yyyy-mm-dd."),
   query("expense_type")
     .optional()
-    .isIn(EXPENSE_TYPES)
+    .matches(expenseTypeListRegex)
     .withMessage(
-      "expense_type phải là withdraw_profit, external_import hoặc mavn_import."
+      "expense_type phải là withdraw_profit, external_import hoặc mavn_import (có thể nhiều, ngăn cách bằng dấu phẩy)."
     ),
   validate,
 ];
@@ -37,6 +41,19 @@ const createStoreProfitExpenseRules = [
     .optional()
     .isIn(EXPENSE_TYPES_CREATABLE)
     .withMessage("expense_type phải là withdraw_profit hoặc external_import."),
+  body("linked_order_code")
+    .optional({ values: "null" })
+    .custom(
+      (v) =>
+        v === null ||
+        v === undefined ||
+        (typeof v === "string" && v.trim().length <= 64)
+    )
+    .withMessage("linked_order_code không hợp lệ (tối đa 64 ký tự)."),
+  body("expense_meta")
+    .optional({ values: "null" })
+    .custom((v) => v === null || v === undefined || (typeof v === "object" && !Array.isArray(v)))
+    .withMessage("expense_meta phải là object hoặc null."),
   validate,
 ];
 

@@ -35,8 +35,10 @@ type ExternalImportLogItem = {
   id: number;
   amount: number;
   reason: string;
+  linkedOrderCode: string | null;
   expenseDate: string | null;
   createdAt: string | null;
+  expenseType: "external_import" | "mavn_import" | string;
 };
 
 const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }) => {
@@ -96,7 +98,7 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
     setExternalError(null);
     try {
       const response = await apiFetch(
-        "/api/store-profit-expenses?expense_type=external_import"
+        "/api/store-profit-expenses?expense_type=external_import,mavn_import"
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -108,8 +110,10 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
           id: Number(item.id || 0),
           amount: Number(item.amount || 0),
           reason: String(item.reason || ""),
+          linkedOrderCode: item.linkedOrderCode ? String(item.linkedOrderCode) : null,
           expenseDate: item.expenseDate || null,
           createdAt: item.createdAt || null,
+          expenseType: String(item.expenseType || "external_import"),
         }))
       );
     } catch (error) {
@@ -314,42 +318,61 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
                   <tr>
                     <th className="px-4 py-3 w-14">STT</th>
                     <th className="px-4 py-3">Ngày tạo</th>
+                    <th className="px-4 py-3">Nguồn</th>
                     <th className="px-4 py-3">Số tiền nhập</th>
+                    <th className="px-4 py-3">Mã đơn liên kết</th>
                     <th className="px-4 py-3">Lý do</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {externalLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                      <td colSpan={6} className="px-4 py-10 text-center text-white/50">
                         Đang tải log nhập hàng...
                       </td>
                     </tr>
                   ) : externalError ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-rose-200">
+                      <td colSpan={6} className="px-4 py-10 text-center text-rose-200">
                         {externalError}
                       </td>
                     </tr>
                   ) : externalLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                      <td colSpan={6} className="px-4 py-10 text-center text-white/50">
                         Chưa có log nhập hàng ngoài luồng.
                       </td>
                     </tr>
                   ) : (
-                    externalLogs.map((log, idx) => (
-                      <tr key={log.id || idx} className="text-sm text-white/90">
-                        <td className="px-4 py-3 text-white/50">{idx + 1}</td>
-                        <td className="px-4 py-3 text-white/70">
-                          {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-emerald-300/90">
-                          {formatCurrency(log.amount)}
-                        </td>
-                        <td className="px-4 py-3">{log.reason || "—"}</td>
-                      </tr>
-                    ))
+                    externalLogs.map((log, idx) => {
+                      const isMavnImport = log.expenseType === "mavn_import";
+                      return (
+                        <tr key={log.id || idx} className="text-sm text-white/90">
+                          <td className="px-4 py-3 text-white/50">{idx + 1}</td>
+                          <td className="px-4 py-3 text-white/70">
+                            {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                isMavnImport
+                                  ? "rounded-lg bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-violet-200"
+                                  : "rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-200"
+                              }
+                            >
+                              {isMavnImport ? "MAVN AUTO" : "MANUAL"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-emerald-300/90">
+                            {formatCurrency(log.amount)}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-indigo-200/90">
+                            {log.linkedOrderCode || "—"}
+                          </td>
+                          <td className="px-4 py-3">{log.reason || "—"}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </>

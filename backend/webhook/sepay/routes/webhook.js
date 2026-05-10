@@ -220,6 +220,8 @@ const incrementDashboardSummaryByDelta = async (
     importDelta = 0,
     offFlowDelta = 0,
     bankBalanceDelta = 0,
+    notify = true,
+    context = "webhook.incrementDashboardSummaryByDelta",
   } = {}
 ) => {
   const revenue = normalizeMoney(revenueDelta);
@@ -257,6 +259,7 @@ const incrementDashboardSummaryByDelta = async (
     [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
   );
   await recomputeSummaryMonthTotalTax(client, monthKey);
+  if (!notify) return;
   await notifyFinanceMonthlyDelta({
     monthKey,
     revenueDelta: revenue,
@@ -265,7 +268,7 @@ const incrementDashboardSummaryByDelta = async (
     refundDelta: 0,
     offFlowDelta: offFlow,
     bankBalanceDelta: bankBalance,
-    context: "webhook.incrementDashboardSummaryByDelta",
+    context,
     executor: client,
   });
 };
@@ -292,6 +295,8 @@ const postWebhookPaymentForOrder = async (
      * - `revenue_equals_profit`: một bước DT/LN += tiền (không chỉnh cost).
      */
     profitPostingMode = "transition_to_paid",
+    notify = true,
+    notifyContext = "webhook.incrementDashboardSummaryByDelta",
   }
 ) => {
   const wire = normalizeMoney(revenueAmount);
@@ -299,7 +304,7 @@ const postWebhookPaymentForOrder = async (
     amountDecision?.offFlowForOrder ?? amountDecision?.offFlowCurrent
   );
   if ((!wire && !offFlow && !ordersDelta) || !state) {
-    return { revenue: 0, profit: 0, offFlow: 0 };
+    return { revenue: 0, profit: 0, offFlow: 0, importDelta: 0 };
   }
 
   const cost = normalizeMoney(state[ORDER_COLS.cost]);
@@ -313,12 +318,16 @@ const postWebhookPaymentForOrder = async (
       revenueDelta: wire,
       profitDelta: wire,
       ordersDelta,
+      notify,
+      context: notifyContext,
     });
   } else {
     await incrementDashboardSummaryByDelta(client, paidMonthKey, {
       revenueDelta: wire,
       profitDelta: wire,
       ordersDelta,
+      notify,
+      context: notifyContext,
     });
     if (cost > 0) {
       importDeltaForAudit = await resolveDashboardImportDeltaOnPaid(
@@ -331,6 +340,8 @@ const postWebhookPaymentForOrder = async (
       await incrementDashboardSummaryByDelta(client, paidMonthKey, {
         profitDelta: -cost,
         importDelta: importDeltaForAudit,
+        notify,
+        context: notifyContext,
       });
     }
     netProfitForLedger = impliedMargin;
@@ -340,6 +351,8 @@ const postWebhookPaymentForOrder = async (
     await incrementDashboardSummaryByDelta(client, paidMonthKey, {
       offFlowDelta: offFlow,
       ordersDelta: 0,
+      notify,
+      context: notifyContext,
     });
   }
 
@@ -395,7 +408,7 @@ const postWebhookPaymentForOrder = async (
     });
   }
 
-  return { revenue: wire, profit: netProfitForLedger, offFlow };
+  return { revenue: wire, profit: netProfitForLedger, offFlow, importDelta: importDeltaForAudit };
 };
 
 const computeWebhookAmountDecision = computeDashboardPaymentDecision;
@@ -637,7 +650,9 @@ router.post("/", async (req, res) => {
         toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
       let postedRevenueDelta = 0;
       let postedProfitDelta = 0;
+      let postedImportDelta = 0;
       let postedOffFlowBankReceiptDelta = 0;
+      let postedBankBalanceDelta = 0;
 
       if (receiptId && alreadyFinancialPosted) {
         await insertFinancialAuditLog(client, {
@@ -656,7 +671,9 @@ router.post("/", async (req, res) => {
       if (!alreadyFinancialPosted && receiptResult?.inserted && transferAmountNormalized > 0) {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
           bankBalanceDelta: transferAmountNormalized,
+          notify: false,
         });
+        postedBankBalanceDelta += transferAmountNormalized;
       }
 
       // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger có thể ghi log chi phí NCC; TT NCC trên log mặc định Chưa Thanh Toán).
@@ -688,6 +705,7 @@ router.post("/", async (req, res) => {
             await incrementDashboardSummaryByDelta(client, paidMonthKey, {
               offFlowDelta: extraVnd,
               ordersDelta: 0,
+              notify: false,
             });
             postedOffFlowBankReceiptDelta += extraVnd;
             if (receiptId) {
@@ -825,6 +843,7 @@ router.post("/", async (req, res) => {
                 revenue: rev,
                 profit: prof,
                 offFlow: flow,
+                importDelta: imp,
               } = await postWebhookPaymentForOrder(client, {
                 code,
                 state,
@@ -840,9 +859,11 @@ router.post("/", async (req, res) => {
                       : amountDecision?.branch || "EXACT_OR_FULL_COMPLETE",
                 amountDecision,
                 profitPostingMode: "transition_to_paid",
+                notify: false,
               });
               postedRevenueDelta += rev;
               postedProfitDelta += prof;
+              postedImportDelta += imp;
               postedOffFlowBankReceiptDelta += flow;
               transitionedOrderCodesToPaid.add(code);
             }
@@ -864,6 +885,7 @@ router.post("/", async (req, res) => {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
           offFlowDelta: transferAmountNormalized,
           ordersDelta: 0,
+          notify: false,
         });
         postedOffFlowBankReceiptDelta += transferAmountNormalized;
         if (receiptId) {
@@ -973,6 +995,27 @@ router.post("/", async (req, res) => {
             );
           }
         }
+      }
+
+      if (
+        !alreadyFinancialPosted &&
+        (postedRevenueDelta !== 0 ||
+          postedProfitDelta !== 0 ||
+          postedImportDelta !== 0 ||
+          postedOffFlowBankReceiptDelta !== 0 ||
+          postedBankBalanceDelta !== 0)
+      ) {
+        await notifyFinanceMonthlyDelta({
+          monthKey: paidMonthKey,
+          revenueDelta: postedRevenueDelta,
+          profitDelta: postedProfitDelta,
+          importDelta: postedImportDelta,
+          refundDelta: 0,
+          offFlowDelta: postedOffFlowBankReceiptDelta,
+          bankBalanceDelta: postedBankBalanceDelta,
+          context: "webhook.incrementDashboardSummaryByDelta",
+          executor: client,
+        });
       }
 
       if (receiptId) {
