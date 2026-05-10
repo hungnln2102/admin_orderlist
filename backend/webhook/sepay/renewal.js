@@ -31,6 +31,9 @@ const {
   updateReceiptFinancialState,
   insertFinancialAuditLog,
 } = require("./payments");
+const {
+  notifyFinanceMonthlyDelta,
+} = require("../../src/services/telegramFinanceDeltaNotifier");
 const logger = require("../../src/utils/logger");
 const {
   WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
@@ -108,6 +111,26 @@ const toMonthKey = (value) => {
   const year = parsedDate.getFullYear();
   const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
+};
+
+const fetchMonthlySummarySnapshot = async (client, monthKey) => {
+  if (!monthKey) return null;
+  const { rows } = await client.query(
+    `
+      SELECT
+        COALESCE(${summaryCols.TOTAL_REVENUE}::numeric, 0) AS total_revenue,
+        COALESCE(${summaryCols.TOTAL_PROFIT}::numeric, 0) AS total_profit,
+        COALESCE(${summaryCols.TOTAL_IMPORT}::numeric, 0) AS total_import,
+        COALESCE(${summaryCols.TOTAL_REFUND}::numeric, 0) AS total_refund,
+        COALESCE(${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt,
+        COALESCE(${summaryCols.ESTIMATED_BANK_BALANCE}::numeric, 0) AS estimated_bank_balance
+      FROM ${summaryTable}
+      WHERE ${summaryCols.MONTH_KEY} = $1
+      LIMIT 1
+    `,
+    [monthKey]
+  );
+  return rows[0] || null;
 };
 
 const hasPostedReceiptForOrder = async (client, orderCode, orderDateRaw) => {
@@ -437,6 +460,7 @@ const runRenewal = async (
       const monthKey = toMonthKey(formatDateDB(ngayBatDauMoi));
       const effectiveMonthKey = paymentMonthKey || monthKey;
       if (effectiveMonthKey && !shouldSkipSummaryForManual && normalizeMoney(paymentAmount) > 0) {
+        const summaryBefore = await fetchMonthlySummarySnapshot(client, effectiveMonthKey);
         const revenue = normalizeMoney(paymentAmount);
         const cost = normalizeMoney(finalGiaNhap);
         // NCC Mavryk/Shop: không ghi nhận cost vào profit khi renewal.
@@ -461,6 +485,35 @@ const runRenewal = async (
           [effectiveMonthKey, 1, revenue, profit]
         );
         await recomputeSummaryMonthTotalTax(client, effectiveMonthKey);
+
+        const summaryAfter = await fetchMonthlySummarySnapshot(
+          client,
+          effectiveMonthKey
+        );
+        const beforeRevenue = normalizeMoney(summaryBefore?.total_revenue);
+        const beforeProfit = normalizeMoney(summaryBefore?.total_profit);
+        const beforeImport = normalizeMoney(summaryBefore?.total_import);
+        const afterRevenue = normalizeMoney(summaryAfter?.total_revenue);
+        const afterProfit = normalizeMoney(summaryAfter?.total_profit);
+        const afterImport = normalizeMoney(summaryAfter?.total_import);
+        const revenueDelta = normalizeMoney(afterRevenue - beforeRevenue);
+        const profitDelta = normalizeMoney(afterProfit - beforeProfit);
+        const importDelta = normalizeMoney(afterImport - beforeImport);
+
+        if (revenueDelta || profitDelta || importDelta) {
+          await notifyFinanceMonthlyDelta({
+            monthKey: effectiveMonthKey,
+            revenueDelta,
+            profitDelta,
+            importDelta,
+            refundDelta: 0,
+            offFlowDelta: 0,
+            bankBalanceDelta: 0,
+            context: `renewal.runRenewal:${orderCode}`,
+            executor: client,
+          });
+        }
+
         if (paymentReceiptId) {
           await updateReceiptFinancialState(client, paymentReceiptId, {
             is_financial_posted: true,
