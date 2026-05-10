@@ -54,21 +54,27 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
 
     setLoading(true);
     try {
+      const trimmedReason = reason.trim();
+      const trimmedLinkedOrderCode = linkedOrderCode.trim();
+      // Mã đơn liên kết và meta là TUỲ CHỌN — chỉ gửi khi có giá trị thực sự
+      // để tránh validator/Knex phải xử lý null thừa.
+      const payload: Record<string, unknown> = {
+        amount: amountValue,
+        expense_type: "external_import",
+      };
+      if (trimmedReason) payload.reason = trimmedReason;
+      if (trimmedLinkedOrderCode) {
+        payload.linked_order_code = trimmedLinkedOrderCode;
+        payload.expense_meta = {
+          source: "manual_external_import",
+          flow: "mavryk_renewal_manual",
+        };
+      }
+
       const response = await apiFetch("/api/store-profit-expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: amountValue,
-          reason: reason.trim() || null,
-          expense_type: "external_import",
-          linked_order_code: linkedOrderCode.trim() || null,
-          expense_meta: linkedOrderCode.trim()
-            ? {
-                source: "manual_external_import",
-                flow: "mavryk_renewal_manual",
-              }
-            : null,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         setError(await readError(response));

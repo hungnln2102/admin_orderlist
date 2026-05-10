@@ -4,8 +4,7 @@ const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSc
 const { normalizeDateInput, normalizeTextInput } = require("../../utils/normalizers");
 const {
   monthKeyVietnamFromDbTimestamp,
-  applyExternalImportProfitDelta,
-  applyEstimatedBankBalanceDelta,
+  mergeSummaryUpdates,
 } = require("../Order/finance/dashboardSummary");
 const {
   storeProfitExpensesHasMavnColumns,
@@ -147,9 +146,13 @@ const createStoreProfitExpense = async (req, res) => {
         [COLS.EXPENSE_TYPE]: expenseType,
       };
 
+      // Mã đơn liên kết & meta là TUỲ CHỌN — chỉ thêm khi có giá trị thực sự,
+      // để cùng cột nullable không bị Knex serialize null/object lệch kiểu JSONB.
+      if (hasMavnCols && linkedOrderCode) {
+        insertPayload[COLS.LINKED_ORDER_CODE] = linkedOrderCode;
+      }
       if (hasMavnCols) {
-        insertPayload[COLS.LINKED_ORDER_CODE] = linkedOrderCode || null;
-        insertPayload[COLS.EXPENSE_META] =
+        const resolvedMeta =
           metaInput ||
           (expenseType === "external_import" && linkedOrderCode
             ? {
@@ -157,6 +160,11 @@ const createStoreProfitExpense = async (req, res) => {
                 flow: "mavryk_renewal_manual",
               }
             : null);
+        if (resolvedMeta && Object.keys(resolvedMeta).length > 0) {
+          insertPayload[COLS.EXPENSE_META] = trx.raw("?::jsonb", [
+            JSON.stringify(resolvedMeta),
+          ]);
+        }
       }
 
       const [created] = await trx(TABLE)
@@ -176,6 +184,8 @@ const createStoreProfitExpense = async (req, res) => {
         .where(COLS.ID, createdId)
         .first();
 
+      // Gộp profit + bank delta trong 1 lần mergeSummaryUpdates để Telegram chỉ bắn 1 message,
+      // thay vì gọi applyEstimatedBankBalanceDelta + applyExternalImportProfitDelta tách rời.
       if (
         (expenseType === "external_import" || expenseType === "withdraw_profit") &&
         amount > 0 &&
@@ -185,19 +195,15 @@ const createStoreProfitExpense = async (req, res) => {
           trx,
           inserted[COLS.CREATED_AT]
         );
-        if (mk) await applyEstimatedBankBalanceDelta(trx, mk, -amount);
-      }
-
-      if (
-        expenseType === "external_import" &&
-        amount > 0 &&
-        inserted?.[COLS.CREATED_AT]
-      ) {
-        const mk = await monthKeyVietnamFromDbTimestamp(
-          trx,
-          inserted[COLS.CREATED_AT]
-        );
-        if (mk) await applyExternalImportProfitDelta(trx, mk, -amount);
+        if (mk) {
+          const updates = { estimated_bank_balance: -amount };
+          if (expenseType === "external_import") {
+            updates.total_profit = -amount;
+          }
+          await mergeSummaryUpdates(trx, mk, updates, {
+            context: `createStoreProfitExpense.${expenseType}`,
+          });
+        }
       }
 
       return inserted;
@@ -208,6 +214,16 @@ const createStoreProfitExpense = async (req, res) => {
     logger.error("[store-profit-expenses] create failed", {
       error: error.message,
       stack: error.stack,
+      payload: {
+        amount,
+        expenseType,
+        hasReason: Boolean(reason),
+        hasLinkedOrderCode: Boolean(linkedOrderCode),
+        hasMeta: metaInput && Object.keys(metaInput).length > 0,
+      },
+      pgCode: error.code,
+      pgDetail: error.detail,
+      pgConstraint: error.constraint,
     });
     res.status(500).json({ error: "Không thể tạo chi phí ngoài luồng." });
   }
@@ -223,6 +239,7 @@ const deleteStoreProfitExpense = async (req, res) => {
       const expType = String(row[COLS.EXPENSE_TYPE] || "");
       const amt = parseAmount(row[COLS.AMOUNT]);
       const n = await trx(TABLE).where(COLS.ID, id).del();
+      // Gộp profit + bank delta trong 1 lần mergeSummaryUpdates để Telegram chỉ bắn 1 message.
       if (
         n &&
         (expType === "external_import" || expType === "withdraw_profit") &&
@@ -233,20 +250,15 @@ const deleteStoreProfitExpense = async (req, res) => {
           trx,
           row[COLS.CREATED_AT]
         );
-        if (mk) await applyEstimatedBankBalanceDelta(trx, mk, amt);
-      }
-
-      if (
-        n &&
-        expType === "external_import" &&
-        amt > 0 &&
-        row[COLS.CREATED_AT]
-      ) {
-        const mk = await monthKeyVietnamFromDbTimestamp(
-          trx,
-          row[COLS.CREATED_AT]
-        );
-        if (mk) await applyExternalImportProfitDelta(trx, mk, amt);
+        if (mk) {
+          const updates = { estimated_bank_balance: amt };
+          if (expType === "external_import") {
+            updates.total_profit = amt;
+          }
+          await mergeSummaryUpdates(trx, mk, updates, {
+            context: `deleteStoreProfitExpense.${expType}`,
+          });
+        }
       }
       return n;
     });
