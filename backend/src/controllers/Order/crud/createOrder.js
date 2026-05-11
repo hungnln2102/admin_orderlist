@@ -101,15 +101,15 @@ const attachCreateOrderRoute = (router) => {
         const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
         const isMavnCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
 
+        // NCC Mavryk / Shop = nội bộ → giá nhập (cost) LUÔN = 0 khi tạo đơn,
+        // bất kể `supplier_cost` table có giá hay không, bất kể loại đơn (MAVL,
+        // MAVN, MAVT...). Hành vi do user yêu cầu rõ ràng — Mavryk = 0%.
         if (payload[supplyIdCol] != null) {
             const supRow = await db(TABLES.supplier)
                 .select(COLS.SUPPLIER.SUPPLIER_NAME)
                 .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
                 .first();
-            if (
-                isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]) &&
-                !isMavnCreate
-            ) {
+            if (isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME])) {
                 payload[costCol] = 0;
             }
         }

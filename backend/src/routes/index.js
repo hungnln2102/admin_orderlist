@@ -18,6 +18,7 @@ const renewAdobePublicRoutes = require("../domains/renew-adobe/publicRoutes");
 
 const dashboardRoutes = require("../domains/dashboard/routes");
 const ordersRoutes = require("../domains/orders/routes");
+const supplierChangeRoutes = require("../domains/supplier-change/routes");
 const suppliesRoutes = require("../domains/supplies/routes");
 const paymentsRoutes = require("../domains/payments/routes");
 const productsRoutes = require("../domains/products/routes");
@@ -87,6 +88,7 @@ router.use("/site-maintenance", siteMaintenanceRoutes);
 router.use("/", customerStatusRoutes);
 router.use("/", accountsRoutes);
 router.use("/", promotionCodesRoutes);
+router.use("/orders", supplierChangeRoutes);
 router.use("/orders", ordersRoutes);
 router.use("/supplies", suppliesRoutes);
 router.use("/", paymentsRoutes);

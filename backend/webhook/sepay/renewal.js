@@ -128,6 +128,9 @@ const createAutoMavrykExternalImportLog = async ({
   supplierName,
   renewalStartDate,
   renewalEndDate,
+  /** Khi true: chỉ ghi vào DB, KHÔNG gửi Telegram BIẾN ĐỘNG THÁNG.
+   *  Caller (webhook) sẽ gửi 1 tin nhắn tổng hợp ở cuối. */
+  suppressFinanceNotify = false,
 }) => {
   const normalizedAmount = normalizeMoney(amount);
   if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
@@ -225,17 +228,19 @@ const createAutoMavrykExternalImportLog = async ({
       [monthKey, -normalizedAmount, -normalizedAmount]
     );
 
-    await notifyFinanceMonthlyDelta({
-      monthKey,
-      revenueDelta: 0,
-      profitDelta: -normalizedAmount,
-      importDelta: 0,
-      refundDelta: 0,
-      offFlowDelta: 0,
-      bankBalanceDelta: -normalizedAmount,
-      context: `renewal.mavryk.external_import:${orderCode}`,
-      executor: client,
-    });
+    if (!suppressFinanceNotify) {
+      await notifyFinanceMonthlyDelta({
+        monthKey,
+        revenueDelta: 0,
+        profitDelta: -normalizedAmount,
+        importDelta: 0,
+        refundDelta: 0,
+        offFlowDelta: 0,
+        bankBalanceDelta: -normalizedAmount,
+        context: `renewal.mavryk.external_import:${orderCode}`,
+        executor: client,
+      });
+    }
   }
 
   return { created: true, reason: "inserted" };
@@ -300,6 +305,10 @@ const runRenewal = async (
     paymentAmount = 0,
     paymentMonthKey = null,
     paymentReceiptId = null,
+    /** Khi true: KHÔNG gửi Telegram BIẾN ĐỘNG THÁNG bên trong runRenewal —
+     *  để caller (webhook handler) gửi 1 tin nhắn tổng hợp bao trùm cả webhook
+     *  posting + renewal. Tránh 2 tin nhắn rời rạc cho cùng 1 sự kiện thanh toán. */
+    suppressFinanceNotify = false,
   } = {}
 ) => {
   if (!orderCode) {
@@ -628,7 +637,7 @@ const runRenewal = async (
         const profitDelta = normalizeMoney(afterProfit - beforeProfit);
         const importDelta = normalizeMoney(afterImport - beforeImport);
 
-        if (revenueDelta || profitDelta || importDelta) {
+        if (!suppressFinanceNotify && (revenueDelta || profitDelta || importDelta)) {
           await notifyFinanceMonthlyDelta({
             monthKey: effectiveMonthKey,
             revenueDelta,
@@ -697,6 +706,7 @@ const runRenewal = async (
           supplierName: supplierNameForNcc,
           renewalStartDate: formatDateDB(ngayBatDauMoi),
           renewalEndDate: formatDateDB(ngayHetHanMoi),
+          suppressFinanceNotify,
         });
       } catch (autoLogErr) {
         logger.error("[Renewal] Không thể tự tạo external_import log cho NCC Mavryk/Shop", {
@@ -754,4 +764,5 @@ module.exports = {
   runRenewalBatch,
   pendingRenewalTasks,
   computeOrderCurrentPrice,
+  fetchMonthlySummarySnapshot,
 };

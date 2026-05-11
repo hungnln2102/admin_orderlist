@@ -1,7 +1,14 @@
 const { db } = require("../../db");
 const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
-const { isGiftOrder } = require("../../utils/orderHelpers");
+const {
+  isGiftOrder,
+  isMavrykShopSupplierName,
+} = require("../../utils/orderHelpers");
 const { STATUS, COLS } = require("./constants");
+const {
+  changeOrderSupplier,
+  ChangeSupplierError,
+} = require("../../domains/supplier-change/service");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -76,10 +83,56 @@ const updateOrderWithFinance = async ({
         sanitized[priceCol] = 0;
     }
 
-    const [updatedOrder] = await trx(TABLES.orderList)
-        .where({ id })
-        .update(sanitized)
-        .returning("*");
+    // Đổi NCC: nếu supply_id trong payload khác supply_id hiện tại của đơn,
+    // chuyển qua domain `supplier-change` (Flow A/B theo tuổi đơn + trạng thái log).
+    // Service đó tự tính cost prorate; bỏ supply_id + cost khỏi sanitized để
+    // tránh ghi đè giá trị service đã set.
+    let supplierChangeResult = null;
+    const beforeSupplyId = beforeOrder?.[supplyIdCol];
+    const incomingSupplyId = sanitized[supplyIdCol];
+    const supplyIdChanging =
+        incomingSupplyId != null &&
+        Number.isFinite(Number(incomingSupplyId)) &&
+        Number(incomingSupplyId) !== Number(beforeSupplyId);
+
+    if (supplyIdChanging) {
+        try {
+            supplierChangeResult = await changeOrderSupplier(id, Number(incomingSupplyId), {
+                trx,
+            });
+        } catch (err) {
+            if (err instanceof ChangeSupplierError) {
+                return { error: err.message };
+            }
+            throw err;
+        }
+        delete sanitized[supplyIdCol];
+        delete sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST];
+    } else if (
+        sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] != null &&
+        beforeSupplyId != null
+    ) {
+        // Supply không đổi nhưng user update cost trực tiếp — nếu NCC hiện tại
+        // là Mavryk/Shop thì ép cost = 0 (luôn luôn 0, theo yêu cầu user).
+        const supRow = await trx(TABLES.supplier)
+            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
+            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
+            .first();
+        if (isMavrykShopSupplierName(supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME])) {
+            sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] = 0;
+        }
+    }
+
+    let updatedOrder;
+    if (Object.keys(sanitized).length > 0) {
+        const [row] = await trx(TABLES.orderList)
+            .where({ id })
+            .update(sanitized)
+            .returning("*");
+        updatedOrder = row;
+    } else {
+        updatedOrder = await trx(TABLES.orderList).where({ id }).first();
+    }
 
     if (!updatedOrder) {
         return { notFound: true };
@@ -147,6 +200,9 @@ const updateOrderWithFinance = async ({
             normalized.product_display_name = displayName;
             normalized.id_product = displayName;
         }
+    }
+    if (supplierChangeResult) {
+        normalized.supplier_change = supplierChangeResult;
     }
     return { updated: normalized };
 };

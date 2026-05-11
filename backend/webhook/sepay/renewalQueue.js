@@ -45,6 +45,10 @@ const queueRenewalTask = (orderCode, options = {}) => {
     paymentAmount: options.paymentAmount ?? existing.paymentAmount ?? 0,
     paymentMonthKey: options.paymentMonthKey || existing.paymentMonthKey || null,
     paymentReceiptId: options.paymentReceiptId || existing.paymentReceiptId || null,
+    /** Webhook gọi với true: tin nhắn BIẾN ĐỘNG THÁNG được caller gom 1 lần. */
+    suppressFinanceNotify:
+      options.suppressFinanceNotify === true ||
+      existing.suppressFinanceNotify === true,
   };
   pendingRenewalTasks.set(key, task);
   return task;
@@ -98,6 +102,7 @@ const processRenewalTask = async (orderCode) => {
         paymentAmount: task.paymentAmount,
         paymentMonthKey: task.paymentMonthKey,
         paymentReceiptId: task.paymentReceiptId,
+        suppressFinanceNotify: task.suppressFinanceNotify === true,
       });
       task.renewalAttempts += 1;
       task.lastRenewalResult = renewalResult;

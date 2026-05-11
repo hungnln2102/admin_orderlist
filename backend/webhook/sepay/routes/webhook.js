@@ -32,6 +32,7 @@ const {
   processRenewalTask,
   fetchOrderState,
   isEligibleForRenewal,
+  fetchMonthlySummarySnapshot,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
 const {
@@ -653,6 +654,12 @@ router.post("/", async (req, res) => {
       let postedImportDelta = 0;
       let postedOffFlowBankReceiptDelta = 0;
       let postedBankBalanceDelta = 0;
+      // Snapshot tài chính tháng TRƯỚC khi xử lý webhook + renewal — để cuối
+      // luồng gửi 1 tin nhắn BIẾN ĐỘNG THÁNG tổng hợp (thay vì 2 tin rời rạc:
+      // webhook posting + renewal.runRenewal).
+      const financeSnapshotBefore = paidMonthKey && !alreadyFinancialPosted
+        ? await fetchMonthlySummarySnapshot(client, paidMonthKey).catch(() => null)
+        : null;
 
       if (receiptId && alreadyFinancialPosted) {
         await insertFinancialAuditLog(client, {
@@ -997,26 +1004,10 @@ router.post("/", async (req, res) => {
         }
       }
 
-      if (
-        !alreadyFinancialPosted &&
-        (postedRevenueDelta !== 0 ||
-          postedProfitDelta !== 0 ||
-          postedImportDelta !== 0 ||
-          postedOffFlowBankReceiptDelta !== 0 ||
-          postedBankBalanceDelta !== 0)
-      ) {
-        await notifyFinanceMonthlyDelta({
-          monthKey: paidMonthKey,
-          revenueDelta: postedRevenueDelta,
-          profitDelta: postedProfitDelta,
-          importDelta: postedImportDelta,
-          refundDelta: 0,
-          offFlowDelta: postedOffFlowBankReceiptDelta,
-          bankBalanceDelta: postedBankBalanceDelta,
-          context: "webhook.incrementDashboardSummaryByDelta",
-          executor: client,
-        });
-      }
+      // KHÔNG gửi notify webhook posting tại đây — defer xuống cuối luồng để
+      // gom với renewal thành 1 tin BIẾN ĐỘNG THÁNG (xem combined notify sau
+      // `processRenewalTask`). Vẫn ghi audit log + cập nhật receipt state.
+      // (Trước đây: 2 message riêng webhook.incrementDashboard + renewal.runRenewal.)
 
       if (receiptId) {
         if (
@@ -1150,12 +1141,80 @@ router.post("/", async (req, res) => {
               paymentAmount: currentAmountForCode,
               paymentMonthKey: paidMonthKey,
               paymentReceiptId: receiptId,
+              // Cuối luồng webhook sẽ gửi 1 tin BIẾN ĐỘNG THÁNG tổng hợp.
+              suppressFinanceNotify: true,
             });
             await processRenewalTask(code);
           }
         }
       } catch (renewErr) {
         logger.error("Renewal flow failed", { error: renewErr.message, stack: renewErr.stack });
+      }
+
+      // ===== Combined finance delta notify =====
+      // Gửi 1 tin nhắn BIẾN ĐỘNG THÁNG tổng hợp cho cả webhook posting +
+      // renewal (nếu có). Tính delta thật từ DB qua before/after snapshot.
+      if (
+        paidMonthKey &&
+        financeSnapshotBefore &&
+        !alreadyFinancialPosted
+      ) {
+        try {
+          const financeSnapshotAfter = await fetchMonthlySummarySnapshot(
+            client,
+            paidMonthKey
+          );
+          if (financeSnapshotAfter) {
+            const revenueDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_revenue) -
+                normalizeMoney(financeSnapshotBefore.total_revenue)
+            );
+            const profitDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_profit) -
+                normalizeMoney(financeSnapshotBefore.total_profit)
+            );
+            const importDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_import) -
+                normalizeMoney(financeSnapshotBefore.total_import)
+            );
+            const refundDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_refund) -
+                normalizeMoney(financeSnapshotBefore.total_refund)
+            );
+            const offFlowDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_off_flow_bank_receipt) -
+                normalizeMoney(financeSnapshotBefore.total_off_flow_bank_receipt)
+            );
+            const bankBalanceDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.estimated_bank_balance) -
+                normalizeMoney(financeSnapshotBefore.estimated_bank_balance)
+            );
+            if (
+              revenueDelta ||
+              profitDelta ||
+              importDelta ||
+              refundDelta ||
+              offFlowDelta ||
+              bankBalanceDelta
+            ) {
+              await notifyFinanceMonthlyDelta({
+                monthKey: paidMonthKey,
+                revenueDelta,
+                profitDelta,
+                importDelta,
+                refundDelta,
+                offFlowDelta,
+                bankBalanceDelta,
+                context: "webhook.sepay.combined",
+                executor: client,
+              });
+            }
+          }
+        } catch (notifyErr) {
+          logger.warn("[Webhook] Combined finance notify failed (non-fatal)", {
+            error: notifyErr?.message,
+          });
+        }
       }
     } catch (dbErr) {
       await client.query("ROLLBACK");

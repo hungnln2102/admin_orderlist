@@ -3,9 +3,8 @@
  */
 
 const https = require("https");
-const dns = require("dns");
-const net = require("net");
 const { HTTP_TIMEOUT_MS } = require("./constants");
+const { preferIpv4Lookup } = require("./dnsHelpers");
 const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ABORT_ERR",
   "UND_ERR_ABORTED",
@@ -17,75 +16,6 @@ const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ECONNREFUSED",
   "ECONNABORTED",
 ]);
-
-/**
- * Agent truyền `options` có thể chứa localAddress, port… — spread vào dns.lookup
- * gây lỗi trên một số bản Node/Windows (ERR_INVALID_IP_ADDRESS: undefined).
- * Chỉ forward các field dns.lookup hỗ trợ.
- */
-const dnsLookupOpts = (options, overrides) => {
-  const out = { ...overrides };
-  if (options && typeof options === "object") {
-    if (options.hints != null) out.hints = options.hints;
-    if (options.verbatim != null) out.verbatim = options.verbatim;
-  }
-  return out;
-};
-
-const normalizeLookupAddress = (address, family) => {
-  if (Array.isArray(address)) {
-    const normalized = address
-      .map((item) => normalizeLookupAddress(item))
-      .filter(Boolean);
-    return normalized.find((item) => item.family === 4) || normalized[0] || null;
-  }
-
-  const rawAddress = address && typeof address === "object" ? address.address : address;
-  const ip = typeof rawAddress === "string" ? rawAddress.trim() : "";
-  const detectedFamily = net.isIP(ip);
-
-  if (!detectedFamily) return null;
-
-  return {
-    address: ip,
-    family: detectedFamily || Number(family) || 4,
-  };
-};
-
-const completeLookup = (options, cb, resolved) => {
-  if (options?.all === true) {
-    cb(null, [resolved]);
-    return;
-  }
-  cb(null, resolved.address, resolved.family);
-};
-
-const preferIpv4Lookup = (hostname, options, cb) => {
-  if (typeof hostname !== "string" || !hostname.trim()) {
-    process.nextTick(() => cb(new TypeError("Invalid hostname for DNS lookup")));
-    return;
-  }
-  const tryCb = (err, address, family) => {
-    if (err) {
-      cb(err);
-      return;
-    }
-    const resolved = normalizeLookupAddress(address, family);
-    if (!resolved) {
-      cb(new Error(`DNS lookup returned no valid address for ${hostname}`));
-      return;
-    }
-    completeLookup(options, cb, resolved);
-  };
-
-  dns.lookup(hostname, dnsLookupOpts(options, { family: 4, all: false }), (err, address, family) => {
-    const resolved = normalizeLookupAddress(address, family);
-    if (err || !resolved) {
-      return dns.lookup(hostname, dnsLookupOpts(options, { all: true }), tryCb);
-    }
-    tryCb(null, resolved.address, resolved.family);
-  });
-};
 
 const getErrorCode = (err) =>
   String(err?.code || err?.cause?.code || "")
@@ -114,6 +44,8 @@ const isTransientFetchError = (err, timeoutSignal) => {
 
 /**
  * POST body qua https.request với keepAlive và IPv4.
+ * `payload` có thể là string (JSON đã stringify), object (auto JSON.stringify),
+ * hoặc Buffer (đã đóng gói multipart sẵn → caller tự set Content-Type).
  */
 const sendWithHttps = (
   url,
@@ -121,7 +53,14 @@ const sendWithHttps = (
   headers = { "Content-Type": "application/json" }
 ) =>
   new Promise((resolve, reject) => {
-    const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+    let body;
+    if (Buffer.isBuffer(payload)) {
+      body = payload;
+    } else if (typeof payload === "string") {
+      body = payload;
+    } else {
+      body = JSON.stringify(payload);
+    }
     const urlObj = new URL(url);
 
     const req = https.request(
@@ -133,7 +72,7 @@ const sendWithHttps = (
         method: "POST",
         headers: {
           ...headers,
-          "Content-Length": Buffer.byteLength(body),
+          "Content-Length": Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body),
         },
         agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
       },
@@ -177,8 +116,20 @@ const postJson = async (url, data) => {
   return sendWithHttps(url, payload, headers);
 };
 
+/**
+ * POST multipart/form-data — caller đã build `body` (Buffer) + `headers` (gồm
+ * Content-Type kèm boundary) qua `multipartBuilder.buildMultipartBody`.
+ */
+const postMultipart = async (url, body, headers) => {
+  if (!Buffer.isBuffer(body)) {
+    throw new TypeError("postMultipart: body must be a Buffer");
+  }
+  return sendWithHttps(url, body, headers);
+};
+
 module.exports = {
   sendWithHttps,
   postJson,
+  postMultipart,
   isTransientFetchError,
 };

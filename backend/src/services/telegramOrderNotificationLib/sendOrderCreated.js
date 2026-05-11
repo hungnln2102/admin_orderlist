@@ -23,7 +23,7 @@ const {
   buildImportOrderCreatedMessage,
   buildCopyKeyboard,
 } = require("./messageBuilders");
-const { buildSepayQrUrl } = require("./qr");
+const { buildSepayQrUrl, fetchQrImageBytes } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 
@@ -84,18 +84,49 @@ async function sendOrderCreatedNotification(order) {
 
   if (!caption) return;
 
+  // Pre-fetch QR bytes ở backend để không phụ thuộc Telegram đi GET URL
+  // (timeout dài, có khi 18s+). Fetch fail → gửi text-only ngay, không chờ.
+  let qrPhotoBuffer = null;
+  if (!isImport && qrUrl) {
+    try {
+      const fetched = await fetchQrImageBytes({
+        amount,
+        addInfo: paymentNote,
+        accountName: QR_ACCOUNT_NAME,
+        bankCode: QR_BANK_CODE,
+        accountNumber: QR_ACCOUNT_NUMBER,
+      });
+      if (fetched?.buffer) {
+        qrPhotoBuffer = fetched.buffer;
+        logger.info("[Order][Telegram] QR fetched as bytes", {
+          orderCode,
+          source: fetched.sourceUrl,
+          cached: !!fetched.cached,
+          size: fetched.buffer.length,
+        });
+      }
+    } catch (qrErr) {
+      logger.warn("[Order][Telegram] QR fetch failed — will send text-only", {
+        orderCode,
+        error: qrErr?.message,
+        providerErrors: qrErr?.providerErrors,
+      });
+    }
+  }
+  const hasPhoto = Boolean(qrPhotoBuffer);
+
   const makePayload = ({
     includeTopic,
     includeButtons,
     includePhoto = true,
   }) => {
-    const usePhoto = !isImport && includePhoto !== false && !!qrUrl;
+    const usePhoto = !isImport && includePhoto !== false && hasPhoto;
     const payload = {
       chat_id: targetChatId,
       parse_mode: "HTML",
     };
     if (usePhoto) {
-      payload.photo = qrUrl;
+      payload.photo = qrPhotoBuffer;
       payload.caption = caption;
     } else {
       payload.text = caption;
@@ -135,13 +166,13 @@ async function sendOrderCreatedNotification(order) {
     },
     maxAttempts: 5,
     enableCopyButtonRetry: true,
-    enablePhotoRetry: Boolean(qrUrl),
+    enablePhotoRetry: hasPhoto,
     log: {
       sending: ({ attempt, includeTopic, includeButtons, includePhoto }) =>
         logger.info("[Order][Telegram] Sending notification", {
           attempt,
           isImport,
-          hasQrUrl: !!qrUrl,
+          hasQrBytes: hasPhoto,
           includeTopic,
           includeButtons,
           includePhoto,

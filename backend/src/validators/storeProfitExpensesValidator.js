@@ -62,8 +62,45 @@ const deleteStoreProfitExpenseRules = [
   validate,
 ];
 
+const updateStoreProfitExpenseRules = [
+  param("id").isInt({ min: 1 }).withMessage("id không hợp lệ."),
+  body("trace_code")
+    .optional({ values: "null" })
+    .custom(
+      (v) =>
+        v === null ||
+        v === undefined ||
+        (typeof v === "string" && v.trim().length <= 100)
+    )
+    .withMessage("trace_code không hợp lệ (tối đa 100 ký tự)."),
+  body("traceCode")
+    .optional({ values: "null" })
+    .custom(
+      (v) =>
+        v === null ||
+        v === undefined ||
+        (typeof v === "string" && v.trim().length <= 100)
+    )
+    .withMessage("traceCode không hợp lệ (tối đa 100 ký tự)."),
+  body("linked_order_code")
+    .optional({ values: "null" })
+    .custom(
+      (v) =>
+        v === null ||
+        v === undefined ||
+        (typeof v === "string" && v.trim().length <= 64)
+    )
+    .withMessage("linked_order_code không hợp lệ (tối đa 64 ký tự)."),
+  body("reason")
+    .optional({ values: "null" })
+    .custom((v) => v === null || v === undefined || typeof v === "string")
+    .withMessage("reason không hợp lệ."),
+  validate,
+];
+
 module.exports = {
   listStoreProfitExpensesRules,
   createStoreProfitExpenseRules,
+  updateStoreProfitExpenseRules,
   deleteStoreProfitExpenseRules,
 };
