@@ -416,8 +416,11 @@ const computeWebhookAmountDecision = computeDashboardPaymentDecision;
 
 const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, statusValue) => {
   const stored = normalizeMoney(state?.[ORDER_COLS.price]);
+  const storedGross = normalizeMoney(state?.[ORDER_COLS.grossSellingPrice]);
+  // Đơn có áp credit khi tạo: `price` đã là số còn thu; webhook cần đối chiếu theo giá gốc.
+  const baseOrderPrice = storedGross > 0 ? storedGross : stored;
   if (statusValue !== ORDER_STATUS.RENEWAL || !state) {
-    return stored;
+    return baseOrderPrice;
   }
   const row = {
     ...state,
@@ -442,7 +445,7 @@ const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, status
       error: e?.message,
     });
   }
-  return stored;
+  return baseOrderPrice;
 };
 
 const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
@@ -614,6 +617,7 @@ router.post("/", async (req, res) => {
             ${ORDER_COLS.expiryDate},
             ${ORDER_COLS.orderDate},
             ${ORDER_COLS.price},
+            ${ORDER_COLS.grossSellingPrice},
             ${ORDER_COLS.cost},
             ${ORDER_COLS.idSupply},
             (
@@ -842,9 +846,15 @@ router.post("/", async (req, res) => {
             if (statusUpdateResult.rowCount > 0) {
               const wireNow =
                 amountDecision?.recognizedRevenueForOrder !== undefined
-                  ? normalizeMoney(amountDecision.recognizedRevenueForOrder)
+                  ? normalizeMoney(
+                      amountDecision.recognizedRevenueForOrder +
+                        (amountDecision.creditedAmount || 0)
+                    )
                   : amountDecision?.recognizedRevenueCurrent !== undefined
-                    ? normalizeMoney(amountDecision.recognizedRevenueCurrent)
+                    ? normalizeMoney(
+                        amountDecision.recognizedRevenueCurrent +
+                          (amountDecision.creditedAmount || 0)
+                      )
                     : currentAmountForCode;
               const {
                 revenue: rev,

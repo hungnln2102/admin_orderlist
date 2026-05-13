@@ -161,6 +161,9 @@ export const useCreateOrderLogic = (
         0,
         Number(selectedCreditNote.available_amount) || 0
       ),
+      sourceOrderCode: String(selectedCreditNote.source_order_code || "").trim(),
+      sourceOrderId: Number(selectedCreditNote.source_order_list_id || 0),
+      creditCode: String(selectedCreditNote.credit_code || "").trim(),
     };
   }, [prefillContext?.creditNoteId, creditMode, selectedCreditNote]);
 

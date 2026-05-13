@@ -2,6 +2,7 @@ const { db } = require("../../db");
 const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
 const {
   isGiftOrder,
+  isMavnImportOrder,
   isMavrykShopSupplierName,
 } = require("../../utils/orderHelpers");
 const { STATUS, COLS } = require("./constants");
@@ -108,12 +109,38 @@ const updateOrderWithFinance = async ({
         }
         delete sanitized[supplyIdCol];
         delete sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST];
+    } else if (isMavnImportOrder(beforeOrder)) {
+        // Đơn MAVN update:
+        // - NCC Mavryk/Shop: cost luôn = 0.
+        // - NCC khác: cost = price.
+        // syncMavnStoreProfitExpense sẽ tự áp rule theo NCC:
+        // Mavryk/Shop trừ profit+bank; NCC khác chỉ trừ profit qua log NCC.
+        const newPriceRaw = sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE];
+        if (newPriceRaw != null) {
+            let isInternalSupplier = false;
+            if (beforeSupplyId != null) {
+                const supRow = await trx(TABLES.supplier)
+                    .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
+                    .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
+                    .first();
+                isInternalSupplier = isMavrykShopSupplierName(
+                    supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME]
+                );
+            }
+            const numericPrice = Number(newPriceRaw);
+            sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] =
+                isInternalSupplier
+                    ? 0
+                    : (Number.isFinite(numericPrice) && numericPrice > 0
+                        ? Math.round(numericPrice)
+                        : 0);
+        }
     } else if (
         sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] != null &&
         beforeSupplyId != null
     ) {
-        // Supply không đổi nhưng user update cost trực tiếp — nếu NCC hiện tại
-        // là Mavryk/Shop thì ép cost = 0 (luôn luôn 0, theo yêu cầu user).
+        // Đơn bán supply không đổi nhưng user update cost trực tiếp — nếu NCC
+        // hiện tại là Mavryk/Shop thì ép cost = 0 (giữ rule cũ cho đơn bán nội bộ).
         const supRow = await trx(TABLES.supplier)
             .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
             .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)

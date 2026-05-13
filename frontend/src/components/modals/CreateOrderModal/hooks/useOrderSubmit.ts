@@ -18,7 +18,13 @@ type UseOrderSubmitParams = {
   products: Product[];
   prefillContext?: CreateOrderPrefillContext | null;
   /** Tạo đơn từ form Credit (chọn phiếu trong dropdown), không dùng khi đã có prefill credit. */
-  creditOrderSelection: { id: number; availableAmount: number } | null;
+  creditOrderSelection: {
+    id: number;
+    availableAmount: number;
+    sourceOrderCode: string;
+    sourceOrderId: number;
+    creditCode: string;
+  } | null;
 };
 
 export const useOrderSubmit = ({
@@ -133,6 +139,11 @@ export const useOrderSubmit = ({
           /** Luôn gửi id phiếu + số áp; nếu `apply` = 0 backend vẫn gán min(dư phiếu, giá) (createOrder). Trước đây `if (apply > 0)` bỏ hết payload khi giá là NaN → không có application. */
           const record = dataToSave as Record<string, unknown>;
           record.refund_credit_note_id = creditOrderSelection.id;
+          record.refund_credit_source_order_code =
+            creditOrderSelection.sourceOrderCode || "";
+          record.refund_credit_source_order_id =
+            Number(creditOrderSelection.sourceOrderId || 0);
+          record.refund_credit_code = creditOrderSelection.creditCode || "";
           const cap = Math.max(0, creditOrderSelection.availableAmount);
           const apply =
             orderTypePrefix === ORDER_CODE_PREFIXES.GIFT

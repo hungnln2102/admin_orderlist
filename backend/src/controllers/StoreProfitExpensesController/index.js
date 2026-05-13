@@ -1,7 +1,20 @@
 const { db } = require("../../db");
 const logger = require("../../utils/logger");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
+const {
+  FINANCE_SCHEMA,
+  SCHEMA_FINANCE,
+  ORDERS_SCHEMA,
+  PARTNER_SCHEMA,
+  SCHEMA_ORDERS,
+  SCHEMA_PARTNER,
+  tableName,
+} = require("../../config/dbSchema");
 const { normalizeDateInput, normalizeTextInput } = require("../../utils/normalizers");
+const { STATUS } = require("../../utils/statuses");
+const {
+  isMavnImportOrder,
+  isMavrykShopSupplierName,
+} = require("../../utils/orderHelpers");
 const {
   monthKeyVietnamFromDbTimestamp,
   mergeSummaryUpdates,
@@ -12,6 +25,10 @@ const {
 
 const TABLE = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+const ORDER_TABLE = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
+const ORDER_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
+const SUPPLIER_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER);
+const SUPPLIER_COLS = PARTNER_SCHEMA.SUPPLIER.COLS;
 const VN_DATE_FROM_CREATED_AT_SQL =
   "to_char((created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date, 'YYYY-MM-DD')";
 
@@ -49,6 +66,45 @@ const normalizeExpenseMetaInput = (value) => {
   if (value === undefined || value === null) return null;
   if (typeof value !== "object" || Array.isArray(value)) return null;
   return value;
+};
+
+const MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED = "MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED";
+
+const ensureNotDuplicateMavnInternalExternalImport = async (trx, linkedOrderCode) => {
+  const normalizedCode = String(linkedOrderCode || "").trim().toUpperCase();
+  if (!normalizedCode) return;
+
+  const order = await trx(`${ORDER_TABLE} as o`)
+    .leftJoin(
+      `${SUPPLIER_TABLE} as s`,
+      "o." + ORDER_COLS.ID_SUPPLY,
+      "s." + SUPPLIER_COLS.ID
+    )
+    .select(
+      `o.${ORDER_COLS.ID_ORDER} as id_order`,
+      `o.${ORDER_COLS.STATUS} as status`,
+      `s.${SUPPLIER_COLS.SUPPLIER_NAME} as supplier_name`
+    )
+    .whereRaw(`UPPER(TRIM(COALESCE(o.${ORDER_COLS.ID_ORDER}::text, ''))) = ?`, [normalizedCode])
+    .first();
+
+  if (!order) return;
+  if (!isMavnImportOrder(order)) return;
+  if (String(order.status || "").trim() !== STATUS.PAID) return;
+  if (!isMavrykShopSupplierName(order.supplier_name)) return;
+
+  // Cho phép tạo tay khi log tự động bị lỗi/mất.
+  // Chỉ chặn nếu đơn đã có log linked với mã đơn này (tránh trừ lặp lần 2+).
+  const existing = await trx(TABLE)
+    .select(COLS.ID)
+    .where(COLS.LINKED_ORDER_CODE, normalizedCode)
+    .whereIn(COLS.EXPENSE_TYPE, ["external_import", "mavn_import"])
+    .first();
+  if (!existing) return;
+
+  const err = new Error("Đơn MAVN NCC nội bộ đã có log linked; chặn tạo log trùng.");
+  err.code = MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED;
+  throw err;
 };
 
 const mapExpenseRow = (row) => {
@@ -149,6 +205,10 @@ const createStoreProfitExpense = async (req, res) => {
   try {
     const hasMavnCols = await storeProfitExpensesHasMavnColumns();
     const row = await db.transaction(async (trx) => {
+      if (expenseType === "external_import" && linkedOrderCode) {
+        await ensureNotDuplicateMavnInternalExternalImport(trx, linkedOrderCode);
+      }
+
       const insertPayload = {
         [COLS.AMOUNT]: amount,
         [COLS.REASON]: reason || null,
@@ -220,6 +280,12 @@ const createStoreProfitExpense = async (req, res) => {
 
     res.status(201).json({ item: mapExpenseRow(row || {}) });
   } catch (error) {
+    if (error?.code === MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED) {
+      return res.status(409).json({
+        error:
+          "Đơn MAVN NCC nội bộ đã có log linked với mã đơn này; không tạo external_import trùng để tránh trừ bank/lợi nhuận lặp.",
+      });
+    }
     logger.error("[store-profit-expenses] create failed", {
       error: error.message,
       stack: error.stack,

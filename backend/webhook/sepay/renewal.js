@@ -455,7 +455,7 @@ const runRenewal = async (
     const pctKhachNormalized = pricingMeta?.pctKhach ?? 0;
 
     // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
-    const finalGiaNhap = pricing.cost;
+    let finalGiaNhap = pricing.cost;
     const finalGiaBan = pricing.price;
 
     const ngayHetHanCu = new Date(hetHan.getTime());
@@ -509,8 +509,15 @@ const runRenewal = async (
       }
     }
     const isMavn = isMavnImportOrder({ id_order: orderCode });
-    // MAVN không dùng NCC Mavryk — luôn cộng NCC khi gia hạn. Đơn khác + NCC Mavryk/Shop: không cộng NCC.
-    const skipNccLedger = !isMavn && isMavrykShopSupplierName(supplierNameForNcc);
+    const isInternalSupplier = isMavrykShopSupplierName(supplierNameForNcc);
+    // MAVN gia hạn:
+    // - NCC Mavryk/Shop: cost = 0 (giá nhập hiển thị luôn 0).
+    // - NCC khác: giữ cost theo giá bán để khớp rule MAVN gia hạn.
+    if (isMavn) {
+      finalGiaNhap = isInternalSupplier ? 0 : finalGiaBan;
+    }
+    // NCC nội bộ Mavryk/Shop: không ghi nhận công nợ NCC.
+    const skipNccLedger = isInternalSupplier;
     // Đơn bán: renewal thủ công → Đang xử lý rồi dùng webhook/giả lập CK; MAVN nhập hàng → thẳng Đã TT (không bank).
     const isManualRenewal = source === "manual";
     const renewalNextStatus =
@@ -697,7 +704,7 @@ const runRenewal = async (
     }
 
     let mavrykExternalImportLog = null;
-    if (skipNccLedger && finalGiaNhap > 0) {
+    if (!isMavn && skipNccLedger && finalGiaNhap > 0) {
       try {
         mavrykExternalImportLog = await createAutoMavrykExternalImportLog({
           client,

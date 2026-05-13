@@ -43,6 +43,10 @@ const attachCreateOrderRoute = (router) => {
         const grossSellingPriceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE;
         const requestedCreditNoteId = Number(req.body?.refund_credit_note_id);
         const requestedCreditApplyAmount = normalizeMoney(req.body?.refund_credit_apply_amount);
+        const requestedCreditSourceOrderCode = String(
+            req.body?.refund_credit_source_order_code || ""
+        ).trim();
+        const requestedCreditCode = String(req.body?.refund_credit_code || "").trim();
         const reservedOrderCodeRaw = String(req.body?.reserved_order_code || "").trim().toUpperCase();
         const requestedPrefixFromReserved = VALID_PREFIXES.find((prefix) =>
             reservedOrderCodeRaw.startsWith(prefix)
@@ -96,22 +100,38 @@ const attachCreateOrderRoute = (router) => {
         }
 
         const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+        const requestedPrefixFromClient = VALID_PREFIXES.find((prefix) =>
+            provisionalIdOrder.startsWith(prefix)
+        ) || null;
+        const effectivePrefix = requestedPrefixFromReserved || requestedPrefixFromClient || "MAVC";
         const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
         const importPrefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
-        const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
-        const isMavnCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
+        const isGiftOrderCreate = effectivePrefix === giftPrefix;
+        const isMavnCreate = effectivePrefix === importPrefix;
 
-        // NCC Mavryk / Shop = nội bộ → giá nhập (cost) LUÔN = 0 khi tạo đơn,
-        // bất kể `supplier_cost` table có giá hay không, bất kể loại đơn (MAVL,
-        // MAVN, MAVT...). Hành vi do user yêu cầu rõ ràng — Mavryk = 0%.
+        // Nhập hàng MAVN:
+        // - NCC Mavryk/Shop: cost luôn = 0.
+        // - NCC khác: cost = giá bán.
+        // Tài chính MAVN được
+        // tách theo NCC trong syncMavnStoreProfitExpense:
+        // - NCC Mavryk/Shop: log external_import + trừ profit/bank.
+        // - NCC khác: log NCC (trigger DB) + trừ profit, không trừ bank.
+        // Đơn bán (MAVL/MAVC/MAVT/MAVK/MAVS) với NCC Mavryk/Shop nội bộ → cost = 0.
+        let isInternalSupplier = false;
         if (payload[supplyIdCol] != null) {
             const supRow = await db(TABLES.supplier)
                 .select(COLS.SUPPLIER.SUPPLIER_NAME)
                 .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
                 .first();
-            if (isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME])) {
+            isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
+            if (!isMavnCreate && isInternalSupplier) {
                 payload[costCol] = 0;
             }
+        }
+        if (isMavnCreate) {
+            payload[costCol] = isInternalSupplier
+                ? 0
+                : normalizeMoney(payload[priceCol]);
         }
 
         if (isGiftOrderCreate) {
@@ -164,20 +184,15 @@ const attachCreateOrderRoute = (router) => {
                 }
             }
 
-            const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
-            const detectedPrefix = requestedPrefixFromReserved
-                || VALID_PREFIXES.find((prefix) => clientIdOrder.startsWith(prefix))
-                || "MAVC";
-
             if (reservedOrderCodeRaw && requestedPrefixFromReserved) {
                 const existingReserved = await trx(TABLES.orderList)
                     .where(idOrderCol, reservedOrderCodeRaw)
                     .first();
                 payload[idOrderCol] = existingReserved
-                    ? await generateUniqueOrderCode(detectedPrefix, trx)
+                    ? await generateUniqueOrderCode(effectivePrefix, trx)
                     : reservedOrderCodeRaw;
             } else {
-                payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
+                payload[idOrderCol] = await generateUniqueOrderCode(effectivePrefix, trx);
             }
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
@@ -185,12 +200,23 @@ const attachCreateOrderRoute = (router) => {
             let applyRefundResult = null;
             let refundCreditApplication = null;
             if (creditNoteForOrder && appliedCreditAmount > 0) {
+                const sourceOrderCodeForNote =
+                    requestedCreditSourceOrderCode ||
+                    String(creditNoteForOrder.source_order_code || "").trim();
+                const creditCodeForNote =
+                    requestedCreditCode ||
+                    String(creditNoteForOrder.credit_code || "").trim();
+                const creditApplicationNote = sourceOrderCodeForNote
+                    ? `Áp credit tự động khi tạo đơn từ đơn hoàn ${sourceOrderCodeForNote}`
+                    : (creditCodeForNote
+                        ? `Áp credit tự động khi tạo đơn từ phiếu ${creditCodeForNote}`
+                        : "Áp credit tự động khi tạo đơn");
                 applyRefundResult = await applyRefundCreditToTargetOrder(trx, {
                     creditNoteId: Number(creditNoteForOrder.id),
                     targetOrderListId: Number(newOrder.id),
                     targetOrderCode: String(newOrder[idOrderCol] || ""),
                     requestedAmount: appliedCreditAmount,
-                    note: `Áp credit tự động khi tạo đơn từ đơn hoàn ${creditNoteForOrder.source_order_code || ""}`.trim(),
+                    note: creditApplicationNote,
                     appliedBy: "system-create-order",
                 });
                 refundCreditApplication = applyRefundResult.application;
