@@ -1,74 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { onRefresh } from "@/lib/refreshBus";
 import {
-  AugmentedRow,
-  OrderListItem,
   PACKAGE_FIELD_OPTIONS,
-  PackageField,
-  PackageRow,
-  PackageTemplate,
-  SlotLinkMode,
-  SlotLinkPreferenceMap,
-  StatusFilter,
-  NormalizedOrderRecord,
-  buildIdentifierKeys,
+  type AugmentedRow,
+  type OrderListItem,
+  type PackageRow,
+  type PackageTemplate,
+  type SlotLinkMode,
+  type SlotLinkPreferenceMap,
+  type StatusFilter,
   enhancePackageRow,
-  getSlotAvailabilityState,
-  normalizeMatchKey,
-  normalizeProductCodeValue,
-  normalizeSlotKey,
-  toCleanString,
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
-  syncActivationFieldInTemplateFields,
 } from "../utils/packageHelpers";
 import { computeAugmentationForPackage } from "../utils/packageMatchUtils";
-import { onRefresh } from "@/lib/refreshBus";
-
-type UsePackageDataResult = {
-  data: {
-    rows: PackageRow[];
-    templates: PackageTemplate[];
-    computedRows: AugmentedRow[];
-    filteredRows: AugmentedRow[];
-    sortedRows: AugmentedRow[];
-    scopedRows: AugmentedRow[];
-    selectedPackage: string | null;
-    selectedTemplate: PackageTemplate | null;
-    packageSummaries: Array<{
-      name: string;
-      total: number;
-      low: number;
-      out: number;
-    }>;
-    slotStats: {
-      total: number;
-      low: number;
-      out: number;
-    };
-    showCapacityColumn: boolean;
-    tableColumnCount: number;
-    loading: boolean;
-    packagesLoading: boolean;
-    ordersLoading: boolean;
-    ordersReady: boolean;
-    defaultTemplateFields: PackageField[];
-  };
-  filters: {
-    searchTerm: string;
-    categoryFilter: string;
-    statusFilter: StatusFilter;
-  };
-  actions: {
-    setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-    setCategoryFilter: React.Dispatch<React.SetStateAction<string>>;
-    setStatusFilter: React.Dispatch<React.SetStateAction<StatusFilter>>;
-    setRows: React.Dispatch<React.SetStateAction<PackageRow[]>>;
-    setTemplates: React.Dispatch<React.SetStateAction<PackageTemplate[]>>;
-    persistSlotLinkPreference: (id: number | string, mode: SlotLinkMode) => void;
-    applySlotLinkPrefs: (row: PackageRow) => PackageRow;
-  };
-};
+import { groupOrdersByProductCode, toNormalizedOrderMatchers } from "./use-package-data/orderMatchers";
+import {
+  computePackageSummaries,
+  computeSlotStats,
+  filterRows,
+  getTableColumnCount,
+  sortRowsByRemainingSlots,
+} from "./use-package-data/rowTransforms";
+import { syncTemplatesFromRows } from "./use-package-data/templateSync";
+import type { UsePackageDataResult } from "./use-package-data/types";
 
 export const usePackageData = (): UsePackageDataResult => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,8 +36,8 @@ export const usePackageData = (): UsePackageDataResult => {
   const [packagesLoading, setPackagesLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersReady, setOrdersReady] = useState(false);
-  const [slotLinkPrefs, setSlotLinkPrefs] = useState<SlotLinkPreferenceMap>(
-    () => readSlotLinkPrefs()
+  const [slotLinkPrefs, setSlotLinkPrefs] = useState<SlotLinkPreferenceMap>(() =>
+    readSlotLinkPrefs()
   );
   const slotLinkPrefsRef = useRef(slotLinkPrefs);
   const isMountedRef = useRef(true);
@@ -94,43 +50,37 @@ export const usePackageData = (): UsePackageDataResult => {
     slotLinkPrefsRef.current = slotLinkPrefs;
   }, [slotLinkPrefs]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       isMountedRef.current = false;
-    };
-  }, []);
-
-  const persistSlotLinkPreference = useCallback(
-    (id: number | string, mode: SlotLinkMode) => {
-      const key = String(id);
-      setSlotLinkPrefs((prev) => {
-        if (prev[key] === mode) return prev;
-        const next = { ...prev, [key]: mode };
-        writeSlotLinkPrefs(next);
-        return next;
-      });
     },
     []
   );
+
+  const persistSlotLinkPreference = useCallback((id: number | string, mode: SlotLinkMode) => {
+    const key = String(id);
+    setSlotLinkPrefs((prev) => {
+      if (prev[key] === mode) return prev;
+      const next = { ...prev, [key]: mode };
+      writeSlotLinkPrefs(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setPackagesLoading(true);
-        const res = await apiFetch(`/api/package-products`);
+        const res = await apiFetch("/api/package-products");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as PackageRow[];
-        if (!cancelled) {
-          if (Array.isArray(data)) {
-            const normalizedRows = data.map((row) =>
-              enhancePackageRow(row, slotLinkPrefsRef.current)
-            );
-            setRows(normalizedRows);
-          } else {
-            setRows([]);
-          }
-        }
+        if (cancelled) return;
+        setRows(
+          Array.isArray(data)
+            ? data.map((row) => enhancePackageRow(row, slotLinkPrefsRef.current))
+            : []
+        );
       } catch (error) {
         console.error("Tải sản phẩm gói thất bại:", error);
         if (!cancelled) {
@@ -139,9 +89,7 @@ export const usePackageData = (): UsePackageDataResult => {
           setRows([]);
         }
       } finally {
-        if (!cancelled) {
-          setPackagesLoading(false);
-        }
+        if (!cancelled) setPackagesLoading(false);
       }
     })();
     return () => {
@@ -155,19 +103,12 @@ export const usePackageData = (): UsePackageDataResult => {
       try {
         setOrdersLoading(true);
         setOrdersReady(false);
-        const res = await apiFetch(
-          `/api/orders?scope=package_match`
-        );
+        const res = await apiFetch("/api/orders?scope=package_match");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as OrderListItem[];
-        if (!cancelled) {
-          if (Array.isArray(data)) {
-            setOrders(data);
-          } else {
-            setOrders([]);
-          }
-          setOrdersReady(true);
-        }
+        if (cancelled) return;
+        setOrders(Array.isArray(data) ? data : []);
+        setOrdersReady(true);
       } catch (error) {
         console.error("Tải danh sách đơn hàng thất bại:", error);
         if (!cancelled) {
@@ -175,9 +116,7 @@ export const usePackageData = (): UsePackageDataResult => {
           setOrdersReady(false);
         }
       } finally {
-        if (!cancelled) {
-          setOrdersLoading(false);
-        }
+        if (!cancelled) setOrdersLoading(false);
       }
     })();
     return () => {
@@ -190,15 +129,11 @@ export const usePackageData = (): UsePackageDataResult => {
     setOrdersLoading(true);
     setOrdersReady(false);
     try {
-      const res = await apiFetch(`/api/orders?scope=package_match`);
+      const res = await apiFetch("/api/orders?scope=package_match");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as OrderListItem[];
       if (!isMountedRef.current) return;
-      if (Array.isArray(data)) {
-        setOrders(data);
-      } else {
-        setOrders([]);
-      }
+      setOrders(Array.isArray(data) ? data : []);
       setOrdersReady(true);
     } catch (error) {
       console.error("Failed to refresh orders for packages:", error);
@@ -207,16 +142,11 @@ export const usePackageData = (): UsePackageDataResult => {
         setOrdersReady(false);
       }
     } finally {
-      if (isMountedRef.current) {
-        setOrdersLoading(false);
-      }
+      if (isMountedRef.current) setOrdersLoading(false);
     }
   }, []);
 
-  useEffect(
-    () => onRefresh(["orders"], () => void refreshOrders()),
-    [refreshOrders]
-  );
+  useEffect(() => onRefresh(["orders"], () => void refreshOrders()), [refreshOrders]);
 
   const packageNames = useMemo(
     () => Array.from(new Set(rows.map((row) => row.package))).sort(),
@@ -224,118 +154,16 @@ export const usePackageData = (): UsePackageDataResult => {
   );
 
   useEffect(() => {
-    setTemplates((prev) => {
-      const map = new Map(prev.map((tpl) => [tpl.name, tpl]));
-      let changed = false;
-      packageNames.forEach((name) => {
-        if (!name) return;
-        const firstRow = rows.find((row) => row.package === name);
-        const productId = firstRow?.productId ?? null;
-        const serverActivation = firstRow?.productRequiresActivation === true;
-        const existing = map.get(name);
-        if (!existing) {
-          map.set(name, {
-            name,
-            productId,
-            fields: syncActivationFieldInTemplateFields(
-              defaultTemplateFields,
-              serverActivation
-            ),
-            isCustom: false,
-          });
-          changed = true;
-          return;
-        }
-        const baseFields =
-          existing.fields && existing.fields.length > 0
-            ? existing.fields
-            : defaultTemplateFields;
-        const mergedFields = syncActivationFieldInTemplateFields(
-          baseFields,
-          serverActivation
-        );
-        const prevFields =
-          existing.fields && existing.fields.length > 0
-            ? existing.fields
-            : defaultTemplateFields;
-        const fieldsEqual =
-          mergedFields.length === prevFields.length &&
-          mergedFields.every((f, i) => f === prevFields[i]);
+    setTemplates((prev) =>
+      syncTemplatesFromRows(prev, packageNames, rows, defaultTemplateFields)
+    );
+  }, [defaultTemplateFields, packageNames, rows]);
 
-        if (!fieldsEqual) {
-          map.set(name, {
-            ...existing,
-            fields: mergedFields,
-            productId: existing.productId ?? productId,
-          });
-          changed = true;
-          return;
-        }
-        if (
-          existing.isCustom !== true &&
-          existing.productId == null &&
-          productId != null
-        ) {
-          map.set(name, { ...existing, productId });
-          changed = true;
-        }
-      });
-      if (!changed) return prev;
-      return Array.from(map.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-    });
-  }, [packageNames, rows, defaultTemplateFields]);
-
-  const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
-    return orders.map((order) => {
-      const o = order as Record<string, unknown>;
-      const idProduct =
-        (order.id_product ?? order.idProduct ?? "") as string;
-      const informationOrder =
-        (order.information_order ?? order.informationOrder ?? "") as string;
-      const slot = order.slot;
-      const rawLinePid =
-        o.line_product_id ?? o.lineProductId;
-      const n =
-        rawLinePid != null && rawLinePid !== "" ? Number(rawLinePid) : NaN;
-      const lineProductId = Number.isFinite(n) && n > 0 ? n : null;
-      const productKeys = buildIdentifierKeys(idProduct);
-      const infoKeys = buildIdentifierKeys(informationOrder);
-      return {
-        base: order,
-        productKey: productKeys.normalized,
-        productLettersKey: productKeys.lettersOnly,
-        infoKey: infoKeys.normalized,
-        infoLettersKey: infoKeys.lettersOnly,
-        slotDisplay: toCleanString(slot),
-        slotKey: normalizeSlotKey(slot),
-        slotMatchKey: normalizeMatchKey(slot),
-        informationDisplay: toCleanString(informationOrder),
-        informationKey: normalizeSlotKey(informationOrder),
-        informationMatchKey: normalizeMatchKey(informationOrder),
-        customerDisplay: toCleanString(order.customer as string | null),
-        productCodeNormalized: normalizeProductCodeValue(idProduct),
-        lineProductId:
-          lineProductId != null && Number.isFinite(lineProductId)
-            ? lineProductId
-            : null,
-      };
-    });
-  }, [orders]);
-
-  const ordersByProductCode = useMemo(() => {
-    const map = new Map<string, NormalizedOrderRecord[]>();
-    orderMatchers.forEach((record) => {
-      if (!record.productCodeNormalized) return;
-      const key = record.productCodeNormalized;
-      if (!map.has(key)) {
-        map.set(key, []);
-      }
-      map.get(key)!.push(record);
-    });
-    return map;
-  }, [orderMatchers]);
+  const orderMatchers = useMemo(() => toNormalizedOrderMatchers(orders), [orders]);
+  const ordersByProductCode = useMemo(
+    () => groupOrdersByProductCode(orderMatchers),
+    [orderMatchers]
+  );
 
   const computedRows: AugmentedRow[] = useMemo(
     () =>
@@ -348,141 +176,32 @@ export const usePackageData = (): UsePackageDataResult => {
           ordersReady,
         }),
       })),
-    [rows, orderMatchers, ordersReady, ordersByProductCode]
+    [orderMatchers, ordersByProductCode, ordersReady, rows]
   );
 
   const selectedPackage = categoryFilter !== "all" ? categoryFilter : null;
   const selectedTemplate = useMemo(
-    () =>
-      selectedPackage
-        ? templates.find((tpl) => tpl.name === selectedPackage) ?? null
-        : null,
-    [templates, selectedPackage]
+    () => (selectedPackage ? templates.find((tpl) => tpl.name === selectedPackage) ?? null : null),
+    [selectedPackage, templates]
   );
   const scopedRows = useMemo(
-    () =>
-      selectedPackage
-        ? computedRows.filter((row) => row.package === selectedPackage)
-        : computedRows,
+    () => (selectedPackage ? computedRows.filter((row) => row.package === selectedPackage) : computedRows),
     [computedRows, selectedPackage]
   );
   const filteredRows = useMemo(
-    () =>
-      scopedRows.filter((item) => {
-        const term = searchTerm.trim().toLowerCase();
-        const infoFields = [
-          item.information,
-          item.informationUser,
-          item.informationMail,
-          item.informationPass,
-          item.accountUser,
-          item.accountMail,
-          item.accountPass,
-          item.note,
-        ];
-        const matchesSearch =
-          term.length === 0 ||
-          infoFields.some((field) => {
-            const normalizedValue =
-              field === null || field === undefined ? "" : String(field);
-            return normalizedValue.toLowerCase().includes(term);
-          });
-        const matchesCategory =
-          categoryFilter === "all" || item.package === categoryFilter;
-        const slotState = getSlotAvailabilityState(item.remainingSlots);
-        const matchesStatus =
-          statusFilter === "all" ||
-          (statusFilter === "full" && slotState === "ok") ||
-          statusFilter === slotState;
-        return matchesSearch && matchesCategory && matchesStatus;
-      }),
-    [scopedRows, searchTerm, categoryFilter, statusFilter]
+    () => filterRows(scopedRows, searchTerm, categoryFilter, statusFilter),
+    [categoryFilter, scopedRows, searchTerm, statusFilter]
   );
-  const sortedRows = useMemo(
-    () =>
-      [...filteredRows].sort((a, b) => {
-        const rawA = Number(a.remainingSlots);
-        const rawB = Number(b.remainingSlots);
-        const slotsA = Number.isFinite(rawA) ? rawA : Number.POSITIVE_INFINITY;
-        const slotsB = Number.isFinite(rawB) ? rawB : Number.POSITIVE_INFINITY;
-        const normA = slotsA <= 0 ? Number.POSITIVE_INFINITY : slotsA;
-        const normB = slotsB <= 0 ? Number.POSITIVE_INFINITY : slotsB;
-        if (normA === normB) return 0;
-        return normA - normB;
-      }),
-    [filteredRows]
+  const sortedRows = useMemo(() => sortRowsByRemainingSlots(filteredRows), [filteredRows]);
+  const { showCapacityColumn, tableColumnCount } = useMemo(
+    () => getTableColumnCount(filteredRows, selectedTemplate),
+    [filteredRows, selectedTemplate]
   );
-
-  const hasCapacityRows = filteredRows.some(
-    (row) => row.hasCapacityField ?? false
+  const slotStats = useMemo(() => computeSlotStats(filteredRows), [filteredRows]);
+  const packageSummaries = useMemo(
+    () => computePackageSummaries(computedRows, templates),
+    [computedRows, templates]
   );
-  const showCapacityColumn =
-    hasCapacityRows ||
-    (filteredRows.length === 0 &&
-      (selectedTemplate?.fields.includes("capacity") ?? false));
-  const tableColumnCount = showCapacityColumn ? 9 : 8;
-
-  /** Thống kê cùng phạm vi với bảng: loại gói + tìm kiếm + lọc trạng thái (tránh lệch «Tổng: 1» với 3 dòng bảng). */
-  const slotStats = useMemo(() => {
-    const low = filteredRows.reduce(
-      (total, row) =>
-        getSlotAvailabilityState(row.remainingSlots) === "low"
-          ? total + 1
-          : total,
-      0
-    );
-    const out = filteredRows.reduce(
-      (total, row) =>
-        getSlotAvailabilityState(row.remainingSlots) === "out"
-          ? total + 1
-          : total,
-      0
-    );
-    return {
-      total: filteredRows.length,
-      low,
-      out,
-    };
-  }, [filteredRows]);
-
-  const allPackageNames = useMemo(() => {
-    const names = new Set<string>();
-    computedRows.forEach((row) => {
-      const trimmed = (row.package || "").trim();
-      if (trimmed) names.add(trimmed);
-    });
-    templates.forEach((tpl) => {
-      if (tpl.name) names.add(tpl.name);
-    });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
-  }, [computedRows, templates]);
-
-  const packageSummaries = useMemo(() => {
-    const stats = new Map<
-      string,
-      { total: number; low: number; out: number }
-    >();
-    allPackageNames.forEach((name) =>
-      stats.set(name, { total: 0, low: 0, out: 0 })
-    );
-    computedRows.forEach((row) => {
-      const key = (row.package || "").trim();
-      if (!key) return;
-      let entry = stats.get(key);
-      if (!entry) {
-        entry = { total: 0, low: 0, out: 0 };
-        stats.set(key, entry);
-      }
-      entry.total += 1;
-      const availability = getSlotAvailabilityState(row.remainingSlots);
-      if (availability === "low") entry.low += 1;
-      if (availability === "out") entry.out += 1;
-    });
-    return allPackageNames.map((name) => ({
-      name,
-      ...(stats.get(name) ?? { total: 0, low: 0, out: 0 }),
-    }));
-  }, [allPackageNames, computedRows]);
 
   const applySlotLinkPrefs = useCallback(
     (row: PackageRow) => enhancePackageRow(row, slotLinkPrefsRef.current),

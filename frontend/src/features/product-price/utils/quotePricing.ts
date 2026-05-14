@@ -54,7 +54,7 @@ export const computeLinePricing = (
 };
 
 export const buildProductOptions = (
-  productPrices: Record<string, any>[],
+  productPrices: Record<string, unknown>[],
   priceMap: Record<string, ApiPriceEntry>
 ) => {
   const seen = new Set<string>();
@@ -136,8 +136,6 @@ export const buildProductOptions = (
         : promoRounded
     );
     const discountValue = promoClamped > 0 ? retailPrice - promoClamped : 0;
-    const unitPrice = retailPrice;
-
     const packageProduct =
       (row?.[VARIANT_PRICING_COLS.variantName] as string) ||
       (row?.package_product as string) ||

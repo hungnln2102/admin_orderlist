@@ -74,7 +74,7 @@ export function enrichOrdersWithVirtualFields(
     const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
     const daysForValue = Math.max(0, effectiveRemaining);
     /** Giá trị còn lại theo doanh thu = giá bán × (ngày còn lại) ÷ tổng ngày (trùng calcRemainingRefund phía server). */
-    let giaTriConLai =
+    const giaTriConLai =
       soNgayDangKy > 0
         ? Math.max(0, Math.round((giaBan * daysForValue) / soNgayDangKy))
         : 0;

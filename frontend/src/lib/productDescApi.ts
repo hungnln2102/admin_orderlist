@@ -102,32 +102,43 @@ export interface ProductImageListResponse {
 
 const normalizeSavedProductDescription = (
   data: Record<string, unknown>
-): ProductDescription => ({
-  id: Number((data as any).id) || 0,
-  descVariantId: (() => {
-    const v =
-      (data as any).descVariantId ?? (data as any).desc_variant_id ?? null;
-    if (v == null || v === "") return null;
-    const n = Number(v);
+): ProductDescription => {
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      if (key in data) return data[key];
+    }
+    return undefined;
+  };
+  const toStringOrEmpty = (value: unknown) =>
+    typeof value === "string" ? value : String(value ?? "");
+  const toStringOrNull = (value: unknown) =>
+    value == null ? null : typeof value === "string" ? value : String(value);
+
+  const descVariantRaw = pick("descVariantId", "desc_variant_id");
+  const descVariantId = (() => {
+    if (descVariantRaw == null || descVariantRaw === "") return null;
+    const n = Number(descVariantRaw);
     return Number.isFinite(n) && n > 0 ? n : null;
-  })(),
-  productId: (data as any).productId || (data as any).product_id || "",
-  productName:
-    (data as any).productName ?? (data as any).product_name ?? null,
-  rules: (data as any).rules || "",
-  rulesHtml: (data as any).rulesHtml || (data as any).rules || "",
-  description: (data as any).description || "",
-  descriptionHtml:
-    (data as any).descriptionHtml || (data as any).description || "",
-  shortDescription:
-    (data as any).shortDescription ??
-    (data as any).shortDesc ??
-    (data as any).short_desc ??
-    null,
-  imageUrl: (data as any).imageUrl ?? (data as any).image_url ?? null,
-  packageImageUrl:
-    (data as any).packageImageUrl ?? (data as any).package_image_url ?? null,
-});
+  })();
+
+  return {
+    id: Number(pick("id")) || 0,
+    descVariantId,
+    productId: toStringOrEmpty(pick("productId", "product_id")),
+    productName: toStringOrNull(pick("productName", "product_name")),
+    rules: toStringOrEmpty(pick("rules")),
+    rulesHtml: toStringOrEmpty(pick("rulesHtml", "rules")),
+    description: toStringOrEmpty(pick("description")),
+    descriptionHtml: toStringOrEmpty(pick("descriptionHtml", "description")),
+    shortDescription: toStringOrNull(
+      pick("shortDescription", "shortDesc", "short_desc")
+    ),
+    imageUrl: toStringOrNull(pick("imageUrl", "image_url")),
+    packageImageUrl: toStringOrNull(
+      pick("packageImageUrl", "package_image_url")
+    ),
+  };
+};
 
 export const createProductDescription = async (
   payload: CreateProductDescriptionPayload
@@ -362,35 +373,11 @@ export const fetchProductDescriptions = async (
     typeof data.total === "number" && Number.isFinite(data.total)
       ? data.total
       : normalizedCount;
-  const normalizedItems = data.items.map((item: any) => ({
-    id: Number(item?.id) || 0,
-    descVariantId: (() => {
-      const raw =
-        item?.descVariantId ?? item?.desc_variant_id ?? null;
-      if (raw === null || raw === "") return null;
-      const n = Number(raw);
-      if (!Number.isFinite(n) || n <= 0) return null;
-      return n;
-    })(),
-    productId: item?.productId || item?.product_id || "",
-    productName: item?.productName ?? item?.product_name ?? null,
-    rules: item?.rules || "",
-    rulesHtml: item?.rulesHtml || item?.rules_html || item?.rules || "",
-    description: item?.description || "",
-    descriptionHtml:
-      item?.descriptionHtml ||
-      item?.description_html ||
-      item?.description ||
-      "",
-    shortDescription:
-      item?.shortDescription ??
-      item?.shortDesc ??
-      item?.short_desc ??
-      null,
-    imageUrl: item?.imageUrl ?? item?.image_url ?? null,
-    packageImageUrl:
-      item?.packageImageUrl ?? item?.package_image_url ?? null,
-  }));
+  const normalizedItems = data.items.map((item) =>
+    normalizeSavedProductDescription(
+      item && typeof item === "object" ? (item as Record<string, unknown>) : {}
+    )
+  );
   return {
     ...data,
     items: normalizedItems,

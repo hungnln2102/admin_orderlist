@@ -31,6 +31,8 @@ export const API_ENDPOINTS = {
   ORDER_REFUND_CREDIT_ENSURE: (id: number) =>
     `/api/orders/canceled/${id}/refund-credit/ensure`,
   ORDERS_REFUND_CREDITS_AVAILABLE: "/api/orders/refund-credits/available",
+  CREDIT_LOGS: "/api/orders/refund-credits/logs",
+  CREDIT_LOG_ACTION: (id: number) => `/api/orders/refund-credits/${id}/actions`,
 
   SUPPLIES: "/api/supplies",
   SUPPLIES_ORDER_COSTS: "/api/supplies/order-costs",

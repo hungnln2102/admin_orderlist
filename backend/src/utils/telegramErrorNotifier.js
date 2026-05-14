@@ -23,7 +23,7 @@ const ENABLED =
 
 const RATE_LIMIT_MS = 2000;
 const MAX_QUEUE = 30;
-let queue = [];
+const queue = [];
 let sending = false;
 let lastSentAt = 0;
 

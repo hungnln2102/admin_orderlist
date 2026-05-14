@@ -136,7 +136,6 @@ function buildWebsiteStatusPayload({
   const accountLicenseCount = Number(resolveAccountSeatLimit(account) || 0);
   const userHasProduct = resolveUserProductState(matchedUser);
   const orderExpired = order ? isOrderExpired(order.expiry_date, now) : false;
-  const hasValidOrder = Boolean(order) && !orderExpired;
   const userOnTeam = matchedUser != null;
   const adminLicenseOk =
     Boolean(account) &&

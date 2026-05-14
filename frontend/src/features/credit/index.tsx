@@ -19,7 +19,7 @@ export default function CreditLogsPage() {
     queryParams,
   } = useCreditLogsList();
 
-  const { data, loading, error } = useCreditLogsFetch(queryParams);
+  const { data, loading, error, reload } = useCreditLogsFetch(queryParams);
 
   return (
     <div className="space-y-4">
@@ -57,6 +57,7 @@ export default function CreditLogsPage() {
         items={data.items}
         pagination={data.pagination}
         onPageChange={setPage}
+        onReload={reload}
       />
 
       <div className="text-xs text-slate-400">

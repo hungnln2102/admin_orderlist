@@ -49,6 +49,8 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   >(null);
   const [goalIdPendingDelete, setGoalIdPendingDelete] = useState<number | null>(null);
   const [goalDeleteSubmitting, setGoalDeleteSubmitting] = useState(false);
+  const availableCurrent = Number(availableProfit?.current || 0);
+  const availablePrevious = Number(availableProfit?.previous || 0);
 
   const { handleReorder, handleDelete, handleUpdateTargetAmount } =
     useSavingGoalsActions({
@@ -99,9 +101,6 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
 
   const columnStats = useWalletColumnStats(walletRows, walletColumns);
   const displayColumnStats = useMemo(() => {
-    const availableCurrent = Number(availableProfit?.current || 0);
-    const availablePrevious = Number(availableProfit?.previous || 0);
-
     const availableProfitStat = {
       field: "__available_profit__",
       name: "Lợi nhuận khả dụng",
@@ -112,7 +111,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
     };
 
     return [availableProfitStat, ...columnStats];
-  }, [availableProfit?.current, availableProfit?.previous, columnStats]);
+  }, [availableCurrent, availablePrevious, columnStats]);
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
@@ -133,7 +132,7 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
           walletColumns={walletColumns}
           walletRows={walletRows}
           currencyFormatter={currencyFormatter}
-          availableProfit={Number(availableProfit?.current || 0)}
+          availableProfit={availableCurrent}
         />
 
         <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr))]">

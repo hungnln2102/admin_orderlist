@@ -139,7 +139,7 @@ export const parseDurationMonthsFromSlot = (slot: string): number | null => {
     const n = Number(monthWord[1]);
     if (Number.isFinite(n) && n > 0 && n <= 120) return n;
   }
-  const mUnit = s.match(/(?:^|[-–—\s(/]|#)(\d{1,2})\s*([mM])(?=\s|$|[)\]—\-])/);
+  const mUnit = s.match(/(?:^|[-–—\s(/]|#)(\d{1,2})\s*([mM])(?=\s|$|[)\]—-])/);
   if (mUnit) {
     const n = Number(mUnit[1]);
     if (Number.isFinite(n) && n > 0 && n <= 120) return n;

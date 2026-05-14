@@ -16,6 +16,15 @@ interface Props {
   onRefreshList?: () => void;
 }
 
+type UnpaidPayment = {
+  id: number;
+  totalImport?: number;
+  import_value?: number;
+  paid?: number;
+  round?: string;
+  status?: string;
+};
+
 const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks = [], onRefreshList }) => {
   const { overview, loading, error, fetchOverview, setError } = useSupplyDetail(supplyId, isOpen);
   const { confirmingId, confirmPayment } = usePayments({
@@ -29,7 +38,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   // Tính toán các giá trị từ overview (phải đặt trước useMemo)
   const supply = overview?.supply;
   const stats = overview?.stats;
-  const unpaidPayments: any[] = overview?.unpaidPayments || [];
+  const unpaidPayments: UnpaidPayment[] = overview?.unpaidPayments || [];
   const logOrdersByMonth: Array<{
     month: number;
     orders: Array<{
@@ -154,7 +163,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     logOrdersByMonth.map((item) => [item.month, item.orders || []])
   );
   const statusLabel = supply?.isActive ? "Đang hoạt động" : "Tạm dừng";
-  const statusClass = supply?.isActive ? "bg-emerald-500/20 text-emerald-200" : "bg-gray-500/20 text-gray-200";
   const bankNameResolved =
     supply?.bankName ||
     banks.find((b) => (b.bin || "").trim() === (supply?.binBank || "").trim())?.name ||

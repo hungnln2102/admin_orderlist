@@ -1,16 +1,17 @@
 import React from "react";
 import { ProductTable } from "../components/ProductTable";
+import type { MergedProduct } from "../utils/productInfoHelpers";
 
 interface ProductViewProps {
-  products: any[];
+  products: MergedProduct[];
   mergedTotal: number;
   loading: boolean;
   currentPage: number;
   pageSize: number;
-  expandedId: string | null;
+  expandedId: number | null;
   onPageChange: (page: number) => void;
-  onToggleExpand: (id: string | null) => void;
-  onEdit: (product: any) => void;
+  onToggleExpand: (id: number | null) => void;
+  onEdit: (product: MergedProduct) => void;
 }
 
 /**

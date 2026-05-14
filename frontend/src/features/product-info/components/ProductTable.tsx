@@ -49,7 +49,7 @@ export const ProductTable: React.FC<ProductTableProps> = ({
         showCardOnMobile={true}
         cardView={
           <TableCard
-            data={products as unknown as any[]}
+            data={products as unknown[]}
             renderCard={(item) => (
               <ProductCard item={item as MergedProduct} onEdit={onEdit} />
             )}

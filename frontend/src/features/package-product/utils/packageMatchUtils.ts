@@ -93,7 +93,6 @@ export function orderBelongsToPackageByProduct(
   const belongs = record.productCodeNormalized === packageCode;
   if (belongs) {
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
       console.debug("[PackageMatch] orderBelongsToPackageByProduct", {
         package: item.package,
         packageCode,
@@ -132,7 +131,6 @@ export function orderMatchesPackageLink(
   // Debug: log detailed comparison when we have keys but không match
   if (import.meta.env.DEV) {
     if (!matched) {
-      // eslint-disable-next-line no-console
       console.debug("[PackageMatch] orderMatchesPackageLink: NO MATCH", {
         packageId: item.id,
         packageName: item.package,
@@ -148,7 +146,6 @@ export function orderMatchesPackageLink(
         customer: record.customerDisplay,
       });
     } else {
-      // eslint-disable-next-line no-console
       console.debug("[PackageMatch] orderMatchesPackageLink: MATCH", {
         packageId: item.id,
         packageName: item.package,

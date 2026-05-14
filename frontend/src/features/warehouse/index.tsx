@@ -20,10 +20,17 @@ export default function Storage() {
   useEffect(() => {
     let mounted = true;
 
-    const parsePayload = (payload: any) => {
+    const parsePayload = (payload: unknown): WarehouseItem[] => {
       if (!payload) return [];
       if (Array.isArray(payload)) return payload;
-      if (Array.isArray(payload.items)) return payload.items;
+      if (
+        typeof payload === "object" &&
+        payload !== null &&
+        "items" in payload &&
+        Array.isArray((payload as { items?: unknown[] }).items)
+      ) {
+        return (payload as { items: WarehouseItem[] }).items;
+      }
       return [];
     };
 
@@ -43,8 +50,10 @@ export default function Storage() {
         if (mounted) {
           setItems(parsed);
         }
-      } catch (err: any) {
-        if (mounted) setError(err?.message || "Lỗi không xác định");
+      } catch (err) {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : "Lỗi không xác định");
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -100,8 +109,8 @@ export default function Storage() {
         );
         cancelEdit();
       }
-    } catch (err: any) {
-      setError(err?.message || "Lỗi khi cập nhật");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi khi cập nhật");
     } finally {
       setLoading(false);
     }
@@ -128,8 +137,8 @@ export default function Storage() {
       setItems((prev) => prev.filter((it) => it.id !== id));
       if (editingId === id) cancelEdit();
       setWarehouseIdPendingDelete(null);
-    } catch (err: any) {
-      setError(err?.message || "Lỗi khi xóa");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi khi xóa");
     } finally {
       setLoading(false);
       setWarehouseDeleteSubmitting(false);

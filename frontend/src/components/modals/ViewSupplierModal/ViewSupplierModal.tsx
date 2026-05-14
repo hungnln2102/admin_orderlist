@@ -16,6 +16,15 @@ import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../ViewOrderModal/con
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
+type PaymentItem = {
+  id: number;
+  totalImport?: number;
+  import_value?: number;
+  paid?: number;
+  round?: string;
+  status?: string;
+};
+
 export default function ViewSupplierModal({
   isOpen,
   onClose,
@@ -35,7 +44,9 @@ export default function ViewSupplierModal({
     if (!selectedPaymentId) return;
     setConfirming(true);
     try {
-      const payment = data.unpaidPayments.find((p: any) => p.id === selectedPaymentId);
+      const payment = data.unpaidPayments.find(
+        (p: PaymentItem) => p.id === selectedPaymentId
+      );
       const raw = Number(payment?.totalImport ?? payment?.import_value ?? 0);
       const paid = Number(payment?.paid ?? 0);
       const amountDue = raw < 0 ? Math.abs(raw) : Math.max(0, raw - paid);
@@ -73,7 +84,9 @@ export default function ViewSupplierModal({
   const supply = data?.supply;
   const stats = data?.stats;
   const unpaidPayments = data?.unpaidPayments || [];
-  const selectedPayment = unpaidPayments.find((p: any) => p.id === selectedPaymentId);
+  const selectedPayment = unpaidPayments.find(
+    (p: PaymentItem) => p.id === selectedPaymentId
+  );
 
   // Còn nợ âm = NCC trả mình → QR dùng STK của tôi, số tiền = số dương.
   const qrImageUrl = useMemo(() => {
@@ -145,7 +158,7 @@ export default function ViewSupplierModal({
               <div className="grid lg:grid-cols-3 gap-6">
                 <div className="space-y-3">
                   <h3 className="font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
-                  {unpaidPayments.length === 0 ? <p className="text-sm text-white/50">Không có công nợ.</p> : unpaidPayments.map((p: any) => (
+                  {unpaidPayments.length === 0 ? <p className="text-sm text-white/50">Không có công nợ.</p> : unpaidPayments.map((p: PaymentItem) => (
                     <button key={p.id} onClick={() => setSelectedPaymentId(p.id)}
                       className={`w-full text-left rounded-xl border px-4 py-3 transition ${p.id === selectedPaymentId ? "border-indigo-500 bg-indigo-500/20" : "border-white/10 bg-white/5"}`}>
                       <p className="font-semibold">{p.round}</p>

@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
 import type { WarehouseItem } from "../../../../../Personal/Storage/types";
 import type {
-  AccountInfo,
   PackageFormValues,
   SlotLinkMode,
 } from "../../../utils/packageHelpers";

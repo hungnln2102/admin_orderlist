@@ -6,7 +6,6 @@ import { AddAdminAccountModal } from "@/features/renew-adobe/components/AddAdmin
 import { RenewAdobeHeader } from "@/features/renew-adobe/components/RenewAdobeHeader";
 import { RenewAdobeProgressPanel } from "@/features/renew-adobe/components/RenewAdobeProgressPanel";
 import { UserOrdersTable } from "@/features/renew-adobe/components/UserOrdersTable";
-import type { AdobeAdminAccount } from "@/features/renew-adobe/types";
 import { useRenewAdobeAdmin } from "@/features/renew-adobe/hooks/useRenewAdobeAdmin";
 
 const PAGE_SIZE = 10;

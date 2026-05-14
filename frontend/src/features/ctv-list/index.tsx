@@ -32,10 +32,10 @@ function mapCustomerStatusToCtvItem(raw: {
     lastName: raw.lastName ?? "",
     firstName: raw.firstName ?? "",
     email: raw.email || "",
-    balance: Number(raw.balance) ?? 0,
-    totalSpent: Number(raw.totalSpent) ?? 0,
+    balance: Number(raw.balance) || 0,
+    totalSpent: Number(raw.totalSpent) || 0,
     totalOrders: 0,
-    totalAmount: Number(raw.totalSpent) ?? 0,
+    totalAmount: Number(raw.totalSpent) || 0,
     rank: raw.rank || "Mới",
     discount: "—",
     status: raw.status,
@@ -69,7 +69,7 @@ export default function CtvList() {
         const list = Array.isArray(data.items) ? data.items : [];
         const mapped: CtvItem[] = sortCtvList(list.map(mapCustomerStatusToCtvItem));
         setItems(mapped);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError("Không thể tải danh sách CTV / khách hàng");
           setItems([]);
@@ -109,7 +109,6 @@ export default function CtvList() {
   }, [items, searchTerm, statusFilter, roleTab]);
 
   const totalItems = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const start = (currentPage - 1) * PAGE_SIZE;
   const currentRows = filtered.slice(start, start + PAGE_SIZE);
 

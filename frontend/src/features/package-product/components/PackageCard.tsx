@@ -4,12 +4,11 @@
  */
 
 import React from "react";
-import { EyeIcon, PencilIcon, TrashIcon, BoltIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import {
   AugmentedRow,
   DEFAULT_CAPACITY_LIMIT,
   DEFAULT_SLOT_LIMIT,
-  formatCapacityLabel,
   formatDisplayDate,
   getCapacityAvailabilityState,
   getSlotAvailabilityState,

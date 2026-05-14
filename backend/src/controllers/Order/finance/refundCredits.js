@@ -32,6 +32,7 @@ const CREDIT_STATUS = {
     FULLY_APPLIED: "FULLY_APPLIED",
     VOID: "VOID",
 };
+const REFUNDED_NOTE_MARKER = "[REFUNDED_CASHOUT]";
 
 const normalizeMoney = (value) => {
     const numeric = Number(value);
@@ -282,6 +283,7 @@ module.exports = {
     REFUND_CREDIT_NOTE_COLS: R,
     REFUND_CREDIT_APPLICATION_COLS: A,
     CREDIT_STATUS,
+    REFUNDED_NOTE_MARKER,
     normalizeMoney,
     buildRefundCreditCode,
     buildSplitReplacementCreditCode,

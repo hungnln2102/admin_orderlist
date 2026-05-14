@@ -56,22 +56,6 @@ const loadWalletTypesOrdered = async () => {
   }
 };
 
-const loadWalletScopeByIdMap = async () => {
-  try {
-    const walletRows = await db(WALLET_TYPES_TABLE).select(
-      WALLET_COLS.ID,
-      WALLET_COLS.BALANCE_SCOPE
-    );
-    return new Map(
-      walletRows.map((r) => [Number(r.id), parseBalanceScope(r[WALLET_COLS.BALANCE_SCOPE])])
-    );
-  } catch (err) {
-    if (!isMissingBalanceScopeColumnError(err)) throw err;
-    const walletRows = await db(WALLET_TYPES_TABLE).select(WALLET_COLS.ID);
-    return new Map(walletRows.map((r) => [Number(r.id), "per_row"]));
-  }
-};
-
 const parseBalanceScope = (raw) => {
   const s = String(raw ?? "per_row").trim().toLowerCase().replace(/-/g, "_");
   return s === "column_total" ? "column_total" : "per_row";

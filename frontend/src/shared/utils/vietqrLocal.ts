@@ -69,7 +69,7 @@ export function buildVietQrPayload({
   return payload;
 }
 
-let _qrCache = new Map<string, string>();
+const _qrCache = new Map<string, string>();
 const MAX_CACHE = 50;
 
 export async function generateVietQrDataUrl(opts: {

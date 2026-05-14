@@ -50,7 +50,7 @@ export const fetchTaxOrdersWithFallback = async (
 ): Promise<TaxOrder[]> => {
   try {
     return await fetchTaxOrders(from);
-  } catch (error) {
+  } catch {
     const legacyOrders = await apiGet<TaxOrder[]>("/api/orders");
     return legacyOrders.filter((order) => {
       const orderDate = getTaxOrderDate(order);

@@ -9,7 +9,7 @@ import {
 
 /** Gói / tên biến thể theo mã sản phẩm (đã chuẩn hóa key). */
 export function buildPackageProductMap(
-  productPrices: Record<string, any>[]
+  productPrices: Record<string, unknown>[]
 ): Map<string, string> {
   const map = new Map<string, string>();
   productPrices.forEach((row) => {

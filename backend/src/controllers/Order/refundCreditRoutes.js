@@ -2,11 +2,18 @@ const { db } = require("../../db");
 const { TABLES, STATUS, COLS } = require("./constants");
 const { orderIdParam } = require("../../validators/orderValidator");
 const logger = require("../../utils/logger");
+const { todayYMDInVietnam } = require("../../utils/normalizers");
+const { applyEstimatedBankBalanceDelta } = require("./finance/dashboardSummary");
+const {
+    parseRefundCreditLogsQuery,
+    listRefundCreditLogs,
+} = require("./queries/listRefundCreditLogs");
 const {
     createOrGetRefundCreditNoteForOrder,
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
     CREDIT_STATUS,
+    REFUNDED_NOTE_MARKER,
     REFUND_CREDIT_NOTES_TABLE,
     REFUND_CREDIT_NOTE_COLS: RCN,
 } = require("./finance/refundCredits");
@@ -21,7 +28,47 @@ const detectPreviewPrefix = (orderCodeRaw) => {
         || "MAVL";
 };
 
+const CREDIT_ACTIONS = {
+    DELETE: "delete",
+    COMPLETE: "complete",
+};
+
+const normalizeCreditAction = (rawAction) => {
+    const action = String(rawAction || "").trim().toLowerCase();
+    if (action === CREDIT_ACTIONS.DELETE) return CREDIT_ACTIONS.DELETE;
+    if (action === CREDIT_ACTIONS.COMPLETE) return CREDIT_ACTIONS.COMPLETE;
+    return "";
+};
+
+const appendNote = (baseNote, suffix) => {
+    const base = String(baseNote || "").trim();
+    const next = String(suffix || "").trim();
+    if (!next) return base || null;
+    if (!base) return next;
+    return `${base} — ${next}`;
+};
+
+const monthKeyCurrentVietnam = () => {
+    const ymd = todayYMDInVietnam();
+    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.slice(0, 7) : null;
+};
+
 const attachRefundCreditRoutes = (router) => {
+    router.get("/refund-credits/logs", async (req, res) => {
+        try {
+            const params = parseRefundCreditLogsQuery(req.query || {});
+            const payload = await listRefundCreditLogs(params);
+            return res.json(payload);
+        } catch (error) {
+            logger.error("List refund credit logs failed", {
+                error: error.message,
+                stack: error.stack,
+                query: req.query,
+            });
+            return res.status(500).json({ error: "Không thể tải credit logs." });
+        }
+    });
+
     /**
      * GET /api/orders/refund-credits/available
      * Phiếu credit **khả dụng** cho form tạo đơn: còn số dư, trạng thái OPEN/PARTIALLY_APPLIED,
@@ -134,6 +181,93 @@ const attachRefundCreditRoutes = (router) => {
                 stack: error.stack,
             });
             return res.status(500).json({ error: "Không thể khởi tạo credit bù đơn." });
+        }
+    });
+
+    router.post("/refund-credits/:id/actions", async (req, res) => {
+        const id = Number(req.params.id);
+        const action = normalizeCreditAction(req.body?.action);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ error: "ID credit không hợp lệ." });
+        }
+        if (!action) {
+            return res.status(400).json({ error: "Action không hợp lệ. Dùng delete hoặc complete." });
+        }
+
+        const trx = await db.transaction();
+        try {
+            const current = await trx(REFUND_CREDIT_NOTES_TABLE)
+                .where({ [RCN.ID]: id })
+                .forUpdate()
+                .first();
+            if (!current) {
+                await trx.rollback();
+                return res.status(404).json({ error: "Không tìm thấy credit log." });
+            }
+
+            const availableAmount = normalizeMoney(current?.[RCN.AVAILABLE_AMOUNT]);
+            const currentStatus = String(current?.[RCN.STATUS] || "").trim().toUpperCase();
+            const isAlreadyUnavailable =
+                availableAmount <= 0 || [CREDIT_STATUS.FULLY_APPLIED, CREDIT_STATUS.VOID].includes(currentStatus);
+
+            let nextNote = current?.[RCN.NOTE] ?? null;
+            let bankBalanceDelta = 0;
+
+            if (action === CREDIT_ACTIONS.DELETE) {
+                nextNote = appendNote(nextNote, "Ẩn credit khỏi danh sách khả dụng (thao tác Xóa).");
+            } else if (action === CREDIT_ACTIONS.COMPLETE) {
+                nextNote = appendNote(
+                    nextNote,
+                    `${REFUNDED_NOTE_MARKER} Đã hoàn tiền theo credit (thao tác Đã Hoàn).`
+                );
+                bankBalanceDelta = -Math.max(0, availableAmount);
+            }
+
+            if (!isAlreadyUnavailable || action === CREDIT_ACTIONS.COMPLETE) {
+                await trx(REFUND_CREDIT_NOTES_TABLE)
+                    .where({ [RCN.ID]: id })
+                    .update({
+                        [RCN.STATUS]: CREDIT_STATUS.VOID,
+                        [RCN.AVAILABLE_AMOUNT]: 0,
+                        [RCN.NOTE]: nextNote,
+                    });
+            }
+
+            if (action === CREDIT_ACTIONS.COMPLETE && bankBalanceDelta !== 0) {
+                const monthKey = monthKeyCurrentVietnam();
+                if (monthKey) {
+                    await applyEstimatedBankBalanceDelta(trx, monthKey, bankBalanceDelta, {
+                        context: "refundCredits.completeAction",
+                    });
+                }
+            }
+
+            const updated = await trx(REFUND_CREDIT_NOTES_TABLE)
+                .where({ [RCN.ID]: id })
+                .first();
+            await trx.commit();
+            return res.json({
+                success: true,
+                item: {
+                    id: Number(updated?.[RCN.ID] || id),
+                    status:
+                        action === CREDIT_ACTIONS.COMPLETE
+                            ? "REFUNDED"
+                            : String(updated?.[RCN.STATUS] || "").toUpperCase(),
+                    available_amount: normalizeMoney(updated?.[RCN.AVAILABLE_AMOUNT]),
+                    note: updated?.[RCN.NOTE] != null ? String(updated[RCN.NOTE]) : null,
+                    updated_at: updated?.[RCN.UPDATED_AT] ? String(updated[RCN.UPDATED_AT]) : null,
+                },
+            });
+        } catch (error) {
+            await trx.rollback();
+            logger.error("Update refund credit action failed", {
+                id,
+                action,
+                error: error.message,
+                stack: error.stack,
+            });
+            return res.status(500).json({ error: "Không thể cập nhật credit log." });
         }
     });
 };

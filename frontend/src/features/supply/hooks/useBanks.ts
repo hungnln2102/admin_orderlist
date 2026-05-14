@@ -13,15 +13,24 @@ export function useBanks() {
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
           setBanks(
-            data.map((bank: any) => ({
-              bin: bank.bin,
+            data.map((bank) => {
+              const row =
+                bank && typeof bank === "object"
+                  ? (bank as Record<string, unknown>)
+                  : {};
+              return {
+              bin: String(row.bin ?? ""),
               name:
-                bank.bank_name ||
-                bank.bankName ||
-                bank.name ||
-                bank.bank ||
-                bank.bin,
-            }))
+                String(
+                  row.bank_name ??
+                    row.bankName ??
+                    row.name ??
+                    row.bank ??
+                    row.bin ??
+                    ""
+                ),
+            };
+          })
           );
         }
       })

@@ -16,8 +16,8 @@ Từ giờ, **mọi tính năng mới hoặc khi thêm tính năng** đều **kh
 
 ## Ví dụ (backend)
 
-- **Đúng**: `services/adobe/` với `constants.js`, `cookies.js`, `scrapers.js`, `otpFlow.js`, `loginHelpers.js`, `index.js`; `adobeCheckService.js` chỉ re-export từ `./adobe`.
-- **Sai**: Một file `adobeCheckService.js` 800+ dòng chứa cookies, scrape, OTP, login, delete user.
+- **Đúng**: `services/renew-adobe/adobe-renew-v2/` tách thành `flows/`, `shared/`, `loginFlow.js`, `runCheckFlow.js`, …; entry point `index.js` chỉ điều phối.
+- **Sai**: Một file `adobeCheckService.js` 800+ dòng chứa cookies, scrape, OTP, login, delete user trộn lẫn.
 
 ## Khi thêm tính năng mới
 

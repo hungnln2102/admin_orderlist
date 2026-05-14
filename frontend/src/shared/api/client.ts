@@ -1,19 +1,22 @@
+const readProcessEnv = (): Record<string, string | undefined> => {
+  if (typeof process === "undefined") return {};
+  const proc = process as { env?: Record<string, string | undefined> };
+  return proc.env ?? {};
+};
+
 const isDev =
-  typeof import.meta !== "undefined" && (import.meta as any).env?.DEV === true;
+  typeof import.meta !== "undefined" && import.meta.env?.DEV === true;
 
 const RAW_API_BASE: string = (() => {
   if (isDev) return "";
 
   const metaBase =
     typeof import.meta !== "undefined"
-      ? ((import.meta as any).env?.VITE_API_BASE_URL as string) || ""
+      ? import.meta.env?.VITE_API_BASE_URL || ""
       : "";
   if (metaBase) return metaBase;
 
-  const envBase =
-    typeof process !== "undefined"
-      ? ((process as any).env?.VITE_API_BASE_URL as string) || ""
-      : "";
+  const envBase = readProcessEnv().VITE_API_BASE_URL || "";
   if (envBase) return envBase;
 
   return "http://localhost:3001";
@@ -110,8 +113,10 @@ export async function apiRequest<T = unknown>(
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
-      const body = await res.json();
-      message = body.error || body.message || message;
+      const body = (await res.json()) as
+        | { error?: string; message?: string }
+        | null;
+      message = body?.error || body?.message || message;
     } catch {}
     throw Object.assign(new Error(message), { status: res.status });
   }

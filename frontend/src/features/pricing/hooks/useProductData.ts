@@ -83,13 +83,16 @@ export const useProductData = (): UseProductDataResult => {
         throw new Error("Không thể tải dữ liệu sản phẩm.");
       }
       const payload = await response.json();
-      const rows: any[] = Array.isArray(payload)
+      const rows: unknown[] = Array.isArray(payload)
         ? payload
         : Array.isArray(payload?.items)
         ? payload.items
         : [];
       const normalizedRows = rows.map((row, index) =>
-        mapProductPriceRow(row, index)
+        mapProductPriceRow(
+          row && typeof row === "object" ? (row as Record<string, unknown>) : {},
+          index
+        )
       );
       const computedRows = normalizedRows.map((row) =>
         applyBasePriceToProduct(row, row.baseSupplyPrice)

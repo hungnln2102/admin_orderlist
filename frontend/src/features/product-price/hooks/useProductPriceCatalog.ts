@@ -4,7 +4,7 @@ import type { ProductDesc } from "../types";
 
 /** Tải bảng giá biến thể + mô tả sản phẩm cho trang báo giá. */
 export function useProductPriceCatalog() {
-  const [productPrices, setProductPrices] = useState<Record<string, any>[]>([]);
+  const [productPrices, setProductPrices] = useState<Record<string, unknown>[]>([]);
   const [productDescs, setProductDescs] = useState<ProductDesc[]>([]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 const { db } = require("../../db");
-const { QUOTED_COLS, SUPPLY_STATUS_CANDIDATES } = require("./constants");
+const { SUPPLY_STATUS_CANDIDATES } = require("./constants");
 const { SCHEMA_PRODUCT, SCHEMA_SUPPLIER, SCHEMA_PARTNER } = require("../../config/dbSchema");
 const { normalizeSupplyStatus } = require("../../utils/normalizers");
 const logger = require("../../utils/logger");

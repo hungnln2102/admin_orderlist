@@ -53,12 +53,12 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
     });
   }, []);
 
+  const currentOrderCode = String(
+    formData?.[ORDER_FIELDS.ID_ORDER as keyof Order] ?? ""
+  );
   const customerType = useMemo(
-    () =>
-      getCustomerTypeFromIdOrder(
-        String(formData?.[ORDER_FIELDS.ID_ORDER as keyof Order] ?? "")
-      ),
-    [formData?.[ORDER_FIELDS.ID_ORDER as keyof Order]]
+    () => getCustomerTypeFromIdOrder(currentOrderCode),
+    [currentOrderCode]
   );
 
   const pricingProductName = String(

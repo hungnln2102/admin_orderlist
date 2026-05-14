@@ -58,9 +58,6 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   const inputBase =
     "w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all";
 
-  const labelBase =
-    "text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2 block";
-
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

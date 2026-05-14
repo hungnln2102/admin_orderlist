@@ -39,7 +39,7 @@ async function purgeAndDeleteNoLicenseAdobeAdminAccount(
       : "imap";
 
   const removedRows = await removeMappingsForAccount(id);
-  let userEmails = removedRows.map((r) => r.user_email).filter(Boolean);
+  const userEmails = removedRows.map((r) => r.user_email).filter(Boolean);
 
   const trackingOrderIds = [
     ...new Set(

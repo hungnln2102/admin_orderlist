@@ -7,8 +7,6 @@ const logger = require("../../../utils/logger");
 const { LOGIN_PAGE_URL, AUTH_SERVICES_BASE } = require("./shared/constants");
 const { LOGIN_TIMEOUTS, runOtpIfPresent, runCredentialsFixedOnce, handleOtpChallenge } = require("./flows/login");
 
-const SKIP_RE = /^\s*(not now|skip|bỏ qua|later|skip for now)\s*$/i;
-
 /** True nếu URL là trang đã đăng nhập (account, adminconsole, home...), không phải form login. */
 function isOnAdobeSite(url) {
   const u = (url || "").toLowerCase();

@@ -17,17 +17,15 @@ interface PricingFiltersProps {
 
 const PricingFilters: React.FC<PricingFiltersProps> = ({
   searchTerm,
-  statusFilter,
+  statusFilter: _statusFilter,
   isLoading,
   isRefreshing,
   error,
   onSearchChange,
-  onPromoFilterToggle,
+  onPromoFilterToggle: _onPromoFilterToggle,
   onRefresh,
   onAddProduct,
 }) => {
-  const isPromoActive = statusFilter === "promo";
-
   return (
     <div className="pricing-filters space-y-4">
       <div className="pricing-filters__panel rounded-[32px] border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm lg:p-5">

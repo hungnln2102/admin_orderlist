@@ -20,14 +20,19 @@ export const useSupplyList = () => {
       const res = await apiFetch("/api/supply-insights");
       if (!res.ok) throw new Error("Lỗi tải dữ liệu");
       const data = await res.json();
+      const suppliesRaw = Array.isArray(data?.supplies)
+        ? (data.supplies as Array<Record<string, unknown>>)
+        : [];
 
-      const items: Supply[] = (data.supplies || []).map((item: any) => {
+      const items: Supply[] = suppliesRaw.map((item) => {
         const isActive = item.isActive ?? (item.status !== "inactive" && item.status !== "tạm dừng");
         return {
-          ...item,
-          isActive,
+          ...(item as Partial<Supply>),
+          isActive: Boolean(isActive),
           status: isActive ? "active" : "inactive",
-          products: Array.isArray(item.products) ? item.products.filter(Boolean) : [],
+          products: Array.isArray(item.products)
+            ? (item.products as unknown[]).filter(Boolean)
+            : [],
         };
       });
 

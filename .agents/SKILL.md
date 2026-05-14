@@ -21,21 +21,26 @@ admin_orderlist/backend/src/
   db/
     index.js          ← Knex instance (db) — dùng cho mọi query
   services/
-    adobe-http/       ← HTTP/Browser functions: autoDeleteUsers, addUsersWithProduct (v1)
     renew-adobe/      ← Luồng Renew Adobe (gom chung)
       adobe-renew-v2/ ← Playwright V2: addUsersWithProductV2, facade, runCheckFlow, flows
       orderUserTrackingService.js
       renewAdobePurgeNoLicenseAccount.js
-      adobeCheckService.js  ← re-export adobe-renew-v2
+      adobeSystemConstants.js
     userAccountMappingService.js  ← CRUD bảng user_account_mapping
   scheduler/
     index.js          ← Đăng ký tất cả cron jobs
     tasks/            ← Mỗi task là 1 file, export createXxxTask() factory function
   routes/
-    schedulerRoutes.js ← Manual trigger endpoints
+    index.js          ← Mount các domain `domains/*/routes`
+    v1.js             ← Versioned mount cho client cũ
   controllers/
-    RenewAdobeController.js ← runCheckForAccountId() — crawl snapshot 1 account
+    RenewAdobeController/ ← runCheckForAccountId() — crawl snapshot 1 account (folder)
+    PaymentsController/   ← Receipts + financial state (đang là God object, xem task.md)
+    Order/                ← Domain order legacy còn chứa nhiều handler
 ```
+
+> Lưu ý: nhiều domain backend vẫn còn ở `controllers/*` (legacy), chỉ một số đã chuyển sang `domains/*` (xem `task.md` Phase 2b).
+> `services/adobe-http/` (V1) đã được loại bỏ; mọi luồng Adobe đi qua `services/renew-adobe/adobe-renew-v2/`.
 
 ---
 
@@ -126,10 +131,9 @@ const ACTIVE_STATUSES = [STATUS.PROCESSING, STATUS.PAID, STATUS.RENEWAL];
 ### Services Adobe
 | Service | Method | Dùng cho |
 |---|---|---|
-| `adobe-http` | `autoDeleteUsers(email, pwd, [emails], opts)` | Xóa user khỏi org (browser V1) |
-| `adobe-http` | `addUsersWithProduct(email, pwd, [emails], opts)` | Add user + product (V1 - cũ) |
-| `renew-adobe/adobe-renew-v2` | `addUsersWithProductV2(email, pwd, [emails], opts)` | Add user + product (V2 Playwright - ưu tiên dùng) |
+| `renew-adobe/adobe-renew-v2` | `addUsersWithProductV2(email, pwd, [emails], opts)` | Add user + product (Playwright V2 — luồng chuẩn) |
 | `renew-adobe/adobe-renew-v2` | `getOrCreateAutoAssignUrlWithPage(page, orgId, email, pwd, opts)` | Lấy/tạo URL auto-assign |
+| `renew-adobe/adobe-renew-v2` | `deleteUsersV2(email, pwd, [emails], opts)` | Xóa user khỏi org (Playwright V2) |
 | `RenewAdobeController` | `runCheckForAccountId(accountId)` | Crawl lại snapshot 1 account |
 
 ### userAccountMappingService — API
@@ -171,7 +175,7 @@ module.exports = { createMyTask };
 3. Mỗi scheduler task xuất `createXxxTask()` factory
 4. Delay `await new Promise(r => setTimeout(r, 3000))` giữa các account để tránh rate limit Adobe
 5. Luôn `try/catch` riêng từng account trong vòng lặp — lỗi 1 account không dừng cả job
-6. `addUsersWithProductV2` (V2) ưu tiên hơn `addUsersWithProduct` (V1)
+6. Tất cả luồng Adobe đi qua `adobe-renew-v2` (V1 đã loại bỏ — không tự tạo lại)
 7. Sau khi add user → gọi `runCheckForAccountId(accId)` để crawl lại snapshot mới nhất
 
 ---

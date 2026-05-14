@@ -16,7 +16,6 @@ interface Props {
   onDelete: (supply: Supply) => void;
   onView: (supply: Supply) => void;
   onToggleStatus: (supply: Supply) => void;
-  onRefreshSupplies: () => void;
 }
 
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
@@ -31,7 +30,6 @@ const SupplyList: React.FC<Props> = ({
   onDelete,
   onView,
   onToggleStatus,
-  onRefreshSupplies,
 }) => {
   return (
     <div className="supply-list glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
@@ -98,7 +96,6 @@ const SupplyList: React.FC<Props> = ({
                   onDelete={onDelete}
                   onView={onView}
                   onToggleStatus={onToggleStatus}
-                  onRefreshSupplies={onRefreshSupplies}
                 />
               ))
             )}
@@ -117,7 +114,6 @@ const SupplyRow = ({
   onDelete,
   onView,
   onToggleStatus,
-  onRefreshSupplies,
 }: {
   supply: Supply;
   isExpanded: boolean;
@@ -126,7 +122,6 @@ const SupplyRow = ({
   onDelete: (supply: Supply) => void;
   onView: (supply: Supply) => void;
   onToggleStatus: (supply: Supply) => void;
-  onRefreshSupplies: () => void;
 }) => {
   const netUnpaid = Number(supply.totalUnpaidImport ?? 0);
 

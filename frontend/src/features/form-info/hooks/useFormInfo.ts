@@ -46,7 +46,7 @@ export function useFormInfo() {
           description: (row.description || "").trim() || "Không có mô tả",
         }));
         setItems(mapped);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError("Không thể tải danh sách form");
           setItems([]);
@@ -73,7 +73,7 @@ export function useFormInfo() {
         const rows: InputDto[] = await fetchInputs();
         if (cancelled) return;
         setInputItems(rows);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setInputError("Không thể tải danh sách input");
           setInputItems([]);
@@ -106,7 +106,6 @@ export function useFormInfo() {
       });
     } catch (err) {
       // Giữ log để debug khi cần
-      // eslint-disable-next-line no-console
       console.error("Không thể tải chi tiết form", err);
       setViewError("Không thể tải chi tiết form");
       setViewData({
@@ -158,7 +157,6 @@ export function useFormInfo() {
 
   const handleDelete = (item: FormInfoItem) => {
     // TODO: triển khai logic xóa form
-    // eslint-disable-next-line no-console
     console.log("Xóa", item);
   };
 

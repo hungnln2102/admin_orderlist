@@ -6,7 +6,7 @@
  * Hiển thị API: dùng `total_profit` như trong DB. Thuế trên (doanh thu ròng).
  */
 const { db } = require("../../db");
-const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryAggregate");
+const { buildDashboardSummaryAggregateQuery } = require("./dashboardSummaryQueries");
 const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
 const { quoteIdent } = require("../../utils/sql");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");

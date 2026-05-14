@@ -60,8 +60,10 @@ export function usePricingTiers() {
         setTiers(data);
         setError(null);
       }
-    } catch (err: any) {
-      if (mounted.current) setError(err.message ?? "Fetch failed");
+    } catch (err) {
+      if (mounted.current) {
+        setError(err instanceof Error ? err.message : "Fetch failed");
+      }
     } finally {
       if (mounted.current) setLoading(false);
     }

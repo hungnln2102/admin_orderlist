@@ -1,5 +1,5 @@
 const { db } = require("../../../db");
-const { QUOTED_COLS, supplyPriceCols, TABLES } = require("../constants");
+const { supplyPriceCols, TABLES } = require("../constants");
 const { findProductIdByName, ensureSupplyRecord, upsertSupplyPrice } = require("../finders");
 const { mapSupplyPriceRow } = require("../mappers");
 const { quoteIdent } = require("../../../utils/sql");

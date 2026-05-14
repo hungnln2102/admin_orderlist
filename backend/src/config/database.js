@@ -5,6 +5,7 @@ const { getPostgresConnectionUrl } = require("./postgresConnectionUrl");
 loadBackendEnv();
 
 const isProd = process.env.NODE_ENV === "production";
+const isTest = process.env.NODE_ENV === "test";
 
 const RAW_POOL_MAX = Number(process.env.DB_RAW_POOL_MAX) || 5;
 
@@ -38,7 +39,9 @@ const checkConnection = async (retries = 3) => {
   if (isProd) process.exit(1);
 };
 
-checkConnection();
+if (!isTest) {
+  checkConnection();
+}
 
 module.exports = {
   query: (text, params) => pool.query(text, params),

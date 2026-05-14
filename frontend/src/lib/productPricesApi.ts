@@ -20,7 +20,7 @@ export type ProductPriceUpdatePayload = {
 export const updateProductPrice = async (
   productId: number,
   payload: ProductPriceUpdatePayload
-): Promise<any> => {
+): Promise<Record<string, unknown>> => {
   const response = await apiFetch(`/api/product-prices/${productId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -34,7 +34,9 @@ export const updateProductPrice = async (
       })
     );
   }
-  return response.json().catch(() => ({}));
+  return response
+    .json()
+    .catch(() => ({} as Record<string, unknown>));
 };
 
 export const deleteProductPrice = async (

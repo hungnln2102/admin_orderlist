@@ -18,7 +18,9 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 
 export const createSupplierEntry = (): CreateSupplierEntry => {
   const globalCrypto =
-    typeof globalThis !== "undefined" ? (globalThis as any).crypto : null;
+    typeof globalThis !== "undefined"
+      ? (globalThis as { crypto?: Crypto }).crypto
+      : null;
   const id =
     globalCrypto && typeof globalCrypto.randomUUID === "function"
       ? globalCrypto.randomUUID()
@@ -366,12 +368,15 @@ export const computeHighestSupplyPrice = (items: SupplyPriceItem[], fallback?: n
   return null;
 };
 
-export const toFinitePrice = (value: any): number | null => {
+export const toFinitePrice = (value: unknown): number | null => {
   const num = Number(value);
   return Number.isFinite(num) && num > 0 ? num : null;
 };
 
-export const mapProductPriceRow = (row: any, fallbackId: number): ProductPricingRow => {
+export const mapProductPriceRow = (
+  row: Record<string, unknown>,
+  fallbackId: number
+): ProductPricingRow => {
   const packageName = cleanupLabel(row?.[VARIANT_PRICING_COLS.packageName] ?? row?.package_label);
   const packageProduct = cleanupLabel(row?.[VARIANT_PRICING_COLS.variantName] ?? row?.package_product_label);
   const sanPhamRaw = (row?.[VARIANT_PRICING_COLS.code] ?? row?.id_product_label ?? row?.id_product ?? "").toString().trim();

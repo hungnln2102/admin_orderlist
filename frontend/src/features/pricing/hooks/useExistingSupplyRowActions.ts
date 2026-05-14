@@ -2,7 +2,7 @@ import { useState } from "react";
 import type React from "react";
 import { apiFetch } from "@/lib/api";
 import { API_ENDPOINTS } from "@/constants";
-import type { ProductPricingRow, SupplyPriceState } from "../types";
+import type { SupplyPriceState } from "../types";
 import {
   buildSupplyRowKey,
   formatVndDisplay,
@@ -234,6 +234,7 @@ export function useExistingSupplyRowActions({
     editingSupplyRows,
     supplyPriceDrafts,
     savingSupplyRows,
+    supplyRowErrors,
     handleStartEditingSupply,
     handleSupplyInputChange,
     handleCancelSupplyEditing,

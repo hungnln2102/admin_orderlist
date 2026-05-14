@@ -1,5 +1,6 @@
 const { db } = require("../../../db");
 const { TABLES } = require("../constants");
+const { REFUNDED_NOTE_MARKER } = require("../finance/refundCredits");
 
 const STATUS_GROUPS = {
     ALL: "all",
@@ -120,7 +121,10 @@ const toNumber = (value) => {
 };
 
 const mapLogRow = (row) => {
-    const status = String(row?.status || "").trim().toUpperCase();
+    const rawStatus = String(row?.status || "").trim().toUpperCase();
+    const note = row?.note != null ? String(row.note) : null;
+    const isRefunded = rawStatus === "VOID" && String(note || "").includes(REFUNDED_NOTE_MARKER);
+    const status = isRefunded ? "REFUNDED" : rawStatus;
     const refundAmount = toNumber(row?.refund_amount);
     const availableAmount = toNumber(row?.available_amount);
     const appliedCount = toNumber(row?.applied_count);
@@ -141,7 +145,7 @@ const mapLogRow = (row) => {
         applied_total: appliedTotal,
         applied_count: appliedCount,
         status,
-        note: row?.note != null ? String(row.note) : null,
+        note,
         issued_at: row?.issued_at ? String(row.issued_at) : null,
         updated_at: row?.updated_at ? String(row.updated_at) : null,
         created_at: row?.created_at ? String(row.created_at) : null,
@@ -152,6 +156,7 @@ const mapLogRow = (row) => {
         is_available: isAvailable,
         is_applied: isApplied,
         is_unavailable: isUnavailable,
+        is_refunded: isRefunded,
     };
 };
 

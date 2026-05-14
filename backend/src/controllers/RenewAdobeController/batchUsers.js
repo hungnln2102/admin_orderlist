@@ -106,7 +106,7 @@ const runAddUsersBatch = async (req, res) => {
     }
 
     const distribution = [];
-    let remaining = [...userEmails];
+    const remaining = [...userEmails];
 
     for (const account of ordered) {
       const currentCount = account._currentCount;

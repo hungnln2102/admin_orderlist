@@ -71,8 +71,8 @@ const deleteOrderWithArchive = async ({
             refundValue = toPositiveAmount(Math.max(0, customerRefund));
         }
 
-        // Rule mới: xóa đơn luôn vào Chưa Hoàn để theo dõi log NCC và xác nhận hoàn theo từng bước.
-        const archiveStatus = STATUS.PENDING_REFUND;
+        // Rule mới: hủy đơn chuyển thẳng Đã Hoàn và tạo credit khả dụng để dùng cho đơn kế tiếp.
+        const archiveStatus = STATUS.REFUNDED;
         movedTo = "canceled";
         const orderCode = order?.[idOrderCol] ?? order?.id_order;
 
@@ -103,16 +103,20 @@ const deleteOrderWithArchive = async ({
         if (updatePayload[canceledAtCol] !== undefined) {
             afterOrder[canceledAtCol] = updatePayload[canceledAtCol];
         }
-        await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder);
+        await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder, {
+            // Luồng hủy -> Đã Hoàn nhưng chi trả thực tế thực hiện khi bấm "Đã Hoàn" ở credit log.
+            // Vì vậy không trừ bank ở bước đổi trạng thái đơn để tránh trừ kép.
+            skipBankBalanceDelta: archiveStatus === STATUS.REFUNDED && refundValue > 0,
+        });
 
-        if (archiveStatus === STATUS.PENDING_REFUND && refundValue > 0) {
+        if (archiveStatus === STATUS.REFUNDED && refundValue > 0) {
             await createOrGetRefundCreditNoteForOrder(trx, {
                 sourceOrderListId: orderId,
                 sourceOrderCode: orderCode,
                 customerName: order?.customer,
                 customerContact: order?.contact,
                 refundAmount: refundValue,
-                note: `Tạo tự động khi đơn chuyển ${STATUS.PENDING_REFUND}`,
+                note: `Tạo tự động khi đơn chuyển ${STATUS.REFUNDED}`,
             });
         }
     } else {

@@ -4,4 +4,4 @@ export type ViewSupplierModalProps = {
   supplyId: number | null;
 };
 
-export type SupplyOverviewData = any;
+export type SupplyOverviewData = unknown;

@@ -94,7 +94,6 @@ const transports = [
 
 // File transports (only in production or if LOG_FILE is set)
 if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
-  const logFile = process.env.LOG_FILE || path.join(logsDir, "app.log");
   const maxSize = process.env.LOG_MAX_SIZE || "10m";
   const maxFiles = process.env.LOG_MAX_FILES || "5";
 
@@ -210,16 +209,6 @@ logger.stream = {
   write: (message) => {
     logger.http(message.trim());
   },
-};
-
-/**
- * Helper to log with context
- * @param {string} level - Log level
- * @param {string} message - Log message
- * @param {Object} context - Additional context
- */
-const logWithContext = (level, message, context = {}) => {
-  logger[level](message, context);
 };
 
 /**

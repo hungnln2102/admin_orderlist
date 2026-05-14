@@ -8,78 +8,23 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowPathIcon,
-  PencilSquareIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
-import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
+import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
-import type { LicenseStatus } from "@/features/renew-adobe/types";
 import {
   deleteTrackingOrder,
   fetchRenewAdobeUserOrders,
 } from "@/features/renew-adobe/user-orders/api";
-import type {
-  DisplayStatus,
-  OrderInfo,
-  UserOrderRow,
-} from "@/features/renew-adobe/user-orders/types";
+import type { OrderInfo, UserOrderRow } from "@/features/renew-adobe/user-orders/types";
 import { flattenToUserRows } from "@/features/renew-adobe/user-orders/utils";
 import { AddTrackingOrdersModal } from "@/features/renew-adobe/components/AddTrackingOrdersModal";
 import { EditTrackingOrderModal } from "@/features/renew-adobe/components/EditTrackingOrderModal";
-import { getAdobeSystemOption } from "@/features/renew-adobe/user-orders/system-options";
 import { renewFixAdesAccount } from "@/features/renew-adobe/fix-ades/api";
 import { showAppNotification } from "@/lib/notifications";
-
-const STATUS_LABELS: Record<LicenseStatus, string> = {
-  paid: "Còn gói",
-  active: "Còn gói",
-  expired: "Hết gói",
-  unknown: "Chờ gia hạn",
-};
-
-/** no_product = chưa cấp quyền Adobe; not_added = chưa gán admin */
-const DISPLAY_LABELS: Record<DisplayStatus, string> = {
-  ...STATUS_LABELS,
-  no_product: "Chưa cấp quyền",
-  not_added: "Chưa add",
-};
-
-const PAGE_SIZE = 10;
-
-function SystemBadge({ code }: { code: string | null | undefined }) {
-  const opt = getAdobeSystemOption(code);
-  return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${opt.badge}`}
-    >
-      {opt.label}
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: DisplayStatus }) {
-  const label = DISPLAY_LABELS[status];
-  const colorClasses =
-    status === "paid" || status === "active"
-      ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/40"
-      : status === "expired"
-        ? "bg-rose-500/15 text-rose-300 border-rose-400/40"
-      : status === "no_product"
-        ? "bg-amber-500/15 text-amber-300 border-amber-400/40"
-      : status === "not_added"
-        ? "bg-slate-500/20 text-slate-300 border-slate-400/35"
-        : "bg-amber-500/15 text-amber-300 border-amber-400/40";
-  return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${colorClasses}`}
-    >
-      {label}
-    </span>
-  );
-}
+import { PAGE_SIZE } from "./user-orders-table/constants";
+import { UserOrdersTableCard } from "./user-orders-table/UserOrdersTableCard";
+import { UserOrdersTableControls } from "./user-orders-table/UserOrdersTableControls";
+import { UserOrdersTableDesktopRow } from "./user-orders-table/UserOrdersTableDesktopRow";
 
 export type UserOrdersTableProps = {
   /** Đổi khi load lại danh sách admin → refetch user-orders (join API). */
@@ -109,12 +54,8 @@ export function UserOrdersTable({
   const [trackingRefreshKey, setTrackingRefreshKey] = useState(0);
   const [editTarget, setEditTarget] = useState<UserOrderRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserOrderRow | null>(null);
-  const [deletingTrackingId, setDeletingTrackingId] = useState<string | null>(
-    null
-  );
-  const [adesRenewTarget, setAdesRenewTarget] = useState<UserOrderRow | null>(
-    null
-  );
+  const [deletingTrackingId, setDeletingTrackingId] = useState<string | null>(null);
+  const [adesRenewTarget, setAdesRenewTarget] = useState<UserOrderRow | null>(null);
   const [adesRenewingId, setAdesRenewingId] = useState<string | null>(null);
 
   const reloadOrders = useCallback(() => {
@@ -144,8 +85,7 @@ export function UserOrdersTable({
       showAppNotification({
         type: "error",
         title: "Xoá thất bại",
-        message:
-          (err as Error)?.message || "Không thể xoá đơn khỏi tracking.",
+        message: (err as Error)?.message || "Không thể xoá đơn khỏi tracking.",
       });
     } finally {
       setDeletingTrackingId(null);
@@ -177,9 +117,7 @@ export function UserOrdersTable({
       showAppNotification({
         type: "error",
         title: "Renew Fix Ades thất bại",
-        message:
-          (err as Error)?.message ||
-          `Không thể renew đơn ${code} qua Fix Ades.`,
+        message: (err as Error)?.message || `Không thể renew đơn ${code} qua Fix Ades.`,
       });
     } finally {
       setAdesRenewingId(null);
@@ -187,7 +125,6 @@ export function UserOrdersTable({
   }, [adesRenewTarget]);
 
   const allRows = useMemo(() => flattenToUserRows(orderData), [orderData]);
-
   const filtered = useMemo(() => {
     if (!searchTerm.trim()) return allRows;
     const q = searchTerm.trim().toLowerCase();
@@ -199,16 +136,28 @@ export function UserOrdersTable({
     );
   }, [allRows, searchTerm]);
 
-  /** Chưa có adobe_account_id (chưa gán admin) */
   const fixableEmailsInView = useMemo(
-    () =>
-      filtered.filter((r) => r.accountId === 0).map((r) => r.email),
+    () => filtered.filter((r) => r.accountId === 0).map((r) => r.email),
     [filtered]
   );
 
   const totalItems = filtered.length;
   const start = (page - 1) * PAGE_SIZE;
   const currentRows = filtered.slice(start, start + PAGE_SIZE);
+  const canInteract = !fixingId && !deletingId && !fixAllProgress;
+
+  const actionProps = {
+    onDeleteUser,
+    deletingId,
+    onFixUser,
+    fixingId,
+    fixAllProgress,
+    deletingTrackingId,
+    adesRenewingId,
+    onOpenEdit: setEditTarget,
+    onOpenDeleteTracking: setDeleteTarget,
+    onOpenAdesRenew: setAdesRenewTarget,
+  };
 
   return (
     <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
@@ -219,40 +168,18 @@ export function UserOrdersTable({
         Mã đơn hàng, Tên Khách Hàng, Email, Profile, Tình trạng Gói, Hạn Sử Dụng
       </p>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <input
-          type="text"
-          placeholder="Tìm theo mã đơn, tên, email..."
-          className="w-full max-w-md px-4 py-2 border border-white/10 rounded-xl bg-slate-950/40 text-sm text-white placeholder:text-slate-400/70 focus:ring-2 focus:ring-indigo-500/50 outline-none"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setPage(1);
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAddTrackingOpen(true)}
-            disabled={!!fixingId || !!deletingId || !!fixAllProgress}
-            className="shrink-0 rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-400/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            + Thêm đơn
-          </button>
-          {onFixAllUsers && fixableEmailsInView.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => onFixAllUsers(fixableEmailsInView)}
-              disabled={!!fixingId || !!deletingId || !!fixAllProgress}
-              className="shrink-0 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/40 px-4 py-2 text-sm font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-            >
-              {fixAllProgress
-                ? `Đang fix ${fixAllProgress.current}/${fixAllProgress.total}...`
-                : `Fix all (${fixableEmailsInView.length})`}
-            </button>
-          ) : null}
-        </div>
-      </div>
+      <UserOrdersTableControls
+        searchTerm={searchTerm}
+        onSearchChange={(value) => {
+          setSearchTerm(value);
+          setPage(1);
+        }}
+        onAddOrder={() => setAddTrackingOpen(true)}
+        canInteract={canInteract}
+        onFixAllUsers={onFixAllUsers}
+        fixableEmailsInView={fixableEmailsInView}
+        fixAllProgress={fixAllProgress}
+      />
 
       <AddTrackingOrdersModal
         open={addTrackingOpen}
@@ -315,100 +242,7 @@ export function UserOrdersTable({
       <div className="rounded-xl border border-white/10 overflow-hidden">
         <ResponsiveTable
           showCardOnMobile
-          cardView={
-            currentRows.length === 0 ? (
-              <div className="p-8 text-center text-white/70">
-                Chưa có dữ liệu. Chạy Check để đồng bộ users từ Adobe.
-              </div>
-            ) : (
-              <TableCard
-                data={currentRows}
-                renderCard={(item) => {
-                  const row = item as UserOrderRow;
-                  const isActive =
-                    row.display_status === "active" ||
-                    row.display_status === "paid";
-                  const showAdesRenew =
-                    !isActive && row.systemNote === "fix_ades";
-                  const showAdobeFix =
-                    !isActive &&
-                    row.systemNote !== "fix_ades" &&
-                    row.accountId === 0 &&
-                    !!onFixUser;
-                  return (
-                    <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs text-white/60">Mã đơn: {row.order_code}</p>
-                        <SystemBadge code={row.systemNote} />
-                      </div>
-                      <p className="text-sm font-medium text-white">{row.customer_name}</p>
-                      <p className="text-xs text-white/80 break-all">{row.email}</p>
-                      <p className="text-xs text-white/60">Profile: {row.profile}</p>
-                      <StatusBadge status={row.display_status} />
-                      <p className="text-xs text-white/70">Hạn: {row.expiry}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {showAdesRenew && (
-                          <button
-                            type="button"
-                            onClick={() => setAdesRenewTarget(row)}
-                            disabled={adesRenewingId === row.email}
-                            className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-40"
-                            title="Renew qua Fix Ades"
-                          >
-                            <ArrowPathIcon className="h-3.5 w-3.5" />
-                            {adesRenewingId === row.email
-                              ? "Đang renew…"
-                              : "Renew Ades"}
-                          </button>
-                        )}
-                        {row.accountId > 0 && onDeleteUser && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteUser(row.accountId, row.email)}
-                            disabled={!!deletingId || !!fixingId || !!fixAllProgress}
-                            className="rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-3 py-1.5 text-xs font-semibold"
-                          >
-                            Xóa user
-                          </button>
-                        )}
-                        {showAdobeFix && (
-                          <button
-                            type="button"
-                            onClick={() => onFixUser?.(row.email)}
-                            disabled={!!fixingId || !!deletingId || !!fixAllProgress}
-                            className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold"
-                          >
-                            {fixingId === row.email ? "Đang fix..." : "Fix"}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setEditTarget(row)}
-                          disabled={deletingTrackingId === row.order_code}
-                          className="inline-flex items-center justify-center rounded-lg border border-indigo-400/40 bg-indigo-500/15 px-2 py-1.5 text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40"
-                          title="Sửa hệ thống fix"
-                          aria-label="Sửa"
-                        >
-                          <PencilSquareIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(row)}
-                          disabled={deletingTrackingId === row.order_code}
-                          className="inline-flex items-center justify-center rounded-lg border border-rose-400/40 bg-rose-500/15 px-2 py-1.5 text-rose-200 hover:bg-rose-500/25 disabled:opacity-40"
-                          title="Xoá đơn khỏi tracking"
-                          aria-label="Xoá khỏi tracking"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }}
-                className="p-4"
-              />
-            )
-          }
+          cardView={<UserOrdersTableCard rows={currentRows} {...actionProps} />}
         >
           <table className="min-w-full divide-y divide-white/5 text-white">
             <thead>
@@ -431,101 +265,9 @@ export function UserOrdersTable({
                   </td>
                 </tr>
               ) : (
-                currentRows.map((row) => {
-                  const isActive =
-                    row.display_status === "active" ||
-                    row.display_status === "paid";
-                  const showAdesRenew =
-                    !isActive && row.systemNote === "fix_ades";
-                  const showAdobeFix =
-                    !isActive &&
-                    row.systemNote !== "fix_ades" &&
-                    row.accountId === 0 &&
-                    !!onFixUser;
-                  return (
-                  <tr key={row.id}>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-white/80 font-mono">
-                      {row.order_code}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-white/90">
-                      {row.customer_name}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-white/90 break-all">
-                      {row.email}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
-                      {row.profile}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3">
-                      <SystemBadge code={row.systemNote} />
-                    </td>
-                    <td className="px-2 sm:px-4 py-3">
-                      <StatusBadge status={row.display_status} />
-                    </td>
-                    <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
-                      {row.expiry}
-                    </td>
-                    <td className="px-2 sm:px-4 py-3">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        {showAdesRenew && (
-                          <button
-                            type="button"
-                            onClick={() => setAdesRenewTarget(row)}
-                            disabled={adesRenewingId === row.email}
-                            className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Renew qua Fix Ades"
-                          >
-                            <ArrowPathIcon className="h-3.5 w-3.5" />
-                            {adesRenewingId === row.email
-                              ? "Đang renew…"
-                              : "Renew Ades"}
-                          </button>
-                        )}
-                        {row.accountId > 0 && onDeleteUser && (
-                          <button
-                            type="button"
-                            onClick={() => onDeleteUser(row.accountId, row.email)}
-                            disabled={!!deletingId || !!fixingId || !!fixAllProgress}
-                            className="rounded-lg bg-rose-500/20 text-rose-300 border border-rose-400/40 px-2.5 py-1 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Xóa user
-                          </button>
-                        )}
-                        {showAdobeFix && (
-                          <button
-                            type="button"
-                            onClick={() => onFixUser?.(row.email)}
-                            disabled={!!fixingId || !!deletingId || !!fixAllProgress}
-                            className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-2.5 py-1 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {fixingId === row.email ? "Đang fix..." : "Fix"}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setEditTarget(row)}
-                          disabled={deletingTrackingId === row.order_code}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-indigo-400/40 bg-indigo-500/15 text-indigo-200 hover:bg-indigo-500/25 disabled:opacity-40"
-                          title="Sửa hệ thống fix"
-                          aria-label="Sửa"
-                        >
-                          <PencilSquareIcon className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(row)}
-                          disabled={deletingTrackingId === row.order_code}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-400/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 disabled:opacity-40"
-                          title="Xoá đơn khỏi tracking"
-                          aria-label="Xoá khỏi tracking"
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })
+                currentRows.map((row) => (
+                  <UserOrdersTableDesktopRow key={row.id} row={row} {...actionProps} />
+                ))
               )}
             </tbody>
           </table>

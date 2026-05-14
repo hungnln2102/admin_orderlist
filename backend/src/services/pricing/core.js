@@ -1,5 +1,5 @@
 const { roundGiaBanValue } = require("../../utils/orderHelpers");
-const { getTiers, getPrefixMap } = require("./tierCache");
+const { getTiers } = require("./tierCache");
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -304,9 +304,6 @@ const calculateOrderPricingFromResolvedValues = ({
       promo: pctPromoNormalized,
       student: pctStuNormalized,
     };
-
-    const prefixMap = _prefixMap || {};
-    const orderKindSync = resolveOrderKindSync(prefixMap, { orderId, customerType });
 
     if (forceKhachLe) {
       price = customerPrice;

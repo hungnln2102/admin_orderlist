@@ -83,7 +83,7 @@ export const usePackageMutationActions = ({
 
       let resolvedStockId = values.stockId;
       let resolvedStorageId = values.storageId;
-      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
+      const resolvedSupplier = includeSupplier ? values.supplier || null : null;
 
       if (!resolvedStockId && values.manualStock.account.trim()) {
         resolvedStockId = await createWarehouseItem(
@@ -161,7 +161,7 @@ export const usePackageMutationActions = ({
 
       let resolvedStockId = values.stockId;
       let resolvedStorageId = values.storageId;
-      let resolvedSupplier = includeSupplier ? values.supplier || null : null;
+      const resolvedSupplier = includeSupplier ? values.supplier || null : null;
 
       if (!resolvedStockId && values.manualStock.account.trim()) {
         resolvedStockId = await createWarehouseItem(

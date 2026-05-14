@@ -71,15 +71,20 @@ export const usePayments = ({
         ...(body !== undefined ? { body } : {}),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "Không thể thanh toán chu kỳ");
+        const data = (await res
+          .json()
+          .catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Không thể thanh toán chu kỳ");
       }
       await fetchOverview();
       setQrPayment(null);
       onRefreshList?.();
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err?.message || "Không thể thanh toán chu kỳ" };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Không thể thanh toán chu kỳ",
+      };
     } finally {
       setConfirmingId(null);
     }

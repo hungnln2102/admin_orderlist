@@ -3,7 +3,7 @@ const { QUOTED_COLS } = require("./constants");
 const { quoteIdent } = require("../../utils/sql");
 const { normalizeTextInput, toNullableNumber } = require("../../utils/normalizers");
 const { getNextSupplyId } = require("../../services/idService");
-const { TABLES, variantCols, supplyPriceCols, supplyCols, productCols } = require("./constants");
+const { TABLES, variantCols, supplyPriceCols, productCols } = require("./constants");
 
 const findProductIdByName = async (nameRaw) => {
   const normalizedInput = normalizeTextInput(nameRaw);
@@ -90,7 +90,7 @@ const ensureSupplyRecord = async (nameRaw, numberBank, binBank) => {
         ? Number(inserted.rows[0].id)
         : nextId;
     return Number.isFinite(newId) ? newId : nextId;
-  } catch (err) {
+  } catch (_err) {
     const insertSql = `
       INSERT INTO ${TABLES.supply} (
         ${QUOTED_COLS.supplier.id},

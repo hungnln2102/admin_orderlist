@@ -57,7 +57,7 @@ export default function EditFormModal({
           if (Number.isFinite(nid) && nid > 0) ordered.push(nid);
         }
         setOrderedInputIds(ordered);
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setDetailError("Không tải được chi tiết form. Vẫn có thể sửa tên / mô tả.");
         }
@@ -69,7 +69,7 @@ export default function EditFormModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, editingItem?.id]);
+  }, [isOpen, editingItem]);
 
   if (!isOpen || !editingItem) return null;
 

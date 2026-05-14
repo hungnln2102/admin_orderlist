@@ -21,12 +21,12 @@ class AppError extends Error {
  * Error handler middleware
  * Must be registered AFTER all routes
  */
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   // Default error values
   let statusCode = err.statusCode || 500;
   let message = err.message || "Đã xảy ra lỗi không xác định";
   let code = err.code || "INTERNAL_ERROR";
-  let details = err.details || null;
+  const details = err.details || null;
 
   // Handle specific error types
   if (err.name === "ValidationError") {

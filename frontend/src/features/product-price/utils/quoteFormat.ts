@@ -23,8 +23,6 @@ export const htmlToPlainText = (value?: string | null): string => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(value, "text/html");
     const blockTags = new Set(["DIV", "P", "BR", "LI", "UL", "OL", "SECTION"]);
-    const lines: string[] = [];
-
     const walk = (node: ChildNode, buffer: string[]) => {
       if (node.nodeType === Node.TEXT_NODE) {
         buffer.push((node.textContent || "").replace(/\u00a0/g, " "));

@@ -47,7 +47,7 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
       setEditName("");
       setEditColor("#facc15");
       onCategoriesChange?.();
-    } catch (err) {
+    } catch {
       // Error is handled by the hook
     }
   };
@@ -73,7 +73,7 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
       setNewName("");
       setNewColor("#facc15");
       onCategoriesChange?.();
-    } catch (err) {
+    } catch {
       // Error is handled by the hook
     }
   };
@@ -83,7 +83,7 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
       await remove(id);
       setDeleteConfirmId(null);
       onCategoriesChange?.();
-    } catch (err) {
+    } catch {
       // Error is handled by the hook
     }
   };

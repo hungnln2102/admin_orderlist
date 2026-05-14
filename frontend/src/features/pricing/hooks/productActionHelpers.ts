@@ -151,24 +151,34 @@ export function createDeleteProductState(
 export function normalizeBankOptions(payload: unknown): BankOption[] {
   return Array.isArray(payload)
     ? payload
-        .map((row: any) => ({
-          bin: row?.bin?.toString().trim() ?? "",
-          name: row?.bank_name?.toString().trim() ?? row?.name ?? "",
-        }))
+        .map((row) => {
+          const item =
+            row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+          return {
+            bin: String(item.bin ?? "").trim(),
+            name: String(item.bank_name ?? item.name ?? "").trim(),
+          };
+        })
         .filter((item) => item.bin && item.name)
     : [];
 }
 
-export function normalizeSupplierOptions(payload: any): SupplierOption[] {
-  const items = Array.isArray(payload?.items)
-    ? payload.items
+export function normalizeSupplierOptions(payload: unknown): SupplierOption[] {
+  const payloadObject =
+    payload && typeof payload === "object"
+      ? (payload as { items?: unknown[] })
+      : undefined;
+  const items = Array.isArray(payloadObject?.items)
+    ? payloadObject.items
     : Array.isArray(payload)
       ? payload
       : [];
 
   const normalized = items
-    .map((item: any) => {
-      const idRaw = item?.id ?? item?.sourceId ?? item?.source_id;
+    .map((item) => {
+      const row =
+        item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const idRaw = row.id ?? row.sourceId ?? row.source_id;
       const idValue =
         typeof idRaw === "number" && Number.isFinite(idRaw)
           ? idRaw
@@ -176,19 +186,19 @@ export function normalizeSupplierOptions(payload: any): SupplierOption[] {
             ? Number(idRaw)
             : null;
       const name =
-        item?.supplier_name ??
-        item?.source_name ??
-        item?.name ??
-        item?.sourceName ??
-        item?.source ??
+        row.supplier_name ??
+        row.source_name ??
+        row.name ??
+        row.sourceName ??
+        row.source ??
         "";
 
       return {
         id: idValue ?? null,
-        name: (name || "").trim(),
+        name: String(name || "").trim(),
         numberBank:
-          item?.number_bank ?? item?.numberBank ?? item?.bankNumber ?? "",
-        binBank: item?.bin_bank ?? item?.binBank ?? item?.bankBin ?? "",
+          String(row.number_bank ?? row.numberBank ?? row.bankNumber ?? ""),
+        binBank: String(row.bin_bank ?? row.binBank ?? row.bankBin ?? ""),
       } as SupplierOption;
     })
     .filter((option: SupplierOption) => option.name.length > 0);
@@ -209,7 +219,7 @@ export function normalizeSupplierOptions(payload: any): SupplierOption[] {
   return deduped;
 }
 
-export function parseJsonResponseText(rawBody: string): any | null {
+export function parseJsonResponseText(rawBody: string): unknown {
   if (!rawBody) return null;
 
   try {

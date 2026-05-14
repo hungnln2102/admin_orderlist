@@ -30,6 +30,12 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+      // Cảnh báo file >400 dòng (không block, chỉ là tín hiệu nên tách module).
+      // Xem .cursor/rules/split-into-components.mdc + task.md "Nợ kỹ thuật".
+      "max-lines": [
+        "warn",
+        { max: 400, skipBlankLines: true, skipComments: true },
+      ],
     },
   }
 );

@@ -1,9 +1,7 @@
 const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
 const { backupDatabaseToDrive } = require("../../utils/backupService");
-const { normalizeOrderRow } = require("../../controllers/Order/helpers");
-const { todayYMDInVietnam } = require("../../utils/normalizers");
-const { COL, TABLES, ORDER_COLS, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
+const { COL, TABLES, ORDER_COLS, expiryDateSQL } = require("../sqlHelpers");
 const { removeMappingsByOrders } = require("../../services/userAccountMappingService");
 
 let lastRunAt = null;

@@ -7,14 +7,8 @@ import {
   runSchedulerRenewAdobeCheck,
 } from "../api/renewAdobeApi";
 import type { AdobeAdminAccount } from "../types";
-import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
-
-type CheckAllProgress = {
-  total: number;
-  completed: number;
-  failed: number;
-  checkingIds: Set<number>;
-};
+import { runCheckAllStream } from "./use-renew-adobe-admin/checkAll";
+import type { CheckAllProgress, FixAllProgress } from "./use-renew-adobe-admin/types";
 
 export function useRenewAdobeAdmin() {
   const [accounts, setAccounts] = useState<AdobeAdminAccount[]>([]);
@@ -25,10 +19,7 @@ export function useRenewAdobeAdmin() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [fixingId, setFixingId] = useState<string | null>(null);
   /** Fix lần lượt nhiều user (Fix all); `current` = thứ tự đang chạy (1-based). */
-  const [fixAllProgress, setFixAllProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
+  const [fixAllProgress, setFixAllProgress] = useState<FixAllProgress | null>(null);
   const [deletingAdminAccountId, setDeletingAdminAccountId] = useState<number | null>(null);
   const [adminAccountPendingDelete, setAdminAccountPendingDelete] =
     useState<AdobeAdminAccount | null>(null);
@@ -74,202 +65,21 @@ export function useRenewAdobeAdmin() {
     setAutoAssignResult(null);
   }, []);
 
-  const handleCheckAll = useCallback(() => {
-    if (isCheckingAll) {
-      return;
-    }
-
-    setCheckError(null);
-    setCronTestBanner(null);
-
-    const abort = new AbortController();
-    checkAllAbortRef.current = abort;
-
-    setCheckAllProgress({
-      total: 0,
-      completed: 0,
-      failed: 0,
-      checkingIds: new Set(),
-    });
-
-    const url = API_ENDPOINTS.RENEW_ADOBE_CHECK_ALL;
-    apiFetch(url, { signal: abort.signal })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(res.statusText || "Check All thất bại");
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) {
-          throw new Error("Không hỗ trợ streaming");
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) {
-              continue;
-            }
-
-            try {
-              const event = JSON.parse(line.slice(6));
-              handleSSEEvent(event);
-            } catch {}
-          }
-        }
-
-        if (buffer.startsWith("data: ")) {
-          try {
-            handleSSEEvent(JSON.parse(buffer.slice(6)));
-          } catch {}
-        }
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") {
-          return;
-        }
-
-        setCheckError(err?.message ?? "Lỗi khi chạy Check All.");
-      })
-      .finally(() => {
-        checkAllAbortRef.current = null;
-        setCheckAllProgress((prev) =>
-          prev ? { ...prev, checkingIds: new Set() } : null
-        );
-      });
-
-    function handleSSEEvent(event: Record<string, unknown>) {
-      switch (event.type) {
-        case "start":
-          setCheckAllProgress({
-            total: event.total as number,
-            completed: 0,
-            failed: 0,
-            checkingIds: new Set(),
-          });
-          setAutoAssignPhase("idle");
-          setAutoAssignResult(null);
-          break;
-        case "checking":
-          setCheckAllProgress((prev) => {
-            if (!prev) {
-              return prev;
-            }
-
-            const ids = new Set(prev.checkingIds);
-            ids.add(event.id as number);
-            return { ...prev, checkingIds: ids };
-          });
-          break;
-        case "done":
-          setAccounts((prev) => {
-            if (event.removed_from_db) {
-              return prev.filter((account) => account.id !== event.id);
-            }
-            return prev.map((account) =>
-              account.id === event.id
-                ? {
-                    ...account,
-                    org_name: (event.org_name as string) ?? null,
-                    user_count:
-                      (event.user_count as number) ?? account.user_count,
-                    license_status: normalizeIncomingLicenseStatus(
-                      event.license_status ?? account.license_status
-                    ),
-                  }
-                : account
-            );
-          });
-          setCheckAllProgress((prev) => {
-            if (!prev) {
-              return prev;
-            }
-
-            const ids = new Set(prev.checkingIds);
-            ids.delete(event.id as number);
-            return {
-              ...prev,
-              completed: event.completed as number,
-              failed: event.failed as number,
-              checkingIds: ids,
-            };
-          });
-          break;
-        case "error":
-          setAccounts((prev) =>
-            prev.map((account) =>
-              account.id === event.id
-                ? {
-                    ...account,
-                    license_status: normalizeIncomingLicenseStatus(
-                      event.license_status ?? account.license_status
-                    ),
-                  }
-                : account
-            )
-          );
-          setCheckAllProgress((prev) => {
-            if (!prev) {
-              return prev;
-            }
-
-            const ids = new Set(prev.checkingIds);
-            ids.delete(event.id as number);
-            return {
-              ...prev,
-              completed: event.completed as number,
-              failed: event.failed as number,
-              checkingIds: ids,
-            };
-          });
-          break;
-        case "complete":
-          setCheckAllProgress((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  completed: event.completed as number,
-                  failed: event.failed as number,
-                  checkingIds: new Set(),
-                }
-              : null
-          );
-          loadAccounts();
-          break;
-        case "auto_assign_start":
-          setAutoAssignPhase("running");
-          break;
-        case "auto_assign_done":
-          setAutoAssignPhase("done");
-          setAutoAssignResult({
-            assigned: (event.assigned as number) ?? 0,
-            skipped: (event.skipped as number) ?? 0,
-          });
-          loadAccounts();
-          break;
-        case "auto_assign_error":
-          setAutoAssignPhase("done");
-          setCheckError(`Auto-assign: ${event.error as string}`);
-          break;
-        case "auto_assign_progress":
-          break;
-        case "fatal":
-          setCheckError(event.error as string);
-          break;
-      }
-    }
-  }, [isCheckingAll, loadAccounts]);
+  const handleCheckAll = useCallback(
+    () =>
+      runCheckAllStream({
+        isCheckingAll,
+        setCheckError,
+        setCronTestBanner,
+        checkAllAbortRef,
+        setCheckAllProgress,
+        setAutoAssignPhase,
+        setAutoAssignResult,
+        setAccounts,
+        loadAccounts,
+      }),
+    [isCheckingAll, loadAccounts]
+  );
 
   const handleCancelCheckAll = useCallback(() => {
     checkAllAbortRef.current?.abort();

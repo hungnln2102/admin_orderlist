@@ -24,6 +24,7 @@ export function useOrdersData(
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const modals = useOrdersModals();
+  const { resetModals } = modals;
 
   const list = useOrdersList({
     orders,
@@ -54,8 +55,8 @@ export function useOrdersData(
     setSearchTerm("");
     setStatusFilter("all");
     setCurrentPage(1);
-    modals.resetModals();
-  }, [dataset, setOrders, modals.resetModals]);
+    resetModals();
+  }, [dataset, setOrders, resetModals]);
 
   return {
     // List data

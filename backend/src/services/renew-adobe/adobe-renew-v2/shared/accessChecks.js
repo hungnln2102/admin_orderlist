@@ -154,17 +154,6 @@ function isCcpLikeProduct(item) {
   return isCcpLikeName(combinedProductLabel(item));
 }
 
-function extractProductIds(products) {
-  if (!Array.isArray(products)) return [];
-  return [
-    ...new Set(
-      products
-        .map((item) => toNormalizedProductId(extractProductId(item)))
-        .filter(Boolean)
-    ),
-  ];
-}
-
 function normalizeCcpProductIdList(value) {
   if (value == null) return [];
   const arr = Array.isArray(value) ? value : [value].filter((x) => x != null);

@@ -30,7 +30,7 @@ export const useSupplySelection = ({
   supplies,
   supplyPrices,
   formData,
-  customerType,
+  customerType: _customerType,
   productName,
   orderId,
   registerDate,
@@ -136,7 +136,6 @@ export const useSupplySelection = ({
       );
     },
     [
-      customerType,
       formData,
       getSupplyImportPrice,
       orderId,

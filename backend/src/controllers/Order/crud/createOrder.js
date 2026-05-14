@@ -22,10 +22,16 @@ const {
     applyRefundCreditToTargetOrder,
     normalizeMoney,
 } = require("../finance/refundCredits");
+const { mergeSummaryUpdates } = require("../finance/dashboardSummary");
+const { resolveDashboardImportDeltaOnPaid } = require("../finance/dashboardImportDeltaOnPaid");
 const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
+const monthKeyFromYmd = (value) => {
+    const ymd = String(value || "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.slice(0, 7) : null;
+};
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -224,6 +230,51 @@ const attachCreateOrderRoute = (router) => {
 
             if (isMavnCreate && newOrder.status === STATUS.PAID) {
                 await syncMavnStoreProfitExpense(trx, null, newOrder);
+            }
+
+            // Đơn bán được thanh toán hoàn toàn bằng credit (không phát sinh receipt ngân hàng):
+            // vẫn phải ghi nhận doanh thu/lợi nhuận tháng và gửi notify delta tài chính.
+            if (
+                !isGiftOrderCreate &&
+                !isMavnCreate &&
+                Number(appliedCreditAmount) > 0 &&
+                String(newOrder?.status || "").trim() === STATUS.PAID
+            ) {
+                const paidMonthKey = monthKeyFromYmd(todayYMDInVietnam());
+                if (paidMonthKey) {
+                    const grossRevenue = Math.max(
+                        0,
+                        Number(newOrder?.[grossSellingPriceCol] ?? rawPriceBeforeCredit) || 0
+                    );
+                    const orderCost = Math.max(0, Number(newOrder?.[costCol]) || 0);
+                    const orderProfit = grossRevenue - orderCost;
+                    const fetchSupplierNameBySupplyId = async (executor, supplyIdRaw) => {
+                        if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
+                        const supRow = await executor(TABLES.supplier)
+                            .select(COLS.SUPPLIER.SUPPLIER_NAME)
+                            .where(COLS.SUPPLIER.ID, Number(supplyIdRaw))
+                            .first();
+                        return String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] || "").trim();
+                    };
+                    const importDelta = await resolveDashboardImportDeltaOnPaid(
+                        trx,
+                        newOrder,
+                        orderCost,
+                        fetchSupplierNameBySupplyId,
+                        paidMonthKey
+                    );
+                    await mergeSummaryUpdates(
+                        trx,
+                        paidMonthKey,
+                        {
+                            total_orders: 1,
+                            total_revenue: grossRevenue,
+                            total_profit: orderProfit,
+                            total_import: importDelta,
+                        },
+                        { context: "createOrder.paidByCredit" }
+                    );
+                }
             }
 
             await trx.commit();

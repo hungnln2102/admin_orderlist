@@ -156,23 +156,23 @@ export async function fetchFormDetail(
     throw new Error("Không thể tải chi tiết form");
   }
   const data = (await res.json().catch(() => null)) as
-    | Partial<FormDetailDto & { inputs?: any[] }>
+    | (Partial<FormDetailDto> & { inputs?: unknown[] })
     | null;
 
   const safeInputs: FormInputDto[] = Array.isArray(data?.inputs)
-    ? data!.inputs.map((raw) => ({
-        id: Number((raw as any).id ?? (raw as any).inputId ?? 0),
-        name: ((raw as any).name ??
-          (raw as any).inputName ??
-          "") as string | null,
-        type: ((raw as any).type ??
-          (raw as any).inputType ??
-          "") as string | null,
-        sortOrder:
-          typeof (raw as any).sortOrder === "number"
-            ? (raw as any).sortOrder
-            : null,
-      }))
+    ? data.inputs.map((raw) => {
+        const item =
+          raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+        const rawName = item.name ?? item.inputName ?? "";
+        const rawType = item.type ?? item.inputType ?? "";
+        const rawSortOrder = item.sortOrder;
+        return {
+          id: Number(item.id ?? item.inputId ?? 0),
+          name: typeof rawName === "string" ? rawName : String(rawName || ""),
+          type: typeof rawType === "string" ? rawType : String(rawType || ""),
+          sortOrder: typeof rawSortOrder === "number" ? rawSortOrder : null,
+        };
+      })
     : [];
 
   return {

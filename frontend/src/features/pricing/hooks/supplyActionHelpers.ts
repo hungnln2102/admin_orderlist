@@ -53,24 +53,30 @@ export function mapSupplyPriceResponse(payload: unknown): {
   highestPrice: number | null;
 } {
   const mappedItems: SupplyPriceItem[] = Array.isArray(payload)
-    ? payload.map((entry: any, index: number) => ({
-        sourceId: Number.isFinite(Number(entry?.sourceId ?? entry?.source_id))
-          ? Number(entry?.sourceId ?? entry?.source_id)
+    ? payload.map((entry, index: number) => {
+        const item =
+          entry && typeof entry === "object"
+            ? (entry as Record<string, unknown>)
+            : {};
+        return {
+        sourceId: Number.isFinite(Number(item.sourceId ?? item.source_id))
+          ? Number(item.sourceId ?? item.source_id)
           : index,
         sourceName:
-          entry?.supplier_name?.toString().trim() ||
-          entry?.sourceName?.toString().trim() ||
-          entry?.source_name?.toString().trim() ||
-          `Nhà Cung Cấp #${Number(entry?.sourceId) || index + 1}`,
+          String(item.supplier_name ?? "").trim() ||
+          String(item.sourceName ?? "").trim() ||
+          String(item.source_name ?? "").trim() ||
+          `Nhà Cung Cấp #${Number(item.sourceId) || index + 1}`,
         price:
-          typeof entry?.price === "number" && Number.isFinite(entry.price)
-            ? entry.price
+          typeof item.price === "number" && Number.isFinite(item.price)
+            ? item.price
             : null,
         lastOrderDate:
-          typeof entry?.last_order_date === "string"
-            ? entry.last_order_date
+          typeof item.last_order_date === "string"
+            ? item.last_order_date
             : null,
-      }))
+      };
+    })
     : [];
 
   const items = sortSupplyItems(dedupeSupplyItems(mappedItems));

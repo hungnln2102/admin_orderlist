@@ -28,6 +28,7 @@ export type CreditLogItem = {
   is_available: boolean;
   is_applied: boolean;
   is_unavailable: boolean;
+  is_refunded?: boolean;
 };
 
 export type CreditLogsPagination = {

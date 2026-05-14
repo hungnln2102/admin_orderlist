@@ -237,7 +237,13 @@ const applyEstimatedBankBalanceDelta = async (
  * **tháng** `paidMonthKey` và NCC tên `mavryk` (khớp SQL); còn lại tổng ledger. **`total_profit`:** webhook Sepay / manual webhook
  * (chuyển Đã TT), chi phí MAVN (`syncMavnStoreProfitExpense`), `external_import`, v.v.
  */
-const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterRow) => {
+const updateDashboardMonthlySummaryOnStatusChange = async (
+    trx,
+    beforeRow,
+    afterRow,
+    options = {}
+) => {
+    const skipBankBalanceDelta = Boolean(options?.skipBankBalanceDelta);
     const prevStatus = beforeRow?.status || STATUS.UNPAID;
     const nextStatus = afterRow?.status || STATUS.UNPAID;
 
@@ -256,7 +262,9 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         const refund = toNullableNumber(beforeRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) - 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
-        bankBalanceDelta += refund;
+        if (!skipBankBalanceDelta) {
+            bankBalanceDelta += refund;
+        }
     }
 
     // Vào hoàn (Model A): ghi tháng hiện tại, trừ thẳng doanh thu theo refund và cộng tracking total_refund.
@@ -265,7 +273,9 @@ const updateDashboardMonthlySummaryOnStatusChange = async(trx, beforeRow, afterR
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
         refundUpdates.total_revenue = (refundUpdates.total_revenue || 0) - refund;
-        bankBalanceDelta -= refund;
+        if (!skipBankBalanceDelta) {
+            bankBalanceDelta -= refund;
+        }
     }
 
     if (Object.keys(refundUpdates).length > 0 && refundMonthKey) {

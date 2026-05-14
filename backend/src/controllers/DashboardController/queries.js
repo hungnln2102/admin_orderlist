@@ -217,7 +217,7 @@ const buildChartsQuery = () => `
 const {
   buildRangeCompareStatsQuery,
   buildRangeMonthlyChartQuery,
-} = require("./dashboardSummaryAggregate");
+} = require("./dashboardSummaryQueries");
 
 module.exports = {
   buildStatsBindings,

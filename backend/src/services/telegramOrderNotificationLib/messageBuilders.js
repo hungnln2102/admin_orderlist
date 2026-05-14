@@ -146,7 +146,8 @@ function buildImportOrderCreatedMessage(order) {
   return lines.join("\n");
 }
 
-function buildCopyKeyboard({ orderCode, paymentNote }) {
+function buildCopyKeyboard(_payload) {
+  // Telegram inline keyboard tạm bỏ — giữ chữ ký để các caller không phải đổi.
   return null;
 }
 

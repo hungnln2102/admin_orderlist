@@ -28,7 +28,7 @@ function buildPerOrderNotificationKey(kind, dateYmd, orderCode) {
   const d = String(dateYmd).replace(/-/g, "");
   const code = String(orderCode || "").trim();
   if (!d || !code) return null;
-  let head = `${kind}:${d}:`;
+  const head = `${kind}:${d}:`;
   if (head.length + code.length <= MAX_KEY_LEN) {
     return head + code;
   }

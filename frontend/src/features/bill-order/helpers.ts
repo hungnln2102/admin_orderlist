@@ -23,8 +23,8 @@ export type InvoiceEntry = {
   code: string;
 };
 
-export type OrderRow = Record<string, any>;
-export type ProductPriceRow = Record<string, any>;
+export type OrderRow = Record<string, unknown>;
+export type ProductPriceRow = Record<string, unknown>;
 
 export type InvoiceLine = {
   id: string;
