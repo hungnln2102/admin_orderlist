@@ -43,7 +43,6 @@ const IDENTITY_SCHEMA = {
       BAN_REASON: "ban_reason",
       UPDATED_AT: "updated_at",
       ROLE_ID: "role_id",
-      MAIL_BACKUP_ID: "mail_backup_id",
     },
   },
   MAIL_BACKUP: {
@@ -83,19 +82,7 @@ const IDENTITY_SCHEMA = {
   },
 };
 
-const COMMON_SCHEMA = {
-  STATUS: {
-    TABLE: "status",
-    COLS: {
-      CODE: "code",
-      LABEL_VI: "label_vi",
-      LABEL_EN: "label_en",
-      DESCRIPTION: "description",
-      SORT_ORDER: "sort_order",
-      IS_ACTIVE: "is_active",
-    },
-  },
-};
+const COMMON_SCHEMA = {};
 
 module.exports = {
   FORM_DESC_SCHEMA,

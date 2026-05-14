@@ -33,6 +33,12 @@ const {
 } = require("./productSystem");
 const { listUserOrders } = require("./userOrders");
 const {
+  listMatchableOrders,
+  addOrdersToTracking,
+  updateTrackingOrder,
+  deleteTrackingOrder,
+} = require("./userOrdersAddTracking");
+const {
   getWebsiteStatus,
   activateWebsiteUser,
 } = require("./publicWebsite");
@@ -65,6 +71,10 @@ module.exports = {
   adobeQueueStatus,
   checkAllAccounts,
   listUserOrders,
+  listMatchableOrders,
+  addOrdersToTracking,
+  updateTrackingOrder,
+  deleteTrackingOrder,
   autoAssignUsers,
   runAutoAssign,
   fixSingleUser,

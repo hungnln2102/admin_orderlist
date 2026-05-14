@@ -1,6 +1,15 @@
 const { db } = require("../../db");
 const { PARTNER_SCHEMA, ORDERS_SCHEMA, PRODUCT_SCHEMA } = require("../../config/dbSchema");
-const { isGiftOrder } = require("../../utils/orderHelpers");
+const {
+  isGiftOrder,
+  isMavnImportOrder,
+  isMavrykShopSupplierName,
+} = require("../../utils/orderHelpers");
+const { STATUS, COLS } = require("./constants");
+const {
+  changeOrderSupplier,
+  ChangeSupplierError,
+} = require("../../domains/supplier-change/service");
 
 const updateOrderWithFinance = async ({
     trx,
@@ -10,7 +19,6 @@ const updateOrderWithFinance = async ({
 }) => {
     const {
         TABLES,
-        STATUS,
         sanitizeOrderWritePayload,
         normalizeOrderRow,
         todayYMDInVietnam,
@@ -18,7 +26,10 @@ const updateOrderWithFinance = async ({
         normalizeTextInput,
         resolveProductToVariantId,
     } = helpers;
-    const { addSupplierImportOnProcessing, recordSupplierPaymentOnCompletion, updateDashboardMonthlySummaryOnStatusChange } = require("./orderFinanceHelpers");
+    const {
+        updateDashboardMonthlySummaryOnStatusChange,
+        syncMavnStoreProfitExpense,
+    } = require("./orderFinanceHelpers");
     const logger = require("../../utils/logger");
 
     const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
@@ -73,21 +84,113 @@ const updateOrderWithFinance = async ({
         sanitized[priceCol] = 0;
     }
 
-    const [updatedOrder] = await trx(TABLES.orderList)
-        .where({ id })
-        .update(sanitized)
-        .returning("*");
+    // Đổi NCC: nếu supply_id trong payload khác supply_id hiện tại của đơn,
+    // chuyển qua domain `supplier-change` (Flow A/B theo tuổi đơn + trạng thái log).
+    // Service đó tự tính cost prorate; bỏ supply_id + cost khỏi sanitized để
+    // tránh ghi đè giá trị service đã set.
+    let supplierChangeResult = null;
+    const beforeSupplyId = beforeOrder?.[supplyIdCol];
+    const incomingSupplyId = sanitized[supplyIdCol];
+    const supplyIdChanging =
+        incomingSupplyId != null &&
+        Number.isFinite(Number(incomingSupplyId)) &&
+        Number(incomingSupplyId) !== Number(beforeSupplyId);
+
+    if (supplyIdChanging) {
+        try {
+            supplierChangeResult = await changeOrderSupplier(id, Number(incomingSupplyId), {
+                trx,
+            });
+        } catch (err) {
+            if (err instanceof ChangeSupplierError) {
+                return { error: err.message };
+            }
+            throw err;
+        }
+        delete sanitized[supplyIdCol];
+        delete sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST];
+    } else if (isMavnImportOrder(beforeOrder)) {
+        // Đơn MAVN update:
+        // - NCC Mavryk/Shop: cost luôn = 0.
+        // - NCC khác: cost = price.
+        // syncMavnStoreProfitExpense sẽ tự áp rule theo NCC:
+        // Mavryk/Shop trừ profit+bank; NCC khác chỉ trừ profit qua log NCC.
+        const newPriceRaw = sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE];
+        if (newPriceRaw != null) {
+            let isInternalSupplier = false;
+            if (beforeSupplyId != null) {
+                const supRow = await trx(TABLES.supplier)
+                    .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
+                    .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
+                    .first();
+                isInternalSupplier = isMavrykShopSupplierName(
+                    supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME]
+                );
+            }
+            const numericPrice = Number(newPriceRaw);
+            sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] =
+                isInternalSupplier
+                    ? 0
+                    : (Number.isFinite(numericPrice) && numericPrice > 0
+                        ? Math.round(numericPrice)
+                        : 0);
+        }
+    } else if (
+        sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] != null &&
+        beforeSupplyId != null
+    ) {
+        // Đơn bán supply không đổi nhưng user update cost trực tiếp — nếu NCC
+        // hiện tại là Mavryk/Shop thì ép cost = 0 (giữ rule cũ cho đơn bán nội bộ).
+        const supRow = await trx(TABLES.supplier)
+            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
+            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
+            .first();
+        if (isMavrykShopSupplierName(supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME])) {
+            sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] = 0;
+        }
+    }
+
+    let updatedOrder;
+    if (Object.keys(sanitized).length > 0) {
+        const [row] = await trx(TABLES.orderList)
+            .where({ id })
+            .update(sanitized)
+            .returning("*");
+        updatedOrder = row;
+    } else {
+        updatedOrder = await trx(TABLES.orderList).where({ id }).first();
+    }
 
     if (!updatedOrder) {
         return { notFound: true };
     }
 
     try {
-        await addSupplierImportOnProcessing(trx, beforeOrder, updatedOrder);
-        await recordSupplierPaymentOnCompletion(trx, beforeOrder, updatedOrder);
         await updateDashboardMonthlySummaryOnStatusChange(trx, beforeOrder, updatedOrder);
+        await syncMavnStoreProfitExpense(trx, beforeOrder, updatedOrder);
+
+        const prevStatus = String(beforeOrder?.[COLS.ORDER.STATUS] ?? beforeOrder?.status ?? "").trim();
+        const nextStatus = String(updatedOrder?.[COLS.ORDER.STATUS] ?? updatedOrder?.status ?? "").trim();
+        const enteredRefundLifecycle =
+            prevStatus !== STATUS.PENDING_REFUND &&
+            prevStatus !== STATUS.REFUNDED &&
+            (nextStatus === STATUS.PENDING_REFUND || nextStatus === STATUS.REFUNDED);
+        if (enteredRefundLifecycle) {
+            const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
+            const refundAmount = Number(updatedOrder?.[COLS.ORDER.REFUND] ?? updatedOrder?.refund) || 0;
+            if (refundAmount > 0) {
+                await createOrGetRefundCreditNoteForOrder(trx, {
+                    sourceOrderListId: updatedOrder?.[COLS.ORDER.ID] ?? updatedOrder?.id,
+                    sourceOrderCode: updatedOrder?.[COLS.ORDER.ID_ORDER] ?? updatedOrder?.id_order,
+                    customerName: updatedOrder?.[COLS.ORDER.CUSTOMER] ?? updatedOrder?.customer,
+                    customerContact: updatedOrder?.[COLS.ORDER.CONTACT] ?? updatedOrder?.contact,
+                    refundAmount,
+                    note: `Tạo tự động khi đơn chuyển ${nextStatus}`,
+                });
+            }
+        }
     } catch (debtErr) {
-        logger.error("Lỗi cập nhật công nợ NCC", {
+        logger.error("Lỗi cập nhật finance/dashboard sau khi sửa đơn", {
             id,
             supply_id: updatedOrder?.[supplyIdCol],
             cost: updatedOrder?.cost,
@@ -124,6 +227,9 @@ const updateOrderWithFinance = async ({
             normalized.product_display_name = displayName;
             normalized.id_product = displayName;
         }
+    }
+    if (supplierChangeResult) {
+        normalized.supplier_change = supplierChangeResult;
     }
     return { updated: normalized };
 };

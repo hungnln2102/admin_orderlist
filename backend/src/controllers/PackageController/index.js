@@ -4,6 +4,8 @@ const {
   updatePackageProduct,
   deletePackageProduct,
   bulkDeletePackages,
+  updateProductPackageOptions,
+  fetchProductRequiresActivationForPackagePayload,
 } = require("./service");
 const { pkgCols } = require("./constants");
 const logger = require("../../utils/logger");
@@ -18,12 +20,18 @@ const listHandler = async (_req, res) => {
   }
 };
 
-const validateMatchRequiresAccount = (body) => {
+const validateMatchRequiresAccount = (body, productRequiresActivation) => {
   const matchMode = body?.matchMode ?? body?.match;
   if (matchMode !== "slot" && matchMode !== "information_order") return null;
   const hasStock = body?.stockId != null && body?.stockId !== "";
   if (!hasStock) {
-    return "Khi chọn Match theo Slot hoặc Information, cần liên kết với kho hàng (stock_id).";
+    return "Cần chọn tài khoản gốc (stock_id) khi bật ghép đơn.";
+  }
+  if (matchMode === "information_order" && productRequiresActivation) {
+    const hasStorage = body?.storageId != null && body?.storageId !== "";
+    if (!hasStorage) {
+      return "Chế độ theo thông tin đơn cần tài khoản kích hoạt (storage_id).";
+    }
   }
   return null;
 };
@@ -35,7 +43,16 @@ const createHandler = async (req, res) => {
   if (!Number.isFinite(idNum) || idNum < 1) {
     return res.status(400).json({ error: "Loại gói (product id) là bắt buộc." });
   }
-  const matchError = validateMatchRequiresAccount(body);
+  let requiresActivation = false;
+  try {
+    requiresActivation = await fetchProductRequiresActivationForPackagePayload(body);
+  } catch (err) {
+    logger.warn("[packages] Không đọc được package_requires_activation, giữ validation storage", {
+      error: err?.message,
+    });
+    requiresActivation = true;
+  }
+  const matchError = validateMatchRequiresAccount(body, requiresActivation);
   if (matchError) {
     return res.status(400).json({ error: matchError });
   }
@@ -56,7 +73,18 @@ const updateHandler = async (req, res) => {
   if (!id) {
     return res.status(400).json({ error: "ID sản phẩm gói hàng là bắt buộc." });
   }
-  const matchError = validateMatchRequiresAccount(body);
+  let requiresActivation = false;
+  try {
+    requiresActivation = await fetchProductRequiresActivationForPackagePayload(body, {
+      packageProductRowId: id,
+    });
+  } catch (err) {
+    logger.warn("[packages] Không đọc được package_requires_activation (update), giữ validation storage", {
+      error: err?.message,
+    });
+    requiresActivation = true;
+  }
+  const matchError = validateMatchRequiresAccount(body, requiresActivation);
   if (matchError) {
     return res.status(400).json({ error: matchError });
   }
@@ -120,10 +148,31 @@ const bulkDeleteHandler = async (req, res) => {
   }
 };
 
+const patchProductOptionsHandler = async (req, res) => {
+  const productId = req.params.productId ?? req.params.packageId;
+  try {
+    const result = await updateProductPackageOptions(productId, req.body || {});
+    if (!result) {
+      return res.status(404).json({ error: "Không tìm thấy sản phẩm (product)." });
+    }
+    res.json(result);
+  } catch (error) {
+    logger.error("[packages] Cập nhật tuỳ chọn product thất bại", {
+      productId,
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Không thể cập nhật.",
+    });
+  }
+};
+
 module.exports = {
   listPackageProducts: listHandler,
   createPackageProduct: createHandler,
   updatePackageProduct: updateHandler,
   deletePackageProduct: deleteHandler,
   bulkDeletePackages: bulkDeleteHandler,
+  patchProductPackageOptions: patchProductOptionsHandler,
 };

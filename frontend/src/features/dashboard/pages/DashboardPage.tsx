@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { FinanceSection } from "../components/FinanceSection";
 import { OverviewSection } from "../components/OverviewSection";
 import { SectionTabs } from "../components/SectionTabs";
+import { DashboardCyclePresetButtons } from "../components/DashboardCyclePresetButtons";
 import { DashboardDateRangeFilter } from "../components/DashboardDateRangeFilter";
 import { DashboardHero } from "../components/DashboardHero";
 import { budgets, currencyFormatter, financeSummary } from "../constants";
@@ -10,7 +12,15 @@ import { useMonthlySummary } from "../hooks/useMonthlySummary";
 import { useWalletBalances } from "../hooks/useWalletBalances";
 import { useSavingGoals } from "../hooks/useSavingGoals";
 
-const Dashboard: React.FC = () => {
+type DashboardSection = "overview" | "finance";
+
+const getDashboardSectionFromSearch = (search: string): DashboardSection => {
+  const tab = new URLSearchParams(search).get("tab");
+  return tab === "finance" ? "finance" : "overview";
+};
+
+const DashboardContent: React.FC = () => {
+  const location = useLocation();
   const {
     statsData,
     revenueChartData,
@@ -22,6 +32,7 @@ const Dashboard: React.FC = () => {
     selectedYear,
     setSelectedYear,
     dashboardRange,
+    chartGranularity,
     setDashboardRange,
     loading,
     errorMessage,
@@ -29,10 +40,16 @@ const Dashboard: React.FC = () => {
     refetchDashboardStats,
   } = useDashboardStats();
 
-  const { data: monthlySummaryData, loading: monthlySummaryLoading, error: monthlySummaryError, refetch: refetchMonthlySummary } = useMonthlySummary();
+  useMonthlySummary();
   const { walletColumns, walletRows, walletLoading, walletError, fetchWalletBalances } = useWalletBalances();
   const { goals: savingGoals, refetch: refetchGoals } = useSavingGoals();
-  const [activeSection, setActiveSection] = useState<"overview" | "finance">("overview");
+  const [activeSection, setActiveSection] = useState<DashboardSection>(() =>
+    getDashboardSectionFromSearch(location.search)
+  );
+
+  useEffect(() => {
+    setActiveSection(getDashboardSectionFromSearch(location.search));
+  }, [location.search]);
 
   if (loading) {
     return (
@@ -47,11 +64,18 @@ const Dashboard: React.FC = () => {
       <DashboardHero
         rightSlot={
           activeSection === "overview" ? (
-            <DashboardDateRangeFilter
-              value={dashboardRange}
-              onChange={setDashboardRange}
-              className="w-full shrink-0"
-            />
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-end sm:gap-2 md:gap-3">
+              <DashboardCyclePresetButtons
+                range={dashboardRange}
+                onChange={setDashboardRange}
+                className="justify-start sm:justify-end"
+              />
+              <DashboardDateRangeFilter
+                value={dashboardRange}
+                onChange={setDashboardRange}
+                className="w-full min-w-0 sm:min-w-[260px] sm:flex-1 sm:max-w-[320px]"
+              />
+            </div>
           ) : undefined
         }
       />
@@ -77,6 +101,7 @@ const Dashboard: React.FC = () => {
             selectedYear={selectedYear}
             onYearChange={setSelectedYear}
             isRangeMode={dashboardRange !== null}
+            chartGranularity={chartGranularity}
           />
           {/* Monthly summary table intentionally hidden by UI request */}
         </>
@@ -100,6 +125,17 @@ const Dashboard: React.FC = () => {
       )}
     </div>
   );
+};
+
+const Dashboard: React.FC = () => {
+  const location = useLocation();
+  const tab = new URLSearchParams(location.search).get("tab");
+
+  if (tab === "tax" || tab === "expenses") {
+    return <Navigate to={tab === "tax" ? "/tax" : "/expenses"} replace />;
+  }
+
+  return <DashboardContent />;
 };
 
 export default Dashboard;

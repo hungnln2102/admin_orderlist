@@ -15,11 +15,25 @@ const BASE_PRICE_CURRENCY_OPTIONS: Array<{
   { value: "JPY", label: "JPY" },
 ];
 
+const SECTION_PANEL_CLASS =
+  "rounded-[22px] border border-white/10 bg-gradient-to-br from-slate-900/55 via-slate-900/45 to-indigo-950/55 p-4 md:p-5 shadow-[0_20px_55px_-35px_rgba(0,0,0,0.75)] backdrop-blur";
+
+const FIELD_LABEL_CLASS =
+  "text-[11px] font-semibold uppercase tracking-[0.08em] text-white/65";
+
+const BASE_INPUT_CLASS =
+  "mt-1.5 h-11 w-full rounded-xl border border-white/15 bg-slate-950/45 px-3 text-sm text-white placeholder:text-white/45 shadow-inner transition focus:border-sky-300/40 focus:ring-2 focus:ring-sky-200/20";
+
+const BASE_SELECT_CLASS =
+  "mt-1.5 h-11 rounded-xl border border-white/15 bg-slate-950/45 px-3 text-sm text-white shadow-inner transition focus:border-sky-300/40 focus:ring-2 focus:ring-sky-200/20";
+
 type ProductEditPanelProps = {
   productId: number;
   currentEditForm: ProductEditFormState;
   productNameOptions: string[];
   highestSupplyPriceDisplay: string;
+  previewWholesaleProfitLabel: string | null;
+  previewRetailProfitLabel: string | null;
   previewWholesalePrice: number | null;
   previewRetailPrice: number | null;
   previewStudentPrice: number | null;
@@ -43,6 +57,8 @@ export function ProductEditPanel({
   currentEditForm,
   productNameOptions,
   highestSupplyPriceDisplay,
+  previewWholesaleProfitLabel,
+  previewRetailProfitLabel,
   previewWholesalePrice,
   previewRetailPrice,
   previewStudentPrice,
@@ -84,17 +100,8 @@ export function ProductEditPanel({
   }, [availableProductNameOptions, currentEditForm.packageName]);
 
   useEffect(() => {
-    const currentName = currentEditForm.packageName.trim();
-    if (!currentName) {
-      setIsCustomProductName(false);
-      return;
-    }
-
-    const existsInAvailable = availableProductNameOptions.some(
-      (option) => option.toLowerCase() === currentName.toLowerCase()
-    );
-    setIsCustomProductName(!existsInAvailable);
-  }, [productId, currentEditForm.packageName, availableProductNameOptions]);
+    setIsCustomProductName(false);
+  }, [productId]);
 
   const handleUseDropdownProductName = () => {
     const fallbackName = availableProductNameOptions[0] ?? "";
@@ -108,16 +115,16 @@ export function ProductEditPanel({
   };
 
   return (
-    <div className="space-y-4 md:space-y-6 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-950/80 via-slate-900/70 to-indigo-950/80 px-3 py-4 md:px-6 md:py-5 text-white shadow-lg">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">
+    <div className="space-y-5 rounded-[24px] border border-white/10 bg-gradient-to-br from-[#101739]/90 via-[#0b1530]/85 to-[#1c1345]/85 px-4 py-5 text-white shadow-[0_30px_70px_-45px_rgba(0,0,0,0.95)] md:space-y-6 md:px-6 md:py-6">
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <div className={SECTION_PANEL_CLASS}>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-sky-200/95">
             Thông Tin Sản Phẩm
           </p>
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-3.5">
             <div>
               <div className="flex items-center justify-between gap-3">
-                <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
+                <label className={FIELD_LABEL_CLASS}>
                   Tên sản phẩm
                 </label>
                 {isCustomProductName ? (
@@ -144,7 +151,7 @@ export function ProductEditPanel({
               {isCustomProductName ? (
                 <input
                   type="text"
-                  className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                    className={BASE_INPUT_CLASS}
                   value={currentEditForm.packageName}
                   onChange={(event) =>
                     onProductEditChange("packageName", event.target.value)
@@ -153,7 +160,7 @@ export function ProductEditPanel({
                 />
               ) : (
                 <select
-                  className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                  className={`${BASE_SELECT_CLASS} w-full`}
                   value={currentEditForm.packageName}
                   onChange={(event) =>
                     onProductEditChange("packageName", event.target.value)
@@ -177,12 +184,12 @@ export function ProductEditPanel({
               )}
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
+              <label className={FIELD_LABEL_CLASS}>
                 Gói sản phẩm
               </label>
               <input
                 type="text"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                className={BASE_INPUT_CLASS}
                 value={currentEditForm.packageProduct}
                 onChange={(event) =>
                   onProductEditChange("packageProduct", event.target.value)
@@ -190,12 +197,12 @@ export function ProductEditPanel({
               />
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
+              <label className={FIELD_LABEL_CLASS}>
                 Mã sản phẩm
               </label>
               <input
                 type="text"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-sky-300/50 focus:ring-2 focus:ring-sky-200/40"
+                className={BASE_INPUT_CLASS}
                 value={currentEditForm.sanPham}
                 onChange={(event) =>
                   onProductEditChange("sanPham", event.target.value)
@@ -204,18 +211,18 @@ export function ProductEditPanel({
             </div>
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 md:p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wide text-purple-200">
-            Tỷ giá
+        <div className={SECTION_PANEL_CLASS}>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-purple-200/95">
+            Bảng Giá
           </p>
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-3.5">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
+              <label className={FIELD_LABEL_CLASS}>
                 Giá gốc
               </label>
               <div className="mt-1 flex gap-2">
                 <select
-                  className="w-24 rounded-xl border border-white/20 bg-white/10 px-2 py-2 text-sm text-white shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                  className={`${BASE_SELECT_CLASS} mt-0 w-24 px-2 focus:border-purple-300/40 focus:ring-purple-200/20`}
                   value={currentEditForm.basePriceCurrency}
                   onChange={(event) =>
                     onProductEditChange("basePriceCurrency", event.target.value)
@@ -238,7 +245,7 @@ export function ProductEditPanel({
                       ? "numeric"
                       : "decimal"
                   }
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40"
+                  className={`${BASE_INPUT_CLASS} mt-0 focus:border-purple-300/40 focus:ring-purple-200/20`}
                   value={currentEditForm.basePrice}
                   onChange={(event) =>
                     onProductEditChange("basePrice", event.target.value)
@@ -252,71 +259,72 @@ export function ProductEditPanel({
                   : `Lưu sẽ tự quy đổi ${currentEditForm.basePriceCurrency} -> VND theo tỷ giá hiện tại.`}
               </p>
             </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Giá CTV
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                value={currentEditForm.pctCtv}
-                onChange={(event) =>
-                  onProductEditChange("pctCtv", event.target.value)
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Giá Khách
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                value={currentEditForm.pctKhach}
-                onChange={(event) =>
-                  onProductEditChange("pctKhach", event.target.value)
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Giá Khuyến mãi
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                value={currentEditForm.pctPromo}
-                onChange={(event) =>
-                  onProductEditChange("pctPromo", event.target.value)
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-white/70">
-                Giá Sinh Viên
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                className="mt-1 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/60 shadow-inner focus:border-purple-300/50 focus:ring-2 focus:ring-purple-200/40 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                placeholder="0"
-                value={currentEditForm.pctStu}
-                onChange={(event) =>
-                  onProductEditChange("pctStu", event.target.value)
-                }
-              />
-
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={FIELD_LABEL_CLASS}>
+                  Giá CTV
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className={`${BASE_INPUT_CLASS} focus:border-purple-300/40 focus:ring-purple-200/20 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  value={currentEditForm.pctCtv}
+                  onChange={(event) =>
+                    onProductEditChange("pctCtv", event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label className={FIELD_LABEL_CLASS}>
+                  Giá Khách
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className={`${BASE_INPUT_CLASS} focus:border-purple-300/40 focus:ring-purple-200/20 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  value={currentEditForm.pctKhach}
+                  onChange={(event) =>
+                    onProductEditChange("pctKhach", event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label className={FIELD_LABEL_CLASS}>
+                  Giá Khuyến mãi
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className={`${BASE_INPUT_CLASS} focus:border-purple-300/40 focus:ring-purple-200/20 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  value={currentEditForm.pctPromo}
+                  onChange={(event) =>
+                    onProductEditChange("pctPromo", event.target.value)
+                  }
+                />
+              </div>
+              <div>
+                <label className={FIELD_LABEL_CLASS}>
+                  Giá Sinh Viên
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className={`${BASE_INPUT_CLASS} focus:border-purple-300/40 focus:ring-purple-200/20 appearance-none [appearance:textfield] [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                  placeholder="0"
+                  value={currentEditForm.pctStu}
+                  onChange={(event) =>
+                    onProductEditChange("pctStu", event.target.value)
+                  }
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-indigo-950/70 via-slate-900/70 to-indigo-950/80 p-3 md:p-4 shadow-lg backdrop-blur">
+      <div className="rounded-[20px] border border-white/15 bg-gradient-to-r from-indigo-950/55 via-slate-900/55 to-indigo-950/65 p-3 md:p-4 shadow-[0_16px_45px_-30px_rgba(0,0,0,0.9)] backdrop-blur">
         <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-white/80 sm:flex-row sm:items-center sm:justify-between">
-          <span>Giá dự kiến theo cấu hình</span>
+          <span>Giá đang nhập để lưu</span>
           <span className="font-medium normal-case text-amber-200">
             Giá nguồn cao nhất:{" "}
             <span className="font-semibold">{highestSupplyPriceDisplay}</span>
@@ -333,34 +341,30 @@ export function ProductEditPanel({
         >
           <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
             <p className="text-[10px] md:text-xs uppercase text-white/70">
-              Giá Sỉ dự kiến
+              Giá Sỉ
             </p>
             <p className="mt-1 text-base md:text-lg font-semibold text-white">
               {formatCurrencyValue(previewWholesalePrice)}
             </p>
             <p className="text-[11px] text-white/70">
-              {currentEditForm.pctCtv
-                ? `Thiết lập: ${currentEditForm.pctCtv}`
-                : "Nhập cấu hình CTV"}
+              {previewWholesaleProfitLabel ?? "Chưa có % lợi nhuận"}
             </p>
           </div>
           <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
             <p className="text-[10px] md:text-xs uppercase text-white/70">
-              Giá Khách dự kiến
+              Giá Khách
             </p>
             <p className="mt-1 text-base md:text-lg font-semibold text-white">
               {formatCurrencyValue(previewRetailPrice)}
             </p>
             <p className="text-[11px] text-white/70">
-              {currentEditForm.pctKhach
-                ? `Thiết lập: ${currentEditForm.pctKhach}`
-                : "Nhập cấu hình khách"}
+              {previewRetailProfitLabel ?? "Chưa có % lợi nhuận"}
             </p>
           </div>
           {showPreviewStudent && (
             <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
               <p className="text-[10px] md:text-xs uppercase text-white/70">
-                Giá SV (MAVS) dự kiến
+                Giá SV (MAVS)
               </p>
               <p className="mt-1 text-base md:text-lg font-semibold text-cyan-100">
                 {formatCurrencyValue(previewStudentPrice)}
@@ -373,13 +377,13 @@ export function ProductEditPanel({
           {showPreviewPromo && (
             <div className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 md:px-4 md:py-3 shadow-lg backdrop-blur-sm">
               <p className="text-[10px] md:text-xs uppercase text-white/70">
-                Giá Khuyến mãi dự kiến
+                Giá Khuyến mãi
               </p>
               <p className="mt-1 text-base md:text-lg font-semibold text-white">
                 {formatCurrencyValue(previewPromoPrice)}
               </p>
               <p className="text-[11px] text-white/70">
-                {previewPromoPercentLabel ?? "Nhập tỷ lệ khuyến mãi"}
+                {previewPromoPercentLabel ?? "Giá lưu trực tiếp"}
               </p>
             </div>
           )}
@@ -387,15 +391,15 @@ export function ProductEditPanel({
       </div>
 
       {productEditError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
+        <div className="rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">
           {productEditError}
         </div>
       )}
 
-      <div className="flex flex-wrap justify-end gap-3">
+      <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-2">
         <button
           type="button"
-          className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-4 md:px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/30 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center rounded-xl border border-white/20 bg-white/10 px-4 md:px-5 text-sm font-semibold text-white shadow-sm transition hover:border-white/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onCancelProductEdit}
           disabled={isSavingProductEdit}
         >
@@ -403,7 +407,7 @@ export function ProductEditPanel({
         </button>
         <button
           type="button"
-          className="inline-flex items-center rounded-xl bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 px-4 md:px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 hover:opacity-90 disabled:opacity-60"
+          className="inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 px-4 md:px-5 text-sm font-semibold text-white shadow-[0_10px_25px_-10px_rgba(56,189,248,0.85)] transition hover:brightness-110 disabled:opacity-60"
           onClick={onSubmitProductEdit}
           disabled={isSavingProductEdit}
         >

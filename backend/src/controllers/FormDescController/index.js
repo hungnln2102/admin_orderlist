@@ -217,6 +217,91 @@ const createInput = async (req, res) => {
   }
 };
 
+const updateForm = async (req, res) => {
+  try {
+    if (!FORM_NAME_DEF || !FORM_INPUT_DEF) {
+      return res.status(500).json({
+        error: "Thiếu cấu hình bảng form trong FORM_DESC_SCHEMA",
+      });
+    }
+
+    const formId = Number(req.params.formId);
+    if (!Number.isFinite(formId) || formId <= 0) {
+      return res.status(400).json({
+        error: "ID form không hợp lệ",
+      });
+    }
+
+    const { name, description, inputIds } = req.body || {};
+    const trimmedName = typeof name === "string" ? name.trim() : "";
+    const trimmedDesc = typeof description === "string" ? description.trim() : "";
+    const ids = Array.isArray(inputIds)
+      ? inputIds
+          .map((v) => Number(v))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+
+    if (!trimmedName) {
+      return res.status(400).json({
+        error: "Tên form không được để trống",
+      });
+    }
+
+    const fCols = FORM_NAME_DEF.columns;
+    const fiCols = FORM_INPUT_DEF.columns;
+
+    await db.transaction(async (trx) => {
+      const existing = await trx(FORM_NAME_TABLE).where(fCols.id, formId).first();
+      if (!existing) {
+        const err = new Error("NOT_FOUND");
+        err.code = "FORM_NOT_FOUND";
+        throw err;
+      }
+
+      const patch = {
+        [fCols.name]: trimmedName,
+        [fCols.description]: trimmedDesc || null,
+      };
+      if (fCols.updatedAt) {
+        patch[fCols.updatedAt] = trx.fn.now();
+      }
+
+      await trx(FORM_NAME_TABLE).where(fCols.id, formId).update(patch);
+
+      await trx(FORM_INPUT_TABLE).where(fiCols.formId, formId).del();
+
+      if (ids.length > 0) {
+        const rows = ids.map((inputId, idx) => ({
+          [fiCols.formId]: formId,
+          [fiCols.inputId]: inputId,
+          [fiCols.sortOrder]: idx,
+        }));
+        await trx(FORM_INPUT_TABLE).insert(rows);
+      }
+    });
+
+    res.json({
+      id: formId,
+      name: trimmedName,
+      description: trimmedDesc || null,
+      inputIds: ids,
+    });
+  } catch (error) {
+    if (error && error.code === "FORM_NOT_FOUND") {
+      return res.status(404).json({
+        error: "Không tìm thấy form",
+      });
+    }
+    logger.error("[forms] Query failed (updateForm)", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: "Không thể cập nhật form.",
+    });
+  }
+};
+
 const createForm = async (req, res) => {
   try {
     if (!FORM_NAME_DEF || !FORM_INPUT_DEF) {
@@ -291,5 +376,6 @@ module.exports = {
   listInputs,
   createInput,
   createForm,
+  updateForm,
 };
 

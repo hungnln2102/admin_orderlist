@@ -13,12 +13,14 @@ import {
   fetchChartDataRange,
   fetchDashboardStats,
   type ChartsApiResponse,
+  type DashboardChartGranularity,
   type OrderStatusData,
   type RevenueData,
   type ProfitData,
   type RefundData,
   type TaxData,
 } from "@/features/dashboard/api/dashboardApi";
+import type { DashboardDateRangeValue } from "../components/DashboardDateRangeFilter";
 import * as Helpers from "@/lib/helpers";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { type OverviewStat } from "../components/OverviewStats";
@@ -110,7 +112,7 @@ const buildStats = (stats: StatsApiResponse): OverviewStat[] => {
 ];
 };
 
-export type DashboardDateRange = { from: string; to: string };
+export type DashboardDateRange = DashboardDateRangeValue;
 
 export const useDashboardStats = () => {
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -122,6 +124,8 @@ export const useDashboardStats = () => {
   const [profitChartData, setProfitChartData] = useState<ProfitData[]>([]);
   const [refundChartData, setRefundChartData] = useState<RefundData[]>([]);
   const [taxChartData, setTaxChartData] = useState<TaxData[]>([]);
+  const [chartGranularity, setChartGranularity] =
+    useState<DashboardChartGranularity>("month");
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [dashboardRange, setDashboardRange] = useState<DashboardDateRange | null>(
@@ -142,7 +146,11 @@ export const useDashboardStats = () => {
       const stats: StatsApiResponse = await fetchDashboardStats(dashboardRange);
 
       const charts: ChartsApiResponse = dashboardRange
-        ? await fetchChartDataRange(dashboardRange.from, dashboardRange.to)
+        ? await fetchChartDataRange(
+            dashboardRange.from,
+            dashboardRange.to,
+            dashboardRange.chartBucket
+          )
         : await fetchChartData(selectedYear);
       setStatsData(buildStats(stats));
       setAvailableProfit({
@@ -155,6 +163,7 @@ export const useDashboardStats = () => {
       setProfitChartData(charts.profitData);
       setRefundChartData(charts.refundData);
       setTaxChartData(charts.taxData ?? []);
+      setChartGranularity(charts.chartGranularity ?? "month");
 
       if (!dashboardRange) {
         const monthLimit = selectedYear === currentYear ? currentMonth : 12;
@@ -238,6 +247,7 @@ export const useDashboardStats = () => {
     profitChartData,
     refundChartData,
     taxChartData,
+    chartGranularity,
     availableYears,
     selectedYear,
     setSelectedYear,

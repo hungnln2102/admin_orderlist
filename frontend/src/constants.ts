@@ -21,6 +21,8 @@ export const API_ENDPOINTS = {
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
   ORDER_RENEW: (orderCode: string) =>
     `/api/orders/${encodeURIComponent(orderCode)}/renew`,
+  ORDER_COMPLETE_MANUAL_WEBHOOK: (id: number) =>
+    `/api/orders/${id}/complete-manual-webhook`,
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",
@@ -28,7 +30,7 @@ export const API_ENDPOINTS = {
   ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
   ORDER_REFUND_CREDIT_ENSURE: (id: number) =>
     `/api/orders/canceled/${id}/refund-credit/ensure`,
-  CREDIT_LOGS: "/api/orders/refund-credit/logs",
+  ORDERS_REFUND_CREDITS_AVAILABLE: "/api/orders/refund-credits/available",
 
   SUPPLIES: "/api/supplies",
   SUPPLIES_ORDER_COSTS: "/api/supplies/order-costs",
@@ -74,15 +76,17 @@ export const API_ENDPOINTS = {
   /** Cùng hàm với job cron hàng giờ (`renewAdobeCheckAndNotifyTask`), chạy trong process API (không phải process `scheduler.js`). */
   SCHEDULER_RUN_ADOBE_CHECK: "/api/scheduler/run-adobe-check",
   RENEW_ADOBE_USER_ORDERS: "/api/renew-adobe/user-orders",
+  RENEW_ADOBE_USER_ORDERS_TRACK: "/api/renew-adobe/user-orders/track",
+  RENEW_ADOBE_USER_ORDERS_BY_CODE: (orderCode: string) =>
+    `/api/renew-adobe/user-orders/${encodeURIComponent(orderCode)}`,
+  RENEW_ADOBE_ORDER_LIST_MATCH: "/api/renew-adobe/order-list/match",
+  FIX_ADES_CHECK: "/api/fix-ades/check",
+  FIX_ADES_RENEW: "/api/fix-ades/renew",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
-  /** Một vòng Fix All: batch theo slot tài khoản gần đầy nhất (lặp cho tới hết emails). */
+  /** Fix All: backend chạy hết vòng (slot + add batch) trong một lần gọi. */
   RENEW_ADOBE_FIX_USERS_ROUND: "/api/renew-adobe/fix-users-round",
   RENEW_ADOBE_URL_ACCESS: (id: number) =>
     `/api/renew-adobe/accounts/${id}/url-access`,
-  RENEW_ADOBE_VARIANTS: "/api/renew-adobe/variants",
-  RENEW_ADOBE_PRODUCT_SYSTEM: "/api/renew-adobe/product-system",
-  RENEW_ADOBE_PRODUCT_SYSTEM_DELETE: (id: number) =>
-    `/api/renew-adobe/product-system/${id}`,
 
   CUSTOMER_STATUS: "/api/customer-status",
   IP_WHITELISTS: "/api/ip-whitelists",
@@ -155,7 +159,6 @@ export const ORDER_STATUSES = {
   DA_THANH_TOAN: ORDER_STATUS.PAID,
   CHO_HOAN: ORDER_STATUS.PENDING_REFUND,
   DA_HOAN: ORDER_STATUS.REFUNDED,
-  CHUYEN_DOI_CREDIT: ORDER_STATUS.CREDIT_CONVERTED,
 };
 
 
@@ -184,7 +187,7 @@ export const ORDER_DATASET_CONFIG = {
   },
   canceled: {
     label: "Hoàn Tiền",
-    description: "Đơn chờ hoàn, đã hoàn hoặc chuyển đổi credit",
+    description: "Đơn đã hoàn tiền",
     endpoint: API_ENDPOINTS.ORDERS_CANCELED,
   },
 };
@@ -199,6 +202,8 @@ export interface Order {
   // id_product: alias hiển thị (display_name); backend đã trả thêm variant_id & product_display_name
   id_product: string;
   variant_id?: number | string | null;
+  /** product.id từ variant (JOIN) — dùng ghép gói khi tên sản phẩm on đơn khác chuỗi variant. */
+  line_product_id?: number | null;
   product_display_name?: string | null;
   information_order: string;
   customer: string;
@@ -219,7 +224,16 @@ export interface Order {
   refund_credit_applied_note_id?: number | string | null;
   refund_credit_applied_amount?: number | string | null;
   refund_credit_applied_at?: string | null;
+  /** Phiếu tạo từ tách số còn (sau khi tách, chọn id này lần sau). */
+  refund_credit_effective_note_id?: number | string | null;
+  refund_credit_effective_code?: string | null;
+  refund_credit_effective_available?: number | string | null;
+  refund_credit_effective_status?: string | null;
   price_before_credit?: number | string | null;
+  gross_selling_price?: number | string | null;
+  refund_credit_code?: string | null;
+  refund_credit_replacement_note_id?: number | string | null;
+  refund_credit_applied_from_note_id?: number | string | null;
   cost: string;
   price: string;
   note: string;

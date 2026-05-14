@@ -17,6 +17,14 @@ type UseOrderSubmitParams = {
   selectedSupplyId: number | null;
   products: Product[];
   prefillContext?: CreateOrderPrefillContext | null;
+  /** Tạo đơn từ form Credit (chọn phiếu trong dropdown), không dùng khi đã có prefill credit. */
+  creditOrderSelection: {
+    id: number;
+    availableAmount: number;
+    sourceOrderCode: string;
+    sourceOrderId: number;
+    creditCode: string;
+  } | null;
 };
 
 export const useOrderSubmit = ({
@@ -27,6 +35,7 @@ export const useOrderSubmit = ({
   selectedSupplyId,
   products,
   prefillContext,
+  creditOrderSelection,
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
@@ -80,10 +89,13 @@ export const useOrderSubmit = ({
         const variantId = matchedProduct?.id;
 
         const orderTypePrefix = String(formData[ORDER_FIELDS.ID_ORDER] || "");
+        const rawSelling = Number(formData[ORDER_FIELDS.PRICE]);
         const sellingPrice =
           orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
             ? 0
-            : Number(formData[ORDER_FIELDS.PRICE]);
+            : Number.isFinite(rawSelling)
+              ? Math.max(0, rawSelling)
+              : 0;
 
         const dataToSave: Partial<ApiOrder> = {
           ...formData,
@@ -119,6 +131,26 @@ export const useOrderSubmit = ({
           if (prefillContext.reservedOrderCode) {
             record.reserved_order_code = prefillContext.reservedOrderCode;
           }
+          record.__credit_avail_snapshot = Math.max(
+            0,
+            Number(prefillContext.creditAvailableAmount) || 0
+          );
+        } else if (creditOrderSelection?.id) {
+          /** Luôn gửi id phiếu + số áp; nếu `apply` = 0 backend vẫn gán min(dư phiếu, giá) (createOrder). Trước đây `if (apply > 0)` bỏ hết payload khi giá là NaN → không có application. */
+          const record = dataToSave as Record<string, unknown>;
+          record.refund_credit_note_id = creditOrderSelection.id;
+          record.refund_credit_source_order_code =
+            creditOrderSelection.sourceOrderCode || "";
+          record.refund_credit_source_order_id =
+            Number(creditOrderSelection.sourceOrderId || 0);
+          record.refund_credit_code = creditOrderSelection.creditCode || "";
+          const cap = Math.max(0, creditOrderSelection.availableAmount);
+          const apply =
+            orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
+              ? 0
+              : Math.min(cap, sellingPrice);
+          record.refund_credit_apply_amount = apply;
+          record.__credit_avail_snapshot = cap;
         }
 
         onSave(dataToSave as Order);
@@ -140,6 +172,7 @@ export const useOrderSubmit = ({
       selectedSupplyId,
       products,
       prefillContext,
+      creditOrderSelection,
     ]
   );
 

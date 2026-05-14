@@ -1,7 +1,6 @@
-const path = require("path");
-const dotenv = require("dotenv");
+const { loadBackendEnv } = require("../loadEnv");
 
-dotenv.config({ path: path.join(__dirname, "..", "..", "..", ".env") });
+loadBackendEnv();
 
 const pickSchema = (...candidates) => candidates.find(Boolean);
 

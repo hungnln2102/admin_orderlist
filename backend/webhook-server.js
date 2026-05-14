@@ -8,7 +8,8 @@
  *   node webhook-server.js
  *   npm run start:webhook
  */
-require("dotenv").config();
+const { loadBackendEnv } = require("./src/config/loadEnv");
+loadBackendEnv();
 
 const logger = require("./src/utils/logger");
 const { notifyCritical } = require("./src/utils/telegramErrorNotifier");

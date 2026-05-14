@@ -4,6 +4,7 @@ import {
   ArrowPathIcon,
   BanknotesIcon,
   ChartBarIcon,
+  CalculatorIcon,
   ClipboardDocumentIcon,
   CubeIcon,
   CurrencyDollarIcon,
@@ -15,6 +16,7 @@ import {
   NewspaperIcon,
   PencilSquareIcon,
   PhotoIcon,
+  ReceiptPercentIcon,
   ShieldCheckIcon,
   ShoppingBagIcon,
   TicketIcon,
@@ -52,7 +54,11 @@ export const menuSections: MenuSection[] = [
     icon: ChartBarIcon,
     tone: "indigo",
     defaultOpen: true,
-    items: [{ name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon }],
+    items: [
+      { name: "Tổng quan", href: "/dashboard", icon: ChartBarIcon },
+      { name: "Thuế", href: "/tax", icon: ReceiptPercentIcon },
+      { name: "Chi phí", href: "/expenses", icon: CalculatorIcon },
+    ],
   },
   {
     id: "sales",
@@ -139,7 +145,7 @@ export const menuSections: MenuSection[] = [
   {
     id: "renew",
     title: "Hệ thống Renew",
-    description: "Quản trị Adobe admin và nhóm sản phẩm hệ thống.",
+    description: "Quản trị Adobe admin và đơn được tracking.",
     icon: ArrowPathIcon,
     tone: "amber",
     items: [
@@ -147,11 +153,6 @@ export const menuSections: MenuSection[] = [
         name: "Danh sách Admin Adobe",
         href: "/renew-adobe-admin",
         icon: UserGroupIcon,
-      },
-      {
-        name: "Sản phẩm hệ thống",
-        href: "/product-system",
-        icon: CubeIcon,
       },
       {
         name: "IP whitelist",

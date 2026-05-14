@@ -1,4 +1,5 @@
 services:
+  # Biến môi trường Node: local → backend/.env.local (+ .env tùy chọn); stack Docker → backend/.env.docker (xem backend/env.*.example).
   # ==========================================
   # 1. DATABASE SERVICE (PostgreSQL)
   # ==========================================
@@ -11,18 +12,20 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASS:-postgres}
       POSTGRES_DB: ${DB_NAME:-mydtbmav}
+    # Postgres 16 (image chính thức): PGDATA = /var/lib/postgresql/data
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
       - app-network
+    # Dùng $$POSTGRES_* để shell trong container đọc đúng user/db do image set (tránh lệch với .env host).
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-mydtbmav}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 12
+      start_period: 90s
     deploy:
       resources:
         limits:
@@ -70,6 +73,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     ports:
       - "3001:3001"   # Main API
     volumes:
@@ -106,6 +112,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     command: ["node", "webhook-server.js"]
     ports:
       - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
@@ -136,6 +145,9 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env.docker
+    environment:
+      APP_ENV: docker
+      NODE_ENV: production
     command: ["node", "scheduler.js"]
     networks:
       - app-network

@@ -1,25 +1,74 @@
 const { db } = require("../../db");
 const {
-  buildChartsQuery,
-  buildYearsQuery,
-  buildRangeCompareStatsQuery,
-  buildRangeMonthlyChartQuery,
-} = require("./queries");
-const { tableName, SCHEMA_FINANCE, FINANCE_SCHEMA } = require("../../config/dbSchema");
+  tableName,
+  SCHEMA_FINANCE,
+  FINANCE_SCHEMA,
+} = require("../../config/dbSchema");
 const { dashboardMonthlyTaxRatePercent } = require("../../config/appConfig");
+const { fetchEstimatedBankBalancePair } = require("./availableProfitFromSummary");
+const {
+  buildOrderCountBirthInRangeQuery,
+} = require("./dashboardSummaryAggregate");
+const { orderListHasCreatedAtColumn } = require("./orderListHasCreatedAtColumn");
+const {
+  sumDailyKpisForRange,
+  dailyRowMapBetween,
+  sumDailyByMonthKeyBetween,
+  sumDailyByYearKeyBetween,
+} = require("./dailyRevenueSummaryAggregate");
 
 const summaryTableName = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
   SCHEMA_FINANCE
 );
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
-const expenseTableName = tableName(
-  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
-  SCHEMA_FINANCE
-);
-const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+const dailyRevCols = FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.COLS;
 
 const MS_PER_DAY = 86400000;
+/** Khoảng ≤ số ngày này: biểu đồ dashboard bucket theo **ngày** (khớp preset ngày/tháng ngắn). */
+const DASHBOARD_CHART_RANGE_DAY_MAX = 120;
+
+const inclusiveDaySpan = (fromStr, toStr) => {
+  const from = parseYMDLocal(fromStr);
+  const to = parseYMDLocal(toStr);
+  return Math.round((to - from) / MS_PER_DAY) + 1;
+};
+
+const listIsoDaysInclusive = (fromStr, toStr) => {
+  const out = [];
+  const start = parseYMDLocal(fromStr);
+  const end = parseYMDLocal(toStr);
+  if (start > end) return out;
+  for (let t = start.getTime(); t <= end.getTime(); t += MS_PER_DAY) {
+    out.push(toYMDDate(new Date(t)));
+  }
+  return out;
+};
+
+/** Khoảng [from,to] trùng đúng một tháng lịch (01 → ngày cuối tháng) — gom biểu đồ theo tháng, không tách từng ngày. */
+const isFullCalendarMonth = (fromYmd, toYmd) => {
+  if (!fromYmd || !toYmd || fromYmd > toYmd) return false;
+  const pf = String(fromYmd).split("-").map(Number);
+  const pt = String(toYmd).split("-").map(Number);
+  if (pf.length !== 3 || pt.length !== 3) return false;
+  const [fy, fm, fd] = pf;
+  const [ty, tm, td] = pt;
+  if (fy !== ty || fm !== tm || fd !== 1) return false;
+  const lastDay = new Date(fy, fm, 0).getDate();
+  return td === lastDay;
+};
+
+/** Nhãn trục X biểu đồ theo ngày: chỉ ngày/tháng (đủ rộng, tránh chồng năm). */
+const formatChartDayLabel = (isoYmd) => {
+  const s = String(isoYmd || "").slice(0, 10);
+  const [y, m, d] = s.split("-");
+  if (!y || !m || !d) return s;
+  return `${d}/${m}`;
+};
+
+/** `month_key` lịch hiện tại (clock server) — chỉ để chọn hàng đọc, không auto-seed. */
+const currentCalendarMonthKey = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -48,188 +97,317 @@ const taxFromRevenueValue = (revenue) =>
 
 const toNumber = (value) => Number(value || 0);
 
-const sumWithdrawProfitBetweenDates = async ({ from, to }) => {
-  const row = await db(expenseTableName)
-    .where(expenseCols.EXPENSE_TYPE, "withdraw_profit")
-    .whereRaw(`DATE(${expenseCols.CREATED_AT}) >= ?`, [from])
-    .whereRaw(`DATE(${expenseCols.CREATED_AT}) <= ?`, [to])
-    .sum({ total: expenseCols.AMOUNT })
-    .first();
-  return toNumber(row?.total);
-};
-
-const fetchMonthlyWithdrawProfitPair = async ({ monthStartDate }) => {
-  const monthStart = parseYMDLocal(monthStartDate);
-  const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
-  const prevMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
-  const prevMonthEnd = new Date(monthStart.getTime() - MS_PER_DAY);
-
-  const [currentMonthWithdraw, previousMonthWithdraw] = await Promise.all([
-    sumWithdrawProfitBetweenDates({
-      from: toYMDDate(monthStart),
-      to: toYMDDate(new Date(nextMonthStart.getTime() - MS_PER_DAY)),
-    }),
-    sumWithdrawProfitBetweenDates({
-      from: toYMDDate(prevMonthStart),
-      to: toYMDDate(prevMonthEnd),
-    }),
-  ]);
-
-  return {
-    current: currentMonthWithdraw,
-    previous: previousMonthWithdraw,
+const monthKeysSpanned = (fromYmd, toYmd) => {
+  const parseYm = (s) => {
+    const p = String(s || "").trim().split("-");
+    return { y: Number(p[0]), m: Number(p[1]) };
   };
+  const a = parseYm(fromYmd);
+  const b = parseYm(toYmd);
+  if (!a.y || !a.m || !b.y || !b.m) return [];
+  const keys = [];
+  let y = a.y;
+  let m = a.m;
+  while (y < b.y || (y === b.y && m <= b.m)) {
+    keys.push(`${y}-${String(m).padStart(2, "0")}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return keys;
 };
 
-const fetchAvailableProfitPair = async ({ currentMonthKey, monthStartDate }) => {
-  const [profitAllRow, profitBeforeRow, expenseAllRow, expenseBeforeRow] =
-    await Promise.all([
-      db(summaryTableName)
-        .sum({ total: summaryCols.TOTAL_PROFIT })
-        .first(),
-      db(summaryTableName)
-        .where(summaryCols.MONTH_KEY, "<", currentMonthKey)
-        .sum({ total: summaryCols.TOTAL_PROFIT })
-        .first(),
-      db(expenseTableName)
-        .sum({ total: expenseCols.AMOUNT })
-        .first(),
-      db(expenseTableName)
-        .whereRaw(`DATE(${expenseCols.CREATED_AT}) < ?`, [monthStartDate])
-        .sum({ total: expenseCols.AMOUNT })
-        .first(),
-    ]);
+/** Năm lịch đầy đủ từ năm của `from` tới năm của `to` (YYYY), mỗi năm một cột biểu đồ. */
+const yearKeysSpanned = (fromYmd, toYmd) => {
+  const y1 = parseInt(String(fromYmd).slice(0, 4), 10);
+  const y2 = parseInt(String(toYmd).slice(0, 4), 10);
+  if (!Number.isFinite(y1) || !Number.isFinite(y2) || y1 > y2) return [];
+  const keys = [];
+  for (let y = y1; y <= y2; y++) keys.push(String(y));
+  return keys;
+};
 
-  const profitAll = toNumber(profitAllRow?.total);
-  const profitBefore = toNumber(profitBeforeRow?.total);
-  const expenseAll = toNumber(expenseAllRow?.total);
-  const expenseBefore = toNumber(expenseBeforeRow?.total);
+const emptyMonthKpi = () => ({
+  total_orders: 0,
+  total_revenue: 0,
+  total_profit: 0,
+  total_refund: 0,
+  total_import: 0,
+  total_tax: 0,
+});
 
+/**
+ * KPI một tháng: **chỉ** từ `dashboard_monthly_summary` (không CTE `order_list`).
+ */
+const kpiFromSummaryOnly = (monthKey, tableMap) => {
+  const tr = tableMap.get(String(monthKey || "").trim());
+  if (!tr) return emptyMonthKpi();
   return {
-    current: profitAll - expenseAll,
-    previous: profitBefore - expenseBefore,
+    total_orders: toNumber(tr[summaryCols.TOTAL_ORDERS]),
+    total_revenue: toNumber(tr[summaryCols.TOTAL_REVENUE]),
+    total_profit: toNumber(tr[summaryCols.TOTAL_PROFIT]),
+    total_refund: toNumber(tr[summaryCols.TOTAL_REFUND]),
+    total_import: toNumber(tr[summaryCols.TOTAL_IMPORT]),
+    total_tax: toNumber(tr[summaryCols.TOTAL_TAX]),
   };
 };
 
 const fetchDashboardStats = async () => {
   const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const currentMonthKey = currentCalendarMonthKey(now);
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const [rows, availableProfit, monthlyWithdrawProfit] = await Promise.all([
+  const [tableRows, estimatedBankBalance] = await Promise.all([
     db(summaryTableName)
+      .select(
+        summaryCols.MONTH_KEY,
+        summaryCols.TOTAL_ORDERS,
+        summaryCols.TOTAL_REVENUE,
+        summaryCols.TOTAL_PROFIT,
+        summaryCols.TOTAL_REFUND,
+        summaryCols.TOTAL_IMPORT,
+        summaryCols.TOTAL_TAX,
+        summaryCols.ESTIMATED_BANK_BALANCE
+      )
       .whereIn(summaryCols.MONTH_KEY, [currentMonthKey, previousMonthKey]),
-    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-    fetchMonthlyWithdrawProfitPair({ monthStartDate }),
+    fetchEstimatedBankBalancePair({ currentMonthKey, previousMonthKey }),
   ]);
 
-  const currentRow = rows.find((r) => r.month_key === currentMonthKey) || {};
-  const previousRow = rows.find((r) => r.month_key === previousMonthKey) || {};
+  const tableMap = new Map(
+    (tableRows || []).map((r) => [String(r[summaryCols.MONTH_KEY] || ""), r])
+  );
 
-  const curr = {
-    total_orders: Number(currentRow.total_orders || 0),
-    total_revenue: Number(currentRow.total_revenue || 0),
-    total_profit: Number(currentRow.total_profit || 0),
-    total_refund: Number(currentRow.total_refund || 0),
-  };
+  const curr = kpiFromSummaryOnly(currentMonthKey, tableMap);
+  const prev = kpiFromSummaryOnly(previousMonthKey, tableMap);
 
-  const prev = {
-    total_orders: Number(previousRow.total_orders || 0),
-    total_revenue: Number(previousRow.total_revenue || 0),
-    total_profit: Number(previousRow.total_profit || 0),
-    total_refund: Number(previousRow.total_refund || 0),
-  };
-  const currentMonthlyProfit = curr.total_profit - monthlyWithdrawProfit.current;
-  const previousMonthlyProfit = prev.total_profit - monthlyWithdrawProfit.previous;
-
-  const taxFromRevenue = (revenue) => taxFromRevenueValue(revenue);
+  const trC = tableMap.get(currentMonthKey);
+  const trP = tableMap.get(previousMonthKey);
+  const revC = toNumber(trC?.[summaryCols.TOTAL_REVENUE]);
+  const revP = toNumber(trP?.[summaryCols.TOTAL_REVENUE]);
+  const importC = toNumber(trC?.[summaryCols.TOTAL_IMPORT]);
+  const importP = toNumber(trP?.[summaryCols.TOTAL_IMPORT]);
+  const marginC = trC
+    ? toNumber(trC[summaryCols.TOTAL_PROFIT])
+    : revC - importC;
+  const marginP = trP
+    ? toNumber(trP[summaryCols.TOTAL_PROFIT])
+    : revP - importP;
+  const taxC = trC ? toNumber(trC[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(revC);
+  const taxP = trP ? toNumber(trP[summaryCols.TOTAL_TAX]) : taxFromRevenueValue(revP);
 
   return {
     totalOrders: { current: curr.total_orders, previous: prev.total_orders },
-    totalRevenue: { current: curr.total_revenue, previous: prev.total_revenue },
+    totalRevenue: { current: revC, previous: revP },
     totalImports: {
-      current: curr.total_revenue - curr.total_profit,
-      previous: prev.total_revenue - prev.total_profit,
+      current: importC,
+      previous: importP,
     },
     totalRefund: { current: curr.total_refund, previous: prev.total_refund },
-    monthlyProfit: { current: currentMonthlyProfit, previous: previousMonthlyProfit },
+    monthlyProfit: { current: marginC, previous: marginP },
     monthlyTax: {
-      current: taxFromRevenue(curr.total_revenue),
-      previous: taxFromRevenue(prev.total_revenue),
+      current: taxC,
+      previous: taxP,
     },
-    availableProfit,
+    estimatedBankBalance,
+    // Backward-compatible field for old clients.
+    availableProfit: estimatedBankBalance,
   };
 };
 
 const fetchDashboardStatsForDateRange = async ({ from, to }) => {
   const { p0, p1 } = computePreviousRange(from, to);
-  const currentMonthKey = `${new Date().getFullYear()}-${String(
-    new Date().getMonth() + 1
-  ).padStart(2, "0")}`;
-  const monthStartDate = `${currentMonthKey}-01`;
-  const [result, availableProfit, currentRangeWithdraw, previousRangeWithdraw] =
-    await Promise.all([
-    db.raw(buildRangeCompareStatsQuery(), [
-      from,
-      to,
-      p0,
-      p1,
-    ]),
-    fetchAvailableProfitPair({ currentMonthKey, monthStartDate }),
-    sumWithdrawProfitBetweenDates({ from, to }),
-    sumWithdrawProfitBetweenDates({ from: p0, to: p1 }),
-  ]);
-  const row = (result.rows && result.rows[0]) || {};
+  const currentMonthKey = currentCalendarMonthKey();
+  const [cy, cm] = String(currentMonthKey).split("-").map(Number);
+  const prevDate = new Date(cy, (cm || 1) - 2, 1);
+  const previousMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const currRev = Number(row.net_revenue_curr || 0);
-  const prevRev = Number(row.net_revenue_prev || 0);
-  const currGrossProfit = Number(row.net_profit_curr || 0);
-  const prevGrossProfit = Number(row.net_profit_prev || 0);
-  const currProfit = currGrossProfit - currentRangeWithdraw;
-  const prevProfit = prevGrossProfit - previousRangeWithdraw;
+  let useCreatedAt = true;
+  try {
+    useCreatedAt = await orderListHasCreatedAtColumn();
+  } catch {
+    useCreatedAt = true;
+  }
+
+  const [currKpi, prevKpi, currOrd, prevOrd, estimatedBankBalance] = await Promise.all([
+    sumDailyKpisForRange(from, to),
+    sumDailyKpisForRange(p0, p1),
+    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [from, to]),
+    db.raw(buildOrderCountBirthInRangeQuery({ useCreatedAt }), [p0, p1]),
+    fetchEstimatedBankBalancePair({ currentMonthKey, previousMonthKey }),
+  ]);
 
   return {
     totalOrders: {
-      current: Number(row.total_orders_curr || 0),
-      previous: Number(row.total_orders_prev || 0),
+      current: toNumber(currOrd.rows?.[0]?.c),
+      previous: toNumber(prevOrd.rows?.[0]?.c),
     },
-    totalRevenue: { current: currRev, previous: prevRev },
+    totalRevenue: {
+      current: currKpi.earned,
+      previous: prevKpi.earned,
+    },
     totalImports: {
-      current: currRev - currGrossProfit,
-      previous: prevRev - prevGrossProfit,
+      current: currKpi.shopCost,
+      previous: prevKpi.shopCost,
     },
     totalRefund: {
-      current: Number(row.total_refund_curr || 0),
-      previous: Number(row.total_refund_prev || 0),
+      current: currKpi.reversed,
+      previous: prevKpi.reversed,
     },
-    monthlyProfit: { current: currProfit, previous: prevProfit },
+    monthlyProfit: {
+      current: currKpi.allocatedProfitTax,
+      previous: prevKpi.allocatedProfitTax,
+    },
     monthlyTax: {
-      current: taxFromRevenueValue(currRev),
-      previous: taxFromRevenueValue(prevRev),
+      current: taxFromRevenueValue(currKpi.earned),
+      previous: taxFromRevenueValue(prevKpi.earned),
     },
-    availableProfit,
+    estimatedBankBalance,
+    // Backward-compatible field for old clients.
+    availableProfit: estimatedBankBalance,
     range: { from, to, previousFrom: p0, previousTo: p1 },
   };
 };
 
-const fetchDashboardChartsForDateRange = async ({ from, to }) => {
-  const result = await db.raw(buildRangeMonthlyChartQuery(), [from, to]);
-  const rows = result.rows || [];
+const fetchDashboardChartsForDateRange = async ({ from, to, chartBucket }) => {
   const startYear = parseInt(String(from).slice(0, 4), 10);
+  const daySpan = inclusiveDaySpan(from, to);
+  const bucket = String(chartBucket || "").toLowerCase();
+  const forceMonthBucket =
+    bucket === "month" ||
+    (bucket !== "day" && isFullCalendarMonth(from, to));
+  const useDailyBuckets =
+    bucket === "day" ||
+    (bucket !== "year" &&
+      !forceMonthBucket &&
+      daySpan > 0 &&
+      daySpan <= DASHBOARD_CHART_RANGE_DAY_MAX);
 
-  const months = rows.map((row) => {
-    const revenue = Number(row.total_revenue) || 0;
+  if (useDailyBuckets) {
+    const drMap = await dailyRowMapBetween(from, to);
+    const daysList = listIsoDaysInclusive(from, to);
+    const months = daysList.map((dayIso) => {
+      const dr = drMap.get(dayIso);
+      const earned = dr ? toNumber(dr[dailyRevCols.EARNED_REVENUE]) : 0;
+      const rev = dr ? toNumber(dr[dailyRevCols.REVENUE_REVERSED]) : 0;
+      const cost = dr ? toNumber(dr[dailyRevCols.TOTAL_SHOP_COST]) : 0;
+      const allocProfit = dr
+        ? toNumber(dr[dailyRevCols.ALLOCATED_PROFIT_TAX])
+        : 0;
+      return {
+        month: formatChartDayLabel(dayIso),
+        month_num: 0,
+        month_key: dayIso,
+        total_orders: dr
+          ? toNumber(dr[dailyRevCols.DASHBOARD_ORDERS_COUNT])
+          : 0,
+        total_canceled: dr
+          ? toNumber(dr[dailyRevCols.DASHBOARD_CANCELED_COUNT])
+          : 0,
+        total_revenue: earned,
+        total_profit: allocProfit,
+        total_refund: rev,
+        total_import: cost,
+        total_tax: taxFromRevenueValue(earned),
+      };
+    });
     return {
-      month: `T${row.month_num}/${row.year_num}`,
-      month_num: Number(row.month_num),
-      total_orders: Number(row.total_orders) || 0,
-      total_canceled: Number(row.total_canceled) || 0,
-      total_revenue: revenue,
-      total_profit: Number(row.total_profit) || 0,
-      total_refund: Number(row.total_refund) || 0,
-      total_tax: taxFromRevenueValue(revenue),
+      year: Number.isFinite(startYear) ? startYear : null,
+      months,
+      range: { from, to },
+      granularity: "day",
+    };
+  }
+
+  if (bucket === "year") {
+    const yearKeys = yearKeysSpanned(from, to);
+    if (!yearKeys.length) {
+      return {
+        year: Number.isFinite(startYear) ? startYear : null,
+        months: [],
+        range: { from, to },
+        granularity: "year",
+      };
+    }
+
+    const finByYk = await sumDailyByYearKeyBetween(from, to);
+
+    const months = yearKeys.map((yk) => {
+      const f = finByYk.get(yk) || {
+        earned: 0,
+        reversed: 0,
+        shopCost: 0,
+        allocatedProfitTax: 0,
+        dashboardOrders: 0,
+        dashboardCanceled: 0,
+      };
+      const yn = parseInt(yk, 10);
+      const earned = f.earned;
+      const rev = f.reversed;
+      const cost = f.shopCost;
+      return {
+        month: yk,
+        month_num: Number.isFinite(yn) ? yn : 0,
+        month_key: yk,
+        total_orders: f.dashboardOrders,
+        total_canceled: f.dashboardCanceled,
+        total_revenue: earned,
+        total_profit: f.allocatedProfitTax,
+        total_refund: rev,
+        total_import: cost,
+        total_tax: taxFromRevenueValue(earned),
+      };
+    });
+
+    return {
+      year: Number.isFinite(startYear) ? startYear : null,
+      months,
+      range: { from, to },
+      granularity: "year",
+    };
+  }
+
+  const monthKeys = monthKeysSpanned(from, to);
+
+  if (!monthKeys.length) {
+    return {
+      year: Number.isFinite(startYear) ? startYear : null,
+      months: [],
+      range: { from, to },
+      granularity: "month",
+    };
+  }
+
+  const finByMk = await sumDailyByMonthKeyBetween(from, to);
+
+  const months = monthKeys.map((mk) => {
+    const f = finByMk.get(mk) || {
+      earned: 0,
+      reversed: 0,
+      shopCost: 0,
+      allocatedProfitTax: 0,
+      dashboardOrders: 0,
+      dashboardCanceled: 0,
+    };
+    const [ys, ms] = mk.split("-");
+    const monthNum = parseInt(ms, 10);
+    const yearNum = parseInt(ys, 10);
+    const earned = f.earned;
+    const rev = f.reversed;
+    const cost = f.shopCost;
+    return {
+      month: `T${monthNum}/${yearNum}`,
+      month_num: monthNum,
+      month_key: mk,
+      total_orders: f.dashboardOrders,
+      total_canceled: f.dashboardCanceled,
+      total_revenue: earned,
+      total_profit: f.allocatedProfitTax,
+      total_refund: rev,
+      total_import: cost,
+      total_tax: taxFromRevenueValue(earned),
     };
   });
 
@@ -237,108 +415,125 @@ const fetchDashboardChartsForDateRange = async ({ from, to }) => {
     year: Number.isFinite(startYear) ? startYear : null,
     months,
     range: { from, to },
+    granularity: "month",
   };
 };
 
 const fetchDashboardYears = async () => {
-  const result = await db.raw(buildYearsQuery());
-  return (result.rows || []).map((row) => Number(row.year_value));
-};
-
-const fetchDashboardCharts = async ({ year, limitToToday }) => {
-  const bindings = [year, year, year, !!limitToToday];
-  const result = await db.raw(buildChartsQuery(), bindings);
-
-  return {
-    year,
-    months: result.rows || [],
-  };
+  const mk = summaryCols.MONTH_KEY;
+  const r = await db.raw(
+    `SELECT DISTINCT CAST(SUBSTRING(${mk}::text, 1, 4) AS INTEGER) AS year_value
+     FROM ${summaryTableName}
+     WHERE ${mk} IS NOT NULL AND LENGTH(TRIM(${mk}::text)) >= 4
+     ORDER BY year_value DESC`
+  );
+  return (r.rows || [])
+    .map((row) => Number(row.year_value))
+    .filter((y) => Number.isFinite(y));
 };
 
 const fetchDashboardMonthlySummary = async () => {
-  const tableName_qualified = tableName(
-    FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
-    SCHEMA_FINANCE
-  );
-  
-  const result = await db(tableName_qualified)
-    .select('*')
-    .orderBy(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS.MONTH_KEY, 'desc');
-  
-  return (result || []).map((row) => ({
-    month_key: row.month_key || '',
-    total_orders: Number(row.total_orders || 0),
-    canceled_orders: Number(row.canceled_orders || 0),
-    total_revenue: Number(row.total_revenue || 0),
-    total_profit: Number(row.total_profit || 0),
-    total_refund: Number(row.total_refund || 0),
-    updated_at: row.updated_at || null,
-  }));
+  const dbRows = await db(summaryTableName)
+    .select(
+      summaryCols.MONTH_KEY,
+      summaryCols.TOTAL_ORDERS,
+      summaryCols.CANCELED_ORDERS,
+      summaryCols.TOTAL_REVENUE,
+      summaryCols.TOTAL_PROFIT,
+      summaryCols.TOTAL_REFUND,
+      summaryCols.TOTAL_IMPORT,
+      summaryCols.TOTAL_TAX,
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
+      summaryCols.ESTIMATED_BANK_BALANCE,
+      summaryCols.UPDATED_AT
+    )
+    .orderBy(summaryCols.MONTH_KEY, "desc");
+
+  return (dbRows || []).map((row) => {
+    const mk = String(row[summaryCols.MONTH_KEY] || "").trim();
+    return {
+      month_key: mk,
+      total_orders: toNumber(row[summaryCols.TOTAL_ORDERS]),
+      canceled_orders: toNumber(row[summaryCols.CANCELED_ORDERS]),
+      total_revenue: toNumber(row[summaryCols.TOTAL_REVENUE]),
+      total_profit: toNumber(row[summaryCols.TOTAL_PROFIT]),
+      total_refund: toNumber(row[summaryCols.TOTAL_REFUND]),
+      total_import: toNumber(row[summaryCols.TOTAL_IMPORT]),
+      total_tax: toNumber(row[summaryCols.TOTAL_TAX]),
+      total_off_flow_bank_receipt: toNumber(row[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT]),
+      estimated_bank_balance: toNumber(row[summaryCols.ESTIMATED_BANK_BALANCE]),
+      updated_at: row[summaryCols.UPDATED_AT] ?? null,
+    };
+  });
 };
 
 const fetchDashboardChartsFromSummary = async ({ year, limitToToday }) => {
-  const tableName_qualified = tableName(
-    FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
-    SCHEMA_FINANCE
-  );
-  const monthKeyCol = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS.MONTH_KEY;
-
-  let query = db(tableName_qualified).select('*');
-  
-  // Filter by year: month_key is in format YYYY-MM
-  const yearStr = String(year).padStart(4, '0');
-  const yearPrefix = `${yearStr}-%`;
-  query = query.where(monthKeyCol, 'like', yearPrefix);
-
-  // If limiting to today, only include months up to current month of current year
-  if (limitToToday && year === new Date().getFullYear()) {
-    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-    const currentYearMonth = `${yearStr}-${currentMonth}`;
-    query = query.where(monthKeyCol, '<=', currentYearMonth);
-  }
-
-  const result = await query.orderBy(monthKeyCol, 'asc');
-
-  // Build a map from existing rows
-  const rowMap = new Map();
-  for (const row of (result || [])) {
-    const [, monthStr] = (row.month_key || '').split('-');
-    const monthNum = parseInt(monthStr, 10);
-    if (monthNum >= 1 && monthNum <= 12) {
-      rowMap.set(monthNum, row);
-    }
-  }
-
-  // Determine how many months to show
+  const yearStr = String(year).padStart(4, "0");
   const now = new Date();
-  const maxMonth = (year === now.getFullYear()) ? (now.getMonth() + 1) : 12;
+  const maxMonth =
+    limitToToday && year === now.getFullYear() ? now.getMonth() + 1 : 12;
 
-  // Fill all months from 1 to maxMonth, using 0 for missing months
+  const keys = [];
+  for (let m = 1; m <= maxMonth; m++) {
+    keys.push(`${yearStr}-${String(m).padStart(2, "0")}`);
+  }
+
+  const dbRows = await db(summaryTableName)
+    .whereIn(summaryCols.MONTH_KEY, keys)
+    .select(
+      summaryCols.MONTH_KEY,
+      summaryCols.TOTAL_ORDERS,
+      summaryCols.CANCELED_ORDERS,
+      summaryCols.TOTAL_REVENUE,
+      summaryCols.TOTAL_PROFIT,
+      summaryCols.TOTAL_REFUND,
+      summaryCols.TOTAL_IMPORT,
+      summaryCols.TOTAL_TAX,
+      summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT,
+      summaryCols.ESTIMATED_BANK_BALANCE
+    );
+
+  const rowByMk = new Map(
+    (dbRows || []).map((r) => [String(r[summaryCols.MONTH_KEY] || "").trim(), r])
+  );
   const months = [];
   for (let m = 1; m <= maxMonth; m++) {
-    const row = rowMap.get(m);
-    const revenue = row ? Number(row.total_revenue || 0) : 0;
+    const mk = `${yearStr}-${String(m).padStart(2, "0")}`;
+    const r = rowByMk.get(mk);
+    const revenue = r ? toNumber(r[summaryCols.TOTAL_REVENUE]) : 0;
+    const refund = r ? toNumber(r[summaryCols.TOTAL_REFUND]) : 0;
+    const profitGross = r ? toNumber(r[summaryCols.TOTAL_PROFIT]) : 0;
+    const taxStored = r ? toNumber(r[summaryCols.TOTAL_TAX]) : null;
     months.push({
       month: `T${m}`,
       month_num: m,
-      month_key: `${yearStr}-${String(m).padStart(2, '0')}`,
-      total_orders: row ? Number(row.total_orders || 0) : 0,
-      total_canceled: row ? Number(row.canceled_orders || 0) : 0,
+      month_key: mk,
+      total_orders: r ? toNumber(r[summaryCols.TOTAL_ORDERS]) : 0,
+      total_canceled: r ? toNumber(r[summaryCols.CANCELED_ORDERS]) : 0,
       total_revenue: revenue,
-      total_profit: row ? Number(row.total_profit || 0) : 0,
-      total_refund: row ? Number(row.total_refund || 0) : 0,
-      total_tax: taxFromRevenueValue(revenue),
+      total_profit: profitGross,
+      total_refund: refund,
+      total_import: r ? toNumber(r[summaryCols.TOTAL_IMPORT]) : 0,
+      total_off_flow_bank_receipt: r
+        ? toNumber(r[summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT])
+        : 0,
+      estimated_bank_balance: r
+        ? toNumber(r[summaryCols.ESTIMATED_BANK_BALANCE])
+        : 0,
+      total_tax:
+        taxStored != null && Number.isFinite(taxStored)
+          ? taxStored
+          : taxFromRevenueValue(revenue),
     });
   }
 
-  return { year, months };
+  return { year, months, granularity: "month" };
 };
 
 module.exports = {
   fetchDashboardStats,
   fetchDashboardStatsForDateRange,
   fetchDashboardYears,
-  fetchDashboardCharts,
   fetchDashboardMonthlySummary,
   fetchDashboardChartsFromSummary,
   fetchDashboardChartsForDateRange,

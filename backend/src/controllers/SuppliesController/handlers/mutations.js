@@ -27,7 +27,9 @@ const createSupply = async (req, res) => {
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
-  const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+  const includeAccountHolder =
+    Boolean(QUOTED_COLS.supplier.accountHolder) &&
+    await supplierHasAccountHolderColumn(db, supplierTable);
   if (
     !includeAccountHolder &&
     account_holder != null &&
@@ -117,7 +119,9 @@ const updateSupply = async (req, res) => {
   const supplierNameCol = await resolveSupplierNameColumn();
   const supplierNameIdent = `"${supplierNameCol}"`;
   const statusColumn = await resolveSupplyStatusColumn();
-  const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+  const includeAccountHolder =
+    Boolean(QUOTED_COLS.supplier.accountHolder) &&
+    await supplierHasAccountHolderColumn(db, supplierTable);
   if (account_holder !== undefined && !includeAccountHolder) {
     return res.status(400).json({ error: ACCOUNT_HOLDER_MIGRATION_HINT });
   }
@@ -283,4 +287,3 @@ module.exports = {
   toggleSupplyActive,
   deleteSupply,
 };
-

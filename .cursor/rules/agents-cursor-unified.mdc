@@ -1,0 +1,33 @@
+---
+description: Hợp nhất nguồn hướng dẫn giữa .agents và .cursor, dùng .agents làm nguồn sự thật và .cursor làm điểm vào duy nhất.
+alwaysApply: true
+---
+
+# Unified Guidance Bridge (.agents + .cursor)
+
+## Mục tiêu
+
+Dùng một đầu mối vận hành trong `.cursor`, nhưng vẫn giữ toàn bộ tri thức chi tiết trong `.agents`.
+
+## Quy tắc áp dụng
+
+1. `.agents` là **nguồn sự thật** cho domain knowledge, workflow và skill chuyên môn.
+2. `.cursor` là **điểm vào thống nhất** để điều phối và auto-apply.
+3. Khi có xung đột nội dung:
+   - Ưu tiên quy tắc hệ thống.
+   - Sau đó ưu tiên workspace rules trong `.cursor/rules/`.
+   - Sau đó ưu tiên skill/domain docs trong `.agents/`.
+4. Không xóa cấu trúc `.agents` hiện có trừ khi có yêu cầu riêng; chỉ bridge để dùng chung.
+
+## Nguồn cần ưu tiên đọc theo ngữ cảnh
+
+- Nền tảng project: `.agents/SKILL.md`
+- Software engineering hiến pháp: `.agents/software-engineering/AGENTS.md`
+- Database schema source-of-truth: `.agents/software-engineering/skills/db-schema-source-of-truth/SKILL.md`
+- ACID review cho luồng nhiều bảng/webhook: `.agents/software-engineering/skills/acid-database-transaction-review/SKILL.md`
+- Task tracking: `.agents/software-engineering/skills/task-tracking/SKILL.md`
+- Vietnamese diacritics: `.agents/software-engineering/skills/vietnamese-diacritics/SKILL.md`
+
+## Ghi chú
+
+File này là lớp hợp nhất để tránh phải quản lý hai đầu mối rời rạc khi làm việc.

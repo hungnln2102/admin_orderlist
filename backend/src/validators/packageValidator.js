@@ -28,4 +28,26 @@ const bulkDeleteRules = [
   validate,
 ];
 
-module.exports = { packageIdParam, createPackageRules, bulkDeleteRules };
+const patchProductPackageOptionsRules = [
+  param("productId").custom((value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1) throw new Error("productId không hợp lệ.");
+    return true;
+  }),
+  body("requiresActivation")
+    .exists()
+    .withMessage("requiresActivation là bắt buộc.")
+    .custom((v) => {
+      if (v !== true && v !== false)
+        throw new Error("requiresActivation phải là true hoặc false.");
+      return true;
+    }),
+  validate,
+];
+
+module.exports = {
+  packageIdParam,
+  createPackageRules,
+  bulkDeleteRules,
+  patchProductPackageOptionsRules,
+};

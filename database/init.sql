@@ -1,9 +1,6 @@
--- init.sql — Bootstrap schema cho Docker container mới.
--- PostgreSQL tự chạy file này khi volume postgres_data chưa tồn tại.
--- Nếu DB đã có data (volume còn), file này bị bỏ qua.
+-- init.sql - Bootstrap schema for a brand-new Docker PostgreSQL volume.
+-- PostgreSQL runs this file only when postgres_data is empty.
+-- Current bootstrap uses one consolidated schema snapshot instead of replaying
+-- legacy hotfix migrations one by one.
 
--- 1. Full schema (tất cả tables, indexes, constraints)
-\i /docker-entrypoint-initdb.d/migrations/000_full_schema.sql
-
--- 2. Seed data mặc định
-\i /docker-entrypoint-initdb.d/seeds/seed_hero_banners_website_defaults.sql
+\i /docker-entrypoint-initdb.d/migrations/000_consolidated_schema.sql

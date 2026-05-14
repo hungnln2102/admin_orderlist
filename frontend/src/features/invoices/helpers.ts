@@ -16,6 +16,13 @@ export interface PaymentReceipt {
   sender: string;
   receiver: string;
   note: string;
+  /** Theo `payment_receipt_financial_state` — API payment-receipts */
+  isFinancialPosted?: boolean;
+  postedRevenue?: number;
+  postedProfit?: number;
+  postedOffFlowBankReceipt?: number;
+  reconciledAt?: string | null;
+  adjustmentApplied?: boolean;
 }
 
 export interface MatchableOrder {
@@ -26,7 +33,7 @@ export interface MatchableOrder {
   informationOrder: string;
 }
 
-export type ReceiptCategory = "receipt" | "refund";
+export type ReceiptCategory = "receipt" | "out-of-flow";
 
 export const formatCurrencyVnd = (value: number): string => {
   if (!Number.isFinite(value)) return "VND 0";
@@ -57,12 +64,44 @@ export const extractTransactionCodeFromNote = (
   return match?.[1] || "";
 };
 
+export type ReceiptCategoryInput = Pick<
+  PaymentReceipt,
+  "orderCode" | "postedRevenue" | "postedProfit" | "postedOffFlowBankReceipt"
+>;
+
+/**
+ * Phân tab Biên nhận vs Ngoài luồng:
+ * - Webhook «tiền thừa» (Đã TT + chỉ cộng `posted_off_flow_bank_receipt`, không DT/LN): luôn Ngoài luồng.
+ * - Chỉ khi ghép mã + reconcile đưa vào đơn khả dụng → financial_state đổi → hiển thị lại tab Biên nhận.
+ */
 export const determineReceiptCategory = (
-  orderCode: string | null | undefined
+  receiptOrCode:
+    | string
+    | null
+    | undefined
+    | ReceiptCategoryInput
 ): ReceiptCategory => {
-  const normalized = (orderCode || "").toUpperCase().trim();
-  if (!normalized) return "refund";
-  return normalized.startsWith("MAV") ? "receipt" : "refund";
+  const receipt: ReceiptCategoryInput =
+    typeof receiptOrCode === "string" || receiptOrCode == null
+      ? {
+          orderCode: receiptOrCode ?? "",
+          postedRevenue: 0,
+          postedProfit: 0,
+          postedOffFlowBankReceipt: 0,
+        }
+      : receiptOrCode;
+
+  const off = Number(receipt.postedOffFlowBankReceipt) || 0;
+  const rev = Number(receipt.postedRevenue) || 0;
+  const prof = Number(receipt.postedProfit) || 0;
+
+  if (off > 0 && rev === 0 && prof === 0) {
+    return "out-of-flow";
+  }
+
+  const normalized = (receipt.orderCode || "").toUpperCase().trim();
+  if (!normalized) return "out-of-flow";
+  return normalized.startsWith("MAV") ? "receipt" : "out-of-flow";
 };
 
 export const CATEGORY_OPTIONS: {
@@ -73,12 +112,12 @@ export const CATEGORY_OPTIONS: {
   {
     value: "receipt",
     label: "Biên Nhận",
-    description: "Mã đơn bắt đầu bằng MAV",
+    description: "MAV đúng luồng thanh toán đơn (không chỉ tiền thừa NH)",
   },
   {
-    value: "refund",
-    label: "Hoàn tiền",
-    description: "Các biên nhận khác",
+    value: "out-of-flow",
+    label: "Ngoài Luồng",
+    description: "Tiền thừa sau Đã TT, không mã đơn, hoặc không MAV",
   },
 ];
 
@@ -126,6 +165,13 @@ export const normalizeReceiptRow = (
     sender: toSafeString(row?.sender ?? row?.[PAYMENT_RECEIPT_COLS.sender]),
     receiver: toSafeString(row?.receiver ?? row?.[PAYMENT_RECEIPT_COLS.receiver]),
     note: toSafeString(row?.note ?? row?.[PAYMENT_RECEIPT_COLS.note]),
+    isFinancialPosted: Boolean(row?.isFinancialPosted),
+    postedRevenue: Number(row?.postedRevenue) || 0,
+    postedProfit: Number(row?.postedProfit) || 0,
+    postedOffFlowBankReceipt: Number(row?.postedOffFlowBankReceipt) || 0,
+    reconciledAt:
+      row?.reconciledAt != null ? String(row.reconciledAt) : null,
+    adjustmentApplied: Boolean(row?.adjustmentApplied),
   };
 };
 
@@ -156,9 +202,9 @@ export const buildExportWorksheet = (
     receipt.note || "",
     extractTransactionCodeFromNote(receipt.note),
     receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "",
-    determineReceiptCategory(receipt.orderCode) === "receipt"
+    determineReceiptCategory(receipt) === "receipt"
       ? "Biên nhận"
-      : "Hoàn tiền",
+      : "Ngoài luồng",
   ]);
 
   const worksheet = xlsxUtils.aoa_to_sheet([headerRow, ...dataRows]);

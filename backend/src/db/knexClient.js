@@ -1,10 +1,5 @@
-const path = require("path");
 const knex = require("knex");
-const dotenv = require("dotenv");
-
-// Always load env from backend root (so running from /src still works)
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
-dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
+const { loadPostgresEnvForCli } = require("../config/loadPostgresEnvForCli");
 
 const {
   SCHEMA_ADMIN,
@@ -23,23 +18,19 @@ const {
   SCHEMA_RENEW_ADOBE,
 } = require("../config/dbSchema");
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.PG_URL ||
-  "";
+const DATABASE_URL = loadPostgresEnvForCli().trim();
 
 if (!DATABASE_URL) {
   // Use require here to avoid circular dependency
   try {
     const logger = require("../utils/logger");
     logger.warn(
-      "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
+      "[db] Thiếu chuỗi kết nối Postgres (DATABASE_URL / POSTGRES_URL / PG_URL hoặc DB_USER+DB_NAME). Knex sẽ được khởi tạo không có connection string."
     );
   } catch {
     // Fallback if logger not available
     console.warn(
-      "[db] Thiếu trường DATABASE_URL. Knex sẽ được khởi tạo mà không có chuỗi kết nối."
+      "[db] Thiếu chuỗi kết nối Postgres (DATABASE_URL / POSTGRES_URL / PG_URL hoặc DB_USER+DB_NAME). Knex sẽ được khởi tạo không có connection string."
     );
   }
 }

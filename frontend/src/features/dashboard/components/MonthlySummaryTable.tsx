@@ -69,20 +69,22 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({
               <th className="px-3 py-2 text-right">Doanh thu</th>
               <th className="px-3 py-2 text-right">Lợi nhuận</th>
               <th className="px-3 py-2 text-right">Hoàn tiền</th>
+              <th className="px-3 py-2 text-right">Nhập hàng</th>
+              <th className="px-3 py-2 text-right">Thuế (ước tính)</th>
               <th className="px-3 py-2 text-left">Cập nhật</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10">
             {loading && (
               <tr>
-                <td className="px-3 py-3 text-center text-white/70" colSpan={7}>
+                <td className="px-3 py-3 text-center text-white/70" colSpan={9}>
                   Đang tải dữ liệu...
                 </td>
               </tr>
             )}
             {!loading && data.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-center text-white/70" colSpan={7}>
+                <td className="px-3 py-3 text-center text-white/70" colSpan={9}>
                   Chưa có dữ liệu.
                 </td>
               </tr>
@@ -105,6 +107,16 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({
                   </td>
                   <td className="px-3 py-2 text-right text-orange-300">
                     {formatCurrency(row.total_refund)}
+                  </td>
+                  <td className="px-3 py-2 text-right text-cyan-300/90">
+                    {formatCurrency(
+                      row.total_import != null ? row.total_import : 0
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-300/90">
+                    {formatCurrency(
+                      row.total_tax != null ? row.total_tax : 0
+                    )}
                   </td>
                   <td className="px-3 py-2 text-left text-white/70 text-xs">
                     {formatDate(row.updated_at)}

@@ -1,11 +1,21 @@
 const { db } = require("../../db");
 const logger = require("../../utils/logger");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
+const {
+  SCHEMA_RENEW_ADOBE,
+  RENEW_ADOBE_SCHEMA,
+  tableName,
+} = require("../../config/dbSchema");
 const { TABLE, COLS, MAX_USERS_PER_ACCOUNT } = require("./accountTable");
+const MAP_TABLE = tableName(
+  RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
+  SCHEMA_RENEW_ADOBE
+);
+const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 const {
   buildAvailableAccounts,
   assignUserToAvailableAccount,
-  fixUsersOneRoundTightest,
+  fixUsersAllRoundsTightest,
 } = require("./assignmentService");
 const {
   TBL_ORDER,
@@ -15,17 +25,21 @@ const {
 } = require("./orderAccess");
 const {
   purgeAndDeleteNoLicenseAdobeAdminAccount,
-} = require("../../services/renewAdobePurgeNoLicenseAccount");
+} = require("../../services/renew-adobe/renewAdobePurgeNoLicenseAccount");
 const { notifyWarn } = require("../../utils/telegramErrorNotifier");
 const { shouldPurgeAdobeAccountByLicenseStatus } = require("./statusUtils");
 const {
   getProfileUsageSnapshot,
-} = require("../../services/adobe-renew-v2/shared/profileUsageMetrics");
+} = require("../../services/renew-adobe/adobe-renew-v2/shared/profileUsageMetrics");
 const {
-  attachLisenceCount,
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  userCountDbValue,
 } = require("./usersSnapshotUtils");
+const {
+  upsertRenewAdobeOrderUserTrackingForAccount,
+  getOrderUserTrackingCountByOrgName,
+} = require("../../services/renew-adobe/orderUserTrackingService");
 
 function logAutoAssign(onProgress, data) {
   if (onProgress) {
@@ -72,26 +86,23 @@ async function autoAssignUsers({ onProgress = null } = {}) {
       COLS.ORG_NAME,
       COLS.LICENSE_STATUS,
       COLS.USER_COUNT,
-      COLS.USERS_SNAPSHOT,
       COLS.ALERT_CONFIG,
       ...(COLS.OTP_SOURCE ? [COLS.OTP_SOURCE] : []),
-      COLS.MAIL_BACKUP_ID
+      COLS.MAIL_BACKUP_ID,
+      ...(COLS.ID_PRODUCT ? [COLS.ID_PRODUCT] : [])
     )
     .where(COLS.IS_ACTIVE, true)
     .orderBy(COLS.ID, "asc");
 
   const existingEmails = new Set();
-  for (const account of accounts) {
-    try {
-      const snapshot = JSON.parse(account[COLS.USERS_SNAPSHOT] || "[]");
-      for (const user of snapshot) {
-        if (user.email) {
-          existingEmails.add(user.email.toLowerCase().trim());
-        }
-      }
-    } catch (parseErr) {
-      logger.warn("[AutoAssign] Parse users_snapshot thất bại", { accountId: account[COLS.ID], error: parseErr.message });
-    }
+  const mappedRows = await db(MAP_TABLE)
+    .whereNotNull(MAP_COLS.ADOBE_ACCOUNT_ID)
+    .select(MAP_COLS.USER_EMAIL);
+  for (const r of mappedRows) {
+    const em = String(r[MAP_COLS.USER_EMAIL] || "")
+      .trim()
+      .toLowerCase();
+    if (em) existingEmails.add(em);
   }
 
   const emailsToAdd = [...activeEmails].filter((email) => !existingEmails.has(email));
@@ -101,7 +112,7 @@ async function autoAssignUsers({ onProgress = null } = {}) {
     return { assigned: 0, skipped: 0, errors: [] };
   }
 
-  const available = buildAvailableAccounts(accounts);
+  const available = await buildAvailableAccounts(accounts);
   logAutoAssign(onProgress, {
     step: "available_accounts",
     count: available.length,
@@ -183,26 +194,33 @@ async function autoAssignUsers({ onProgress = null } = {}) {
       }
 
       const lisencecount = resolveLisenceCount({
-        usersSnapshot: account[COLS.USERS_SNAPSHOT],
+        usersSnapshot: null,
         alertConfig: account[COLS.ALERT_CONFIG],
       });
       const updatePayload = {
-        [COLS.USER_COUNT]: v2.userCount ?? (v2.manageTeamMembers?.length ?? 0),
-        [COLS.USERS_SNAPSHOT]: JSON.stringify(
-          attachLisenceCount(v2.manageTeamMembers || [], lisencecount)
+        [COLS.USER_COUNT]: userCountDbValue(
+          lisencecount,
+          v2.userCount ?? (v2.manageTeamMembers?.length ?? 0)
         ),
       };
       if (v2.savedCookies) {
         updatePayload[COLS.ALERT_CONFIG] = mergeRenewAdobeAlertConfig(
           account[COLS.ALERT_CONFIG],
           v2.savedCookies,
-          account[COLS.USERS_SNAPSHOT]
+          null
         );
       }
       await db(TABLE).where(COLS.ID, accountId).update(updatePayload);
 
       const addedCount = v2.addResult?.added?.length ?? emails.length;
       totalAssigned += addedCount;
+
+      await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((error) => {
+        logger.warn("[renew-adobe] autoAssign order_user_tracking failed", {
+          accountId,
+          error: error.message,
+        });
+      });
 
       logAutoAssign(onProgress, {
         step: "done",
@@ -231,6 +249,16 @@ async function autoAssignUsers({ onProgress = null } = {}) {
   return { assigned: totalAssigned, skipped, errors };
 }
 
+/** Lỗi nghiệp vụ (hết slot, không còn account) — trả 409, không 500. */
+function fixUserExpectableErrorMessage(msg) {
+  const s = String(msg || "");
+  return (
+    s.includes("đầy slot") ||
+    s.includes("hết slot") ||
+    s.includes("Không có tài khoản nào còn gói và còn slot")
+  );
+}
+
 const runAutoAssign = async (_req, res) => {
   try {
     const result = await autoAssignUsers();
@@ -250,6 +278,17 @@ const fixSingleUser = async (req, res) => {
   try {
     const assigned = await assignUserToAvailableAccount(userEmail);
 
+    if (assigned.alreadyOnAdobe) {
+      return res.json({
+        success: true,
+        already_on_adobe: true,
+        message: `User đã có trên admin ${assigned.accountEmail} (đã làm mới tracking).`,
+        accountId: assigned.accountId,
+        accountEmail: assigned.accountEmail,
+        profile: assigned.profileName ?? "—",
+      });
+    }
+
     return res.json({
       success: true,
       message: `Đã gán ${userEmail} vào ${assigned.accountEmail}.`,
@@ -258,15 +297,23 @@ const fixSingleUser = async (req, res) => {
       profile: assigned.profileName ?? "—",
     });
   } catch (err) {
-    logger.error("[renew-adobe] fixSingleUser failed", {
+    const msg = err?.message || String(err);
+    const expectable = fixUserExpectableErrorMessage(msg);
+    (expectable ? logger.warn : logger.error)("[renew-adobe] fixSingleUser failed", {
       email: userEmail,
-      error: err.message,
+      error: msg,
     });
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(expectable ? 409 : 500).json({
+      success: false,
+      error: msg,
+    });
   }
 };
 
-/** Một vòng Fix All: batch user theo slot tài khoản gần đầy nhất (gọi lặp từ frontend cho tới hết danh sách). */
+/**
+ * Fix All: một lần POST — nội bộ nhiều vòng (tài khoản còn slot + batch theo slot),
+ * kèm tối ưu add user (Playwright) batch PATCH + tạo user song song ở tầng addUsersFlow.
+ */
 const fixUsersRound = async (req, res) => {
   const emailsRaw = req.body?.emails;
   if (!Array.isArray(emailsRaw)) {
@@ -278,7 +325,7 @@ const fixUsersRound = async (req, res) => {
   }
 
   try {
-    const result = await fixUsersOneRoundTightest(emailsRaw);
+    const result = await fixUsersAllRoundsTightest(emailsRaw);
     return res.json(result);
   } catch (err) {
     logger.error("[renew-adobe] fixUsersRound failed", { error: err.message });
@@ -286,8 +333,9 @@ const fixUsersRound = async (req, res) => {
       success: false,
       error: err.message,
       added_count: 0,
+      total_added: 0,
       remaining_emails: emailsRaw,
-      round: null,
+      rounds: [],
     });
   }
 };
@@ -355,23 +403,47 @@ async function runCheckAllAccountsFlow({
       let removedFromDb = false;
       const statusAfterCheck = updated?.[COLS.LICENSE_STATUS] ?? null;
       if (updated && shouldPurgeAdobeAccountByLicenseStatus(statusAfterCheck, updated)) {
-        nonPaidForTelegram.push({
-          id,
-          email,
-          org_name: updated[COLS.ORG_NAME] ?? null,
-          license_status: statusAfterCheck,
-          removed_from_db: false,
+        const orgNameForTrack = updated[COLS.ORG_NAME] ?? null;
+        const adminNorm = (updated[COLS.EMAIL] || "").toLowerCase().trim();
+        const trackingCount = await getOrderUserTrackingCountByOrgName(orgNameForTrack);
+        const mappedEmails = await db(MAP_TABLE)
+          .where(MAP_COLS.ADOBE_ACCOUNT_ID, id)
+          .pluck(MAP_COLS.USER_EMAIL);
+        const hasNonAdminUserInMapping = (mappedEmails || []).some((ue) => {
+          const l = String(ue || "").toLowerCase().trim();
+          return l && l !== adminNorm;
         });
-        const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
-          updated,
-          { logPrefix }
-        );
-        if (deletedFromDb) {
-          removedFromDb = true;
-          updated = null;
-          const last = nonPaidForTelegram[nonPaidForTelegram.length - 1];
-          if (last && last.id === id) {
-            last.removed_from_db = true;
+        /**
+         * order_user_tracking chỉ có email KH (account), không có dòng cho email đăng nhập admin.
+         * - Org chỉ admin (không có end-user trong mapping) + chưa có dòng tracking theo org → không purge (tránh xóa nhầm admin).
+         * - Có end-user trong mapping mà không có bản ghi tracking theo org → vẫn purge (case lệch sync / không phải “chỉ admin”).
+         */
+        if (trackingCount === 0 && !hasNonAdminUserInMapping) {
+          logger.info(
+            "%s Bỏ qua xóa tài khoản admin id=%s (%s): không có order_user_tracking cho org và mapping chỉ admin (hoặc rỗng) — giữ tài khoản admin.",
+            logPrefix,
+            id,
+            email
+          );
+        } else {
+          nonPaidForTelegram.push({
+            id,
+            email,
+            org_name: orgNameForTrack,
+            license_status: statusAfterCheck,
+            removed_from_db: false,
+          });
+          const { deletedFromDb } = await purgeAndDeleteNoLicenseAdobeAdminAccount(
+            updated,
+            { logPrefix }
+          );
+          if (deletedFromDb) {
+            removedFromDb = true;
+            updated = null;
+            const last = nonPaidForTelegram[nonPaidForTelegram.length - 1];
+            if (last && last.id === id) {
+              last.removed_from_db = true;
+            }
           }
         }
       }

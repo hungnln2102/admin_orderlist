@@ -22,6 +22,10 @@ const {
     applyRefundCreditToTargetOrder,
     normalizeMoney,
 } = require("../finance/refundCredits");
+const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
+
+/** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
+const CREDIT_BALANCE_TOLERANCE_VND = 5000;
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -36,8 +40,13 @@ const attachCreateOrderRoute = (router) => {
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
         const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
         const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
+        const grossSellingPriceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE;
         const requestedCreditNoteId = Number(req.body?.refund_credit_note_id);
         const requestedCreditApplyAmount = normalizeMoney(req.body?.refund_credit_apply_amount);
+        const requestedCreditSourceOrderCode = String(
+            req.body?.refund_credit_source_order_code || ""
+        ).trim();
+        const requestedCreditCode = String(req.body?.refund_credit_code || "").trim();
         const reservedOrderCodeRaw = String(req.body?.reserved_order_code || "").trim().toUpperCase();
         const requestedPrefixFromReserved = VALID_PREFIXES.find((prefix) =>
             reservedOrderCodeRaw.startsWith(prefix)
@@ -91,22 +100,38 @@ const attachCreateOrderRoute = (router) => {
         }
 
         const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
+        const requestedPrefixFromClient = VALID_PREFIXES.find((prefix) =>
+            provisionalIdOrder.startsWith(prefix)
+        ) || null;
+        const effectivePrefix = requestedPrefixFromReserved || requestedPrefixFromClient || "MAVC";
         const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
         const importPrefix = String(ORDER_PREFIXES.import || "MAVN").toUpperCase();
-        const isGiftOrderCreate = Boolean(giftPrefix && provisionalIdOrder.startsWith(giftPrefix));
-        const isMavnCreate = Boolean(importPrefix && provisionalIdOrder.startsWith(importPrefix));
+        const isGiftOrderCreate = effectivePrefix === giftPrefix;
+        const isMavnCreate = effectivePrefix === importPrefix;
 
+        // Nhập hàng MAVN:
+        // - NCC Mavryk/Shop: cost luôn = 0.
+        // - NCC khác: cost = giá bán.
+        // Tài chính MAVN được
+        // tách theo NCC trong syncMavnStoreProfitExpense:
+        // - NCC Mavryk/Shop: log external_import + trừ profit/bank.
+        // - NCC khác: log NCC (trigger DB) + trừ profit, không trừ bank.
+        // Đơn bán (MAVL/MAVC/MAVT/MAVK/MAVS) với NCC Mavryk/Shop nội bộ → cost = 0.
+        let isInternalSupplier = false;
         if (payload[supplyIdCol] != null) {
             const supRow = await db(TABLES.supplier)
                 .select(COLS.SUPPLIER.SUPPLIER_NAME)
                 .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
                 .first();
-            if (
-                isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]) &&
-                !isMavnCreate
-            ) {
+            isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
+            if (!isMavnCreate && isInternalSupplier) {
                 payload[costCol] = 0;
             }
+        }
+        if (isMavnCreate) {
+            payload[costCol] = isInternalSupplier
+                ? 0
+                : normalizeMoney(payload[priceCol]);
         }
 
         if (isGiftOrderCreate) {
@@ -127,45 +152,78 @@ const attachCreateOrderRoute = (router) => {
             if (Number.isFinite(requestedCreditNoteId) && requestedCreditNoteId > 0) {
                 creditNoteForOrder = await lockRefundCreditNoteById(trx, requestedCreditNoteId);
                 if (creditNoteForOrder) {
+                    const noteAvailable = normalizeMoney(creditNoteForOrder.available_amount);
+                    let effectiveApplyRequest = requestedCreditApplyAmount;
+                    if (
+                        !Number.isFinite(effectiveApplyRequest) ||
+                        effectiveApplyRequest <= 0
+                    ) {
+                        /** Không gửi số áp dụng → mặc định áp tối đa đủ trừ giá đơn (min(dư phiếu, giá)), và PAID khi dư ≥ giá. */
+                        effectiveApplyRequest = Math.min(noteAvailable, rawPriceBeforeCredit);
+                    }
                     appliedCreditAmount = Math.min(
-                        requestedCreditApplyAmount,
+                        effectiveApplyRequest,
                         rawPriceBeforeCredit,
-                        normalizeMoney(creditNoteForOrder.available_amount)
+                        noteAvailable
                     );
                 }
             }
 
-            payload[priceCol] = Math.max(0, rawPriceBeforeCredit - appliedCreditAmount);
+            const remainingToPay = Math.max(0, rawPriceBeforeCredit - appliedCreditAmount);
+            payload[priceCol] = remainingToPay;
+            if (appliedCreditAmount > 0) {
+                payload[grossSellingPriceCol] = rawPriceBeforeCredit;
+            }
 
-            const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
-            const detectedPrefix = requestedPrefixFromReserved
-                || VALID_PREFIXES.find((prefix) => clientIdOrder.startsWith(prefix))
-                || "MAVC";
+            if (!isGiftOrderCreate && !isMavnCreate) {
+                if (appliedCreditAmount > 0 && remainingToPay <= CREDIT_BALANCE_TOLERANCE_VND) {
+                    payload.status = STATUS.PAID;
+                    payload[priceCol] = 0;
+                } else {
+                    payload.status = STATUS.UNPAID;
+                }
+            }
 
             if (reservedOrderCodeRaw && requestedPrefixFromReserved) {
                 const existingReserved = await trx(TABLES.orderList)
                     .where(idOrderCol, reservedOrderCodeRaw)
                     .first();
                 payload[idOrderCol] = existingReserved
-                    ? await generateUniqueOrderCode(detectedPrefix, trx)
+                    ? await generateUniqueOrderCode(effectivePrefix, trx)
                     : reservedOrderCodeRaw;
             } else {
-                payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, trx);
+                payload[idOrderCol] = await generateUniqueOrderCode(effectivePrefix, trx);
             }
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 
+            let applyRefundResult = null;
             let refundCreditApplication = null;
             if (creditNoteForOrder && appliedCreditAmount > 0) {
-                const result = await applyRefundCreditToTargetOrder(trx, {
+                const sourceOrderCodeForNote =
+                    requestedCreditSourceOrderCode ||
+                    String(creditNoteForOrder.source_order_code || "").trim();
+                const creditCodeForNote =
+                    requestedCreditCode ||
+                    String(creditNoteForOrder.credit_code || "").trim();
+                const creditApplicationNote = sourceOrderCodeForNote
+                    ? `Áp credit tự động khi tạo đơn từ đơn hoàn ${sourceOrderCodeForNote}`
+                    : (creditCodeForNote
+                        ? `Áp credit tự động khi tạo đơn từ phiếu ${creditCodeForNote}`
+                        : "Áp credit tự động khi tạo đơn");
+                applyRefundResult = await applyRefundCreditToTargetOrder(trx, {
                     creditNoteId: Number(creditNoteForOrder.id),
                     targetOrderListId: Number(newOrder.id),
                     targetOrderCode: String(newOrder[idOrderCol] || ""),
                     requestedAmount: appliedCreditAmount,
-                    note: `Áp credit tự động khi tạo đơn từ đơn hoàn ${creditNoteForOrder.source_order_code || ""}`.trim(),
+                    note: creditApplicationNote,
                     appliedBy: "system-create-order",
                 });
-                refundCreditApplication = result.application;
+                refundCreditApplication = applyRefundResult.application;
+            }
+
+            if (isMavnCreate && newOrder.status === STATUS.PAID) {
+                await syncMavnStoreProfitExpense(trx, null, newOrder);
             }
 
             await trx.commit();
@@ -183,7 +241,9 @@ const attachCreateOrderRoute = (router) => {
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {
                 const sCols = PARTNER_SCHEMA.SUPPLIER.COLS;
-                const includeAccountHolder = await supplierHasAccountHolderColumn(db, TABLES.supplier);
+                const includeAccountHolder =
+                    Boolean(sCols.ACCOUNT_HOLDER) &&
+                    await supplierHasAccountHolderColumn(db, TABLES.supplier);
                 const selectCols = [
                     sCols.SUPPLIER_NAME,
                     sCols.NUMBER_BANK,
@@ -223,8 +283,26 @@ const attachCreateOrderRoute = (router) => {
 
             if (refundCreditApplication) {
                 normalized.refund_credit_applied_amount = Number(refundCreditApplication.applied_amount || 0);
-                normalized.refund_credit_note_id = Number(refundCreditApplication.credit_note_id || 0);
+                const consumedNoteId = Number(refundCreditApplication.credit_note_id || 0);
+                normalized.refund_credit_applied_from_note_id = consumedNoteId;
+                if (applyRefundResult?.replacementCreditNote) {
+                    const rep = applyRefundResult.replacementCreditNote;
+                    normalized.refund_credit_replacement_note_id = Number(rep.id);
+                    normalized.refund_credit_note_id = Number(rep.id);
+                    normalized.refund_credit_code = String(rep.credit_code || "");
+                } else {
+                    normalized.refund_credit_note_id = consumedNoteId;
+                    const cn = applyRefundResult?.creditNote;
+                    if (cn?.credit_code) {
+                        normalized.refund_credit_code = String(cn.credit_code);
+                    }
+                }
                 normalized.price_before_credit = rawPriceBeforeCredit;
+                if (newOrder && newOrder[grossSellingPriceCol] != null) {
+                    normalized.gross_selling_price = Number(newOrder[grossSellingPriceCol]);
+                } else {
+                    normalized.gross_selling_price = rawPriceBeforeCredit;
+                }
             }
 
             res.status(201).json(normalized);

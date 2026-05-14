@@ -1,0 +1,18 @@
+---
+description: Tính năng backend mới chỉ đặt trong domains/; không thêm controller + routes legacy tách rời
+alwaysApply: true
+---
+
+# Backend — một hướng `domains/`
+
+## Quy tắc
+
+- **Mọi tính năng backend mới** (API nghiệp vụ, slice migrate) phải nằm trong `backend/src/domains/<tên-domain>/`, theo skeleton trong `backend/src/domains/README.md`.
+- **Không** tạo cặp mới `controllers/<XxxController>/` + `routes/xxxRoutes.js` rời cho nghiệp vụ thuộc một bounded context rõ ràng.
+- Trong giai đoạn chuyển tiếp, code legacy vẫn có thể tồn tại; khi sửa/slice, **ưu tiên** gom về domain và **đăng ký** `require('../domains/<x>/routes')` trong `routes/index.js` (xem `docs/STRUCTURE-SINGLE-DIRECTION.md` và `task.md`).
+- `routes/index.js` chỉ là **điểm mount** (và timeout/proxy toàn cục); logic HTTP đi qua `domains/<x>/routes.js` → controller mỏng → use-cases / repositories.
+
+## Tham chiếu code
+
+- `backend/src/domains/ip-whitelist/`
+- `backend/src/domains/site-maintenance/`

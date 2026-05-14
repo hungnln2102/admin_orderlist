@@ -1,9 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { API_ENDPOINTS, ORDER_FIELDS } from "../../../../constants";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import {
+  API_ENDPOINTS,
+  DEFAULT_ORDER_CODE_PREFIX,
+  ORDER_CODE_PREFIXES,
+  ORDER_FIELDS,
+  ORDER_STATUSES,
+} from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { apiFetch } from "@/lib/api";
+import { resolveOrderType } from "@/features/bill-order/helpers";
+import { usePriceCalculation } from "../../CreateOrderModal/hooks/usePriceCalculation";
+import type { CustomerType, Order as PricingOrder } from "../../CreateOrderModal/types";
 import { Order, Supply, SupplyPrice } from "../types";
 import { getSupplyName } from "../utils";
+
+const getCustomerTypeFromIdOrder = (idOrder: string): CustomerType => {
+  const upper = String(idOrder || "").trim().toUpperCase();
+  if (upper.startsWith(ORDER_CODE_PREFIXES.IMPORT)) {
+    return ORDER_CODE_PREFIXES.IMPORT;
+  }
+  return resolveOrderType(idOrder) ?? DEFAULT_ORDER_CODE_PREFIX;
+};
 
 export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [formData, setFormData] = useState<Order | null>(null);
@@ -12,6 +37,46 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
   const [supplyPrices, setSupplyPrices] = useState<SupplyPrice[]>([]);
   const baseOrderRef = useRef<Order | null>(order);
   const [isCustomSupply, setIsCustomSupply] = useState(false);
+
+  const setFormDataForPricing = useCallback<
+    Dispatch<SetStateAction<Partial<PricingOrder>>>
+  >((updater) => {
+    setFormData((prev) => {
+      if (!prev) return prev;
+      const patch =
+        typeof updater === "function"
+          ? (updater as (p: Partial<PricingOrder>) => Partial<PricingOrder>)({
+              ...prev,
+            } as Partial<PricingOrder>)
+          : updater;
+      return { ...prev, ...patch } as Order;
+    });
+  }, []);
+
+  const customerType = useMemo(
+    () =>
+      getCustomerTypeFromIdOrder(
+        String(formData?.[ORDER_FIELDS.ID_ORDER as keyof Order] ?? "")
+      ),
+    [formData?.[ORDER_FIELDS.ID_ORDER as keyof Order]]
+  );
+
+  const pricingProductName = String(
+    formData?.[ORDER_FIELDS.ID_PRODUCT as keyof Order] ?? ""
+  );
+
+  const { recalcPrice, infoRef } = usePriceCalculation({
+    customerType,
+    setFormData: setFormDataForPricing,
+    productName: pricingProductName,
+  });
+
+  useEffect(() => {
+    if (!formData) return;
+    infoRef.current = String(
+      formData[ORDER_FIELDS.INFORMATION_ORDER as keyof Order] ?? ""
+    );
+  }, [formData, infoRef]);
 
   const fetchProductOptions = useCallback(async () => {
     try {
@@ -208,6 +273,38 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         supplyPrices.find((p) => p.source_id === supplyId)?.price ??
         null;
       const normalizedPrice = Number(matchedPrice);
+      const statusText = String(
+        formData?.[ORDER_FIELDS.STATUS as keyof Order] ?? ""
+      );
+      const isUnpaid = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
+      const productName = String(
+        formData?.[ORDER_FIELDS.ID_PRODUCT as keyof Order] || ""
+      );
+      const orderTypePrefix = getCustomerTypeFromIdOrder(
+        String(formData?.[ORDER_FIELDS.ID_ORDER as keyof Order] || "")
+      );
+      let registerDate = String(
+        formData?.[ORDER_FIELDS.ORDER_DATE as keyof Order] || ""
+      ).trim();
+      if (!registerDate) {
+        registerDate = Helpers.getTodayDMY();
+      }
+      if (
+        isUnpaid &&
+        Number.isFinite(supplyId) &&
+        supplyId > 0 &&
+        productName &&
+        orderTypePrefix
+      ) {
+        const fallbackImport = Number.isFinite(normalizedPrice)
+          ? normalizedPrice
+          : undefined;
+        recalcPrice(supplyId, productName, orderTypePrefix, registerDate, fallbackImport, {
+          updateCost: true,
+          onlyPricing: true,
+        });
+        return;
+      }
       if (Number.isFinite(normalizedPrice)) {
         setFieldValue(
           ORDER_FIELDS.COST as keyof Order,
@@ -223,7 +320,7 @@ export const useEditOrderLogic = (order: Order | null, isOpen: boolean) => {
         );
       }
     },
-    [formData, setFieldValue, supplies, supplyPrices]
+    [formData, recalcPrice, setFieldValue, supplies, supplyPrices]
   );
 
   const handleCustomSupplyChange = useCallback(

@@ -8,20 +8,40 @@ const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   FOUR_DAYS_TOPIC_ID,
+  QR_ACCOUNT_NUMBER,
+  QR_BANK_CODE,
+  QR_ACCOUNT_NAME,
+  QR_NOTE_PREFIX,
 } = require("./constants");
 const { toSafeString } = require("./formatters");
 const { buildDueOrderMessage } = require("./messageBuilders");
-const { buildVietQrUrl } = require("./qr");
+const { buildVietQrUrl, fetchQrImageBytes } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 
 async function sendFourDaysRemainingNotification(orders = []) {
+  const deduped = [];
+  const seenCodes = new Set();
+  for (const o of orders) {
+    const code = String(o?.id_order ?? o?.idOrder ?? "").trim();
+    if (code && seenCodes.has(code)) continue;
+    if (code) seenCodes.add(code);
+    deduped.push(o);
+  }
 
   logger.info("[Order][Telegram] sendFourDaysRemainingNotification called", {
     ordersCount: orders.length,
+    dedupedCount: deduped.length,
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     FOUR_DAYS_TOPIC_ID,
+  });
+  logger.info("[Order][Telegram] QR runtime config", {
+    accountNumber: QR_ACCOUNT_NUMBER,
+    bankCode: QR_BANK_CODE,
+    accountName: QR_ACCOUNT_NAME,
+    notePrefix: QR_NOTE_PREFIX,
+    pid: process.pid,
   });
 
   if (!SEND_ORDER_NOTIFICATION || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -37,12 +57,12 @@ async function sendFourDaysRemainingNotification(orders = []) {
     return;
   }
 
-  if (!orders || orders.length === 0) {
+  if (!deduped.length) {
     logger.info("[Order][Telegram] No orders with 4 days remaining to notify");
     return;
   }
 
-  const total = orders.length;
+  const total = deduped.length;
 
   try {
     const headerPayload = {
@@ -59,8 +79,8 @@ async function sendFourDaysRemainingNotification(orders = []) {
     });
   }
 
-  for (let i = 0; i < orders.length; i++) {
-    const order = orders[i];
+  for (let i = 0; i < deduped.length; i++) {
+    const order = deduped[i];
     const index = i + 1;
     const orderCode = toSafeString(
       order.id_order || order.idOrder || order.order_code || order.orderCode
@@ -69,10 +89,40 @@ async function sendFourDaysRemainingNotification(orders = []) {
     const caption = buildDueOrderMessage(order, index, total);
     const qrUrl = buildVietQrUrl({ amount: price, orderCode });
 
+    // Pre-fetch QR bytes (xem comment trong sendOrderCreated.js).
+    let qrPhotoBuffer = null;
+    if (qrUrl) {
+      try {
+        const fetched = await fetchQrImageBytes({
+          amount: price,
+          addInfo: [QR_NOTE_PREFIX, orderCode].filter(Boolean).join(" ").trim(),
+          accountName: QR_ACCOUNT_NAME,
+          bankCode: QR_BANK_CODE,
+          accountNumber: QR_ACCOUNT_NUMBER,
+        });
+        if (fetched?.buffer) {
+          qrPhotoBuffer = fetched.buffer;
+          logger.info("[Order][Telegram] Due order QR fetched as bytes", {
+            orderCode,
+            source: fetched.sourceUrl,
+            cached: !!fetched.cached,
+            size: fetched.buffer.length,
+          });
+        }
+      } catch (qrErr) {
+        logger.warn("[Order][Telegram] Due order QR fetch failed — text-only", {
+          orderCode,
+          error: qrErr?.message,
+          providerErrors: qrErr?.providerErrors,
+        });
+      }
+    }
+    const hasPhoto = Boolean(qrPhotoBuffer);
+
     const buildPhotoPayload = (includeTopic = true) => {
       const payload = {
         chat_id: TELEGRAM_CHAT_ID,
-        photo: qrUrl,
+        photo: qrPhotoBuffer,
         caption: caption,
       };
       if (includeTopic && Number.isFinite(FOUR_DAYS_TOPIC_ID)) {
@@ -94,7 +144,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
 
     await sendWithRetry({
       buildPayload: ({ includeTopic, includePhoto = true }) =>
-        qrUrl && includePhoto
+        hasPhoto && includePhoto
           ? buildPhotoPayload(includeTopic)
           : buildTextPayload(includeTopic),
       sendFn: async (payload) => {
@@ -105,7 +155,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
         }
       },
       maxAttempts: 5,
-      enablePhotoRetry: Boolean(qrUrl),
+      enablePhotoRetry: hasPhoto,
       log: {
         sending: ({ attempt, includeTopic, includePhoto }) =>
           logger.info("[Order][Telegram] Sending due order notification", {
@@ -113,7 +163,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
             orderIndex: index,
             total,
             orderCode,
-            hasQrUrl: !!qrUrl,
+            hasQrBytes: hasPhoto,
             includeTopic,
             includePhoto,
           }),
@@ -169,7 +219,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
       },
     });
 
-    if (i < orders.length - 1) {
+    if (i < deduped.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }

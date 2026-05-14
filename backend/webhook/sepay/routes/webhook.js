@@ -25,32 +25,55 @@ const {
   insertFinancialAuditLog,
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
+  countPaymentReceiptsForOrderCode,
 } = require("../payments");
 const {
   queueRenewalTask,
   processRenewalTask,
   fetchOrderState,
   isEligibleForRenewal,
+  fetchMonthlySummarySnapshot,
 } = require("../renewal");
 const { STATUS: ORDER_STATUS } = require("../../../src/utils/statuses");
 const {
   isMavnImportOrder,
   isMavrykShopSupplierName,
-  isDashboardSalesOrder,
 } = require("../../../src/utils/orderHelpers");
+const {
+  resolveDashboardImportDeltaOnPaid,
+} = require("../../../src/controllers/Order/finance/dashboardImportDeltaOnPaid");
 const { getOrderQrPaymentEligibility } = require("../orderPaymentEligibility");
-const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../src/config/dbSchema");
-const { qualifiedSummaryCol } = require("../../../src/controllers/Order/finance/dashboardSummary");
+const { FINANCE_SCHEMA, SCHEMA_FINANCE, SCHEMA_RECEIPT, RECEIPT_SCHEMA, tableName } = require("../../../src/config/dbSchema");
+const {
+  qualifiedSummaryCol,
+  recomputeSummaryMonthTotalTax,
+  monthKeyFromPaidDateYmd,
+} = require("../../../src/controllers/Order/finance/dashboardSummary");
+const {
+  notifyFinanceMonthlyDelta,
+} = require("../../../src/services/telegramFinanceDeltaNotifier");
+const {
+  UNDERPAY_TOLERANCE_VND,
+  computeDashboardPaymentDecision,
+  requiredMinForSuccessfulPayment,
+} = require("../../../src/controllers/Order/finance/dashboardPaymentPostingPolicy");
 const logger = require("../../../src/utils/logger");
+const { computeOrderCurrentPrice } = require("../renewalPricing");
 const { withSavepoint } = require("../savepoint");
-const UNDERPAY_TOLERANCE_VND = 5000;
 const PAYMENT_RECEIPT_BASE_TABLE = PAYMENT_RECEIPT_TABLE.split(".").pop();
-const PAYMENT_RECEIPT_SCHEMA =
-  process.env.DB_SCHEMA_RECEIPT || process.env.SCHEMA_RECEIPT || "receipt";
-const PAYMENT_RECEIPT_TABLE_RESOLVED = `${PAYMENT_RECEIPT_SCHEMA}.${PAYMENT_RECEIPT_BASE_TABLE}`;
-const REFUND_CREDIT_APPLICATIONS_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.refund_credit_applications`;
-const PAYMENT_RECEIPT_BATCH_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_batch`;
-const PAYMENT_RECEIPT_BATCH_ITEM_TABLE = `${PAYMENT_RECEIPT_SCHEMA}.payment_receipt_batch_item`;
+const PAYMENT_RECEIPT_TABLE_RESOLVED = tableName(PAYMENT_RECEIPT_BASE_TABLE, SCHEMA_RECEIPT);
+const REFUND_CREDIT_APPLICATIONS_TABLE = tableName(
+  RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.TABLE,
+  SCHEMA_RECEIPT
+);
+const PAYMENT_RECEIPT_BATCH_TABLE = tableName(
+  RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.TABLE,
+  SCHEMA_RECEIPT
+);
+const PAYMENT_RECEIPT_BATCH_ITEM_TABLE = tableName(
+  RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH_ITEM.TABLE,
+  SCHEMA_RECEIPT
+);
 const BATCH_CODE_REGEX = /\bMAVG[A-Z0-9]{4,20}\b/gi;
 const isBatchCode = (value) => /^MAVG[A-Z0-9]{4,20}$/i.test(String(value || "").trim());
 const hasMissingTableError = (error, tableName) =>
@@ -116,6 +139,45 @@ const resolveOrderCodesByBatchCodes = async (client, batchCodes) => {
   return map;
 };
 
+/**
+ * Map order_code -> tổng amount của batch item cho các mã MAVG.
+ * Dùng để phân bổ đúng tiền webhook theo từng order trong batch.
+ */
+const resolveBatchOrderAmountsByBatchCodes = async (client, batchCodes) => {
+  const normalized = [...new Set((batchCodes || []).map((x) => String(x || "").trim().toUpperCase()).filter(Boolean))];
+  if (normalized.length === 0) return new Map();
+  const sql = `
+    SELECT
+      UPPER(COALESCE(i.order_code::text, '')) AS order_code,
+      COALESCE(SUM(i.amount::numeric), 0) AS total_amount
+    FROM ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE} i
+    INNER JOIN ${PAYMENT_RECEIPT_BATCH_TABLE} b
+      ON b.id = i.batch_id
+    WHERE UPPER(COALESCE(i.batch_code::text, '')) = ANY($1::text[])
+      AND TRIM(COALESCE(i.order_code::text, '')) <> ''
+      AND LOWER(COALESCE(b.status::text, 'pending')) <> 'cancelled'
+    GROUP BY UPPER(COALESCE(i.order_code::text, ''))
+  `;
+  let rows = [];
+  try {
+    const result = await client.query(sql, [normalized]);
+    rows = result.rows || [];
+  } catch (error) {
+    if (isMissingBatchTablesError(error)) {
+      logger.warn("[Webhook] Skip batch amount expansion: batch tables missing");
+      return new Map();
+    }
+    throw error;
+  }
+  const map = new Map();
+  for (const row of rows) {
+    const orderCode = String(row?.order_code || "").trim().toUpperCase();
+    if (!orderCode) continue;
+    map.set(orderCode, Math.max(0, normalizeMoney(row?.total_amount)));
+  }
+  return map;
+};
+
 /** Tên NCC theo supply_id (chuẩn hóa lowercase trong isMavrykShopSupplierName). */
 const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
   if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
@@ -152,13 +214,25 @@ const toMonthKey = (value) => {
 const incrementDashboardSummaryByDelta = async (
   client,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0 } = {}
+  {
+    revenueDelta = 0,
+    profitDelta = 0,
+    ordersDelta = 0,
+    importDelta = 0,
+    offFlowDelta = 0,
+    bankBalanceDelta = 0,
+    notify = true,
+    context = "webhook.incrementDashboardSummaryByDelta",
+  } = {}
 ) => {
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
+  const imp = normalizeMoney(importDelta);
+  const offFlow = normalizeMoney(offFlowDelta);
+  const bankBalance = normalizeMoney(bankBalanceDelta);
   if (!monthKey) return;
-  if (!revenue && !profit && !orders) return;
+  if (!revenue && !profit && !orders && !imp && !offFlow && !bankBalance) return;
 
   await client.query(
     `
@@ -167,100 +241,222 @@ const incrementDashboardSummaryByDelta = async (
         ${summaryCols.TOTAL_ORDERS},
         ${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.TOTAL_IMPORT},
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
+        ${summaryCols.ESTIMATED_BANK_BALANCE},
         ${summaryCols.UPDATED_AT}
       )
-      VALUES ($1, $2, $3, $4, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       ON CONFLICT (${summaryCols.MONTH_KEY})
       DO UPDATE SET
         ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
         ${summaryCols.TOTAL_REVENUE} = ${qualifiedSummaryCol(summaryCols.TOTAL_REVENUE)} + EXCLUDED.${summaryCols.TOTAL_REVENUE},
         ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
+        ${summaryCols.TOTAL_IMPORT} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_IMPORT)} + EXCLUDED.${summaryCols.TOTAL_IMPORT}),
+        ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT} = ${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + EXCLUDED.${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
+        ${summaryCols.ESTIMATED_BANK_BALANCE} = ${qualifiedSummaryCol(summaryCols.ESTIMATED_BANK_BALANCE)} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
         ${summaryCols.UPDATED_AT} = NOW()
     `,
-    [monthKey, orders, revenue, profit]
+    [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
   );
+  await recomputeSummaryMonthTotalTax(client, monthKey);
+  if (!notify) return;
+  await notifyFinanceMonthlyDelta({
+    monthKey,
+    revenueDelta: revenue,
+    profitDelta: profit,
+    importDelta: imp,
+    refundDelta: 0,
+    offFlowDelta: offFlow,
+    bankBalanceDelta: bankBalance,
+    context,
+    executor: client,
+  });
 };
 
-const computeWebhookAmountDecision = ({
-  orderPrice,
-  currentAmount,
-  accumulatedAmount,
-  creditAppliedAmount,
-}) => {
-  const normalizedPrice = normalizeMoney(orderPrice);
-  const receivedCurrent = normalizeMoney(currentAmount);
-  const receivedAccumulated = normalizeMoney(accumulatedAmount);
-  const creditedAmount = Math.max(0, normalizeMoney(creditAppliedAmount));
-  const effectiveReceivedCurrent = normalizeMoney(receivedCurrent + creditedAmount);
-  const effectiveReceivedAccumulated = normalizeMoney(receivedAccumulated + creditedAmount);
-  const requiredMin = Math.max(0, normalizedPrice - UNDERPAY_TOLERANCE_VND);
-  const shortfallAmount = Math.max(0, requiredMin - effectiveReceivedAccumulated);
-  const meetsCurrent = effectiveReceivedCurrent >= requiredMin;
-  const meetsAccumulated = effectiveReceivedAccumulated >= requiredMin;
-  const overpaidCurrent = receivedCurrent > normalizedPrice;
+/**
+ * `importDelta`: xem `resolveDashboardImportDeltaOnPaid` — chỉ khi **không** có dòng log
+ * NCC trong **đúng tháng** `paidMonthKey` (log tháng trước + gia hạn tháng này vẫn bù được).
+ */
 
-  if (meetsCurrent) {
-    return {
-      complete: true,
-      waitTopup: false,
-      useAccumulated: false,
-      branch: overpaidCurrent ? "OVERPAID_COMPLETE" : "WITHIN_5K_COMPLETE",
-      orderPriceAtWebhook: normalizedPrice,
-      requiredMin,
-      receivedCurrent,
-      receivedAccumulated,
-      creditedAmount,
-      effectiveReceivedCurrent,
-      effectiveReceivedAccumulated,
-      shortfallAmount,
-      webhookAmountFlow: overpaidCurrent ? "OVERPAID" : "WITHIN_5K",
-      postedAmount: receivedCurrent,
-    };
+const postWebhookPaymentForOrder = async (
+  client,
+  {
+    code,
+    state,
+    receiptId,
+    paidMonthKey,
+    revenueAmount,
+    ordersDelta = 0,
+    ruleBranch,
+    amountDecision = null,
+    /**
+     * - `transition_to_paid`: DT/LN += tiền lần này; LN −= cost; `total_import` += cost trên app
+     *   chỉ khi **không có** dòng log NCC trong **tháng** `paidMonthKey` (có trong tháng đó → ledger).
+     * - `revenue_equals_profit`: một bước DT/LN += tiền (không chỉnh cost).
+     */
+    profitPostingMode = "transition_to_paid",
+    notify = true,
+    notifyContext = "webhook.incrementDashboardSummaryByDelta",
+  }
+) => {
+  const wire = normalizeMoney(revenueAmount);
+  const offFlow = normalizeMoney(
+    amountDecision?.offFlowForOrder ?? amountDecision?.offFlowCurrent
+  );
+  if ((!wire && !offFlow && !ordersDelta) || !state) {
+    return { revenue: 0, profit: 0, offFlow: 0, importDelta: 0 };
   }
 
-  if (meetsAccumulated) {
-    return {
-      complete: true,
-      waitTopup: false,
-      useAccumulated: true,
-      branch: "ACCUMULATED_COMPLETE",
-      orderPriceAtWebhook: normalizedPrice,
-      requiredMin,
-      receivedCurrent,
-      receivedAccumulated,
-      creditedAmount,
-      effectiveReceivedCurrent,
-      effectiveReceivedAccumulated,
-      shortfallAmount: 0,
-      webhookAmountFlow: "ACCUMULATED",
-      postedAmount: receivedAccumulated,
-    };
+  const cost = normalizeMoney(state[ORDER_COLS.cost]);
+  const impliedMargin = normalizeMoney(wire - cost);
+  let netProfitForLedger = 0;
+  let importDeltaForAudit = 0;
+
+  if (profitPostingMode === "revenue_equals_profit") {
+    netProfitForLedger = wire;
+    await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+      revenueDelta: wire,
+      profitDelta: wire,
+      ordersDelta,
+      notify,
+      context: notifyContext,
+    });
+  } else {
+    await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+      revenueDelta: wire,
+      profitDelta: wire,
+      ordersDelta,
+      notify,
+      context: notifyContext,
+    });
+    if (cost > 0) {
+      importDeltaForAudit = await resolveDashboardImportDeltaOnPaid(
+        client,
+        state,
+        cost,
+        fetchSupplierNameBySupplyId,
+        paidMonthKey
+      );
+      await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+        profitDelta: -cost,
+        importDelta: importDeltaForAudit,
+        notify,
+        context: notifyContext,
+      });
+    }
+    netProfitForLedger = impliedMargin;
   }
 
-  return {
-    complete: false,
-    waitTopup: true,
-    useAccumulated: false,
-    branch: "UNDER_5K_WAIT_TOPUP",
-    orderPriceAtWebhook: normalizedPrice,
-    requiredMin,
-    receivedCurrent,
-    receivedAccumulated,
-    creditedAmount,
-    effectiveReceivedCurrent,
-    effectiveReceivedAccumulated,
-    shortfallAmount,
-    webhookAmountFlow: "AWAITING_TOPUP",
-    postedAmount: 0,
+  if (offFlow > 0) {
+    await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+      offFlowDelta: offFlow,
+      ordersDelta: 0,
+      notify,
+      context: notifyContext,
+    });
+  }
+
+  if (receiptId) {
+    await insertFinancialAuditLog(client, {
+      payment_receipt_id: receiptId,
+      order_code: code,
+      rule_branch: ruleBranch,
+      delta: {
+        posted_revenue: wire,
+        posted_profit: netProfitForLedger,
+        posted_off_flow_bank_receipt: offFlow > 0 ? offFlow : undefined,
+        profit_provisional_wire: profitPostingMode === "transition_to_paid" ? wire : undefined,
+        profit_deduct_cost_on_paid: profitPostingMode === "transition_to_paid" && cost > 0 ? cost : undefined,
+        total_import_add_on_paid:
+          profitPostingMode === "transition_to_paid" && importDeltaForAudit > 0
+            ? importDeltaForAudit
+            : undefined,
+        total_import_via_supplier_cost_log_recalc:
+          profitPostingMode === "transition_to_paid" && cost > 0 && importDeltaForAudit === 0
+            ? true
+            : undefined,
+        implied_margin_vnd: impliedMargin,
+        month_key: paidMonthKey,
+        received_current: amountDecision?.receivedCurrent ?? wire,
+        received_accumulated: amountDecision?.receivedAccumulated ?? wire,
+        credit_applied_amount:
+          amountDecision?.creditedAmount ?? normalizeMoney(state.credit_applied_amount),
+        effective_received_current:
+          amountDecision?.effectiveReceivedCurrent ??
+          normalizeMoney(wire + normalizeMoney(state.credit_applied_amount)),
+        effective_received_accumulated:
+          amountDecision?.effectiveReceivedAccumulated ??
+          normalizeMoney(wire + normalizeMoney(state.credit_applied_amount)),
+        order_price_at_webhook:
+          amountDecision?.orderPriceAtWebhook ?? normalizeMoney(state[ORDER_COLS.price]),
+        required_min:
+          amountDecision?.requiredMin ??
+          requiredMinForSuccessfulPayment(state[ORDER_COLS.price]),
+        shortfall_amount: amountDecision?.shortfallAmount ?? 0,
+        max_accepted_shortfall:
+          amountDecision?.maxAcceptedShortfall ?? UNDERPAY_TOLERANCE_VND - 1,
+        recognized_revenue_current: amountDecision?.recognizedRevenueCurrent ?? wire,
+        recognized_revenue_for_order:
+          amountDecision?.recognizedRevenueForOrder ?? wire,
+        off_flow_current: amountDecision?.offFlowCurrent ?? 0,
+        off_flow_for_order:
+          amountDecision?.offFlowForOrder ?? offFlow,
+        off_flow_source_order_code: offFlow > 0 ? code : undefined,
+        webhook_amount_flow: amountDecision?.webhookAmountFlow ?? "WEBHOOK_AMOUNT",
+      },
+      source: "webhook",
+    });
+  }
+
+  return { revenue: wire, profit: netProfitForLedger, offFlow, importDelta: importDeltaForAudit };
+};
+
+const computeWebhookAmountDecision = computeDashboardPaymentDecision;
+
+const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, statusValue) => {
+  const stored = normalizeMoney(state?.[ORDER_COLS.price]);
+  const storedGross = normalizeMoney(state?.[ORDER_COLS.grossSellingPrice]);
+  // Đơn có áp credit khi tạo: `price` đã là số còn thu; webhook cần đối chiếu theo giá gốc.
+  const baseOrderPrice = storedGross > 0 ? storedGross : stored;
+  if (statusValue !== ORDER_STATUS.RENEWAL || !state) {
+    return baseOrderPrice;
+  }
+  const row = {
+    ...state,
+    [ORDER_COLS.idOrder]: state[ORDER_COLS.idOrder] ?? orderCode,
   };
+  try {
+    const { price } = await computeOrderCurrentPrice(client, row);
+    const current = normalizeMoney(price);
+    if (current > 0 && current !== stored) {
+      logger.info("[Webhook] Gia hạn: so khớp CK theo giá bảng hiện tại (không snapshot đơn)", {
+        orderCode,
+        storedPrice: stored,
+        currentPrice: current,
+      });
+    }
+    if (current > 0) {
+      return current;
+    }
+  } catch (e) {
+    logger.warn("[Webhook] Không tính được giá hiện tại khi gia hạn, dùng giá trên đơn", {
+      orderCode,
+      error: e?.message,
+    });
+  }
+  return baseOrderPrice;
 };
 
 const getAccumulatedReceiptAmount = async (client, orderCode, orderDateRaw) => {
   const normalizedCode = String(orderCode || "").trim();
   if (!normalizedCode) return 0;
   const parsedOrderDate = parseFlexibleDate(orderDateRaw);
+  const now = new Date();
   const fromDate = parsedOrderDate
-    ? parsedOrderDate.toISOString().slice(0, 10)
+    ? parsedOrderDate > now
+      ? "1900-01-01"
+      : parsedOrderDate.toISOString().slice(0, 10)
     : "1900-01-01";
 
   const res = await client.query(
@@ -356,7 +552,7 @@ router.post("/", async (req, res) => {
     try {
       await client.query("BEGIN");
 
-      // Fallback: nếu không extract được mã MAV, thử match theo số tiền + trạng thái
+      const transitionedOrderCodesToPaid = new Set();
       if (!orderCodes.length && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
         logger.info("[Webhook] No MAV order code found, trying amount-based fallback", {
           amount: transferAmountNormalized,
@@ -382,6 +578,10 @@ router.post("/", async (req, res) => {
       }
 
       const batchOrderMap = await resolveOrderCodesByBatchCodes(client, batchCodes);
+      const batchOrderAmountMap = await resolveBatchOrderAmountsByBatchCodes(
+        client,
+        batchCodes
+      );
       const expandedOrderCodes = [
         ...new Set([
           ...orderCodes.filter((code) => !isBatchCode(code)),
@@ -398,16 +598,26 @@ router.post("/", async (req, res) => {
         logger.info("[Webhook] Resolve MAVG batch codes", {
           batchCodes,
           expandedOrderCodes: loopOrderCodes,
+          amountByOrder: Object.fromEntries(batchOrderAmountMap.entries()),
         });
       }
+
+      const getCurrentAmountForCode = (code) => {
+        if (batchCodes.length === 0) return transferAmountNormalized;
+        return Math.max(0, normalizeMoney(batchOrderAmountMap.get(code) || 0));
+      };
 
       for (const code of loopOrderCodes) {
         const stateRes = await client.query(
           `SELECT
+            ${ORDER_COLS.id},
+            ${ORDER_COLS.idOrder},
+            ${ORDER_COLS.idProduct},
             ${ORDER_COLS.status},
             ${ORDER_COLS.expiryDate},
             ${ORDER_COLS.orderDate},
             ${ORDER_COLS.price},
+            ${ORDER_COLS.grossSellingPrice},
             ${ORDER_COLS.cost},
             ${ORDER_COLS.idSupply},
             (
@@ -439,9 +649,21 @@ router.post("/", async (req, res) => {
       const receiptId = receiptResult?.id ?? receiptResult?.existingId ?? null;
       const receiptState = await getReceiptFinancialState(client, receiptId);
       const alreadyFinancialPosted = !!receiptState?.is_financial_posted;
-      const paidMonthKey = toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
+      // Ưu tiên YYYY-MM-DD từ biên lai (khớp INSERT) để cùng tháng với `payment_receipt.paid_date`.
+      const paidMonthKey =
+        monthKeyFromPaidDateYmd(receiptResult?.paidDate) ||
+        toMonthKey(transaction.transaction_date || transaction.transaction_date_raw || new Date());
       let postedRevenueDelta = 0;
       let postedProfitDelta = 0;
+      let postedImportDelta = 0;
+      let postedOffFlowBankReceiptDelta = 0;
+      let postedBankBalanceDelta = 0;
+      // Snapshot tài chính tháng TRƯỚC khi xử lý webhook + renewal — để cuối
+      // luồng gửi 1 tin nhắn BIẾN ĐỘNG THÁNG tổng hợp (thay vì 2 tin rời rạc:
+      // webhook posting + renewal.runRenewal).
+      const financeSnapshotBefore = paidMonthKey && !alreadyFinancialPosted
+        ? await fetchMonthlySummarySnapshot(client, paidMonthKey).catch(() => null)
+        : null;
 
       if (receiptId && alreadyFinancialPosted) {
         await insertFinancialAuditLog(client, {
@@ -457,6 +679,266 @@ router.post("/", async (req, res) => {
         });
       }
 
+      if (!alreadyFinancialPosted && receiptResult?.inserted && transferAmountNormalized > 0) {
+        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+          bankBalanceDelta: transferAmountNormalized,
+          notify: false,
+        });
+        postedBankBalanceDelta += transferAmountNormalized;
+      }
+
+      // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger có thể ghi log chi phí NCC; TT NCC trên log mặc định Chưa Thanh Toán).
+      // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
+      // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
+      if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate)) {
+        const codesToUpdate = loopOrderCodes;
+        for (const code of codesToUpdate) {
+          const currentAmountForCode = getCurrentAmountForCode(code);
+          if (isMavnImportOrder({ id_order: code })) {
+            logger.info("[Webhook] Skip status update for MAVN (nhập hàng)", {
+              orderCode: code,
+            });
+            continue;
+          }
+
+          const state = stateByOrderCode.get(code);
+          if (!state) continue;
+
+          const statusValue = state[ORDER_COLS.status];
+
+          // Đơn đã Đã Thanh Toán + biên lai mới: tiền vào NH không ghi DT/LN (ngoài luồng kế toán).
+          if (
+            receiptResult?.inserted &&
+            currentAmountForCode > 0 &&
+            statusValue === ORDER_STATUS.PAID
+          ) {
+            const extraVnd = normalizeMoney(currentAmountForCode);
+            await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+              offFlowDelta: extraVnd,
+              ordersDelta: 0,
+              notify: false,
+            });
+            postedOffFlowBankReceiptDelta += extraVnd;
+            if (receiptId) {
+              await insertFinancialAuditLog(client, {
+                payment_receipt_id: receiptId,
+                order_code: code,
+                rule_branch: "POST_PAID_ADDITIONAL_OFF_FLOW_BANK_RECEIPT",
+                delta: {
+                  posted_off_flow_bank_receipt: extraVnd,
+                  month_key: paidMonthKey,
+                },
+                source: "webhook",
+              });
+            }
+            logger.debug("[Webhook] Ghi nhận tiền NH ngoài luồng DT/LN (biên thêm sau Đã TT)", {
+              orderCode: code,
+              status: statusValue,
+              amount: extraVnd,
+            });
+            continue;
+          }
+
+          const qrEligibility = getOrderQrPaymentEligibility(statusValue);
+          if (!qrEligibility.canPayByQr && statusValue !== ORDER_STATUS.PROCESSING) {
+            logger.info("[Webhook] Skip QR payment posting for locked order", {
+              orderCode: code,
+              status: statusValue,
+              reason: qrEligibility.reason,
+            });
+            if (receiptId) {
+              await insertFinancialAuditLog(client, {
+                payment_receipt_id: receiptId,
+                order_code: code,
+                rule_branch: qrEligibility.auditBranch,
+                delta: {
+                  order_status: statusValue,
+                  reason: qrEligibility.reason,
+                },
+                source: "webhook",
+              });
+            }
+            continue;
+          }
+
+          let amountDecision = amountDecisionByOrderCode.get(code) || null;
+          if (
+            !amountDecision &&
+            (
+              statusValue === ORDER_STATUS.UNPAID ||
+              statusValue === ORDER_STATUS.RENEWAL ||
+              statusValue === ORDER_STATUS.PROCESSING
+            )
+          ) {
+            const accumulatedAmount = await getAccumulatedReceiptAmount(
+              client,
+              code,
+              state[ORDER_COLS.orderDate]
+            );
+            const orderPriceForWebhook = await resolveOrderPriceForWebhookMatch(
+              client,
+              code,
+              state,
+              statusValue
+            );
+            amountDecision = computeWebhookAmountDecision({
+              orderPrice: orderPriceForWebhook,
+              currentAmount: currentAmountForCode,
+              accumulatedAmount,
+              creditAppliedAmount: state.credit_applied_amount,
+            });
+            amountDecisionByOrderCode.set(code, amountDecision);
+          }
+
+          const renewalEligibility = eligibilityByOrderCode.get(code);
+          // RENEWAL + đủ tiền + trong cửa sổ gia hạn: renewal.js (sau COMMIT) mới ghi dashboard / đổi trạng thái.
+          if (
+            statusValue === ORDER_STATUS.RENEWAL &&
+            renewalEligibility?.eligible &&
+            amountDecision?.complete
+          ) {
+            continue;
+          }
+
+          if (
+            statusValue === ORDER_STATUS.UNPAID ||
+            statusValue === ORDER_STATUS.PROCESSING ||
+            statusValue === ORDER_STATUS.RENEWAL
+          ) {
+            if (amountDecision && !amountDecision.complete) {
+              if (receiptId) {
+                await insertFinancialAuditLog(client, {
+                  payment_receipt_id: receiptId,
+                  order_code: code,
+                  rule_branch: amountDecision.branch,
+                  delta: {
+                    received_current: amountDecision.receivedCurrent,
+                    received_accumulated: amountDecision.receivedAccumulated,
+                    credit_applied_amount: amountDecision.creditedAmount,
+                    effective_received_current: amountDecision.effectiveReceivedCurrent,
+                    effective_received_accumulated: amountDecision.effectiveReceivedAccumulated,
+                    order_price_at_webhook: amountDecision.orderPriceAtWebhook,
+                    required_min: amountDecision.requiredMin,
+                    shortfall_amount: amountDecision.shortfallAmount,
+                    max_accepted_shortfall: amountDecision.maxAcceptedShortfall,
+                    recognized_revenue_current:
+                      amountDecision.recognizedRevenueCurrent,
+                    off_flow_current: amountDecision.offFlowCurrent,
+                    webhook_amount_flow: amountDecision.webhookAmountFlow,
+                    posted_revenue: 0,
+                    posted_profit: 0,
+                    installment_note:
+                      "Chưa đủ thu — chờ bù tiền, chưa cộng DT/LN.",
+                  },
+                  source: "webhook",
+                });
+              }
+              continue;
+            }
+            const nextStatus = ORDER_STATUS.PAID;
+            const statusUpdateResult = await client.query(
+              `UPDATE ${ORDER_TABLE}
+               SET ${ORDER_COLS.status} = $2
+               WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
+                 AND ${ORDER_COLS.status} = $3`,
+              [code, nextStatus, statusValue]
+            );
+            if (statusUpdateResult.rowCount > 0) {
+              const wireNow =
+                amountDecision?.recognizedRevenueForOrder !== undefined
+                  ? normalizeMoney(
+                      amountDecision.recognizedRevenueForOrder +
+                        (amountDecision.creditedAmount || 0)
+                    )
+                  : amountDecision?.recognizedRevenueCurrent !== undefined
+                    ? normalizeMoney(
+                        amountDecision.recognizedRevenueCurrent +
+                          (amountDecision.creditedAmount || 0)
+                      )
+                    : currentAmountForCode;
+              const {
+                revenue: rev,
+                profit: prof,
+                offFlow: flow,
+                importDelta: imp,
+              } = await postWebhookPaymentForOrder(client, {
+                code,
+                state,
+                receiptId,
+                paidMonthKey,
+                revenueAmount: wireNow,
+                ordersDelta: 1,
+                ruleBranch:
+                  statusValue === ORDER_STATUS.PROCESSING
+                    ? "PROCESSING_TO_PAID_WEBHOOK_POST"
+                    : statusValue === ORDER_STATUS.RENEWAL
+                      ? amountDecision?.branch || "RENEWAL_TO_PAID_WEBHOOK_POST"
+                      : amountDecision?.branch || "EXACT_OR_FULL_COMPLETE",
+                amountDecision,
+                profitPostingMode: "transition_to_paid",
+                notify: false,
+              });
+              postedRevenueDelta += rev;
+              postedProfitDelta += prof;
+              postedImportDelta += imp;
+              postedOffFlowBankReceiptDelta += flow;
+              transitionedOrderCodesToPaid.add(code);
+            }
+            logger.debug("[Webhook] Order status → Đã Thanh Toán", {
+              orderCode: code,
+              previousStatus: statusValue,
+              nextStatus,
+            });
+          }
+        }
+      }
+
+      if (
+        !alreadyFinancialPosted &&
+        (!loopOrderCodes.length && !orderCode) &&
+        transferAmountNormalized > 0 &&
+        !supplierSettlementTransfer
+      ) {
+        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+          offFlowDelta: transferAmountNormalized,
+          ordersDelta: 0,
+          notify: false,
+        });
+        postedOffFlowBankReceiptDelta += transferAmountNormalized;
+        if (receiptId) {
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: receiptId,
+            order_code: "",
+            rule_branch: "NO_ORDER_CODE_OFF_FLOW_BANK_RECEIPT",
+            delta: {
+              posted_off_flow_bank_receipt: transferAmountNormalized,
+              month_key: paidMonthKey,
+            },
+            source: "webhook",
+          });
+        }
+      }
+      if (
+        !alreadyFinancialPosted &&
+        (!loopOrderCodes.length && !orderCode) &&
+        transferAmountNormalized > 0 &&
+        supplierSettlementTransfer &&
+        receiptId
+      ) {
+        await insertFinancialAuditLog(client, {
+          payment_receipt_id: receiptId,
+          order_code: "",
+          rule_branch: "NO_ORDER_CODE_SUPPLIER_SETTLEMENT_SKIP",
+          delta: {
+            posted_revenue: 0,
+            posted_profit: 0,
+            month_key: paidMonthKey,
+            content: String(transaction.transaction_content || ""),
+          },
+          source: "webhook",
+        });
+      }
+
       if (receiptResult?.inserted) {
         const referenceImport =
           loopOrderCodes.length > 1 ? null : transferAmountNormalized;
@@ -465,8 +947,10 @@ router.post("/", async (req, res) => {
           const state = stateByOrderCode.get(code);
           const eligibility = eligibilityByOrderCode.get(code);
           const qrEligibility = getOrderQrPaymentEligibility(state?.[ORDER_COLS.status]);
+          const isManualProcessingAwaitingWebhook =
+            state?.[ORDER_COLS.status] === ORDER_STATUS.PROCESSING;
 
-          if (!qrEligibility.canPayByQr) {
+          if (!qrEligibility.canPayByQr && !isManualProcessingAwaitingWebhook) {
             logger.info("[Webhook] Skip supplier import for QR-locked order", {
               orderCode: code,
               status: state?.[ORDER_COLS.status],
@@ -495,8 +979,24 @@ router.post("/", async (req, res) => {
 
           // Avoid double supplier import updates for renewal flows:
           // - Renewal path already calls updatePaymentSupplyBalance() inside runRenewal().
-          // - Non-renewal path should add import once per unique receipt.
+          // - Additional Sepay receipt after order already PAID (e.g. two transfers / simulate with different amounts):
+          //   must not call updatePaymentSupplyBalance again or payment_supply / perceived import doubles.
           if (eligibility?.eligible) continue;
+
+          const priorStatus = state?.[ORDER_COLS.status];
+          if (
+            priorStatus === ORDER_STATUS.PAID &&
+            !transitionedOrderCodesToPaid.has(code)
+          ) {
+            const receiptN = await countPaymentReceiptsForOrderCode(client, code);
+            if (receiptN > 1) {
+              logger.info(
+                "[Webhook] Skip payment_supply bump: order already PAID before this webhook; extra receipt (avoid double import)",
+                { orderCode: code, receiptCount: receiptN }
+              );
+              continue;
+            }
+          }
 
           const ensured = await ensureSupplyAndPriceFromOrder(code, {
             referenceImport,
@@ -514,204 +1014,30 @@ router.post("/", async (req, res) => {
         }
       }
 
-      // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai (trigger có thể ghi log chi phí NCC; TT NCC trên log mặc định Chưa Thanh Toán).
-      // MAVN: không đổi trạng thái đơn qua Sepay — Đã Thanh Toán khi xác nhận thanh toán NCC (POST .../payment-supply/.../confirm).
-      // Cần Gia Hạn: renewal sau COMMIT (+ log khi cập nhật đơn trong renewal.js).
-      if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate)) {
-        const codesToUpdate = loopOrderCodes;
-        for (const code of codesToUpdate) {
-          if (isMavnImportOrder({ id_order: code })) {
-            logger.info("[Webhook] Skip status update for MAVN (nhập hàng)", {
-              orderCode: code,
-            });
-            continue;
-          }
-
-          const state = stateByOrderCode.get(code);
-          if (!state) continue;
-
-          const statusValue = state[ORDER_COLS.status];
-          const qrEligibility = getOrderQrPaymentEligibility(statusValue);
-          if (!qrEligibility.canPayByQr) {
-            logger.info("[Webhook] Skip QR payment posting for locked order", {
-              orderCode: code,
-              status: statusValue,
-              reason: qrEligibility.reason,
-            });
-            if (receiptId) {
-              await insertFinancialAuditLog(client, {
-                payment_receipt_id: receiptId,
-                order_code: code,
-                rule_branch: qrEligibility.auditBranch,
-                delta: {
-                  order_status: statusValue,
-                  reason: qrEligibility.reason,
-                },
-                source: "webhook",
-              });
-            }
-            continue;
-          }
-
-          let amountDecision = amountDecisionByOrderCode.get(code) || null;
-          if (!amountDecision && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
-            // Must evaluate after receipt has been inserted to include current webhook.
-            const accumulatedAmount = await getAccumulatedReceiptAmount(
-              client,
-              code,
-              state[ORDER_COLS.orderDate]
-            );
-            amountDecision = computeWebhookAmountDecision({
-              orderPrice: state[ORDER_COLS.price],
-              currentAmount: transferAmountNormalized,
-              accumulatedAmount,
-              creditAppliedAmount: state.credit_applied_amount,
-            });
-            amountDecisionByOrderCode.set(code, amountDecision);
-          }
-
-          if (statusValue === ORDER_STATUS.UNPAID) {
-            if (amountDecision && !amountDecision.complete) {
-              if (receiptId) {
-                await insertFinancialAuditLog(client, {
-                  payment_receipt_id: receiptId,
-                  order_code: code,
-                  rule_branch: amountDecision.branch,
-                  delta: {
-                    received_current: amountDecision.receivedCurrent,
-                    received_accumulated: amountDecision.receivedAccumulated,
-                    credit_applied_amount: amountDecision.creditedAmount,
-                    effective_received_current: amountDecision.effectiveReceivedCurrent,
-                    effective_received_accumulated: amountDecision.effectiveReceivedAccumulated,
-                    order_price_at_webhook: amountDecision.orderPriceAtWebhook,
-                    required_min: amountDecision.requiredMin,
-                    shortfall_amount: amountDecision.shortfallAmount,
-                    webhook_amount_flow: amountDecision.webhookAmountFlow,
-                  },
-                  source: "webhook",
-                });
-              }
-              continue;
-            }
-            const nextStatus = ORDER_STATUS.PAID;
-            const statusUpdateResult = await client.query(
-              `UPDATE ${ORDER_TABLE}
-               SET ${ORDER_COLS.status} = $2
-               WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)
-                 AND ${ORDER_COLS.status} = $3`,
-              [code, nextStatus, ORDER_STATUS.UNPAID]
-            );
-            if (statusUpdateResult.rowCount > 0) {
-              const rev = normalizeMoney(state[ORDER_COLS.price]);
-              const prof = rev - normalizeMoney(state[ORDER_COLS.cost]);
-              await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-                revenueDelta: rev,
-                profitDelta: prof,
-                ordersDelta: 1,
-              });
-              postedRevenueDelta += rev;
-              postedProfitDelta += prof;
-              if (receiptId) {
-                await insertFinancialAuditLog(client, {
-                  payment_receipt_id: receiptId,
-                  order_code: code,
-                  rule_branch: amountDecision?.branch || "WITHIN_5K_COMPLETE",
-                  delta: {
-                    posted_revenue: rev,
-                    posted_profit: prof,
-                    month_key: paidMonthKey,
-                    received_current: amountDecision?.receivedCurrent ?? transferAmountNormalized,
-                    received_accumulated: amountDecision?.receivedAccumulated ?? transferAmountNormalized,
-                    credit_applied_amount: amountDecision?.creditedAmount ?? normalizeMoney(state.credit_applied_amount),
-                    effective_received_current:
-                      amountDecision?.effectiveReceivedCurrent ??
-                      normalizeMoney(transferAmountNormalized + normalizeMoney(state.credit_applied_amount)),
-                    effective_received_accumulated:
-                      amountDecision?.effectiveReceivedAccumulated ??
-                      normalizeMoney(
-                        (amountDecision?.receivedAccumulated ?? transferAmountNormalized) +
-                          normalizeMoney(state.credit_applied_amount)
-                      ),
-                    order_price_at_webhook: amountDecision?.orderPriceAtWebhook ?? normalizeMoney(state[ORDER_COLS.price]),
-                    required_min:
-                      amountDecision?.requiredMin ??
-                      Math.max(0, normalizeMoney(state[ORDER_COLS.price]) - UNDERPAY_TOLERANCE_VND),
-                    shortfall_amount: amountDecision?.shortfallAmount ?? 0,
-                    webhook_amount_flow: amountDecision?.webhookAmountFlow ?? "WITHIN_5K",
-                  },
-                  source: "webhook",
-                });
-              }
-            }
-            logger.debug("[Webhook] Order status → Đã Thanh Toán", {
-              orderCode: code,
-              previousStatus: statusValue,
-              nextStatus,
-            });
-          }
-        }
-      }
-
-      if (
-        !alreadyFinancialPosted &&
-        (!loopOrderCodes.length && !orderCode) &&
-        transferAmountNormalized > 0 &&
-        !supplierSettlementTransfer
-      ) {
-        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-          revenueDelta: transferAmountNormalized,
-          profitDelta: transferAmountNormalized,
-          ordersDelta: 0,
-        });
-        postedRevenueDelta += transferAmountNormalized;
-        postedProfitDelta += transferAmountNormalized;
-        if (receiptId) {
-          await insertFinancialAuditLog(client, {
-            payment_receipt_id: receiptId,
-            order_code: "",
-            rule_branch: "NO_ORDER_CODE_AMOUNT_POST",
-            delta: {
-              posted_revenue: transferAmountNormalized,
-              posted_profit: transferAmountNormalized,
-              month_key: paidMonthKey,
-            },
-            source: "webhook",
-          });
-        }
-      }
-      if (
-        !alreadyFinancialPosted &&
-        (!loopOrderCodes.length && !orderCode) &&
-        transferAmountNormalized > 0 &&
-        supplierSettlementTransfer &&
-        receiptId
-      ) {
-        await insertFinancialAuditLog(client, {
-          payment_receipt_id: receiptId,
-          order_code: "",
-          rule_branch: "NO_ORDER_CODE_SUPPLIER_SETTLEMENT_SKIP",
-          delta: {
-            posted_revenue: 0,
-            posted_profit: 0,
-            month_key: paidMonthKey,
-            content: String(transaction.transaction_content || ""),
-          },
-          source: "webhook",
-        });
-      }
+      // KHÔNG gửi notify webhook posting tại đây — defer xuống cuối luồng để
+      // gom với renewal thành 1 tin BIẾN ĐỘNG THÁNG (xem combined notify sau
+      // `processRenewalTask`). Vẫn ghi audit log + cập nhật receipt state.
+      // (Trước đây: 2 message riêng webhook.incrementDashboard + renewal.runRenewal.)
 
       if (receiptId) {
-        if (!alreadyFinancialPosted && (postedRevenueDelta !== 0 || postedProfitDelta !== 0)) {
+        if (
+          !alreadyFinancialPosted &&
+          (postedRevenueDelta !== 0 ||
+            postedProfitDelta !== 0 ||
+            postedOffFlowBankReceiptDelta !== 0)
+        ) {
           await updateReceiptFinancialState(client, receiptId, {
             is_financial_posted: true,
             posted_revenue: postedRevenueDelta,
             posted_profit: postedProfitDelta,
+            posted_off_flow_bank_receipt: postedOffFlowBankReceiptDelta,
           });
         } else if (!alreadyFinancialPosted) {
           await updateReceiptFinancialState(client, receiptId, {
             is_financial_posted: false,
             posted_revenue: 0,
             posted_profit: 0,
+            posted_off_flow_bank_receipt: 0,
           });
           await insertFinancialAuditLog(client, {
             payment_receipt_id: receiptId,
@@ -720,6 +1046,7 @@ router.post("/", async (req, res) => {
             delta: {
               posted_revenue: 0,
               posted_profit: 0,
+              posted_off_flow_bank_receipt: 0,
               is_financial_posted: false,
             },
             source: "webhook",
@@ -741,6 +1068,17 @@ router.post("/", async (req, res) => {
             `,
             [receiptId, batchCodes]
           );
+
+          // Đồng bộ trạng thái item theo batch: khi batch đã paid thì item không nên giữ pending.
+          await client.query(
+            `
+              UPDATE ${PAYMENT_RECEIPT_BATCH_ITEM_TABLE}
+              SET status = 'paid'
+              WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($1::text[])
+                AND LOWER(COALESCE(status::text, 'pending')) NOT IN ('paid', 'cancelled')
+            `,
+            [batchCodes]
+          );
         } catch (error) {
           if (isMissingBatchTablesError(error)) {
             logger.warn("[Webhook] Skip updating batch status: batch tables missing");
@@ -751,69 +1089,148 @@ router.post("/", async (req, res) => {
       }
 
       await client.query("COMMIT");
+
+      // Gia hạn: sau COMMIT, vẫn dùng cùng client (trước release). paidMonthKey/receiptId chỉ tồn tại trong khối try này.
+      try {
+        for (const code of loopOrderCodes) {
+          const currentAmountForCode = getCurrentAmountForCode(code);
+          const state = stateByOrderCode.get(code);
+          const statusValue = state?.[ORDER_COLS.status];
+          const qrEligibility = getOrderQrPaymentEligibility(statusValue);
+          if (!qrEligibility.canPayByQr) {
+            logger.info("[Webhook] Skip renewal for QR-locked order", {
+              orderCode: code,
+              status: statusValue,
+              reason: qrEligibility.reason,
+            });
+            continue;
+          }
+
+          let amountDecision = amountDecisionByOrderCode.get(code) || null;
+          if (!amountDecision) {
+            if (state && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
+              const accumulatedAmount = await getAccumulatedReceiptAmount(
+                client,
+                code,
+                state[ORDER_COLS.orderDate]
+              );
+              const orderPriceForWebhook = await resolveOrderPriceForWebhookMatch(
+                client,
+                code,
+                state,
+                statusValue
+              );
+              amountDecision = computeWebhookAmountDecision({
+                orderPrice: orderPriceForWebhook,
+                currentAmount: currentAmountForCode,
+                accumulatedAmount,
+                creditAppliedAmount: state.credit_applied_amount,
+              });
+              amountDecisionByOrderCode.set(code, amountDecision);
+            }
+          }
+          if (amountDecision && !amountDecision.complete) {
+            logger.debug("[Webhook] Skip renewal, chờ đủ tiền theo rule (chưa complete)", {
+              orderCode: code,
+              receivedCurrent: amountDecision.receivedCurrent,
+              receivedAccumulated: amountDecision.receivedAccumulated,
+              requiredMin: amountDecision.requiredMin,
+            });
+            continue;
+          }
+
+          if (isMavnImportOrder({ id_order: code })) {
+            logger.info("[Webhook] Bỏ qua renewal Sepay cho đơn MAVN", { orderCode: code });
+            continue;
+          }
+          const precomputedEligibility = eligibilityByOrderCode.get(code);
+          if (precomputedEligibility?.eligible) {
+            queueRenewalTask(code, {
+              forceRenewal: precomputedEligibility.forceRenewal,
+              source: "webhook",
+              paymentAmount: currentAmountForCode,
+              paymentMonthKey: paidMonthKey,
+              paymentReceiptId: receiptId,
+              // Cuối luồng webhook sẽ gửi 1 tin BIẾN ĐỘNG THÁNG tổng hợp.
+              suppressFinanceNotify: true,
+            });
+            await processRenewalTask(code);
+          }
+        }
+      } catch (renewErr) {
+        logger.error("Renewal flow failed", { error: renewErr.message, stack: renewErr.stack });
+      }
+
+      // ===== Combined finance delta notify =====
+      // Gửi 1 tin nhắn BIẾN ĐỘNG THÁNG tổng hợp cho cả webhook posting +
+      // renewal (nếu có). Tính delta thật từ DB qua before/after snapshot.
+      if (
+        paidMonthKey &&
+        financeSnapshotBefore &&
+        !alreadyFinancialPosted
+      ) {
+        try {
+          const financeSnapshotAfter = await fetchMonthlySummarySnapshot(
+            client,
+            paidMonthKey
+          );
+          if (financeSnapshotAfter) {
+            const revenueDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_revenue) -
+                normalizeMoney(financeSnapshotBefore.total_revenue)
+            );
+            const profitDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_profit) -
+                normalizeMoney(financeSnapshotBefore.total_profit)
+            );
+            const importDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_import) -
+                normalizeMoney(financeSnapshotBefore.total_import)
+            );
+            const refundDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_refund) -
+                normalizeMoney(financeSnapshotBefore.total_refund)
+            );
+            const offFlowDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.total_off_flow_bank_receipt) -
+                normalizeMoney(financeSnapshotBefore.total_off_flow_bank_receipt)
+            );
+            const bankBalanceDelta = normalizeMoney(
+              normalizeMoney(financeSnapshotAfter.estimated_bank_balance) -
+                normalizeMoney(financeSnapshotBefore.estimated_bank_balance)
+            );
+            if (
+              revenueDelta ||
+              profitDelta ||
+              importDelta ||
+              refundDelta ||
+              offFlowDelta ||
+              bankBalanceDelta
+            ) {
+              await notifyFinanceMonthlyDelta({
+                monthKey: paidMonthKey,
+                revenueDelta,
+                profitDelta,
+                importDelta,
+                refundDelta,
+                offFlowDelta,
+                bankBalanceDelta,
+                context: "webhook.sepay.combined",
+                executor: client,
+              });
+            }
+          }
+        } catch (notifyErr) {
+          logger.warn("[Webhook] Combined finance notify failed (non-fatal)", {
+            error: notifyErr?.message,
+          });
+        }
+      }
     } catch (dbErr) {
       await client.query("ROLLBACK");
       throw dbErr;
     } finally {
       client.release();
-    }
-
-    // Chạy gia hạn cho đơn Cần Gia Hạn (RENEWAL, daysLeft <= 4). MAVN không xử lý gia hạn qua Sepay — dùng API gia hạn tay.
-    try {
-      for (const code of loopOrderCodes) {
-        const state = stateByOrderCode.get(code);
-        const statusValue = state?.[ORDER_COLS.status];
-        const qrEligibility = getOrderQrPaymentEligibility(statusValue);
-        if (!qrEligibility.canPayByQr) {
-          logger.info("[Webhook] Skip renewal for QR-locked order", {
-            orderCode: code,
-            status: statusValue,
-            reason: qrEligibility.reason,
-          });
-          continue;
-        }
-
-        let amountDecision = amountDecisionByOrderCode.get(code) || null;
-        if (!amountDecision) {
-          if (state && (statusValue === ORDER_STATUS.UNPAID || statusValue === ORDER_STATUS.RENEWAL)) {
-            const accumulatedAmount = await getAccumulatedReceiptAmount(
-              client,
-              code,
-              state[ORDER_COLS.orderDate]
-            );
-            amountDecision = computeWebhookAmountDecision({
-              orderPrice: state[ORDER_COLS.price],
-              currentAmount: transferAmountNormalized,
-              accumulatedAmount,
-              creditAppliedAmount: state.credit_applied_amount,
-            });
-            amountDecisionByOrderCode.set(code, amountDecision);
-          }
-        }
-        if (amountDecision && !amountDecision.complete) {
-          logger.warn("[Webhook] Skip renewal, waiting topup by amount rule", {
-            orderCode: code,
-            receivedCurrent: amountDecision.receivedCurrent,
-            receivedAccumulated: amountDecision.receivedAccumulated,
-            requiredMin: amountDecision.requiredMin,
-          });
-          continue;
-        }
-
-        if (isMavnImportOrder({ id_order: code })) {
-          logger.info("[Webhook] Bỏ qua renewal Sepay cho đơn MAVN", { orderCode: code });
-          continue;
-        }
-        const precomputedEligibility = eligibilityByOrderCode.get(code);
-        if (precomputedEligibility?.eligible) {
-          queueRenewalTask(code, {
-            forceRenewal: precomputedEligibility.forceRenewal,
-          });
-          await processRenewalTask(code);
-        }
-      }
-    } catch (renewErr) {
-      logger.error("Renewal flow failed", { error: renewErr.message, stack: renewErr.stack });
     }
 
     return res.json({ message: "OK" });

@@ -21,12 +21,15 @@ type UsePackageFormStateParams = {
   open: boolean;
   initialValues?: PackageFormValues;
   onSubmit: (values: PackageFormValues) => void;
+  /** Bật khi loại gói có trường «activation» — khi false, không bắt buộc kích hoạt dù chọn match theo thông tin đơn. */
+  requireActivationForInformation: boolean;
 };
 
 export const usePackageFormState = ({
   open,
   initialValues,
   onSubmit,
+  requireActivationForInformation,
 }: UsePackageFormStateParams) => {
   const mergedInitialValues = useMemo(
     () => ({ ...EMPTY_FORM_VALUES, ...(initialValues ?? {}) }),
@@ -273,16 +276,34 @@ export const usePackageFormState = ({
     (values.slotLinkMode === "slot" || values.slotLinkMode === "information") &&
     !values.stockId &&
     !stockManual
-      ? "Khi chọn Match, cần liên kết với kho hàng (stock_id)."
+      ? "Cần chọn tài khoản gốc (kho) để gán gói."
+      : null;
+
+  // Khớp với mutation: có storageId hoặc account nhập tay (POST kho khi submit). Không phụ thuộc cờ storageManual để tránh lệch validation vs dữ liệu gửi đi.
+  const hasActivation =
+    values.storageId != null ||
+    Boolean(values.manualStorage?.account?.trim());
+
+  const matchRequiresActivationError =
+    values.slotLinkMode === "information" &&
+    requireActivationForInformation &&
+    !hasActivation
+      ? "Chế độ theo thông tin đơn cần chọn tài khoản kích hoạt (kho kích hoạt)."
       : null;
 
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
       if (matchRequiresAccountError) return;
+      if (matchRequiresActivationError) return;
       onSubmit(values);
     },
-    [matchRequiresAccountError, onSubmit, values]
+    [
+      matchRequiresAccountError,
+      matchRequiresActivationError,
+      onSubmit,
+      values,
+    ]
   );
 
   const handleSlotLinkModeChange = useCallback((mode: SlotLinkMode) => {
@@ -319,6 +340,7 @@ export const usePackageFormState = ({
     handleClearStorage,
     handleToggleStorageManual,
     matchRequiresAccountError,
+    matchRequiresActivationError,
     handleSubmit,
     handleSlotLinkModeChange,
   };

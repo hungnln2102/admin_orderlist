@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { PencilIcon } from "@heroicons/react/24/outline";
 import * as Helpers from "@/lib/helpers";
 import { apiFetch } from "@/lib/api";
 import {
@@ -7,6 +8,7 @@ import {
   type SupplyOrderCostRow,
 } from "@/lib/suppliesApi";
 import ExternalImportLogModal from "./ExternalImportLogModal";
+import EditTraceCodeModal from "./EditTraceCodeModal";
 import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import type { Supply } from "../types";
 import { showAppNotification } from "@/lib/notifications";
@@ -35,8 +37,11 @@ type ExternalImportLogItem = {
   id: number;
   amount: number;
   reason: string;
+  linkedOrderCode: string | null;
   expenseDate: string | null;
   createdAt: string | null;
+  expenseType: "external_import" | "mavn_import" | string;
+  traceCode: string | null;
 };
 
 const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }) => {
@@ -55,6 +60,8 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
   const [externalLogs, setExternalLogs] = useState<ExternalImportLogItem[]>([]);
   const [externalLoading, setExternalLoading] = useState(false);
   const [externalError, setExternalError] = useState<string | null>(null);
+  const [editTraceTarget, setEditTraceTarget] =
+    useState<ExternalImportLogItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,7 +103,7 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
     setExternalError(null);
     try {
       const response = await apiFetch(
-        "/api/store-profit-expenses?expense_type=external_import"
+        "/api/store-profit-expenses?expense_type=external_import,mavn_import"
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -108,8 +115,11 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
           id: Number(item.id || 0),
           amount: Number(item.amount || 0),
           reason: String(item.reason || ""),
+          linkedOrderCode: item.linkedOrderCode ? String(item.linkedOrderCode) : null,
           expenseDate: item.expenseDate || null,
           createdAt: item.createdAt || null,
+          expenseType: String(item.expenseType || "external_import"),
+          traceCode: item.traceCode ? String(item.traceCode) : null,
         }))
       );
     } catch (error) {
@@ -254,6 +264,23 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
         }}
       />
 
+      <EditTraceCodeModal
+        isOpen={Boolean(editTraceTarget)}
+        expenseId={editTraceTarget?.id ?? 0}
+        initialTraceCode={editTraceTarget?.traceCode ?? ""}
+        initialReason={editTraceTarget?.reason ?? ""}
+        onClose={() => setEditTraceTarget(null)}
+        onSaved={() => {
+          setEditTraceTarget(null);
+          void loadExternalLogs();
+          showAppNotification({
+            type: "success",
+            title: "Đã lưu mã trace",
+            message: "Mã trace cho log nhập hàng đã được cập nhật.",
+          });
+        }}
+      />
+
       <div className="glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
         <ResponsiveTable className="supply-order-costs__inner" showCardOnMobile={false}>
           <table className="w-full text-left">
@@ -314,42 +341,77 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
                   <tr>
                     <th className="px-4 py-3 w-14">STT</th>
                     <th className="px-4 py-3">Ngày tạo</th>
+                    <th className="px-4 py-3">Nguồn</th>
                     <th className="px-4 py-3">Số tiền nhập</th>
+                    <th className="px-4 py-3">Mã đơn liên kết</th>
                     <th className="px-4 py-3">Lý do</th>
+                    <th className="px-4 py-3">Mã trace</th>
+                    <th className="px-4 py-3 w-20 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {externalLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                      <td colSpan={8} className="px-4 py-10 text-center text-white/50">
                         Đang tải log nhập hàng...
                       </td>
                     </tr>
                   ) : externalError ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-rose-200">
+                      <td colSpan={8} className="px-4 py-10 text-center text-rose-200">
                         {externalError}
                       </td>
                     </tr>
                   ) : externalLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-10 text-center text-white/50">
+                      <td colSpan={8} className="px-4 py-10 text-center text-white/50">
                         Chưa có log nhập hàng ngoài luồng.
                       </td>
                     </tr>
                   ) : (
-                    externalLogs.map((log, idx) => (
-                      <tr key={log.id || idx} className="text-sm text-white/90">
-                        <td className="px-4 py-3 text-white/50">{idx + 1}</td>
-                        <td className="px-4 py-3 text-white/70">
-                          {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-emerald-300/90">
-                          {formatCurrency(log.amount)}
-                        </td>
-                        <td className="px-4 py-3">{log.reason || "—"}</td>
-                      </tr>
-                    ))
+                    externalLogs.map((log, idx) => {
+                      const isMavnImport = log.expenseType === "mavn_import";
+                      return (
+                        <tr key={log.id || idx} className="text-sm text-white/90">
+                          <td className="px-4 py-3 text-white/50">{idx + 1}</td>
+                          <td className="px-4 py-3 text-white/70">
+                            {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                isMavnImport
+                                  ? "rounded-lg bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-violet-200"
+                                  : "rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-200"
+                              }
+                            >
+                              {isMavnImport ? "MAVN AUTO" : "MANUAL"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-emerald-300/90">
+                            {formatCurrency(log.amount)}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-indigo-200/90">
+                            {log.linkedOrderCode || "—"}
+                          </td>
+                          <td className="px-4 py-3">{log.reason || "—"}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-amber-200/90">
+                            {log.traceCode || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => setEditTraceTarget(log)}
+                              title="Sửa mã trace"
+                              aria-label="Sửa mã trace"
+                              className="inline-flex items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/10 p-1.5 text-amber-200 transition-colors hover:border-amber-300/60 hover:bg-amber-500/20"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </>

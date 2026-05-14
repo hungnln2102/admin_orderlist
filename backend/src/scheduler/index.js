@@ -14,11 +14,16 @@ const {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  cleanupExpiredTrackingTask,
+  syncDailyRevenueSummaryTask,
   getSchedulerStatus,
   schedulerTimezone,
   cronExpression,
   runOnStart,
 } = require("./taskInstances");
+
+const dailyRevenueSummaryCron =
+  process.env.DAILY_REVENUE_SUMMARY_CRON || "15 0 * * *";
 
 const runCronSafe = (source) =>
   updateDatabaseTask(source).catch((err) =>
@@ -68,6 +73,22 @@ const runCleanupAdobeProfileGarbageSafe = (source) =>
     })
   );
 
+const runDailyRevenueSummarySafe = (source) =>
+  syncDailyRevenueSummaryTask(source).catch((err) =>
+    logger.error(`[CRON] daily_revenue_summary failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
+const runCleanupExpiredTrackingSafe = (source) =>
+  cleanupExpiredTrackingTask(source).catch((err) =>
+    logger.error(`[CRON] cleanup expired tracking failed during ${source}`, {
+      error: err.message,
+      stack: err.stack,
+    })
+  );
+
 if (require.main === module && process.argv.includes("--run-once")) {
   runCronSafe("manual");
 }
@@ -77,6 +98,8 @@ cron.schedule(
   async () => {
     logger.info("[Scheduler] Cron 00:01 triggered", { cronExpression, timezone: schedulerTimezone });
     await runCronSafe("cron");
+    // Cleanup tracking ngay sau update DB — tránh giữ row hết hạn trong UI Renew Adobe.
+    await runCleanupExpiredTrackingSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }
 );
@@ -97,7 +120,9 @@ cron.schedule(
 cron.schedule(
   "30 23 * * *",
   async () => {
-    logger.info("[Scheduler] Cron 23:30 — check all Adobe rồi cleanup expired users (số ngày còn lại <= 0)");
+    logger.info(
+      "[Scheduler] Cron 23:30 — cleanup user Adobe: tracking/order hết hạn + mapping → theo từng admin (tùy env check-all trước)"
+    );
     await runCleanupExpiredAdobeUsersSafe("cron");
   },
   { scheduled: true, timezone: schedulerTimezone }
@@ -126,12 +151,30 @@ cron.schedule(
   { scheduled: true, timezone: schedulerTimezone }
 );
 
+if (process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON !== "false") {
+  cron.schedule(
+    dailyRevenueSummaryCron,
+    async () => {
+      logger.info("[Scheduler] Cron daily_revenue_summary", {
+        cron: dailyRevenueSummaryCron,
+        timezone: schedulerTimezone,
+      });
+      await runDailyRevenueSummarySafe("cron");
+    },
+    { scheduled: true, timezone: schedulerTimezone }
+  );
+}
+
 logger.info(`[Scheduler] Đã khởi động`, {
   cronExpression,
   /** Job update DB / backup — không phải Renew Adobe. */
   cronExpressionNote: "CRON_SCHEDULE (vd. 1 0 * * * = 00:01 mỗi ngày)",
   renewAdobeCron: "0 * * * *",
   renewAdobeNote: "Mỗi giờ phút 0 (timezone scheduler) — check tài khoản Adobe",
+  dailyRevenueSummaryCron:
+    process.env.ENABLE_DAILY_REVENUE_SUMMARY_CRON === "false"
+      ? "(tắt)"
+      : dailyRevenueSummaryCron,
   schedulerTimezone,
   runOnStart,
 });
@@ -143,5 +186,7 @@ module.exports = {
   renewAdobeCheckAndNotifyTask,
   cleanupExpiredAdobeUsersTask,
   cleanupAdobeProfileGarbageTask,
+  cleanupExpiredTrackingTask,
+  syncDailyRevenueSummaryTask,
   getSchedulerStatus,
 };

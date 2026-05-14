@@ -13,7 +13,12 @@ export type CreatePackageModalProps = {
   mode: "create" | "edit";
   usedProductIds?: Set<number>;
   onClose: () => void;
-  onSubmit: (packageId: number, productName: string, fields: PackageField[]) => void;
+  onSubmit: (
+    mode: "create" | "edit",
+    packageId: number,
+    productName: string,
+    fields: PackageField[]
+  ) => void;
 };
 
 export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
@@ -93,7 +98,7 @@ export const CreatePackageModal: React.FC<CreatePackageModalProps> = ({
       setError("Vui lòng chọn ít nhất một trường dữ liệu.");
       return;
     }
-    onSubmit(productId, name || String(productId), Array.from(fields));
+    onSubmit(mode, productId, name || String(productId), Array.from(fields));
   };
 
   return (

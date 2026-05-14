@@ -61,7 +61,20 @@ if (process.env.NODE_ENV === "production") {
   app.use(morgan("dev", { stream: logger.stream }));
 }
 
-app.use(express.json({ limit: "1mb" }));
+const jsonBodyLimitDefault = express.json({ limit: "1mb" });
+const jsonBodyLimitNinerouter = express.json({ limit: "10mb" });
+
+function isNinerouterApiPath(req) {
+  const p = req.originalUrl || req.url || "";
+  return p.startsWith("/api/ninerouter") || p.startsWith("/api/v1/ninerouter");
+}
+
+app.use((req, res, next) => {
+  if (isNinerouterApiPath(req)) {
+    return jsonBodyLimitNinerouter(req, res, next);
+  }
+  return jsonBodyLimitDefault(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 const staticOpts = { maxAge: "30d", etag: true };
 app.use("/image", express.static(path.join(__dirname, "../image"), staticOpts));

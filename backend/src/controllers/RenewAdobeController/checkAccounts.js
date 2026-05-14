@@ -5,14 +5,22 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
-const adobeRenewV2 = require("../../services/adobe-renew-v2");
+const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
 const { TABLE, COLS } = require("./accountTable");
 const { persistCheckResult } = require("./checkSyncService");
 const {
-  attachLisenceCount,
-  resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
+  resolveAccountSeatLimit,
 } = require("./usersSnapshotUtils");
+const {
+  upsertRenewAdobeOrderUserTrackingForAccount,
+  upsertRenewAdobeOrderUserTrackingForOrderIds,
+  reconcileOrderUserTrackingWithTeamMembers,
+} = require("../../services/renew-adobe/orderUserTrackingService");
+const {
+  syncRenewAdobeMappingFromTeamMembers,
+  clearRenewAdobeMappingForEmailsNotOnTeam,
+} = require("../../services/userAccountMappingService");
 
 const mappingSchema = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING;
 const mappingTable = tableName(mappingSchema.TABLE, SCHEMA_RENEW_ADOBE);
@@ -40,6 +48,48 @@ function pickOverflowUserEmails(manageTeamMembers, contractActiveLicenseCount) {
     })
     .slice(0, overflowCount)
     .map((item) => item.email);
+}
+
+/**
+ * 1) Đồng bộ user_account_mapping từ list team (check).
+ * 2) Gỡ gán (adobe_account_id) cho email còn trong DB nhưng không còn trên team Adobe
+ *    (vd. xóa user thủ công trên Adobe) — nếu không, slot/tracking vẫn tính thừa.
+ * 3) Upsert order_user_tracking cho đơn vừa gỡ + còn map vào account.
+ * 4) Reconcile status tracking theo team.
+ */
+async function syncMappingAndUpsertTracking(accountId, scrapedData, syncFromTeam) {
+  if (syncFromTeam) {
+    const team = scrapedData?.manageTeamMembers || [];
+    await syncRenewAdobeMappingFromTeamMembers(accountId, team).catch((err) => {
+      logger.warn("[renew-adobe] sync mapping từ team Adobe: %s", err.message);
+    });
+    const { orderIds: orderIdsCleared } =
+      await clearRenewAdobeMappingForEmailsNotOnTeam(accountId, team).catch((err) => {
+        logger.warn("[renew-adobe] clear mapping (không còn trên team): %s", err.message);
+        return { orderIds: [] };
+      });
+    if (orderIdsCleared.length > 0) {
+      await upsertRenewAdobeOrderUserTrackingForOrderIds(orderIdsCleared).catch((err) => {
+        logger.warn(
+          "[renew-adobe] order_user_tracking (sau gỡ mapping): %s",
+          err.message
+        );
+      });
+    }
+  }
+  await upsertRenewAdobeOrderUserTrackingForAccount(accountId).catch((err) => {
+    logger.warn("[renew-adobe] order_user_tracking: %s", err.message);
+  });
+  if (syncFromTeam) {
+    return await reconcileOrderUserTrackingWithTeamMembers(
+      accountId,
+      scrapedData?.manageTeamMembers || []
+    ).catch((err) => {
+      logger.warn("[renew-adobe] reconcile order_user_tracking: %s", err.message);
+      return null;
+    });
+  }
+  return null;
 }
 
 async function markMappingProductFalse(accountId, userEmails) {
@@ -90,10 +140,7 @@ async function runCheckForAccountId(id) {
       : "";
   const existingOrgName =
     rawOrgName && rawOrgName !== "-" ? rawOrgName : undefined;
-  const cachedContractActiveLicenseCountRaw = resolveLisenceCount({
-    usersSnapshot: account[COLS.USERS_SNAPSHOT],
-    alertConfig: COLS.ALERT_CONFIG ? account[COLS.ALERT_CONFIG] : null,
-  });
+  const cachedContractActiveLicenseCountRaw = resolveAccountSeatLimit(account);
   // Chỉ dùng cache khi > 0 để tránh stale "0" gây false expired và xóa nhầm user.
   const cachedContractActiveLicenseCount =
     Number(cachedContractActiveLicenseCountRaw) > 0
@@ -183,7 +230,7 @@ async function runCheckForAccountId(id) {
           scrapedData.licenseStatus,
           contractActiveLicenseCount
         );
-        return;
+        return await syncMappingAndUpsertTracking(id, scrapedData, true);
       }
 
       logger.info(
@@ -197,9 +244,6 @@ async function runCheckForAccountId(id) {
           mailBackupId: Number.isFinite(mailBackupId) ? mailBackupId : null,
           otpSource,
         });
-        // Chỉ cập nhật user_count; giữ users_snapshot (danh sách email trước khi kick) để job
-        // renewAdobeCheckAndNotify → purgeAndDeleteNoLicenseAdobeAdminAccount vẫn có fallback
-        // khi user_account_mapping không có adobe_account_id (tránh mất danh sách reassign).
         await db(TABLE).where(COLS.ID, id).update({
           [COLS.USER_COUNT]: 0,
         });
@@ -262,7 +306,7 @@ async function runCheckForAccountId(id) {
             [COLS.ALERT_CONFIG]: mergeRenewAdobeAlertConfig(
               result.savedCookies,
               deleteResult.savedCookies,
-              account[COLS.USERS_SNAPSHOT]
+              null
             ),
           });
         }
@@ -290,21 +334,7 @@ async function runCheckForAccountId(id) {
           Array.isArray(deleteResult.snapshot.manageTeamMembers)
         ) {
           await db(TABLE).where(COLS.ID, id).update({
-            [COLS.USER_COUNT]: deleteResult.snapshot.manageTeamMembers.length,
-            [COLS.USERS_SNAPSHOT]: JSON.stringify(
-              attachLisenceCount(
-                deleteResult.snapshot.manageTeamMembers,
-                contractActiveLicenseCount
-              )
-            ),
-          });
-        } else {
-          await db(TABLE).where(COLS.ID, id).update({
-            [COLS.USER_COUNT]: Math.max(
-              0,
-              (scrapedData.manageTeamMembers?.length || 0) -
-                (deleteResult.deleted?.length || 0)
-            ),
+            [COLS.USER_COUNT]: Number(contractActiveLicenseCount) || 0,
           });
         }
       } catch (deleteError) {
@@ -316,6 +346,12 @@ async function runCheckForAccountId(id) {
       }
     }
   }
+
+  return await syncMappingAndUpsertTracking(
+    id,
+    scrapedData,
+    hasActiveLicense
+  );
 }
 
 const runCheck = async (req, res) => {
@@ -328,7 +364,7 @@ const runCheck = async (req, res) => {
   }
 
   try {
-    await runCheckForAccountId(id);
+    const trackingReconcile = await runCheckForAccountId(id);
     const account = await db(TABLE).where(COLS.ID, id).first();
 
     return res.json({
@@ -338,6 +374,14 @@ const runCheck = async (req, res) => {
       org_name: account?.[COLS.ORG_NAME] ?? null,
       user_count: account?.[COLS.USER_COUNT] ?? 0,
       license_status: account?.[COLS.LICENSE_STATUS] ?? "unknown",
+      tracking_reconcile:
+        trackingReconcile && typeof trackingReconcile === "object"
+          ? {
+              updated: trackingReconcile.updated ?? 0,
+              onTeam: trackingReconcile.onTeam ?? [],
+              notOnTeam: trackingReconcile.notOnTeam ?? [],
+            }
+          : null,
     });
   } catch (err) {
     logger.error("[renew-adobe] Run check failed marker=%s", marker, {

@@ -28,7 +28,14 @@ export function AddUserByEmail({ onAdded }: AddUserByEmailProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [lastDistribution, setLastDistribution] = useState<
-    { accountId: number; accountEmail: string; added: string[]; user_count_after?: number; error?: string }[]
+    {
+      accountId: number;
+      accountEmail: string;
+      added: string[];
+      user_count_after?: number;
+      members_after?: number;
+      error?: string;
+    }[]
   >([]);
   const [lastExceeded, setLastExceeded] = useState<string[] | null>(null);
 
@@ -121,7 +128,12 @@ export function AddUserByEmail({ onAdded }: AddUserByEmailProps) {
             ) : (
               <p key={d.accountId} className="text-emerald-400/90">
                 {d.accountEmail}: đã thêm {d.added?.length ?? 0} user
-                {d.user_count_after != null ? ` (sau: ${d.user_count_after}/10)` : ""}.
+                {d.members_after != null && d.user_count_after != null
+                  ? ` (team: ${d.members_after}/${d.user_count_after} slot)`
+                  : d.user_count_after != null
+                    ? ` (slot gói: ${d.user_count_after})`
+                    : ""}
+                .
               </p>
             )
           )}

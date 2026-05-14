@@ -51,7 +51,7 @@ const PackageProduct: React.FC = () => {
       closeAddModal,
       closeEditModal,
       closeViewModal,
-      handleCreateTemplate,
+      handleTemplateModalSubmit,
       handleAddSubmit,
       handleEditSubmit,
     },
@@ -150,7 +150,7 @@ const PackageProduct: React.FC = () => {
         mode={createModalMode}
         usedProductIds={usedProductIds}
         onClose={() => setCreateModalOpen(false)}
-        onSubmit={handleCreateTemplate}
+        onSubmit={handleTemplateModalSubmit}
       />
       {selectedTemplate && (
         <PackageFormModal

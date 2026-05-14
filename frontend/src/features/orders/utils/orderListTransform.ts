@@ -73,8 +73,11 @@ export function enrichOrdersWithVirtualFields(
     );
     const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
     const daysForValue = Math.max(0, effectiveRemaining);
+    /** Giá trị còn lại theo doanh thu = giá bán × (ngày còn lại) ÷ tổng ngày (trùng calcRemainingRefund phía server). */
     let giaTriConLai =
-      soNgayDangKy > 0 ? (giaBan * daysForValue) / soNgayDangKy : 0;
+      soNgayDangKy > 0
+        ? Math.max(0, Math.round((giaBan * daysForValue) / soNgayDangKy))
+        : 0;
 
     const rawRefund =
       order.can_hoan ??
@@ -88,8 +91,7 @@ export function enrichOrdersWithVirtualFields(
     if (dataset === "canceled") {
       refundFromDb = parseNumeric((order as Record<string, unknown>)["refund"]);
       if (refundFromDb !== null) {
-        // refund trong DB đang lưu âm để phục vụ bút toán; UI hoàn tiền cần hiển thị giá trị tuyệt đối.
-        giaTriConLai = Math.abs(refundFromDb);
+        // Cột `refund` khi hủy đơn lưu theo giá vốn/NCC (calcRemainingImport), không dùng để hiển thị "giá trị còn lại" theo giá bán.
         canHoanValue = Math.abs(refundFromDb);
       }
     }

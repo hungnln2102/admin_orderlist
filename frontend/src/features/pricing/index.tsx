@@ -21,6 +21,7 @@ function Pricing() {
     setRowsPerPage,
     pricingStats,
     filteredPricing,
+    productPrices,
     isLoading,
     error,
     isRefreshing,
@@ -92,6 +93,7 @@ function Pricing() {
       <CreateProductModal
         isOpen={isCreateModalOpen}
         createForm={createForm}
+        existingProductRows={productPrices}
         productNameOptions={productNameOptions}
         productPackageOptionsByName={productPackageOptionsByName}
         createSuppliers={createSuppliers}
@@ -120,10 +122,14 @@ function Pricing() {
         />
         <PricingFilters
           searchTerm={searchTerm}
+          statusFilter={statusFilter}
           isLoading={isLoading}
           isRefreshing={isRefreshing}
           error={error}
           onSearchChange={setSearchTerm}
+          onPromoFilterToggle={() =>
+            setStatusFilter(statusFilter === "promo" ? "all" : "promo")
+          }
           onRefresh={handleRefreshAll}
           onAddProduct={handleOpenCreateModal}
         />

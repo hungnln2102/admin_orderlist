@@ -34,8 +34,11 @@ export const PackageRow: React.FC<PackageRowProps> = ({
   const totalSlots = row.slotLimit || DEFAULT_SLOT_LIMIT;
   const slotUsed = row.slotUsed;
   const remainingSlots = row.remainingSlots;
-  const slotAvailabilityRatio =
-    totalSlots > 0 ? Math.min((remainingSlots / totalSlots) * 100, 100) : 0;
+  /** Cột “SỐ LƯỢNG”: thanh tô = tỷ lệ **đã dùng** (0 dùng → thanh trống). */
+  const slotUsedFillRatio =
+    totalSlots > 0
+      ? Math.min((Math.min(slotUsed, totalSlots) / totalSlots) * 100, 100)
+      : 0;
   const slotAvailabilityState = getSlotAvailabilityState(remainingSlots);
   const slotColorClass =
     slotAvailabilityState === "out"
@@ -47,9 +50,13 @@ export const PackageRow: React.FC<PackageRowProps> = ({
   const capacityLimit = row.capacityLimit || DEFAULT_CAPACITY_LIMIT;
   const capacityUsed = row.capacityUsed;
   const remainingCapacity = row.remainingCapacity;
-  const capacityAvailabilityRatio =
+  /** Cột dung lượng: thanh tô = tỷ lệ **đã dùng** GB. */
+  const capacityUsedFillRatio =
     capacityLimit > 0
-      ? Math.min((remainingCapacity / capacityLimit) * 100, 100)
+      ? Math.min(
+          (Math.min(capacityUsed, capacityLimit) / capacityLimit) * 100,
+          100
+        )
       : 0;
   const capacityAvailabilityState = getCapacityAvailabilityState(
     remainingCapacity,
@@ -98,7 +105,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
           <div className="w-full bg-white/5 rounded-full h-1.5 mt-2 overflow-hidden border border-white/5">
             <div
               className={`h-full rounded-full transition-all duration-500 ${slotColorClass} shadow-[0_0_8px_rgba(34,197,94,0.4)]`}
-              style={{ width: `${slotAvailabilityRatio}%` }}
+              style={{ width: `${slotUsedFillRatio}%` }}
             />
           </div>
           <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mt-2 whitespace-nowrap">
@@ -118,7 +125,7 @@ export const PackageRow: React.FC<PackageRowProps> = ({
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${capacityColorClass} shadow-[0_0_8px_rgba(168,85,247,0.4)]`}
                     style={{
-                      width: `${capacityAvailabilityRatio}%`,
+                      width: `${capacityUsedFillRatio}%`,
                     }}
                   />
                 </div>
@@ -223,11 +230,60 @@ export const PackageRow: React.FC<PackageRowProps> = ({
                         {slot.assignment?.slotLabel || `Slot ${slot.slotNumber}`}
                       </span>
                     </div>
-                    <p className={`text-[11px] font-bold uppercase tracking-widest mt-2 ${slot.isUsed ? "text-amber-500/80" : "text-emerald-500/80"}`}>
-                      {slot.assignment && showRowCapacity
-                        ? formatCapacityLabel(slot.assignment.capacityUnits)
-                        : slot.isUsed ? "ASSIGNED" : "AVAILABLE"}
-                    </p>
+                    <div
+                      className={`mt-2 w-full min-w-0 flex flex-col items-center gap-0.5 ${
+                        slot.isUsed ? "text-amber-200/95" : "text-emerald-500/80"
+                      }`}
+                    >
+                      {slot.assignment ? (
+                        <>
+                          {slot.assignment.sourceOrderCode != null &&
+                            String(slot.assignment.sourceOrderCode).length > 0 && (
+                            <p
+                              className="text-[10px] font-bold uppercase tracking-tight text-center line-clamp-2"
+                              title={String(slot.assignment.sourceOrderCode)}
+                            >
+                              Đơn: {String(slot.assignment.sourceOrderCode)}
+                            </p>
+                          )}
+                          {slot.assignment.customerLabel && (
+                            <p
+                              className="text-[9px] font-medium text-center text-white/70 line-clamp-2 w-full"
+                              title={slot.assignment.customerLabel}
+                            >
+                              {slot.assignment.customerLabel}
+                            </p>
+                          )}
+                          {showRowCapacity && (
+                            <p className="text-[9px] font-semibold text-amber-400/90 tabular-nums">
+                              {formatCapacityLabel(slot.assignment.capacityUnits)}
+                            </p>
+                          )}
+                          {(() => {
+                            const a = slot.assignment;
+                            const hasCode =
+                              a?.sourceOrderCode != null &&
+                              String(a.sourceOrderCode).trim().length > 0;
+                            if (!a || hasCode || a.customerLabel || showRowCapacity) return null;
+                            const mv = a.matchValue?.toString().trim();
+                            if (!mv) return null;
+                            return (
+                              <p className="text-[9px] text-center text-white/55 line-clamp-2" title={mv}>
+                                {mv}
+                              </p>
+                            );
+                          })()}
+                        </>
+                      ) : slot.isUsed ? (
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-amber-500/80">
+                          Đã gán
+                        </p>
+                      ) : (
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-500/80">
+                          AVAILABLE
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

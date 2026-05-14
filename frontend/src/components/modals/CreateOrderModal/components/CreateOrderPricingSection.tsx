@@ -7,7 +7,6 @@ import {
   inputClass,
   labelClass,
   panelClass,
-  panelSubtitleClass,
   panelTitleClass,
   readOnlyClass,
 } from "../helpers";
@@ -57,7 +56,6 @@ export const CreateOrderPricingSection = ({
     <section className={`${panelClass} lg:col-span-2`}>
       <div className="mb-4">
         <h4 className={panelTitleClass}>Chi phí & thời hạn đơn hàng</h4>
-        <p className={panelSubtitleClass}>{copy.panelSubtitle}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div>

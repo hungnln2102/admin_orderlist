@@ -5,20 +5,18 @@ const deleteOrderWithArchive = async ({
     helpers,
 }) => {
     const { TABLES, ORDERS_SCHEMA, STATUS } = helpers;
-    const { adjustSupplierDebtIfNeeded } = require("./orderFinanceHelpers");
-    const { calcRemainingImport } = require("./finance/refunds");
+    const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
+    const { storeProfitExpensesHasMavnColumns } = require("./finance/storeProfitExpensesHasMavnColumns");
+    const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
+    const { calcRemainingRefund } = require("./finance/refunds");
     const { updateDashboardMonthlySummaryOnStatusChange } = require("./finance/dashboardSummary");
     const { createOrGetRefundCreditNoteForOrder } = require("./finance/refundCredits");
-    const { toNullableNumber, todayYMDInVietnam } = require("../../utils/normalizers");
-    const { isMavnImportOrder, isGiftOrder } = require("../../utils/orderHelpers");
-    const logger = require("../../utils/logger");
-
+    const { todayYMDInVietnam } = require("../../utils/normalizers");
     const orderId = order?.id;
     const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
     const refundCol = ORDERS_SCHEMA.ORDER_LIST.COLS.REFUND;
     const canceledAtCol = ORDERS_SCHEMA.ORDER_LIST.COLS.CANCELED_AT;
     const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
-    const informationOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.INFORMATION_ORDER;
     const buildRefundReferenceCode = (orderCodeRaw) => {
         const normalizedCode = String(orderCodeRaw || "").trim();
         return normalizedCode ? `RF ${normalizedCode}` : "RF";
@@ -28,20 +26,6 @@ const deleteOrderWithArchive = async ({
         if (!Number.isFinite(num) || num === 0) return 0;
         return Math.abs(Math.round(num));
     };
-
-    try {
-        await adjustSupplierDebtIfNeeded(trx, order, normalized);
-    } catch (debtErr) {
-        const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
-        logger.warn("Lỗi khi trừ/cộng công nợ NCC", {
-            id: orderId,
-            supply_id: order?.[supplyIdCol],
-            cost: order?.cost,
-            status: order?.status,
-            error: debtErr?.message || String(debtErr),
-            stack: debtErr?.stack,
-        });
-    }
 
     const normalizedStatus = String(
         normalized?.status ||
@@ -54,6 +38,17 @@ const deleteOrderWithArchive = async ({
         normalizedStatus === STATUS.EXPIRED;
 
     if (isHardDelete) {
+        const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
+        const eCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+        if (isMavnImportOrder(order) && (await storeProfitExpensesHasMavnColumns())) {
+            const code = String(order?.[idOrderCol] ?? "").trim();
+            if (code) {
+                await trx(expenseTable)
+                    .where(eCols.EXPENSE_TYPE, "mavn_import")
+                    .where(eCols.LINKED_ORDER_CODE, code)
+                    .del();
+            }
+        }
         await trx(TABLES.orderList).where({ id: orderId }).del();
         await trx.commit();
         return { success: true, movedTo: "deleted", deletedOrder: normalized };
@@ -65,31 +60,21 @@ const deleteOrderWithArchive = async ({
     let movedTo = shouldArchiveToCanceled ? "canceled" : "expired";
 
     if (shouldArchiveToCanceled) {
-        const isMavn = isMavnImportOrder(order);
         const isGift = isGiftOrder(order);
         let refundValue = 0;
-        if (isMavn) {
-            const importRefund = calcRemainingImport(order, normalized);
-            const fallbackCost = toNullableNumber(order?.cost) || 0;
-            refundValue = toPositiveAmount(
-                Math.max(0, importRefund != null ? Number(importRefund) : fallbackCost)
-            );
-        } else if (isGift) {
-            // MAVT: giá trị hoàn trên đơn luôn 0 (log NCC được trigger tính riêng theo cost/ngày còn lại).
+        if (isGift) {
+            // MAVT: giá trị hoàn ghi trên đơn = 0 (NCC tính riêng theo cost / ngày còn lại).
             refundValue = 0;
         } else {
-            const importRefund = calcRemainingImport(order, normalized);
-            const fallbackCost = toNullableNumber(order?.cost) || 0;
-            refundValue = toPositiveAmount(
-                Math.max(0, importRefund != null ? Number(importRefund) : fallbackCost)
-            );
+            // Cột `refund` = giá trị còn lại theo doanh thu (giá bán prorata), cùng calcRemainingRefund ở UI.
+            const customerRefund = Number(calcRemainingRefund(order, normalized)) || 0;
+            refundValue = toPositiveAmount(Math.max(0, customerRefund));
         }
 
         // Rule mới: xóa đơn luôn vào Chưa Hoàn để theo dõi log NCC và xác nhận hoàn theo từng bước.
         const archiveStatus = STATUS.PENDING_REFUND;
         movedTo = "canceled";
         const orderCode = order?.[idOrderCol] ?? order?.id_order;
-        const refundReferenceCode = buildRefundReferenceCode(orderCode);
 
         // canceled_at: chỉ ghi một lần lúc chuyển sang Chưa Hoàn / Hủy (ngày VN, YYYY-MM-DD).
         const existingCanceledRaw = order?.[canceledAtCol] ?? order?.canceled_at;
@@ -99,10 +84,10 @@ const deleteOrderWithArchive = async ({
             String(existingCanceledRaw).trim() !== "" &&
             String(existingCanceledRaw).trim().toLowerCase() !== "null";
 
+        // Không ghi đè information_order (email/tài khoản…) — chỉ trạng thái, refund, ngày hủy.
         const updatePayload = {
             [statusCol]: archiveStatus,
             [refundCol]: refundValue,
-            [informationOrderCol]: refundReferenceCode,
         };
         if (!hasCanceledAt) {
             updatePayload[canceledAtCol] = todayYMDInVietnam();
@@ -114,7 +99,6 @@ const deleteOrderWithArchive = async ({
             ...order,
             [statusCol]: archiveStatus,
             [refundCol]: refundValue,
-            [informationOrderCol]: refundReferenceCode,
         };
         if (updatePayload[canceledAtCol] !== undefined) {
             afterOrder[canceledAtCol] = updatePayload[canceledAtCol];

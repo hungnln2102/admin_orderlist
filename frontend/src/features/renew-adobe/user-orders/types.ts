@@ -1,6 +1,7 @@
 import type { LicenseStatus } from "../types";
+import type { AdobeSystemCode } from "./system-options";
 
-/** not_added = email chưa có trong users_snapshot; no_product = đã add nhưng chưa gán product Adobe */
+/** not_added = chưa gán admin; no_product = đã gán nhưng chưa cấp quyền Adobe */
 export type DisplayStatus = LicenseStatus | "no_product" | "not_added";
 
 export type UserOrderRow = {
@@ -12,6 +13,7 @@ export type UserOrderRow = {
   display_status: DisplayStatus;
   expiry: string;
   accountId: number;
+  systemNote: AdobeSystemCode;
 };
 
 export type OrderInfo = {
@@ -21,4 +23,11 @@ export type OrderInfo = {
   contact: string;
   expiry_date: string | null;
   status: string;
+  tracking_org_name?: string | null;
+  tracking_status?: string | null;
+  tracking_id_product?: string | null;
+  system_note?: AdobeSystemCode | string | null;
+  adobe_account_id?: number | null;
+  admin_license_status?: string | null;
+  admin_org_name?: string | null;
 };

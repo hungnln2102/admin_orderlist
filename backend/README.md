@@ -18,10 +18,10 @@ src/
 │   ├── DashboardController/
 │   └── ...
 ├── middleware/          # authGuard, errorHandler, validateRequest, rateLimiter, csrfProtection
-├── routes/              # API route definitions
-│   ├── index.js         # Main router (auth, system, then authGuard, then feature routes)
-│   ├── systemRoutes.js  # error-report, run-due-notification (no auth)
-│   ├── ordersRoutes.js
+├── domains/             # Bounded context: <name>/routes.js (+ controller, use-cases, … khi refactor sâu)
+├── routes/              # API: index.js (mount domains + legacy), auth, system, renew, …
+│   ├── index.js         # Main router — ưu tiên require ../domains/<x>/routes
+│   ├── systemRoutes.js
 │   └── ...
 ├── scheduler/           # Cron jobs (đơn hết hạn, thông báo Telegram)
 │   ├── config.js        # pool, timezone, cron expression, getSqlCurrentDate
@@ -37,7 +37,8 @@ src/
 ```
 
 Root-level (backend/):
-- `index.js` → requires `src/server`
+- `src/server.js` → entry mặc định (`npm start`, `npm run dev`)
+- `index.js` → shim tương thích (`require("./src/server")`) nếu deploy vẫn gọi `node index.js`
 - `helpers.js` → re-exports `src/utils/orderHelpers`
 - `scheduler.js` → re-exports `src/scheduler`
 - `webhook/` → Sepay webhook server
@@ -187,7 +188,7 @@ npm run format    # Format with Prettier
 ### Debugging
 Set breakpoints và sử dụng:
 ```bash
-node --inspect index.js
+node --inspect src/server.js
 ```
 
 ## Common Tasks

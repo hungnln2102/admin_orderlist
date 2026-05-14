@@ -14,15 +14,7 @@ import { ViewSupplierModalProps } from "./types";
 import { showAppNotification } from "@/lib/notifications";
 import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../ViewOrderModal/constants";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-
-const formatCompactDate = (date = new Date()) => {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = String(date.getFullYear());
-  return `${day}${month}${year}`;
-};
-const buildPaymentContent = (supplierName: string) =>
-  `TT ${supplierName || "NCC"} kỳ ${formatCompactDate()}`;
+import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
 export default function ViewSupplierModal({
   isOpen,
@@ -48,6 +40,10 @@ export default function ViewSupplierModal({
       const paid = Number(payment?.paid ?? 0);
       const amountDue = raw < 0 ? Math.abs(raw) : Math.max(0, raw - paid);
       const supplierName = String(supply?.sourceName || "").trim() || "NCC";
+      const paymentContent = buildNccTransferContentByBalance({
+        balanceSigned: raw,
+        supplierName,
+      });
       const res = await apiFetch(`/api/payment-supply/${selectedPaymentId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,7 +52,7 @@ export default function ViewSupplierModal({
             ? {
               supplyId: supply?.id,
               paidAmount: Math.round(amountDue),
-              paymentContent: buildPaymentContent(supplierName),
+              paymentContent,
             }
             : { supplyId: supply?.id }
         ),
@@ -85,8 +81,11 @@ export default function ViewSupplierModal({
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
     const supplierName = String(supply.sourceName || "").trim() || "NCC";
-    const desc = buildPaymentContent(supplierName);
     const isNegative = raw < 0;
+    const desc = buildNccTransferContentByBalance({
+      balanceSigned: raw,
+      supplierName,
+    });
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
     if (isNegative) {

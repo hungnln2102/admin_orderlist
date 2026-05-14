@@ -1,5 +1,5 @@
 /**
- * Supplier Service — công nợ theo đơn: supplier_order_cost_log; phát sinh TT: supplier_payment_ledger.
+ * Supplier service — resolve supplier id; ghi chú NCC theo đơn: `partner.supplier_order_cost_log`.
  */
 
 const { db } = require("../db");
@@ -9,7 +9,8 @@ const { resolveSupplierNameColumn } = require("../controllers/SuppliesController
 
 const findSupplierIdByName = async (supplyName, trx = null) => {
   const query = trx || db;
-  const name = supplyName === undefined || supplyName === null ? "" : String(supplyName);
+  const name =
+    supplyName === undefined || supplyName === null ? "" : String(supplyName);
 
   if (!name) return null;
 
@@ -32,15 +33,7 @@ const formatPaymentNote = (date = new Date()) => {
   return `${day}/${month}/${year}`;
 };
 
-/** @deprecated Dùng trigger / ledger. */
-const increaseSupplierDebt = async () => {};
-
-/** @deprecated Dùng trigger / ledger. */
-const decreaseSupplierDebt = async () => {};
-
 module.exports = {
   findSupplierIdByName,
-  increaseSupplierDebt,
-  decreaseSupplierDebt,
   formatPaymentNote,
 };

@@ -20,11 +20,11 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({ rightSlot }) => (
         </p>
       </div>
       {rightSlot ? (
-        <div className="w-full shrink-0 md:w-auto md:max-w-[min(100%,22.5rem)] flex flex-col items-stretch md:items-end gap-2">
+        <div className="w-full shrink-0 md:w-auto md:max-w-[min(100%,46rem)] flex flex-col items-stretch md:items-end gap-2">
           <p className="hidden md:block text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-200/45 text-right pr-0.5">
             Lọc chu kỳ
           </p>
-          <div className="w-full md:w-[min(100%,22.5rem)]">{rightSlot}</div>
+          <div className="w-full md:w-auto">{rightSlot}</div>
         </div>
       ) : null}
     </div>

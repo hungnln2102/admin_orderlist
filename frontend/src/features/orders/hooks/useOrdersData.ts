@@ -98,6 +98,7 @@ export function useOrdersData(
     handleRenewOrder: actions.handleRenewOrder,
     confirmDelete: actions.confirmDelete,
     renewingOrderCode: actions.renewingOrderCode,
+    completingOrderCode: actions.completingOrderCode,
     // Fetch
     fetchError,
     reloadOrders: fetchOrders,

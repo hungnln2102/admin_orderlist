@@ -10,6 +10,8 @@ export type CategoryItem = {
 
 export type ProductPriceItem = {
   id: number;
+  /** `product.id` (bảng product) — định danh gói, dùng nhóm danh mục / đổi tên theo id */
+  catalog_product_id?: number | null;
   san_pham: string;
   package_product?: string | null;
   package?: string | null;
@@ -27,6 +29,8 @@ export type ProductPriceItem = {
 
 export type MergedProduct = ProductDescription & {
   priceId?: number | null;
+  /** `product.id` từ bảng giá (cùng cho mọi variant thuộc gói) */
+  catalogProductId?: number | null;
   packageProduct?: string | null;
   packageName?: string | null;
   category?: string | null;
@@ -696,6 +700,7 @@ export const mergeProducts = (
     merged.push({
       ...item,
       priceId: priceRow?.id ?? null,
+      catalogProductId: priceRow?.catalog_product_id ?? null,
       productId: item.productId || "",
       productName:
         item.productName ||
@@ -737,6 +742,7 @@ export const mergeProducts = (
     merged.push({
       id: priceItem.id,
       priceId: priceItem.id,
+      catalogProductId: priceItem.catalog_product_id ?? null,
       productId: priceItem.san_pham || "",
       productName: priceItem.package_product || priceItem.san_pham || "",
       packageProduct: priceItem.package_product || priceItem.san_pham || "",

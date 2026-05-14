@@ -6,6 +6,7 @@
   "scripts": {
     "docker:build": "node scripts/docker-build.js",
     "docker:up": "docker compose up -d",
+    "dev:renew-adobe": "node services/renew-adobe-api/server.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build:frontend": "npm --prefix frontend run build",

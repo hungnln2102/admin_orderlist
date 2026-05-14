@@ -1,14 +1,16 @@
 import { useEffect } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
+  ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
 import * as Helpers from "../../../../lib/helpers";
 import { INITIAL_FORM_DATA } from "../helpers";
-import { CreateOrderPrefillContext, CustomerType, Order, Supply, SupplyPrice } from "../types";
+import { CreateOrderPrefillContext, CreateOrderCreationKind, CustomerType, Order, Supply, SupplyPrice } from "../types";
 
 type UseOrderInitParams = {
   isOpen: boolean;
+  orderCreationKind: CreateOrderCreationKind;
   customerType: CustomerType;
   setCustomerType: React.Dispatch<React.SetStateAction<CustomerType>>;
   setFormData: React.Dispatch<React.SetStateAction<Partial<Order>>>;
@@ -24,6 +26,7 @@ type UseOrderInitParams = {
 
 export const useOrderInit = ({
   isOpen,
+  orderCreationKind,
   customerType,
   setCustomerType,
   setFormData,
@@ -42,7 +45,16 @@ export const useOrderInit = ({
     const detectedPrefix = (["MAVC", "MAVL", "MAVK", "MAVT", "MAVN", "MAVS"] as const).find((prefix) =>
       prefillReservedCode.startsWith(prefix)
     );
-    const initialType: CustomerType = (detectedPrefix || DEFAULT_ORDER_CODE_PREFIX) as CustomerType;
+    let initialType: CustomerType = (detectedPrefix || DEFAULT_ORDER_CODE_PREFIX) as CustomerType;
+    if (orderCreationKind === "import") {
+      if (initialType !== ORDER_CODE_PREFIXES.IMPORT) {
+        initialType = ORDER_CODE_PREFIXES.IMPORT;
+      }
+    } else {
+      if (initialType === ORDER_CODE_PREFIXES.IMPORT) {
+        initialType = DEFAULT_ORDER_CODE_PREFIX as CustomerType;
+      }
+    }
     const initialDate = Helpers.getTodayDMY();
 
     setCustomerType(initialType);
@@ -64,6 +76,7 @@ export const useOrderInit = ({
     fetchAllSupplies();
   }, [
     prefillContext,
+    orderCreationKind,
     fetchAllSupplies,
     fetchProducts,
     isOpen,

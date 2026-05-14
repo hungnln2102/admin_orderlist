@@ -71,7 +71,62 @@ const FINANCE_SCHEMA = {
       TOTAL_REVENUE: "total_revenue",
       TOTAL_PROFIT: "total_profit",
       TOTAL_REFUND: "total_refund",
+      /** Tổng import_cost từ partner.supplier_order_cost_log theo tháng (logged_at). */
+      TOTAL_IMPORT: "total_import",
+      /** Ước tính thuế theo tháng (theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT trên total_revenue). */
+      TOTAL_TAX: "total_tax",
+      /**
+       * Tiền NH nhận ngoài luồng doanh thu: webhook không mã đơn, và tiền thừa sau khi đơn đã PAID.
+       */
+      TOTAL_OFF_FLOW_BANK_RECEIPT: "total_off_flow_bank_receipt",
+      /**
+       * Số dư bank ước tính (tiền lưu động): cộng/trừ trực tiếp theo luồng in/out thực tế.
+       */
+      ESTIMATED_BANK_BALANCE: "estimated_bank_balance",
       UPDATED_AT: "updated_at",
+    },
+  },
+  /** Tổng hợp theo ngày: earned / unearned cuối ngày / đảo chiều — nguồn ghi do job hoặc sync sau này. */
+  DAILY_REVENUE_SUMMARY: {
+    TABLE: "daily_revenue_summary",
+    COLS: {
+      SUMMARY_DATE: "summary_date",
+      EARNED_REVENUE: "earned_revenue",
+      UNEARNED_REVENUE_END: "unearned_revenue_end",
+      REVENUE_REVERSED: "revenue_reversed",
+      /** Nhập (mavn/external): phân bổ amount/term theo đơn hoặc N ngày từ created_at; withdraw_profit: cả khoản vào ngày created_at. */
+      TOTAL_SHOP_COST: "total_shop_cost",
+      /** Σ((price−cost)/term) đơn MAVC/L/K/S — khớp TaxDailyFormTable metric «profit». */
+      ALLOCATED_PROFIT_TAX: "allocated_profit_tax",
+      /**
+       * Đơn đếm trên biểu đồ dashboard: birth_date = ngày, status trong nhóm «đang trong sổ bán», birth ≥ tax_from (backfill).
+       */
+      DASHBOARD_ORDERS_COUNT: "dashboard_orders_count",
+      /** Đơn hủy/hoàn: canceled_at ngày, status Chưa/Đã hoàn, canceled ≥ tax_from. */
+      DASHBOARD_CANCELED_COUNT: "dashboard_canceled_count",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  /** Log biến động tài chính dashboard theo tháng (append-only, phục vụ đối soát/audit). */
+  DASHBOARD_FINANCIAL_CHANGE_LOG: {
+    TABLE: "dashboard_financial_change_log",
+    COLS: {
+      ID: "id",
+      MONTH_KEY: "month_key",
+      REVENUE_DELTA: "revenue_delta",
+      PROFIT_DELTA: "profit_delta",
+      IMPORT_DELTA: "import_delta",
+      REFUND_DELTA: "refund_delta",
+      OFF_FLOW_DELTA: "off_flow_delta",
+      BANK_BALANCE_DELTA: "bank_balance_delta",
+      TAX_SNAPSHOT: "tax_snapshot",
+      OFF_FLOW_SNAPSHOT: "off_flow_snapshot",
+      BANK_BALANCE_SNAPSHOT: "bank_balance_snapshot",
+      // Legacy column kept for backward compatibility with old migrations/data.
+      AVAILABLE_PROFIT_SNAPSHOT: "available_profit_snapshot",
+      CONTEXT: "context",
+      CREATED_AT: "created_at",
     },
   },
   STORE_PROFIT_EXPENSES: {
@@ -82,6 +137,9 @@ const FINANCE_SCHEMA = {
       REASON: "reason",
       EXPENSE_TYPE: "expense_type",
       CREATED_AT: "created_at",
+      /** Gắn mã đơn MAVN khi `expense_type = mavn_import` (migration 088). */
+      LINKED_ORDER_CODE: "linked_order_code",
+      EXPENSE_META: "expense_meta",
     },
   },
 };

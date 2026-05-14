@@ -40,11 +40,18 @@ export function normalizeAdobeAdminAccount(
         : null,
     org_name: row.org_name != null ? String(row.org_name) : null,
     user_count: Number(row.user_count) ?? 0,
+    tracking_user_count:
+      row.tracking_user_count != null &&
+      Number.isFinite(Number(row.tracking_user_count))
+        ? Number(row.tracking_user_count)
+        : 0,
     license_status: licenseStatus,
-    users_snapshot:
-      row.users_snapshot != null ? String(row.users_snapshot) : null,
     order_code: row.order_code != null ? String(row.order_code) : null,
     last_checked_at: row.last_checked_at != null ? String(row.last_checked_at) : null,
     access_url: row.access_url != null ? String(row.access_url) : null,
+    id_product:
+      row.id_product != null && String(row.id_product).trim() !== ""
+        ? String(row.id_product).trim()
+        : null,
   };
 }

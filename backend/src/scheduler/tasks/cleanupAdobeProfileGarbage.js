@@ -6,7 +6,10 @@ const { TABLE, COLS } = require("../../controllers/RenewAdobeController/accountT
 const {
   getProfilesRootDir,
   sanitizeEmailForPath,
-} = require("../../services/adobe-renew-v2/shared/profileSession");
+} = require("../../services/renew-adobe/adobe-renew-v2/shared/profileSession");
+const {
+  ensureAdminAccountsExist,
+} = require("./shared/adminAccountsGuard");
 
 function buildExpectedProfileKeysFromEmails(emails = []) {
   const keys = new Set();
@@ -44,6 +47,14 @@ function removeOrphanProfileDirs(rootDir, existingProfileKeys) {
 
 function createCleanupAdobeProfileGarbageTask() {
   return async function cleanupAdobeProfileGarbageTask(trigger = "cron") {
+    if (
+      !(await ensureAdminAccountsExist({
+        taskName: "cleanupAdobeProfileGarbageTask",
+        trigger,
+      }))
+    ) {
+      return { success: true, trigger, skipped: true };
+    }
     const rootDir = getProfilesRootDir();
     try {
       const rows = await db(TABLE).select(COLS.EMAIL);

@@ -10,22 +10,34 @@ const {
   SCHEMA_RECEIPT,
   SCHEMA_FINANCE,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   tableName,
 } = require("../../config/dbSchema");
 const { QUOTED_COLS } = require("../../utils/columns");
 const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
-const { updateDashboardMonthlySummaryOnStatusChange } = require("../Order/finance/dashboardSummary");
+const {
+  updateDashboardMonthlySummaryOnStatusChange,
+  recomputeSummaryMonthTotalTax,
+  applyEstimatedBankBalanceDelta,
+} = require("../Order/finance/dashboardSummary");
+const {
+  notifyFinanceMonthlyDelta,
+} = require("../../services/telegramFinanceDeltaNotifier");
+const {
+  computeDashboardPaymentDecision,
+} = require("../Order/finance/dashboardPaymentPostingPolicy");
+const { syncMavnStoreProfitExpense } = require("../Order/orderFinanceHelpers");
 const { runRenewal } = require("../../../webhook/sepay/renewal");
 
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 const PAYMENT_RECEIPT_STATE_DEF = getDefinition(
   "PAYMENT_RECEIPT_FINANCIAL_STATE",
-  ORDERS_SCHEMA
+  RECEIPT_SCHEMA
 );
 const PAYMENT_RECEIPT_AUDIT_DEF = getDefinition(
   "PAYMENT_RECEIPT_FINANCIAL_AUDIT_LOG",
-  ORDERS_SCHEMA
+  RECEIPT_SCHEMA
 );
 const ORDER_LIST_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
 const DASHBOARD_SUMMARY_DEF = getDefinition(
@@ -33,29 +45,8 @@ const DASHBOARD_SUMMARY_DEF = getDefinition(
   FINANCE_SCHEMA
 );
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
-const PAYMENT_RECEIPT_BATCH_COLS = {
-  ID: "id",
-  BATCH_CODE: "batch_code",
-  TOTAL_AMOUNT: "total_amount",
-  ORDER_COUNT: "order_count",
-  STATUS: "status",
-  SOURCE: "source",
-  NOTE: "note",
-  PAID_RECEIPT_ID: "paid_receipt_id",
-  PAID_AT: "paid_at",
-  CREATED_AT: "created_at",
-  UPDATED_AT: "updated_at",
-};
-const PAYMENT_RECEIPT_BATCH_ITEM_COLS = {
-  ID: "id",
-  BATCH_ID: "batch_id",
-  BATCH_CODE: "batch_code",
-  ORDER_CODE: "order_code",
-  ORDER_LIST_ID: "order_list_id",
-  AMOUNT: "amount",
-  STATUS: "status",
-  CREATED_AT: "created_at",
-};
+const PAYMENT_RECEIPT_BATCH_COLS = RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.COLS;
+const PAYMENT_RECEIPT_BATCH_ITEM_COLS = RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH_ITEM.COLS;
 const TABLES = {
   paymentReceipt: tableName(PAYMENT_RECEIPT_DEF.tableName, SCHEMA_RECEIPT),
   paymentReceiptState: tableName(PAYMENT_RECEIPT_STATE_DEF.tableName, SCHEMA_RECEIPT),
@@ -63,8 +54,8 @@ const TABLES = {
   orderList: tableName(ORDER_LIST_DEF.tableName, SCHEMA_ORDERS),
   dashboardSummary: tableName(DASHBOARD_SUMMARY_DEF.tableName, SCHEMA_FINANCE),
   paymentSupply: tableName(PAYMENT_SUPPLY_DEF.tableName, SCHEMA_PARTNER),
-  paymentReceiptBatch: tableName("payment_receipt_batch", SCHEMA_RECEIPT),
-  paymentReceiptBatchItem: tableName("payment_receipt_batch_item", SCHEMA_RECEIPT),
+  paymentReceiptBatch: tableName(RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.TABLE, SCHEMA_RECEIPT),
+  paymentReceiptBatchItem: tableName(RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH_ITEM.TABLE, SCHEMA_RECEIPT),
   supply: tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER),
   supplyOrderCostLog: tableName(PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE, SCHEMA_PARTNER),
 };
@@ -144,13 +135,21 @@ const toMonthKey = (value) => {
 const applyDashboardDelta = async (
   trx,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0 } = {}
+  {
+    revenueDelta = 0,
+    profitDelta = 0,
+    ordersDelta = 0,
+    offFlowDelta = 0,
+    bankBalanceDelta = 0,
+  } = {}
 ) => {
   if (!monthKey) return;
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
-  if (!revenue && !profit && !orders) return;
+  const offFlow = normalizeMoney(offFlowDelta);
+  const bankBalance = normalizeMoney(bankBalanceDelta);
+  if (!revenue && !profit && !orders && !offFlow && !bankBalance) return;
 
   await trx.raw(
     `
@@ -159,18 +158,34 @@ const applyDashboardDelta = async (
         ${SUMMARY_COLS.totalOrders},
         ${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalOffFlowBankReceipt},
+        ${SUMMARY_COLS.estimatedBankBalance},
         ${SUMMARY_COLS.updatedAt}
       )
-      VALUES (?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
       ON CONFLICT (${SUMMARY_COLS.monthKey})
       DO UPDATE SET
         ${SUMMARY_COLS.totalOrders} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOrders} + EXCLUDED.${SUMMARY_COLS.totalOrders}),
         ${SUMMARY_COLS.totalRevenue} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalRevenue} + EXCLUDED.${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalProfit} + EXCLUDED.${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalOffFlowBankReceipt} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOffFlowBankReceipt} + EXCLUDED.${SUMMARY_COLS.totalOffFlowBankReceipt},
+        ${SUMMARY_COLS.estimatedBankBalance} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.estimatedBankBalance} + EXCLUDED.${SUMMARY_COLS.estimatedBankBalance},
         ${SUMMARY_COLS.updatedAt} = NOW();
     `,
-    [monthKey, orders, revenue, profit]
+    [monthKey, orders, revenue, profit, offFlow, bankBalance]
   );
+  await recomputeSummaryMonthTotalTax(trx, monthKey);
+  await notifyFinanceMonthlyDelta({
+    monthKey,
+    revenueDelta: revenue,
+    profitDelta: profit,
+    importDelta: 0,
+    refundDelta: 0,
+    offFlowDelta: offFlow,
+    bankBalanceDelta: bankBalance,
+    context: "payments.applyDashboardDelta",
+    executor: trx,
+  });
 };
 
 const listPaymentReceipts = async (req, res) => {
@@ -206,6 +221,7 @@ const listPaymentReceipts = async (req, res) => {
         isFinancialPosted: `fs.${RECEIPT_STATE_COLS.isFinancialPosted}`,
         postedRevenue: `fs.${RECEIPT_STATE_COLS.postedRevenue}`,
         postedProfit: `fs.${RECEIPT_STATE_COLS.postedProfit}`,
+        postedOffFlowBankReceipt: `fs.${RECEIPT_STATE_COLS.postedOffFlowBankReceipt}`,
         reconciledAt: `fs.${RECEIPT_STATE_COLS.reconciledAt}`,
         adjustmentApplied: `fs.${RECEIPT_STATE_COLS.adjustmentApplied}`,
       })
@@ -228,6 +244,7 @@ const listPaymentReceipts = async (req, res) => {
       isFinancialPosted: !!row.isFinancialPosted,
       postedRevenue: Number(row.postedRevenue) || 0,
       postedProfit: Number(row.postedProfit) || 0,
+      postedOffFlowBankReceipt: Number(row.postedOffFlowBankReceipt) || 0,
       reconciledAt: row.reconciledAt || null,
       adjustmentApplied: !!row.adjustmentApplied,
     }));
@@ -272,6 +289,7 @@ const listPaymentReceipts = async (req, res) => {
           isFinancialPosted: false,
           postedRevenue: 0,
           postedProfit: 0,
+          postedOffFlowBankReceipt: 0,
           reconciledAt: null,
           adjustmentApplied: false,
         }));
@@ -648,18 +666,49 @@ const reconcilePaymentReceipt = async (req, res) => {
 
       const adjustmentApplied = !!stateRow?.[RECEIPT_STATE_COLS.adjustmentApplied];
       const statusValueInitial = String(orderRow[ORDER_COLS.status] || "").trim();
-      // Mặc định luồng "Sửa mã đơn" sẽ tự mark paid nếu đơn đang Chưa Thanh Toán.
-      // Giúp đảm bảo phát sinh log NCC (trigger DB) và đúng rule nghiệp vụ mới.
-      const effectiveAction =
-        requestedAction === RECONCILE_ACTIONS.ONLY &&
-        statusValueInitial === STATUS.UNPAID
-          ? RECONCILE_ACTIONS.MARK_PAID
-          : requestedAction;
+      const orderSellingPriceVnd = normalizeMoney(orderRow[ORDER_COLS.price]);
+      const oCodeCol = PAYMENT_RECEIPT_DEF.columns.orderCode;
+      const aAmtCol = PAYMENT_RECEIPT_DEF.columns.amount;
+      const sumRes = await trx(TABLES.paymentReceipt)
+        .whereRaw(`LOWER(TRIM(COALESCE(??, '')::text)) = LOWER(?)`, [oCodeCol, orderCodeRaw])
+        .sum({ total_receipts: aAmtCol })
+        .first();
+      const totalReceiptsForOrderVnd = normalizeMoney(sumRes?.total_receipts);
+      const receiptAmtForDecision = normalizeMoney(
+        receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]
+      );
+      const paymentDecision = computeDashboardPaymentDecision({
+        orderPrice: orderSellingPriceVnd,
+        currentAmount: receiptAmtForDecision,
+        accumulatedAmount: totalReceiptsForOrderVnd,
+        creditAppliedAmount: 0,
+      });
+      // Giá bán 0/âm: giữ hành vi cũ (tự nâng mark paid nếu đơn Chưa Thanh Toán với luồng only).
+      const paidAmountCoversOrder =
+        orderSellingPriceVnd <= 0 ? true : paymentDecision.complete;
+
+      // Mặc định luồng "Sửa mã đơn" (reconcile_only) tự mark paid nếu đơn Chưa Thanh Toán
+      // và tổng biên lai gắn mã đủ theo policy thiếu < 5.000 VND. Tránh đưa "Đã Thanh Toán"
+      // khi thiếu đúng 5.000 VND trở lên.
+      let effectiveAction = requestedAction;
+      if (requestedAction === RECONCILE_ACTIONS.ONLY) {
+        if (statusValueInitial === STATUS.UNPAID && paidAmountCoversOrder) {
+          effectiveAction = RECONCILE_ACTIONS.MARK_PAID;
+        }
+      } else if (requestedAction === RECONCILE_ACTIONS.MARK_PAID) {
+        if (statusValueInitial === STATUS.UNPAID && !paidAmountCoversOrder) {
+          // Gắn mã vẫn lưu; không rollback — chỉ bỏ bước chuyển "Đã Thanh Toán" khi thiếu tiền.
+          effectiveAction = RECONCILE_ACTIONS.ONLY;
+        }
+      }
       let statusValue = statusValueInitial;
       let revenueDelta = 0;
       let profitDelta = 0;
+      let offFlowDelta = 0;
       let nextPostedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
       let nextPostedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
+      let nextPostedOffFlowBankReceipt =
+        Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
 
       if (adjustmentApplied) {
         await trx.raw(
@@ -679,25 +728,44 @@ const reconcilePaymentReceipt = async (req, res) => {
         const receiptMonthKey = toMonthKey(receiptRes[PAYMENT_RECEIPT_DEF.columns.paidDate]);
         const postedRevenue = Number(stateRow?.[RECEIPT_STATE_COLS.postedRevenue]) || 0;
         const postedProfit = Number(stateRow?.[RECEIPT_STATE_COLS.postedProfit]) || 0;
+        const postedOffFlowBankReceipt =
+          Number(stateRow?.[RECEIPT_STATE_COLS.postedOffFlowBankReceipt]) || 0;
+        const receiptAmt = normalizeMoney(receiptRes[PAYMENT_RECEIPT_DEF.columns.amount]);
+        const recognizedRevenue = normalizeMoney(
+          paymentDecision.recognizedRevenueForOrder ??
+            paymentDecision.recognizedRevenueCurrent
+        );
+        const offFlowForReceipt = normalizeMoney(
+          paymentDecision.offFlowForOrder ?? paymentDecision.offFlowCurrent
+        );
 
         if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
-          // Đơn đã được xử lý trước đó: trừ lại phần đã cộng trước ở receipt không mã.
+          // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
           revenueDelta = -postedRevenue;
           profitDelta = -postedProfit;
+          offFlowDelta = -postedOffFlowBankReceipt;
         } else if (statusValue === STATUS.UNPAID || statusValue === STATUS.RENEWAL) {
-          // Chỉ điều chỉnh lợi nhuận về đúng amount - cost.
           const cost = normalizeMoney(orderRow[ORDER_COLS.cost]);
-          profitDelta = -cost;
+          if (postedOffFlowBankReceipt > 0) {
+            revenueDelta = recognizedRevenue;
+            profitDelta = recognizedRevenue - cost;
+            offFlowDelta = offFlowForReceipt - postedOffFlowBankReceipt;
+          } else {
+            // Legacy: receipt không mã đã cộng thẳng DT/LN — chỉ chỉnh LN − cost.
+            profitDelta = -cost;
+          }
         }
 
         await applyDashboardDelta(trx, receiptMonthKey, {
           revenueDelta,
           profitDelta,
           ordersDelta: 0,
+          offFlowDelta,
         });
 
         nextPostedRevenue = postedRevenue + revenueDelta;
         nextPostedProfit = postedProfit + profitDelta;
+        nextPostedOffFlowBankReceipt = postedOffFlowBankReceipt + offFlowDelta;
 
         await trx(TABLES.paymentReceiptState)
           .where(RECEIPT_STATE_COLS.paymentReceiptId, receiptId)
@@ -705,6 +773,7 @@ const reconcilePaymentReceipt = async (req, res) => {
             [RECEIPT_STATE_COLS.isFinancialPosted]: true,
             [RECEIPT_STATE_COLS.postedRevenue]: nextPostedRevenue,
             [RECEIPT_STATE_COLS.postedProfit]: nextPostedProfit,
+            [RECEIPT_STATE_COLS.postedOffFlowBankReceipt]: nextPostedOffFlowBankReceipt,
             [RECEIPT_STATE_COLS.reconciledAt]: new Date(),
             [RECEIPT_STATE_COLS.adjustmentApplied]: true,
             [RECEIPT_STATE_COLS.updatedAt]: new Date(),
@@ -723,8 +792,23 @@ const reconcilePaymentReceipt = async (req, res) => {
             JSON.stringify({
               revenueDelta,
               profitDelta,
+              offFlowDelta,
               postedRevenue: nextPostedRevenue,
               postedProfit: nextPostedProfit,
+              postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
+              orderSellingPriceVnd,
+              receiptAmount: receiptAmt,
+              totalReceiptsForOrderVnd,
+              requiredMin: paymentDecision.requiredMin,
+              maxAcceptedShortfall: paymentDecision.maxAcceptedShortfall,
+              shortfallAmount: paymentDecision.shortfallAmount,
+              recognized_revenue_current:
+                normalizeMoney(paymentDecision.recognizedRevenueCurrent),
+              recognized_revenue_for_order: recognizedRevenue,
+              off_flow_current: offFlowForReceipt,
+              off_flow_for_order: offFlowForReceipt,
+              off_flow_source_order_code:
+                offFlowForReceipt > 0 ? orderCodeRaw : undefined,
               orderStatus: statusValue,
               action: effectiveAction,
             }),
@@ -761,6 +845,7 @@ const reconcilePaymentReceipt = async (req, res) => {
         }
 
         await updateDashboardMonthlySummaryOnStatusChange(trx, orderRow, updatedOrder);
+        await syncMavnStoreProfitExpense(trx, orderRow, updatedOrder);
         statusValue = STATUS.PAID;
         actionResult.statusAfterAction = statusValue;
 
@@ -805,14 +890,19 @@ const reconcilePaymentReceipt = async (req, res) => {
         status: statusValue,
         revenueDelta,
         profitDelta,
+        offFlowDelta,
         postedRevenue: nextPostedRevenue,
         postedProfit: nextPostedProfit,
+        postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
         reconciledAt: new Date().toISOString(),
         skipped: adjustmentApplied,
         reason: adjustmentApplied ? "adjustment already applied" : null,
         actionResult,
         shouldRunRenewal,
         effectiveAction,
+        orderSellingPriceVnd,
+        totalReceiptsForOrderVnd,
+        paidAmountCoversOrder,
       };
     });
 
@@ -844,7 +934,8 @@ const reconcilePaymentReceipt = async (req, res) => {
   } catch (error) {
     const statusCode = Number(error?.status) || 500;
     if (statusCode >= 400 && statusCode < 500) {
-      logger.warn("[payments] Từ chối reconcile biên lai theo rule nghiệp vụ", {
+      // 4xx = rule nghiệp vụ / idempotent (vd: đơn đã đổi trạng thái) — không gửi Telegram warn.
+      logger.debug("[payments] Từ chối reconcile biên lai (HTTP client/rule)", {
         receiptId,
         orderCode: orderCodeRaw,
         action: requestedAction,
@@ -984,7 +1075,7 @@ const confirmPaymentSupply = async (req, res) => {
       const addAmount = isSupplierRefundToShop
         ? -Math.abs(expectedPaidAmount)
         : Math.abs(expectedPaidAmount);
-      await trx.raw("DROP INDEX IF EXISTS partner.uq_supplier_payments_supplier_id;");
+      await trx.raw(`DROP INDEX IF EXISTS ${SCHEMA_PARTNER}.uq_supplier_payments_supplier_id;`);
       const insertResult = await trx.raw(
         `
         INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
@@ -1008,6 +1099,11 @@ const confirmPaymentSupply = async (req, res) => {
       `,
         [STATUS.PAID, resolvedSupplyId, STATUS.PAID]
       );
+
+      const paidMonthKey = toMonthKey(paymentDate);
+      if (paidMonthKey && expectedPaidAmount > 0) {
+        await applyEstimatedBankBalanceDelta(trx, paidMonthKey, -expectedPaidAmount);
+      }
 
       return {
         paymentRow: insertResult.rows?.[0] || null,

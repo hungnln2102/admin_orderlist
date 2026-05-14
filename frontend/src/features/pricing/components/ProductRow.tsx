@@ -7,15 +7,10 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ProductPricingRow } from "../types";
 import {
-  calculatePromoPrice,
   computeHighestSupplyPrice,
   formatCurrencyValue,
   formatDateLabel,
-  formatPromoPercent,
-  formatRateDescription,
-  hasValidPromoRatio,
-  multiplyBasePrice,
-  multiplyValue,
+  formatProfitPercentBySale,
   parseRatioInput,
   pickCheapestSupplier,
 } from "../utils";
@@ -68,82 +63,81 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
   const formattedUpdated = displayUpdated
     ? formatDateLabel(displayUpdated)
     : "-";
-  const hasPromoForRow = hasValidPromoRatio(
-    item.pctPromo,
-    item.pctKhach,
-    item.pctCtv
-  );
+  const hasPromoForRow =
+    typeof item.promoPrice === "number" &&
+    Number.isFinite(item.promoPrice) &&
+    item.promoPrice > 0;
   const isEditingProduct = editControls.editingProductId === item.id;
   const currentEditForm = isEditingProduct ? editControls.productEditForm : null;
-  const previewRatios = currentEditForm
+  const previewPrices = currentEditForm
     ? {
-        pctCtv: parseRatioInput(currentEditForm.pctCtv),
-        pctKhach: parseRatioInput(currentEditForm.pctKhach),
-        pctPromo: parseRatioInput(currentEditForm.pctPromo),
+        ctv: parseRatioInput(currentEditForm.pctCtv),
+        customer: parseRatioInput(currentEditForm.pctKhach),
+        promo: parseRatioInput(currentEditForm.pctPromo),
+        student: parseRatioInput(currentEditForm.pctStu),
       }
     : null;
-  const previewWholesalePrice = previewRatios
-    ? multiplyBasePrice(previewRatios.pctCtv, highestSupplyPrice)
-    : null;
-  const resolvedWholesaleBase =
-    typeof previewWholesalePrice === "number" &&
-    Number.isFinite(previewWholesalePrice) &&
-    previewWholesalePrice > 0
-      ? previewWholesalePrice
-      : highestSupplyPrice;
-  const previewRetailPrice = previewRatios
-    ? multiplyValue(resolvedWholesaleBase, previewRatios.pctKhach)
-    : null;
-  const previewPromoPrice = previewRatios
-    ? calculatePromoPrice(
-        previewRatios.pctKhach,
-        previewRatios.pctPromo,
-        previewRatios.pctCtv,
-        previewWholesalePrice,
-        highestSupplyPrice
-      )
-    : null;
-  const previewPromoPercentLabel = formatPromoPercent(
-    previewRatios?.pctPromo ?? null
-  );
+  const previewWholesalePrice = previewPrices?.ctv ?? null;
+  const previewRetailPrice = previewPrices?.customer ?? null;
+  const previewPromoPrice = previewPrices?.promo ?? null;
   const showPreviewPromo =
-    hasValidPromoRatio(
-      previewRatios?.pctPromo ?? null,
-      previewRatios?.pctKhach ?? null,
-      previewRatios?.pctCtv ?? null
-    ) && Number.isFinite(previewPromoPrice ?? NaN);
-  const pctStuProvided = (v: unknown) =>
-    v !== null &&
-    v !== undefined &&
-    !(typeof v === "string" && v.trim() === "");
-  const pctStuForStudentPreview =
-    isEditingProduct && currentEditForm && (currentEditForm.pctStu ?? "").trim() !== ""
-      ? currentEditForm.pctStu
-      : pctStuProvided(item.pctStu)
-        ? item.pctStu
-        : null;
-  const previewStudentPriceVal =
-    previewRatios &&
-    typeof resolvedWholesaleBase === "number" &&
-    Number.isFinite(resolvedWholesaleBase) &&
-    resolvedWholesaleBase > 0
-      ? multiplyValue(resolvedWholesaleBase, pctStuForStudentPreview)
-      : null;
+    typeof previewPromoPrice === "number" &&
+    Number.isFinite(previewPromoPrice) &&
+    previewPromoPrice > 0;
+  const previewStudentPriceVal = previewPrices?.student ?? null;
   const showPreviewStudent =
-    Boolean(previewRatios) &&
+    Boolean(previewPrices) &&
     typeof previewStudentPriceVal === "number" &&
     Number.isFinite(previewStudentPriceVal) &&
     previewStudentPriceVal > 0;
   const displayStudentPrice =
     isEditingProduct && currentEditForm ? previewStudentPriceVal : item.studentPrice;
-  const previewStudentBlendHint =
-    "Chỉ áp dụng khi cấu hình pct_stu > 0.";
   const highestSupplyPriceDisplay =
     typeof highestSupplyPrice === "number" &&
     Number.isFinite(highestSupplyPrice) &&
     highestSupplyPrice > 0
       ? formatCurrencyValue(highestSupplyPrice)
       : "Chưa có dữ liệu";
+  const profitBasePrice =
+    typeof highestSupplyPrice === "number" &&
+    Number.isFinite(highestSupplyPrice) &&
+    highestSupplyPrice > 0
+      ? highestSupplyPrice
+      : item.baseSupplyPrice;
+
+  const wholesaleProfitLabel =
+    formatProfitPercentBySale(item.wholesalePrice, profitBasePrice, "short") ??
+    "Chưa có %";
+  const retailProfitLabel =
+    formatProfitPercentBySale(item.retailPrice, profitBasePrice, "short") ??
+    "Chưa có %";
+  const studentProfitLabel =
+    formatProfitPercentBySale(displayStudentPrice, profitBasePrice, "short") ??
+    "Chưa có %";
+  const promoProfitLabel =
+    formatProfitPercentBySale(item.promoPrice, profitBasePrice, "short") ??
+    "Chưa có %";
+
+  const previewWholesaleProfitLabel = formatProfitPercentBySale(
+    previewWholesalePrice,
+    profitBasePrice,
+    "full"
+  );
+  const previewRetailProfitLabel = formatProfitPercentBySale(
+    previewRetailPrice,
+    profitBasePrice,
+    "full"
+  );
+  const previewStudentBlendHint = formatProfitPercentBySale(
+    previewStudentPriceVal,
+    profitBasePrice,
+    "full"
+  );
+  const previewPromoPercentLabel = formatProfitPercentBySale(
+    previewPromoPrice,
+    profitBasePrice,
+    "full"
+  );
 
   const handleReloadSupply = () => {
     supplyControls.fetchSupplyPricesForProduct(item.sanPhamRaw);
@@ -180,25 +174,13 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
           <div className="text-sm font-semibold text-white">
             {formatCurrencyValue(item.wholesalePrice)}
           </div>
-          <div className="text-xs text-white/70">
-            {formatRateDescription({
-              multiplier: item.pctCtv,
-              price: item.wholesalePrice,
-              basePrice: item.baseSupplyPrice,
-            })}
-          </div>
+          <div className="text-xs text-white/55">{wholesaleProfitLabel}</div>
         </td>
         <td className="whitespace-nowrap px-6 py-4">
           <div className="text-sm font-semibold text-amber-300">
             {formatCurrencyValue(item.retailPrice)}
           </div>
-          <div className="text-xs text-white/70">
-            {formatRateDescription({
-              multiplier: item.pctKhach,
-              price: item.retailPrice,
-              basePrice: item.baseSupplyPrice,
-            })}
-          </div>
+          <div className="text-xs text-white/55">{retailProfitLabel}</div>
         </td>
         <td className="whitespace-nowrap px-6 py-4">
           <div
@@ -208,6 +190,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
           >
             {formatCurrencyValue(displayStudentPrice)}
           </div>
+          <div className="text-xs text-white/55">{studentProfitLabel}</div>
         </td>
         <td className="whitespace-nowrap px-6 py-4">
           {hasPromoForRow ? (
@@ -215,9 +198,7 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
               <div className="text-sm font-semibold text-pink-200">
                 {formatCurrencyValue(item.promoPrice)}
               </div>
-              <div className="text-xs text-white/70">
-                {formatPromoPercent(item.pctPromo) ?? "-"}
-              </div>
+              <div className="text-xs text-white/55">{promoProfitLabel}</div>
             </>
           ) : (
             <div className="text-sm text-white/60">-</div>
@@ -275,6 +256,8 @@ const ProductRowComponent: React.FC<ProductRowProps> = ({
               currentEditForm={currentEditForm}
               productNameOptions={editControls.productNameOptions}
               highestSupplyPriceDisplay={highestSupplyPriceDisplay}
+              previewWholesaleProfitLabel={previewWholesaleProfitLabel}
+              previewRetailProfitLabel={previewRetailProfitLabel}
               previewWholesalePrice={previewWholesalePrice}
               previewRetailPrice={previewRetailPrice}
               previewStudentPrice={previewStudentPriceVal}

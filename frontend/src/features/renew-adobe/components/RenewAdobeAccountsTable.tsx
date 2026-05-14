@@ -14,6 +14,13 @@ import { StatusBadge } from "./StatusBadge";
 import { UrlAccessCell } from "./UrlAccessCell";
 import { EditAccountModal } from "./EditAccountModal";
 
+/** x = số dòng order_user_tracking khớp org; y = user_count (slot license). */
+function formatSlotRatio(account: AdobeAdminAccount): string {
+  const x = account.tracking_user_count ?? 0;
+  const y = Number(account.user_count) || 0;
+  return `${x}/${y}`;
+}
+
 export type RenewAdobeAccountsTableProps = {
   accounts: AdobeAdminAccount[];
   currentRows: AdobeAdminAccount[];
@@ -72,7 +79,7 @@ export function RenewAdobeAccountsTable({
           <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300/70 pointer-events-none" />
           <input
             type="text"
-            placeholder="Tìm theo email, alias, org_name..."
+            placeholder="Tìm theo email, alias, org, id product..."
             className="w-full pl-11 pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
@@ -136,8 +143,11 @@ export function RenewAdobeAccountsTable({
                         <p className="text-xs text-white/70">
                           Org: {account.org_name ?? "—"}
                         </p>
+                        <p className="text-xs text-white/70 break-all">
+                          ID Product: {account.id_product ?? "—"}
+                        </p>
                         <p className="text-xs text-white/70">
-                          Số user: {account.user_count}
+                          Slot (user tracking / license): {formatSlotRatio(account)}
                         </p>
                         <StatusBadge
                           status={account.license_status}
@@ -206,7 +216,10 @@ export function RenewAdobeAccountsTable({
                   <th className="min-w-[120px]">OTP</th>
                   <th className="min-w-[120px]">OTP SOURCE</th>
                   <th className="min-w-[140px]">TEAM</th>
-                  <th className="w-24 text-center">USER</th>
+                  <th className="min-w-[120px]">ID PRODUCT</th>
+                  <th className="w-28 text-center" title="user tracking / user_count">
+                    SLOT
+                  </th>
                   <th className="w-36">LICENSE</th>
                   <th className="w-20 text-center">LINK PRODUCT</th>
                   <th className="w-28 text-center">THAO TÁC</th>
@@ -216,7 +229,7 @@ export function RenewAdobeAccountsTable({
                 {currentRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-12 text-center text-white/70"
                     >
                       <p className="text-lg mb-2">
@@ -256,8 +269,11 @@ export function RenewAdobeAccountsTable({
                         <td className="px-2 sm:px-4 py-3 text-sm text-white/80">
                           {account.org_name ?? "—"}
                         </td>
-                        <td className="px-2 sm:px-4 py-3 text-sm text-white/80 text-center tabular-nums">
-                          {account.user_count}
+                        <td className="px-2 sm:px-4 py-3 text-sm text-white/80 font-mono text-xs break-all max-w-[220px]">
+                          {account.id_product ?? "—"}
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-sm text-white/80 text-center tabular-nums whitespace-nowrap">
+                          {formatSlotRatio(account)}
                         </td>
                         <td className="px-2 sm:px-4 py-3">
                           <StatusBadge

@@ -11,6 +11,7 @@ exports.up = async function up(knex) {
       account TEXT,
       org_name TEXT,
       expired DATE,
+      id_product TEXT NULL,
       status TEXT NOT NULL DEFAULT 'chưa add',
       update_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CONSTRAINT order_user_tracking_status_check

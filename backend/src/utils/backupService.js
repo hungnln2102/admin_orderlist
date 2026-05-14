@@ -3,6 +3,10 @@ const os = require("os");
 const path = require("path");
 const { execFile, execFileSync } = require("child_process");
 const { google } = require("googleapis");
+const { loadBackendEnv } = require("../config/loadEnv");
+const { getPostgresConnectionUrl } = require("../config/postgresConnectionUrl");
+
+loadBackendEnv();
 
 /**
  * Tìm binary pg_dump (Windows thường không có trong PATH).
@@ -69,7 +73,8 @@ function resolvePgDumpExecutable() {
       "hoặc đặt PG_DUMP_PATH trong .env (Windows: đường dẫn đầy đủ tới pg_dump.exe; Docker/Linux: thường /usr/bin/pg_dump)."
   );
 }
-const databaseUrl = process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL;
+const databaseUrl =
+  process.env.BACKUP_DATABASE_URL || getPostgresConnectionUrl();
 const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || undefined;
 const retentionDays = Number.parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 7;
 const oauthClientId = process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID;

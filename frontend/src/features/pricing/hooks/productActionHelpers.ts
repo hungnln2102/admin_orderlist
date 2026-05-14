@@ -8,10 +8,8 @@ import type {
   SupplierOption,
 } from "../types";
 import {
-  MIN_PROMO_RATIO,
   formatVndDisplay,
-  getDiscountRatioInput,
-  getMarginRatioInput,
+  normalizeProductKey,
   parseRatioInput,
 } from "../utils";
 
@@ -60,8 +58,16 @@ type CreateProductValidationResult =
       error: string;
     };
 
-const formatPercent = (ratio: number): string =>
-  `${(ratio * 100).toFixed(2).replace(/\.?0+$/, "")}%`;
+export function isExistingSanPhamCode(
+  existingRows: ProductPricingRow[],
+  sanPham: string
+): boolean {
+  const code = normalizeProductKey(sanPham);
+  if (!code) return false;
+  return existingRows.some(
+    (row) => normalizeProductKey(row.sanPhamRaw) === code
+  );
+}
 
 const parseCurrencyInput = (value: string): number | null => {
   const digits = String(value ?? "").replace(/\D+/g, "");
@@ -99,22 +105,22 @@ export function buildProductEditForm(
     basePriceCurrency: "VND",
     pctCtv:
       product.pctCtv !== null && product.pctCtv !== undefined
-        ? String(product.pctCtv)
+        ? formatVndDisplay(product.pctCtv)
         : "",
     pctKhach:
       product.pctKhach !== null && product.pctKhach !== undefined
-        ? String(product.pctKhach)
+        ? formatVndDisplay(product.pctKhach)
         : "",
     pctPromo:
       product.pctPromo !== null && product.pctPromo !== undefined
-        ? String(product.pctPromo)
+        ? formatVndDisplay(product.pctPromo)
         : "",
     pctStu:
       product.pctStu !== null &&
       product.pctStu !== undefined &&
       Number.isFinite(product.pctStu) &&
       product.pctStu > 0
-        ? String(product.pctStu)
+        ? formatVndDisplay(product.pctStu)
         : "",
   };
 }
@@ -297,79 +303,29 @@ export function validateProductEditForm(
     if (nextPctStuRaw === 0) {
       nextPctStu = null;
     } else {
-    const stuMargin = getMarginRatioInput(nextPctStuRaw);
-    if (stuMargin === null) {
-      return {
-        ok: false,
-        error:
-          "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
-      };
-    }
-    nextPctStu = stuMargin;
+      nextPctStu = nextPctStuRaw;
     }
   }
-  const nextPctCtvMargin = getMarginRatioInput(nextPctCtv);
-  const nextPctKhachMargin = getMarginRatioInput(nextPctKhach);
-  const nextPctPromoRatio =
-    nextPctPromo !== null ? getDiscountRatioInput(nextPctPromo) : null;
 
   if (nextPctCtv === null || nextPctCtv < 0) {
     return {
       ok: false,
-      error: "Tỷ giá CTV không được nhỏ hơn 0",
+      error: "Giá CTV không được nhỏ hơn 0",
     };
   }
 
   if (nextPctKhach === null || nextPctKhach < 0) {
     return {
       ok: false,
-      error: "Tỷ giá Khách không được nhỏ hơn 0",
-    };
-  }
-
-  if (nextPctCtvMargin === null) {
-    return {
-      ok: false,
-      error: "Thiết lập CTV không hợp lệ. Biên độ phải nhỏ hơn 100%.",
-    };
-  }
-
-  if (nextPctKhachMargin === null) {
-    return {
-      ok: false,
-      error: "Thiết lập Khách không hợp lệ. Biên độ phải nhỏ hơn 100%.",
+      error: "Giá Khách không được nhỏ hơn 0",
     };
   }
 
   if (nextPctPromo !== null) {
-    if (nextPctPromo < MIN_PROMO_RATIO) {
+    if (nextPctPromo < 0) {
       return {
         ok: false,
-        error: "Tỷ lệ khuyến mãi không được âm.",
-      };
-    }
-
-    if (nextPctPromoRatio === null) {
-      return {
-        ok: false,
-        error: "Tỷ lệ khuyến mãi phải nhỏ hơn 100%.",
-      };
-    }
-
-    const promoHeadroom = Math.max(0, nextPctKhachMargin);
-    if (promoHeadroom === 0 && nextPctPromoRatio > 0) {
-      return {
-        ok: false,
-        error: "Khuyến mãi không áp dụng khi biên độ Khách đang ở mức 0%.",
-      };
-    }
-
-    if (nextPctPromoRatio > promoHeadroom) {
-      return {
-        ok: false,
-        error: `Tỷ lệ khuyến mãi không được vượt ${formatPercent(
-          promoHeadroom
-        )} theo biên độ Khách.`,
+        error: "Giá Khuyến mãi không được nhỏ hơn 0.",
       };
     }
   }
@@ -389,7 +345,8 @@ export function validateProductEditForm(
 
 export function validateCreateProductForm(
   form: CreateProductFormState,
-  suppliers: CreateSupplierEntry[]
+  suppliers: CreateSupplierEntry[],
+  existingRows: ProductPricingRow[] = []
 ): CreateProductValidationResult {
   const trimmedPackage = form.packageName.trim();
   const trimmedProduct = form.packageProduct.trim();
@@ -412,28 +369,21 @@ export function validateCreateProductForm(
     if (pctStuRaw === 0) {
       pctStuValue = null;
     } else {
-      const stuMarginCreate = getMarginRatioInput(pctStuRaw);
-      if (stuMarginCreate === null) {
-        return {
-          ok: false,
-          error:
-            "Thiết lập Sinh viên không hợp lệ. Biên độ phải nhỏ hơn 100% (như Giá Khách).",
-        };
-      }
-      pctStuValue = stuMarginCreate;
+      pctStuValue = pctStuRaw;
     }
   }
-  const pctCtvMargin =
-    pctCtvValue !== null ? getMarginRatioInput(pctCtvValue) : null;
-  const pctKhachMargin =
-    pctKhachValue !== null ? getMarginRatioInput(pctKhachValue) : null;
-  const pctPromoRatio =
-    pctPromoValue !== null ? getDiscountRatioInput(pctPromoValue) : null;
 
   if (!trimmedSanPham) {
     return {
       ok: false,
       error: "Vui lòng nhập mã sản phẩm",
+    };
+  }
+
+  if (isExistingSanPhamCode(existingRows, trimmedSanPham)) {
+    return {
+      ok: false,
+      error: "Mã sản phẩm đã tồn tại.",
     };
   }
 
@@ -447,63 +397,23 @@ export function validateCreateProductForm(
   if (pctCtvValue !== null && pctCtvValue < 0) {
     return {
       ok: false,
-      error: "Tỷ giá CTV không được nhỏ hơn 0.",
+      error: "Giá CTV không được nhỏ hơn 0.",
     };
   }
 
   if (pctKhachValue !== null && pctKhachValue < 0) {
     return {
       ok: false,
-      error: "Tỷ giá khách không được nhỏ hơn 0.",
-    };
-  }
-
-  if (pctCtvValue !== null && pctCtvMargin === null) {
-    return {
-      ok: false,
-      error: "Thiết lập CTV không hợp lệ. Biên độ phải nhỏ hơn 100%.",
-    };
-  }
-
-  if (pctKhachValue !== null && pctKhachMargin === null) {
-    return {
-      ok: false,
-      error: "Thiết lập Khách không hợp lệ. Biên độ phải nhỏ hơn 100%.",
+      error: "Giá Khách không được nhỏ hơn 0.",
     };
   }
 
   if (pctPromoValue !== null) {
-    if (pctPromoValue < MIN_PROMO_RATIO) {
+    if (pctPromoValue < 0) {
       return {
         ok: false,
-        error: "Tỷ lệ khuyến mãi không được âm.",
+        error: "Giá Khuyến mãi không được nhỏ hơn 0.",
       };
-    }
-
-    if (pctPromoRatio === null) {
-      return {
-        ok: false,
-        error: "Tỷ lệ khuyến mãi phải nhỏ hơn 100%.",
-      };
-    }
-
-    if (pctKhachValue !== null && pctKhachMargin !== null) {
-      const promoHeadroom = Math.max(0, pctKhachMargin);
-      if (promoHeadroom === 0 && pctPromoRatio > 0) {
-        return {
-          ok: false,
-          error: "Khuyến mãi không áp dụng khi biên độ Khách đang ở mức 0%.",
-        };
-      }
-
-      if (pctPromoRatio > promoHeadroom) {
-        return {
-          ok: false,
-          error: `Tỷ lệ khuyến mãi không được vượt ${formatPercent(
-            promoHeadroom
-          )} theo biên độ Khách.`,
-        };
-      }
     }
   }
 

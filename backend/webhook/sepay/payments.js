@@ -46,6 +46,7 @@ const RECEIPT_STATE_COLS = {
   IS_FINANCIAL_POSTED: "is_financial_posted",
   POSTED_REVENUE: "posted_revenue",
   POSTED_PROFIT: "posted_profit",
+  POSTED_OFF_FLOW_BANK_RECEIPT: "posted_off_flow_bank_receipt",
   RECONCILED_AT: "reconciled_at",
   ADJUSTMENT_APPLIED: "adjustment_applied",
   CREATED_AT: "created_at",
@@ -181,6 +182,7 @@ const getReceiptFinancialState = async (client, receiptId) => {
         ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT)}::numeric, 0) AS posted_off_flow_bank_receipt,
         ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
         ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
       FROM ${PAYMENT_RECEIPT_FINANCIAL_STATE_TABLE}
@@ -213,6 +215,12 @@ const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
   if (Object.prototype.hasOwnProperty.call(patch, "posted_profit")) {
     push(RECEIPT_STATE_COLS.POSTED_PROFIT, Number(patch.posted_profit) || 0);
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "posted_off_flow_bank_receipt")) {
+    push(
+      RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT,
+      Number(patch.posted_off_flow_bank_receipt) || 0
+    );
+  }
   if (Object.prototype.hasOwnProperty.call(patch, "reconciled_at")) {
     push(RECEIPT_STATE_COLS.RECONCILED_AT, patch.reconciled_at);
   }
@@ -234,6 +242,7 @@ const updateReceiptFinancialState = async (client, receiptId, patch = {}) => {
         ${safeIdent(RECEIPT_STATE_COLS.IS_FINANCIAL_POSTED)} AS is_financial_posted,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_REVENUE)}::numeric, 0) AS posted_revenue,
         COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_PROFIT)}::numeric, 0) AS posted_profit,
+        COALESCE(${safeIdent(RECEIPT_STATE_COLS.POSTED_OFF_FLOW_BANK_RECEIPT)}::numeric, 0) AS posted_off_flow_bank_receipt,
         ${safeIdent(RECEIPT_STATE_COLS.RECONCILED_AT)} AS reconciled_at,
         ${safeIdent(RECEIPT_STATE_COLS.ADJUSTMENT_APPLIED)} AS adjustment_applied
     `,
@@ -276,10 +285,13 @@ const insertFinancialAuditLog = async (
 const insertPaymentReceipt = async (transaction, options = {}) => {
   if (!transaction) return { inserted: false, skipped: true, reason: "missing_transaction" };
 
+  const explicitOrderCodeRaw =
+    options.orderCode !== undefined && options.orderCode !== null
+      ? String(options.orderCode || "")
+      : "";
+  const normalizedExplicitOrderCode = normalizeOrderCode(explicitOrderCodeRaw);
   const orderCode =
-    normalizeOrderCode(
-      options.orderCode !== undefined ? String(options.orderCode || "") : ""
-    ) ||
+    normalizedExplicitOrderCode ||
     normalizeOrderCode(
       extractOrderCodeFromText(
       transaction.transaction_content,
@@ -312,7 +324,9 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     transaction.transfer_type || transaction.transferType
   );
   const gateway = normalizeOptionalText(transaction.gateway);
-  const noteValue = transaction.note || transaction.description || "";
+  /** Giao dịch gốc. Cột `note` DB: khi có `options.orderCode` (mã đơn đã resolve, thường là đơn mới) thì ghi đúng mã đó — khớp `id_order`; ngược lại giữ text CK. */
+  const transferNote = transaction.note || transaction.description || "";
+  const noteValue = normalizedExplicitOrderCode ? normalizedExplicitOrderCode : transferNote;
 
   const orderCodeColumn =
     (await getPaymentReceiptOrderColumn()) ||
@@ -499,6 +513,9 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     const insertRes = await client.query(sql, insertValues);
     const insertedId = insertRes.rows[0]?.id ?? null;
     await ensureReceiptFinancialState(client, insertedId);
+    // INSERT chỉ tạo biên lai + payment_receipt_financial_state (chưa posted).
+    // Cập nhật total_revenue / total_profit trên dashboard_monthly_summary do luồng ứng dụng
+    // (webhook Sepay, manual webhook, reconcile, renewal, …), không còn trigger receipt→dashboard.
 
     if (manageTransaction) {
       await client.query("COMMIT");
@@ -726,6 +743,21 @@ const updatePaymentSupplyBalance = async (sourceId, priceValue, noteDate, option
   }
 };
 
+const countPaymentReceiptsForOrderCode = async (client, orderCode) => {
+  const normalized = normalizeOrderCode(String(orderCode || "").trim());
+  if (!normalized) return 0;
+  const orderCodeColumn = (await getPaymentReceiptOrderColumn()) || "id_order";
+  const { rows } = await client.query(
+    `
+      SELECT COUNT(*)::int AS c
+      FROM ${PAYMENT_RECEIPT_TABLE_RESOLVED}
+      WHERE LOWER(TRIM(COALESCE(${safeIdent(orderCodeColumn)}::text, ''))) = LOWER($1)
+    `,
+    [normalized]
+  );
+  return Number(rows[0]?.c) || 0;
+};
+
 const calculateSalePrice = ({
   orderCode,
   giaNhap,
@@ -760,4 +792,5 @@ module.exports = {
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
   calculateSalePrice,
+  countPaymentReceiptsForOrderCode,
 };

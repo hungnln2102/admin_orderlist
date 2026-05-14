@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import {
   ArrowTrendingUpIcon,
   CurrencyDollarIcon,
+  MegaphoneIcon,
   PencilIcon,
 } from "@heroicons/react/24/outline";
 import { PricingStat, ProductPricingRow } from "../types";
@@ -105,6 +106,12 @@ export const usePricingData = () => {
     const total = productPrices.length;
     const activeCount = productPrices.filter((item) => item.isActive).length;
     const inactiveCount = total - activeCount;
+    const promoCount = productPrices.filter(
+      (item) =>
+        typeof item.promoPrice === "number" &&
+        Number.isFinite(item.promoPrice) &&
+        item.promoPrice > 0
+    ).length;
 
     return [
       {
@@ -131,6 +138,14 @@ export const usePricingData = () => {
         subtitle: "Đang ẩn trên bảng giá",
         filterValue: "inactive",
       },
+      {
+        name: "Sản phẩm đang khuyến mãi",
+        value: promoCount.toString(),
+        icon: MegaphoneIcon,
+        accent: "rose",
+        subtitle: "Có giá khuyến mãi",
+        filterValue: "promo",
+      },
     ];
   }, [productPrices]);
 
@@ -145,6 +160,7 @@ export const usePricingData = () => {
     setRowsPerPage,
     totalRows,
     filteredPricing,
+    productPrices,
     pricingStats,
     isLoading,
     error,

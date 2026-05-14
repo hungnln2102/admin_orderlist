@@ -3,7 +3,9 @@ import * as Helpers from "@/lib/helpers";
 
 export type PackageField =
   | "supplier"
-  | "import";
+  | "import"
+  /** Kho / tài khoản kích hoạt + dung lượng trên form thêm–sửa gói */
+  | "activation";
 export type SlotLinkMode = "information" | "slot";
 export type PackageRow = {
   id: number;
@@ -36,6 +38,8 @@ export type PackageRow = {
   normalizedProductCodes?: string[];
   matchModeValue?: string | null;
   stockId?: number | null;
+  /** Từ product.package_requires_activation (JOIN API package-products). */
+  productRequiresActivation?: boolean;
 };
 export type OrderListItem = {
   id?: number | string | null;
@@ -51,9 +55,13 @@ export type PackageSlotAssignment = {
   matchValue?: string | null;
   sourceOrderId?: number | string | null;
   sourceOrderCode?: string | number | null;
+  sourceOrderStartYmd?: string | null;
+  /** Giá trị cột thông tin đối nghĩa với chế độ match: hiển thị trên thẻ vị trí. */
   displayColumn: "slot" | "information";
   matchColumn: "slot" | "information";
   capacityUnits?: number | null;
+  /** Tên/định danh khách từ đơn (customer) khi đã gắn. */
+  customerLabel?: string | null;
 };
 export type AugmentedRow = PackageRow & {
   slotUsed: number;
@@ -84,6 +92,9 @@ export type NormalizedOrderRecord = {
   informationMatchKey: string;
   customerDisplay: string;
   productCodeNormalized: string;
+  registrationDateYmd?: string | null;
+  /** product.id từ variant; khớp với packageRow.productId để gán đơn cùng dòng sản phẩm. */
+  lineProductId: number | null;
 };
 export type PackageTemplate = {
   name: string;
@@ -158,7 +169,19 @@ export const PACKAGE_FIELD_OPTIONS: Array<{ value: PackageField; label: string }
   [
     { value: "supplier", label: "Nhà cung cấp" },
     { value: "import", label: "Giá nhập (VND)" },
+    { value: "activation", label: "Tài khoản kích hoạt" },
   ];
+
+/** Đồng bộ cờ activation trong `fields` template với DB (`productRequiresActivation`). */
+export function syncActivationFieldInTemplateFields(
+  fields: PackageField[],
+  serverRequiresActivation: boolean
+): PackageField[] {
+  const set = new Set(fields);
+  if (serverRequiresActivation) set.add("activation");
+  else set.delete("activation");
+  return PACKAGE_FIELD_OPTIONS.map((o) => o.value).filter((v) => set.has(v));
+}
 
 export const DEFAULT_SLOT_LIMIT = 5;
 export const DEFAULT_CAPACITY_LIMIT = 2000;
@@ -175,13 +198,13 @@ export const SLOT_LINK_OPTIONS: Array<{
     value: "information",
     label: "Liên kết theo thông tin đơn hàng",
     helper:
-      "Các gói sẽ được liên kết với đơn hàng dựa trên các trường thông tin như tên sản phẩm, thông tin sản phẩm.",
+      "So cột information_order với username kho lưu trữ (kích hoạt) hoặc kho gói chính (cùng cột «Thông tin gói»); nhãn vị trí lấy từ cột slot trên đơn.",
   },
   {
     value: "slot",
     label: "Liên kết theo vị trí",
     helper:
-      "Các gói sẽ được liên kết với đơn hàng dựa trên mã định danh vị trí (slot) của đơn hàng.",
+      "So username tài khoản gốc (kho chính) với cột slot trên đơn; nội dung hiển thị bổ sung từ information_order khi cần.",
   },
 ];
 
@@ -261,12 +284,26 @@ export const normalizeMatchKey = (value: string | null | undefined): string => {
 };
 
 /**
- * Chuỗi dùng để so khớp đơn (slot / information_order): **chỉ** tài khoản gốc (`informationUser`),
- * không dùng tài khoản kích hoạt (`accountUser`).
+ * Một chuỗi duy nhất tùy chế độ ghép:
+ * - `slot` (theo vị trí): **tài khoản gốc** `informationUser` ↔ cột `slot` trên đơn.
+ * - `information` (theo thông tin đơn): cột `information_order` trên đơn so với tài khoản kho lưu trữ
+ *   `accountUser` (nếu có) **và** tài khoản kho gói chính `informationUser` (cùng cột «Thông tin gói» trên bảng).
+ *   Cả hai nguồn để tránh mất match khi chỉ một trong hai dòng kho có username.
  */
-export const buildPackageLinkKeys = (row: PackageRow): string[] => {
-  const normalized = normalizeMatchKey(row.informationUser || "");
-  return normalized ? [normalized] : [];
+export const buildPackageLinkKeys = (
+  row: PackageRow,
+  mode: SlotLinkMode = "information"
+): string[] => {
+  if (mode === "slot") {
+    const n = normalizeMatchKey(row.informationUser);
+    return n ? [n] : [];
+  }
+  const keys = new Set<string>();
+  const a = normalizeMatchKey(row.accountUser);
+  const u = normalizeMatchKey(row.informationUser);
+  if (a) keys.add(a);
+  if (u) keys.add(u);
+  return Array.from(keys);
 };
 
 export const resolveOrderDisplayValue = (
@@ -347,8 +384,21 @@ export const formatCapacityLabel = (units?: number | null): string => {
   return `${value} GB`;
 };
 
-export const toSlotLinkModeFromMatch = (value?: string | null): SlotLinkMode =>
-  value === MATCH_COLUMN_SLOT ? "slot" : "information";
+/** Giá trị cột `match` trên DB: `slot` | `information_order` (bỏ qua hoa thường, khoảng trắng). */
+export const normalizeMatchModeDbValue = (value?: string | null): string | null => {
+  const s = (value == null ? "" : String(value)).trim().toLowerCase();
+  if (!s) return null;
+  if (s === "slot") return MATCH_COLUMN_SLOT;
+  if (s === "information_order" || s === "informationorder" || s === "information")
+    return MATCH_COLUMN_INFORMATION;
+  return s;
+};
+
+export const toSlotLinkModeFromMatch = (value?: string | null): SlotLinkMode => {
+  const n = normalizeMatchModeDbValue(value);
+  if (n === MATCH_COLUMN_SLOT) return "slot";
+  return "information";
+};
 
 export const toMatchColumnValue = (mode: SlotLinkMode): string =>
   mode === "slot" ? MATCH_COLUMN_SLOT : MATCH_COLUMN_INFORMATION;
@@ -442,15 +492,25 @@ export const enhancePackageRow = (
     row.hasCapacityField === undefined
       ? row.storageId != null || row.storageTotal != null
       : Boolean(row.hasCapacityField);
-  const matchValue = row.match ?? row.matchModeValue ?? null;
+  const rRow = row as Record<string, unknown>;
+  const matchRaw =
+    row.match ?? row.matchModeValue ?? (rRow.package_match as string | null | undefined) ?? null;
+  const matchValue =
+    matchRaw != null ? normalizeMatchModeDbValue(String(matchRaw)) : null;
   const prefKey =
     row.id !== undefined && row.id !== null
       ? slotLinkPrefs[String(row.id)]
       : undefined;
-  const slotLinkMode: SlotLinkMode = matchValue
-    ? toSlotLinkModeFromMatch(matchValue)
-    : (row.slotLinkMode as SlotLinkMode | undefined) ??
-      (prefKey === "slot" ? "slot" : "information");
+  const slotLinkMode: SlotLinkMode =
+    matchRaw != null && String(matchRaw).trim() !== ""
+      ? toSlotLinkModeFromMatch(matchRaw)
+      : (row.slotLinkMode as SlotLinkMode | undefined) ??
+        (prefKey === "slot" ? "slot" : "information");
+  const rawProductId = rRow.productId ?? rRow.product_id;
+  const resolvedProductId =
+    rawProductId != null && String(rawProductId).trim() !== "" && Number.isFinite(Number(rawProductId))
+      ? Number(rawProductId)
+      : row.productId ?? null;
   const productCodes = Array.isArray(row.productCodes)
     ? row.productCodes
         .map((code) => (typeof code === "string" ? code.trim() : ""))
@@ -463,11 +523,13 @@ export const enhancePackageRow = (
   );
   return {
     ...row,
+    match: matchValue ?? row.match ?? (rRow.package_match as string | null) ?? null,
+    productId: resolvedProductId,
     slot: row.slot ?? DEFAULT_SLOT_LIMIT,
     slotUsed: row.slotUsed ?? 0,
     hasCapacityField: normalizedHasCapacity,
     slotLinkMode,
-    matchModeValue: matchValue,
+    matchModeValue: matchValue ?? (matchRaw != null ? String(matchRaw).trim() || null : null),
     productCodes,
     normalizedProductCodes,
   } as PackageRow;

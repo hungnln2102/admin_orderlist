@@ -1,3 +1,3 @@
-// Legacy entrypoint kept for backward compatibility.
-// Forward to the modular server implementation in src/server.js.
+// Compatibility shim: `node index.js` === `node src/server.js`.
+// Prefer `npm start` / `npm run dev` (they run src/server.js directly).
 require("./src/server");

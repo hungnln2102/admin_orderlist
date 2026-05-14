@@ -1,5 +1,5 @@
 const ACTIVE_LICENSE_STATUSES = new Set(["paid", "active"]);
-const { resolveLisenceCount } = require("./usersSnapshotUtils");
+const { resolveAccountSeatLimit } = require("./usersSnapshotUtils");
 
 function normalizeLicenseStatus(value) {
   return String(value || "unknown").trim().toLowerCase() || "unknown";
@@ -19,12 +19,7 @@ function shouldPurgeAdobeAccountByLicenseStatus(value, account = null) {
   if (n === "unknown") return false;
   if (ACTIVE_LICENSE_STATUSES.has(n)) return false;
 
-  const contractActiveLicenseCount = Number(
-    resolveLisenceCount({
-      usersSnapshot: account?.users_snapshot,
-      alertConfig: account?.cookie_config ?? account?.alert_config ?? null,
-    }) || 0
-  );
+  const contractActiveLicenseCount = Number(resolveAccountSeatLimit(account) || 0);
   // Safe-guard: nếu còn license count > 0 thì chưa purge account để tránh xóa nhầm.
   if (contractActiveLicenseCount > 0) return false;
 
@@ -138,12 +133,7 @@ function buildWebsiteStatusPayload({
   const profileName = account?.org_name ?? null;
   const licenseStatus = normalizeLicenseStatus(account?.license_status);
   const accountIsActive = account ? isAccountEnabled(account.is_active) : false;
-  const accountLicenseCount = Number(
-    resolveLisenceCount({
-      usersSnapshot: account?.users_snapshot,
-      alertConfig: account?.cookie_config,
-    }) || 0
-  );
+  const accountLicenseCount = Number(resolveAccountSeatLimit(account) || 0);
   const userHasProduct = resolveUserProductState(matchedUser);
   const orderExpired = order ? isOrderExpired(order.expiry_date, now) : false;
   const hasValidOrder = Boolean(order) && !orderExpired;

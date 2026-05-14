@@ -161,7 +161,8 @@ frontend/src/features/orders/
 
 ### Khớp code (kiểm tra định kỳ)
 
-- **Log chi phí NCC (DB)**: `database/migrations/057_supplier_order_cost_log_webhook_paid_flow.sql` (trigger `partner.fn_supplier_order_cost_log_on_success` trên `orders.order_list`).
-- **NCC / MAVN / Mavryk**: `Order/finance/supplierDebt.js` (stub / không còn bút toán cũ), `Order/crud/createOrder.js`, `services/orderService.js`, `services/pricing/orderPricingService.js`, `Order/orderDeletionService`, `Order/finance/dashboardSummary.js`, `PaymentsController` (xác nhận thanh toán NCC).
+- **Log chi phí NCC (DB)**: bản canonical của `partner.fn_supplier_order_cost_log_on_success` nằm trong `database/migrations/091_supplier_order_cost_log_fn_canonical.sql` (áp qua `backend/migrations/20260605120000_supplier_order_cost_log_fn_canonical.js`); trigger `tr_supplier_order_cost_log_order_success` trên `orders.order_list` không đổi tên (lịch sử từ các migration `039`…`089`).
+- **Dashboard `total_import` / phần NCC của `total_profit`**: trigger `trg_supplier_order_cost_log_dashboard_import` trên `partner.supplier_order_cost_log` gọi `partner.fn_recalc_dashboard_total_import` — rule MAVN `Đã Thanh Toán` → margin **−cost** và `total_import` = tổng `import_cost` theo tháng; migration `backend/migrations/20260604120000_mavn_dashboard_profit_minus_cost_on_paid.js`.
+- **NCC / MAVN / Mavryk**: `Order/finance/supplierDebt.js` (`findSupplyIdByName`; công nợ theo đơn chỉ qua DB trigger + log), `Order/crud/createOrder.js`, `services/orderService.js`, `services/pricing/orderPricingService.js`, `Order/orderDeletionService`, `Order/finance/dashboardSummary.js`, `PaymentsController` (xác nhận thanh toán NCC).
 - **Sepay webhook & renewal tự động**: `backend/webhook/sepay/routes/webhook.js`, `backend/webhook/sepay/utils.js` (`resolveOrderByPayment`), `backend/webhook/sepay/renewal.js`; gia hạn tay: `backend/src/controllers/Order/renewRoutes.js`.
 - UI tạo đơn: `createOrderPricingCopy.ts` như mục trên.

@@ -14,7 +14,9 @@ const listSupplies = async (_req, res) => {
     const rows = await supplierCache.getOrSet("all", async () => {
       const supplierTable = await resolveSupplierTableName();
       const supplierNameCol = await resolveSupplierNameColumn();
-      const includeAccountHolder = await supplierHasAccountHolderColumn(db, supplierTable);
+      const includeAccountHolder =
+        Boolean(QUOTED_COLS.supplier.accountHolder) &&
+        await supplierHasAccountHolderColumn(db, supplierTable);
       const baseSelect = {
         id: "id",
         source_name: supplierNameCol,
@@ -177,6 +179,7 @@ const listSupplyOrderCosts = async (req, res) => {
   }
 
   const lt = "l";
+  const o = "o";
   const sj = "s";
   const supplyIdCol = quoteIdent(logCols.SUPPLY_ID);
   const idOrderCol = quoteIdent(logCols.ID_ORDER);
@@ -186,6 +189,7 @@ const listSupplyOrderCosts = async (req, res) => {
   const refundAmountCol = quoteIdent(logCols.REFUND_AMOUNT);
   const nccPaymentStatusCol = quoteIdent(logCols.NCC_PAYMENT_STATUS);
   const loggedAtCol = quoteIdent(logCols.LOGGED_AT);
+  const orderIdCol = quoteIdent(orderCols.id);
 
   const whereParts = [];
   const bindings = [];
@@ -210,8 +214,6 @@ const listSupplyOrderCosts = async (req, res) => {
       FROM ${TABLES.supplyOrderCostLog} ${lt}
       ${whereSql}
     `;
-    const countResult = await db.raw(countSql, bindings);
-    const total = Number(countResult.rows?.[0]?.c) || 0;
 
     const aggSql = `
       WITH filtered AS (
@@ -227,31 +229,27 @@ const listSupplyOrderCosts = async (req, res) => {
       )
       SELECT
         COUNT(*) FILTER (
-          WHERE TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
+          WHERE TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) <> 'Đã Thanh Toán'
         )::bigint AS order_count,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
             THEN 0::numeric
-            ELSE COALESCE(import_cost, 0)::numeric - COALESCE(refund_amount, 0)::numeric
+            ELSE GREATEST(
+              0::numeric,
+              COALESCE(latest.${importCostCol}, 0)::numeric - COALESCE(latest.${refundAmountCol}, 0)::numeric
+            )
           END
         ), 0) AS total_cost,
         COALESCE(SUM(
           CASE
-            WHEN TRIM(COALESCE(${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
+            WHEN TRIM(COALESCE(latest.${nccPaymentStatusCol}::text, '')) = 'Đã Thanh Toán'
             THEN 0::numeric
-            ELSE COALESCE(refund_amount, 0)::numeric
+            ELSE COALESCE(latest.${refundAmountCol}, 0)::numeric
           END
         ), 0) AS total_refund
       FROM latest
     `;
-    const aggResult = await db.raw(aggSql, bindings);
-    const aggRow = aggResult.rows?.[0] || {};
-    const aggregates = {
-      orderCount: Number(aggRow.order_count) || 0,
-      totalCost: Number(aggRow.total_cost) || 0,
-      totalRefund: Number(aggRow.total_refund) || 0,
-    };
 
     const dataSql = `
       SELECT
@@ -264,24 +262,64 @@ const listSupplyOrderCosts = async (req, res) => {
         ${lt}.${loggedAtCol} AS order_date,
         ${lt}.${loggedAtCol} AS canceled_at
       FROM ${TABLES.supplyOrderCostLog} ${lt}
+      INNER JOIN ${TABLES.orderList} ${o} ON ${o}.${orderIdCol} = ${lt}.${orderListIdCol}
       INNER JOIN ${supplierTable} ${sj} ON ${sj}.${supIdCol} = ${lt}.${supplyIdCol}
       ${whereSql}
       ORDER BY ${lt}.${logIdCol} DESC
       OFFSET ?
       LIMIT ?
     `;
-    const dataResult = await db.raw(dataSql, [...bindings, offset, limit]);
-    const rows = (dataResult.rows || []).map((row) => ({
-      orderPk: Number(row.order_pk) || 0,
-      idOrder: row.id_order != null ? String(row.id_order) : "",
-      supplierName: row.supplier_name != null ? String(row.supplier_name) : "",
-      cost: Number(row.cost_value) || 0,
-      refund: Number(row.refund_value) || 0,
-      nccPaymentStatus:
-        row.ncc_payment_status != null ? String(row.ncc_payment_status) : "Chưa Thanh Toán",
-      orderDate: row.order_date,
-      canceledAt: row.canceled_at,
-    }));
+
+    const [countSettled, aggSettled, dataSettled] = await Promise.allSettled([
+      db.raw(countSql, bindings),
+      db.raw(aggSql, bindings),
+      db.raw(dataSql, [...bindings, offset, limit]),
+    ]);
+
+    if (countSettled.status === "rejected") {
+      logger.error("Query failed (GET /api/supplies/order-costs) count", {
+        error: countSettled.reason?.message || String(countSettled.reason),
+      });
+      return res.status(500).json({
+        error:
+          "Không thể đọc bảng chi phí NCC (partner.supplier_order_cost_log). Kiểm tra migration SQL trên DB.",
+      });
+    }
+
+    const total = Number(countSettled.value.rows?.[0]?.c) || 0;
+
+    let aggregates = { orderCount: 0, totalCost: 0, totalRefund: 0 };
+    if (aggSettled.status === "fulfilled") {
+      const aggRow = aggSettled.value.rows?.[0] || {};
+      aggregates = {
+        orderCount: Number(aggRow.order_count) || 0,
+        totalCost: Number(aggRow.total_cost) || 0,
+        totalRefund: Number(aggRow.total_refund) || 0,
+      };
+    } else {
+      logger.error("Query failed (GET /api/supplies/order-costs) aggregates", {
+        error: aggSettled.reason?.message || String(aggSettled.reason),
+      });
+    }
+
+    let rows = [];
+    if (dataSettled.status === "fulfilled") {
+      rows = (dataSettled.value.rows || []).map((row) => ({
+        orderPk: Number(row.order_pk) || 0,
+        idOrder: row.id_order != null ? String(row.id_order) : "",
+        supplierName: row.supplier_name != null ? String(row.supplier_name) : "",
+        cost: Number(row.cost_value) || 0,
+        refund: Number(row.refund_value) || 0,
+        nccPaymentStatus:
+          row.ncc_payment_status != null ? String(row.ncc_payment_status) : "Chưa Thanh Toán",
+        orderDate: row.order_date,
+        canceledAt: row.canceled_at,
+      }));
+    } else {
+      logger.error("Query failed (GET /api/supplies/order-costs) data", {
+        error: dataSettled.reason?.message || String(dataSettled.reason),
+      });
+    }
 
     res.json({
       rows,

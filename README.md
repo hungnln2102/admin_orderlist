@@ -113,7 +113,7 @@ admin_orderlist/
 │   ├── webhook/             # Sepay webhook server
 │   ├── helpers.js           # Re-export → src/utils/orderHelpers
 │   ├── scheduler.js         # Re-export → src/scheduler
-│   ├── index.js             # Entry point → src/server
+│   ├── index.js             # Optional shim → src/server (npm start dùng src/server.js)
 │   └── package.json
 ├── frontend/
 │   ├── src/

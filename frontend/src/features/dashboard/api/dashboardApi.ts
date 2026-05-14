@@ -26,6 +26,8 @@ export interface TaxData {
   total_tax: number;
 }
 
+export type DashboardChartGranularity = "day" | "month" | "year";
+
 export interface ChartsApiResponse {
   revenueData: RevenueData[];
   orderStatusData: OrderStatusData[];
@@ -33,6 +35,8 @@ export interface ChartsApiResponse {
   refundData: RefundData[];
   taxData: TaxData[];
   year?: number;
+  /** Backend: bucket biểu đồ theo ngày (khoảng ngắn) hoặc theo tháng. */
+  chartGranularity?: DashboardChartGranularity;
 }
 
 export interface MonthlySummaryData {
@@ -42,6 +46,10 @@ export interface MonthlySummaryData {
   total_revenue: number;
   total_profit: number;
   total_refund: number;
+  /** Tổng nhập hàng (import_cost) theo tháng — đồng bộ từ bảng tổng hợp. */
+  total_import: number;
+  /** Ước tính thuế theo tháng (bảng tổng hợp; % từ DASHBOARD_MONTHLY_TAX_RATE_PERCENT). */
+  total_tax: number;
   updated_at: string | null;
 }
 
@@ -73,23 +81,40 @@ type DashboardMonthRow = Partial<{
   total_sales: number;
   total_profit: number;
   total_refund: number;
+  total_import: number;
   total_tax: number;
 }>;
 
 type DashboardChartsResponse = Partial<{
   months: DashboardMonthRow[];
   year: number;
+  granularity: string;
 }>;
 
-export type DashboardStatsQueryRange = { from: string; to: string };
+export type DashboardStatsQueryRange = {
+  from: string;
+  to: string;
+  chartBucket?: "day" | "month" | "year";
+};
 
 export async function fetchDashboardStats(
   range?: DashboardStatsQueryRange | null
 ): Promise<DashboardStatsResponse> {
-  const qs =
-    range?.from && range?.to
-      ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
-      : "";
+  let qs = "";
+  if (range?.from && range?.to) {
+    const p = new URLSearchParams({
+      from: range.from,
+      to: range.to,
+    });
+    if (
+      range.chartBucket === "day" ||
+      range.chartBucket === "month" ||
+      range.chartBucket === "year"
+    ) {
+      p.set("chartBucket", range.chartBucket);
+    }
+    qs = `?${p.toString()}`;
+  }
   const response = await apiFetch(`/api/dashboard/stats${qs}`);
   if (!response.ok) {
     const raw = await response.text().catch(() => "");
@@ -118,6 +143,13 @@ const normalizeChartsPayload = (
     return String(label || "").trim();
   };
 
+  const chartGranularity: DashboardChartGranularity =
+    String(payload.granularity || "").toLowerCase() === "day"
+      ? "day"
+      : String(payload.granularity || "").toLowerCase() === "year"
+        ? "year"
+        : "month";
+
   return {
     revenueData: months.map((row) => ({
       month: normalizeMonthLabel(row),
@@ -141,6 +173,7 @@ const normalizeChartsPayload = (
       total_tax: Number(row.total_tax) || 0,
     })),
     year: Number.isFinite(payload.year) ? Number(payload.year) : undefined,
+    chartGranularity,
   };
 };
 
@@ -159,10 +192,15 @@ export async function fetchChartData(
 
 export async function fetchChartDataRange(
   from: string,
-  to: string
+  to: string,
+  chartBucket?: "day" | "month" | "year"
 ): Promise<ChartsApiResponse> {
+  const bucketQs =
+    chartBucket === "day" || chartBucket === "month" || chartBucket === "year"
+      ? `&chartBucket=${encodeURIComponent(chartBucket)}`
+      : "";
   const response = await apiFetch(
-    `/api/dashboard/charts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    `/api/dashboard/charts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${bucketQs}`
   );
   if (!response.ok) {
     const raw = await response.text().catch(() => "");

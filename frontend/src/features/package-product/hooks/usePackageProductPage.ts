@@ -258,8 +258,9 @@ export const usePackageProductPage = () => {
     closeEditModal,
   });
 
-  const { handleCreateTemplate } = usePackageTemplateActions({
+  const { handleTemplateModalSubmit } = usePackageTemplateActions({
     setRows,
+    setTemplates,
     closeCreateModal,
     handleCategorySelect,
   });
@@ -272,18 +273,15 @@ export const usePackageProductPage = () => {
     [templates]
   );
 
-  const productHasStorage = useMemo(() => {
-    if (!selectedTemplate?.productId) return false;
-
-    return rows
-      .filter((row) => row.productId === selectedTemplate.productId)
-      .some((row) => row.storageTotal != null);
-  }, [rows, selectedTemplate]);
+  /** Theo cấu hình loại gói (checkbox «Tài khoản kích hoạt»). */
+  const productHasStorage = Boolean(
+    selectedTemplate?.fields.includes("activation")
+  );
 
   const slotCards = useMemo(
     () => [
       {
-        name: "Tổng",
+        name: "Số dòng bảng",
         value: String(slotStats.total),
         icon: CheckCircleIcon,
         accent: STAT_CARD_ACCENTS.sky,
@@ -353,7 +351,7 @@ export const usePackageProductPage = () => {
       closeAddModal,
       closeEditModal,
       closeViewModal,
-      handleCreateTemplate,
+      handleTemplateModalSubmit,
       handleAddSubmit,
       handleEditSubmit,
     },

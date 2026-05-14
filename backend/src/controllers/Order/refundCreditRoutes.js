@@ -1,17 +1,15 @@
 const { db } = require("../../db");
-const { TABLES, STATUS } = require("./constants");
-const { ORDERS_SCHEMA } = require("../../config/dbSchema");
+const { TABLES, STATUS, COLS } = require("./constants");
 const { orderIdParam } = require("../../validators/orderValidator");
 const logger = require("../../utils/logger");
 const {
     createOrGetRefundCreditNoteForOrder,
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
+    CREDIT_STATUS,
+    REFUND_CREDIT_NOTES_TABLE,
+    REFUND_CREDIT_NOTE_COLS: RCN,
 } = require("./finance/refundCredits");
-const {
-    parseRefundCreditLogsQuery,
-    listRefundCreditLogs,
-} = require("./queries/listRefundCreditLogs");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../services/orderCodeService");
 const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 
@@ -24,19 +22,52 @@ const detectPreviewPrefix = (orderCodeRaw) => {
 };
 
 const attachRefundCreditRoutes = (router) => {
-    router.get("/refund-credit/logs", async(req, res) => {
+    /**
+     * GET /api/orders/refund-credits/available
+     * Phiếu credit **khả dụng** cho form tạo đơn: còn số dư, trạng thái OPEN/PARTIALLY_APPLIED,
+     * không bị tuyến thay thế (succeeded_by), và nếu gắn đơn nguồn thì đơn nguồn vẫn ở trạng thái hoàn.
+     */
+    router.get("/refund-credits/available", async (req, res) => {
         try {
-            const params = parseRefundCreditLogsQuery(req.query || {});
-            const payload = await listRefundCreditLogs(params);
-            return res.json(payload);
+            const orderIdCol = COLS.ORDER.ID;
+            const orderStatusCol = COLS.ORDER.STATUS;
+            const orderTable = TABLES.orderList;
+            const rcn = REFUND_CREDIT_NOTES_TABLE;
+
+            const rows = await db(`${rcn} as rcn_row`)
+                .leftJoin(
+                    `${orderTable} as src_order`,
+                    `src_order.${orderIdCol}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_LIST_ID}`
+                )
+                .where(`rcn_row.${RCN.AVAILABLE_AMOUNT}`, ">", 0)
+                .whereIn(`rcn_row.${RCN.STATUS}`, [
+                    CREDIT_STATUS.OPEN,
+                    CREDIT_STATUS.PARTIALLY_APPLIED,
+                ])
+                .whereNull(`rcn_row.${RCN.SUCCEEDED_BY_NOTE_ID}`)
+                .where((qb) => {
+                    qb.whereNull(`rcn_row.${RCN.SOURCE_ORDER_LIST_ID}`).orWhereIn(
+                        `src_order.${orderStatusCol}`,
+                        [STATUS.PENDING_REFUND, STATUS.REFUNDED]
+                    );
+                })
+                .orderBy(`rcn_row.${RCN.ID}`, "desc")
+                .select(
+                    `rcn_row.${RCN.ID} as ${RCN.ID}`,
+                    `rcn_row.${RCN.CREDIT_CODE} as ${RCN.CREDIT_CODE}`,
+                    `rcn_row.${RCN.CUSTOMER_NAME} as ${RCN.CUSTOMER_NAME}`,
+                    `rcn_row.${RCN.CUSTOMER_CONTACT} as ${RCN.CUSTOMER_CONTACT}`,
+                    `rcn_row.${RCN.AVAILABLE_AMOUNT} as ${RCN.AVAILABLE_AMOUNT}`,
+                    `rcn_row.${RCN.REFUND_AMOUNT} as ${RCN.REFUND_AMOUNT}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_CODE} as ${RCN.SOURCE_ORDER_CODE}`,
+                    `rcn_row.${RCN.SOURCE_ORDER_LIST_ID} as ${RCN.SOURCE_ORDER_LIST_ID}`,
+                    `rcn_row.${RCN.STATUS} as ${RCN.STATUS}`
+                );
+            return res.json({ data: rows });
         } catch (error) {
-            logger.error("Lỗi lấy danh sách credit logs", {
-                error: error.message,
-                stack: error.stack,
-            });
-            return res.status(500).json({
-                error: "Không thể tải danh sách credit logs.",
-            });
+            logger.error("List available refund credit notes failed", { error: error.message });
+            return res.status(500).json({ error: "Không tải được danh sách credit." });
         }
     });
 
@@ -58,21 +89,12 @@ const attachRefundCreditRoutes = (router) => {
             }
 
             const orderStatus = String(order.status || "").trim();
-            const allowedStatuses = [STATUS.PENDING_REFUND, STATUS.CREDIT_CONVERTED];
+            const allowedStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
             if (!allowedStatuses.includes(orderStatus)) {
                 await trx.rollback();
                 return res.status(400).json({
-                    error: "Chỉ đơn Chưa Hoàn/Chuyển đổi credit mới dùng được luồng tạo đơn credit.",
+                    error: "Chỉ đơn Chưa Hoàn/Đã Hoàn mới có thể tạo credit bù đơn.",
                 });
-            }
-
-            const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
-            if (orderStatus === STATUS.PENDING_REFUND) {
-                await trx(TABLES.orderList)
-                    .where({ id })
-                    .update({
-                        [statusCol]: STATUS.CREDIT_CONVERTED,
-                    });
             }
 
             const refundAmount = normalizeMoney(order.refund);

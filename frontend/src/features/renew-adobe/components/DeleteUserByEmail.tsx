@@ -1,6 +1,6 @@
 /**
  * Component: Xóa user trên Adobe Admin Console theo email.
- * Luồng: nhập email → tra cứu tài khoản (account có email trong users_snapshot hoặc là email chủ) → login tài khoản đó → vào .../users → chọn user → bấm Xóa người dùng → xác nhận popup.
+ * Luồng: nhập email → tra cứu tài khoản (user_account_mapping hoặc email chủ admin) → login → Users → xóa + xác nhận.
  */
 
 import { useState } from "react";
@@ -33,7 +33,7 @@ export function DeleteUserByEmail({ onDeleted }: DeleteUserByEmailProps) {
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
         if (!ok || !data.account) {
-          setError(data?.error ?? "Không tìm thấy tài khoản chứa user này (kiểm tra email trong users_snapshot).");
+          setError(data?.error ?? "Không tìm thấy tài khoản chứa user này (mapping / email admin).");
           setLoading(false);
           return;
         }
@@ -71,7 +71,7 @@ export function DeleteUserByEmail({ onDeleted }: DeleteUserByEmailProps) {
     <div className="rounded-[18px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-6 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm">
       <h3 className="text-sm font-semibold text-white/90 mb-1">Xóa người dùng trên Admin Console</h3>
       <p className="text-xs text-white/50 mb-3">
-        Nhập email user cần xóa. Hệ thống sẽ tìm tài khoản chứa user này (theo users_snapshot), đăng nhập tài khoản đó, vào trang Users, chọn user và thực hiện xóa + xác nhận.
+        Nhập email user cần xóa. Hệ thống tìm admin theo mapping (hoặc email chủ), đăng nhập, vào Users và xóa + xác nhận.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">

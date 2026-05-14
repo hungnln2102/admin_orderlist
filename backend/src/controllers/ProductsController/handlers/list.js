@@ -52,6 +52,7 @@ const listProducts = async (_req, res) => {
     const query = `
       SELECT
         v.id AS id,
+        p.${quoteIdent(productSchemaCols.id)} AS catalog_product_id,
         v.${quoteIdent(variantCols.displayName)} AS id_product,
         v.${quoteIdent(variantCols.displayName)} AS san_pham,
         v.${quoteIdent(variantCols.variantName)} AS package_product,
@@ -82,6 +83,7 @@ const listProducts = async (_req, res) => {
         ON c.${quoteIdent(categoryCols.id)} = pc.${quoteIdent(productCategoryCols.categoryId)}
       GROUP BY
         v.id,
+        p.${quoteIdent(productSchemaCols.id)},
         v.${quoteIdent(variantCols.displayName)},
         v.${quoteIdent(variantCols.variantName)},
         p.${quoteIdent(productSchemaCols.packageName)},

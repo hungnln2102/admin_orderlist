@@ -6,6 +6,7 @@ export type PackageStatCardItem = {
   value: string;
   icon: React.ElementType;
   accent: StatAccent;
+  subtitle?: React.ReactNode;
 };
 
 type PackageStatsSectionProps = {
@@ -25,6 +26,7 @@ export const PackageStatsSection: React.FC<PackageStatsSectionProps> = ({
             value={stat.value}
             icon={stat.icon}
             accent={stat.accent}
+            subtitle={stat.subtitle}
           />
         ))}
       </div>

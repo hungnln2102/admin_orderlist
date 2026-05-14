@@ -41,6 +41,14 @@ const queueRenewalTask = (orderCode, options = {}) => {
     telegramAttempts: existing.telegramAttempts || 0,
     lastError: existing.lastError || null,
     forceRenewal: existing.forceRenewal || options.forceRenewal || false,
+    source: options.source || existing.source || undefined,
+    paymentAmount: options.paymentAmount ?? existing.paymentAmount ?? 0,
+    paymentMonthKey: options.paymentMonthKey || existing.paymentMonthKey || null,
+    paymentReceiptId: options.paymentReceiptId || existing.paymentReceiptId || null,
+    /** Webhook gọi với true: tin nhắn BIẾN ĐỘNG THÁNG được caller gom 1 lần. */
+    suppressFinanceNotify:
+      options.suppressFinanceNotify === true ||
+      existing.suppressFinanceNotify === true,
   };
   pendingRenewalTasks.set(key, task);
   return task;
@@ -90,6 +98,11 @@ const processRenewalTask = async (orderCode) => {
     try {
       const renewalResult = await runRenewal(orderCode, {
         forceRenewal: task.forceRenewal || forceRenewal,
+        source: task.source,
+        paymentAmount: task.paymentAmount,
+        paymentMonthKey: task.paymentMonthKey,
+        paymentReceiptId: task.paymentReceiptId,
+        suppressFinanceNotify: task.suppressFinanceNotify === true,
       });
       task.renewalAttempts += 1;
       task.lastRenewalResult = renewalResult;

@@ -35,6 +35,7 @@ type OrderRowProps = {
   canRenewOrder: boolean;
   totalColumns: number;
   renewingOrderCode: string | null;
+  completingOrderCode: string | null;
   onToggleDetails: (orderId: number) => void;
   onView: (order: Order) => void;
   onEdit: (order: Order) => void;
@@ -56,6 +57,7 @@ export const OrderRow = React.memo(function OrderRow({
   canRenewOrder,
   totalColumns,
   renewingOrderCode,
+  completingOrderCode,
   onToggleDetails,
   onView,
   onEdit,
@@ -82,10 +84,27 @@ export const OrderRow = React.memo(function OrderRow({
     ? Number(giaTriConLai)
     : 0;
   const orderRecord = order as Record<string, unknown>;
-  const webhookAmountRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
-  const webhookAmount = Number.isFinite(Number(webhookAmountRaw))
-    ? Number(webhookAmountRaw)
-    : null;
+  /** Tổng biên lai từ ngày đăng ký (SUM receipt có paid_date >= order_date); ưu tiên khi > 0 (2+ giao dịch cùng chu kỳ). */
+  const totalWhRaw = orderRecord.total_webhook_amount;
+  const latestWhRaw = orderRecord.latest_webhook_amount ?? orderRecord.webhook_amount;
+  const parseWebhookMoney = (v: unknown): number | null => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string" && v.trim() === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const totalWh = parseWebhookMoney(totalWhRaw);
+  const latestWh = parseWebhookMoney(latestWhRaw);
+  /**
+   * Sau gia hạn, order_date thường được kéo về sau; receipt cũ có paid_date < order_date mới
+   * → total_webhook_amount = 0 dù webhook đã về. Trước đây UI ưu tiên total nên 0 − giá bán = chênh âm sai.
+   */
+  let webhookAmount: number | null = null;
+  if (totalWh !== null && totalWh > 0) {
+    webhookAmount = totalWh;
+  } else if (latestWh !== null) {
+    webhookAmount = latestWh;
+  }
   const webhookDelta = webhookAmount !== null ? webhookAmount - priceValue : null;
   const webhookDeltaDisplay =
     webhookDelta !== null ? formatCurrency(webhookDelta) : "Chưa có webhook";
@@ -97,20 +116,9 @@ export const OrderRow = React.memo(function OrderRow({
       : webhookDelta > 0
       ? "text-amber-300"
       : "text-rose-300";
-  const refundFromRow = Number.isFinite(Number(order.can_hoan))
-    ? Number(order.can_hoan)
-    : null;
-  const refundFromRowAbs =
-    refundFromRow !== null && Number.isFinite(refundFromRow)
-      ? Math.abs(refundFromRow)
-      : null;
+  /** Đã hủy: cột "Giá trị còn lại" = prorata theo giá bán; `refund` trên DB là theo vốn/NCC — không min với cột refund. */
   const giaTriConLaiForCanceled = isCanceled
-    ? Math.max(
-        0,
-        refundFromRowAbs !== null && Number.isFinite(giaTriConLaiSafe)
-          ? Math.min(refundFromRowAbs, Math.abs(giaTriConLaiSafe))
-          : refundFromRowAbs ?? Math.abs(giaTriConLaiSafe)
-      )
+    ? Math.max(0, giaTriConLaiSafe)
     : giaTriConLaiSafe;
 
   const pendingRefundStatus = ORDER_STATUSES.CHO_HOAN;
@@ -118,9 +126,10 @@ export const OrderRow = React.memo(function OrderRow({
   const canConfirmRefund = isCanceled && statusText === pendingRefundStatus;
   const canRenew =
     canRenewOrder &&
-    (statusText === ORDER_STATUSES.CAN_GIA_HAN ||
-      statusText === ORDER_STATUSES.ORDER_EXPIRED);
-  const canStartProcessing = statusText === ORDER_STATUSES.CHUA_THANH_TOAN;
+    statusText === ORDER_STATUSES.ORDER_EXPIRED;
+  const canStartProcessing =
+    statusText === ORDER_STATUSES.CHUA_THANH_TOAN ||
+    statusText === ORDER_STATUSES.CAN_GIA_HAN;
   const canMarkPaid = statusText === ORDER_STATUSES.DANG_XU_LY;
 
   const orderDateDisplay = order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "";
@@ -129,6 +138,7 @@ export const OrderRow = React.memo(function OrderRow({
   const orderCodeDisplay = formatOrderCodeShort(orderCodeText);
   const orderTheme = getOrderCodeTheme(orderCodeText);
   const isRenewing = renewingOrderCode === orderCodeText;
+  const isCompleting = completingOrderCode === orderCodeText;
 
   const remainingValue = Number.isFinite(Number(soNgayConLai))
     ? Number(soNgayConLai)
@@ -335,9 +345,15 @@ export const OrderRow = React.memo(function OrderRow({
                     {canMarkPaid && (
                       <button
                         className="rounded-full px-3 py-1 text-xs font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-md shadow-amber-900/40"
-                        onClick={stopPropagation(onMarkPaid)}
+                        disabled={isCompleting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isCompleting) {
+                            onMarkPaid(order);
+                          }
+                        }}
                       >
-                        Hoàn Thành
+                        {isCompleting ? "Đang Hoàn Thành..." : "Hoàn Thành"}
                       </button>
                     )}
                     {canRenew && (

@@ -9,7 +9,8 @@ const {
 } = require("../../services/packageProductService");
 const { syncOrdersMatchingPackageAccount } = require("../../services/packageOrderAccountSync");
 const logger = require("../../utils/logger");
-const { pkgCols, TABLES } = require("./constants");
+const { pkgCols, TABLES, productCols } = require("./constants");
+
 
 const normalizeMatchMode = (matchMode) =>
   matchMode === "slot" ? "slot" : "information_order";
@@ -186,10 +187,63 @@ const bulkDeletePackages = async (productIds) =>
     return deleteResult || [];
   });
 
+/**
+ * Đọc `product.package_requires_activation` — khớp UI: chỉ bắt storage khi loại gói bật trường kích hoạt.
+ * @param {{ packageId?: unknown, package_id?: unknown }} payload
+ * @param {{ packageProductRowId?: string|number }} [options] — khi PUT body không có package_id (dùng id dòng package_product)
+ */
+const fetchProductRequiresActivationForPackagePayload = async (payload, options = {}) => {
+  let rawPid = payload?.packageId ?? payload?.package_id;
+  if (
+    (rawPid == null || rawPid === "" || !Number.isFinite(Number(rawPid))) &&
+    options.packageProductRowId != null
+  ) {
+    const row = await db(TABLES.packageProduct)
+      .select(pkgCols.packageId)
+      .where(pkgCols.id, options.packageProductRowId)
+      .first();
+    rawPid = row?.[pkgCols.packageId];
+  }
+  const idNum = rawPid != null ? Number(rawPid) : NaN;
+  if (!Number.isFinite(idNum) || idNum < 1) return false;
+  const row = await db(TABLES.product)
+    .select(productCols.packageRequiresActivation)
+    .where(productCols.id, idNum)
+    .first();
+  return Boolean(row?.[productCols.packageRequiresActivation]);
+};
+
+/** @see database/migrations/092_product_package_requires_activation.sql */
+const updateProductPackageOptions = async (productId, payload) => {
+  const idNum = Number(productId);
+  if (!Number.isFinite(idNum) || idNum < 1) {
+    throw new Error("productId không hợp lệ.");
+  }
+  const raw = payload?.requiresActivation ?? payload?.package_requires_activation;
+  const requiresActivation = Boolean(raw);
+
+  const updatedCount = await db(TABLES.product)
+    .where(productCols.id, idNum)
+    .update({
+      [productCols.packageRequiresActivation]: requiresActivation,
+    });
+
+  if (!updatedCount) {
+    return null;
+  }
+
+  return {
+    productId: idNum,
+    packageRequiresActivation: requiresActivation,
+  };
+};
+
 module.exports = {
   listPackageProducts,
   createPackageProduct,
   updatePackageProduct,
   deletePackageProduct,
   bulkDeletePackages,
+  fetchProductRequiresActivationForPackagePayload,
+  updateProductPackageOptions,
 };

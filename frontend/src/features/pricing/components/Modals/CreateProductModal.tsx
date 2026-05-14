@@ -5,6 +5,7 @@ import type {
   BankOption,
   CreateProductFormState,
   CreateSupplierEntry,
+  ProductPricingRow,
   SupplierOption,
 } from "../../types";
 import { ProductBasicsSection } from "./create-product/ProductBasicsSection";
@@ -15,6 +16,7 @@ import { CreateProductActions } from "./create-product/CreateProductActions";
 interface CreateProductModalProps {
   isOpen: boolean;
   createForm: CreateProductFormState;
+  existingProductRows: ProductPricingRow[];
   productNameOptions: string[];
   productPackageOptionsByName: Record<string, string[]>;
   createSuppliers: CreateSupplierEntry[];
@@ -42,6 +44,7 @@ interface CreateProductModalProps {
 const CreateProductModal: React.FC<CreateProductModalProps> = ({
   isOpen,
   createForm,
+  existingProductRows,
   productNameOptions,
   productPackageOptionsByName,
   createSuppliers,
@@ -90,6 +93,7 @@ const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
           <ProductBasicsSection
             createForm={createForm}
+            existingProductRows={existingProductRows}
             productNameOptions={productNameOptions}
             productPackageOptionsByName={productPackageOptionsByName}
             onFormChange={onFormChange}

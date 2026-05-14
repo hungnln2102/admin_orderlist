@@ -5,6 +5,7 @@ import { InputListSection } from "./components/InputListSection";
 import { FormDetailModal } from "./components/FormDetailModal";
 import CreateInputModal from "./CreateInputModal";
 import CreateFormModal from "./CreateFormModal";
+import EditFormModal from "./EditFormModal";
 
 export default function FormInfo() {
   const {
@@ -22,6 +23,8 @@ export default function FormInfo() {
     viewError,
     createInputOpen,
     createFormOpen,
+    editFormOpen,
+    editingItem,
     handleView,
     handleCloseView,
     handleEdit,
@@ -29,6 +32,8 @@ export default function FormInfo() {
     handleCreateForm,
     handleCreateFormClose,
     handleCreateFormSuccess,
+    handleEditFormClose,
+    handleEditFormSuccess,
     handleCreateInput,
     handleCreateInputClose,
     handleCreateInputSuccess,
@@ -89,6 +94,14 @@ export default function FormInfo() {
         onClose={handleCreateFormClose}
         onSuccess={handleCreateFormSuccess}
         inputItems={inputItems}
+      />
+
+      <EditFormModal
+        isOpen={editFormOpen}
+        onClose={handleEditFormClose}
+        onSuccess={handleEditFormSuccess}
+        inputItems={inputItems}
+        editingItem={editingItem}
       />
     </div>
   );

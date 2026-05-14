@@ -20,6 +20,7 @@ import {
   toCleanString,
   readSlotLinkPrefs,
   writeSlotLinkPrefs,
+  syncActivationFieldInTemplateFields,
 } from "../utils/packageHelpers";
 import { computeAugmentationForPackage } from "../utils/packageMatchUtils";
 import { onRefresh } from "@/lib/refreshBus";
@@ -154,7 +155,9 @@ export const usePackageData = (): UsePackageDataResult => {
       try {
         setOrdersLoading(true);
         setOrdersReady(false);
-        const res = await apiFetch(`/api/orders`);
+        const res = await apiFetch(
+          `/api/orders?scope=package_match`
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as OrderListItem[];
         if (!cancelled) {
@@ -187,7 +190,7 @@ export const usePackageData = (): UsePackageDataResult => {
     setOrdersLoading(true);
     setOrdersReady(false);
     try {
-      const res = await apiFetch(`/api/orders`);
+      const res = await apiFetch(`/api/orders?scope=package_match`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as OrderListItem[];
       if (!isMountedRef.current) return;
@@ -228,21 +231,51 @@ export const usePackageData = (): UsePackageDataResult => {
         if (!name) return;
         const firstRow = rows.find((row) => row.package === name);
         const productId = firstRow?.productId ?? null;
-        const hasCapacityConfigured = rows.some(
-          (row) => row.package === name && row.hasCapacityField
-        );
+        const serverActivation = firstRow?.productRequiresActivation === true;
         const existing = map.get(name);
         if (!existing) {
           map.set(name, {
             name,
             productId,
-            fields: defaultTemplateFields,
+            fields: syncActivationFieldInTemplateFields(
+              defaultTemplateFields,
+              serverActivation
+            ),
             isCustom: false,
           });
           changed = true;
           return;
         }
-        if (existing.isCustom !== true && existing.productId == null && productId != null) {
+        const baseFields =
+          existing.fields && existing.fields.length > 0
+            ? existing.fields
+            : defaultTemplateFields;
+        const mergedFields = syncActivationFieldInTemplateFields(
+          baseFields,
+          serverActivation
+        );
+        const prevFields =
+          existing.fields && existing.fields.length > 0
+            ? existing.fields
+            : defaultTemplateFields;
+        const fieldsEqual =
+          mergedFields.length === prevFields.length &&
+          mergedFields.every((f, i) => f === prevFields[i]);
+
+        if (!fieldsEqual) {
+          map.set(name, {
+            ...existing,
+            fields: mergedFields,
+            productId: existing.productId ?? productId,
+          });
+          changed = true;
+          return;
+        }
+        if (
+          existing.isCustom !== true &&
+          existing.productId == null &&
+          productId != null
+        ) {
           map.set(name, { ...existing, productId });
           changed = true;
         }
@@ -256,11 +289,17 @@ export const usePackageData = (): UsePackageDataResult => {
 
   const orderMatchers = useMemo<NormalizedOrderRecord[]>(() => {
     return orders.map((order) => {
+      const o = order as Record<string, unknown>;
       const idProduct =
         (order.id_product ?? order.idProduct ?? "") as string;
       const informationOrder =
         (order.information_order ?? order.informationOrder ?? "") as string;
       const slot = order.slot;
+      const rawLinePid =
+        o.line_product_id ?? o.lineProductId;
+      const n =
+        rawLinePid != null && rawLinePid !== "" ? Number(rawLinePid) : NaN;
+      const lineProductId = Number.isFinite(n) && n > 0 ? n : null;
       const productKeys = buildIdentifierKeys(idProduct);
       const infoKeys = buildIdentifierKeys(informationOrder);
       return {
@@ -277,6 +316,10 @@ export const usePackageData = (): UsePackageDataResult => {
         informationMatchKey: normalizeMatchKey(informationOrder),
         customerDisplay: toCleanString(order.customer as string | null),
         productCodeNormalized: normalizeProductCodeValue(idProduct),
+        lineProductId:
+          lineProductId != null && Number.isFinite(lineProductId)
+            ? lineProductId
+            : null,
       };
     });
   }, [orders]);
@@ -379,15 +422,16 @@ export const usePackageData = (): UsePackageDataResult => {
       (selectedTemplate?.fields.includes("capacity") ?? false));
   const tableColumnCount = showCapacityColumn ? 9 : 8;
 
+  /** Thống kê cùng phạm vi với bảng: loại gói + tìm kiếm + lọc trạng thái (tránh lệch «Tổng: 1» với 3 dòng bảng). */
   const slotStats = useMemo(() => {
-    const low = scopedRows.reduce(
+    const low = filteredRows.reduce(
       (total, row) =>
         getSlotAvailabilityState(row.remainingSlots) === "low"
           ? total + 1
           : total,
       0
     );
-    const out = scopedRows.reduce(
+    const out = filteredRows.reduce(
       (total, row) =>
         getSlotAvailabilityState(row.remainingSlots) === "out"
           ? total + 1
@@ -395,11 +439,11 @@ export const usePackageData = (): UsePackageDataResult => {
       0
     );
     return {
-      total: scopedRows.length,
+      total: filteredRows.length,
       low,
       out,
     };
-  }, [scopedRows]);
+  }, [filteredRows]);
 
   const allPackageNames = useMemo(() => {
     const names = new Set<string>();
@@ -424,8 +468,11 @@ export const usePackageData = (): UsePackageDataResult => {
     computedRows.forEach((row) => {
       const key = (row.package || "").trim();
       if (!key) return;
-      const entry = stats.get(key);
-      if (!entry) return;
+      let entry = stats.get(key);
+      if (!entry) {
+        entry = { total: 0, low: 0, out: 0 };
+        stats.set(key, entry);
+      }
       entry.total += 1;
       const availability = getSlotAvailabilityState(row.remainingSlots);
       if (availability === "low") entry.low += 1;

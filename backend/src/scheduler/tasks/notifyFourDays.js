@@ -8,6 +8,7 @@ const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
 const {
   claimDailyNotificationRun,
   releaseDailyNotificationRun,
+  claimOrderOnceNotification,
 } = require("./shared/dailyNotificationGuard");
 
 const ADVISORY_LOCK_KEY_1 = 90101;
@@ -85,13 +86,66 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         const today = todayYMDInVietnam();
         const variantIds = notifyRows.map((r) => r.id_product).filter((id) => id != null);
         const nameMap = await fetchVariantDisplayNames(client, variantIds);
-        const normalizedOrders = [];
+        const seenOrderKeys = new Set();
+        const uniqueRows = [];
         for (const row of notifyRows) {
-          const computed = await computeOrderCurrentPrice(client, row);
-          normalizedOrders.push(normalizeNotifyRow(row, today, nameMap, computed));
+          const raw = String(row.id_order || row.idOrder || "").trim();
+          const k = raw ? raw.toUpperCase() : "";
+          if (seenOrderKeys.has(k)) continue;
+          seenOrderKeys.add(k);
+          uniqueRows.push(row);
         }
 
-        await sendFourDaysRemainingNotification(normalizedOrders);
+        const candidates = [];
+        for (const row of uniqueRows) {
+          const computed = await computeOrderCurrentPrice(client, row);
+          candidates.push(normalizeNotifyRow(row, today, nameMap, computed));
+        }
+
+        if (candidates.length === 0) {
+          logger.info("[CRON] Không còn đơn 4 ngày sau lọc trùng mã");
+        } else {
+          const pending = [];
+          for (const o of candidates) {
+            const code = String(o.id_order || o.idOrder || "").trim();
+            if (!code) {
+              pending.push({ order: o, perOrderKey: null });
+              continue;
+            }
+            const { claimed, key: perOrderKey } = await claimOrderOnceNotification(client, {
+              kind: "4d",
+              dateYmd,
+              orderCode: code,
+              trigger,
+            });
+            if (claimed) {
+              pending.push({ order: o, perOrderKey });
+            } else {
+              logger.warn(
+                "[CRON] Bỏ qua thông báo 4 ngày cho mã đơn (đã gửi hoặc process khác đã giữ chốt)",
+                { orderCode: code, dateYmd, perOrderKey, trigger }
+              );
+            }
+          }
+          if (pending.length > 0) {
+            try {
+              await sendFourDaysRemainingNotification(
+                pending.map((p) => p.order)
+              );
+            } catch (sendErr) {
+              for (const p of pending) {
+                if (p.perOrderKey) {
+                  await releaseDailyNotificationRun(client, p.perOrderKey);
+                }
+              }
+              throw sendErr;
+            }
+          } else {
+            logger.info(
+              "[CRON] Không còn đơn 4 ngày nào sau chốt từng mã (có thể trùng process)"
+            );
+          }
+        }
       } else {
         logger.info(
           "[CRON] Không có đơn nào cần gia hạn để gửi thông báo (còn 4 ngày, bỏ qua MAVT)"

@@ -11,7 +11,11 @@ const { removeMappingsForAccount } = require("../../services/userAccountMappingS
 const { normalizeOtpSource } = require("../../services/otpProviderService");
 const {
   removeProfileDirForEmail,
-} = require("../../services/adobe-renew-v2/shared/profileSession");
+} = require("../../services/renew-adobe/adobe-renew-v2/shared/profileSession");
+const {
+  upsertRenewAdobeOrderUserTrackingForOrderIds,
+  getOrderUserTrackingCountsForAdminAccounts,
+} = require("../../services/renew-adobe/orderUserTrackingService");
 
 const MAIL_BACKUP_TABLE =
   IDENTITY_SCHEMA?.MAIL_BACKUP
@@ -27,7 +31,6 @@ const CHECK_EMPTY_COLS = [
   COLS.ORG_NAME,
   COLS.LICENSE_STATUS,
   COLS.USER_COUNT,
-  COLS.USERS_SNAPSHOT,
   COLS.LAST_CHECKED,
   COLS.IS_ACTIVE,
   COLS.CREATED_AT,
@@ -255,13 +258,13 @@ const listAccounts = async (_req, res) => {
       `${TABLE}.${COLS.ORG_NAME}`,
       `${TABLE}.${COLS.LICENSE_STATUS}`,
       `${TABLE}.${COLS.USER_COUNT}`,
-      `${TABLE}.${COLS.USERS_SNAPSHOT}`,
       `${TABLE}.${COLS.LAST_CHECKED}`,
       `${TABLE}.${COLS.IS_ACTIVE}`,
       `${TABLE}.${COLS.CREATED_AT}`,
       `${TABLE}.${COLS.MAIL_BACKUP_ID}`,
       ...(COLS.OTP_SOURCE ? [`${TABLE}.${COLS.OTP_SOURCE}`] : []),
       ...(COLS.URL_ACCESS ? [`${TABLE}.${COLS.URL_ACCESS}`] : []),
+      ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : []),
     ];
 
     let qb = db(TABLE);
@@ -282,9 +285,17 @@ const listAccounts = async (_req, res) => {
 
     const rows = await qb.orderBy(`${TABLE}.${COLS.ID}`, "asc");
 
+    const trackingByAccountId = await getOrderUserTrackingCountsForAdminAccounts(
+      rows,
+      COLS.ID,
+      COLS.ORG_NAME
+    );
+
     const withEmptyCheck = rows.map((row) => ({
       ...row,
       empty_fields: getEmptyFields(row),
+      tracking_user_count:
+        trackingByAccountId.get(Number(row[COLS.ID])) ?? 0,
     }));
 
     logger.info("[renew-adobe] List accounts", { total: withEmptyCheck.length });
@@ -390,7 +401,6 @@ const createAccount = async (req, res) => {
         [COLS.ORG_NAME]: null,
         [COLS.LICENSE_STATUS]: null,
         [COLS.USER_COUNT]: 0,
-        [COLS.USERS_SNAPSHOT]: null,
         [COLS.ALERT_CONFIG]: null,
         [COLS.LAST_CHECKED]: null,
         [COLS.IS_ACTIVE]: true,
@@ -437,11 +447,27 @@ const deleteAccount = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy tài khoản." });
     }
 
-    await removeMappingsForAccount(id);
+    const removedMappings = await removeMappingsForAccount(id);
+    const trackingOrderIds = [
+      ...new Set(
+        removedMappings
+          .map((r) => String(r.id_order ?? "").trim())
+          .filter(Boolean)
+      ),
+    ];
+
     const deleted = await db(TABLE).where(COLS.ID, id).del();
 
     if (!deleted) {
       return res.status(404).json({ error: "Không tìm thấy tài khoản." });
+    }
+
+    if (trackingOrderIds.length > 0) {
+      await upsertRenewAdobeOrderUserTrackingForOrderIds(trackingOrderIds).catch(
+        (err) => {
+          logger.warn("[renew-adobe] deleteAccount order_user_tracking: %s", err.message);
+        }
+      );
     }
 
     logger.info("[renew-adobe] Deleted admin account", {

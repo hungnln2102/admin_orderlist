@@ -1,5 +1,8 @@
 const { Pool } = require("pg");
-require("dotenv").config();
+const { loadBackendEnv } = require("./loadEnv");
+const { getPostgresConnectionUrl } = require("./postgresConnectionUrl");
+
+loadBackendEnv();
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -8,7 +11,7 @@ const RAW_POOL_MAX = Number(process.env.DB_RAW_POOL_MAX) || 5;
 const CONNECTION_TIMEOUT = Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 15_000;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: getPostgresConnectionUrl(),
   max: RAW_POOL_MAX,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: CONNECTION_TIMEOUT,

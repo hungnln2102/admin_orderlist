@@ -1,5 +1,11 @@
 import * as Helpers from "@/lib/helpers";
-import type { AdobeAdminAccount, LicenseStatus, SnapshotUser } from "../types";
+import type { LicenseStatus } from "../types";
+import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
+import {
+  DEFAULT_ADOBE_SYSTEM_CODE,
+  isAdobeSystemCode,
+  type AdobeSystemCode,
+} from "./system-options";
 import type { DisplayStatus, OrderInfo, UserOrderRow } from "./types";
 
 /**
@@ -54,62 +60,65 @@ export function buildEmailOrderMap(
   return map;
 }
 
-export function flattenToUserRows(
-  accounts: AdobeAdminAccount[],
-  emailOrderMap: Map<string, OrderInfo>
-): UserOrderRow[] {
-  type SnapshotInfo = {
-    accountId: number;
-    orgName: string;
-    product: boolean | string | number | undefined;
-    licenseStatus: LicenseStatus;
-  };
-
-  const snapshotLookup = new Map<string, SnapshotInfo>();
-
-  for (const account of accounts) {
-    let users: SnapshotUser[] = [];
-
-    if (account.users_snapshot) {
-      try {
-        users = JSON.parse(account.users_snapshot) as SnapshotUser[];
-      } catch {
-        users = [];
-      }
-    }
-
-    for (const user of users) {
-      const key = (user.email || "").toLowerCase().trim();
-      if (key && !snapshotLookup.has(key)) {
-        snapshotLookup.set(key, {
-          accountId: account.id,
-          orgName: account.org_name ?? "—",
-          product: user.product,
-          licenseStatus: account.license_status,
-        });
-      }
-    }
+/** Trạng thái hiển thị từ order_user_tracking + admin (API user-orders đã join). */
+function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
+  const ts = (order.tracking_status || "").trim().toLowerCase();
+  // "hết gói" / "hết hạn" — set bởi luồng Fix Ades khi check trả error/expired.
+  // Bypass require accountId vì Ades không gắn admin Adobe.
+  if (ts.includes("hết gói") || ts.includes("hết hạn") || ts === "expired") {
+    return "expired";
   }
+  // Fix Ades / hệ thống dùng tracking_status="có gói" trực tiếp (không cần adobe_account_id).
+  if (ts.includes("có gói")) {
+    if (
+      order.system_note === "fix_ades" ||
+      order.system_note === "fix_adobe_edu"
+    ) {
+      return "active";
+    }
+    return normalizeIncomingLicenseStatus(order.admin_license_status);
+  }
+  const aid = Number(order.adobe_account_id) || 0;
+  if (aid <= 0) return "not_added";
+  if (ts.includes("chưa cấp")) return "no_product";
+  if (ts.includes("chưa add")) return "not_added";
+  return "not_added";
+}
 
+export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
   const rows: UserOrderRow[] = [];
-  for (const [email, order] of emailOrderMap) {
-    const snapshot = snapshotLookup.get(email);
+  for (const order of orders) {
+    const email = (order.information_order || "").trim().toLowerCase();
+    if (!email) continue;
+    const aid = Number(order.adobe_account_id) || 0;
+    const displayStatus = displayStatusFromOrder(order);
+    const profile =
+      displayStatus === "not_added"
+        ? "—"
+        : (order.tracking_org_name != null &&
+            String(order.tracking_org_name).trim() !== "" &&
+            String(order.tracking_org_name).trim()) ||
+          (order.admin_org_name != null &&
+            String(order.admin_org_name).trim() !== "" &&
+            String(order.admin_org_name).trim()) ||
+          "—";
 
+    const systemNote: AdobeSystemCode = isAdobeSystemCode(order.system_note)
+      ? order.system_note
+      : DEFAULT_ADOBE_SYSTEM_CODE;
     rows.push({
-      id: snapshot ? `acc-${snapshot.accountId}-${email}` : `order-${email}`,
+      id: aid > 0 ? `acc-${aid}-${email}` : `order-${email}`,
       order_code: order.order_code ?? "—",
       customer_name: order.customer || "—",
       email,
-      profile: snapshot?.orgName ?? "—",
-      display_status: snapshot
-        ? resolveDisplayStatus(snapshot.product, snapshot.licenseStatus)
-        : "not_added",
+      profile,
+      display_status: displayStatus,
       expiry: order.expiry_date
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",
-      accountId: snapshot?.accountId ?? 0,
+      accountId: aid,
+      systemNote,
     });
   }
-
   return rows;
 }

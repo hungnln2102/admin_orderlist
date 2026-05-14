@@ -54,7 +54,8 @@ export default function RenewAdobeAdmin() {
       (item) =>
         item.email.toLowerCase().includes(q) ||
         (item.alias ?? "").toLowerCase().includes(q) ||
-        (item.org_name ?? "").toLowerCase().includes(q)
+        (item.org_name ?? "").toLowerCase().includes(q) ||
+        (item.id_product ?? "").toLowerCase().includes(q)
     );
   }, [accounts, searchTerm]);
 
@@ -128,7 +129,12 @@ export default function RenewAdobeAdmin() {
 
       <div className="mt-6 space-y-6">
         <UserOrdersTable
-          accounts={accounts}
+          accountsRefreshDep={accounts
+            .map(
+              (a) =>
+                `${a.id}:${a.tracking_user_count ?? 0}:${a.user_count}:${a.license_status}`
+            )
+            .join("|")}
           onDeleteUser={handleDeleteUser}
           deletingId={deletingId}
           onFixUser={handleFixUser}

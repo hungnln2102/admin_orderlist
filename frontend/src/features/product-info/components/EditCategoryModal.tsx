@@ -11,6 +11,8 @@ import CategoryTagManager from "./CategoryTagManager";
 
 type EditCategoryModalProps = {
   open: boolean;
+  /** `product.id` — đổi tên gói = cập nhật theo id này, không tìm theo chuỗi tên. */
+  catalogProductId?: number | null;
   packageName: string;
   imageUrl: string;
   categoryOptions: CategoryItem[];
@@ -30,6 +32,7 @@ type TabType = "edit" | "manage";
 
 export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
   open,
+  catalogProductId,
   packageName,
   imageUrl,
   categoryOptions,
@@ -141,7 +144,19 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
               <div className="lg:col-span-2 space-y-6">
                 {/* Package Name */}
                 <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-6 shadow-sm backdrop-blur-sm">
-                  <label className={labelBase}>Gói Sản Phẩm</label>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide block">
+                      Gói Sản Phẩm
+                    </label>
+                    {catalogProductId != null && catalogProductId > 0 && (
+                      <span
+                        className="text-[11px] font-mono text-slate-500"
+                        title="ID bản ghi product (schema)"
+                      >
+                        product.id = {catalogProductId}
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={packageName}

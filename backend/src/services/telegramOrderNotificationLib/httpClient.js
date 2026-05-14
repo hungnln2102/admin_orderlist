@@ -3,9 +3,8 @@
  */
 
 const https = require("https");
-const dns = require("dns");
-const logger = require("../../utils/logger");
 const { HTTP_TIMEOUT_MS } = require("./constants");
+const { preferIpv4Lookup } = require("./dnsHelpers");
 const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ABORT_ERR",
   "UND_ERR_ABORTED",
@@ -17,45 +16,6 @@ const TRANSIENT_FETCH_ERROR_CODES = new Set([
   "ECONNREFUSED",
   "ECONNABORTED",
 ]);
-
-/**
- * Agent truyền `options` có thể chứa localAddress, port… — spread vào dns.lookup
- * gây lỗi trên một số bản Node/Windows (ERR_INVALID_IP_ADDRESS: undefined).
- * Chỉ forward các field dns.lookup hỗ trợ.
- */
-const dnsLookupOpts = (options, overrides) => {
-  const out = { ...overrides };
-  if (options && typeof options === "object") {
-    if (options.hints != null) out.hints = options.hints;
-    if (options.verbatim != null) out.verbatim = options.verbatim;
-  }
-  return out;
-};
-
-const preferIpv4Lookup = (hostname, options, cb) => {
-  if (typeof hostname !== "string" || !hostname.trim()) {
-    process.nextTick(() => cb(new TypeError("Invalid hostname for DNS lookup")));
-    return;
-  }
-  const tryCb = (err, address, family) => {
-    if (err) {
-      cb(err);
-      return;
-    }
-    if (address == null || address === "") {
-      cb(new Error("DNS lookup returned no address"));
-      return;
-    }
-    cb(null, String(address), Number(family) || 4);
-  };
-
-  dns.lookup(hostname, dnsLookupOpts(options, { family: 4, all: false }), (err, address, family) => {
-    if (err || address == null || address === "") {
-      return dns.lookup(hostname, dnsLookupOpts(options, { all: false }), tryCb);
-    }
-    tryCb(null, address, family);
-  });
-};
 
 const getErrorCode = (err) =>
   String(err?.code || err?.cause?.code || "")
@@ -84,6 +44,8 @@ const isTransientFetchError = (err, timeoutSignal) => {
 
 /**
  * POST body qua https.request với keepAlive và IPv4.
+ * `payload` có thể là string (JSON đã stringify), object (auto JSON.stringify),
+ * hoặc Buffer (đã đóng gói multipart sẵn → caller tự set Content-Type).
  */
 const sendWithHttps = (
   url,
@@ -91,7 +53,14 @@ const sendWithHttps = (
   headers = { "Content-Type": "application/json" }
 ) =>
   new Promise((resolve, reject) => {
-    const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+    let body;
+    if (Buffer.isBuffer(payload)) {
+      body = payload;
+    } else if (typeof payload === "string") {
+      body = payload;
+    } else {
+      body = JSON.stringify(payload);
+    }
     const urlObj = new URL(url);
 
     const req = https.request(
@@ -103,7 +72,7 @@ const sendWithHttps = (
         method: "POST",
         headers: {
           ...headers,
-          "Content-Length": Buffer.byteLength(body),
+          "Content-Length": Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body),
         },
         agent: new https.Agent({ keepAlive: true, lookup: preferIpv4Lookup }),
       },
@@ -137,51 +106,30 @@ const sendWithHttps = (
   });
 
 /**
- * POST JSON; dùng fetch nếu có, fallback sendWithHttps khi lỗi tạm thời.
+ * POST JSON with one transport only.
+ * Telegram sendMessage/sendPhoto is not idempotent; retrying the same payload
+ * after a client timeout can create duplicate messages.
  */
 const postJson = async (url, data) => {
   const payload = JSON.stringify(data);
   const headers = { "Content-Type": "application/json" };
-
-  const timeoutSignal =
-    typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-      ? AbortSignal.timeout(HTTP_TIMEOUT_MS)
-      : undefined;
-
-  if (typeof fetch === "function") {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers,
-        body: payload,
-        signal: timeoutSignal,
-      });
-      if (!res.ok) {
-        const err = new Error(`Request failed with status ${res.status}`);
-        err.status = res.status;
-        err.body = await res.text().catch(() => "");
-        throw err;
-      }
-      return await res.text();
-    } catch (err) {
-      const code = getErrorCode(err);
-      if (!isTransientFetchError(err, timeoutSignal)) {
-        throw err;
-      }
-      logger.warn("[Order][Telegram] Fetch failed, retrying with https client", {
-        name: err?.name,
-        code,
-        status: err?.status,
-        message: err?.message,
-      });
-    }
-  }
-
   return sendWithHttps(url, payload, headers);
+};
+
+/**
+ * POST multipart/form-data — caller đã build `body` (Buffer) + `headers` (gồm
+ * Content-Type kèm boundary) qua `multipartBuilder.buildMultipartBody`.
+ */
+const postMultipart = async (url, body, headers) => {
+  if (!Buffer.isBuffer(body)) {
+    throw new TypeError("postMultipart: body must be a Buffer");
+  }
+  return sendWithHttps(url, body, headers);
 };
 
 module.exports = {
   sendWithHttps,
   postJson,
+  postMultipart,
   isTransientFetchError,
 };

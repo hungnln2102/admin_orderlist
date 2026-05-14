@@ -187,6 +187,7 @@ export default function Orders() {
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
         prefillContext={createPrefill}
+        orderCreationKind={datasetKey === "import" ? "import" : "sales"}
         onSave={(data) => {
           void handleSaveNewOrder(data);
         }}

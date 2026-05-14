@@ -5,6 +5,7 @@ const {
   cleanupExpiredAdobeUsersTask,
   renewAdobeCheckAndNotifyTask,
   cleanupAdobeProfileGarbageTask,
+  syncDailyRevenueSummaryTask,
 } = require("../../scheduler/taskInstances");
 const logger = require("../../utils/logger");
 const { syncOrdersToMapping } = require("../../services/userAccountMappingService");
@@ -82,6 +83,21 @@ const runCleanupAdobeProfileGarbageNow = async (_req, res) => {
   }
 };
 
+const runDailyRevenueSummaryNow = async (_req, res) => {
+  try {
+    await syncDailyRevenueSummaryTask("manual");
+    res.json({ success: true });
+  } catch (error) {
+    logger.error("[scheduler] daily_revenue_summary sync failed", {
+      error: error.message,
+      stack: error.stack,
+    });
+    res
+      .status(500)
+      .json({ error: "Không thể đồng bộ daily_revenue_summary." });
+  }
+};
+
 module.exports = {
   runSchedulerNow,
   schedulerStatus,
@@ -90,4 +106,5 @@ module.exports = {
   runCleanupAdobeProfileGarbageNow,
   runRenewAdobeCheckNow,
   runSyncMappingNow,
+  runDailyRevenueSummaryNow,
 };

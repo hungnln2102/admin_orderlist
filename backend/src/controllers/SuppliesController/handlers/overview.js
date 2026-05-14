@@ -35,7 +35,9 @@ const getSupplyOverview = async (req, res) => {
     const statusColumnName = await resolveSupplyStatusColumn();
     const supplyStatusColumn = statusColumnName || null;
 
-    const includeAccountHolder = await supplierHasAccountHolderColumn(client, supplierTable);
+    const includeAccountHolder =
+      Boolean(QUOTED_COLS.supplier.accountHolder) &&
+      await supplierHasAccountHolderColumn(client, supplierTable);
     const accountHolderSelect = includeAccountHolder
       ? `s.${QUOTED_COLS.supplier.accountHolder} AS account_holder`
       : `NULL::text AS account_holder`;
@@ -104,9 +106,11 @@ const getSupplyOverview = async (req, res) => {
       ORDER BY month_num ASC, latest.logged_at DESC;
     `;
 
+    const orderIdCol = quoteIdent(orderCols.id);
     const orderUnpaidSql = `
       WITH latest AS (
         SELECT DISTINCT ON (l.${lc.orderListId})
+          l.${lc.orderListId} AS order_list_id,
           l.${lc.supplyId} AS supply_id,
           l.${lc.importCost} AS import_cost,
           l.${lc.refundAmount} AS refund_amount,
@@ -123,6 +127,7 @@ const getSupplyOverview = async (req, res) => {
         END
       ), 0)::numeric AS total_unpaid_import
       FROM latest
+      INNER JOIN ${TABLES.orderList} o ON o.${orderIdCol} = latest.order_list_id
     `;
 
     const paidSummarySql = `
@@ -183,6 +188,7 @@ const getSupplyOverview = async (req, res) => {
     }));
 
     const orderUnpaidImport = Number(orderUnpaidRes.rows?.[0]?.total_unpaid_import) || 0;
+
     const unpaidPayments = [];
     if (orderUnpaidImport !== 0) {
       unpaidPayments.push({

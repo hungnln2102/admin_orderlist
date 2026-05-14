@@ -3,7 +3,6 @@ const { db } = require("../../../db");
 const { TABLES, COLS } = require("../constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../../config/dbSchema");
 const { findProductIdByName } = require("../../ProductsController/finders");
-const { deriveVariantMarginsFromCostAndSalePrice } = require("../../../services/pricing/core");
 const { getTiers } = require("../../../services/pricing/tierCache");
 
 const resolveProductToVariantId = async(productNameOrId) => {
@@ -123,13 +122,6 @@ const ensureVariantRecord = async(productName, options = {}) => {
         }
 
         const newVariantId = await nextId(TABLES.variant, variantIdCol, trx);
-        const { pctCtv, pctKhach } = deriveVariantMarginsFromCostAndSalePrice({
-            cost: options.cost,
-            salePrice: options.salePrice,
-            orderPrefix: options.orderPrefix,
-            customerType: options.customerType,
-        });
-
         await trx(TABLES.variant).insert({
             [variantIdCol]: newVariantId,
             [PRODUCT_SCHEMA.VARIANT.COLS.PRODUCT_ID]: productId,
@@ -140,19 +132,37 @@ const ensureVariantRecord = async(productName, options = {}) => {
         });
 
         const tiers = await getTiers();
-        const marginEntries = [
-            { key: "ctv", value: pctCtv },
-            { key: "customer", value: pctKhach },
-        ];
-        for (const { key, value } of marginEntries) {
-            if (value == null || value === 0) continue;
-            const tier = tiers.find((t) => t.key === key);
-            if (!tier) continue;
-            await trx(TABLES.variantMargin).insert({
-                variant_id: newVariantId,
-                tier_id: tier.id,
-                margin_ratio: value,
-            });
+        const rawPrefix = String(options.orderPrefix || options.customerType || "")
+            .trim()
+            .toUpperCase();
+        const matchedTier =
+            tiers.find((tier) => String(tier.prefix || "").toUpperCase() === rawPrefix) ||
+            tiers.find((tier) => tier.key === "customer") ||
+            null;
+
+        const salePrice = Number(options.salePrice);
+        if (matchedTier && Number.isFinite(salePrice) && salePrice > 0) {
+            await trx(TABLES.variantMargin)
+                .insert({
+                    variant_id: newVariantId,
+                    tier_id: matchedTier.id,
+                    price: salePrice,
+                })
+                .onConflict(["variant_id", "tier_id"])
+                .merge({ price: salePrice });
+        }
+
+        const importTier = tiers.find((tier) => tier.key === "import");
+        const importCost = Number(options.cost);
+        if (importTier && Number.isFinite(importCost) && importCost > 0) {
+            await trx(TABLES.variantMargin)
+                .insert({
+                    variant_id: newVariantId,
+                    tier_id: importTier.id,
+                    price: importCost,
+                })
+                .onConflict(["variant_id", "tier_id"])
+                .merge({ price: importCost });
         }
 
         return newVariantId;

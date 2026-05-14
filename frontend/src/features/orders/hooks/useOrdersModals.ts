@@ -7,6 +7,8 @@ export type RefundCreatePrefill = {
   creditNoteId: number;
   creditAvailableAmount: number;
   creditApplyAmount: number;
+  /** Giá bán đơn nguồn (trước trừ credit) — hiển thị chi tiết trong form tạo đơn. */
+  sourceOrderListPrice: number;
   creditSourceOrderId: number;
   creditSourceOrderCode: string;
   reservedOrderCode?: string | null;

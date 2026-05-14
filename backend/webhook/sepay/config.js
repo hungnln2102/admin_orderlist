@@ -13,6 +13,7 @@ const {
   PRODUCT_SCHEMA,
   PARTNER_SCHEMA,
   ORDERS_SCHEMA,
+  RECEIPT_SCHEMA,
   PRICING_TIER_SCHEMA,
 } = require("../../src/config/dbSchema");
 
@@ -26,12 +27,8 @@ const PORT = Number(process.env.SEPAY_PORT) || 5000;
 // All sensitive values must come from environment variables
 // No hardcoded defaults for security reasons
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_CHAT_ID =
-  process.env.RENEWAL_GROUP_ID ||
-  process.env.NOTIFICATION_CHAT_ID ||
-  process.env.TELEGRAM_CHAT_ID ||
-  process.env.ORDER_NOTIFICATION_CHAT_ID ||
-  "";
+// Quy ước mới: toàn bộ Telegram dùng 1 chat ID duy nhất.
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
 const TELEGRAM_TOPIC_ID = Number.parseInt(
   process.env.RENEWAL_TOPIC_ID || 
   process.env.TELEGRAM_TOPIC_ID || 
@@ -49,7 +46,7 @@ const { pool } = require("../../src/config/database");
 // GET table and column definitions
 // --------------------------------
 const ORDER_DEF = getDefinition("ORDER_LIST", ORDERS_SCHEMA);
-const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", ORDERS_SCHEMA);
+const PAYMENT_RECEIPT_DEF = getDefinition("PAYMENT_RECEIPT", RECEIPT_SCHEMA);
 const PAYMENT_SUPPLY_DEF = getDefinition("PAYMENT_SUPPLY", PARTNER_SCHEMA);
 const VARIANT_DEF = getDefinition("VARIANT", PRODUCT_SCHEMA);
 const SUPPLIER_DEF = getDefinition("SUPPLIER", PARTNER_SCHEMA);

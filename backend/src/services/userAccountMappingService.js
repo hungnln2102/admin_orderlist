@@ -313,8 +313,257 @@ async function markUsersProductFalseByAccount(userEmails, adobeAccountId) {
   return updated;
 }
 
+/**
+ * Số user đã gán vào admin (đếm dòng mapping).
+ * @param {number[]} accountIds
+ * @returns {Promise<Map<number, number>>} adobe_account_id → count
+ */
+/**
+ * Đồng bộ mapping từ danh sách user Adobe (sau check / JIL) → gắn đơn renew_adobe với admin hiện tại.
+ * Tránh UI "chưa add" / auto-assign cố add user đã có trên team.
+ * @param {number} adobeAccountId
+ * @param {Array<{ email?: string, product?: boolean }>} manageTeamMembers
+ * @returns {Promise<{ upserted: number, skippedNoOrder: number }>}
+ */
+async function syncRenewAdobeMappingFromTeamMembers(
+  adobeAccountId,
+  manageTeamMembers
+) {
+  const id = Number(adobeAccountId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return { upserted: 0, skippedNoOrder: 0 };
+  }
+
+  const members = Array.isArray(manageTeamMembers) ? manageTeamMembers : [];
+  if (members.length === 0) {
+    return { upserted: 0, skippedNoOrder: 0 };
+  }
+
+  const PS_TABLE = tableName(RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.TABLE, SCHEMA_RENEW_ADOBE);
+  const PS_COLS = RENEW_ADOBE_SCHEMA.PRODUCT_SYSTEM.COLS;
+  const O_TABLE = tableName(ORDERS_SCHEMA.ORDER_LIST.TABLE, SCHEMA_ORDERS);
+  const O_COLS = ORDERS_SCHEMA.ORDER_LIST.COLS;
+
+  const variants = await db(PS_TABLE)
+    .where(PS_COLS.SYSTEM_CODE, ADOBE_SYSTEM_CODE)
+    .select(PS_COLS.VARIANT_ID);
+  const variantIds = variants.map((v) => v[PS_COLS.VARIANT_ID]);
+  if (variantIds.length === 0) {
+    return { upserted: 0, skippedNoOrder: 0 };
+  }
+
+  let upserted = 0;
+  let skippedNoOrder = 0;
+  const now = new Date();
+
+  for (const m of members) {
+    const email = (m?.email || "").toString().trim().toLowerCase();
+    if (!email) continue;
+
+    const productBool = m?.product === true || m?.hasPackage === true;
+
+    const order = await db(O_TABLE)
+      .whereIn(O_COLS.ID_PRODUCT, variantIds)
+      .whereNot(O_COLS.STATUS, STATUS.EXPIRED)
+      .whereRaw(`LOWER(TRIM(${O_COLS.INFORMATION_ORDER})) = ?`, [email])
+      .orderBy(O_COLS.ORDER_DATE, "desc")
+      .first();
+
+    if (!order) {
+      skippedNoOrder += 1;
+      continue;
+    }
+
+    const idOrder = order[O_COLS.ID_ORDER];
+    const existing = await db(TABLE)
+      .where(COLS.USER_EMAIL, email)
+      .where(COLS.ORDER_ID, idOrder)
+      .first();
+
+    const prevAdobe = existing
+      ? existing[COLS.ADOBE_ACCOUNT_ID] != null
+        ? Number(existing[COLS.ADOBE_ACCOUNT_ID])
+        : null
+      : null;
+    if (
+      prevAdobe != null &&
+      Number.isFinite(prevAdobe) &&
+      prevAdobe > 0 &&
+      prevAdobe !== id
+    ) {
+      logger.warn(
+        "[Mapping] Email %s (order=%s) đang map admin %s; check admin %s có user trên team → ghi đè theo Adobe.",
+        email,
+        idOrder,
+        prevAdobe,
+        id
+      );
+    }
+
+    await db(TABLE)
+      .insert({
+        [COLS.USER_EMAIL]: email,
+        [COLS.ORDER_ID]: idOrder,
+        [COLS.ADOBE_ACCOUNT_ID]: id,
+        [COLS.PRODUCT]: productBool,
+        [COLS.ASSIGNED_AT]: now,
+        [COLS.UPDATED_AT]: now,
+      })
+      .onConflict([COLS.USER_EMAIL, COLS.ORDER_ID])
+      .merge({
+        [COLS.ADOBE_ACCOUNT_ID]: id,
+        [COLS.PRODUCT]: productBool,
+        [COLS.UPDATED_AT]: now,
+      });
+
+    upserted += 1;
+  }
+
+  if (upserted > 0) {
+    logger.info(
+      "[Mapping] syncRenewAdobeMappingFromTeamMembers: adobeAccount=%s upserted=%s skippedNoOrder=%s",
+      id,
+      upserted,
+      skippedNoOrder
+    );
+  }
+
+  return { upserted, skippedNoOrder };
+}
+
+/**
+ * User đã bị gỡ khỏi team Adobe (hoặc crawl không còn thấy) nhưng DB vẫn gắn admin
+ * → bỏ gán (adobe_account_id = null) để số slot / tracking khớp thực tế.
+ * @param {number} adobeAccountId
+ * @param {Array<{ email?: string }>} manageTeamMembers - danh sách từ check account (nguồn thật từ Adobe)
+ * @returns {Promise<{ cleared: number, orderIds: string[] }>}
+ */
+async function clearRenewAdobeMappingForEmailsNotOnTeam(
+  adobeAccountId,
+  manageTeamMembers
+) {
+  const id = Number(adobeAccountId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return { cleared: 0, orderIds: [] };
+  }
+
+  const teamEmails = new Set();
+  for (const m of Array.isArray(manageTeamMembers) ? manageTeamMembers : []) {
+    const e = (m?.email || "").toString().trim().toLowerCase();
+    if (e) teamEmails.add(e);
+  }
+
+  const rows = await db(TABLE)
+    .where(COLS.ADOBE_ACCOUNT_ID, id)
+    .select(COLS.ID, COLS.USER_EMAIL, COLS.ORDER_ID);
+
+  const orderIds = [];
+  let cleared = 0;
+  const now = new Date();
+  const trx = await db.transaction();
+  try {
+    for (const r of rows) {
+      const em = (r[COLS.USER_EMAIL] || "").toString().trim().toLowerCase();
+      if (!em) continue;
+      if (teamEmails.has(em)) continue;
+
+      await trx(TABLE)
+        .where(COLS.ID, r[COLS.ID])
+        .update({
+          [COLS.ADOBE_ACCOUNT_ID]: null,
+          [COLS.PRODUCT]: false,
+          [COLS.UPDATED_AT]: now,
+        });
+      cleared += 1;
+      const oid = String(r[COLS.ORDER_ID] || "").trim();
+      if (oid) orderIds.push(oid);
+    }
+    await trx.commit();
+  } catch (e) {
+    await trx.rollback();
+    throw e;
+  }
+
+  if (cleared > 0) {
+    logger.info(
+      "[Mapping] clearRenewAdobeMappingForEmailsNotOnTeam: adobeAccount=%s cleared=%d (user không còn trên team Adobe so với check)",
+      id,
+      cleared
+    );
+  }
+  return { cleared, orderIds: [...new Set(orderIds)] };
+}
+
+/**
+ * Email đã có ít nhất một mapping renew_adobe với adobe_account_id (đã gán admin).
+ * @param {string} userEmail
+ * @returns {Promise<number|null>} adobe_account_id hoặc null
+ */
+async function getAssignedAdobeAccountIdForUserEmail(userEmail) {
+  const email = (userEmail || "").toString().trim().toLowerCase();
+  if (!email) return null;
+
+  const row = await db(TABLE)
+    .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [COLS.USER_EMAIL, email])
+    .whereNotNull(COLS.ADOBE_ACCOUNT_ID)
+    .orderBy(COLS.UPDATED_AT, "desc")
+    .first();
+
+  if (!row) return null;
+  const aid = Number(row[COLS.ADOBE_ACCOUNT_ID]);
+  return Number.isFinite(aid) && aid > 0 ? aid : null;
+}
+
+/**
+ * Trong danh sách email, những email đã có adobe_account_id trong mapping.
+ * @param {string[]} emailsRaw
+ * @returns {Promise<Set<string>>} lowercase emails
+ */
+async function getEmailSetAlreadyAssignedToAdobe(emailsRaw) {
+  const emails = [
+    ...new Set(
+      (Array.isArray(emailsRaw) ? emailsRaw : [])
+        .map((e) => (e || "").toString().trim().toLowerCase())
+        .filter(Boolean)
+    ),
+  ];
+  if (emails.length === 0) return new Set();
+
+  const placeholders = emails.map(() => "?").join(",");
+  const rows = await db(TABLE)
+    .whereNotNull(COLS.ADOBE_ACCOUNT_ID)
+    .whereRaw(
+      `LOWER(TRIM(COALESCE(??, ''))) IN (${placeholders})`,
+      [COLS.USER_EMAIL, ...emails]
+    )
+    .select(db.raw(`LOWER(TRIM(COALESCE(??, ''))) as em`, [COLS.USER_EMAIL]));
+
+  return new Set(rows.map((r) => String(r.em || "").toLowerCase()).filter(Boolean));
+}
+
+async function getMappingCountsByAdobeAccountIds(accountIds) {
+  const ids = [
+    ...new Set(
+      (Array.isArray(accountIds) ? accountIds : [])
+        .map((id) => Number(id))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    ),
+  ];
+  if (ids.length === 0) return new Map();
+  const rows = await db(TABLE)
+    .whereIn(COLS.ADOBE_ACCOUNT_ID, ids)
+    .groupBy(COLS.ADOBE_ACCOUNT_ID)
+    .select(COLS.ADOBE_ACCOUNT_ID)
+    .count(`${COLS.ID} as c`);
+  return new Map(
+    rows.map((r) => [Number(r[COLS.ADOBE_ACCOUNT_ID]), Number(r.c) || 0])
+  );
+}
+
 module.exports = {
   syncOrdersToMapping,
+  syncRenewAdobeMappingFromTeamMembers,
+  clearRenewAdobeMappingForEmailsNotOnTeam,
   lookupAndRecordIfNeeded,
   markUsersProductFalseByAccount,
   recordUsersAssigned,
@@ -322,4 +571,7 @@ module.exports = {
   removeMappingsByOrders,
   getMappingsForAccount,
   getAccountForUser,
+  getAssignedAdobeAccountIdForUserEmail,
+  getEmailSetAlreadyAssignedToAdobe,
+  getMappingCountsByAdobeAccountIds,
 };

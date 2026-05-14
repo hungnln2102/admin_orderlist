@@ -7,7 +7,7 @@ require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 async function main() {
   const { db } = require("../src/db");
   const { RENEW_ADOBE_SCHEMA, SCHEMA_RENEW_ADOBE, tableName } = require("../src/config/dbSchema");
-  const adobeRenewV2 = require("../src/services/adobe-renew-v2");
+  const adobeRenewV2 = require("../src/services/renew-adobe/adobe-renew-v2");
 
   const TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
   const COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;

@@ -277,262 +277,313 @@ export const QrModal: React.FC<QrModalProps> = ({
 
   if (!open) return null;
 
+  const panelSurface =
+    "rounded-2xl border border-white/[0.08] bg-gradient-to-br from-slate-800/35 via-slate-900/50 to-slate-950/60 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]";
+  const panelEmerald =
+    "rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/25 via-slate-900/45 to-slate-950/55 shadow-[inset_0_1px_0_0_rgba(16,185,129,0.12)]";
+  const labelCls =
+    "block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 mb-1.5";
+  const inputCls =
+    "w-full rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/50 focus:ring-2 focus:ring-sky-500/20 outline-none transition";
+  const applyAll = () => {
+    commitAmount();
+    commitNote();
+  };
+
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-900/80 px-3 py-6">
-      <div className="w-full max-w-5xl rounded-3xl bg-slate-900 text-white shadow-2xl border border-slate-700 relative z-[100]">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-950/80 backdrop-blur-md px-3 py-6 sm:py-10">
+      <div className="relative w-full max-w-6xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-gradient-to-b from-[#151c2e] via-[#0f141c] to-[#0a0d12] text-white shadow-[0_32px_96px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/[0.06]">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/35 to-transparent"
+          aria-hidden
+        />
         <button
-          className="absolute right-6 top-6 text-slate-400 hover:text-indigo-100 transition"
+          type="button"
+          className="absolute right-3 top-3 z-10 rounded-full p-2.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
           onClick={onClose}
+          aria-label="Đóng"
         >
-          <XMarkIcon className="h-6 w-6" />
+          <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
-        <div className="px-6 py-10 space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-semibold">
+        <div className="px-5 py-7 sm:px-9 sm:py-9 space-y-5 sm:space-y-6 pt-14 sm:pt-10">
+          <div className="text-center space-y-3 max-w-2xl mx-auto">
+            <span className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-300/90">
+              VietQR · Sepay
+            </span>
+            <h2 className="text-[1.35rem] sm:text-2xl font-bold text-white tracking-tight leading-snug">
               Tạo thông tin thanh toán qua QR Code
             </h2>
-            <p className="text-sm text-slate-300">
-              Quét mã QR để chuyển khoản nhanh. Nhập số tiền và nội dung để cập
-              nhật chi tiết.
+            <p className="text-sm text-slate-400/95 leading-relaxed max-w-xl mx-auto">
+              Trên: nhập số tiền và nội dung hoặc gộp đơn MAVG. Dưới: mã QR và thông tin giao dịch
+              khớp với các ô đã nhập.
             </p>
           </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-6 flex flex-col items-center text-center space-y-4">
-              <p className="text-lg font-semibold text-sky-200">
-                Quét mã QR để thanh toán
+
+          {/* Tài khoản nhận */}
+          <div
+            className={`${panelSurface} p-3.5 sm:p-4 flex items-center gap-3 sm:gap-4`}
+          >
+            <img
+              src="https://companieslogo.com/img/orig/VPB.VN-b0a9916f.png?t=1722928514"
+              alt=""
+              className="h-10 w-10 object-contain shrink-0 rounded-xl bg-white/12 p-1.5 ring-1 ring-white/10"
+            />
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Tài khoản nhận
               </p>
-              <div className="rounded-2xl bg-white p-4 relative z-0">
-                <img
-                  src={qrImageUrl}
-                  alt="QR thanh toan"
-                  className="h-64 w-64 object-contain relative z-0"
+              <p className="font-mono text-sm font-semibold text-white tracking-tight truncate">
+                {QR_BANK_INFO.accountNumber}
+              </p>
+              <p className="text-xs text-slate-400 truncate">{QR_BANK_INFO.accountHolder}</p>
+            </div>
+          </div>
+
+          {/* Hàng trên: 2 khối ngang */}
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+            <div className={`${panelSurface} p-4 sm:p-6 space-y-5 flex flex-col`}>
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/15 text-xs font-bold text-sky-300">
+                  1
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-tight">Cập nhật mã QR</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Số tiền và nội dung hiển thị trên VietQR bên dưới.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="qr-modal-amount" className={labelCls}>
+                  Số tiền (VND)
+                </label>
+                <input
+                  id="qr-modal-amount"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="Ví dụ: 65000"
+                  className={inputCls}
+                  value={amountDraft}
+                  onChange={handleAmountInputChange}
+                  onBlur={commitAmount}
+                  onKeyDown={(e) => e.key === "Enter" && commitAmount()}
                 />
+              </div>
+              <div>
+                <label htmlFor="qr-modal-note" className={labelCls}>
+                  Nội dung chuyển khoản
+                </label>
+                <input
+                  id="qr-modal-note"
+                  type="text"
+                  placeholder="VD: TT NCC kỳ … hoặc mã MAVG"
+                  className={inputCls}
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  onBlur={commitNote}
+                  onKeyDown={(e) => e.key === "Enter" && commitNote()}
+                />
+              </div>
+              <button
+                type="button"
+                className="w-full mt-auto rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-md shadow-sky-900/40 transition hover:from-sky-400 hover:to-blue-500 active:scale-[0.99]"
+                onClick={applyAll}
+              >
+                Áp dụng số tiền & nội dung
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 min-h-0">
+              <div
+                className={`${panelEmerald} p-4 sm:p-6 space-y-4 flex-1 flex flex-col`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-xs font-bold text-emerald-300">
+                    2
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-emerald-100 tracking-tight">
+                      Mã nhóm biên lai (MAVG)
+                    </h3>
+                    <p className="text-xs text-emerald-200/65 mt-0.5 leading-relaxed">
+                      Dán mã đơn MAV… — hệ thống tạo MAVG và điền nội dung + tổng tiền.
+                    </p>
+                  </div>
+                </div>
+                <textarea
+                  id="qr-modal-batch-codes"
+                  rows={3}
+                  placeholder="MAVC…, MAVK… (phẩy hoặc xuống dòng)"
+                  className={`${inputCls} resize-y min-h-[6rem] border-emerald-500/20 focus:border-emerald-400/50 focus:ring-emerald-500/15 flex-1`}
+                  value={batchCodesDraft}
+                  onChange={(event) => setBatchCodesDraft(event.target.value)}
+                />
+                {orderHint ? (
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    <span className="text-slate-400 font-semibold">Gợi ý:</span> {orderHint}
+                  </p>
+                ) : null}
+                {batchError ? (
+                  <p className="text-xs text-rose-300">{batchError}</p>
+                ) : null}
+                {batchInfo ? (
+                  <p className="text-xs text-emerald-300 font-medium">
+                    Đã tạo {batchInfo.batchCode} · {batchInfo.orderCount} đơn ·{" "}
+                    {batchInfo.totalAmount.toLocaleString("vi-VN")} VND
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-950/50 transition hover:from-emerald-400 hover:to-teal-500 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.99]"
+                  onClick={createBatchFromOrders}
+                  disabled={batchLoading}
+                >
+                  {batchLoading ? "Đang tạo MAVG…" : "Tạo mã MAVG"}
+                </button>
+              </div>
+
+              <div className={`${panelSurface} p-4 sm:p-5 space-y-3`}>
+                <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    MAVG gần đây
+                  </h3>
+                  {batchListLoading ? (
+                    <span className="text-[11px] text-slate-500">Đang tải…</span>
+                  ) : null}
+                </div>
+                {batchListError ? (
+                  <p className="text-xs text-rose-300">{batchListError}</p>
+                ) : null}
+                {!batchListError && batchList.length === 0 && !batchListLoading ? (
+                  <p className="text-xs text-slate-500 py-2">Chưa có batch nào.</p>
+                ) : null}
+                {batchList.length > 0 ? (
+                  <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1 scroll-smooth">
+                    {batchList.map((batch) => (
+                      <button
+                        key={batch.id}
+                        type="button"
+                        className="w-full rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-left transition hover:border-emerald-500/35 hover:bg-emerald-500/5"
+                        onClick={() => openBatchDetail(batch.batchCode)}
+                      >
+                        <span className="text-xs font-semibold text-emerald-300">
+                          {batch.batchCode}
+                        </span>
+                        <span className="block text-[11px] text-slate-400 mt-0.5">
+                          {batch.orderCount} đơn ·{" "}
+                          {(Number(batch.totalAmount) || 0).toLocaleString("vi-VN")} VND
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedBatchCode ? (
+                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-3 space-y-2 mt-1">
+                    <p className="text-xs font-semibold text-emerald-200">
+                      Chi tiết · {selectedBatchCode}
+                    </p>
+                    {selectedBatchLoading ? (
+                      <p className="text-xs text-slate-400">Đang tải đơn trong batch…</p>
+                    ) : null}
+                    {selectedBatchError ? (
+                      <p className="text-xs text-rose-300">{selectedBatchError}</p>
+                    ) : null}
+                    {!selectedBatchLoading &&
+                    !selectedBatchError &&
+                    selectedBatchItems.length === 0 ? (
+                      <p className="text-xs text-slate-500">Batch chưa có đơn.</p>
+                    ) : null}
+                    {selectedBatchItems.length > 0 ? (
+                      <ul className="max-h-28 overflow-y-auto space-y-1 text-xs">
+                        {selectedBatchItems.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex justify-between gap-2 rounded-md bg-slate-900/70 px-2 py-1.5"
+                          >
+                            <span className="text-slate-200 font-medium">{item.orderCode}</span>
+                            <span className="text-slate-400 tabular-nums shrink-0">
+                              {(Number(item.amount) || 0).toLocaleString("vi-VN")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Hàng dưới: VietQR */}
+          <div
+            className={`${panelSurface} p-6 sm:p-8 flex flex-col items-center gap-8 relative overflow-hidden`}
+          >
+            <div
+              className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-sky-500/15 blur-3xl"
+              aria-hidden
+            />
+            <div className="relative flex flex-col items-center text-center space-y-4 w-full">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 text-xs font-bold text-violet-200">
+                  3
+                </span>
+                <p className="text-sm font-semibold text-sky-200/95 tracking-tight">
+                  Quét mã QR để thanh toán
+                </p>
+              </div>
+              <div className="relative mx-auto">
+                <div
+                  className="absolute -inset-[3px] rounded-[1.35rem] bg-gradient-to-br from-sky-400/30 via-white/10 to-violet-500/25 opacity-80 blur-[2px]"
+                  aria-hidden
+                />
+                <div className="relative rounded-2xl bg-white p-4 sm:p-5 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.5)]">
+                  <img
+                    src={qrImageUrl}
+                    alt="Mã QR chuyển khoản VietQR"
+                    className="h-52 w-52 sm:h-56 sm:w-56 object-contain block mx-auto"
+                  />
+                </div>
               </div>
               <a
                 href={qrImageUrl}
                 download
-                className="inline-flex items-center justify-center rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 relative z-10"
+                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-sky-900/30 transition hover:from-sky-400 hover:to-blue-500"
               >
                 Tải ảnh QR
               </a>
-              <div className="w-full text-left space-y-1 text-sm text-slate-200">
-                <p>
-                  Ngân hàng: <span className="font-semibold">{QR_BANK_INFO.bankName}</span>
-                </p>
-                <p>
-                  Số tài khoản:{" "}
-                  <span className="font-semibold">{QR_BANK_INFO.accountNumber}</span>
-                </p>
-                <p>
-                  Chủ tài khoản:{" "}
-                  <span className="font-semibold uppercase">
-                    {QR_BANK_INFO.accountHolder}
-                  </span>
-                </p>
-                <p>
-                  Số tiền:{" "}
-                  <span className="font-semibold text-rose-200">
-                    {formattedAmountDisplay}
-                  </span>
-                </p>
-                <p>
-                  Nội dung:{" "}
-                  <span className="font-semibold text-violet-200">
-                    {noteDisplay}
-                  </span>
-                </p>
-              </div>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/60 p-6 space-y-5">
-              <div className="flex items-center space-x-3 border-b border-slate-700 pb-4">
-                <img
-                  src="https://companieslogo.com/img/orig/VPB.VN-b0a9916f.png?t=1722928514"
-                  alt="VPBank"
-                  className="h-10 w-10 object-contain"
-                />
-                <div>
-                  <p className="text-sm uppercase tracking-wide text-slate-300">
-                    Ngân hàng
-                  </p>
-                  <p className="text-lg font-semibold text-white">
-                    {QR_BANK_INFO.bankName}
-                  </p>
-                </div>
+            <dl className="relative w-full max-w-lg mx-auto space-y-0 rounded-2xl border border-white/[0.07] bg-slate-950/55 px-4 py-1 divide-y divide-white/[0.06]">
+              <div className="flex justify-between gap-4 py-3">
+                <dt className="text-slate-500 shrink-0 text-sm">Ngân hàng</dt>
+                <dd className="font-medium text-slate-100 text-right text-sm">{QR_BANK_INFO.bankName}</dd>
               </div>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm text-slate-300">
-                  <span>Thụ hưởng</span>
-                  <span className="font-semibold text-white">
-                    {QR_BANK_INFO.accountHolder}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-slate-300">Số Tài Khoản</p>
-                  <div className="rounded-xl border border-slate-600 bg-slate-900/50 px-3 py-2 text-white font-semibold">
-                    {QR_BANK_INFO.accountNumber}
-                  </div>
-                </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt className="text-slate-500 shrink-0 text-sm">Số tài khoản</dt>
+                <dd className="font-mono font-semibold text-slate-100 text-right break-all text-sm">
+                  {QR_BANK_INFO.accountNumber}
+                </dd>
               </div>
-              <div className="space-y-5">
-                <div>
-                  <button
-                    type="button"
-                    className="w-full rounded-xl border border-sky-400/50 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-sky-200 hover:border-sky-300 transition"
-                    onClick={commitAmount}
-                  >
-                    + Thêm số tiền
-                  </button>
-                  <div className="mt-3 flex items-center gap-3">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="Ví dụ: 65.000"
-                      className="flex-1 rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-white focus:border-sky-400 focus:ring-2 focus:ring-sky-400/40"
-                      value={amountDraft}
-                      onChange={handleAmountInputChange}
-                      onBlur={commitAmount}
-                    />
-                    <button
-                      type="button"
-                      className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white"
-                      onClick={commitAmount}
-                    >
-                      OK
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    className="w-full rounded-xl border border-violet-400/50 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-violet-200 hover:border-violet-300 transition"
-                    onClick={commitNote}
-                  >
-                    + Thêm nội dung
-                  </button>
-                  <div className="mt-3 flex items-center gap-3">
-                    <input
-                      type="text"
-                      placeholder="Nhập nội dung"
-                      className="flex-1 rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-white focus:border-violet-400 focus:ring-2 focus:ring-violet-400/30"
-                      value={noteDraft}
-                      onChange={(event) => setNoteDraft(event.target.value)}
-                      onBlur={commitNote}
-                    />
-                    <button
-                      type="button"
-                      className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white"
-                      onClick={commitNote}
-                    >
-                      Lưu
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    className="w-full rounded-xl border border-emerald-400/50 bg-slate-900/40 px-4 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-300 transition"
-                    onClick={createBatchFromOrders}
-                    disabled={batchLoading}
-                  >
-                    {batchLoading ? "Đang tạo MAVG..." : "+ Tạo mã nhóm MAVG từ nhiều đơn"}
-                  </button>
-                  <div className="mt-3 space-y-2">
-                    <textarea
-                      rows={3}
-                      placeholder="Nhập mã đơn, ngăn cách bằng dấu phẩy/dấu cách (VD: MAVL123, MAVK234, ...)"
-                      className="w-full rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
-                      value={batchCodesDraft}
-                      onChange={(event) => setBatchCodesDraft(event.target.value)}
-                    />
-                    {orderHint ? (
-                      <p className="text-[11px] text-slate-400">
-                        Gợi ý đơn có thể ghép: {orderHint}
-                      </p>
-                    ) : null}
-                    {batchError ? (
-                      <p className="text-xs text-rose-300">{batchError}</p>
-                    ) : null}
-                    {batchInfo ? (
-                      <p className="text-xs text-emerald-300">
-                        Đã tạo {batchInfo.batchCode} ({batchInfo.orderCount} đơn,{" "}
-                        {batchInfo.totalAmount.toLocaleString("vi-VN")} VND).
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-600 bg-slate-900/40 p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-emerald-200">
-                      Batch MAVG gần đây
-                    </p>
-                    {batchListLoading ? (
-                      <span className="text-[11px] text-slate-400">Đang tải...</span>
-                    ) : null}
-                  </div>
-                  {batchListError ? (
-                    <p className="text-xs text-rose-300">{batchListError}</p>
-                  ) : null}
-                  {!batchListError && batchList.length === 0 && !batchListLoading ? (
-                    <p className="text-xs text-slate-400">Chưa có batch MAVG nào.</p>
-                  ) : null}
-                  {batchList.length > 0 ? (
-                    <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
-                      {batchList.map((batch) => (
-                        <button
-                          key={batch.id}
-                          type="button"
-                          className="w-full rounded-lg border border-slate-600 bg-slate-800/60 px-3 py-2 text-left hover:border-emerald-400/60 transition"
-                          onClick={() => openBatchDetail(batch.batchCode)}
-                        >
-                          <p className="text-xs font-semibold text-emerald-200">
-                            {batch.batchCode}
-                          </p>
-                          <p className="text-[11px] text-slate-300">
-                            {batch.orderCount} đơn -{" "}
-                            {(Number(batch.totalAmount) || 0).toLocaleString("vi-VN")} VND
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {selectedBatchCode ? (
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-emerald-200">
-                        Chi tiết {selectedBatchCode}
-                      </p>
-                      {selectedBatchLoading ? (
-                        <p className="text-xs text-slate-300">Đang tải danh sách đơn...</p>
-                      ) : null}
-                      {selectedBatchError ? (
-                        <p className="text-xs text-rose-300">{selectedBatchError}</p>
-                      ) : null}
-                      {!selectedBatchLoading &&
-                      !selectedBatchError &&
-                      selectedBatchItems.length === 0 ? (
-                        <p className="text-xs text-slate-300">Batch chưa có đơn.</p>
-                      ) : null}
-                      {selectedBatchItems.length > 0 ? (
-                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                          {selectedBatchItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center justify-between rounded-md bg-slate-900/50 px-2 py-1"
-                            >
-                              <span className="text-xs text-white">{item.orderCode}</span>
-                              <span className="text-[11px] text-slate-300">
-                                {(Number(item.amount) || 0).toLocaleString("vi-VN")} VND
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt className="text-slate-500 shrink-0 text-sm">Chủ TK</dt>
+                <dd className="font-medium text-slate-100 text-right uppercase text-xs sm:text-sm leading-snug">
+                  {QR_BANK_INFO.accountHolder}
+                </dd>
               </div>
-            </div>
+              <div className="flex justify-between gap-4 py-3 items-baseline">
+                <dt className="text-slate-500 shrink-0 text-sm">Số tiền</dt>
+                <dd className="font-semibold text-amber-200 tabular-nums text-right text-sm">
+                  {formattedAmountDisplay}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3 items-start">
+                <dt className="text-slate-500 shrink-0 text-sm pt-0.5">Nội dung</dt>
+                <dd className="font-medium text-violet-200 text-right break-words max-w-[70%] text-sm">
+                  {noteDisplay}
+                </dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>
