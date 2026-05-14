@@ -12,7 +12,6 @@ const {
   TELEGRAM_IMPORT_ORDER_CHAT_ID,
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
-  QR_NOTE_PREFIX,
   QR_ACCOUNT_NUMBER,
   QR_BANK_CODE,
   QR_ACCOUNT_NAME,
@@ -69,7 +68,7 @@ async function sendOrderCreatedNotification(order) {
   const orderCode = toSafeString(
     order.id_order || order.idOrder || order.order_code || order.orderCode
   ).trim();
-  const paymentNote = `${QR_NOTE_PREFIX} ${orderCode}`.trim();
+  const paymentNote = orderCode;
   const amount = roundGiaBanValue(order.price || 0);
   const qrUrl = isImport
     ? null

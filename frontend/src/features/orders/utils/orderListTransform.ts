@@ -301,11 +301,16 @@ export function computeOrderStats(
       const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
       return status === ORDER_STATUSES.CHO_HOAN;
     }).length;
+    const convertedCreditOrders = ordersWithVirtual.filter((order) => {
+      const status = String(order[VIRTUAL_FIELDS.TRANG_THAI_TEXT] || "").trim();
+      return status === ORDER_STATUSES.CHUYEN_DOI_CREDIT;
+    }).length;
 
     const updatedStats = [
       { ...BASE_REFUND_STATS[0], value: String(totalOrders) },
       { ...BASE_REFUND_STATS[1], value: String(refundedOrders) },
       { ...BASE_REFUND_STATS[2], value: String(pendingRefundOrders) },
+      { ...BASE_REFUND_STATS[3], value: String(convertedCreditOrders) },
     ];
 
     return { updatedStats, totalRecords: totalOrders };

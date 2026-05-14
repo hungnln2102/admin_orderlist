@@ -9,6 +9,7 @@ const PageLoader = () => (
 
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
 const Orders = lazy(() => import("@/features/orders/index.tsx"));
+const CreditLogsPage = lazy(() => import("@/features/credit/index.tsx"));
 const PackageProduct = lazy(() => import("@/features/package-product/index.tsx"));
 const ProductInfo = lazy(() => import("@/features/product-info/index.ts"));
 const FormInfo = lazy(() => import("@/features/form-info/index.tsx"));
@@ -37,6 +38,7 @@ export function AppRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/credit" element={<CreditLogsPage />} />
         <Route path="/package-products" element={<PackageProduct />} />
         <Route path="/product-info" element={<ProductInfo />} />
         <Route path="/form-info" element={<FormInfo />} />

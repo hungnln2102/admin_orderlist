@@ -36,7 +36,6 @@ const SEND_ORDER_TO_TOPIC =
 const QR_ACCOUNT_NUMBER = (process.env.ORDER_QR_ACCOUNT_NUMBER || "").trim();
 const QR_BANK_CODE = (process.env.ORDER_QR_BANK_CODE || "VPB").trim();
 const QR_ACCOUNT_NAME = (process.env.ORDER_QR_ACCOUNT_NAME || "").trim();
-const QR_NOTE_PREFIX = process.env.ORDER_QR_NOTE_PREFIX || "Thanh toan";
 const SEND_ORDER_COPY_BUTTONS =
   String(process.env.SEND_ORDER_COPY_BUTTONS || "true").toLowerCase() !== "false";
 
@@ -61,7 +60,6 @@ module.exports = {
   QR_ACCOUNT_NUMBER,
   QR_BANK_CODE,
   QR_ACCOUNT_NAME,
-  QR_NOTE_PREFIX,
   SEND_ORDER_COPY_BUTTONS,
   ZERO_DAYS_TOPIC_ID,
   FOUR_DAYS_TOPIC_ID,

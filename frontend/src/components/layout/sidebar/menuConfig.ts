@@ -63,6 +63,7 @@ export const menuSections: MenuSection[] = [
     defaultOpen: true,
     items: [
       { name: "Đơn hàng", href: "/orders", icon: ShoppingBagIcon },
+      { name: "Credit", href: "/credit", icon: BanknotesIcon },
       { name: "Bảng giá", href: "/pricing", icon: CurrencyDollarIcon },
     ],
   },

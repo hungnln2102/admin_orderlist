@@ -11,6 +11,7 @@ const ORDER_STATUS_META: Record<
   [ORDER_STATUS.PAID]: { color: "bg-green-600 text-white", priority: 5 },
   [ORDER_STATUS.PENDING_REFUND]: { color: "bg-rose-500 text-white", priority: 6 },
   [ORDER_STATUS.REFUNDED]: { color: "bg-slate-600 text-white", priority: 7 },
+  [ORDER_STATUS.CREDIT_CONVERTED]: { color: "bg-cyan-600 text-white", priority: 8 },
 };
 
 const getStatusMeta = (status: string) =>

@@ -1,5 +1,6 @@
 const { db } = require("../../db");
 const { TABLES, STATUS } = require("./constants");
+const { ORDERS_SCHEMA } = require("../../config/dbSchema");
 const { orderIdParam } = require("../../validators/orderValidator");
 const logger = require("../../utils/logger");
 const {
@@ -7,6 +8,10 @@ const {
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
 } = require("./finance/refundCredits");
+const {
+    parseRefundCreditLogsQuery,
+    listRefundCreditLogs,
+} = require("./queries/listRefundCreditLogs");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../services/orderCodeService");
 const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 
@@ -19,6 +24,22 @@ const detectPreviewPrefix = (orderCodeRaw) => {
 };
 
 const attachRefundCreditRoutes = (router) => {
+    router.get("/refund-credit/logs", async(req, res) => {
+        try {
+            const params = parseRefundCreditLogsQuery(req.query || {});
+            const payload = await listRefundCreditLogs(params);
+            return res.json(payload);
+        } catch (error) {
+            logger.error("Lỗi lấy danh sách credit logs", {
+                error: error.message,
+                stack: error.stack,
+            });
+            return res.status(500).json({
+                error: "Không thể tải danh sách credit logs.",
+            });
+        }
+    });
+
     router.post("/canceled/:id/refund-credit/ensure", ...orderIdParam, async (req, res) => {
         const id = Number(req.params.id);
         if (!Number.isFinite(id) || id <= 0) {
@@ -37,12 +58,21 @@ const attachRefundCreditRoutes = (router) => {
             }
 
             const orderStatus = String(order.status || "").trim();
-            const allowedStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
+            const allowedStatuses = [STATUS.PENDING_REFUND, STATUS.CREDIT_CONVERTED];
             if (!allowedStatuses.includes(orderStatus)) {
                 await trx.rollback();
                 return res.status(400).json({
-                    error: "Chỉ đơn Chưa Hoàn/Đã Hoàn mới có thể tạo credit bù đơn.",
+                    error: "Chỉ đơn Chưa Hoàn/Chuyển đổi credit mới dùng được luồng tạo đơn credit.",
                 });
+            }
+
+            const statusCol = ORDERS_SCHEMA.ORDER_LIST.COLS.STATUS;
+            if (orderStatus === STATUS.PENDING_REFUND) {
+                await trx(TABLES.orderList)
+                    .where({ id })
+                    .update({
+                        [statusCol]: STATUS.CREDIT_CONVERTED,
+                    });
             }
 
             const refundAmount = normalizeMoney(order.refund);

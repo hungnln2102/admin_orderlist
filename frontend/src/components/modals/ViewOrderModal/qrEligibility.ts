@@ -37,7 +37,11 @@ export const getOrderQrEligibility = (statusValue: unknown): QrEligibility => {
     };
   }
 
-  if (status === ORDER_STATUS.REFUNDED || status === ORDER_STATUS.PENDING_REFUND) {
+  if (
+    status === ORDER_STATUS.REFUNDED ||
+    status === ORDER_STATUS.PENDING_REFUND ||
+    status === ORDER_STATUS.CREDIT_CONVERTED
+  ) {
     return {
       canUseQr: false,
       reason: "Đơn đang trong luồng hoàn tiền nên QR đã bị khóa.",

@@ -83,7 +83,7 @@ const buildOrdersListQuery = async (scope = "") => {
         query = query.where(statusCol, STATUS.EXPIRED);
     } else if (normalizedScope === "canceled" || normalizedScope === "cancelled") {
         query = query.where((qb) =>
-            qb.whereIn(statusCol, [STATUS.PENDING_REFUND, STATUS.REFUNDED]).orWhere((qb2) => {
+            qb.whereIn(statusCol, [STATUS.PENDING_REFUND, STATUS.REFUNDED, STATUS.CREDIT_CONVERTED]).orWhere((qb2) => {
                 qb2.whereNotNull(refundCol).whereNot((w) => {
                     w.whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]).andWhere(
                         statusCol,
@@ -94,11 +94,11 @@ const buildOrdersListQuery = async (scope = "") => {
         );
     } else if (normalizedScope === "import" || normalizedScope === "nhap") {
         query = query
-            .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED])
+            .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED, STATUS.CREDIT_CONVERTED])
             .whereRaw(`${table}.${idOrderCol}::text ILIKE ?`, [importPattern]);
     } else {
         query = query
-            .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED])
+            .whereNotIn(statusCol, [STATUS.EXPIRED, STATUS.PENDING_REFUND, STATUS.REFUNDED, STATUS.CREDIT_CONVERTED])
             .whereRaw(`NOT (${table}.${idOrderCol}::text ILIKE ?)`, [importPattern]);
     }
 

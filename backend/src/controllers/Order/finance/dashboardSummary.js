@@ -53,11 +53,11 @@ const getMonthKey = (date) => {
 // Statuses that count the order as "successful" (entered lifecycle from PROCESSING onwards)
 const ORDER_COUNTED_STATUSES = [
     STATUS.PROCESSING, STATUS.PAID, STATUS.PENDING_REFUND,
-    STATUS.REFUNDED, STATUS.EXPIRED, STATUS.RENEWAL,
+    STATUS.REFUNDED, STATUS.CREDIT_CONVERTED, STATUS.EXPIRED, STATUS.RENEWAL,
 ];
 
 // Statuses that count the order as a refund
-const REFUND_COUNTED_STATUSES = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
+const REFUND_COUNTED_STATUSES = [STATUS.PENDING_REFUND, STATUS.REFUNDED, STATUS.CREDIT_CONVERTED];
 
 const isOrderCounted = (status) => ORDER_COUNTED_STATUSES.includes(status);
 const isRefundCounted = (status) => REFUND_COUNTED_STATUSES.includes(status);

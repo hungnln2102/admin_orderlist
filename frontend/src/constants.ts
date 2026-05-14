@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   ORDER_CANCELED_REFUND: (id: number) => `/api/orders/canceled/${id}/refund`,
   ORDER_REFUND_CREDIT_ENSURE: (id: number) =>
     `/api/orders/canceled/${id}/refund-credit/ensure`,
+  CREDIT_LOGS: "/api/orders/refund-credit/logs",
 
   SUPPLIES: "/api/supplies",
   SUPPLIES_ORDER_COSTS: "/api/supplies/order-costs",
@@ -154,6 +155,7 @@ export const ORDER_STATUSES = {
   DA_THANH_TOAN: ORDER_STATUS.PAID,
   CHO_HOAN: ORDER_STATUS.PENDING_REFUND,
   DA_HOAN: ORDER_STATUS.REFUNDED,
+  CHUYEN_DOI_CREDIT: ORDER_STATUS.CREDIT_CONVERTED,
 };
 
 
@@ -182,7 +184,7 @@ export const ORDER_DATASET_CONFIG = {
   },
   canceled: {
     label: "Hoàn Tiền",
-    description: "Đơn đã hoàn tiền",
+    description: "Đơn chờ hoàn, đã hoàn hoặc chuyển đổi credit",
     endpoint: API_ENDPOINTS.ORDERS_CANCELED,
   },
 };

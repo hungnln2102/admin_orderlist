@@ -21,4 +21,4 @@ export const BANK_BIN = (
   ENV.VITE_ORDER_QR_BANK_BIN ||
   (BANK_SHORT_CODE.toUpperCase() === "VPB" ? "970432" : "")
 ).trim();
-export const ORDER_QR_NOTE_PREFIX = (ENV.VITE_ORDER_QR_NOTE_PREFIX || "Thanh toan").trim();
+export const ORDER_QR_NOTE_PREFIX = (ENV.VITE_ORDER_QR_NOTE_PREFIX || "").trim();

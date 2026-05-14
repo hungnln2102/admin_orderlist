@@ -5,6 +5,7 @@ export const ORDER_STATUS = {
   CANCELED: "Hủy",
   REFUNDED: "Đã Hoàn",
   PENDING_REFUND: "Chưa Hoàn",
+  CREDIT_CONVERTED: "Chuyển đổi credit",
   EXPIRED: "Hết Hạn",
   RENEWAL: "Cần Gia Hạn",
 };

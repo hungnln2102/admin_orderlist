@@ -142,6 +142,8 @@ export function useOrderActions(deps: OrderActionsDeps) {
           reservedOrderCode: String(data?.preview_order_code || "").trim() || null,
         };
 
+        await fetchOrders();
+        emitRefresh(["orders", "dashboard"]);
         openCreateModal(prefill);
       } catch (error) {
         showAppNotification({
@@ -154,7 +156,7 @@ export function useOrderActions(deps: OrderActionsDeps) {
         });
       }
     },
-    [openCreateModal]
+    [fetchOrders, openCreateModal]
   );
 
   const handleMarkPaid = useCallback(

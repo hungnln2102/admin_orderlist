@@ -71,6 +71,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
     [ORDER_STATUSES.CAN_GIA_HAN]: "bg-sky-500/20 text-sky-300 border-sky-500/30",
     [ORDER_STATUSES.CHO_HOAN]: "bg-rose-500/20 text-rose-300 border-rose-500/30",
     [ORDER_STATUSES.DA_HOAN]: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    [ORDER_STATUSES.CHUYEN_DOI_CREDIT]: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
     [ORDER_STATUSES.DANG_XU_LY]: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
   };
 

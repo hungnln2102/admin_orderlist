@@ -20,7 +20,8 @@ export type StatFilterKey =
   | "processing"
   | "today"
   | "refunded"
-  | "pending_refund";
+  | "pending_refund"
+  | "credit_converted";
 
 export type BaseStat = {
   name: string;
@@ -38,6 +39,7 @@ export const STAT_FILTER_MAP: Record<StatFilterKey, string> = {
   today: "today",
   refunded: ORDER_STATUSES.DA_HOAN,
   pending_refund: ORDER_STATUSES.CHO_HOAN,
+  credit_converted: ORDER_STATUSES.CHUYEN_DOI_CREDIT,
 };
 
 export const BASE_STOCK_STATS: BaseStat[] = [
@@ -92,6 +94,13 @@ export const BASE_REFUND_STATS: BaseStat[] = [
     icon: ClockIcon,
     accent: CARD_ACCENTS.amber,
     filterKey: "pending_refund",
+  },
+  {
+    name: "Chuyển đổi credit",
+    value: "0",
+    icon: ArrowPathIcon,
+    accent: CARD_ACCENTS.teal,
+    filterKey: "credit_converted",
   },
 ];
 

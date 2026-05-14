@@ -57,7 +57,10 @@ function buildVietQrUrl({ amount, orderCode }) {
 
   const params = new URLSearchParams();
   params.set("amount", Math.round(numericAmount).toString());
-  params.set("addInfo", `Thanh toan ${orderCode}`);
+  const code = String(orderCode || "").trim();
+  if (code) {
+    params.set("addInfo", code);
+  }
   params.set("accountName", QR_ACCOUNT_NAME);
 
   return `https://img.vietqr.io/image/${QR_BANK_CODE}-${QR_ACCOUNT_NUMBER}-${VIETQR_IMAGE_TEMPLATE}.png?${params.toString()}`;

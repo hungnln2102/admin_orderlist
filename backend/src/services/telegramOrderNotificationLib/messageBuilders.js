@@ -13,7 +13,6 @@ const {
   QR_ACCOUNT_NUMBER,
   QR_ACCOUNT_NAME,
   QR_BANK_CODE,
-  QR_NOTE_PREFIX,
 } = require("./constants");
 
 function buildOrderCreatedMessage(order, paymentNote) {
@@ -200,7 +199,7 @@ function buildDueOrderMessage(order, index, total) {
     QR_BANK_CODE ? `🏦 Ngân hàng: ${QR_BANK_CODE}` : null,
     QR_ACCOUNT_NUMBER ? `🏧 STK: ${QR_ACCOUNT_NUMBER}` : null,
     QR_ACCOUNT_NAME ? `👤 Tên: ${QR_ACCOUNT_NAME}` : null,
-    `📝 Nội dung: ${(QR_NOTE_PREFIX || "Thanh toan")} ${orderCode}`,
+    `📝 Nội dung: ${orderCode || "..."}`,
     ``,
     `⚠️ Vui lòng ghi đúng mã đơn trong nội dung chuyển khoản để xử lý nhanh.`,
     `🙏 Trân trọng cảm ơn quý khách!`,
