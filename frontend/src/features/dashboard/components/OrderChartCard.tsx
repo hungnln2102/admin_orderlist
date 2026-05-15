@@ -80,7 +80,7 @@ export const OrderChartCard: React.FC<OrderChartCardProps> = ({
       </div>
 
       <div className="mt-5 flex-1 rounded-[28px] border border-white/8 bg-gradient-to-br from-slate-950/55 via-slate-950/30 to-slate-900/12 p-3 sm:p-4">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={320}>
           <BarChart data={data} margin={{ top: 14, right: 8, left: -12, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#33415533" />
             <XAxis

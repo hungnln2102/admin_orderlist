@@ -1,6 +1,5 @@
 const { db } = require("../../../../db");
 const { TABLES } = require("../constants");
-const { REFUNDED_NOTE_MARKER } = require("../finance/refundCredits");
 
 const STATUS_GROUPS = {
     ALL: "all",
@@ -123,7 +122,8 @@ const toNumber = (value) => {
 const mapLogRow = (row) => {
     const rawStatus = String(row?.status || "").trim().toUpperCase();
     const note = row?.note != null ? String(row.note) : null;
-    const isRefunded = rawStatus === "VOID" && String(note || "").includes(REFUNDED_NOTE_MARKER);
+    const refundedCashoutAt = row?.refunded_cashout_at ? String(row.refunded_cashout_at) : null;
+    const isRefunded = refundedCashoutAt != null;
     const status = isRefunded ? "REFUNDED" : rawStatus;
     const refundAmount = toNumber(row?.refund_amount);
     const availableAmount = toNumber(row?.available_amount);
@@ -146,6 +146,7 @@ const mapLogRow = (row) => {
         applied_count: appliedCount,
         status,
         note,
+        refunded_cashout_at: refundedCashoutAt,
         issued_at: row?.issued_at ? String(row.issued_at) : null,
         updated_at: row?.updated_at ? String(row.updated_at) : null,
         created_at: row?.created_at ? String(row.created_at) : null,
@@ -190,6 +191,7 @@ const listRefundCreditLogs = async (params) => {
             "rcn.available_amount",
             "rcn.status",
             "rcn.note",
+            "rcn.refunded_cashout_at",
             "rcn.issued_at",
             "rcn.created_at",
             "rcn.updated_at",

@@ -88,6 +88,7 @@ const RECEIPT_SCHEMA = {
       AVAILABLE_AMOUNT: "available_amount",
       STATUS: "status",
       NOTE: "note",
+      REFUNDED_CASHOUT_AT: "refunded_cashout_at",
       ISSUED_AT: "issued_at",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",

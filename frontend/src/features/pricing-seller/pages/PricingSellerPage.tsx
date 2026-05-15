@@ -4,6 +4,7 @@ import { apiFetch } from "@/shared/api/client";
 type SellerPricingItem = {
   variant_name: string;
   display_name?: string;
+  gia_goc: number;
   gia_si: number;
   gia_le: number;
 };
@@ -148,6 +149,9 @@ export default function PricingSellerPage() {
                     Thời hạn
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Giá gốc
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
                     Gia si
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
@@ -163,6 +167,9 @@ export default function PricingSellerPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">
                       {parseDurationFromVariantName(item.variant_name, item.display_name)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
+                      {formatVnd(item.gia_goc)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
                       {formatVnd(item.gia_si)}

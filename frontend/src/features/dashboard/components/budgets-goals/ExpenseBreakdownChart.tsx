@@ -97,7 +97,7 @@ export const ExpenseBreakdownChart: React.FC<{
           <div className="text-sm">Chưa có dữ liệu chi tiêu</div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={220} minHeight={220}>
               <PieChart>
                 <Pie
                   data={chartData}

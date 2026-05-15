@@ -20,3 +20,7 @@ clean_repo/
 
 # Playwright / Chromium user data (local automation profiles — never commit)
 backend/.adobe-profiles/
+
+# Local tools / temporary artifacts
+.tmp/
+database.zip

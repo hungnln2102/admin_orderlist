@@ -20,6 +20,7 @@ export type CreditLogItem = {
   applied_count: number;
   status: string;
   note: string | null;
+  refunded_cashout_at?: string | null;
   issued_at: string | null;
   updated_at: string | null;
   created_at: string | null;

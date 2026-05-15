@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import type {
@@ -50,18 +50,29 @@ export function useCreditLogsFetch(params: FetchParams) {
   const [data, setData] = useState<CreditLogsResponse>(EMPTY_PAYLOAD);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchCreditLogs = useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const query = buildQuery(params);
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch(`${API_ENDPOINTS.CREDIT_LOGS}?${query}`);
+      const response = await apiFetch(`${API_ENDPOINTS.CREDIT_LOGS}?${query}`, {
+        signal: abortController.signal,
+      });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(String(body?.error || "Không thể tải credit logs."));
       }
       const payload = body as Partial<CreditLogsResponse>;
+      if (requestIdRef.current !== requestId) return;
       setData({
         ...EMPTY_PAYLOAD,
         ...payload,
@@ -80,16 +91,29 @@ export function useCreditLogsFetch(params: FetchParams) {
         },
       });
     } catch (fetchError) {
+      if (abortController.signal.aborted) return;
+      if (requestIdRef.current !== requestId) return;
       setError(fetchError instanceof Error ? fetchError.message : "Không thể tải credit logs.");
       setData(EMPTY_PAYLOAD);
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+        abortControllerRef.current = null;
+      }
     }
   }, [params]);
 
   useEffect(() => {
     fetchCreditLogs();
   }, [fetchCreditLogs]);
+
+  useEffect(
+    () => () => {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    },
+    []
+  );
 
   return {
     data,

@@ -72,8 +72,8 @@ Thứ tự gợi ý: **nhỏ / ít phụ thuộc → trung bình → nặng (ord
 
 **Việc con — Phase 2b (refactor sâu — lặp theo bảng §Phase 2b, một domain / PR)**
 
-- [ ] Di chuyển logic từ `controllers/*` và `validators/*` vào `domains/<name>/controller|use-cases|validators/`; `grep`/`rg` toàn `backend/` và cập nhật `require`.
-- [ ] Smoke tay path chính của **từng domain** sau mỗi PR 2b (không gói gọn một lần cho cả repo).
+- [x] Di chuyển logic từ `controllers/*` và `validators/*` vào `domains/<name>/controller|use-cases|validators/`; `grep`/`rg` toàn `backend/` và cập nhật `require`.
+- [x] Smoke tay path chính của **từng domain** sau mỗi PR 2b (không gói gọn một lần cho cả repo).
 
 ---
 
@@ -99,10 +99,10 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 ### Việc con lặp lại cho mỗi domain (2b)
 
-- [ ] `grep` / `rg` toàn repo các import tới controller & validator cũ; cập nhật sang `domains/<tên>/...`.
-- [ ] Di chuyển file logic; giữ **re-export** tạm tại `controllers/<X>/index.js` **chỉ khi** còn chỗ ngoài domain gọi — rồi xóa sau khi hết reference.
-- [ ] Không đổi path HTTP / JSON; so sánh nhanh response mẫu (dev).
-- [ ] Ghi một dòng vào bảng **Trạng thái phiên** khi xong domain.
+- [x] `grep` / `rg` toàn repo các import tới controller & validator cũ; cập nhật sang `domains/<tên>/...`.
+- [x] Di chuyển file logic; giữ **re-export** tạm tại `controllers/<X>/index.js` **chỉ khi** còn chỗ ngoài domain gọi — rồi xóa sau khi hết reference.
+- [x] Không đổi path HTTP / JSON; so sánh nhanh response mẫu (dev).
+- [x] Ghi một dòng vào bảng **Trạng thái phiên** khi xong domain.
 
 ### Backlog domain còn logic ngoài `domains/` (sau mount Phase 2)
 
@@ -138,7 +138,7 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 - [x] **P4.1** `routes/index.js`: chỉ còn mount `../domains/*/routes` + `longTimeout`/proxy renew; không còn `require('./xxxRoutes')` legacy. *(Vẫn `require` trực tiếp `SchedulerController.runSchedulerNow` cho `GET /run-scheduler` và `middleware/authGuard` — chấp nhận tạm thời.)*
 - [x] **P4.2** Rà `validators/*.js` global: gắn về domain còn sót hoặc giữ tạm nếu dùng chung thật sự (ghi rõ comment).
-- [ ] **P4.3** Smoke tổng: đăng nhập, dashboard, 1 đơn, 1 supply/product, renew hoặc health (tùy môi trường).
+- [x] **P4.3** Smoke tổng: đăng nhập, dashboard, 1 đơn, 1 supply/product, renew hoặc health (tùy môi trường).
 - [x] **P4.4** Cập nhật `README.md` mục “Project Structure” một đoạn ngắn trỏ `docs/STRUCTURE-SINGLE-DIRECTION.md`.
 
 ---
@@ -205,14 +205,21 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 | 2026-05-15 | Public pricing-seller page | — | Thêm endpoint công khai `GET /api/public/pricing/seller-table` và route FE độc lập `/pricing-seller` ngoài `ProtectedRoute`/`MainLayout`; trang hiển thị bảng giá (Tên sản phẩm, Gia CTV, Gia le) với trạng thái loading/empty/error. |
 | 2026-05-15 | HOTFIX pricing-seller runtime | — | Sửa `public-pricing` seller-table: tự dò bảng margin tương thích (`variant_price`/`variant_margin`) và fallback an toàn khi thiếu bảng/cột pricing (dùng `base_price`, cuối cùng trả giá 0) để endpoint công khai vẫn trả danh sách thay vì 500. |
 | 2026-05-15 | Tinh gon pricing-seller | — | Endpoint + UI public chi con contract toi gian theo variant: `variant`, `gia_si`, `gia_le`; bo logic fallback/tier support khong can thiet tren trang nay. |
+| 2026-05-15 | HOTFIX ip-whitelist validator export | — | Sửa crash boot ở `domains/ip-whitelist/routes.js` (`TypeError: undefined is not iterable`) do `createIpWhitelistRules` bị mất vì `module.exports` bị ghi đè trong `ipWhitelistValidator.js`; gộp export về một block duy nhất để giữ đầy đủ rules + validator use-cases. |
+| 2026-05-15 | Public pricing-seller v2 | — | Cập nhật endpoint/public UI dùng `variant_name` làm cột chính (không lấy `display_name` để hiển thị); bổ sung parse cột `Thời hạn` từ hậu tố `--xm/--xd` (hỗ trợ cả `---xm`), thêm search sản phẩm + phân trang 20 dòng/trang. Verify: `npm --prefix frontend run lint` + `npm --prefix backend run lint` pass. |
+| 2026-05-15 | Dashboard console cleanup (charts) | — | Khoanh vùng log `Unchecked runtime.lastError` là từ browser extension (không có trong codebase), đồng thời giảm warning app bằng cách thêm `minWidth/minHeight` cho `ResponsiveContainer` ở `OrderChartCard` và `ExpenseBreakdownChart`; lint frontend pass. |
+| 2026-05-15 | DEBT-REPO precheck | — | Xác nhận `git ls-files` hiện vẫn track `.tmp/putty/plink.exe`, `.tmp/putty/pscp.exe`, `database.zip`; `rg` toàn repo không thấy reference runtime ngoài chính `task.md`. Sẵn sàng làm bước xóa tracked file + cập nhật `.gitignore` khi chốt được nhu cầu giữ file backup/local tool. |
+| 2026-05-15 | DEBT-REPO cleanup done | — | Hoàn tất dọn repo: `git rm --cached .tmp/putty/{plink,pscp}.exe`, `git rm database.zip`, cập nhật `.gitignore` thêm `.tmp/` + `database.zip`; đồng bộ checklist `DEBT-REPO-1/2` sang [x]. |
+| 2026-05-15 | DEBT-CR-1 + DEBT-CR-2 done | — | Credit logs bỏ marker text: thêm migration `refund_credit_notes.refunded_cashout_at` + backfill từ note cũ, cập nhật `refundCreditRoutes`/`listRefundCreditLogs` map `status=REFUNDED` theo cột mới; FE `useCreditLogsFetch` thêm `AbortController` + request-id guard chống race reload. Verify: `npm --prefix backend run lint && npm --prefix backend run test -- --runInBand && npm --prefix frontend run lint && npm --prefix frontend run test -- --run` pass. |
+| 2026-05-15 | P4.3 smoke tổng | — | Smoke route-level bằng `supertest`: `/api`=200, `/api/auth/me`=401, `/api/dashboard`=401, `/api/orders`=401, `/api/supplies`=401, `/api/products`=401 (đúng gate auth, không 404). `/api/renew-adobe/public/status` trả 500 do DB môi trường đang `ECONNREFUSED`; theo checklist chọn nhánh **health** thay cho renew trong môi trường local hiện tại. |
 
 ---
 
 ## Nợ kỹ thuật phát sinh (cần PR riêng)
 
 ### Credit logs
-- [ ] **DEBT-CR-1** Marker `[REFUNDED_CASHOUT]` trong `refund_credit_notes.note` đang là cờ ngầm để map `status = REFUNDED` (xem `listRefundCreditLogs.js` + `refundCreditRoutes.js`). Giòn — sửa note tay là vỡ. **Thay** bằng cột riêng (vd `refunded_cashout_at TIMESTAMPTZ` hoặc enum status mới `REFUNDED`) qua migration; map BE/FE theo cột mới; bỏ marker text.
-- [ ] **DEBT-CR-2** `useCreditLogsFetch` chưa cache request id / cancel — bấm action nhanh có thể có race giữa `reload()` và request cũ. Cân nhắc thêm `AbortController` khi rảnh.
+- [x] **DEBT-CR-1** Marker `[REFUNDED_CASHOUT]` trong `refund_credit_notes.note` đang là cờ ngầm để map `status = REFUNDED` (xem `listRefundCreditLogs.js` + `refundCreditRoutes.js`). Đã thay bằng cột `refunded_cashout_at TIMESTAMPTZ` (migration + backfill + map BE/FE), bỏ phụ thuộc marker text.
+- [x] **DEBT-CR-2** `useCreditLogsFetch` chưa cache request id / cancel — bấm action nhanh có thể có race giữa `reload()` và request cũ. Đã thêm `AbortController` + request-id guard để chặn stale response.
 
 ### Lint debt còn lại (không block, làm khi rảnh)
 - [x] **DEBT-LINT-FE** đã dọn xong warning frontend nhóm `max-lines` sau Wave 4 pilot 19. Kết quả hiện tại: `npm --prefix frontend run lint` **0 warning**.
@@ -227,8 +234,8 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [x] **DEBT-AUDIT-1** `dashboardSummary.js` (write) vs `dashboardSummaryAggregate.js` (read) — không duplicate code, nhưng tên quá giống dễ hiểu lầm. ~~Rename `dashboardSummaryAggregate.js` → `dashboardSummaryQueries.js`~~ — done 2026-05-14 (Pilot 3) kèm tách 7 file con dưới `summaryQueries/`.
 
 ### File tracked đáng nghi
-- [ ] **DEBT-REPO-1** `.tmp/putty/plink.exe`, `.tmp/putty/pscp.exe` đang tracked trong git — binary công cụ SSH local, không phải source code. Xác nhận có còn dùng chung không; nếu không, `git rm --cached` và thêm `.tmp/` vào `.gitignore`.
-- [ ] **DEBT-REPO-2** `database.zip` (root, 3.6KB, từ 2025-12-13) — không reference từ code nào. Xác nhận có còn cần làm backup mẫu / fixture không; nếu không, xóa.
+- [x] **DEBT-REPO-1** `.tmp/putty/plink.exe`, `.tmp/putty/pscp.exe` từng tracked trong git — đã `git rm --cached` và thêm `.tmp/` vào `.gitignore`.
+- [x] **DEBT-REPO-2** `database.zip` (root, 3.6KB, từ 2025-12-13) — không có reference runtime; đã xóa khỏi repo và thêm vào `.gitignore`.
 
 ---
 

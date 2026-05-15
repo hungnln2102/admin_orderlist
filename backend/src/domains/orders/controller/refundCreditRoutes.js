@@ -13,7 +13,6 @@ const {
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
     CREDIT_STATUS,
-    REFUNDED_NOTE_MARKER,
     REFUND_CREDIT_NOTES_TABLE,
     REFUND_CREDIT_NOTE_COLS: RCN,
 } = require("./finance/refundCredits");
@@ -218,19 +217,24 @@ const attachRefundCreditRoutes = (router) => {
             } else if (action === CREDIT_ACTIONS.COMPLETE) {
                 nextNote = appendNote(
                     nextNote,
-                    `${REFUNDED_NOTE_MARKER} Đã hoàn tiền theo credit (thao tác Đã Hoàn).`
+                    "Đã hoàn tiền theo credit (thao tác Đã Hoàn)."
                 );
                 bankBalanceDelta = -Math.max(0, availableAmount);
             }
 
             if (!isAlreadyUnavailable || action === CREDIT_ACTIONS.COMPLETE) {
+                const updatePayload = {
+                    [RCN.STATUS]: CREDIT_STATUS.VOID,
+                    [RCN.AVAILABLE_AMOUNT]: 0,
+                    [RCN.NOTE]: nextNote,
+                };
+                if (action === CREDIT_ACTIONS.COMPLETE) {
+                    updatePayload[RCN.REFUNDED_CASHOUT_AT] = db.fn.now();
+                }
+
                 await trx(REFUND_CREDIT_NOTES_TABLE)
                     .where({ [RCN.ID]: id })
-                    .update({
-                        [RCN.STATUS]: CREDIT_STATUS.VOID,
-                        [RCN.AVAILABLE_AMOUNT]: 0,
-                        [RCN.NOTE]: nextNote,
-                    });
+                    .update(updatePayload);
             }
 
             if (action === CREDIT_ACTIONS.COMPLETE && bankBalanceDelta !== 0) {
@@ -250,12 +254,14 @@ const attachRefundCreditRoutes = (router) => {
                 success: true,
                 item: {
                     id: Number(updated?.[RCN.ID] || id),
-                    status:
-                        action === CREDIT_ACTIONS.COMPLETE
-                            ? "REFUNDED"
-                            : String(updated?.[RCN.STATUS] || "").toUpperCase(),
+                    status: updated?.[RCN.REFUNDED_CASHOUT_AT]
+                        ? "REFUNDED"
+                        : String(updated?.[RCN.STATUS] || "").toUpperCase(),
                     available_amount: normalizeMoney(updated?.[RCN.AVAILABLE_AMOUNT]),
                     note: updated?.[RCN.NOTE] != null ? String(updated[RCN.NOTE]) : null,
+                    refunded_cashout_at: updated?.[RCN.REFUNDED_CASHOUT_AT]
+                        ? String(updated[RCN.REFUNDED_CASHOUT_AT])
+                        : null,
                     updated_at: updated?.[RCN.UPDATED_AT] ? String(updated[RCN.UPDATED_AT]) : null,
                 },
             });
