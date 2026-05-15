@@ -7,8 +7,6 @@ const createIpWhitelistRules = [
     .withMessage("Địa chỉ IP là bắt buộc."),
   validate,
 ];
-
-module.exports = { createIpWhitelistRules };
 const net = require("node:net");
 
 const createHttpError = (status, message) => {
@@ -112,6 +110,7 @@ const validateDeletePayload = (id) => {
 };
 
 module.exports = {
+  createIpWhitelistRules,
   createHttpError,
   validateCreatePayload,
   validateUpdatePayload,
