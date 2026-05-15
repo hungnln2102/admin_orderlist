@@ -15,6 +15,7 @@ const {
   isRedisAvailable,
   assertProductionSessionStoreGuard,
 } = require("./config/redisClient");
+const { createConnectRedisClientAdapter } = require("./config/redisSessionClientAdapter");
 const v1Routes = require("./routes/v1");
 const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -125,7 +126,10 @@ if (redisClient) {
     const connectRedis = require("connect-redis");
     const RedisStore =
       connectRedis.RedisStore || connectRedis.default || connectRedis;
-    sessionOpts.store = new RedisStore({ client: redisClient, prefix: "sess:" });
+    sessionOpts.store = new RedisStore({
+      client: createConnectRedisClientAdapter(redisClient),
+      prefix: "sess:",
+    });
     logger.info(
       "[Session] Using Redis store (target=%s, connected=%s)",
       sessionStoreGuardState.redisTarget || "unknown",

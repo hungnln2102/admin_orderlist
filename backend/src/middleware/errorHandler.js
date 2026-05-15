@@ -21,7 +21,17 @@ class AppError extends Error {
  * Error handler middleware
  * Must be registered AFTER all routes
  */
-const errorHandler = (err, req, res, _next) => {
+const errorHandler = (err, req, res, next) => {
+  if (res.headersSent) {
+    logger.error("Error Handler (headers already sent)", {
+      message: err?.message,
+      code: err?.code || "INTERNAL_ERROR",
+      url: req.originalUrl,
+      method: req.method,
+    });
+    return next(err);
+  }
+
   // Default error values
   let statusCode = err.statusCode || 500;
   let message = err.message || "Đã xảy ra lỗi không xác định";
