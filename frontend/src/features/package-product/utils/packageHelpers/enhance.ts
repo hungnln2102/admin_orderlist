@@ -1,9 +1,9 @@
 import { DEFAULT_SLOT_LIMIT } from "./constants";
 import {
   normalizeMatchModeDbValue,
-  normalizeProductCodeValue,
   toSlotLinkModeFromMatch,
 } from "./matching";
+import { normalizeProductCodeValue } from "./normalizers";
 import type { PackageRow, SlotLinkMode, SlotLinkPreferenceMap } from "./types";
 
 export const enhancePackageRow = (
