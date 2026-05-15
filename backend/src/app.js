@@ -122,7 +122,9 @@ const sessionStoreGuardState = assertProductionSessionStoreGuard();
 
 if (redisClient) {
   try {
-    const RedisStore = require("connect-redis").default;
+    const connectRedis = require("connect-redis");
+    const RedisStore =
+      connectRedis.RedisStore || connectRedis.default || connectRedis;
     sessionOpts.store = new RedisStore({ client: redisClient, prefix: "sess:" });
     logger.info(
       "[Session] Using Redis store (target=%s, connected=%s)",
