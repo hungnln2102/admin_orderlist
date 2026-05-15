@@ -62,6 +62,11 @@ const generateToken = (req, res, next) => {
   next();
 };
 
+function isAuthCsrfExempt(req) {
+  const path = String(req.path || "");
+  return req.method === "POST" && path === "/auth/login";
+}
+
 /**
  * Verify CSRF token
  * Only applies to state-changing methods (POST, PUT, PATCH, DELETE)
@@ -74,7 +79,7 @@ const generateToken = (req, res, next) => {
  * @description
  * Skips verification for:
  * - GET, HEAD, OPTIONS methods
- * - /auth/* endpoints (have their own security)
+ * - Explicit auth exceptions only (`POST /auth/login`)
  * - /api/payment/* endpoints (have signature verification)
  * - When DISABLE_CSRF is set to "true" (dev only)
  */
@@ -84,8 +89,8 @@ const verifyToken = (req, res, next) => {
     return next();
   }
 
-  // Skip CSRF for auth endpoints (they have their own security)
-  if (req.path.startsWith("/auth/")) {
+  // Keep auth bypass surface minimal: only login may stay CSRF-exempt.
+  if (isAuthCsrfExempt(req)) {
     return next();
   }
 

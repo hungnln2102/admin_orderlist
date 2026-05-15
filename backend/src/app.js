@@ -10,7 +10,11 @@ const {
   normalizeOrigin,
   session: sessionConfig,
 } = require("./config/appConfig");
-const { redisClient, isRedisAvailable } = require("./config/redisClient");
+const {
+  redisClient,
+  isRedisAvailable,
+  assertProductionSessionStoreGuard,
+} = require("./config/redisClient");
 const v1Routes = require("./routes/v1");
 const { AUTH_OPEN_PATHS } = require("./middleware/authGuard");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
@@ -114,16 +118,34 @@ const sessionOpts = {
   },
 };
 
-if (isRedisAvailable()) {
+const sessionStoreGuardState = assertProductionSessionStoreGuard();
+
+if (redisClient) {
   try {
     const RedisStore = require("connect-redis").default;
     sessionOpts.store = new RedisStore({ client: redisClient, prefix: "sess:" });
-    logger.info("[Session] Using Redis store");
-  } catch {
+    logger.info(
+      "[Session] Using Redis store (target=%s, connected=%s)",
+      sessionStoreGuardState.redisTarget || "unknown",
+      isRedisAvailable()
+    );
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    if (sessionStoreGuardState.persistentSessionStoreRequired) {
+      throw new Error(
+        `[Session] Production requires connect-redis persistent store; refusing to boot (${reason})`
+      );
+    }
     logger.warn("[Session] connect-redis not installed — using in-memory store");
   }
 } else {
   logger.info("[Session] Using in-memory store (no Redis)");
+}
+
+if (sessionStoreGuardState.persistentSessionStoreRequired && !sessionOpts.store) {
+  throw new Error(
+    "[Session] Production requires persistent Redis session store; in-memory fallback blocked"
+  );
 }
 
 app.use(session(sessionOpts));

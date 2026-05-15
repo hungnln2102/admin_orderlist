@@ -153,4 +153,50 @@ if (REDIS_ENABLED && redisConnection) {
 
 const isRedisAvailable = () => redisAvailable && redisClient !== null;
 
-module.exports = { redisClient, isRedisAvailable };
+function getSessionStoreGuardState() {
+  return {
+    production: isProduction,
+    persistentSessionStoreRequired: isProduction,
+    redisEnabled: REDIS_ENABLED,
+    redisConfigured: Boolean(redisConnection),
+    redisClientInitialized: redisClient !== null,
+    redisConnected: isRedisAvailable(),
+    redisTarget: redisConnection ? redisConnection.target : null,
+  };
+}
+
+function assertProductionSessionStoreGuard() {
+  const state = getSessionStoreGuardState();
+
+  if (!state.persistentSessionStoreRequired) {
+    return state;
+  }
+
+  const blockers = [];
+  if (!state.redisEnabled) {
+    blockers.push("REDIS_ENABLED=false");
+  }
+  if (!state.redisConfigured) {
+    blockers.push("REDIS_URL/REDIS_HOST missing");
+  }
+  if (!state.redisClientInitialized) {
+    blockers.push("Redis client init failed or ioredis unavailable");
+  }
+
+  if (blockers.length > 0) {
+    const message = `[Session] Production requires persistent Redis session store; refusing to boot (${blockers.join("; ")})`;
+    logger.error(message);
+    const error = new Error(message);
+    error.code = "SESSION_STORE_HARDENING_BLOCK";
+    throw error;
+  }
+
+  return state;
+}
+
+module.exports = {
+  redisClient,
+  isRedisAvailable,
+  getSessionStoreGuardState,
+  assertProductionSessionStoreGuard,
+};

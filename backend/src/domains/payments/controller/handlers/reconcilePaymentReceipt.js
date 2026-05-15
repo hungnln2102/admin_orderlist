@@ -13,7 +13,7 @@ const { normalizeMoney } = require("../shared/helpers");
 const {
   computeDashboardPaymentDecision,
 } = require("../../../orders/controller/finance/dashboardPaymentPostingPolicy");
-const { runRenewal } = require("../../../../../webhook/sepay/renewal");
+const { enqueueRenewal } = require("../../../../../webhook/sepay/renewalQueue");
 const {
   applyReconcileDashboardAdjustment,
 } = require("./reconcile/dashboardAdjustment");
@@ -185,30 +185,57 @@ const reconcilePaymentReceipt = async (req, res) => {
       };
     });
 
-    let renewalResult = null;
+    let renewalStatus = null;
+    let renewalDispatchedVia = null;
+    let renewalError = null;
     if (result.shouldRunRenewal) {
-      renewalResult = await runRenewal(orderCodeRaw, {
-        forceRenewal: true,
-        source: "manual",
-      });
+      try {
+        const enqueueResult = await enqueueRenewal(orderCodeRaw, {
+          forceRenewal: true,
+          source: "manual",
+        });
+        renewalStatus = enqueueResult?.status || "queued";
+        renewalDispatchedVia = enqueueResult?.dispatched || null;
+      } catch (enqueueError) {
+        renewalStatus = "enqueue_failed";
+        renewalError = enqueueError?.message || "Không thể enqueue renewal.";
+        logger.error("[payments] Reconcile thành công nhưng enqueue renewal thất bại", {
+          receiptId,
+          orderCode: orderCodeRaw,
+          action: requestedAction,
+          error: renewalError,
+          stack: enqueueError?.stack,
+        });
+      }
+    }
+    if (!result.shouldRunRenewal) {
+      renewalStatus = "not_requested";
     }
     const actionResult = {
       ...(result.actionResult || {}),
     };
-    if (renewalResult?.success && renewalResult?.details?.TINH_TRANG) {
-      actionResult.statusAfterAction = renewalResult.details.TINH_TRANG;
-    }
+    const renewalAccepted = renewalStatus === "queued" || renewalStatus === "already_queued";
 
     return res.json({
       success: true,
+      reconciled: true,
       actionRequested: requestedAction,
       actionApplied: result.effectiveAction || requestedAction,
       ...result,
       shouldRunRenewal: undefined,
       effectiveAction: undefined,
       actionResult,
-      renewalSuccess: renewalResult ? !!renewalResult?.success : null,
-      renewalDetails: renewalResult?.details || null,
+      renewal_status: renewalStatus,
+      renewal_dispatched_via: renewalDispatchedVia,
+      renewal_error: renewalError,
+      renewalSuccess: result.shouldRunRenewal ? renewalAccepted : null,
+      renewalDetails: result.shouldRunRenewal
+        ? {
+            status: renewalStatus,
+            dispatched_via: renewalDispatchedVia,
+            error: renewalError,
+          }
+        : null,
     });
   } catch (error) {
     const statusCode = Number(error?.status) || 500;

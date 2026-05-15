@@ -17,10 +17,15 @@ const pendingRenewalTasks = new Map();
 const tryBullMQEnqueue = async (orderCode, options = {}) => {
   try {
     const { addRenewalJob } = require("../../src/queues/renewalQueue");
-    const job = await addRenewalJob(orderCode, options);
-    return job !== null;
+    const result = await addRenewalJob(orderCode, options);
+    if (!result) return null;
+    return {
+      dispatched: "bullmq",
+      status: result.alreadyQueued ? "already_queued" : "queued",
+      jobId: result.jobId || null,
+    };
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -31,6 +36,7 @@ const queueRenewalTask = (orderCode, options = {}) => {
   if (!orderCode) return null;
   const key = orderCode.trim();
   if (!key) return null;
+  const alreadyQueued = pendingRenewalTasks.has(key);
   const existing = pendingRenewalTasks.get(key) || {};
   const task = {
     orderCode: key,
@@ -50,6 +56,7 @@ const queueRenewalTask = (orderCode, options = {}) => {
       options.suppressFinanceNotify === true ||
       existing.suppressFinanceNotify === true,
   };
+  task.alreadyQueued = alreadyQueued;
   pendingRenewalTasks.set(key, task);
   return task;
 };
@@ -63,13 +70,23 @@ const enqueueRenewal = async (orderCode, options = {}) => {
   const key = String(orderCode).trim();
   if (!key) return null;
 
-  const dispatched = await tryBullMQEnqueue(key, options);
-  if (dispatched) {
-    return { dispatched: "bullmq", orderCode: key };
+  const bullMqResult = await tryBullMQEnqueue(key, options);
+  if (bullMqResult) {
+    return {
+      orderCode: key,
+      dispatched: bullMqResult.dispatched,
+      status: bullMqResult.status,
+      jobId: bullMqResult.jobId,
+    };
   }
 
   const task = queueRenewalTask(key, options);
-  return { dispatched: "memory", orderCode: key, task };
+  return {
+    dispatched: "memory",
+    orderCode: key,
+    status: task?.alreadyQueued ? "already_queued" : "queued",
+    task,
+  };
 };
 
 const processRenewalTask = async (orderCode) => {

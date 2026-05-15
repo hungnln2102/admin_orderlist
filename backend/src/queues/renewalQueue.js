@@ -33,15 +33,21 @@ const getRenewalQueue = () => {
 const addRenewalJob = async (orderCode, options = {}) => {
   const queue = getRenewalQueue();
   if (!queue) return null;
+  const jobId = `renewal-${orderCode}`;
+  const existingJob = await queue.getJob(jobId);
+  if (existingJob) {
+    logger.info(`[RenewalQueue] Job already queued: ${orderCode} (id: ${existingJob.id})`);
+    return { job: existingJob, alreadyQueued: true, jobId };
+  }
 
   const job = await queue.add(
     "process-renewal",
     { orderCode, forceRenewal: options.forceRenewal || false },
-    { jobId: `renewal-${orderCode}` }
+    { jobId }
   );
 
   logger.info(`[RenewalQueue] Job added: ${orderCode} (id: ${job.id})`);
-  return job;
+  return { job, alreadyQueued: false, jobId };
 };
 
 module.exports = { QUEUE_NAME, getRenewalQueue, addRenewalJob };

@@ -39,6 +39,7 @@ async function sendOrderCreatedNotification(order) {
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     botTokenLength: TELEGRAM_BOT_TOKEN?.length || 0,
     targetChatId,
+    hasDefaultChatId: !!TELEGRAM_CHAT_ID,
     TELEGRAM_ORDER_TOPIC_ID,
     TELEGRAM_IMPORT_ORDER_TOPIC_ID,
     SEND_ORDER_TO_TOPIC,
