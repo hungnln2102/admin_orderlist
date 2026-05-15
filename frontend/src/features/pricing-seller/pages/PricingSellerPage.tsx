@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 
 type SellerPricingItem = {
-  variant: string;
+  variant_name: string;
   gia_si: number;
   gia_le: number;
 };
@@ -16,6 +16,17 @@ const money = new Intl.NumberFormat("vi-VN");
 function formatVnd(value: number): string {
   const safe = Number.isFinite(value) ? value : 0;
   return `${money.format(Math.round(safe))} ₫`;
+}
+
+function parseDurationFromVariantName(variantName: string): string {
+  const normalized = String(variantName || "").trim();
+  const matched = normalized.match(/--\s*(\d+)\s*([md])$/i);
+  if (!matched) return "-";
+
+  const value = Number(matched[1]);
+  if (!Number.isFinite(value) || value <= 0) return "-";
+
+  return matched[2].toLowerCase() === "m" ? `${value} tháng` : `${value} ngày`;
 }
 
 export default function PricingSellerPage() {
@@ -89,6 +100,9 @@ export default function PricingSellerPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">
                     Variant
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Thời hạn
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
                     Gia si
                   </th>
@@ -99,8 +113,13 @@ export default function PricingSellerPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {items.map((item) => (
-                  <tr key={`${item.variant}-${item.gia_si}-${item.gia_le}`}>
-                    <td className="px-4 py-3 text-sm text-slate-900">{item.variant || "-"}</td>
+                  <tr key={`${item.variant_name}-${item.gia_si}-${item.gia_le}`}>
+                    <td className="px-4 py-3 text-sm text-slate-900">
+                      {item.variant_name || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {parseDurationFromVariantName(item.variant_name)}
+                    </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
                       {formatVnd(item.gia_si)}
                     </td>
