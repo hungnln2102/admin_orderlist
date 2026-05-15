@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 
 type SellerPricingItem = {
-  id: number;
-  product_name: string;
-  gia_ctv: number;
+  variant: string;
+  gia_si: number;
   gia_le: number;
 };
 
@@ -54,14 +53,14 @@ export default function PricingSellerPage() {
     };
   }, []);
 
-  const hasRows = useMemo(() => items.length > 0, [items]);
+  const hasRows = items.length > 0;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl rounded-xl bg-white p-4 shadow-sm sm:p-6">
         <header className="mb-4 border-b border-slate-200 pb-4">
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Bảng giá sản phẩm</h1>
-          <p className="mt-1 text-sm text-slate-500">Giá CTV và giá lẻ cập nhật theo hệ thống.</p>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Bảng giá bán</h1>
+          <p className="mt-1 text-sm text-slate-500">Giá sỉ và giá lẻ theo từng variant.</p>
         </header>
 
         {loading ? (
@@ -88,10 +87,10 @@ export default function PricingSellerPage() {
               <thead className="bg-slate-100">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Tên sản phẩm
+                    Variant
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Gia CTV
+                    Gia si
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
                     Gia le
@@ -100,10 +99,10 @@ export default function PricingSellerPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-3 text-sm text-slate-900">{item.product_name || "-"}</td>
+                  <tr key={`${item.variant}-${item.gia_si}-${item.gia_le}`}>
+                    <td className="px-4 py-3 text-sm text-slate-900">{item.variant || "-"}</td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
-                      {formatVnd(item.gia_ctv)}
+                      {formatVnd(item.gia_si)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
                       {formatVnd(item.gia_le)}
