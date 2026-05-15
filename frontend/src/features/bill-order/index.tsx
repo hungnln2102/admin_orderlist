@@ -4,7 +4,7 @@ import {
   ORDER_CODE_PREFIXES,
 } from "@/constants";
 import { multiplyValue } from "@/features/pricing/utils";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";

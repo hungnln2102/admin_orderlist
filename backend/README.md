@@ -52,7 +52,7 @@ Controllers xử lý business logic cho từng resource. Mỗi controller có th
 - Helper functions
 - Service functions
 
-**Example**: `controllers/Order/`
+**Example**: `domains/orders/controller/`
 - `index.js` - Router setup
 - `crudRoutes.js` - CRUD operations
 - `listRoutes.js` - List/filter operations

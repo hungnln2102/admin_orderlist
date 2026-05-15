@@ -11,7 +11,7 @@ const { db } = require("../src/db");
 const {
   TABLES,
   categoryCols,
-} = require("../src/controllers/ProductsController/constants");
+} = require("../src/domains/products/controller/constants");
 
 function isGradientCssValue(color) {
   if (!color || typeof color !== "string") return false;

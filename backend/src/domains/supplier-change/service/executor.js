@@ -1,5 +1,5 @@
 const logger = require("../../../utils/logger");
-const { normalizeOrderRow } = require("../../../controllers/Order/helpers/normalize");
+const { normalizeOrderRow } = require("../../orders/controller/helpers/normalize");
 const {
   computeProratedCostForNewSupplier,
   computeRefundFromOldSupplier,

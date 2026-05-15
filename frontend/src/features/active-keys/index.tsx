@@ -6,7 +6,7 @@ import type { ActiveKeyItem, CreateKeySuccessPayload } from "./types";
 import { ActiveKeyRow } from "./components/ActiveKeyRow";
 import { ActiveKeyCard } from "./components/ActiveKeyCard";
 import { CreateKeyModal } from "./components/CreateKeyModal";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 
 const PAGE_SIZE = 10;
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { ORDER_FIELDS } from "../../../../constants";
-import * as Helpers from "../../../../lib/helpers";
+import * as Helpers from "../../../../shared/utils";
 import { Order, Supply, SupplyPrice } from "../types";
 
 type RecalcPrice = (

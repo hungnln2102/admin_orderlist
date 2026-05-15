@@ -1,53 +1,36 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { PencilIcon } from "@heroicons/react/24/outline";
-import * as Helpers from "@/lib/helpers";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import {
   fetchSupplyOrderCosts,
   type SupplyOrderCostAggregates,
-  type SupplyOrderCostRow,
 } from "@/lib/suppliesApi";
 import ExternalImportLogModal from "./ExternalImportLogModal";
 import EditTraceCodeModal from "./EditTraceCodeModal";
-import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import type { Supply } from "../types";
 import { showAppNotification } from "@/lib/notifications";
-
-const formatCurrency = Helpers.formatCurrency;
-const formatUpdateDate = (row: SupplyOrderCostRow) => {
-  const raw = row.canceledAt || row.orderDate;
-  if (!raw) return "--";
-  return Helpers.formatDateToDMY(raw) || String(raw);
-};
-
-const PAGE_SIZE = 80;
-
-const EMPTY_AGG: SupplyOrderCostAggregates = {
-  orderCount: 0,
-  totalCost: 0,
-  totalRefund: 0,
-};
+import SupplyCostFilters from "./supply-order-costs-panel/SupplyCostFilters";
+import SupplyCostTabs from "./supply-order-costs-panel/SupplyCostTabs";
+import SupplyCostTable from "./supply-order-costs-panel/SupplyCostTable";
+import type {
+  ActiveSupplyTab,
+  ExternalImportLogItem,
+} from "./supply-order-costs-panel/types";
+import {
+  EMPTY_AGG,
+  formatCurrency,
+  formatUpdateDate,
+  PAGE_SIZE,
+} from "./supply-order-costs-panel/utils";
 
 type Props = {
   supplies: Supply[];
   onAggregatesChange?: (aggregates: SupplyOrderCostAggregates) => void;
 };
 
-type ExternalImportLogItem = {
-  id: number;
-  amount: number;
-  reason: string;
-  linkedOrderCode: string | null;
-  expenseDate: string | null;
-  createdAt: string | null;
-  expenseType: "external_import" | "mavn_import" | string;
-  traceCode: string | null;
-};
-
 const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }) => {
   const onAggregatesRef = useRef(onAggregatesChange);
   onAggregatesRef.current = onAggregatesChange;
-  const [activeTab, setActiveTab] = useState<"nccCosts" | "externalImport">("nccCosts");
+  const [activeTab, setActiveTab] = useState<ActiveSupplyTab>("nccCosts");
 
   const [supplyId, setSupplyId] = useState<string>("");
   const [q, setQ] = useState("");
@@ -146,107 +129,27 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-indigo-500/25 bg-indigo-950/25 p-2 backdrop-blur-xl">
-        <div className="grid min-h-[2.75rem] grid-cols-2 gap-2">
-          {(
-            [
-              { key: "nccCosts" as const, label: "Chi phí NCC theo đơn" },
-              { key: "externalImport" as const, label: "Nhập hàng ngoài luồng" },
-            ] as const
-          ).map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`w-full rounded-xl px-3 py-2.5 text-xs font-bold uppercase tracking-[0.08em] transition-all sm:text-sm ${
-                  isActive
-                    ? "border border-indigo-300/40 bg-gradient-to-br from-indigo-500/85 via-indigo-600/55 to-violet-700/45 text-white shadow-[0_10px_28px_-6px_rgba(99,102,241,0.45)]"
-                    : "border border-transparent text-indigo-200/65 hover:border-indigo-500/25 hover:bg-indigo-900/25 hover:text-indigo-100/95"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <SupplyCostTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        {activeTab === "nccCosts" ? (
-          <>
-            <label className="flex min-w-[200px] flex-col gap-1 text-xs text-white/50">
-              Nhà cung cấp
-              <select
-                value={supplyId === "" ? "all" : supplyId}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSupplyId(v === "all" ? "" : v);
-                  setOffset(0);
-                }}
-                className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white focus:border-indigo-400/60 focus:outline-none"
-              >
-                <option value="all">Tất cả NCC</option>
-                {supplies.map((s) => (
-                  <option key={s.id} value={String(s.id)}>
-                    {s.sourceName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-xs text-white/50">
-              Mã đơn
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onSearch();
-                }}
-                placeholder="Tìm theo mã đơn..."
-                className="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-indigo-400/60 focus:outline-none"
-              />
-            </label>
-          </>
-        ) : (
-          <div className="min-w-[280px] flex-1 rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-white/70">
-            Danh sách log nhập hàng ngoài luồng
-          </div>
-        )}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateLogOpen(true)}
-            className="rounded-xl border border-emerald-400/40 bg-emerald-600/25 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500/40"
-          >
-            Tạo log nhập hàng
-          </button>
-          {activeTab === "nccCosts" ? (
-            <>
-              <button
-                type="button"
-                onClick={onSearch}
-                className="rounded-xl border border-indigo-400/40 bg-indigo-600/40 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500/50"
-              >
-                Tìm
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setQ("");
-                  setQApplied("");
-                  setSupplyId("");
-                  setOffset(0);
-                }}
-                className="rounded-xl border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
-              >
-                Xóa lọc
-              </button>
-            </>
-          ) : null}
-        </div>
-      </div>
+      <SupplyCostFilters
+        activeTab={activeTab}
+        supplies={supplies}
+        supplyId={supplyId}
+        q={q}
+        onSupplyIdChange={(value) => {
+          setSupplyId(value);
+          setOffset(0);
+        }}
+        onQueryChange={setQ}
+        onSearch={onSearch}
+        onReset={() => {
+          setQ("");
+          setQApplied("");
+          setSupplyId("");
+          setOffset(0);
+        }}
+        onOpenCreateLog={() => setCreateLogOpen(true)}
+      />
 
       <ExternalImportLogModal
         isOpen={createLogOpen}
@@ -282,142 +185,18 @@ const SupplyOrderCostsPanel: React.FC<Props> = ({ supplies, onAggregatesChange }
       />
 
       <div className="glass-panel-dark border border-white/5 rounded-[32px] overflow-hidden shadow-2xl backdrop-blur-xl">
-        <ResponsiveTable className="supply-order-costs__inner" showCardOnMobile={false}>
-          <table className="w-full text-left">
-            {activeTab === "nccCosts" ? (
-              <>
-                <thead className="bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
-                  <tr>
-                    <th className="px-4 py-3 w-14">STT</th>
-                    <th className="px-4 py-3">NCC</th>
-                    <th className="px-4 py-3">Đơn</th>
-                    <th className="px-4 py-3">Tiền nhập</th>
-                    <th className="px-4 py-3">Tiền hoàn</th>
-                    <th className="px-4 py-3">Trạng thái</th>
-                    <th className="px-4 py-3">Ngày cập nhật</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-white/50">
-                        Đang tải...
-                      </td>
-                    </tr>
-                  ) : rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-white/50">
-                        Không có dòng nào.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((row, idx) => (
-                      <tr key={row.orderPk || `${row.idOrder}-${idx}`} className="text-sm text-white/90">
-                        <td className="px-4 py-3 text-white/50">{offset + idx + 1}</td>
-                        <td className="px-4 py-3">{row.supplierName || "—"}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{row.idOrder || "—"}</td>
-                        <td className="px-4 py-3 text-emerald-300/90">{formatCurrency(row.cost)}</td>
-                        <td className="px-4 py-3 text-amber-200/90">{formatCurrency(row.refund)}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={
-                              String(row.nccPaymentStatus || "").includes("Đã")
-                                ? "rounded-lg bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-200"
-                                : "rounded-lg bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-100/90"
-                            }
-                          >
-                            {row.nccPaymentStatus || "Chưa Thanh Toán"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-white/70">{formatUpdateDate(row)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </>
-            ) : (
-              <>
-                <thead className="bg-white/5 text-[10px] uppercase text-indigo-300/40 font-bold tracking-[0.2em]">
-                  <tr>
-                    <th className="px-4 py-3 w-14">STT</th>
-                    <th className="px-4 py-3">Ngày tạo</th>
-                    <th className="px-4 py-3">Nguồn</th>
-                    <th className="px-4 py-3">Số tiền nhập</th>
-                    <th className="px-4 py-3">Mã đơn liên kết</th>
-                    <th className="px-4 py-3">Lý do</th>
-                    <th className="px-4 py-3">Mã trace</th>
-                    <th className="px-4 py-3 w-20 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {externalLoading ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-white/50">
-                        Đang tải log nhập hàng...
-                      </td>
-                    </tr>
-                  ) : externalError ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-rose-200">
-                        {externalError}
-                      </td>
-                    </tr>
-                  ) : externalLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-white/50">
-                        Chưa có log nhập hàng ngoài luồng.
-                      </td>
-                    </tr>
-                  ) : (
-                    externalLogs.map((log, idx) => {
-                      const isMavnImport = log.expenseType === "mavn_import";
-                      return (
-                        <tr key={log.id || idx} className="text-sm text-white/90">
-                          <td className="px-4 py-3 text-white/50">{idx + 1}</td>
-                          <td className="px-4 py-3 text-white/70">
-                            {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={
-                                isMavnImport
-                                  ? "rounded-lg bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-violet-200"
-                                  : "rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-200"
-                              }
-                            >
-                              {isMavnImport ? "MAVN AUTO" : "MANUAL"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-emerald-300/90">
-                            {formatCurrency(log.amount)}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs text-indigo-200/90">
-                            {log.linkedOrderCode || "—"}
-                          </td>
-                          <td className="px-4 py-3">{log.reason || "—"}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-amber-200/90">
-                            {log.traceCode || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setEditTraceTarget(log)}
-                              title="Sửa mã trace"
-                              aria-label="Sửa mã trace"
-                              className="inline-flex items-center justify-center rounded-lg border border-amber-400/30 bg-amber-500/10 p-1.5 text-amber-200 transition-colors hover:border-amber-300/60 hover:bg-amber-500/20"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </>
-            )}
-          </table>
-        </ResponsiveTable>
+        <SupplyCostTable
+          activeTab={activeTab}
+          loading={loading}
+          rows={rows}
+          offset={offset}
+          externalLoading={externalLoading}
+          externalError={externalError}
+          externalLogs={externalLogs}
+          formatCurrency={formatCurrency}
+          formatUpdateDate={formatUpdateDate}
+          onEditTrace={setEditTraceTarget}
+        />
         {activeTab === "nccCosts" ? (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 px-4 py-3 text-xs text-white/50">
             <span>

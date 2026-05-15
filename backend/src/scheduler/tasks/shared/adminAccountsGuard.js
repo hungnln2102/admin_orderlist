@@ -8,7 +8,7 @@ const logger = require("../../../utils/logger");
 const {
   TABLE: ACCOUNTS_ADMIN_TABLE,
   COLS: ACCOUNTS_ADMIN_COLS,
-} = require("../../../controllers/RenewAdobeController/accountTable");
+} = require("../../../domains/renew-adobe/controller/accountTable");
 
 /**
  * @returns {Promise<boolean>} true khi tồn tại ≥ 1 row trong `accounts_admin`.

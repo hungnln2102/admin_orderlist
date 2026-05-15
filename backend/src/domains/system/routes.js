@@ -1,6 +1,6 @@
 const express = require("express");
 const { notifyError } = require("../../utils/telegramErrorNotifier");
-const { runFourDaysNotificationNow } = require("../../controllers/SchedulerController");
+const { runFourDaysNotificationNow } = require("../scheduler/controller");
 const { requireCronInvokeSecret } = require("../../middleware/secureCronInvoke");
 
 const router = express.Router();

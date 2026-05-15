@@ -6,8 +6,8 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
-import { apiFetch } from "../../../lib/api";
-import * as Helpers from "../../../lib/helpers";
+import { apiFetch } from "../../../shared/api/client";
+import * as Helpers from "../../../shared/utils";
 import StatCard from "./components/StatCard";
 import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";

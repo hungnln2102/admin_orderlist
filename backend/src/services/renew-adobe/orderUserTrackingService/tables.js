@@ -7,7 +7,7 @@ const {
   TBL_ORDER,
   ORD_COLS,
   getRenewAdobeVariantIds,
-} = require("../../../controllers/RenewAdobeController/orderAccess");
+} = require("../../../domains/renew-adobe/controller/orderAccess");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 
 export interface ArticleImageItem {
   fileName: string;

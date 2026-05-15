@@ -7,7 +7,7 @@ const logger = require("../../utils/logger");
 const { db } = require("../../db");
 const adobeRenewV2 = require("./adobe-renew-v2");
 const { removeMappingsForAccount } = require("../userAccountMappingService");
-const { TABLE, COLS } = require("../../controllers/RenewAdobeController/accountTable");
+const { TABLE, COLS } = require("../../domains/renew-adobe/controller/accountTable");
 const {
   removeProfileDirForEmail,
 } = require("./adobe-renew-v2/shared/profileSession");

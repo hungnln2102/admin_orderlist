@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { SupplyPriceState } from "../types";
 import {

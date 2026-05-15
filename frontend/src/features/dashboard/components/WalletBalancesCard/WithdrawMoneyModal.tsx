@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { apiFetch } from "@/lib/api";
-import * as Helpers from "@/lib/helpers";
+import { apiFetch } from "@/shared/api/client";
+import * as Helpers from "@/shared/utils";
 
 type WithdrawMoneyModalProps = {
   isOpen: boolean;

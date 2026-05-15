@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { Payment } from "../types";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 
 const formatCurrency = Helpers.formatCurrency;
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { CategoryItem } from "../utils/productInfoHelpers";
 

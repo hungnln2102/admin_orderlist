@@ -6,8 +6,8 @@ const {
   getSupplyPricesByProductName,
   updateSupplyPriceForProduct,
   deleteSupplyPriceForProduct,
-} = require("../../controllers/ProductsController");
-const { sourceIdParam } = require("../../validators/productValidator");
+} = require("./controller");
+const { sourceIdParam } = require("./validators/productValidator");
 
 const router = express.Router();
 

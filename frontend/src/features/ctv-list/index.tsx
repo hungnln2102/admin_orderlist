@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable, TableCard } from "@/components/ui/ResponsiveTable";
 import Pagination from "@/components/ui/Pagination";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { CtvItem, CtvStatus } from "./types";
 import { CTV_STATUS_OPTIONS } from "./types";

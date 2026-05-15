@@ -2,7 +2,7 @@ const {
   computeDashboardPaymentDecision,
   isSuccessfulPaymentAmount,
   requiredMinForSuccessfulPayment,
-} = require("../../../src/controllers/Order/finance/dashboardPaymentPostingPolicy");
+} = require("../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 
 describe("dashboardPaymentPostingPolicy", () => {
   test("accepts underpayment strictly below 5,000 VND", () => {

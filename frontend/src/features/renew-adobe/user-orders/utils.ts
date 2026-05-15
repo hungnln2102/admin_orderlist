@@ -1,4 +1,4 @@
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import type { LicenseStatus } from "../types";
 import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
 import {

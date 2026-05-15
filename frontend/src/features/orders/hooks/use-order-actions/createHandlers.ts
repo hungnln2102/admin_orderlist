@@ -1,5 +1,5 @@
 import { API_ENDPOINTS, ORDER_FIELDS, type Order } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
 import { formatCurrency, parseErrorResponse } from "../../utils/ordersHelpers";

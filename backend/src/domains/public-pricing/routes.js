@@ -1,9 +1,13 @@
 const express = require("express");
-const { postCalculate } = require("../../controllers/PublicPricingController");
-const { postVariantsPricing } = require("../../controllers/PublicCatalogPricingController");
+const {
+  getSellerPricingTable,
+  postCalculate,
+  postVariantsPricing,
+} = require("./controller");
 
 const router = express.Router();
 
+router.get("/seller-table", getSellerPricingTable);
 router.post("/calculate", postCalculate);
 router.post("/variants", postVariantsPricing);
 

@@ -12,7 +12,7 @@ jest.mock("../../../../src/db", () => ({
 }));
 
 jest.mock(
-  "../../../../src/controllers/Order/helpers/normalize",
+  "../../../../src/domains/orders/controller/helpers/normalize",
   () => ({
     normalizeOrderRow: jest.fn(),
   })
@@ -44,7 +44,7 @@ jest.mock("../../../../src/domains/supplier-change/repository", () => {
 
 // Mock dashboardSummary.mergeSummaryUpdates: kiểm chứng profit_delta đi đúng tháng.
 jest.mock(
-  "../../../../src/controllers/Order/finance/dashboardSummary",
+  "../../../../src/domains/orders/controller/finance/dashboardSummary",
   () => ({
     mergeSummaryUpdates: jest.fn(async () => {}),
   })
@@ -58,10 +58,10 @@ jest.mock(
   })
 );
 
-const dashboardSummary = require("../../../../src/controllers/Order/finance/dashboardSummary");
+const dashboardSummary = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
 const financeNotifier = require("../../../../src/services/telegramFinanceDeltaNotifier");
 
-const { normalizeOrderRow } = require("../../../../src/controllers/Order/helpers/normalize");
+const { normalizeOrderRow } = require("../../../../src/domains/orders/controller/helpers/normalize");
 const repo = require("../../../../src/domains/supplier-change/repository");
 const {
   changeOrderSupplier,

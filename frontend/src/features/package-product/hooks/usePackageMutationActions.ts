@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type React from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type { WarehouseItem } from "../../../Personal/Storage/types";
 import type {

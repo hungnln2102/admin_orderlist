@@ -4,7 +4,7 @@ const {
   TABLES,
   productSchemaCols,
   variantCols,
-} = require("../controllers/ProductsController/constants");
+} = require("../domains/products/controller/constants");
 
 /**
  * Hai dạng path thường gặp trong DB (host khác nhau nhưng đều chứa đoạn này).

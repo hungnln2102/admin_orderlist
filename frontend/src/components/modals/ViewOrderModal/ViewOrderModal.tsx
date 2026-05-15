@@ -1,5 +1,5 @@
 import React from "react";
-import * as Helpers from "../../../lib/helpers";
+import * as Helpers from "../../../shared/utils";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";

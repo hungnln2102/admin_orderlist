@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type { ProductDesc } from "../types";
 
 export async function fetchVariantPricingRows(): Promise<Record<string, unknown>[]> {

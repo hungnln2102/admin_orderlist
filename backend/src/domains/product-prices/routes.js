@@ -7,12 +7,12 @@ const {
   toggleProductPriceStatus,
   deleteProductPrice,
   createSupplyPriceForProduct,
-} = require("../../controllers/ProductsController");
+} = require("../products/controller");
 const {
   productIdParam,
   createProductPriceRules,
   updateProductPriceRules,
-} = require("../../validators/productValidator");
+} = require("../products/validators/productValidator");
 
 const router = express.Router();
 

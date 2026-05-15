@@ -41,14 +41,14 @@ const {
 } = require("../../../src/utils/orderHelpers");
 const {
   resolveDashboardImportDeltaOnPaid,
-} = require("../../../src/controllers/Order/finance/dashboardImportDeltaOnPaid");
+} = require("../../../src/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
 const { getOrderQrPaymentEligibility } = require("../orderPaymentEligibility");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, SCHEMA_RECEIPT, RECEIPT_SCHEMA, tableName } = require("../../../src/config/dbSchema");
 const {
   qualifiedSummaryCol,
   recomputeSummaryMonthTotalTax,
   monthKeyFromPaidDateYmd,
-} = require("../../../src/controllers/Order/finance/dashboardSummary");
+} = require("../../../src/domains/orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
 } = require("../../../src/services/telegramFinanceDeltaNotifier");
@@ -56,7 +56,7 @@ const {
   UNDERPAY_TOLERANCE_VND,
   computeDashboardPaymentDecision,
   requiredMinForSuccessfulPayment,
-} = require("../../../src/controllers/Order/finance/dashboardPaymentPostingPolicy");
+} = require("../../../src/domains/orders/controller/finance/dashboardPaymentPostingPolicy");
 const logger = require("../../../src/utils/logger");
 const { computeOrderCurrentPrice } = require("../renewalPricing");
 const { withSavepoint } = require("../savepoint");

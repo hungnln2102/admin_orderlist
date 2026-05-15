@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { onRefresh } from "@/lib/refreshBus";
 import {
   PACKAGE_FIELD_OPTIONS,

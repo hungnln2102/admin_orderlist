@@ -1,6 +1,6 @@
 const app = require("./app");
 const { port } = require("./config/appConfig");
-const { ensureDefaultAdmin } = require("./controllers/AuthController");
+const { ensureDefaultAdmin } = require("./domains/auth/controller");
 const logger = require("./utils/logger");
 const { notifyCritical } = require("./utils/telegramErrorNotifier");
 

@@ -1,6 +1,6 @@
 const { db } = require("../../db");
 const { ORDERS_SCHEMA } = require("../../config/dbSchema");
-const { TABLES, COLS } = require("../../controllers/Order/constants");
+const { TABLES, COLS } = require("../../domains/orders/controller/constants");
 const {
   normalizeMoney,
   roundToThousands,

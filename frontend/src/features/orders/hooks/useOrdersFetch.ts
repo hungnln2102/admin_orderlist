@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ORDER_DATASET_CONFIG, Order, OrderDatasetKey } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 
 export function useOrdersFetch(dataset: OrderDatasetKey) {
   const [orders, setOrders] = useState<Order[]>([]);

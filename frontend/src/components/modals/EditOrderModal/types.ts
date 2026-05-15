@@ -1,5 +1,5 @@
 import { Order as ApiOrder } from "../../../constants";
-import * as Helpers from "../../../lib/helpers";
+import * as Helpers from "../../../shared/utils";
 
 export type Order = Omit<ApiOrder, "cost" | "price"> & {
   cost: number | string;

@@ -108,17 +108,17 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 | Ưu tiên | Domain | Nguồn cần gom vào `domains/<tên>/` | Ghi chú |
 |--------|--------|-------------------------------------|---------|
-| ☐ 2b-1 | `banks` | `controllers/BanksController` | Ít phụ thuộc — pilot tốt. |
-| ☐ 2b-2 | `categories` | `controllers/CategoriesController`, `validators/categoryValidator` | |
-| ☐ 2b-3 | `promotion-codes` | `controllers/PromotionCodesController` | |
-| ☐ 2b-4 | `form-info` | `controllers/FormDescController`, `validators/formDescValidator` | |
-| ☐ 2b-5 | `customer-status` | `controllers/CustomerStatusController` | |
-| ☐ 2b-6 | `accounts` | `controllers/AccountsController` | |
-| ☐ 2b-7 | `saving-goals` | Logic đã trong `routes.js` — tách `use-cases/` + thin `routes` khi cần | Không bắt buộc trùng pattern controller folder. |
-| ☐ 2b-8 | `pricing-tiers` | `controllers/PricingTierController`, `validators/pricingTierValidator` | |
-| ☐ 2b-9 | `store-profit-expenses` | `controllers/StoreProfitExpensesController`, `validators/storeProfitExpensesValidator` | |
-| ☐ 2b-10 | `key-active` | Logic đã trong domain — có thể tách `use-cases`/repo sau | Tùy độ phình file. |
-| ☐ 2b-11 | `warehouse` | `controllers/WarehouseController`, `validators/warehouseValidator` | |
+| ☑ 2b-1 | `banks` | `controllers/BanksController` | Hoàn tất direct cutover vào `domains/banks/controller`. |
+| ☑ 2b-2 | `categories` | `controllers/CategoriesController`, `validators/categoryValidator` | Hoàn tất direct cutover vào `domains/categories/controller|validators`. |
+| ☑ 2b-3 | `promotion-codes` | `controllers/PromotionCodesController` | Hoàn tất direct cutover vào `domains/promotion-codes/controller`. |
+| ☑ 2b-4 | `form-info` | `controllers/FormDescController`, `validators/formDescValidator` | Hoàn tất direct cutover vào `domains/form-info/controller|validators`. |
+| ☑ 2b-5 | `customer-status` | `controllers/CustomerStatusController` | Hoàn tất direct cutover vào `domains/customer-status/controller`. |
+| ☑ 2b-6 | `accounts` | `controllers/AccountsController` | Hoàn tất direct cutover vào `domains/accounts/controller`. |
+| ☑ 2b-7 | `saving-goals` | Logic đã trong `routes.js` — tách `use-cases/` + thin `routes` khi cần | Đã gom validator vào `domains/saving-goals/validators`. |
+| ☑ 2b-8 | `pricing-tiers` | `controllers/PricingTierController`, `validators/pricingTierValidator` | Hoàn tất direct cutover vào `domains/pricing-tiers/controller|validators`. |
+| ☑ 2b-9 | `store-profit-expenses` | `controllers/StoreProfitExpensesController`, `validators/storeProfitExpensesValidator` | Hoàn tất direct cutover vào `domains/store-profit-expenses/controller|validators`. |
+| ☑ 2b-10 | `key-active` | Logic đã trong domain — có thể tách `use-cases`/repo sau | Không còn phụ thuộc controller/validator global cho domain này. |
+| ☑ 2b-11 | `warehouse` | `controllers/WarehouseController`, `validators/warehouseValidator` | Hoàn tất direct cutover vào `domains/warehouse/controller|validators`. |
 | — | `ip-whitelist`, `site-maintenance` | Đã theo mẫu domain đầy đủ | Theo dõi khi chỉnh nghiệp vụ. |
 
 **Domain T3–T5** (`supplies`, `dashboard`, `payments`, `wallet`, `orders`, `products`, `product-*`, `package-products`, `content`/`mediaRoutes`, `public-content`, `public-pricing`, `auth`, `system`, `scheduler`, `renew-adobe`, `test-telegram`): cùng nguyên tắc Phase 2b — gom `controllers/*` + `validators/*` tương ứng khi tới lượt; riêng `content` có thêm `mediaRoutes.js` trong `domains/content/`; `renew-adobe` có thêm `publicRoutes.js` và `proxy.js`.
@@ -127,19 +127,19 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 
 ## Phase 3 — Frontend một hướng
 
-- [ ] **F3.1** Rà soát `frontend/src/lib/api.ts`: chỉ re-export **mỏng** từ `shared/api/client`; chuyển `dashboardApi` và export type dashboard về `features/dashboard/api/`.
-- [ ] **F3.2** Thống nhất import HTTP: ưu tiên `import { apiFetch, apiRequest, … } from '@/shared/api/client'` (hoặc `@/shared/api` nếu tạo barrel một tầng).
-- [ ] **F3.3** Rà `lib/helpers.ts`: tách từng nhóm về `features/<x>/utils` hoặc `shared/utils` (chỉ khi ≥ 2 feature).
-- [ ] **F3.4** (Tuỳ chọn) ESLint `no-restricted-imports` chặn import `lib/api` từ feature mới sau ngày chốt — áp dụng khi F3.1 xong.
+- [x] **F3.1** Rà soát `frontend/src/lib/api.ts`: chỉ re-export **mỏng** từ `shared/api/client`; chuyển `dashboardApi` và export type dashboard về `features/dashboard/api/`.
+- [x] **F3.2** Thống nhất import HTTP: ưu tiên `import { apiFetch, apiRequest, … } from '@/shared/api/client'` (hoặc `@/shared/api` nếu tạo barrel một tầng).
+- [x] **F3.3** Rà `lib/helpers.ts`: tách từng nhóm về `features/<x>/utils` hoặc `shared/utils` (chỉ khi ≥ 2 feature).
+- [x] **F3.4** (Tuỳ chọn) ESLint `no-restricted-imports` chặn import `lib/api` từ feature mới sau ngày chốt — áp dụng khi F3.1 xong.
 
 ---
 
 ## Phase 4 — Dọn dẹp & bảo toàn
 
 - [x] **P4.1** `routes/index.js`: chỉ còn mount `../domains/*/routes` + `longTimeout`/proxy renew; không còn `require('./xxxRoutes')` legacy. *(Vẫn `require` trực tiếp `SchedulerController.runSchedulerNow` cho `GET /run-scheduler` và `middleware/authGuard` — chấp nhận tạm thời.)*
-- [ ] **P4.2** Rà `validators/*.js` global: gắn về domain còn sót hoặc giữ tạm nếu dùng chung thật sự (ghi rõ comment).
+- [x] **P4.2** Rà `validators/*.js` global: gắn về domain còn sót hoặc giữ tạm nếu dùng chung thật sự (ghi rõ comment).
 - [ ] **P4.3** Smoke tổng: đăng nhập, dashboard, 1 đơn, 1 supply/product, renew hoặc health (tùy môi trường).
-- [ ] **P4.4** Cập nhật `README.md` mục “Project Structure” một đoạn ngắn trỏ `docs/STRUCTURE-SINGLE-DIRECTION.md`.
+- [x] **P4.4** Cập nhật `README.md` mục “Project Structure” một đoạn ngắn trỏ `docs/STRUCTURE-SINGLE-DIRECTION.md`.
 
 ---
 
@@ -186,6 +186,23 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 | 2026-05-15 | HOTFIX — restore export `htmlToPlainText` | — | Sửa `frontend/src/features/product-info/utils/productInfoHelpers.ts` từ `export * from "./productInfoHelpers"` sang `export * from "./productInfoHelpers/index"` để tránh self-resolution loop khi loader resolve module cùng tên file/folder. Khôi phục tương thích ngược cho import cũ `from ".../productInfoHelpers"` (bao gồm `htmlToPlainText`). |
 | 2026-05-15 | Wave 4 (pilot 9) — split `useOrderActions.ts` | — | Tách `frontend/src/features/orders/hooks/useOrderActions.ts` thành module `use-order-actions/*`: `types.ts`, `createHandlers.ts`, `paymentHandlers.ts`, `mutationHandlers.ts`; file `useOrderActions.ts` giữ role entry mỏng và export type `OrderActionsDeps` như cũ. Không đổi contract hook và luồng create/renew/mark-paid/refund/edit/delete. |
 | 2026-05-15 | Wave 4 (pilot 10) — split `useRenewAdobeAdmin.ts` | — | Tách phần streaming Check All của `frontend/src/features/renew-adobe/hooks/useRenewAdobeAdmin.ts` sang `use-renew-adobe-admin/checkAll.ts` + `types.ts`, giữ `useRenewAdobeAdmin.ts` làm orchestrator state/handlers. Không đổi API trả về cho `RenewAdobeAdminPage`/`RenewOrdersDeskPage`. Verify chung sau pilot 7→10 + hotfix: `npm --prefix frontend run lint` còn **9 warning** (`max-lines`), `npm --prefix frontend run test` pass 3 files / 9 tests. |
+| 2026-05-15 | Wave 4 (pilot 11) — split `packageHelpers.ts` | — | Tách `frontend/src/features/package-product/utils/packageHelpers.ts` thành module `packageHelpers/*`: `types.ts`, `defaults.ts`, `constants.ts`, `availability.ts`, `normalizers.ts`, `matching.ts`, `forms.ts`, `prefs.ts`, `enhance.ts`, `index.ts`; giữ `packageHelpers.ts` làm entry barrel `export * from "./packageHelpers/index"` để không đổi import path public. Không đổi contract helper đang dùng bởi `usePackageData`, `usePackageMutationActions`, `usePackageTemplateActions`, `usePackageProductPage`, `packageMatchUtils` và các component/modals liên quan. Verify: `npm --prefix frontend run lint` còn **8 warning** (`max-lines`), `npm --prefix frontend run test` fail do thiếu binary `vitest` trong môi trường hiện tại. |
+| 2026-05-15 | Wave 4 (pilot 12) — split `RichTextEditor.tsx` | — | Tách `frontend/src/features/product-info/components/EditProductModal/RichTextEditor.tsx` theo module `rich-text-editor/*`: `types.ts`, `constants.ts` (toolbar options + css text), `RichTextEditorToolbar.tsx`, `RichTextEditorSurface.tsx`; giữ file chính làm orchestrator state/mode + exec command. Không đổi API component (`default export RichTextEditor`) và behavior editor (visual/html mode, toolbar command, placeholder/canvas style). Verify: `npm --prefix frontend run lint` còn **7 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 13) — split `productActionHelpers.ts` | — | Tách `frontend/src/features/pricing/hooks/productActionHelpers.ts` thành module `product-action-helpers/*`: `types.ts`, `parsers.ts`, `forms.ts`, `suppliers.ts`, `validation.ts`, `json.ts`, `index.ts`; giữ file cũ làm entry barrel `export * from "./product-action-helpers/index"` để không đổi import path public cho `useProductActions`, `useProductReferenceOptions`, `useDeleteProductActions`, `ProductBasicsSection`. Không đổi validation/supplier payload contract. Verify: `npm --prefix frontend run lint` còn **6 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 14) — split `SupplyOrderCostsPanel.tsx` | — | Tách `frontend/src/features/supply/components/SupplyOrderCostsPanel.tsx` theo module `supply-order-costs-panel/*`: `types.ts`, `utils.ts`, `SupplyCostTabs.tsx`, `SupplyCostFilters.tsx`, `SupplyCostTable.tsx`; giữ file chính làm orchestrator state/data fetch + modal wiring. Không đổi behavior 2 tab (NCC costs/external import), search/filter/pagination, edit trace và tạo log. Verify: `npm --prefix frontend run lint` còn **5 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 15) — split `OrderRow.tsx` | — | Tách phần expandable detail của `frontend/src/features/orders/components/OrderRow.tsx` sang `order-row/OrderRowExpanded.tsx`; giữ `OrderRow.tsx` làm row chính + action handlers + QR prefetch hover. Không đổi contract `OrderRow` và luồng thao tác mark-paid/renew/refund/view/edit/delete. Verify: `npm --prefix frontend run lint` còn **4 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 16) — split `ReceiptsTable.tsx` | — | Tách `frontend/src/features/invoices/components/ReceiptsTable.tsx` thành module `receipts-table/*`: `ReceiptsExpandedDetailsRow.tsx`, `ReceiptsMatchConfirmModal.tsx`; giữ file chính làm orchestrator danh sách + state ghép mã + editing mã đơn. Không đổi luồng ghép mã đơn, modal confirm reconcile, expand chi tiết biên lai. Verify: `npm --prefix frontend run lint` còn **2 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 17) — split `useProductActions.ts` | — | Tách logic edit sản phẩm trong `frontend/src/features/pricing/hooks/useProductActions.ts` sang `use-product-actions/useProductEditActions.ts` (state edit, normalize input theo currency, submit PATCH + convert FX + map row). Giữ API return của `useProductActions` không đổi bằng cách re-export handlers/state từ hook con. Verify: `npm --prefix frontend run lint` còn **2 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 18) — split `ProductEditPanel.tsx` | — | Tách block preview giá trong `frontend/src/features/pricing/components/ProductEditPanel.tsx` sang `product-edit-panel/PricePreviewGrid.tsx`; file chính tập trung phần form product + bảng giá + actions. Không đổi contract props `ProductEditPanel` và behavior hiển thị preview. Verify: `npm --prefix frontend run lint` còn **1 warning** (`max-lines`). |
+| 2026-05-15 | Wave 4 (pilot 19) — split `VariantContentView.tsx` | — | Tách nhóm modal của `frontend/src/features/product-info/views/VariantContentView.tsx` sang `variant-content-view/VariantContentModals.tsx` (create/view/edit/delete confirm). Giữ file chính cho table/card list + pagination + handlers dữ liệu. Không đổi luồng CRUD `desc_variant`. Verify: `npm --prefix frontend run lint` **0 warning**. |
+| 2026-05-15 | Wave 4 (W5 gate) — lint + test frontend | — | Đồng bộ lại deps frontend bằng `npm --prefix frontend install` để khôi phục binary `vitest` trong `.bin` (trước đó script test lỗi `'vitest' is not recognized`). Verify lại: `npm --prefix frontend run lint` **0 warning**, `npm --prefix frontend run test -- --run` pass **3 files / 9 tests**. |
+| 2026-05-15 | Phase 2b pilot loop (direct cutover) | — | Hoàn tất nhóm backlog 2b-1→2b-11: migrate `banks`, `categories`, `promotion-codes`, `form-info`, `customer-status`, `accounts`, `pricing-tiers`, `store-profit-expenses`, `warehouse` vào `domains/*/controller`; migrate validators: `category`, `formDesc`, `pricingTier`, `warehouse`, `savingGoal`, `storeProfitExpenses` vào `domains/*/validators`; xóa legacy files tương ứng. Gate pass: `npm --prefix backend run lint` + `npm --prefix backend run test` (20/20 suites). |
+| 2026-05-15 | Phase 2b tiếp tục (batch wallet/scheduler/public-pricing/auth/dashboard + validators) | — | Migrate controller: `wallet`, `scheduler` (dùng cho `system`), `public-pricing`, `auth`, `dashboard` vào `domains/*/controller`; migrate validators: `wallet`, `auth`, `dashboard`, `product`, `package`, `ip-whitelist` vào `domains/*/validators`; cập nhật `routes/index.js` dùng `domains/scheduler/controller` và `server.js` dùng `domains/auth/controller`; xóa legacy files tương ứng. Gate pass nhiều vòng: `npm --prefix backend run lint` + `npm --prefix backend run test` đều pass. |
+| 2026-05-15 | Phase 2b tiếp tục (pilot supplies direct cutover) | — | Migrate `controllers/SuppliesController/*` vào `domains/supplies/controller/*`, migrate `validators/supplyValidator` vào `domains/supplies/validators`, cập nhật `domains/supplies/routes.js` và các caller dùng `resolveSupplierNameColumn` sang path domain mới (`services/supplierService`, `controllers/ProductsController/handlers/supplies`, `controllers/Order/finance/supplierDebt`); xóa legacy files tương ứng. Gate pass: `npm --prefix backend run lint` + `npm --prefix backend run test` (20/20 suites). |
+| 2026-05-15 | Phase 2b batch lớn (payments/orders/products/package/content/product-descriptions/renew-adobe + verifier) | — | Direct cutover hàng loạt: migrate `controllers/PaymentsController`, `Order`, `ProductsController`, `PackageController`, `ContentController`, `ProductDescriptionsController`, `RenewAdobeController` vào `domains/*/controller`; migrate `validators/contentValidator` vào `domains/content/validators`; cập nhật toàn bộ import liên quan ở `domains/*/routes`, `webhook/sepay/*`, `scripts/*`, `backend/tests/jest/*` và `backend/tests/manual/*`; xóa legacy files tương ứng. Gate pass cuối: `npm --prefix backend run lint` + `npm --prefix backend run test` (20/20 suites). |
+| 2026-05-15 | Phase 3 frontend một hướng (F3.1→F3.4) | — | Tối giản `frontend/src/lib/api.ts` chỉ còn re-export mỏng từ `shared/api/client`; thêm barrel `features/dashboard/api/index.ts` + cập nhật import dashboard API/type qua barrel; chuẩn hoá toàn bộ import `lib/api` sang `shared/api/client` và `lib/helpers` sang `shared/utils` (thêm `shared/api/index.ts`, `shared/utils/index.ts`); bật ESLint `no-restricted-imports` chặn `lib/api`/`lib/helpers` path cũ. Gate pass: `npm --prefix frontend run lint`. |
+| 2026-05-15 | Phase 4 (P4.2 + P4.4) | — | Hoàn tất rà validator global: di chuyển `src/validators/orderValidator.js` vào `domains/orders/validators/orderValidator.js`, cập nhật toàn bộ import trong orders controller và xóa bản global; cập nhật `README.md` mục “Project Structure” thêm đoạn tham chiếu `docs/STRUCTURE-SINGLE-DIRECTION.md`. Gate pass: `npm --prefix backend run lint` + `npm --prefix backend run test` + `npm --prefix frontend run lint`. |
+| 2026-05-15 | Public pricing-seller page | — | Thêm endpoint công khai `GET /api/public/pricing/seller-table` và route FE độc lập `/pricing-seller` ngoài `ProtectedRoute`/`MainLayout`; trang hiển thị bảng giá (Tên sản phẩm, Gia CTV, Gia le) với trạng thái loading/empty/error. |
 
 ---
 
@@ -196,18 +213,12 @@ Sau Phase 2 (**mount** T0–T5), mọi domain dưới `domains/*/routes.js` vẫ
 - [ ] **DEBT-CR-2** `useCreditLogsFetch` chưa cache request id / cancel — bấm action nhanh có thể có race giữa `reload()` và request cũ. Cân nhắc thêm `AbortController` khi rảnh.
 
 ### Lint debt còn lại (không block, làm khi rảnh)
-- [ ] **DEBT-LINT-FE** 9 warning frontend còn lại sau Wave 4 pilot 10 + hotfix: hiện chỉ còn nhóm `max-lines` (9 file > 400 dòng). Top hotspot hiện tại: `packageHelpers.ts` 478, `RichTextEditor.tsx` 460, `productActionHelpers.ts` 443, `SupplyOrderCostsPanel.tsx` 442, `OrderRow.tsx` 438.
+- [x] **DEBT-LINT-FE** đã dọn xong warning frontend nhóm `max-lines` sau Wave 4 pilot 19. Kết quả hiện tại: `npm --prefix frontend run lint` **0 warning**.
 - [x] **DEBT-LINT-FE-W1** (safe cleanup, không đổi behavior): đã dọn hết nhóm `@typescript-eslint/no-unused-vars`, `no-constant-binary-expression`, `unused eslint-disable` và `react-refresh/only-export-components` (37 warning) ở các file nhỏ/trung bình. Kết quả lint frontend giảm **130 → 93 warning**.
 - [x] **DEBT-LINT-FE-W2** (hook deps): đã xử lý hết `react-hooks/exhaustive-deps` (6 warning) theo nhóm `orders`, `dashboard`, `form-info`, `modals`. Verify bằng lint + test frontend: warning tổng **93 → 87**, test pass.
 - [x] **DEBT-LINT-FE-W3** (typing debt): đã dọn hết `@typescript-eslint/no-explicit-any` qua 2 slice (API + hooks/components liên quan). Kết quả warning tổng **87 → 19**; phần còn lại chuyển sang Wave 4 (`max-lines` split).
-- [/] **DEBT-LINT-FE-W4** (`max-lines` split): đã xong pilot 1 (`ExpenseCostAllocationTable.tsx`) + pilot 2 (`productInfoHelpers.ts`) + pilot 3 (`CreateOrderModal.tsx`) + pilot 4 (`QrModal.tsx`) + pilot 5 (`TaxDailyFormTable.tsx`) + pilot 6 (`UserOrdersTable.tsx`) + pilot 7 (`usePackageData.ts`) + pilot 8 (`BannersPage.tsx`) + pilot 9 (`useOrderActions.ts`) + pilot 10 (`useRenewAdobeAdmin.ts`), tiếp tục tách các file lớn còn lại theo thứ tự:
-  1) `packageHelpers.ts`
-  2) `RichTextEditor.tsx`
-  3) `productActionHelpers.ts`
-  4) `SupplyOrderCostsPanel.tsx`
-  5) `OrderRow.tsx`
-  rồi đến các file 400+ còn lại.
-- [ ] **DEBT-LINT-FE-W5** (final gate): chạy lại `npm --prefix frontend run lint` + `npm --prefix frontend run test` và chốt 0 warning mới phát sinh trong phạm vi thay đổi (warning legacy ngoài scope phải ghi rõ trong PR nếu còn).
+- [x] **DEBT-LINT-FE-W4** (`max-lines` split): hoàn tất pilot 1 → 19, bao gồm các pilot cuối: `ReceiptsTable.tsx`, `useProductActions.ts`, `ProductEditPanel.tsx`, `VariantContentView.tsx`. Kết quả lint frontend hiện tại: **0 warning**.
+- [x] **DEBT-LINT-FE-W5** (final gate): đã chạy `npm --prefix frontend run lint` + `npm --prefix frontend run test -- --run`; kết quả lint **0 warning**, test pass **3 files / 9 tests**.
 - [x] **DEBT-LINT-BE** 0 warning backend (`max-lines`) sau chuỗi pilot 1→16. ~~`userAccountMappingService.js` 407~~ đã split nốt. Danh sách hotspot đã xử lý: ~~`PaymentsController/index.js` 1077~~, ~~`ProductDescriptionsController/index.js` 866~~, ~~`dashboardSummaryAggregate.js` 636~~, ~~`mailOtpService.js` 659~~, ~~`supplier-change/service.js` 552~~, ~~`assignmentService.js` 545~~, ~~`orderUserTrackingService.js` 534~~, ~~`addUsersFlow.js` 529~~, ~~`accounts.js` 525~~, ~~`autoAssign.js` 522~~, ~~`userAddActions.js` 505~~, ~~`DashboardController/service.js` 483~~, ~~`usersListApi.js` 478~~, ~~`dailyRevenueSummaryBackfill.js` 461~~, ~~`StoreProfitExpensesController/index.js` 423~~, ~~`userAccountMappingService.js` 407~~.
 
 ### Audit hệ thống

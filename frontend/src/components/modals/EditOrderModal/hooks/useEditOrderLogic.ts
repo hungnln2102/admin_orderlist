@@ -14,8 +14,8 @@ import {
   ORDER_FIELDS,
   ORDER_STATUSES,
 } from "../../../../constants";
-import * as Helpers from "../../../../lib/helpers";
-import { apiFetch } from "@/lib/api";
+import * as Helpers from "../../../../shared/utils";
+import { apiFetch } from "@/shared/api/client";
 import { resolveOrderType } from "@/features/bill-order/helpers";
 import { usePriceCalculation } from "../../CreateOrderModal/hooks/usePriceCalculation";
 import type { CustomerType, Order as PricingOrder } from "../../CreateOrderModal/types";

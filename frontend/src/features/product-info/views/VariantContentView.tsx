@@ -16,12 +16,9 @@ import {
   saveProductDescription,
 } from "@/lib/productDescApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
-import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
-import { CreateDescVariantModal } from "../components/CreateDescVariantModal";
-import { DescVariantEditModal } from "../components/DescVariantEditModal";
-import { DescVariantViewModal } from "../components/DescVariantViewModal";
 import { useVariantContent } from "../hooks/useVariantContent";
 import { PAGE_SIZE, htmlToPlainText } from "../utils/productInfoHelpers";
+import VariantContentModals from "./variant-content-view/VariantContentModals";
 
 const preview = (html: string | undefined | null, max = 96) => {
   const plain = htmlToPlainText(html ?? "")
@@ -390,41 +387,23 @@ export const VariantContentView: React.FC<VariantContentViewProps> = ({
         </div>
       </div>
 
-      <CreateDescVariantModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+      <VariantContentModals
+        createOpen={createOpen}
+        editing={editing}
+        viewing={viewing}
+        saving={saving}
+        saveError={saveError}
+        deleteTarget={deleteTarget}
+        deleteSubmitting={deleteSubmitting}
+        onCloseCreate={() => setCreateOpen(false)}
         onCreated={handleCreated}
-      />
-
-      {viewing ? (
-        <DescVariantViewModal item={viewing} onClose={closeView} />
-      ) : null}
-
-      {editing && (
-        <DescVariantEditModal
-          item={editing}
-          saving={saving}
-          saveError={saveError}
-          onClose={closeEdit}
-          onSave={handleSave}
-        />
-      )}
-
-      <ConfirmModal
-        isOpen={deleteTarget != null}
-        onClose={() => {
+        onCloseView={closeView}
+        onCloseEdit={closeEdit}
+        onSave={handleSave}
+        onCloseDelete={() => {
           if (!deleteSubmitting) setDeleteTarget(null);
         }}
-        onConfirm={handleConfirmDelete}
-        title="Xóa nội dung desc_variant?"
-        message={
-          deleteTarget?.descVariantId != null
-            ? `Bản ghi id ${deleteTarget.descVariantId} sẽ bị xóa. Các biến thể đang trỏ tới bản ghi này sẽ được gỡ liên kết (id_desc → null).`
-            : ""
-        }
-        confirmLabel="Xóa"
-        cancelLabel="Hủy"
-        isSubmitting={deleteSubmitting}
+        onConfirmDelete={handleConfirmDelete}
       />
     </>
   );

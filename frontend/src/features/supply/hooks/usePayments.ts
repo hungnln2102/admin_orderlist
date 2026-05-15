@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { buildSepayQrUrl } from "../utils/supplies";
 import {
   ACCOUNT_NAME,

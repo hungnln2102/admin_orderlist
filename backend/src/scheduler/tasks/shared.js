@@ -1,4 +1,4 @@
-const { normalizeOrderRow } = require("../../controllers/Order/helpers");
+const { normalizeOrderRow } = require("../../domains/orders/controller/helpers");
 const { STATUS } = require("../../utils/statuses");
 const { COL, TABLES, normalizeDateSQL, intFromTextSQL, expiryDateSQL } = require("../sqlHelpers");
 

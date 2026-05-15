@@ -1,7 +1,7 @@
 import type React from "react";
 import { useMemo } from "react";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
-import * as Helpers from "../../../../lib/helpers";
+import * as Helpers from "../../../../shared/utils";
 import { getCreateOrderPricingCopy } from "../createOrderPricingCopy";
 import {
   inputClass,

@@ -19,9 +19,9 @@ import {
   type ProfitData,
   type RefundData,
   type TaxData,
-} from "@/features/dashboard/api/dashboardApi";
+} from "@/features/dashboard/api";
 import type { DashboardDateRangeValue } from "../components/DashboardDateRangeFilter";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { type OverviewStat } from "../components/OverviewStats";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";

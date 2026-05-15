@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch } from "../../../shared/api/client";
 import { useAuth } from "../../../AuthContext";
 
 interface UseLoginReturn {

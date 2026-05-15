@@ -12,7 +12,7 @@ import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type {
   DashboardChartGranularity,
   OrderStatusData,
-} from "@/features/dashboard/api/dashboardApi";
+} from "@/features/dashboard/api";
 
 type OrderChartCardProps = {
   data: OrderStatusData[];

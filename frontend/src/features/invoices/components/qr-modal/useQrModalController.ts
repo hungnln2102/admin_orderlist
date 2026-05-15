@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import * as Helpers from "@/lib/helpers";
-import { apiFetch } from "@/lib/api";
+import * as Helpers from "@/shared/utils";
+import { apiFetch } from "@/shared/api/client";
 import { QR_BANK_INFO } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
 import type { BatchItem, BatchSummary } from "./types";

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ModalShell } from "./ModalShell";
 import { PACKAGE_FIELD_OPTIONS, PackageField } from "../../utils/packageHelpers";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 
 export type ProductPackageOption = { id: number; package_name: string };
 

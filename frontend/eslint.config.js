@@ -30,6 +30,45 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/api",
+              message: "Use '@/shared/api/client' (or '@/shared/api') instead.",
+            },
+            {
+              name: "./lib/api",
+              message: "Use './shared/api/client' instead.",
+            },
+            {
+              name: "@/lib/helpers",
+              message: "Use '@/shared/utils' instead.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "../lib/api",
+                "../../lib/api",
+                "../../../lib/api",
+                "../../../../lib/api",
+              ],
+              message: "Use shared API client modules instead of lib/api.",
+            },
+            {
+              group: [
+                "../lib/helpers",
+                "../../lib/helpers",
+                "../../../lib/helpers",
+                "../../../../lib/helpers",
+              ],
+              message: "Use shared utility modules instead of lib/helpers.",
+            },
+          ],
+        },
+      ],
       // Cảnh báo file >400 dòng (không block, chỉ là tín hiệu nên tách module).
       // Xem .cursor/rules/split-into-components.mdc + task.md "Nợ kỹ thuật".
       "max-lines": [

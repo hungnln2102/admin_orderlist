@@ -1,6 +1,6 @@
 const express = require("express");
-const publicArticles = require("../../controllers/ContentController/handlers/publicArticles");
-const publicBanners = require("../../controllers/ContentController/handlers/publicBanners");
+const publicArticles = require("../content/controller/handlers/publicArticles");
+const publicBanners = require("../content/controller/handlers/publicBanners");
 
 const router = express.Router();
 

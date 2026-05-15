@@ -1,28 +1,25 @@
 import { useMemo, useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import type {
   CreateProductFormState,
   CreateSupplierEntry,
-  ProductEditFormState,
   ProductPricingRow,
 } from "../types";
-import { createSupplierEntry, formatVndInput, mapProductPriceRow } from "../utils";
+import { createSupplierEntry, formatVndInput } from "../utils";
 import {
   applySelectedSupplierToEntry,
-  buildProductEditForm,
   createEmptyCreateForm,
   parseJsonResponseText,
   updateCreateSupplierEntry,
   validateCreateProductForm,
-  validateProductEditForm,
   enableCustomSupplierEntry,
 } from "./productActionHelpers";
-import { convertAmountToVnd } from "../services/exchangeRateService";
 import { useDeleteProductActions } from "./useDeleteProductActions";
 import { useProductReferenceOptions } from "./useProductReferenceOptions";
 import { useProductStatusActions } from "./useProductStatusActions";
+import { useProductEditActions } from "./use-product-actions/useProductEditActions";
 
 interface UseProductActionsParams {
   productPrices: ProductPricingRow[];
@@ -47,21 +44,6 @@ export const useProductActions = ({
   updatedTimestampMap,
   setUpdatedTimestampMap,
 }: UseProductActionsParams) => {
-  const normalizeBasePriceInputByCurrency = (
-    rawValue: string,
-    currency: ProductEditFormState["basePriceCurrency"]
-  ): string => {
-    if (currency === "VND") return formatVndInput(rawValue);
-    return String(rawValue ?? "")
-      .replace(/[^\d.,]/g, "")
-      .replace(/,/g, ".");
-  };
-
-  const [editingProductId, setEditingProductId] = useState<number | null>(null);
-  const [productEditForm, setProductEditForm] =
-    useState<ProductEditFormState | null>(null);
-  const [productEditError, setProductEditError] = useState<string | null>(null);
-  const [isSavingProductEdit, setIsSavingProductEdit] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState<CreateProductFormState>(
     createEmptyCreateForm()
@@ -128,152 +110,11 @@ export const useProductActions = ({
     setUpdatedTimestampMap,
     setProductPrices,
   });
-
-  const handleStartProductEdit = (
-    event: React.MouseEvent<HTMLButtonElement>,
-    product: ProductPricingRow
-  ) => {
-    event.stopPropagation();
-    setIsSavingProductEdit(false);
-
-    if (editingProductId === product.id) {
-      setEditingProductId(null);
-      setProductEditForm(null);
-      setProductEditError(null);
-      return;
-    }
-
-    setProductEditError(null);
-    setEditingProductId(product.id);
-    setProductEditForm(buildProductEditForm(product));
-  };
-
-  const handleProductEditChange = (
-    field: keyof ProductEditFormState,
-    value: string
-  ) => {
-    setProductEditForm((prev) => {
-      if (!prev) return prev;
-
-      if (field === "basePrice") {
-        return {
-          ...prev,
-          basePrice: normalizeBasePriceInputByCurrency(
-            value,
-            prev.basePriceCurrency
-          ),
-        };
-      }
-
-      if (
-        field === "pctCtv" ||
-        field === "pctKhach" ||
-        field === "pctPromo" ||
-        field === "pctStu"
-      ) {
-        return {
-          ...prev,
-          [field]: formatVndInput(value),
-        };
-      }
-
-      if (field === "basePriceCurrency") {
-        const nextCurrency = (value ||
-          "VND") as ProductEditFormState["basePriceCurrency"];
-        return {
-          ...prev,
-          basePriceCurrency: nextCurrency,
-          basePrice: normalizeBasePriceInputByCurrency(prev.basePrice, nextCurrency),
-        };
-      }
-
-      return { ...prev, [field]: value };
-    });
-  };
-
-  const handleCancelProductEdit = () => {
-    setEditingProductId(null);
-    setProductEditForm(null);
-    setProductEditError(null);
-    setIsSavingProductEdit(false);
-  };
-
-  const handleSubmitProductEdit = async () => {
-    if (!productEditForm || editingProductId === null) return;
-
-    const validation = validateProductEditForm(productEditForm);
-    if (!validation.ok) {
-      setProductEditError(validation.error);
-      return;
-    }
-
-    setIsSavingProductEdit(true);
-    setProductEditError(null);
-
-    try {
-      let resolvedBasePrice = validation.nextBasePrice;
-      if (resolvedBasePrice && resolvedBasePrice > 0) {
-        const conversion = await convertAmountToVnd(
-          resolvedBasePrice,
-          productEditForm.basePriceCurrency
-        );
-        resolvedBasePrice = conversion.convertedAmount;
-      }
-
-      const response = await apiFetch(
-        API_ENDPOINTS.PRODUCT_PRICE_DETAIL(editingProductId),
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            packageName: validation.normalizedPackageName,
-            packageProduct: validation.normalizedPackageProduct,
-            sanPham: validation.normalizedSanPham,
-            basePrice: resolvedBasePrice,
-            pctCtv: validation.nextPctCtv,
-            pctKhach: validation.nextPctKhach,
-            pctPromo: validation.nextPctPromo,
-            pctStu: validation.nextPctStu,
-          }),
-        }
-      );
-      const rawBody = await response.text();
-      const payload = parseJsonResponseText(rawBody);
-
-      if (!response.ok) {
-        const errorMessage =
-          payload?.error ||
-          rawBody?.trim() ||
-          "Không thể cập nhật giá sản phẩm";
-        throw new Error(errorMessage);
-      }
-
-      const updatedRow = mapProductPriceRow(payload, editingProductId);
-      setProductPrices((prev) =>
-        prev.map((row) => (row.id === editingProductId ? updatedRow : row))
-      );
-
-      if (updatedRow?.id !== undefined) {
-        setUpdatedTimestampMap((prev) => ({
-          ...prev,
-          [updatedRow.id]: updatedRow.lastUpdated || new Date().toISOString(),
-        }));
-      }
-
-      await fetchProductPrices();
-      setEditingProductId(null);
-      setProductEditForm(null);
-    } catch (err) {
-      console.error("Lỗi khi cập nhật giá sản phẩm:", err);
-      setProductEditError(
-        err instanceof Error ? err.message : "Không thể cập nhật giá sản phẩm"
-      );
-    } finally {
-      setIsSavingProductEdit(false);
-    }
-  };
+  const editActions = useProductEditActions({
+    setProductPrices,
+    setUpdatedTimestampMap,
+    fetchProductPrices,
+  });
 
   const resetCreateState = () => {
     setCreateForm(createEmptyCreateForm());
@@ -425,10 +266,10 @@ export const useProductActions = ({
   };
 
   return {
-    editingProductId,
-    productEditForm,
-    productEditError,
-    isSavingProductEdit,
+    editingProductId: editActions.editingProductId,
+    productEditForm: editActions.productEditForm,
+    productEditError: editActions.productEditError,
+    isSavingProductEdit: editActions.isSavingProductEdit,
     isCreateModalOpen,
     createForm,
     createSuppliers,
@@ -443,10 +284,10 @@ export const useProductActions = ({
     bankOptions: referenceOptions.bankOptions,
     isLoadingBanks: referenceOptions.isLoadingBanks,
     deleteProductState: deleteActions.deleteProductState,
-    handleStartProductEdit,
-    handleProductEditChange,
-    handleCancelProductEdit,
-    handleSubmitProductEdit,
+    handleStartProductEdit: editActions.handleStartProductEdit,
+    handleProductEditChange: editActions.handleProductEditChange,
+    handleCancelProductEdit: editActions.handleCancelProductEdit,
+    handleSubmitProductEdit: editActions.handleSubmitProductEdit,
     handleRequestDeleteProduct: deleteActions.handleRequestDeleteProduct,
     confirmDeleteProduct: deleteActions.confirmDeleteProduct,
     closeDeleteProductModal: deleteActions.closeDeleteProductModal,

@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type { AdobeAdminAccount } from "../../types";
 import { normalizeIncomingLicenseStatus } from "../../utils/accountUtils";
 import type { CheckAllProgress } from "./types";

@@ -4,10 +4,10 @@ const crypto = require("crypto");
 const request = require("supertest");
 const { Pool } = require("pg");
 const webhookApp = require("../../webhook/sepay/app");
-const { reconcilePaymentReceipt } = require("../../src/controllers/PaymentsController");
+const { reconcilePaymentReceipt } = require("../../src/domains/payments/controller");
 const { STATUS } = require("../../src/utils/statuses");
 const { db } = require("../../src/db");
-const { updateDashboardMonthlySummaryOnStatusChange } = require("../../src/controllers/Order/finance/dashboardSummary");
+const { updateDashboardMonthlySummaryOnStatusChange } = require("../../src/domains/orders/controller/finance/dashboardSummary");
 const { runRenewal } = require("../../webhook/sepay/renewal");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });

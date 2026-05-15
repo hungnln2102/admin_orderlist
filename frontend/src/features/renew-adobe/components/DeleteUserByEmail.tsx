@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 
 export type DeleteUserByEmailProps = {
   /** Gọi lại sau khi xóa thành công (vd. refresh danh sách account) */

@@ -1,3 +1,3 @@
-const router = require("./index");
+const router = require("./");
 
 module.exports = router;

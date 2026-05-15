@@ -18,7 +18,7 @@ const webhookApp = require("../../webhook/sepay/app");
 const { STATUS } = require("../../src/utils/statuses");
 const {
   completeProcessingOrderWithManualWebhook,
-} = require("../../src/controllers/Order/manualWebhookCompletion");
+} = require("../../src/domains/orders/controller/manualWebhookCompletion");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 

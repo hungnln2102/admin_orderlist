@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { showAppNotification } from "@/lib/notifications";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import {
   MatchableOrder,
   PaymentReceipt,

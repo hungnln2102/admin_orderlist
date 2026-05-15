@@ -5,7 +5,7 @@
  * Xem `src/domains/README.md`, `docs/STRUCTURE-SINGLE-DIRECTION.md`.
  */
 const express = require("express");
-const { runSchedulerNow } = require("../controllers/SchedulerController");
+const { runSchedulerNow } = require("../domains/scheduler/controller");
 const { authGuard } = require("../middleware/authGuard");
 
 const authRoutes = require("../domains/auth/routes");

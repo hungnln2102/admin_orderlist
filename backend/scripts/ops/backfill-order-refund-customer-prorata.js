@@ -7,9 +7,9 @@
  */
 
 const { db } = require("../../src/db");
-const { TABLES, STATUS } = require("../../src/controllers/Order/constants");
-const { normalizeOrderRow } = require("../../src/controllers/Order/helpers");
-const { calcRemainingRefund } = require("../../src/controllers/Order/finance/refunds");
+const { TABLES, STATUS } = require("../../src/domains/orders/controller/constants");
+const { normalizeOrderRow } = require("../../src/domains/orders/controller/helpers");
+const { calcRemainingRefund } = require("../../src/domains/orders/controller/finance/refunds");
 const { todayYMDInVietnam } = require("../../src/utils/normalizers");
 const { isGiftOrder } = require("../../src/utils/orderHelpers");
 const { ORDERS_SCHEMA } = require("../../src/config/dbSchema");

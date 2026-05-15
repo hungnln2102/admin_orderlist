@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import {
   extractTransactionCodeFromNote,
   MatchableOrder,
@@ -8,6 +8,8 @@ import {
   formatCurrencyVnd,
   resolveSender,
 } from "../helpers";
+import ReceiptsExpandedDetailsRow from "./receipts-table/ReceiptsExpandedDetailsRow";
+import ReceiptsMatchConfirmModal from "./receipts-table/ReceiptsMatchConfirmModal";
 
 type ReceiptsTableProps = {
   receipts: PaymentReceipt[];
@@ -345,103 +347,25 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                       </span>
                     </td>
                   </tr>
-                  {isExpanded && (
-                    <tr className="animate-in fade-in slide-in-from-top-2 duration-300 relative z-0">
-                      <td colSpan={expandedColSpan} className="px-6 pb-8 pt-2">
-                        <div className="rounded-[32px] glass-panel-light p-6 shadow-2xl border border-indigo-500/20">
-                          <div className={expandedGridClass}>
-                            {showOrderCode ? (
-                              <div className="space-y-1">
-                                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Mã đơn hàng</p>
-                                <p className="text-sm font-black text-white">
-                                  {receipt.orderCode || "—"}
-                                </p>
-                              </div>
-                            ) : null}
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Người gửi</p>
-                              <p className="text-sm font-bold text-white">
-                                {resolveSender(receipt) || "—"}
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Người nhận</p>
-                              <p className="text-sm font-medium text-indigo-200/80">
-                                {QR_BANK_INFO.accountNumber}
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Mã giao dịch</p>
-                              <p className="text-sm font-bold text-indigo-100/90">
-                                {extractTransactionCodeFromNote(receipt.note) || "—"}
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">Ngày thanh toán</p>
-                              <p className="text-sm font-bold text-indigo-100/90">
-                                {receipt.paidAt
-                                  ? Helpers.formatDateToDMY(receipt.paidAt)
-                                  : "—"}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-6 pt-6 border-t border-white/5">
-                            <div className="space-y-2">
-                              <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] leading-none">
-                                Nội dung chuyển khoản
-                              </p>
-                              <div className="relative overflow-hidden rounded-2xl bg-slate-950/40 p-4 border border-white/5">
-                                <p className="text-[13px] font-medium text-indigo-50 leading-relaxed italic">
-                                  "{receipt.note || "Không có nội dung ghi chú đi kèm."}"
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  {isExpanded ? (
+                    <ReceiptsExpandedDetailsRow
+                      receipt={receipt}
+                      expandedColSpan={expandedColSpan}
+                      expandedGridClass={expandedGridClass}
+                      showOrderCode={showOrderCode}
+                    />
+                  ) : null}
                 </React.Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
-      {pendingConfirm ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-indigo-400/30 bg-slate-900/95 p-6 shadow-2xl">
-            <h3 className="text-lg font-black text-white tracking-tight">
-              Xác nhận gắn mã đơn
-            </h3>
-            <p className="mt-3 text-sm text-indigo-100/90 leading-relaxed">
-              Bạn có chắc muốn gắn mã đơn{" "}
-              <span className="font-black text-white">{pendingConfirm.orderCode}</span>{" "}
-              cho biên lai này không?
-            </p>
-            <p className="mt-2 text-xs text-indigo-200/70 leading-relaxed">
-              Khi xác nhận, hệ thống sẽ chạy luồng gán mã đơn (reconcile) và tự động
-              cộng/trừ doanh thu, lợi nhuận theo đúng quy tắc đối soát hiện hành.
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingConfirm(null)}
-                className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleConfirmMatch()}
-                className="rounded-xl border border-indigo-300/30 bg-indigo-600/70 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-500"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ReceiptsMatchConfirmModal
+        pendingConfirm={pendingConfirm}
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={() => void handleConfirmMatch()}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "@/constants";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { normalizeAdobeAdminAccount } from "../utils/accountUtils";
 
 export type MailBackupMailboxOption = {

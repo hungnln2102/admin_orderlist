@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "../../../../lib/api";
+import { apiFetch } from "../../../../shared/api/client";
 import { SupplyOverviewData } from "../types";
 
 type UseSupplyOverviewResult = {
@@ -25,7 +25,7 @@ export const useSupplyOverview = (
     setLoading(true);
     try {
       const res = await apiFetch(`/api/supplies/${supplyId}/overview`);
-      if (!res.ok) throw new Error("KhA'ng th ¯Ÿ t §œi thA'ng tin chi ti §¨t");
+      if (!res.ok) throw new Error("KhA'ng thï¿½ï¿½ï¿½ tï¿½ï¿½ï¿½i thA'ng tin chi tiï¿½ï¿½ï¿½t");
       const json = await res.json();
 
       const supply = json.supply || {};
@@ -37,7 +37,7 @@ export const useSupplyOverview = (
       setData({ supply, stats, unpaidPayments: unpaid });
       if (unpaid.length > 0) setSelectedPaymentId(unpaid[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "L ¯-i t §œi d ¯_ li ¯Øu");
+      setError(err instanceof Error ? err.message : "Lï¿½ï¿½-i tï¿½ï¿½ï¿½i dï¿½ï¿½_ liï¿½ï¿½ï¿½u");
     } finally {
       setLoading(false);
     }

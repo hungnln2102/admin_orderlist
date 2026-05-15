@@ -2,14 +2,14 @@ const express = require("express");
 const {
   getWebsiteStatus,
   activateWebsiteUser,
-} = require("../../controllers/RenewAdobeController");
+} = require("./controller");
 const {
   resolveSystemByEmail,
-} = require("../../controllers/RenewAdobeController/publicResolveSystem");
+} = require("./controller/publicResolveSystem");
 const {
   publicCheckFixAdes,
   publicRenewFixAdes,
-} = require("../../controllers/RenewAdobeController/publicFixAdes");
+} = require("./controller/publicFixAdes");
 const {
   requireRenewAdobePublicActivateKey,
 } = require("../../middleware/renewAdobePublicActivateKey");

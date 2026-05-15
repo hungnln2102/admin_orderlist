@@ -1,7 +1,7 @@
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import { PaymentReceipt, formatCurrencyVnd, resolveSender } from "../helpers";
 
 type ReceiptDetailModalProps = {

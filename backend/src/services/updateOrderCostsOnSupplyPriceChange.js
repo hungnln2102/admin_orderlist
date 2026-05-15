@@ -1,5 +1,5 @@
 const { db } = require("../db");
-const { TABLES, STATUS } = require("../controllers/Order/constants");
+const { TABLES, STATUS } = require("../domains/orders/controller/constants");
 const { toNullableNumber } = require("../utils/normalizers");
 const logger = require("../utils/logger");
 

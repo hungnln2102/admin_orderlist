@@ -3,9 +3,9 @@
  */
 
 const { db } = require("../db");
-const { TABLES } = require("../controllers/Order/constants");
+const { TABLES } = require("../domains/orders/controller/constants");
 const { PARTNER_SCHEMA } = require("../config/dbSchema");
-const { resolveSupplierNameColumn } = require("../controllers/SuppliesController/helpers");
+const { resolveSupplierNameColumn } = require("../domains/supplies/controller/helpers");
 
 const findSupplierIdByName = async (supplyName, trx = null) => {
   const query = trx || db;

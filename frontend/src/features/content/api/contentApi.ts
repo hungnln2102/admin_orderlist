@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type { Article, ArticleCategory, Banner, BannerPayload } from "../types";
 
 const json = (res: Response) => res.json();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch } from '@/shared/api/client';
 
 export interface SavingGoal {
   id: number;

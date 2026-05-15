@@ -3,7 +3,11 @@ const router = express.Router();
 const { db } = require("../../db");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../config/dbSchema");
 const logger = require("../../utils/logger");
-const { goalIdParam, createGoalRules, updatePriorityRules } = require("../../validators/savingGoalValidator");
+const {
+  goalIdParam,
+  createGoalRules,
+  updatePriorityRules,
+} = require("./validators/savingGoalValidator");
 
 const SAVING_GOALS_TABLE = tableName(FINANCE_SCHEMA.SAVING_GOALS.TABLE, SCHEMA_FINANCE);
 const COLS = FINANCE_SCHEMA.SAVING_GOALS.COLS;

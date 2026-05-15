@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type {
   ActiveKeyItem,
   CreateKeyFormValues,

@@ -4,7 +4,7 @@ import {
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import * as Helpers from "../../../../lib/helpers";
+import * as Helpers from "../../../../shared/utils";
 import { INITIAL_FORM_DATA } from "../helpers";
 import { CreateOrderPrefillContext, CreateOrderCreationKind, CustomerType, Order, Supply, SupplyPrice } from "../types";
 

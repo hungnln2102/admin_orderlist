@@ -1,6 +1,6 @@
 const {
   buildWebsiteStatusPayload,
-} = require("../../src/controllers/RenewAdobeController/statusUtils");
+} = require("../../src/domains/renew-adobe/controller/statusUtils");
 
 describe("renew-adobe website status payload", () => {
   const activeOrder = {

@@ -29,7 +29,7 @@ const {
   mergeRenewAdobeAlertConfig,
   resolveAccountUserLimit,
   userCountDbValue,
-} = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
+} = require("../../domains/renew-adobe/controller/usersSnapshotUtils");
 
 const ACCOUNT_TABLE_DEF = RENEW_ADOBE_SCHEMA.ACCOUNT;
 const ACCOUNT_TABLE = tableName(ACCOUNT_TABLE_DEF.TABLE, SCHEMA_RENEW_ADOBE);

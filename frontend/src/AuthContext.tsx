@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { apiFetch } from "./lib/api";
+import { apiFetch } from "./shared/api/client";
 
 type User = { id: number; username: string; role?: string };
 

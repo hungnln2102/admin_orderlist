@@ -13,8 +13,12 @@ const {
   createInput,
   createForm,
   updateForm,
-} = require("../../controllers/FormDescController");
-const { formIdParam, createFormRules, createInputRules } = require("../../validators/formDescValidator");
+} = require("./controller");
+const {
+  formIdParam,
+  createFormRules,
+  createInputRules,
+} = require("./validators/formDescValidator");
 
 const router = express.Router();
 

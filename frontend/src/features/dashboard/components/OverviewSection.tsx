@@ -9,7 +9,7 @@ import type {
   RefundData,
   TaxData,
   DashboardChartGranularity,
-} from "@/features/dashboard/api/dashboardApi";
+} from "@/features/dashboard/api";
 
 type OverviewSectionProps = {
   stats: OverviewStat[];

@@ -1,5 +1,5 @@
 import type { Order } from "@/constants";
-import { apiGet } from "@/lib/api";
+import { apiGet } from "@/shared/api/client";
 
 export const TAX_ORDER_START_DATE = "2026-04-22";
 const TAX_ORDER_PREFIXES = ["MAVC", "MAVL", "MAVK", "MAVS"];

@@ -1,6 +1,6 @@
 import React from "react";
 import { PowerIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import { Supply } from "../types";
 import PaymentHistoryTable from "./PaymentHistoryTable";
 

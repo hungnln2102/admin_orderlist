@@ -93,6 +93,11 @@ Frontend: http://localhost:5173
 
 ## 📁 Project Structure
 
+Kiến trúc chuẩn và quy ước tổ chức code được mô tả tại
+[`docs/STRUCTURE-SINGLE-DIRECTION.md`](docs/STRUCTURE-SINGLE-DIRECTION.md).
+Tài liệu này là nguồn tham chiếu chính cho cấu trúc `backend/src/domains/*`,
+`frontend/src/features/*` và các bước migrate theo phase.
+
 ```
 admin_orderlist/
 ├── backend/

@@ -10,7 +10,7 @@
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
 const { db } = require("../../src/db");
-const { TABLES, STATUS, COLS } = require("../../src/controllers/Order/constants");
+const { TABLES, STATUS, COLS } = require("../../src/domains/orders/controller/constants");
 const { isEligibleForRenewal, fetchOrderState } = require("../../webhook/sepay/renewal");
 const { ORDER_COLS, ORDER_TABLE } = require("../../webhook/sepay/config");
 const { STATUS: ORDER_STATUS } = require("../../src/utils/statuses");

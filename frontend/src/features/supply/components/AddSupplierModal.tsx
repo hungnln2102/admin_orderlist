@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type { BankOption } from "../types";
 import {
   supplyModalBackdropClass,

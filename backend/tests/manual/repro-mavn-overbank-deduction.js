@@ -10,14 +10,14 @@ const {
   SCHEMA_PRODUCT,
   tableName,
 } = require("../../src/config/dbSchema");
-const { STATUS, COLS } = require("../../src/controllers/Order/constants");
+const { STATUS, COLS } = require("../../src/domains/orders/controller/constants");
 const { nextId } = require("../../src/services/idService");
 const {
   syncMavnStoreProfitExpense,
-} = require("../../src/controllers/Order/finance/mavnStoreExpenseSync");
+} = require("../../src/domains/orders/controller/finance/mavnStoreExpenseSync");
 const {
   mergeSummaryUpdates,
-} = require("../../src/controllers/Order/finance/dashboardSummary");
+} = require("../../src/domains/orders/controller/finance/dashboardSummary");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;

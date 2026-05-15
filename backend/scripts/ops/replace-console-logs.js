@@ -14,7 +14,7 @@ const filesToProcess = process.argv.slice(2);
 
 if (filesToProcess.length === 0) {
   console.log("Usage: node scripts/replace-console-logs.js <file1> [file2] ...");
-  console.log("Example: node scripts/replace-console-logs.js src/controllers/Order/crudRoutes.js");
+  console.log("Example: node scripts/replace-console-logs.js src/domains/orders/controller/crudRoutes.js");
   process.exit(1);
 }
 

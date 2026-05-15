@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type React from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { showAppNotification } from "@/lib/notifications";
 import type { AugmentedRow, PackageRow, PackageTemplate } from "../utils/packageHelpers";
 

@@ -5,7 +5,7 @@ import {
   ArrowUturnLeftIcon,
 } from "@heroicons/react/24/outline";
 import StatCard, { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 
 interface Props {
   orderCount: number;

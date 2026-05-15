@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import type { StorefrontRenewStatusPayload } from "../types/storefrontRenew.types";
 
 type ApiErrorShape = {

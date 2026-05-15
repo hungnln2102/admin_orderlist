@@ -11,12 +11,12 @@
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
 const { db } = require("../../src/db");
-const { TABLES, STATUS, COLS } = require("../../src/controllers/Order/constants");
+const { TABLES, STATUS, COLS } = require("../../src/domains/orders/controller/constants");
 const { PARTNER_SCHEMA, SCHEMA_PARTNER, tableName } = require("../../src/config/dbSchema");
 const { createOrder } = require("../../src/services/orderService");
-const { updateOrderWithFinance } = require("../../src/controllers/Order/orderUpdateService");
-const { deleteOrderWithArchive } = require("../../src/controllers/Order/orderDeletionService");
-const { normalizeOrderRow, sanitizeOrderWritePayload } = require("../../src/controllers/Order/helpers");
+const { updateOrderWithFinance } = require("../../src/domains/orders/controller/orderUpdateService");
+const { deleteOrderWithArchive } = require("../../src/domains/orders/controller/orderDeletionService");
+const { normalizeOrderRow, sanitizeOrderWritePayload } = require("../../src/domains/orders/controller/helpers");
 const { todayYMDInVietnam } = require("../../src/utils/normalizers");
 const { nextId } = require("../../src/services/idService");
 const { runRenewal } = require("../../webhook/sepay/renewal");
@@ -61,7 +61,7 @@ const getSupplierDebt = async (supplyId) => {
 };
 
 const findSupplierId = async (supplyName) => {
-  const { resolveSupplierNameColumn } = require("../../src/controllers/SuppliesController/helpers");
+  const { resolveSupplierNameColumn } = require("../../src/domains/supplies/controller/helpers");
   const supplierNameCol = await resolveSupplierNameColumn();
   const row = await db(TABLES.supplier)
     .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
@@ -71,7 +71,7 @@ const findSupplierId = async (supplyName) => {
 };
 
 const createTestSupplier = async (name) => {
-  const { resolveSupplierNameColumn } = require("../../src/controllers/SuppliesController/helpers");
+  const { resolveSupplierNameColumn } = require("../../src/domains/supplies/controller/helpers");
   const supplierNameCol = await resolveSupplierNameColumn();
   const existing = await db(TABLES.supplier)
     .where(supplierNameCol, name)

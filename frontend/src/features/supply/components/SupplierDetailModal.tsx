@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";

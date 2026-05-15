@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../constants";
-import * as Helpers from "../../../lib/helpers";
+import * as Helpers from "../../../shared/utils";
 import { useEditOrderLogic } from "./hooks/useEditOrderLogic";
 import { EditOrderModalProps, Order } from "./types";
 import { getSupplyName, normalizeDateLike } from "./utils";

@@ -24,9 +24,9 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
 const { db } = require("../../src/db");
-const { TABLE, COLS } = require("../../src/controllers/RenewAdobeController/accountTable");
+const { TABLE, COLS } = require("../../src/domains/renew-adobe/controller/accountTable");
 const { runCheckFlow } = require("../../src/services/renew-adobe/adobe-renew-v2/runCheckFlow");
-const { resolveAccountSeatLimit } = require("../../src/controllers/RenewAdobeController/usersSnapshotUtils");
+const { resolveAccountSeatLimit } = require("../../src/domains/renew-adobe/controller/usersSnapshotUtils");
 const {
   inferAdobeProProductIdSet,
   checkUserAssignedProduct,

@@ -25,7 +25,7 @@ const {
   computeCcpProductIdsToPersist,
   parseCcpProductIdsFromAlertConfig,
 } = require("./shared/accessChecks");
-const { mergeRenewAdobeAlertConfig } = require("../../../controllers/RenewAdobeController/usersSnapshotUtils");
+const { mergeRenewAdobeAlertConfig } = require("../../../domains/renew-adobe/controller/usersSnapshotUtils");
 
 /**
  * Chuẩn hóa savedCookiesFromDb từ DB.

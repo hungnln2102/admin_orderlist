@@ -4,14 +4,14 @@
  */
 
 const { db } = require("../db");
-const { TABLES, STATUS, COLS } = require("../controllers/Order/constants");
+const { TABLES, STATUS, COLS } = require("../domains/orders/controller/constants");
 const { ORDERS_SCHEMA } = require("../config/dbSchema");
 const {
   normalizeOrderRow,
   sanitizeOrderWritePayload,
   ensureSupplyRecord,
   normalizeTextInput,
-} = require("../controllers/Order/helpers");
+} = require("../domains/orders/controller/helpers");
 const { nextId } = require("./idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
 const { todayYMDInVietnam } = require("../utils/normalizers");

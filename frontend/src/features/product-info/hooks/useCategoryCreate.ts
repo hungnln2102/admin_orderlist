@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { generateUniqueCategoryGradient } from "../utils/categoryColors";
 

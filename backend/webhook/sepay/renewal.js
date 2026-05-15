@@ -16,7 +16,7 @@ const {
   SUPPLIER_COLS,
 } = require("./config");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../src/config/dbSchema");
-const { STATUS: ORDER_STATUS } = require("../../src/controllers/Order/constants");
+const { STATUS: ORDER_STATUS } = require("../../src/domains/orders/controller/constants");
 const {
   parseFlexibleDate,
   normalizeProductDuration,
@@ -37,10 +37,10 @@ const {
 const logger = require("../../src/utils/logger");
 const {
   storeProfitExpensesHasMavnColumns,
-} = require("../../src/controllers/Order/finance/storeProfitExpensesHasMavnColumns");
+} = require("../../src/domains/orders/controller/finance/storeProfitExpensesHasMavnColumns");
 const {
   WEBHOOK_RECEIPT_PRE_ORDER_DATE_GRACE_DAYS,
-} = require("../../src/controllers/Order/queries/webhookReceiptOrderDateWindow");
+} = require("../../src/domains/orders/controller/queries/webhookReceiptOrderDateWindow");
 
 const { calculateRenewalPricing, computeOrderCurrentPrice } = require("./renewalPricing");
 const {
@@ -55,7 +55,7 @@ const {
   runRenewalBatch,
 } = require("./renewalQueue");
 
-const { recomputeSummaryMonthTotalTax } = require("../../src/controllers/Order/finance/dashboardSummary");
+const { recomputeSummaryMonthTotalTax } = require("../../src/domains/orders/controller/finance/dashboardSummary");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const storeExpenseTable = tableName(
@@ -579,7 +579,7 @@ const runRenewal = async (
     if (isMavn && renewalNextStatus === ORDER_STATUS.PAID) {
       const {
         syncMavnFinanceAfterRenewalOrderPaid,
-      } = require("../../src/controllers/Order/finance/mavnRenewalPaidSync");
+      } = require("../../src/domains/orders/controller/finance/mavnRenewalPaidSync");
       await syncMavnFinanceAfterRenewalOrderPaid({
         orderCode,
         beforeRenewalRow: {

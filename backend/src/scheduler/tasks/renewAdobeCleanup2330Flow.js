@@ -6,8 +6,8 @@ const {
   tableName,
 } = require("../../config/dbSchema");
 const adobeRenewV2 = require("../../services/renew-adobe/adobe-renew-v2");
-const { runCheckForAccountId } = require("../../controllers/RenewAdobeController");
-const { runCheckAllAccountsFlow } = require("../../controllers/RenewAdobeController/autoAssign");
+const { runCheckForAccountId } = require("../../domains/renew-adobe/controller");
+const { runCheckAllAccountsFlow } = require("../../domains/renew-adobe/controller/autoAssign");
 const { notifyWarn } = require("../../utils/telegramErrorNotifier");
 const {
   startJobRun,
@@ -19,7 +19,7 @@ const {
   resolveLisenceCount,
   mergeRenewAdobeAlertConfig,
   userCountDbValue,
-} = require("../../controllers/RenewAdobeController/usersSnapshotUtils");
+} = require("../../domains/renew-adobe/controller/usersSnapshotUtils");
 const { getMapAccountIdToUserEmailsFor2330Cleanup } = require("../../services/renew-adobe/orderUserTrackingService");
 
 const ACCOUNT_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);

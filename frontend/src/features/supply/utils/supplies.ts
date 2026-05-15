@@ -1,4 +1,4 @@
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 
 export const normalizeText = (text: string) => text.trim().toLowerCase();
 

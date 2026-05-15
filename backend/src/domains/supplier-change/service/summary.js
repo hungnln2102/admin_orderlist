@@ -1,7 +1,7 @@
 const logger = require("../../../utils/logger");
 const {
   mergeSummaryUpdates,
-} = require("../../../controllers/Order/finance/dashboardSummary");
+} = require("../../orders/controller/finance/dashboardSummary");
 const {
   notifyFinanceMonthlyDelta,
 } = require("../../../services/telegramFinanceDeltaNotifier");

@@ -1,5 +1,5 @@
 import type React from "react";
-import * as Helpers from "../../../../lib/helpers";
+import * as Helpers from "../../../../shared/utils";
 import { ORDER_FIELDS } from "../../../../constants";
 import type { OrderView } from "../types";
 

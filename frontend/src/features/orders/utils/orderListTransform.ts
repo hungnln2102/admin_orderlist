@@ -5,7 +5,7 @@ import {
   Order,
   OrderDatasetKey,
 } from "@/constants";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import {
   isGiftOrderCode,
   normalizeOrderCode,

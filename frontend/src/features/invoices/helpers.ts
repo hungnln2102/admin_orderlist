@@ -1,5 +1,5 @@
 import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
-import * as Helpers from "@/lib/helpers";
+import * as Helpers from "@/shared/utils";
 import {
   ACCOUNT_NAME,
   ACCOUNT_NO,

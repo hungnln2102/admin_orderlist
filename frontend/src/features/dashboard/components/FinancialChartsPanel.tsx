@@ -15,8 +15,8 @@ import type {
   RefundData,
   RevenueData,
   TaxData,
-} from "@/features/dashboard/api/dashboardApi";
-import * as Helpers from "@/lib/helpers";
+} from "@/features/dashboard/api";
+import * as Helpers from "@/shared/utils";
 
 type FinancialChartsPanelProps = {
   revenueData: RevenueData[];

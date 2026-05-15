@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "@/shared/api/client";
 import { useAuth } from "../../../AuthContext";
 import SidebarAccount from "./SidebarAccount";
 import ChangePasswordModal from "./ChangePasswordModal";

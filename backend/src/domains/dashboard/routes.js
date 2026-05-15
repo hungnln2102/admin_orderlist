@@ -4,8 +4,8 @@ const {
   dashboardYears,
   dashboardCharts,
   dashboardMonthlySummary,
-} = require("../../controllers/DashboardController");
-const { dateRangeRules } = require("../../validators/dashboardValidator");
+} = require("./controller");
+const { dateRangeRules } = require("./validators/dashboardValidator");
 
 const router = express.Router();
 

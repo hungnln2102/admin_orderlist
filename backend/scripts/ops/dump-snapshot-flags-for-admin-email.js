@@ -15,7 +15,7 @@ const {
   RENEW_ADOBE_SCHEMA,
   tableName,
 } = require("../../src/config/dbSchema");
-const { TABLE, COLS } = require("../../src/controllers/RenewAdobeController/accountTable");
+const { TABLE, COLS } = require("../../src/domains/renew-adobe/controller/accountTable");
 const { applyAdobeProFlags } = require("../../src/services/renew-adobe/adobe-renew-v2/shared/usersListApi");
 const {
   inferAdobeProProductIdSet,

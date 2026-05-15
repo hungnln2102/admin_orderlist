@@ -8,8 +8,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { RevenueData } from "@/features/dashboard/api/dashboardApi";
-import * as Helpers from "@/lib/helpers";
+import type { RevenueData } from "@/features/dashboard/api";
+import * as Helpers from "@/shared/utils";
 
 type RevenueChartCardProps = {
   data: RevenueData[];

@@ -11,10 +11,10 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 
-const { runCheckForAccountId } = require("../../src/controllers/RenewAdobeController/checkAccounts");
+const { runCheckForAccountId } = require("../../src/domains/renew-adobe/controller/checkAccounts");
 const {
   runCheckAllAccountsFlow,
-} = require("../../src/controllers/RenewAdobeController/autoAssign");
+} = require("../../src/domains/renew-adobe/controller/autoAssign");
 const { db } = require("../../src/db");
 
 async function main() {
