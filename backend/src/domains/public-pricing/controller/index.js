@@ -91,6 +91,7 @@ function postCalculate(req, res, next) {
 async function getSellerPricingTable(_req, res, next) {
   try {
     const vid = quoteIdent(variantCols.id);
+    const vDisplayName = quoteIdent(variantCols.displayName || "display_name");
     const vVariantName = quoteIdent(variantCols.variantName || "variant_name");
     const vIsActive = quoteIdent(variantCols.isActive);
     const marginJoin = TABLES.variantMargin;
@@ -99,6 +100,7 @@ async function getSellerPricingTable(_req, res, next) {
     const query = `
       SELECT
         COALESCE(NULLIF(TRIM(v.${vVariantName}::text), ''), v.${vid}::text) AS variant_name,
+        COALESCE(NULLIF(TRIM(v.${vDisplayName}::text), ''), '') AS display_name,
         MAX(CASE WHEN pt.key = 'ctv' THEN vm.price END) AS gia_si_raw,
         MAX(CASE WHEN pt.key = 'customer' THEN vm.price END) AS gia_le_raw
       FROM ${TABLES.variant} v
@@ -107,7 +109,7 @@ async function getSellerPricingTable(_req, res, next) {
       LEFT JOIN ${tierJoin} pt
         ON pt.id = vm.tier_id
       WHERE COALESCE(v.${vIsActive}, TRUE) = TRUE
-      GROUP BY v.${vid}, v.${vVariantName}
+      GROUP BY v.${vid}, v.${vVariantName}, v.${vDisplayName}
       ORDER BY variant_name ASC
     `;
 
@@ -119,6 +121,7 @@ async function getSellerPricingTable(_req, res, next) {
       const giaSi = toNum(row.gia_si_raw) || giaLe;
       return {
         variant_name: String(row.variant_name || "").trim() || "-",
+        display_name: String(row.display_name || "").trim(),
         gia_si: giaSi,
         gia_le: giaLe,
       };
