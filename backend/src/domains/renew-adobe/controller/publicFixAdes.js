@@ -114,7 +114,7 @@ function normalizeCheckResultForRenewFlow(result) {
  * - `id_product`← `productName` (fallback `groupName`)
  * - `status`    ← map từ Ades status
  */
-async function syncTrackingFromAdesCheckData(email, adesData) {
+async function syncTrackingFromAdesCheckData(email, adesData, trackingRow) {
   const teamName =
     typeof adesData?.teamName === "string" ? adesData.teamName.trim() : "";
   const productName =
@@ -126,12 +126,7 @@ async function syncTrackingFromAdesCheckData(email, adesData) {
   const trackingStatus = mapAdesStatusToTracking(adesData?.status);
 
   try {
-    await db(TRACK_TABLE)
-      .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [
-        TRACK_COLS.ACCOUNT,
-        email,
-      ])
-      .where(TRACK_COLS.SYSTEM_NOTE, FIX_ADES_CODE)
+    await applyFixAdesTrackingFilter(db(TRACK_TABLE), email, trackingRow)
       .update({
         ...(teamName ? { [TRACK_COLS.ORG_NAME]: teamName } : {}),
         ...(productName ? { [TRACK_COLS.ID_PRODUCT]: productName } : {}),
@@ -144,6 +139,17 @@ async function syncTrackingFromAdesCheckData(email, adesData) {
       error: err?.message,
     });
   }
+}
+
+function applyFixAdesTrackingFilter(query, email, trackingRow) {
+  const scopedQuery = query
+    .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [TRACK_COLS.ACCOUNT, email])
+    .where(TRACK_COLS.SYSTEM_NOTE, FIX_ADES_CODE);
+  const orderId = trackingRow?.[TRACK_COLS.ORDER_ID];
+  if (orderId != null && String(orderId).trim() !== "") {
+    scopedQuery.andWhere(TRACK_COLS.ORDER_ID, orderId);
+  }
+  return scopedQuery;
 }
 
 function normalizeEmail(value) {
@@ -187,7 +193,7 @@ const publicCheckFixAdes = async (req, res) => {
     const rawResult = await checkAdesAccount(email);
     const result = normalizeCheckResultForRenewFlow(rawResult);
     if (result.data && typeof result.data === "object") {
-      await syncTrackingFromAdesCheckData(email, result.data);
+      await syncTrackingFromAdesCheckData(email, result.data, eligible);
     }
     return res.status(result.ok ? 200 : 502).json({
       ok: result.ok,
@@ -207,18 +213,13 @@ const publicCheckFixAdes = async (req, res) => {
   }
 };
 
-async function syncTrackingFromAdesRenewData(email, adesData) {
+async function syncTrackingFromAdesRenewData(email, adesData, trackingRow) {
   if (!adesData || adesData.success !== true) return;
   const user = adesData.user || {};
   const products = Array.isArray(user.products) ? user.products : [];
   const productName = products.length > 0 ? String(products[0]).trim() : "";
   try {
-    await db(TRACK_TABLE)
-      .whereRaw(`LOWER(TRIM(COALESCE(??, ''))) = ?`, [
-        TRACK_COLS.ACCOUNT,
-        email,
-      ])
-      .where(TRACK_COLS.SYSTEM_NOTE, FIX_ADES_CODE)
+    await applyFixAdesTrackingFilter(db(TRACK_TABLE), email, trackingRow)
       .update({
         ...(productName ? { [TRACK_COLS.ID_PRODUCT]: productName } : {}),
         [TRACK_COLS.STATUS]: "có gói",
@@ -239,7 +240,7 @@ const publicRenewFixAdes = async (req, res) => {
   try {
     const result = await renewAdesAccount(email);
     if (result.ok && result.data && typeof result.data === "object") {
-      await syncTrackingFromAdesRenewData(email, result.data);
+      await syncTrackingFromAdesRenewData(email, result.data, eligible);
     }
     return res.status(result.ok ? 200 : 502).json({
       ok: result.ok,
@@ -266,5 +267,6 @@ module.exports = {
     mapAdesStatusToTracking,
     isLikelyNotActivePayload,
     normalizeCheckResultForRenewFlow,
+    applyFixAdesTrackingFilter,
   },
 };

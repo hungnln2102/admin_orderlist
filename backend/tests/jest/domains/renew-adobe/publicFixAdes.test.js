@@ -23,4 +23,36 @@ describe("publicFixAdes status normalization", () => {
     expect(normalized.ok).toBe(true);
     expect(normalized.data.status).toBe("not active");
   });
+
+  it("adds order_id scope when tracking row has order", () => {
+    const calls = [];
+    const query = {
+      whereRaw(...args) {
+        calls.push(["whereRaw", ...args]);
+        return this;
+      },
+      where(...args) {
+        calls.push(["where", ...args]);
+        return this;
+      },
+      andWhere(...args) {
+        calls.push(["andWhere", ...args]);
+        return this;
+      },
+    };
+
+    __test__.applyFixAdesTrackingFilter(query, "mail@example.com", {
+      order_id: "ORD-123",
+    });
+
+    expect(calls).toEqual([
+      [
+        "whereRaw",
+        "LOWER(TRIM(COALESCE(??, ''))) = ?",
+        ["account", "mail@example.com"],
+      ],
+      ["where", "system_note", "fix_ades"],
+      ["andWhere", "order_id", "ORD-123"],
+    ]);
+  });
 });
