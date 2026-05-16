@@ -80,7 +80,8 @@ function isAuthCsrfExempt(req) {
  * Skips verification for:
  * - GET, HEAD, OPTIONS methods
  * - Explicit auth exceptions only (`POST /auth/login`)
- * - /api/payment/* endpoints (have signature verification)
+ * - Legacy `/api/payment/*` webhook compatibility path (signature-verified, tách process)
+ *   Lưu ý: payment domain chính (`/payment-receipts*`, `/payment-supply/*`) vẫn nằm sau auth + CSRF.
  * - When DISABLE_CSRF is set to "true" (dev only)
  */
 const verifyToken = (req, res, next) => {
@@ -94,7 +95,8 @@ const verifyToken = (req, res, next) => {
     return next();
   }
 
-  // Skip CSRF for webhook endpoints (they have signature verification)
+  // Legacy compatibility: webhook path cũ `/api/payment/*` có signature verification riêng.
+  // Payment APIs trong domain hiện tại không đi qua nhánh bypass này.
   if (req.path.startsWith("/api/payment/")) {
     return next();
   }

@@ -63,6 +63,11 @@ export function buildEmailOrderMap(
 /** Trạng thái hiển thị từ order_user_tracking + admin (API user-orders đã join). */
 function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
   const ts = (order.tracking_status || "").trim().toLowerCase();
+  const isFixAdes = order.system_note === "fix_ades";
+  if (isFixAdes) {
+    // Fix ADES: chỉ "có gói" mới là còn gói; mọi case khác là không có gói.
+    return ts.includes("có gói") ? "active" : "expired";
+  }
   // "hết gói" / "hết hạn" — set bởi luồng Fix Ades khi check trả error/expired.
   // Bypass require accountId vì Ades không gắn admin Adobe.
   if (ts.includes("hết gói") || ts.includes("hết hạn") || ts === "expired") {

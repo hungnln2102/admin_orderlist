@@ -6,10 +6,9 @@ const authGuard = (req, res, next) => {
     return next();
   }
 
-  // CHO PHÉP: Đường dẫn thanh toán (Webhook) - Webhook có signature verification riêng
-  // LƯU Ý: Webhook chạy trên server riêng (port 5000) với signature verification,
-  // nhưng để đảm bảo tương thích, vẫn bypass auth cho /api/payment/* trong main API
-  // Webhook endpoints nên được bảo vệ bằng signature verification, không phải session auth
+  // CHO PHÉP: Legacy webhook path `/api/payment/*` (tương thích ngược).
+  // Kiến trúc hiện tại: webhook Sepay chạy process/server riêng + signature verification,
+  // còn payment domain chính mount tại `/payment-receipts*` và vẫn bắt buộc session auth.
   if (req.path.startsWith("/api/payment/")) {
     return next();
   }

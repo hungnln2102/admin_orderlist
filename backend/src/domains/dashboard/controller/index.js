@@ -5,8 +5,8 @@ const {
   fetchDashboardMonthlySummary,
   fetchDashboardChartsFromSummary,
   fetchDashboardChartsForDateRange,
-} = require("../../../controllers/DashboardController/service");
-const { timezoneCandidate } = require("../../../controllers/DashboardController/constants");
+} = require("../use-cases/dashboardMetricsUseCases");
+const { timezoneCandidate } = require("../constants");
 const logger = require("../../../utils/logger");
 
 const MAX_DASHBOARD_RANGE_DAYS = 732;

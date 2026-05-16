@@ -41,16 +41,71 @@ const ADES_DEAD_STATUSES = new Set([
   "error",
   "expired",
   "inactive",
+  "not active",
+  "not_active",
+  "not-active",
+  "pending",
   "hết hạn",
   "hết gói",
 ]);
+const ADES_NOT_ACTIVE_HINTS = [
+  "inactive",
+  "not active",
+  "not_active",
+  "not-active",
+  "chua active",
+  "chưa active",
+  "chua kich hoat",
+  "chưa kích hoạt",
+];
 
 /** Map status từ Ades sang chuỗi `tracking_status` chuẩn (UI hiện đang khớp). */
 function mapAdesStatusToTracking(status) {
   const s = String(status || "").trim().toLowerCase();
+  // Quy ước fix ADES: chỉ các status active dưới đây mới là "có gói".
+  // Mọi case còn lại đều coi là "không có gói" để đi luồng Renew.
   if (ADES_ACTIVE_STATUSES.has(s)) return "có gói";
   if (ADES_DEAD_STATUSES.has(s)) return "hết gói";
-  return "chưa cấp quyền";
+  return "hết gói";
+}
+
+function isLikelyNotActivePayload(data) {
+  if (!data || typeof data !== "object") return false;
+  const candidates = [
+    data.status,
+    data.accountStatus,
+    data.state,
+    data.message,
+    data.error,
+    data.reason,
+    data?.user?.status,
+  ];
+  return candidates.some((item) => {
+    const text = String(item || "").trim().toLowerCase();
+    return ADES_NOT_ACTIVE_HINTS.some((hint) => text.includes(hint));
+  });
+}
+
+function normalizeCheckResultForRenewFlow(result) {
+  const shouldTreatAsNoPackage =
+    !result?.ok && isLikelyNotActivePayload(result?.data);
+  if (!shouldTreatAsNoPackage) {
+    return result;
+  }
+  const normalizedData =
+    result?.data && typeof result.data === "object"
+      ? {
+          ...result.data,
+          status: String(result.data.status || "inactive")
+            .trim()
+            .toLowerCase(),
+        }
+      : { status: "inactive", message: "Tài khoản chưa active." };
+  return {
+    ok: true,
+    status: result?.status || 200,
+    data: normalizedData,
+  };
 }
 
 /**
@@ -129,8 +184,9 @@ const publicCheckFixAdes = async (req, res) => {
   const eligible = await ensureFixAdesEligible(email, res);
   if (!eligible) return;
   try {
-    const result = await checkAdesAccount(email);
-    if (result.ok && result.data && typeof result.data === "object") {
+    const rawResult = await checkAdesAccount(email);
+    const result = normalizeCheckResultForRenewFlow(rawResult);
+    if (result.data && typeof result.data === "object") {
       await syncTrackingFromAdesCheckData(email, result.data);
     }
     return res.status(result.ok ? 200 : 502).json({
@@ -206,4 +262,9 @@ const publicRenewFixAdes = async (req, res) => {
 module.exports = {
   publicCheckFixAdes,
   publicRenewFixAdes,
+  __test__: {
+    mapAdesStatusToTracking,
+    isLikelyNotActivePayload,
+    normalizeCheckResultForRenewFlow,
+  },
 };

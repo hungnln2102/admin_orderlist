@@ -1,112 +1,115 @@
-const express = require("express");
-const request = require("supertest");
-
 describe("saving-goals priority/order sensitive flows", () => {
-  const buildHarness = () => {
+  const buildUseCases = () => {
     jest.resetModules();
 
-    const maxFirstSpy = jest.fn().mockResolvedValue({ maxPriority: 3 });
-    const insertReturningSpy = jest.fn().mockResolvedValue([
-      {
+    const fakeTrx = { id: "trx" };
+    const withTransaction = jest.fn(async (handler) => handler(fakeTrx));
+    const repository = {
+      lockPriorityRows: jest.fn().mockResolvedValue(undefined),
+      getMaxPriority: jest.fn().mockResolvedValue(3),
+      insertGoal: jest.fn().mockResolvedValue({
         id: 41,
         goal_name: "Mua laptop",
         target_amount: 25000000,
         priority: 4,
         created_at: "2026-05-15T00:00:00.000Z",
-      },
-    ]);
-    const updateSpy = jest.fn();
-    const updateReturningSpy = jest.fn().mockResolvedValue([
-      {
+      }),
+      updateGoalById: jest.fn().mockResolvedValue({
+        id: 41,
+        goal_name: "Mua laptop",
+        target_amount: 25000000,
+        created_at: "2026-05-15T00:00:00.000Z",
+      }),
+      findGoalByIdForUpdate: jest.fn().mockResolvedValue({
+        id: 41,
+        goal_name: "Mua laptop",
+        target_amount: 25000000,
+        priority: 3,
+        created_at: "2026-05-15T00:00:00.000Z",
+      }),
+      deleteGoalById: jest.fn().mockResolvedValue(1),
+      decrementPrioritiesAbove: jest.fn().mockResolvedValue(2),
+      countGoals: jest.fn().mockResolvedValue(6),
+      shiftPrioritiesForReorder: jest.fn().mockResolvedValue(undefined),
+      updateGoalPriority: jest.fn().mockResolvedValue({
         id: 41,
         goal_name: "Mua laptop",
         target_amount: 25000000,
         priority: 2,
         created_at: "2026-05-15T00:00:00.000Z",
-      },
-    ]);
-
-    const dbMock = jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      max: jest.fn().mockReturnThis(),
-      first: maxFirstSpy,
-      insert: jest.fn(() => ({
-        returning: insertReturningSpy,
-      })),
-      where: jest.fn().mockReturnThis(),
-      update: jest.fn((payload) => {
-        updateSpy(payload);
-        return {
-          returning: updateReturningSpy,
-        };
       }),
-      returning: jest.fn(),
-      decrement: jest.fn().mockResolvedValue(1),
-      delete: jest.fn().mockResolvedValue(1),
-    }));
+      toGoalResponse: jest.fn((goal) => goal),
+      listGoals: jest.fn().mockResolvedValue([]),
+    };
 
     jest.doMock("../../../../src/db", () => ({
-      db: dbMock,
-      withTransaction: jest.fn(),
+      db: {},
+      withTransaction,
     }));
-    jest.doMock("../../../../src/utils/logger", () => ({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    }));
+    jest.doMock(
+      "../../../../src/domains/saving-goals/repositories/savingGoalsRepository",
+      () => repository
+    );
 
-    const router = require("../../../../src/domains/saving-goals/routes");
-    const app = express();
-    app.use(express.json());
-    app.use("/", router);
-
-    return {
-      app,
-      insertReturningSpy,
-      updateSpy,
-    };
+    const useCases = require("../../../../src/domains/saving-goals/use-cases/savingGoalsUseCases");
+    return { useCases, withTransaction, repository, fakeTrx };
   };
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("assigns next priority on create (happy path ordering)", async () => {
-    const { app, insertReturningSpy } = buildHarness();
+  it("assigns next priority inside transaction with row-level lock", async () => {
+    const { useCases, withTransaction, repository, fakeTrx } = buildUseCases();
 
-    const response = await request(app).post("/").send({
+    const created = await useCases.createSavingGoal({
       goal_name: "Mua laptop",
       target_amount: 25000000,
     });
 
-    expect(response.statusCode).toBe(201);
-    expect(response.body).toEqual(
+    expect(withTransaction).toHaveBeenCalledTimes(1);
+    expect(repository.lockPriorityRows).toHaveBeenCalledWith(fakeTrx);
+    expect(repository.getMaxPriority).toHaveBeenCalledWith(fakeTrx);
+    expect(repository.insertGoal).toHaveBeenCalledWith(
+      fakeTrx,
       expect.objectContaining({
-        id: 41,
         goal_name: "Mua laptop",
         priority: 4,
       })
     );
-    expect(insertReturningSpy).toHaveBeenCalled();
+    expect(created.priority).toBe(4);
   });
 
-  it("keeps idempotent outcome when concurrent same-priority updates happen", async () => {
-    const { app, updateSpy } = buildHarness();
+  it("deletes goal and compacts following priorities atomically", async () => {
+    const { useCases, repository, fakeTrx } = buildUseCases();
+
+    const deleted = await useCases.deleteSavingGoal({ goalId: 41 });
+
+    expect(deleted).toBe(true);
+    expect(repository.lockPriorityRows).toHaveBeenCalledWith(fakeTrx);
+    expect(repository.deleteGoalById).toHaveBeenCalledWith(fakeTrx, 41);
+    expect(repository.decrementPrioritiesAbove).toHaveBeenCalledWith(fakeTrx, 3);
+  });
+
+  it("keeps idempotent outcome for same-priority reorder requests", async () => {
+    const { useCases, repository } = buildUseCases();
+    repository.findGoalByIdForUpdate.mockResolvedValue({
+      id: 41,
+      goal_name: "Mua laptop",
+      target_amount: 25000000,
+      priority: 2,
+      created_at: "2026-05-15T00:00:00.000Z",
+    });
 
     const [first, second] = await Promise.all([
-      request(app).put("/41/priority").send({ priority: 2 }),
-      request(app).put("/41/priority").send({ priority: 2 }),
+      useCases.reorderSavingGoal({ goalId: 41, requestedPriority: 2 }),
+      useCases.reorderSavingGoal({ goalId: 41, requestedPriority: 2 }),
     ]);
 
-    expect(first.statusCode).toBe(200);
-    expect(second.statusCode).toBe(200);
-    expect(first.body.priority).toBe(2);
-    expect(second.body.priority).toBe(2);
-    expect(updateSpy).toHaveBeenCalledTimes(2);
-    for (const [payload] of updateSpy.mock.calls) {
-      expect(Object.values(payload)).toContain(2);
-    }
+    expect(first.priority).toBe(2);
+    expect(second.priority).toBe(2);
+    expect(repository.shiftPrioritiesForReorder).not.toHaveBeenCalled();
+    expect(repository.updateGoalPriority).not.toHaveBeenCalled();
+    expect(repository.lockPriorityRows).toHaveBeenCalledTimes(2);
   });
 });
