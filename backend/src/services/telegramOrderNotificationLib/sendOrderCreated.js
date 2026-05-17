@@ -68,7 +68,12 @@ async function sendOrderCreatedNotification(order) {
   const orderCode = toSafeString(
     order.id_order || order.idOrder || order.order_code || order.orderCode
   ).trim();
-  const paymentNote = `${QR_NOTE_PREFIX} ${orderCode}`.trim();
+  const notePrefix = String(QR_NOTE_PREFIX || "")
+    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
+    .replace(/\bTT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const paymentNote = [notePrefix, orderCode].filter(Boolean).join(" ").trim();
   const amount = roundGiaBanValue(order.price || 0);
   const qrUrl = isImport
     ? null
