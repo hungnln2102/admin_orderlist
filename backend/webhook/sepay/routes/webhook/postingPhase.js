@@ -7,6 +7,7 @@ const {
 const { parseFlexibleDate, normalizeMoney } = require("../../utils");
 const { insertFinancialAuditLog } = require("../../payments");
 const { STATUS: ORDER_STATUS } = require("../../../../src/utils/statuses");
+const { isMavrykShopSupplierName } = require("../../../../src/utils/orderHelpers");
 const {
   resolveDashboardImportDeltaOnPaid,
 } = require("../../../../src/domains/orders/controller/finance/dashboardImportDeltaOnPaid");
@@ -161,7 +162,13 @@ const postWebhookPaymentForOrder = async (
   }
 
   const cost = normalizeMoney(state[ORDER_COLS.cost]);
-  const impliedMargin = normalizeMoney(wire - cost);
+  const supplierName = await fetchSupplierNameBySupplyId(
+    client,
+    state?.[ORDER_COLS.idSupply]
+  );
+  const skipCostDeduction = isMavrykShopSupplierName(supplierName);
+  const effectiveCost = skipCostDeduction ? 0 : cost;
+  const impliedMargin = normalizeMoney(wire - effectiveCost);
   let netProfitForLedger = 0;
   let importDeltaForAudit = 0;
 
@@ -182,16 +189,16 @@ const postWebhookPaymentForOrder = async (
       notify,
       context: notifyContext,
     });
-    if (cost > 0) {
+    if (effectiveCost > 0) {
       importDeltaForAudit = await resolveDashboardImportDeltaOnPaid(
         client,
         state,
-        cost,
+        effectiveCost,
         fetchSupplierNameBySupplyId,
         paidMonthKey
       );
       await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-        profitDelta: -cost,
+        profitDelta: -effectiveCost,
         importDelta: importDeltaForAudit,
         notify,
         context: notifyContext,
@@ -219,13 +226,22 @@ const postWebhookPaymentForOrder = async (
         posted_profit: netProfitForLedger,
         posted_off_flow_bank_receipt: offFlow > 0 ? offFlow : undefined,
         profit_provisional_wire: profitPostingMode === "transition_to_paid" ? wire : undefined,
-        profit_deduct_cost_on_paid: profitPostingMode === "transition_to_paid" && cost > 0 ? cost : undefined,
+        profit_deduct_cost_on_paid:
+          profitPostingMode === "transition_to_paid" && effectiveCost > 0
+            ? effectiveCost
+            : undefined,
         total_import_add_on_paid:
           profitPostingMode === "transition_to_paid" && importDeltaForAudit > 0
             ? importDeltaForAudit
             : undefined,
         total_import_via_supplier_cost_log_recalc:
-          profitPostingMode === "transition_to_paid" && cost > 0 && importDeltaForAudit === 0
+          profitPostingMode === "transition_to_paid" &&
+          effectiveCost > 0 &&
+          importDeltaForAudit === 0
+            ? true
+            : undefined,
+        mavryk_supplier_skip_cost_deduction:
+          profitPostingMode === "transition_to_paid" && skipCostDeduction
             ? true
             : undefined,
         implied_margin_vnd: impliedMargin,

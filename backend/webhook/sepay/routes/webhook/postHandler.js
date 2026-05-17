@@ -3,6 +3,11 @@ const {
   ORDER_TABLE,
   pool,
 } = require("../../config");
+const {
+  PARTNER_SCHEMA,
+  SCHEMA_PARTNER,
+  tableName,
+} = require("../../../../src/config/dbSchema");
 const { safeStringify, normalizeAmount, normalizeMoney } = require("../../utils");
 const {
   insertPaymentReceipt,
@@ -54,6 +59,241 @@ const {
 } = require("./postingPhase");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
+const {
+  applyEstimatedBankBalanceDelta,
+} = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
+const { STATUS } = require("../../../../src/utils/statuses");
+
+const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(
+  PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
+  SCHEMA_PARTNER
+);
+const PAYMENT_SUPPLY_TABLE = tableName(
+  PARTNER_SCHEMA.PAYMENT_SUPPLY.TABLE,
+  SCHEMA_PARTNER
+);
+const SUPPLIER_TABLE = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER);
+const supplierOrderCostCols = PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.COLS;
+const paymentSupplyCols = PARTNER_SCHEMA.PAYMENT_SUPPLY.COLS;
+const supplierCols = PARTNER_SCHEMA.SUPPLIER.COLS;
+const SUPPLIER_REFUND_MATCH_TOLERANCE = 5000;
+
+const parseRfNccDirective = (contentRaw) => {
+  const content = String(contentRaw || "")
+    .replace(/\s+/g, " ")
+    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
+    .replace(/\bTT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!content) return null;
+  const match = content.match(/\bRF\s+NCC\s+(.+?)\s+(\d{8})(?:\b|$)/i);
+  if (!match?.[1] || !match?.[2]) return null;
+  const supplierHint = String(match[1]).trim();
+  const ymd = String(match[2]).trim();
+  if (!supplierHint || !/^\d{8}$/.test(ymd)) return null;
+  return { supplierHint, ymd };
+};
+
+const isPotentialSupplierRefundTransfer = (contentRaw) => {
+  if (parseRfNccDirective(contentRaw)) return true;
+  const content = String(contentRaw || "").toUpperCase();
+  if (!content) return false;
+  return (
+    /\bRF\b/.test(content) ||
+    /\bND\s+RE\b/.test(content) ||
+    /\bHOAN\b/.test(content) ||
+    /\bREFUND\b/.test(content) ||
+    /\bTRA\b/.test(content)
+  );
+};
+
+const normalizeSupplierHintText = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+
+const extractSupplierHintFromContent = (contentRaw) => {
+  const parsed = parseRfNccDirective(contentRaw);
+  return parsed?.supplierHint || "";
+};
+
+async function resolveSupplierByHint(client, hintRaw) {
+  const hintNormalized = normalizeSupplierHintText(hintRaw);
+  if (!hintNormalized) return null;
+
+  const { rows } = await client.query(
+    `
+      SELECT ${supplierCols.ID} AS id, ${supplierCols.SUPPLIER_NAME} AS supplier_name
+      FROM ${SUPPLIER_TABLE}
+      WHERE COALESCE(${supplierCols.SUPPLIER_NAME}::text, '') <> ''
+    `
+  );
+
+  const matches = (rows || [])
+    .map((row) => {
+      const supplierName = String(row.supplier_name || "").trim();
+      const normalizedName = normalizeSupplierHintText(supplierName);
+      if (!normalizedName) return null;
+      const exact = normalizedName === hintNormalized;
+      const include =
+        normalizedName.includes(hintNormalized) || hintNormalized.includes(normalizedName);
+      if (!exact && !include) return null;
+      return {
+        id: Number(row.id) || 0,
+        supplierName,
+        score: exact ? 0 : 1,
+        lengthGap: Math.abs(normalizedName.length - hintNormalized.length),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.score - b.score || a.lengthGap - b.lengthGap);
+
+  if (matches.length === 0) return null;
+  if (
+    matches.length > 1 &&
+    matches[0].score === matches[1].score &&
+    matches[0].lengthGap === matches[1].lengthGap
+  ) {
+    return null;
+  }
+  return matches[0];
+}
+
+async function tryAutoSettleSupplierRefundByReceipt({
+  client,
+  receiptId,
+  transferAmount,
+  paidMonthKey,
+  transactionContent,
+}) {
+  const incoming = normalizeMoney(transferAmount);
+  if (!(incoming > 0)) return null;
+  const rfDirective = parseRfNccDirective(transactionContent);
+  const supplierHint = extractSupplierHintFromContent(transactionContent);
+  if (String(transactionContent || "").toUpperCase().includes("RF") && !rfDirective) return null;
+  const hintedSupplier = supplierHint
+    ? await resolveSupplierByHint(client, supplierHint)
+    : null;
+  if (supplierHint && !hintedSupplier) return null;
+
+  const result = await client.query(
+    `
+      WITH latest AS (
+        SELECT DISTINCT ON (l.${supplierOrderCostCols.ORDER_LIST_ID})
+          l.${supplierOrderCostCols.SUPPLY_ID} AS supply_id,
+          COALESCE(l.${supplierOrderCostCols.IMPORT_COST}, 0)::numeric AS import_cost,
+          COALESCE(l.${supplierOrderCostCols.REFUND_AMOUNT}, 0)::numeric AS refund_amount,
+          COALESCE(l.${supplierOrderCostCols.NCC_PAYMENT_STATUS}::text, '') AS ncc_payment_status
+        FROM ${SUPPLIER_ORDER_COST_LOG_TABLE} l
+        ORDER BY l.${supplierOrderCostCols.ORDER_LIST_ID}, l.${supplierOrderCostCols.ID} DESC
+      ),
+      agg AS (
+        SELECT
+          supply_id,
+          COUNT(*) FILTER (
+            WHERE TRIM(COALESCE(ncc_payment_status, '')) <> $1
+          )::int AS unpaid_count,
+          COALESCE(
+            SUM(
+              CASE
+                WHEN TRIM(COALESCE(ncc_payment_status, '')) <> $1
+                THEN import_cost - refund_amount
+                ELSE 0::numeric
+              END
+            ),
+            0
+          )::numeric AS net_unpaid_amount
+        FROM latest
+        GROUP BY supply_id
+      )
+      SELECT supply_id, unpaid_count, net_unpaid_amount
+      FROM agg
+      WHERE unpaid_count > 0
+        AND net_unpaid_amount < 0
+    `,
+    [STATUS.PAID]
+  );
+
+  const candidates = (result.rows || [])
+    .map((row) => {
+      const expectedRefund = Math.abs(normalizeMoney(row.net_unpaid_amount));
+      const gap = Math.abs(expectedRefund - incoming);
+      return {
+        supplyId: Number(row.supply_id) || 0,
+        unpaidCount: Number(row.unpaid_count) || 0,
+        expectedRefund,
+        gap,
+      };
+    })
+    .filter(
+      (row) =>
+        row.supplyId > 0 &&
+        row.unpaidCount > 0 &&
+        row.expectedRefund > 0 &&
+        row.gap <= SUPPLIER_REFUND_MATCH_TOLERANCE
+    )
+    .sort((a, b) => a.gap - b.gap);
+
+  const targetPool = hintedSupplier
+    ? candidates.filter((candidate) => candidate.supplyId === hintedSupplier.id)
+    : candidates;
+  if (targetPool.length !== 1) return null;
+  const target = targetPool[0];
+
+  const paymentDate = new Date();
+  const day = String(paymentDate.getDate()).padStart(2, "0");
+  const month = String(paymentDate.getMonth() + 1).padStart(2, "0");
+  const year = String(paymentDate.getFullYear());
+  const roundLabel = `${day}/${month}/${year} - ${day}/${month}/${year}`;
+
+  await client.query(
+    `
+      INSERT INTO ${PAYMENT_SUPPLY_TABLE}
+        (${paymentSupplyCols.SOURCE_ID}, ${paymentSupplyCols.ROUND}, ${paymentSupplyCols.STATUS}, ${paymentSupplyCols.PAID})
+      VALUES ($1, $2, $3, $4)
+    `,
+    [target.supplyId, roundLabel, STATUS.PAID, -target.expectedRefund]
+  );
+
+  await client.query(
+    `
+      UPDATE ${SUPPLIER_ORDER_COST_LOG_TABLE}
+      SET ${supplierOrderCostCols.NCC_PAYMENT_STATUS} = $1,
+          ${supplierOrderCostCols.LOGGED_AT} = NOW()
+      WHERE ${supplierOrderCostCols.SUPPLY_ID} = $2
+        AND TRIM(COALESCE(${supplierOrderCostCols.NCC_PAYMENT_STATUS}::text, '')) <> $1
+    `,
+    [STATUS.PAID, target.supplyId]
+  );
+
+  if (paidMonthKey) {
+    await applyEstimatedBankBalanceDelta(client, paidMonthKey, -incoming);
+  }
+
+  if (receiptId) {
+    await insertFinancialAuditLog(client, {
+      payment_receipt_id: receiptId,
+      order_code: "",
+      rule_branch: "SUPPLIER_REFUND_AUTO_SETTLED",
+      delta: {
+        supplier_id: target.supplyId,
+        supplier_hint: supplierHint || null,
+        supplier_name: hintedSupplier?.supplierName || null,
+        rf_ymd: rfDirective?.ymd || null,
+        expected_refund_amount: target.expectedRefund,
+        incoming_receipt_amount: incoming,
+        match_gap: target.gap,
+        month_key: paidMonthKey || null,
+      },
+      source: "webhook",
+    });
+  }
+
+  return target;
+}
 
 async function handleWebhookPost(req, res) {
   logger.debug("Incoming Sepay webhook", {
@@ -91,6 +331,9 @@ async function handleWebhookPost(req, res) {
     transferAmountNormalized,
     supplierSettlementTransfer,
   } = parsed;
+  const potentialSupplierRefundTransfer = isPotentialSupplierRefundTransfer(
+    transaction.transaction_content
+  );
   logger.debug("Order codes from webhook", { orderCodes, count: orderCodes.length });
 
   try {
@@ -445,11 +688,30 @@ async function handleWebhookPost(req, res) {
         }
       }
 
+      let autoSupplierSettlement = null;
       if (
         !alreadyFinancialPosted &&
         (!loopOrderCodes.length && !orderCode) &&
         transferAmountNormalized > 0 &&
-        !supplierSettlementTransfer
+        receiptId &&
+        (supplierSettlementTransfer || potentialSupplierRefundTransfer)
+      ) {
+        autoSupplierSettlement = await tryAutoSettleSupplierRefundByReceipt({
+          client,
+          receiptId,
+          transferAmount: transferAmountNormalized,
+          paidMonthKey,
+          transactionContent: transaction.transaction_content,
+        });
+      }
+
+      if (
+        !alreadyFinancialPosted &&
+        (!loopOrderCodes.length && !orderCode) &&
+        transferAmountNormalized > 0 &&
+        !supplierSettlementTransfer &&
+        !potentialSupplierRefundTransfer &&
+        !autoSupplierSettlement
       ) {
         await incrementDashboardSummaryByDelta(client, paidMonthKey, {
           offFlowDelta: transferAmountNormalized,
@@ -474,8 +736,9 @@ async function handleWebhookPost(req, res) {
         !alreadyFinancialPosted &&
         (!loopOrderCodes.length && !orderCode) &&
         transferAmountNormalized > 0 &&
-        supplierSettlementTransfer &&
-        receiptId
+        (supplierSettlementTransfer || potentialSupplierRefundTransfer) &&
+        receiptId &&
+        !autoSupplierSettlement
       ) {
         await insertFinancialAuditLog(client, {
           payment_receipt_id: receiptId,
@@ -484,6 +747,20 @@ async function handleWebhookPost(req, res) {
           delta: {
             posted_revenue: 0,
             posted_profit: 0,
+            month_key: paidMonthKey,
+            content: String(transaction.transaction_content || ""),
+          },
+          source: "webhook",
+        });
+      } else if (autoSupplierSettlement && receiptId) {
+        await insertFinancialAuditLog(client, {
+          payment_receipt_id: receiptId,
+          order_code: "",
+          rule_branch: "NO_ORDER_CODE_SUPPLIER_SETTLEMENT_AUTO_MATCHED",
+          delta: {
+            supplier_id: autoSupplierSettlement.supplyId,
+            expected_refund_amount: autoSupplierSettlement.expectedRefund,
+            match_gap: autoSupplierSettlement.gap,
             month_key: paidMonthKey,
             content: String(transaction.transaction_content || ""),
           },

@@ -70,7 +70,15 @@ function buildVietQrUrl({ amount, orderCode }) {
 
   const params = new URLSearchParams();
   params.set("amount", Math.round(numericAmount).toString());
-  const note = [QR_NOTE_PREFIX, String(orderCode || "").trim()].filter(Boolean).join(" ").trim();
+  const notePrefix = String(QR_NOTE_PREFIX || "")
+    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
+    .replace(/\bTT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const note = [notePrefix, String(orderCode || "").trim()]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   if (note) {
     params.set("addInfo", note);
   }

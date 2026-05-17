@@ -59,14 +59,14 @@ const ADES_NOT_ACTIVE_HINTS = [
   "chưa kích hoạt",
 ];
 
-/** Map status từ Ades sang chuỗi `tracking_status` chuẩn (UI hiện đang khớp). */
+/** Map status từ Ades sang chuỗi `tracking_status` hợp lệ theo DB constraint. */
 function mapAdesStatusToTracking(status) {
   const s = String(status || "").trim().toLowerCase();
   // Quy ước fix ADES: chỉ các status active dưới đây mới là "có gói".
-  // Mọi case còn lại đều coi là "không có gói" để đi luồng Renew.
+  // Mọi case còn lại coi là chưa có quyền sử dụng để đi luồng Renew.
   if (ADES_ACTIVE_STATUSES.has(s)) return "có gói";
-  if (ADES_DEAD_STATUSES.has(s)) return "hết gói";
-  return "hết gói";
+  if (ADES_DEAD_STATUSES.has(s)) return "chưa cấp quyền";
+  return "chưa cấp quyền";
 }
 
 function isLikelyNotActivePayload(data) {

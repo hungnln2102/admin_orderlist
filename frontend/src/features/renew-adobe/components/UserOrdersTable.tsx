@@ -135,15 +135,23 @@ export function UserOrdersTable({
         r.email.toLowerCase().includes(q)
     );
   }, [allRows, searchTerm]);
+  const sortedRows = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (a.expirySortTs === null && b.expirySortTs === null) return 0;
+      if (a.expirySortTs === null) return 1;
+      if (b.expirySortTs === null) return -1;
+      return a.expirySortTs - b.expirySortTs;
+    });
+  }, [filtered]);
 
   const fixableEmailsInView = useMemo(
-    () => filtered.filter((r) => r.accountId === 0).map((r) => r.email),
-    [filtered]
+    () => sortedRows.filter((r) => r.accountId === 0).map((r) => r.email),
+    [sortedRows]
   );
 
-  const totalItems = filtered.length;
+  const totalItems = sortedRows.length;
   const start = (page - 1) * PAGE_SIZE;
-  const currentRows = filtered.slice(start, start + PAGE_SIZE);
+  const currentRows = sortedRows.slice(start, start + PAGE_SIZE);
   const canInteract = !fixingId && !deletingId && !fixAllProgress;
 
   const actionProps = {

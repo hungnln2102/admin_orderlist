@@ -12,6 +12,7 @@ export type UserOrderRow = {
   profile: string;
   display_status: DisplayStatus;
   expiry: string;
+  expirySortTs: number | null;
   accountId: number;
   systemNote: AdobeSystemCode;
 };

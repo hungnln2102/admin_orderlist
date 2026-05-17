@@ -90,6 +90,12 @@ function displayStatusFromOrder(order: OrderInfo): DisplayStatus {
   return "not_added";
 }
 
+function getExpirySortTs(expiryDate: string | null | undefined): number | null {
+  if (!expiryDate) return null;
+  const parsed = Date.parse(expiryDate);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
   const rows: UserOrderRow[] = [];
   for (const order of orders) {
@@ -121,6 +127,7 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
       expiry: order.expiry_date
         ? Helpers.formatDateToDMY(order.expiry_date)
         : "—",
+      expirySortTs: getExpirySortTs(order.expiry_date),
       accountId: aid,
       systemNote,
     });

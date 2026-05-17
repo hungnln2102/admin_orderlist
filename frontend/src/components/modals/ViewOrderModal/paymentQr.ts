@@ -52,7 +52,12 @@ export const buildViewOrderPaymentQrPayload = ({
 }: ViewOrderPaymentQrBuildInput): ViewOrderPaymentQrPayload => {
   const idOrder = String(order[ORDER_FIELDS.ID_ORDER] ?? "");
   /** Nội dung CK shop: cùng chuẩn ORDER_QR_NOTE_PREFIX + mã đơn (khớp Telegram / .env). */
-  const shopTransferContent = [ORDER_QR_NOTE_PREFIX, idOrder]
+  const notePrefix = String(ORDER_QR_NOTE_PREFIX || "")
+    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
+    .replace(/\bTT\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const shopTransferContent = [notePrefix, idOrder]
     .map((s) => String(s || "").trim())
     .filter(Boolean)
     .join(" ")

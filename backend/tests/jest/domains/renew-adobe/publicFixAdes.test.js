@@ -8,9 +8,9 @@ describe("publicFixAdes status normalization", () => {
     expect(__test__.mapAdesStatusToTracking("processing")).toBe("có gói");
   });
 
-  it("maps non-active statuses to hết gói", () => {
-    expect(__test__.mapAdesStatusToTracking("inactive")).toBe("hết gói");
-    expect(__test__.mapAdesStatusToTracking("anything-else")).toBe("hết gói");
+  it("maps non-active statuses to chưa cấp quyền", () => {
+    expect(__test__.mapAdesStatusToTracking("inactive")).toBe("chưa cấp quyền");
+    expect(__test__.mapAdesStatusToTracking("anything-else")).toBe("chưa cấp quyền");
   });
 
   it("normalizes not-active payloads to ok=true for renew flow", () => {
