@@ -17,7 +17,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # Production hardening: chỉ cho truy cập từ localhost host machine, không public ra Internet.
+      - "127.0.0.1:5432:5432"
     networks:
       - app-network
     # Dùng DB_* từ compose để tránh lệch user khi volume DB đã init sẵn (case spam user "postgres").
