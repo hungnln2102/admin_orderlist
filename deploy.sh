@@ -20,6 +20,9 @@ if [ "${1:-}" = "--no-cache" ]; then
   NO_CACHE="--no-cache"
 fi
 
+CLEAR_CACHE_ON_DEPLOY="${CLEAR_CACHE_ON_DEPLOY:-1}"
+REDIS_DB="${REDIS_DB:-0}"
+
 echo "======================================"
 echo "  Deploying Admin Order List"
 echo "======================================"
@@ -37,6 +40,16 @@ fi
 "${DC[@]}" -f docker-compose.yml down
 "${DC[@]}" -f docker-compose.yml build $NO_CACHE
 "${DC[@]}" -f docker-compose.yml up -d
+
+if [ "$CLEAR_CACHE_ON_DEPLOY" = "1" ]; then
+  echo ""
+  echo "Clearing Redis cache (DB $REDIS_DB) for debug..."
+  if "${DC[@]}" -f docker-compose.yml exec -T redis redis-cli -n "$REDIS_DB" FLUSHDB >/dev/null 2>&1; then
+    echo "Redis cache cleared."
+  else
+    echo "Warning: Could not clear Redis cache automatically."
+  fi
+fi
 
 if command -v nginx >/dev/null 2>&1 || [ -x /usr/sbin/nginx ]; then
   echo ""

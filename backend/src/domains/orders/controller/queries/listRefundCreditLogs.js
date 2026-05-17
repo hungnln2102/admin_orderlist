@@ -119,6 +119,34 @@ const toNumber = (value) => {
     return Number.isFinite(n) ? n : 0;
 };
 
+let refundedCashoutColumnExistsCache = null;
+
+const hasRefundedCashoutAtColumn = async () => {
+    if (typeof refundedCashoutColumnExistsCache === "boolean") {
+        return refundedCashoutColumnExistsCache;
+    }
+
+    try {
+        const result = await db.raw(
+            `
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = ?
+                      AND table_name = ?
+                      AND column_name = ?
+                ) AS exists
+            `,
+            ["receipt", "refund_credit_notes", "refunded_cashout_at"]
+        );
+        refundedCashoutColumnExistsCache = Boolean(result?.rows?.[0]?.exists);
+    } catch {
+        refundedCashoutColumnExistsCache = false;
+    }
+
+    return refundedCashoutColumnExistsCache;
+};
+
 const mapLogRow = (row) => {
     const rawStatus = String(row?.status || "").trim().toUpperCase();
     const note = row?.note != null ? String(row.note) : null;
@@ -165,6 +193,7 @@ const listRefundCreditLogs = async (params) => {
     const { page, limit, statusGroup, sort } = params;
     const offset = (page - 1) * limit;
     const { column, direction } = SORT_OPTIONS[sort] || SORT_OPTIONS.issued_at_desc;
+    const hasRefundedCashoutAt = await hasRefundedCashoutAtColumn();
 
     const baseQuery = buildBaseQuery(params);
     const filteredQuery = baseQuery.clone();
@@ -191,7 +220,9 @@ const listRefundCreditLogs = async (params) => {
             "rcn.available_amount",
             "rcn.status",
             "rcn.note",
-            "rcn.refunded_cashout_at",
+            ...(hasRefundedCashoutAt
+                ? ["rcn.refunded_cashout_at"]
+                : [db.raw("NULL::text as refunded_cashout_at")]),
             "rcn.issued_at",
             "rcn.created_at",
             "rcn.updated_at",

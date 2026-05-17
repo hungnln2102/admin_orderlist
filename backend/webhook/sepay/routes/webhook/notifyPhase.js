@@ -47,6 +47,34 @@ async function notifyCombinedMonthlyDelta({
         normalizeMoney(financeSnapshotBefore.estimated_bank_balance)
     );
 
+    logger.info("[Webhook][FinancialDebug] Combined monthly snapshot delta", {
+      monthKey: paidMonthKey,
+      before: {
+        revenue: normalizeMoney(financeSnapshotBefore.total_revenue),
+        profit: normalizeMoney(financeSnapshotBefore.total_profit),
+        importVal: normalizeMoney(financeSnapshotBefore.total_import),
+        refund: normalizeMoney(financeSnapshotBefore.total_refund),
+        offFlow: normalizeMoney(financeSnapshotBefore.total_off_flow_bank_receipt),
+        bankBalance: normalizeMoney(financeSnapshotBefore.estimated_bank_balance),
+      },
+      after: {
+        revenue: normalizeMoney(financeSnapshotAfter.total_revenue),
+        profit: normalizeMoney(financeSnapshotAfter.total_profit),
+        importVal: normalizeMoney(financeSnapshotAfter.total_import),
+        refund: normalizeMoney(financeSnapshotAfter.total_refund),
+        offFlow: normalizeMoney(financeSnapshotAfter.total_off_flow_bank_receipt),
+        bankBalance: normalizeMoney(financeSnapshotAfter.estimated_bank_balance),
+      },
+      delta: {
+        revenueDelta,
+        profitDelta,
+        importDelta,
+        refundDelta,
+        offFlowDelta,
+        bankBalanceDelta,
+      },
+    });
+
     if (
       !revenueDelta &&
       !profitDelta &&

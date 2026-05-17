@@ -495,6 +495,12 @@ async function handleWebhookPost(req, res) {
           notify: false,
         });
         postedBankBalanceDelta += transferAmountNormalized;
+        logger.info("[Webhook][FinancialDebug] Applied bank balance seed from receipt", {
+          receiptId,
+          monthKey: paidMonthKey,
+          transferAmount: transferAmountNormalized,
+          postedBankBalanceDelta,
+        });
       }
 
       // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai.
@@ -598,6 +604,20 @@ async function handleWebhookPost(req, res) {
               creditAppliedAmount: state.credit_applied_amount,
             });
             amountDecisionByOrderCode.set(code, amountDecision);
+            logger.info("[Webhook][FinancialDebug] Computed payment decision", {
+              receiptId,
+              orderCode: code,
+              orderStatus: statusValue,
+              monthKey: paidMonthKey,
+              webhookAmount: currentAmountForCode,
+              orderPriceAtWebhook: amountDecision.orderPriceAtWebhook,
+              creditedAmount: amountDecision.creditedAmount,
+              recognizedRevenueCurrent: amountDecision.recognizedRevenueCurrent,
+              offFlowCurrent: amountDecision.offFlowCurrent,
+              complete: amountDecision.complete,
+              branch: amountDecision.branch,
+              webhookAmountFlow: amountDecision.webhookAmountFlow,
+            });
           }
 
           const renewalEligibility = eligibilityByOrderCode.get(code);
@@ -693,6 +713,20 @@ async function handleWebhookPost(req, res) {
               postedImportDelta += imp;
               postedOffFlowBankReceiptDelta += flow;
               transitionedOrderCodesToPaid.add(code);
+              logger.info("[Webhook][FinancialDebug] Posted order financial delta", {
+                receiptId,
+                orderCode: code,
+                monthKey: paidMonthKey,
+                webhookAmount: currentAmountForCode,
+                creditedAmount: amountDecision?.creditedAmount ?? 0,
+                recognizedRevenueCurrent:
+                  amountDecision?.recognizedRevenueCurrent ?? rev,
+                postedRevenueDelta: rev,
+                postedProfitDelta: prof,
+                postedImportDelta: imp,
+                postedOffFlowDelta: flow,
+                statusTransition: `${statusValue}->${nextStatus}`,
+              });
             }
             logger.debug("[Webhook] Order status → Đã Thanh Toán", {
               orderCode: code,
