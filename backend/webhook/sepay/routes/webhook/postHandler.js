@@ -419,7 +419,22 @@ async function handleWebhookPost(req, res) {
             (
               SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
               FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
-              WHERE LOWER(COALESCE(rca.target_order_code::text, '')) = LOWER(${ORDER_TABLE}.${ORDER_COLS.idOrder}::text)
+              WHERE (
+                (
+                  rca.target_order_list_id IS NOT NULL
+                  AND rca.target_order_list_id = ${ORDER_TABLE}.${ORDER_COLS.id}
+                )
+                OR (
+                  rca.target_order_list_id IS NULL
+                  AND LOWER(COALESCE(rca.target_order_code::text, '')) =
+                    LOWER(${ORDER_TABLE}.${ORDER_COLS.idOrder}::text)
+                  AND (
+                    ${ORDER_TABLE}.${ORDER_COLS.CREATED_AT} IS NULL
+                    OR rca.applied_at IS NULL
+                    OR rca.applied_at >= ${ORDER_TABLE}.${ORDER_COLS.CREATED_AT}
+                  )
+                )
+              )
             ) AS credit_applied_amount
           FROM ${ORDER_TABLE}
           WHERE LOWER(${ORDER_COLS.idOrder}) = LOWER($1)

@@ -9,8 +9,9 @@ services:
       context: ./database
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+      # Mặc định phải khớp tài khoản DB app để tránh healthcheck ping nhầm user "postgres".
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASS:-change_me}
       POSTGRES_DB: ${DB_NAME:-mydtbmav}
     # Postgres 16 (image chính thức): PGDATA = /var/lib/postgresql/data
     volumes:
@@ -21,7 +22,7 @@ services:
       - app-network
     # Dùng $$POSTGRES_* để shell trong container đọc đúng user/db do image set (tránh lệch với .env host).
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 12
