@@ -19,48 +19,64 @@ describe("supplier-change / priceCalculator", () => {
       ).toBe(50000);
     });
 
-    test("Prorate làm tròn về bội số 1.000: 100k / 365 × 100 = 27 397 → 27 000", () => {
-      // Lý do: cost lưu DB / hiển thị UI / delta dashboard / Telegram đều
-      // dùng cùng đơn vị 1.000 VND (xem `roundGiaBanValue` ở frontend).
+    test("Prorate làm tròn đến hàng đơn vị: 100k / 365 × 100 = 27 397,26 → 27 397", () => {
       expect(
         computeProratedCostForNewSupplier({
           fullPrice: 100000,
           totalDays: 365,
           remainingDays: 100,
         })
-      ).toBe(27000);
+      ).toBe(27397);
     });
 
-    test("Prorate làm tròn nửa lên về bội 1.000: 100k / 7 × 1 = 14 285,7 → 14 000", () => {
+    test("Prorate làm tròn nửa lên đến hàng đơn vị: 100k / 7 × 1 = 14 285,7 → 14 286", () => {
       expect(
         computeProratedCostForNewSupplier({
           fullPrice: 100000,
           totalDays: 7,
           remainingDays: 1,
         })
-      ).toBe(14000);
+      ).toBe(14286);
     });
 
-    test("Prorate làm tròn nửa lên về bội 1.000: 100k / 7 × 4 = 57 142,8 → 57 000", () => {
+    test("Prorate làm tròn nửa lên đến hàng đơn vị: 100k / 7 × 4 = 57 142,8 → 57 143", () => {
       expect(
         computeProratedCostForNewSupplier({
           fullPrice: 100000,
           totalDays: 7,
           remainingDays: 4,
         })
-      ).toBe(57000);
+      ).toBe(57143);
     });
 
-    test("Prorate gần bội 1.000 (case bug NCC=Ades 33 871 → 34 000)", () => {
-      // Lặp lại tình huống từ ảnh báo cáo: NCC mới Ades, prorate ra 33 871
-      // → phải lưu 34 000 để khớp với UI/Dashboard/Telegram.
+    test("Prorate giữ nguyên số nguyên nếu không có thập phân", () => {
       expect(
         computeProratedCostForNewSupplier({
           fullPrice: 35000,
           totalDays: 31,
           remainingDays: 30,
         })
-      ).toBe(34000);
+      ).toBe(33871);
+    });
+
+    test("Giữ nguyên giá nhập nguyên 165567", () => {
+      expect(
+        computeProratedCostForNewSupplier({
+          fullPrice: 165567,
+          totalDays: 30,
+          remainingDays: 30,
+        })
+      ).toBe(165567);
+    });
+
+    test("Giá nhập có thập phân 67777.19 sẽ làm tròn về đơn vị", () => {
+      expect(
+        computeProratedCostForNewSupplier({
+          fullPrice: 67777.19,
+          totalDays: 30,
+          remainingDays: 30,
+        })
+      ).toBe(67777);
     });
 
     test("remainingDays = 0 → 0", () => {
@@ -139,16 +155,14 @@ describe("supplier-change / priceCalculator", () => {
       ).toBe(0);
     });
 
-    test("Refund làm tròn về bội số 1.000: 33 871 × 10/30 = 11 290,3 → 11 000", () => {
-      // Cùng convention với cost: số tiền hoàn cũng phải là bội số 1.000 để
-      // dashboard.total_refund / log NCC / Telegram khớp với UI.
+    test("Refund làm tròn đến hàng đơn vị: 33 871 × 10/30 = 11 290,3 → 11 290", () => {
       expect(
         computeRefundFromOldSupplier({
           oldImportCost: 33871,
           totalDays: 30,
           remainingDays: 10,
         })
-      ).toBe(11000);
+      ).toBe(11290);
     });
   });
 

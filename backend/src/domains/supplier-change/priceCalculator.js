@@ -2,19 +2,7 @@
  * Pure helpers tính giá nhập / hoàn theo số ngày còn lại khi đổi NCC.
  *
  * Không touch DB. Đầu vào là plain values; đầu ra số nguyên (đồng) đã
- * **làm tròn về bội số 1.000 VND** — đồng nhất với cách frontend hiển thị
- * tiền (`formatCurrency` ở `frontend/src/shared/utils/money.ts` cũng dùng
- * `roundGiaBanValue` = `Math.round(n / 1000) * 1000`).
- *
- * Lý do làm tròn ngay tại nguồn (thay vì chỉ làm tròn ở chỗ hiển thị):
- *   - `order.cost` lưu DB = giá trị này → trigger
- *     `fn_recalc_dashboard_total_import` cộng đúng bội số 1.000 vào
- *     `dashboard.dashboard_monthly_summary.total_import`.
- *   - Notification "BIẾN ĐỘNG THÁNG" (`telegramFinanceDeltaNotifier`) lấy
- *     delta từ snapshot tháng → cũng là bội số 1.000.
- *   - Frontend `SupplyOrderCostsPanel` hiển thị `formatCurrency(row.cost)`
- *     → idempotent, không đổi giá trị nữa.
- *   ⇒ 4 chỗ (DB, dashboard, Telegram, UI) cùng số.
+ * làm tròn đến hàng đơn vị (không giữ số thập phân).
  *
  * Quy ước:
  * - `totalDays`: tổng số ngày của đơn (order.days).
@@ -32,21 +20,16 @@ const toNonNegative = (value) => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-/** Đơn vị làm tròn (VND). Khớp `roundGiaBanValue` ở frontend. */
-const PRICE_ROUND_UNIT = 1000;
+/** Đơn vị làm tròn (VND): chỉ làm tròn đến hàng đơn vị. */
+const PRICE_ROUND_UNIT = 1;
+
+/** Làm tròn về số nguyên gần nhất (hàng đơn vị). */
+const roundToInteger = (amount) => Math.round(amount / PRICE_ROUND_UNIT) * PRICE_ROUND_UNIT;
 
 /**
- * Làm tròn về bội số `PRICE_ROUND_UNIT` (1.000 VND), nửa lên.
- * @param {number} amount giá trị thô (đã là số hữu hạn, không âm).
- */
-const roundToThousands = (amount) =>
-  Math.round(amount / PRICE_ROUND_UNIT) * PRICE_ROUND_UNIT;
-
-/**
- * Giá nhập NCC mới = full_price × (remaining / total), làm tròn về bội số
- * 1.000 VND để khớp UI/Dashboard/Telegram.
+ * Giá nhập NCC mới = full_price × (remaining / total), làm tròn đến hàng đơn vị.
  * @param {{ fullPrice: number, totalDays: number, remainingDays: number }} args
- * @returns {number} VND nguyên, bội số 1.000.
+ * @returns {number} VND nguyên (không có phần thập phân).
  */
 function computeProratedCostForNewSupplier({ fullPrice, totalDays, remainingDays }) {
   const price = toFinitePositive(fullPrice);
@@ -54,12 +37,12 @@ function computeProratedCostForNewSupplier({ fullPrice, totalDays, remainingDays
   const remaining = toNonNegative(remainingDays);
   if (price === 0 || total === 0 || remaining === 0) return 0;
   const effectiveRemaining = Math.min(remaining, total);
-  return roundToThousands((price * effectiveRemaining) / total);
+  return roundToInteger((price * effectiveRemaining) / total);
 }
 
 /**
  * Số tiền NCC CŨ cần hoàn = oldImportCost × (remaining / total), làm tròn
- * về bội số 1.000 VND (cùng convention với cost).
+ * về hàng đơn vị (cùng convention với cost).
  * Dùng khi đơn đã chạy được "elapsed" ngày, NCC cũ chỉ phục vụ phần "elapsed",
  * phần "remaining" chưa phục vụ → hoàn lại.
  *
@@ -72,7 +55,7 @@ function computeRefundFromOldSupplier({ oldImportCost, totalDays, remainingDays 
   const remaining = toNonNegative(remainingDays);
   if (cost === 0 || total === 0 || remaining === 0) return 0;
   const effectiveRemaining = Math.min(remaining, total);
-  return roundToThousands((cost * effectiveRemaining) / total);
+  return roundToInteger((cost * effectiveRemaining) / total);
 }
 
 /**
