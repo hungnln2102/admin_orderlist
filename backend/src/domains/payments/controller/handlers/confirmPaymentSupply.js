@@ -58,15 +58,34 @@ const confirmPaymentSupply = async (req, res) => {
       const logCols = QUOTED_COLS.supplierOrderCostLog;
       const unpaidLogSummary = await trx.raw(
         `
+        WITH latest AS (
+          SELECT DISTINCT ON (l.${logCols.orderListId})
+            l.${logCols.orderListId} AS order_list_id,
+            l.${logCols.importCost} AS import_cost,
+            l.${logCols.refundAmount} AS refund_amount,
+            l.${logCols.nccPaymentStatus} AS ncc_payment_status,
+            l.${logCols.loggedAt} AS logged_at
+          FROM ${TABLES.supplyOrderCostLog} l
+          WHERE l.${logCols.supplyId} = ?
+          ORDER BY l.${logCols.orderListId}, l.${logCols.id} DESC
+        )
         SELECT
-          MIN(${logCols.loggedAt}::date) AS oldest_date,
-          COUNT(*)::int AS unpaid_count,
-          COALESCE(SUM(COALESCE(${logCols.importCost}, 0) - COALESCE(${logCols.refundAmount}, 0)), 0)::numeric AS net_unpaid_amount
-        FROM ${TABLES.supplyOrderCostLog}
-        WHERE ${logCols.supplyId} = ?
-          AND TRIM(COALESCE(${logCols.nccPaymentStatus}::text, '')) <> ?;
+          MIN(latest.logged_at::date) FILTER (
+            WHERE TRIM(COALESCE(latest.ncc_payment_status::text, '')) <> ?
+          ) AS oldest_date,
+          COUNT(*) FILTER (
+            WHERE TRIM(COALESCE(latest.ncc_payment_status::text, '')) <> ?
+          )::int AS unpaid_count,
+          COALESCE(SUM(
+            CASE
+              WHEN TRIM(COALESCE(latest.ncc_payment_status::text, '')) = ?
+              THEN 0::numeric
+              ELSE COALESCE(latest.import_cost, 0)::numeric - COALESCE(latest.refund_amount, 0)::numeric
+            END
+          ), 0)::numeric AS net_unpaid_amount
+        FROM latest;
       `,
-        [resolvedSupplyId, STATUS.PAID]
+        [resolvedSupplyId, STATUS.PAID, STATUS.PAID, STATUS.PAID]
       );
 
       const summary = unpaidLogSummary.rows?.[0] || {};
