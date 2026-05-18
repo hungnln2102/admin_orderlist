@@ -21,6 +21,7 @@ const {
   parseFlexibleDate,
   normalizeProductDuration,
   normalizeMoney,
+  normalizeImportValue,
   formatDateDMY,
   formatDateDB,
   addMonthsClamped,
@@ -449,6 +450,12 @@ const runRenewal = async (
         Boolean(ORDER_PREFIXES?.promo) &&
         orderCode.toUpperCase().startsWith(ORDER_PREFIXES.promo.toUpperCase()),
     });
+    const liveImportNormalized = normalizeImportValue(
+      giaNhapSource,
+      giaNhapCu || undefined
+    );
+    const hasLiveSupplierImport =
+      normalizeMoney(liveImportNormalized?.value) > 0;
     const pricingMeta = pricing.meta;
     const pctCtvNormalized = pricingMeta?.pctCtv ?? 0;
 
@@ -518,6 +525,11 @@ const runRenewal = async (
     }
     // NCC nội bộ Mavryk/Shop: không ghi nhận công nợ NCC.
     const skipNccLedger = isInternalSupplier;
+    // Nếu NCC nội bộ đã bỏ giá nhập hiện hành khỏi supplier_cost, không được
+    // kéo lại giá nhập cũ từ fallback đơn (tránh trừ bank/profit sai khi renewal webhook).
+    if (!isMavn && skipNccLedger && !hasLiveSupplierImport) {
+      finalGiaNhap = 0;
+    }
     // Đơn bán: renewal thủ công → Đang xử lý rồi dùng webhook/giả lập CK; MAVN nhập hàng → thẳng Đã TT (không bank).
     const isManualRenewal = source === "manual";
     const renewalNextStatus =
