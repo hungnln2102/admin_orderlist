@@ -19,7 +19,7 @@ export const NCC_REFUND_TRANSFER_LABEL = "MAVRYK";
 
 export function buildPaySupplierContent(supplierName: string, date: Date = new Date()): string {
   const name = String(supplierName || "").trim() || "NCC";
-  return `THANH TOAN ${name} KY ${formatPaySupplierPeriod(date)}`;
+  return `${name} KY ${formatPaySupplierPeriod(date)}`;
 }
 
 /** `RF MAVRYK <kỳ YYYYDDMM>` — ví dụ `RF MAVRYK 20263004` */
@@ -40,7 +40,7 @@ export type NccTransferContentParams = {
 
 /**
  * Hai luồng nội dung chuyển khoản (VietQR / Sepay đối soái).
- * Chưa thanh toán dương → THANH TOAN; âm → RF MAVRYK.
+ * Chưa thanh toán dương → `<NCC> KY ...`; âm → RF MAVRYK.
  */
 export function buildNccTransferContentByBalance({
   balanceSigned,

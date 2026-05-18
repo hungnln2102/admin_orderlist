@@ -110,7 +110,7 @@ const EditTraceCodeModal: React.FC<EditTraceCodeModalProps> = ({
                 type="text"
                 value={traceCode}
                 onChange={(e) => setTraceCode(e.target.value)}
-                placeholder="Ví dụ: TT Ky 20261005 / FT2026..."
+                placeholder="Ví dụ: NCC Ky 20261005 / FT2026..."
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 disabled={loading}
                 maxLength={100}

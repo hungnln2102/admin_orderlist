@@ -92,7 +92,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         <input
           id="qr-modal-note"
           type="text"
-          placeholder="VD: TT NCC kỳ … hoặc mã MAVG"
+          placeholder="VD: NCC KY … hoặc mã MAVG"
           className={inputCls}
           value={noteDraft}
           onChange={(event) => onNoteDraftChange(event.target.value)}
