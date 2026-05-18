@@ -2,7 +2,10 @@ const { STATUS } = require("../../utils/statuses");
 const logger = require("../../utils/logger");
 const { backupDatabaseToDrive } = require("../../utils/backupService");
 const { COL, TABLES, ORDER_COLS, expiryDateSQL } = require("../sqlHelpers");
-const { removeMappingsByOrders } = require("../../services/userAccountMappingService");
+// Require trực tiếp file con để tránh phụ thuộc thứ tự load `index.js` của service.
+const {
+  removeMappingsByOrders,
+} = require("../../services/userAccountMappingService/mappingCrud");
 
 let lastRunAt = null;
 
@@ -46,9 +49,17 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
         if (expiredOrderIds.length > 0) {
           await client.query("COMMIT"); // Commit trước để tránh deadlock
           try {
+            if (typeof removeMappingsByOrders !== "function") {
+              throw new Error(
+                `removeMappingsByOrders import sai: ${typeof removeMappingsByOrders}`
+              );
+            }
             await removeMappingsByOrders(expiredOrderIds);
           } catch (mappingErr) {
-            logger.warn("[CRON] Xóa mapping thất bại (bỏ qua)", { error: mappingErr.message });
+            logger.warn("[CRON] Xóa mapping thất bại (bỏ qua)", {
+              error: mappingErr.message,
+              stack: mappingErr.stack,
+            });
           }
           await client.query("BEGIN"); // Mở lại transaction cho paidToRenewal
         }
