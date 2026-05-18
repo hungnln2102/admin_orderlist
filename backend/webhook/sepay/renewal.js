@@ -464,6 +464,7 @@ const runRenewal = async (
     // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
     let finalGiaNhap = pricing.cost;
     const finalGiaBan = pricing.price;
+    let internalSupplierAccountingImport = 0;
 
     const ngayHetHanCu = new Date(hetHan.getTime());
     ngayHetHanCu.setHours(0, 0, 0, 0);
@@ -525,10 +526,18 @@ const runRenewal = async (
     }
     // NCC nội bộ Mavryk/Shop: không ghi nhận công nợ NCC.
     const skipNccLedger = isInternalSupplier;
+    if (!isMavn && skipNccLedger) {
+      // Yêu cầu nghiệp vụ: renew xong luôn reset cost trên đơn về 0 cho NCC Mavryk/Shop.
+      // Nếu có giá nhập sống từ supplier_cost, giữ lại ở biến accounting để ghi external_import.
+      const accountingCandidate = normalizeMoney(finalGiaNhap);
+      internalSupplierAccountingImport = accountingCandidate > 0 ? accountingCandidate : 0;
+      finalGiaNhap = 0;
+    }
     // Nếu NCC nội bộ đã bỏ giá nhập hiện hành khỏi supplier_cost, không được
     // kéo lại giá nhập cũ từ fallback đơn (tránh trừ bank/profit sai khi renewal webhook).
     if (!isMavn && skipNccLedger && !hasLiveSupplierImport) {
       finalGiaNhap = 0;
+      internalSupplierAccountingImport = 0;
     }
     // Đơn bán: renewal thủ công → Đang xử lý rồi dùng webhook/giả lập CK; MAVN nhập hàng → thẳng Đã TT (không bank).
     const isManualRenewal = source === "manual";
@@ -706,36 +715,25 @@ const runRenewal = async (
       } catch (balanceErr) {
         logger.error("Không thể cập nhật giá nhập cho Nhà Cung Cấp", { orderCode, error: balanceErr.message, stack: balanceErr.stack });
       }
-    } else if (skipNccLedger && supplierId && finalGiaNhap > 0) {
+    } else if (skipNccLedger && supplierId && internalSupplierAccountingImport > 0) {
       logger.info("[Renewal] Bỏ cộng công nợ NCC (NCC Mavryk/Shop)", {
         orderCode,
         supplierId,
-        finalGiaNhap,
+        finalGiaNhap: internalSupplierAccountingImport,
         isMavn,
       });
     }
 
-    let mavrykExternalImportLog = null;
-    if (!isMavn && skipNccLedger && finalGiaNhap > 0) {
-      try {
-        mavrykExternalImportLog = await createAutoMavrykExternalImportLog({
-          client,
-          orderCode,
-          amount: finalGiaNhap,
-          supplierName: supplierNameForNcc,
-          renewalStartDate: formatDateDB(ngayBatDauMoi),
-          renewalEndDate: formatDateDB(ngayHetHanMoi),
-          suppressFinanceNotify,
-        });
-      } catch (autoLogErr) {
-        logger.error("[Renewal] Không thể tự tạo external_import log cho NCC Mavryk/Shop", {
-          orderCode,
-          supplierId,
-          finalGiaNhap,
-          error: autoLogErr.message,
-          stack: autoLogErr.stack,
-        });
-      }
+    // Theo nghiệp vụ: renew đơn NCC Mavryk/Shop → cost = 0 và KHÔNG tạo
+    // external_import log (log này trước đây trừ -amount vào bank/profit, làm
+    // bank không nhận đủ tiền webhook).
+    const mavrykExternalImportLog = null;
+    if (!isMavn && skipNccLedger && internalSupplierAccountingImport > 0) {
+      logger.info("[Renewal] Bỏ tạo external_import log (NCC Mavryk/Shop)", {
+        orderCode,
+        supplierId,
+        amountSkipped: internalSupplierAccountingImport,
+      });
     }
 
     const details = {
