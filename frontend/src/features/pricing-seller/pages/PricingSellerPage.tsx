@@ -1,42 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
-
-type SellerPricingItem = {
-  variant_name: string;
-  display_name?: string;
-  gia_goc: number;
-  gia_si: number;
-  gia_le: number;
-};
-
-type SellerPricingResponse = {
-  items?: SellerPricingItem[];
-};
-
-const money = new Intl.NumberFormat("vi-VN");
-
-function formatVnd(value: number): string {
-  const safe = Number.isFinite(value) ? value : 0;
-  return `${money.format(Math.round(safe))} ₫`;
-}
-
-function parseDurationFromVariantName(
-  variantName: string,
-  displayName?: string
-): string {
-  const candidates = [variantName, displayName ?? ""];
-  for (const candidate of candidates) {
-    const normalized = String(candidate || "").trim();
-    const matched = normalized.match(/-{2,}\s*(\d+)\s*([md])$/i);
-    if (!matched) continue;
-
-    const value = Number(matched[1]);
-    if (!Number.isFinite(value) || value <= 0) continue;
-
-    return matched[2].toLowerCase() === "m" ? `${value} tháng` : `${value} ngày`;
-  }
-  return "-";
-}
+import CategoryFilterPanel from "../components/CategoryFilterPanel";
+import SellerPricingTable from "../components/SellerPricingTable";
+import type { SellerPricingItem, SellerPricingResponse } from "../types";
+import { getCategoryFilterOptions } from "../utils";
 
 export default function PricingSellerPage() {
   const PAGE_SIZE = 20;
@@ -44,6 +11,7 @@ export default function PricingSellerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -77,12 +45,27 @@ export default function PricingSellerPage() {
   }, []);
 
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredItems = items.filter((item) => {
-    if (!normalizedSearch) return true;
-    const variantName = String(item.variant_name || "").toLowerCase();
-    const displayName = String(item.display_name || "").toLowerCase();
-    return variantName.includes(normalizedSearch) || displayName.includes(normalizedSearch);
-  });
+  const categoryOptions = useMemo(() => getCategoryFilterOptions(items), [items]);
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const matchesSearch = !normalizedSearch
+          ? true
+          : String(item.variant_name || "").toLowerCase().includes(normalizedSearch) ||
+            String(item.display_name || "").toLowerCase().includes(normalizedSearch) ||
+            String(item.product_name || "").toLowerCase().includes(normalizedSearch);
+
+        const matchesCategory =
+          activeCategoryId == null
+            ? true
+            : Array.isArray(item.categories) &&
+              item.categories.some((category) => Number(category?.id) === activeCategoryId);
+
+        return matchesSearch && matchesCategory;
+      }),
+    [activeCategoryId, items, normalizedSearch]
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -92,7 +75,16 @@ export default function PricingSellerPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, activeCategoryId]);
+
+  useEffect(() => {
+    if (
+      activeCategoryId != null &&
+      !categoryOptions.some((category) => category.id === activeCategoryId)
+    ) {
+      setActiveCategoryId(null);
+    }
+  }, [activeCategoryId, categoryOptions]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -102,7 +94,7 @@ export default function PricingSellerPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-5xl rounded-xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="mx-auto w-full max-w-6xl rounded-xl bg-white p-4 shadow-sm sm:p-6">
         <header className="mb-4 border-b border-slate-200 pb-4">
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">Bảng giá bán</h1>
           <p className="mt-1 text-sm text-slate-500">Giá sỉ và giá lẻ theo từng variant.</p>
@@ -121,13 +113,21 @@ export default function PricingSellerPage() {
         ) : null}
 
         {!loading && !error ? (
-          <div className="mb-4">
+          <div className="mb-4 space-y-3">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm sản phẩm theo variant..."
+              placeholder="Tìm sản phẩm theo variant hoặc tên product..."
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-blue-500 focus:ring-2"
             />
+            <p className="text-xs text-slate-500">
+              Đang lọc danh mục:{" "}
+              <span className="font-medium text-slate-700">
+                {activeCategoryId == null
+                  ? "Tất cả"
+                  : categoryOptions.find((item) => item.id === activeCategoryId)?.name || "Tất cả"}
+              </span>
+            </p>
           </div>
         ) : null}
 
@@ -138,49 +138,13 @@ export default function PricingSellerPage() {
         ) : null}
 
         {!loading && !error && hasRows ? (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Variant
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Thời hạn
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Giá gốc
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Gia si
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Gia le
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {pageItems.map((item) => (
-                  <tr key={`${item.variant_name}-${item.gia_si}-${item.gia_le}`}>
-                    <td className="px-4 py-3 text-sm text-slate-900">
-                      {item.variant_name || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {parseDurationFromVariantName(item.variant_name, item.display_name)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
-                      {formatVnd(item.gia_goc)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
-                      {formatVnd(item.gia_si)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-slate-700">
-                      {formatVnd(item.gia_le)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+            <CategoryFilterPanel
+              categories={categoryOptions}
+              activeCategoryId={activeCategoryId}
+              onChangeCategory={setActiveCategoryId}
+            />
+            <SellerPricingTable items={pageItems} />
           </div>
         ) : null}
 

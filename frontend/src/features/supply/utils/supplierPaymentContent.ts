@@ -1,4 +1,4 @@
-/** Kỳ TT trả NCC: DDMMYYYY */
+/** Kỳ thanh toán cho NCC: DDMMYYYY */
 export function formatPaySupplierPeriod(date: Date = new Date()): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -19,7 +19,7 @@ export const NCC_REFUND_TRANSFER_LABEL = "MAVRYK";
 
 export function buildPaySupplierContent(supplierName: string, date: Date = new Date()): string {
   const name = String(supplierName || "").trim() || "NCC";
-  return `TT ${name} kỳ ${formatPaySupplierPeriod(date)}`;
+  return `THANH TOAN ${name} KY ${formatPaySupplierPeriod(date)}`;
 }
 
 /** `RF MAVRYK <kỳ YYYYDDMM>` — ví dụ `RF MAVRYK 20263004` */
@@ -30,7 +30,7 @@ export function buildRefundSupplierContent(date: Date = new Date()): string {
 export type NccTransferContentParams = {
   /**
    * Số dư công nợ NCC theo đơn (cùng dấu với API `totalImport` / chênh chu kỳ).
-   * - \> 0: shop còn nợ NCC → nội dung thanh toán tiền hàng (TT …).
+   * - \> 0: shop còn nợ NCC → nội dung thanh toán tiền hàng.
    * - \< 0: NCC hoàn cho shop → nội dung hoàn tiền (RF MAVRYK …).
    */
   balanceSigned: number;
@@ -40,7 +40,7 @@ export type NccTransferContentParams = {
 
 /**
  * Hai luồng nội dung chuyển khoản (VietQR / Sepay đối soái).
- * Chưa thanh toán dương → TT; âm → RF MAVRYK.
+ * Chưa thanh toán dương → THANH TOAN; âm → RF MAVRYK.
  */
 export function buildNccTransferContentByBalance({
   balanceSigned,

@@ -193,10 +193,10 @@ const getSupplyOverview = async (req, res) => {
     if (orderUnpaidImport !== 0) {
       unpaidPayments.push({
         id: 0,
-        round: "Công nợ theo đơn (Chưa TT NCC)",
+        round: "Công nợ theo đơn (Chưa thanh toán)",
         totalImport: orderUnpaidImport,
         paid: 0,
-        status: orderUnpaidImport < 0 ? "NCC hoàn tiền cho Shop" : "Chưa Thanh Toán NCC",
+        status: orderUnpaidImport < 0 ? "Hoàn tiền về shop" : "Chưa thanh toán",
       });
     }
 

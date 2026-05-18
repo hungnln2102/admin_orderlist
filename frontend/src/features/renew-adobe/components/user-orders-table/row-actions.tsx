@@ -1,4 +1,4 @@
-import { ArrowPathIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { UserOrdersTableActionProps } from "./types";
 import { getRowActionState } from "./row-action-state";
 
@@ -21,7 +21,7 @@ export function RowActionButtons({
   onOpenAdesRenew,
   compact = false,
 }: Props) {
-  const { showAdesRenew, showAdobeFix } = getRowActionState(
+  const { isActive, canFixViaAdes, canFixViaAdobe, showFixButton } = getRowActionState(
     displayStatus,
     row.systemNote,
     row.accountId,
@@ -35,21 +35,35 @@ export function RowActionButtons({
   const fixBtnCls = compact
     ? "rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-2.5 py-1 text-xs font-semibold hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
     : "rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40 px-3 py-1.5 text-xs font-semibold";
+  const disabledFixBtnCls = compact
+    ? "rounded-lg bg-slate-500/20 text-slate-300 border border-slate-400/35 px-2.5 py-1 text-xs font-semibold cursor-not-allowed"
+    : "rounded-lg bg-slate-500/20 text-slate-300 border border-slate-400/35 px-3 py-1.5 text-xs font-semibold cursor-not-allowed";
+  const isFixLoading = fixingId === row.email || adesRenewingId === row.email;
+  const canClickFix = canFixViaAdes || canFixViaAdobe;
+  const disableFix = isFixLoading || deleteDisabled || !canClickFix || isActive;
+  const handleFix = () => {
+    if (canFixViaAdes) {
+      onOpenAdesRenew(row);
+      return;
+    }
+    if (canFixViaAdobe) {
+      onFixUser?.(row.email);
+    }
+  };
 
   return (
     <>
-      {showAdesRenew && (
+      {showFixButton ? (
         <button
           type="button"
-          onClick={() => onOpenAdesRenew(row)}
-          disabled={adesRenewingId === row.email}
-          className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Renew qua Fix Ades"
+          onClick={handleFix}
+          disabled={disableFix}
+          className={disableFix ? disabledFixBtnCls : fixBtnCls}
+          title={isActive ? "Đơn đã fix, không cần thao tác thêm" : "Fix user"}
         >
-          <ArrowPathIcon className="h-3.5 w-3.5" />
-          {adesRenewingId === row.email ? "Đang renew…" : "Renew Ades"}
+          {isFixLoading ? "Đang fix..." : "Fix"}
         </button>
-      )}
+      ) : null}
 
       {row.accountId > 0 && onDeleteUser && (
         <button
@@ -59,17 +73,6 @@ export function RowActionButtons({
           className={actionBtnCls}
         >
           Xóa user
-        </button>
-      )}
-
-      {showAdobeFix && (
-        <button
-          type="button"
-          onClick={() => onFixUser?.(row.email)}
-          disabled={deleteDisabled}
-          className={fixBtnCls}
-        >
-          {fixingId === row.email ? "Đang fix..." : "Fix"}
         </button>
       )}
 

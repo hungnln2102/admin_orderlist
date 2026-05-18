@@ -2,8 +2,9 @@ import type { UserOrdersTableActionProps } from "./types";
 
 type RowActionState = {
   isActive: boolean;
-  showAdesRenew: boolean;
-  showAdobeFix: boolean;
+  canFixViaAdes: boolean;
+  canFixViaAdobe: boolean;
+  showFixButton: boolean;
 };
 
 export const getRowActionState = (
@@ -13,9 +14,12 @@ export const getRowActionState = (
   canFixUser: boolean
 ): RowActionState => {
   const isActive = displayStatus === "active" || displayStatus === "paid";
+  const canFixViaAdes = !isActive && systemNote === "fix_ades";
+  const canFixViaAdobe = !isActive && systemNote !== "fix_ades" && accountId === 0 && canFixUser;
   return {
     isActive,
-    showAdesRenew: !isActive && systemNote === "fix_ades",
-    showAdobeFix: !isActive && systemNote !== "fix_ades" && accountId === 0 && canFixUser,
+    canFixViaAdes,
+    canFixViaAdobe,
+    showFixButton: true,
   };
 };

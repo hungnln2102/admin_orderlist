@@ -237,7 +237,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                       <p className="text-lg font-bold text-orange-400 mt-1">{Helpers.formatCurrency(totalUnpaid)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
-                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">NCC hoàn tiền</p>
+                      <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Hoàn tiền</p>
                       <p className="text-lg font-bold text-rose-400 mt-1">{Helpers.formatCurrency(totalSupplierRefund)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
@@ -263,7 +263,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
                     <span className="text-xs text-white/60">
-                      Trả NCC {Helpers.formatCurrency(totalUnpaid)} | NCC hoàn {Helpers.formatCurrency(totalSupplierRefund)}
+                      Cần chi {Helpers.formatCurrency(totalUnpaid)} | Hoàn về shop {Helpers.formatCurrency(totalSupplierRefund)}
                     </span>
                   </div>
                   {unpaidPayments.length === 0 ? (
@@ -293,7 +293,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                                 return (
                                   <>
                                     <p className={raw < 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
-                                      {Helpers.formatCurrency(display)}{raw < 0 ? " (NCC trả bạn)" : ""}
+                                      {Helpers.formatCurrency(display)}{raw < 0 ? " (Hoàn về bạn)" : ""}
                                     </p>
                                     <p className="text-white/40 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
                                   </>

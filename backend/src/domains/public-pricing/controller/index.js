@@ -3,6 +3,10 @@ const { roundToThousands } = require("../../../services/pricing/core");
 const {
   TABLES,
   variantCols,
+  productSchemaCols,
+  productCategoryCols,
+  categoryCols,
+  productDescCols,
   supplyPriceCols,
 } = require("../../products/controller/constants");
 const { quoteIdent } = require("../../../utils/sql");
@@ -91,27 +95,65 @@ function postCalculate(req, res, next) {
 async function getSellerPricingTable(_req, res, next) {
   try {
     const vid = quoteIdent(variantCols.id);
+    const vProductId = quoteIdent(variantCols.productId);
+    const vDescId = quoteIdent(variantCols.descVariantId);
     const vDisplayName = quoteIdent(variantCols.displayName || "display_name");
     const vVariantName = quoteIdent(variantCols.variantName || "variant_name");
     const vBasePrice = quoteIdent(variantCols.basePrice || "base_price");
     const vIsActive = quoteIdent(variantCols.isActive);
+    const pId = quoteIdent(productSchemaCols.id);
+    const pPackageName = quoteIdent(productSchemaCols.packageName);
+    const pcProductId = quoteIdent(productCategoryCols.productId);
+    const pcCategoryId = quoteIdent(productCategoryCols.categoryId);
+    const cId = quoteIdent(categoryCols.id);
+    const cName = quoteIdent(categoryCols.name);
+    const dId = quoteIdent(productDescCols.id);
+    const dRules = quoteIdent(productDescCols.rules);
     const marginJoin = TABLES.variantMargin;
     const tierJoin = TABLES.pricingTier;
 
     const query = `
       SELECT
+        v.${vid} AS variant_id,
+        v.${vProductId} AS product_id,
         COALESCE(NULLIF(TRIM(v.${vVariantName}::text), ''), v.${vid}::text) AS variant_name,
         COALESCE(NULLIF(TRIM(v.${vDisplayName}::text), ''), '') AS display_name,
+        COALESCE(NULLIF(TRIM(p.${pPackageName}::text), ''), '') AS product_name,
+        COALESCE(NULLIF(TRIM(d.${dRules}::text), ''), '') AS product_rules,
         COALESCE(v.${vBasePrice}, 0) AS gia_goc_raw,
         MAX(CASE WHEN pt.key = 'ctv' THEN vm.price END) AS gia_si_raw,
-        MAX(CASE WHEN pt.key = 'customer' THEN vm.price END) AS gia_le_raw
+        MAX(CASE WHEN pt.key = 'customer' THEN vm.price END) AS gia_le_raw,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object(
+              'id', c.${cId},
+              'name', c.${cName}
+            )
+          ) FILTER (WHERE c.${cId} IS NOT NULL),
+          '[]'::json
+        ) AS categories
       FROM ${TABLES.variant} v
+      LEFT JOIN ${TABLES.product} p
+        ON p.${pId} = v.${vProductId}
+      LEFT JOIN ${TABLES.productDesc} d
+        ON d.${dId} = v.${vDescId}
+      LEFT JOIN ${TABLES.productCategory} pc
+        ON pc.${pcProductId} = p.${pId}
+      LEFT JOIN ${TABLES.category} c
+        ON c.${cId} = pc.${pcCategoryId}
       LEFT JOIN ${marginJoin} vm
         ON vm.variant_id = v.${vid}
       LEFT JOIN ${tierJoin} pt
         ON pt.id = vm.tier_id
       WHERE COALESCE(v.${vIsActive}, TRUE) = TRUE
-      GROUP BY v.${vid}, v.${vVariantName}, v.${vDisplayName}, v.${vBasePrice}
+      GROUP BY
+        v.${vid},
+        v.${vProductId},
+        v.${vVariantName},
+        v.${vDisplayName},
+        v.${vBasePrice},
+        p.${pPackageName},
+        d.${dRules}
       ORDER BY variant_name ASC
     `;
 
@@ -123,8 +165,13 @@ async function getSellerPricingTable(_req, res, next) {
       const giaSi = toNum(row.gia_si_raw) || giaLe;
       const giaGoc = toNum(row.gia_goc_raw);
       return {
+        variant_id: toNum(row.variant_id),
+        product_id: toNum(row.product_id),
         variant_name: String(row.variant_name || "").trim() || "-",
         display_name: String(row.display_name || "").trim(),
+        product_name: String(row.product_name || "").trim(),
+        product_rules: String(row.product_rules || "").trim(),
+        categories: Array.isArray(row.categories) ? row.categories : [],
         gia_goc: giaGoc,
         gia_si: giaSi,
         gia_le: giaLe,
