@@ -8,7 +8,12 @@ const {
   SCHEMA_PARTNER,
   tableName,
 } = require("../../../../src/config/dbSchema");
-const { safeStringify, normalizeAmount, normalizeMoney } = require("../../utils");
+const {
+  safeStringify,
+  normalizeAmount,
+  normalizeMoney,
+  resolveOrderByPayment,
+} = require("../../utils");
 const {
   insertPaymentReceipt,
   getReceiptFinancialState,
@@ -17,7 +22,6 @@ const {
   ensureSupplyAndPriceFromOrder,
   updatePaymentSupplyBalance,
   countPaymentReceiptsForOrderCode,
-  resolveOrderByPayment,
 } = require("../../payments");
 const {
   isEligibleForRenewal,
@@ -429,9 +433,9 @@ async function handleWebhookPost(req, res) {
                   AND LOWER(COALESCE(rca.target_order_code::text, '')) =
                     LOWER(${ORDER_TABLE}.${ORDER_COLS.idOrder}::text)
                   AND (
-                    ${ORDER_TABLE}.${ORDER_COLS.CREATED_AT} IS NULL
+                    ${ORDER_TABLE}.${ORDER_COLS.createdAt} IS NULL
                     OR rca.applied_at IS NULL
-                    OR rca.applied_at >= ${ORDER_TABLE}.${ORDER_COLS.CREATED_AT}
+                    OR rca.applied_at >= ${ORDER_TABLE}.${ORDER_COLS.createdAt}
                   )
                 )
               )
