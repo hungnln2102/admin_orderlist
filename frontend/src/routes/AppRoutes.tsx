@@ -26,6 +26,11 @@ const PromoCodes = lazy(() => import("@/features/promo-codes/index.tsx"));
 const AddMcoin = lazy(() => import("@/features/add-mcoin/index.tsx"));
 const ActiveKeys = lazy(() => import("@/features/active-keys/index.tsx"));
 const IpWhitelistPage = lazy(() => import("@/features/ip-whitelist/pages/IpWhitelistPage").then(m => ({ default: m.IpWhitelistPage })));
+const ShopBankAccountsPage = lazy(() =>
+  import("@/features/shop-bank-accounts/pages/ShopBankAccountsPage").then((m) => ({
+    default: m.ShopBankAccountsPage,
+  }))
+);
 const RenewAdobeAdminPage = lazy(() => import("@/features/renew-adobe/pages/RenewAdobeAdminPage"));
 const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/RenewOrdersDeskPage"));
 const RenewProfileCheckDeskPage = lazy(
@@ -60,6 +65,7 @@ export function AppRoutes() {
         <Route path="/add-mcoin" element={<AddMcoin />} />
         <Route path="/active-keys" element={<ActiveKeys />} />
         <Route path="/ip-whitelist" element={<IpWhitelistPage />} />
+        <Route path="/shop-bank-accounts" element={<ShopBankAccountsPage />} />
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />

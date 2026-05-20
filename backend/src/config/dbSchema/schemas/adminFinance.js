@@ -28,6 +28,23 @@ const ADMIN_SCHEMA = {
       UPDATED_AT: "updated_at",
     },
   },
+  SHOP_BANK_ACCOUNTS: {
+    TABLE: "shop_bank_accounts",
+    COLS: {
+      ID: "id",
+      LABEL: "label",
+      ACCOUNT_NUMBER: "account_number",
+      ACCOUNT_HOLDER: "account_holder",
+      BANK_BIN: "bank_bin",
+      BANK_SHORT_CODE: "bank_short_code",
+      BANK_DISPLAY_NAME: "bank_display_name",
+      QR_NOTE_PREFIX: "qr_note_prefix",
+      IS_DEFAULT: "is_default",
+      IS_ACTIVE: "is_active",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
 };
 
 const FINANCE_SCHEMA = {

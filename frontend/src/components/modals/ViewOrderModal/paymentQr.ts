@@ -9,12 +9,23 @@ import {
   ORDER_QR_NOTE_PREFIX,
 } from "./constants";
 
+export type ShopBankQrOverride = {
+  accountNumber: string;
+  accountHolder: string;
+  bankCode: string;
+  bankDisplayName: string;
+  qrNotePrefix: string;
+};
+
 export type ViewOrderPaymentQrBuildInput = {
   order: Record<string, unknown>;
   keepOrderPrice: boolean;
   calculatedPrice: number | null;
   isGift: boolean;
   overrideCustomerQrAmount?: number | null;
+  shopBank?: ShopBankQrOverride | null;
+  /** Mã CK (transaction) — đã ensure từ API nếu đơn cũ chưa có. */
+  transferCodeOverride?: string | null;
 };
 
 export type ViewOrderPaymentQrPayload = {
@@ -49,20 +60,32 @@ export const buildViewOrderPaymentQrPayload = ({
   calculatedPrice,
   isGift,
   overrideCustomerQrAmount = null,
+  shopBank = null,
+  transferCodeOverride = null,
 }: ViewOrderPaymentQrBuildInput): ViewOrderPaymentQrPayload => {
   const idOrder = String(order[ORDER_FIELDS.ID_ORDER] ?? "");
-  /** Nội dung CK shop: cùng chuẩn ORDER_QR_NOTE_PREFIX + mã đơn (khớp Telegram / .env). */
-  const notePrefix = String(ORDER_QR_NOTE_PREFIX || "")
+  const transferCode = String(
+    transferCodeOverride ?? order[ORDER_FIELDS.TRANSACTION] ?? ""
+  )
+    .trim()
+    .toUpperCase();
+  const accountNo = shopBank?.accountNumber || ACCOUNT_NO;
+  const accountName = shopBank?.accountHolder || ACCOUNT_NAME;
+  const bankCode = shopBank?.bankCode || BANK_SHORT_CODE;
+  const bankDisplay = shopBank?.bankDisplayName || BANK_DISPLAY_NAME || BANK_SHORT_CODE;
+  const qrPrefix = shopBank?.qrNotePrefix ?? ORDER_QR_NOTE_PREFIX;
+  /** Nội dung CK shop: prefix + mã transaction (đơn mới); fallback id_order nếu chưa có. */
+  const notePrefix = String(qrPrefix || "")
     .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
     .replace(/\bTT\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const shopTransferContent = [notePrefix, idOrder]
+  const shopTransferContent = [notePrefix, transferCode]
     .map((s) => String(s || "").trim())
     .filter(Boolean)
     .join(" ")
     .trim();
-  const qrMessage = shopTransferContent || idOrder;
+  const qrMessage = shopTransferContent;
   const supplyName = String(order[ORDER_FIELDS.SUPPLY] ?? order.supply ?? "").trim();
   const accountHolder = String(order.supplier_account_holder ?? "").trim();
   const holderLabel = accountHolder || supplyName;
@@ -113,19 +136,22 @@ export const buildViewOrderPaymentQrPayload = ({
   }
 
   const effectiveQrAmount = Helpers.roundGiaBanValue(displayPriceAmount);
+  const canBuildShopQr = Boolean(transferCode && accountNo && bankCode);
   return {
-    qrCodeImageUrl: buildSepayQrUrl({
-      accountNumber: ACCOUNT_NO,
-      bankCode: BANK_SHORT_CODE,
-      amount: effectiveQrAmount,
-      description: qrMessage,
-      accountName: ACCOUNT_NAME,
-    }),
+    qrCodeImageUrl: canBuildShopQr
+      ? buildSepayQrUrl({
+          accountNumber: accountNo,
+          bankCode,
+          amount: effectiveQrAmount,
+          description: qrMessage,
+          accountName,
+        })
+      : "",
     effectiveQrAmount,
     qrMessage,
-    bankDisplay: BANK_DISPLAY_NAME || BANK_SHORT_CODE,
-    accountNoDisplay: ACCOUNT_NO,
-    holderDisplay: ACCOUNT_NAME,
+    bankDisplay,
+    accountNoDisplay: accountNo,
+    holderDisplay: accountName,
     isSupplierPayout: false,
     missingSupplierBank: false,
   };

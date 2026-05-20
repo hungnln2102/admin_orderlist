@@ -21,6 +21,7 @@ import {
 export const ORDER_FIELD_MAP = {
   ID: ORDER_COLS.id,
   ID_ORDER: ORDER_COLS.idOrder,
+  TRANSACTION: ORDER_COLS.transaction,
   ID_PRODUCT: ORDER_COLS.idProduct,
   INFORMATION_ORDER: ORDER_COLS.informationOrder,
   CUSTOMER: ORDER_COLS.customer,

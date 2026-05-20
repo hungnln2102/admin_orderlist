@@ -18,6 +18,7 @@ type OrderPaymentQrSectionProps = {
   missingSupplierBank?: boolean;
   canUseQr?: boolean;
   qrLockReason?: string;
+  transferCodeLoading?: boolean;
 };
 
 export const OrderPaymentQrSection = ({
@@ -36,6 +37,7 @@ export const OrderPaymentQrSection = ({
   missingSupplierBank = false,
   canUseQr = true,
   qrLockReason = "",
+  transferCodeLoading = false,
 }: OrderPaymentQrSectionProps) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -51,6 +53,14 @@ export const OrderPaymentQrSection = ({
       {!canUseQr && (
         <p className="text-sm text-amber-300/95 mb-3 px-2">
           {qrLockReason || "QR này đã bị khóa và không thể sử dụng."}
+        </p>
+      )}
+      {transferCodeLoading && (
+        <p className="text-sm text-indigo-200/80 mb-3">Đang tạo mã thanh toán…</p>
+      )}
+      {!transferCodeLoading && canUseQr && !qrCodeImageUrl && !missingSupplierBank && (
+        <p className="text-sm text-amber-200/90 mb-3">
+          Chưa có mã transaction — không tạo được QR. Thử tải lại trang.
         </p>
       )}
       {isSupplierPayout && (

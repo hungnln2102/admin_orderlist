@@ -44,6 +44,7 @@ const {
   resolveOrderCodesByBatchCodes,
   resolveBatchOrderAmountsByBatchCodes,
 } = require("./matchPhase");
+const { resolveOrderCodesByTransaction } = require("../../paymentReference");
 const {
   isBatchCode,
   PAYMENT_RECEIPT_BATCH_TABLE,
@@ -330,6 +331,7 @@ async function handleWebhookPost(req, res) {
 
   const {
     orderCode,
+    paymentReferenceCodes,
     orderCodes,
     batchCodes,
     transferAmountNormalized,
@@ -382,8 +384,19 @@ async function handleWebhookPost(req, res) {
         batchCodes,
         normalizeMoney
       );
+      const orderCodesFromTransaction = await resolveOrderCodesByTransaction(
+        client,
+        paymentReferenceCodes
+      );
+      if (orderCodesFromTransaction.length > 0) {
+        logger.info("[Webhook] Resolved orders by transaction code", {
+          paymentReferenceCodes,
+          orderCodesFromTransaction,
+        });
+      }
       const expandedOrderCodes = [
         ...new Set([
+          ...orderCodesFromTransaction,
           ...orderCodes.filter((code) => !isBatchCode(code)),
           ...[...batchOrderMap.values()].flat(),
         ]),

@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import * as Helpers from "../../../shared/utils";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
 import { useCalculatedPrice } from "./hooks/useCalculatedPrice";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { ensureOrderTransaction } from "@/features/orders/api/ensureOrderTransaction";
 import { buildViewOrderPaymentQrPayload, isImportOrderId } from "./paymentQr";
 import { getOrderQrEligibility } from "./qrEligibility";
 import { ViewOrderModalProps } from "./types";
@@ -20,7 +22,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   keepOrderPrice = false,
 }) => {
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
+  const orderListPk = Number(order?.[ORDER_FIELDS.ID]);
   const isGift = isGiftOrderCode(orderId);
+  const [transferCode, setTransferCode] = useState<string | null>(() => {
+    const existing = String(order?.[ORDER_FIELDS.TRANSACTION] ?? "").trim();
+    return existing || null;
+  });
+  const [transferCodeLoading, setTransferCodeLoading] = useState(false);
   const productName = order?.[ORDER_FIELDS.ID_PRODUCT] as string | undefined;
   const variantId = order?.variant_id;
   const basePrice = isGift
@@ -62,6 +70,42 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     ).trim() || "Chưa Thanh Toán";
   const shouldForceTargetedCreditQr =
     hasCreditApplication && targetedStatusForceQrPriceSet.has(displayStatus);
+
+  const { config: shopBankConfig } = useDefaultShopBankAccount();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const existing = String(order?.[ORDER_FIELDS.TRANSACTION] ?? "").trim();
+    setTransferCode(existing || null);
+  }, [isOpen, orderListPk]);
+
+  useEffect(() => {
+    if (!isOpen || !order) return;
+    const existing = String(order[ORDER_FIELDS.TRANSACTION] ?? "").trim();
+    if (existing) {
+      setTransferCode(existing);
+      return;
+    }
+    if (!Number.isFinite(orderListPk) || orderListPk <= 0) return;
+    if (importOrder) return;
+
+    let ignore = false;
+    setTransferCodeLoading(true);
+    void ensureOrderTransaction(orderListPk)
+      .then((result) => {
+        if (!ignore) setTransferCode(result.transaction);
+      })
+      .catch(() => {
+        if (!ignore) setTransferCode(null);
+      })
+      .finally(() => {
+        if (!ignore) setTransferCodeLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, orderListPk, importOrder]);
 
   const { calculatedPrice, priceLoading, priceError } = useCalculatedPrice({
     isOpen,
@@ -144,6 +188,14 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     calculatedPrice: shouldForceTargetedCreditQr ? null : calculatedPrice,
     isGift,
     overrideCustomerQrAmount: forcedCustomerQrAmount,
+    shopBank: {
+      accountNumber: shopBankConfig.accountNumber,
+      accountHolder: shopBankConfig.accountHolder,
+      bankCode: shopBankConfig.bankCode,
+      bankDisplayName: shopBankConfig.bankDisplayName,
+      qrNotePrefix: shopBankConfig.qrNotePrefix,
+    },
+    transferCodeOverride: transferCode,
   });
   const {
     qrCodeImageUrl,
@@ -208,6 +260,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             missingSupplierBank={missingSupplierBank}
             canUseQr={qrEligibility.canUseQr}
             qrLockReason={qrEligibility.reason}
+            transferCodeLoading={transferCodeLoading}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@
 export const ORDER_COLS = {
   id: "id",
   idOrder: "id_order",
+  transaction: "transaction",
   idProduct: "id_product",
   informationOrder: "information_order",
   customer: "customer",

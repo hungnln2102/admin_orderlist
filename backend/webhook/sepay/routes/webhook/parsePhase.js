@@ -3,6 +3,7 @@ const {
   normalizeTransactionPayload,
   deriveOrderCode,
 } = require("../../transactions");
+const { extractPaymentReferenceCandidates } = require("../../paymentReference");
 const { BATCH_CODE_REGEX, isBatchCode } = require("./constants");
 
 const isSupplierSettlementTransfer = (transaction) => {
@@ -34,6 +35,7 @@ function parseWebhookTransaction(payload) {
   if (!transaction) return null;
 
   const orderCode = deriveOrderCode(transaction);
+  const paymentReferenceCodes = extractPaymentReferenceCandidates(transaction);
   const extractedOrderCodes = extractOrderCodes(transaction);
   const explicitBatchCodes = extractBatchCodes(transaction);
   const normalizedPrimary = String(orderCode || "").trim().toUpperCase();
@@ -64,6 +66,7 @@ function parseWebhookTransaction(payload) {
   return {
     transaction,
     orderCode,
+    paymentReferenceCodes,
     orderCodes,
     batchCodes,
     transferAmountNormalized,

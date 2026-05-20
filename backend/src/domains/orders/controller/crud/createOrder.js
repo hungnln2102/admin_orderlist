@@ -13,6 +13,7 @@ const { todayYMDInVietnam } = require("../../../../utils/normalizers");
 const { ORDERS_SCHEMA, PARTNER_SCHEMA, PRODUCT_SCHEMA } = require("../../../../config/dbSchema");
 const { nextId } = require("../../../../services/idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../../services/orderCodeService");
+const { generateUniqueTransactionCode } = require("../../../../services/transactionCodeService");
 const { sendOrderCreatedNotification } = require("../../../../services/telegramOrderNotification");
 const logger = require("../../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
@@ -44,6 +45,7 @@ const attachCreateOrderRoute = (router) => {
         const supplyIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY;
         const productIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_PRODUCT;
         const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
+        const transactionCol = ORDERS_SCHEMA.ORDER_LIST.COLS.TRANSACTION;
         const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
         const costCol = ORDERS_SCHEMA.ORDER_LIST.COLS.COST;
         const grossSellingPriceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.GROSS_SELLING_PRICE;
@@ -200,6 +202,8 @@ const attachCreateOrderRoute = (router) => {
             } else {
                 payload[idOrderCol] = await generateUniqueOrderCode(effectivePrefix, trx);
             }
+
+            payload[transactionCol] = await generateUniqueTransactionCode(trx);
 
             const [newOrder] = await trx(TABLES.orderList).insert(payload).returning("*");
 

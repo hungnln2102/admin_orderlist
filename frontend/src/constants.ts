@@ -19,6 +19,7 @@ import { ORDER_STATUS } from "@shared/orderStatuses";
 export const API_ENDPOINTS = {
   ORDERS: "/api/orders",
   ORDER_BY_ID: (id: number) => `/api/orders/${id}`,
+  ORDER_ENSURE_TRANSACTION: (id: number) => `/api/orders/${id}/ensure-transaction`,
   ORDER_RENEW: (orderCode: string) =>
     `/api/orders/${encodeURIComponent(orderCode)}/renew`,
   ORDER_COMPLETE_MANUAL_WEBHOOK: (id: number) =>
@@ -93,6 +94,11 @@ export const API_ENDPOINTS = {
   CUSTOMER_STATUS: "/api/customer-status",
   IP_WHITELISTS: "/api/ip-whitelists",
   IP_WHITELIST_BY_ID: (id: number) => `/api/ip-whitelists/${id}`,
+  SHOP_BANK_ACCOUNTS: "/api/shop-bank-accounts",
+  SHOP_BANK_ACCOUNT_DEFAULT: "/api/shop-bank-accounts/default",
+  SHOP_BANK_ACCOUNT_BY_ID: (id: number) => `/api/shop-bank-accounts/${id}`,
+  SHOP_BANK_ACCOUNT_SET_DEFAULT: (id: number) =>
+    `/api/shop-bank-accounts/${id}/set-default`,
   SITE_MAINTENANCE: "/api/site-maintenance",
   PRICING_TIERS: "/api/pricing-tiers",
 };

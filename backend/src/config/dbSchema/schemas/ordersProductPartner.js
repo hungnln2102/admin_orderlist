@@ -7,6 +7,8 @@ const ORDERS_SCHEMA = {
     COLS: {
       ID: "id",
       ID_ORDER: "id_order",
+      /** Mã nội dung CK / webhook (chữ+số, unique). */
+      TRANSACTION: "transaction",
       ID_PRODUCT: "id_product",
       INFORMATION_ORDER: "information_order",
       CUSTOMER: "customer",

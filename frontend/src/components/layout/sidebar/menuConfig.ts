@@ -159,6 +159,11 @@ export const menuSections: MenuSection[] = [
         href: "/ip-whitelist",
         icon: ShieldCheckIcon,
       },
+      {
+        name: "Quản lý STK",
+        href: "/shop-bank-accounts",
+        icon: BanknotesIcon,
+      },
     ],
   },
 ];

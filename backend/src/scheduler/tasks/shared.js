@@ -24,6 +24,7 @@ function buildRenewalQuery(sqlDate, daysLeft) {
   return `
       SELECT
         ${COL.idOrder},
+        ${COL.transaction},
         ${COL.idProduct},
         ${COL.informationOrder},
         ${COL.customer},
@@ -69,6 +70,7 @@ function normalizeNotifyRow(row, today, nameMap, computedPrice) {
   const out = {
     id_order: normalized.id_order || normalized.idOrder,
     idOrder: normalized.id_order || normalized.idOrder,
+    transaction: normalized.transaction || row.transaction,
     order_code: normalized.id_order || normalized.idOrder,
     orderCode: normalized.id_order || normalized.idOrder,
     customer: normalized.customer,

@@ -11,6 +11,7 @@ const TABLES = {
 
 const COL = {
   idOrder: quoteIdent(ORDER_COLS.idOrder),
+  transaction: quoteIdent(ORDER_COLS.transaction),
   idProduct: quoteIdent(ORDER_COLS.idProduct),
   informationOrder: quoteIdent(ORDER_COLS.informationOrder),
   customer: quoteIdent(ORDER_COLS.customer),
