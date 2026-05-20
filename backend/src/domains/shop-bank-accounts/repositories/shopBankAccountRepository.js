@@ -6,56 +6,75 @@ const {
   tableName,
 } = require("../../../config/dbSchema");
 
-const DEF = getDefinition("SHOP_BANK_ACCOUNTS", ADMIN_SCHEMA);
-const COLS = DEF?.columns || ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
+const SCHEMA_COLS = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
+const SHOP_BANK_ACCOUNTS_DEF = getDefinition("SHOP_BANK_ACCOUNTS", ADMIN_SCHEMA);
+
+/** camelCase → tên cột DB (getDefinition); fallback từ ADMIN_SCHEMA.COLS */
+const FALLBACK_COLUMNS = {
+  id: SCHEMA_COLS.ID,
+  label: SCHEMA_COLS.LABEL,
+  accountNumber: SCHEMA_COLS.ACCOUNT_NUMBER,
+  accountHolder: SCHEMA_COLS.ACCOUNT_HOLDER,
+  bankBin: SCHEMA_COLS.BANK_BIN,
+  bankShortCode: SCHEMA_COLS.BANK_SHORT_CODE,
+  bankDisplayName: SCHEMA_COLS.BANK_DISPLAY_NAME,
+  qrNotePrefix: SCHEMA_COLS.QR_NOTE_PREFIX,
+  isDefault: SCHEMA_COLS.IS_DEFAULT,
+  isActive: SCHEMA_COLS.IS_ACTIVE,
+  createdAt: SCHEMA_COLS.CREATED_AT,
+  updatedAt: SCHEMA_COLS.UPDATED_AT,
+};
+
+const columns = SHOP_BANK_ACCOUNTS_DEF?.columns || FALLBACK_COLUMNS;
+
 const TABLE = tableName(
-  DEF?.tableName || ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE,
+  SHOP_BANK_ACCOUNTS_DEF?.tableName || ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE,
   SCHEMA_ADMIN
 );
 
 const selectColumns = {
-  id: COLS.ID,
-  label: COLS.LABEL,
-  accountNumber: COLS.ACCOUNT_NUMBER,
-  accountHolder: COLS.ACCOUNT_HOLDER,
-  bankBin: COLS.BANK_BIN,
-  bankShortCode: COLS.BANK_SHORT_CODE,
-  bankDisplayName: COLS.BANK_DISPLAY_NAME,
-  qrNotePrefix: COLS.QR_NOTE_PREFIX,
-  isDefault: COLS.IS_DEFAULT,
-  isActive: COLS.IS_ACTIVE,
-  createdAt: COLS.CREATED_AT,
-  updatedAt: COLS.UPDATED_AT,
+  id: columns.id,
+  label: columns.label,
+  accountNumber: columns.accountNumber,
+  accountHolder: columns.accountHolder,
+  bankBin: columns.bankBin,
+  bankShortCode: columns.bankShortCode,
+  bankDisplayName: columns.bankDisplayName,
+  qrNotePrefix: columns.qrNotePrefix,
+  isDefault: columns.isDefault,
+  isActive: columns.isActive,
+  createdAt: columns.createdAt,
+  updatedAt: columns.updatedAt,
 };
 
 const listShopBankAccounts = async () =>
   db(TABLE)
     .select(selectColumns)
-    .orderBy(COLS.IS_DEFAULT, "desc")
-    .orderBy(COLS.IS_ACTIVE, "desc")
-    .orderBy(COLS.ID, "desc");
+    .orderBy(columns.isDefault, "desc")
+    .orderBy(columns.isActive, "desc")
+    .orderBy(columns.id, "desc");
 
 const findShopBankAccountById = async (id) =>
-  db(TABLE).select(selectColumns).where(COLS.ID, id).first();
+  db(TABLE).select(selectColumns).where(columns.id, id).first();
 
 const findDefaultActiveAccount = async () =>
   db(TABLE)
     .select(selectColumns)
-    .where(COLS.IS_ACTIVE, true)
-    .where(COLS.IS_DEFAULT, true)
-    .orderBy(COLS.ID, "desc")
+    .where(columns.isActive, true)
+    .where(columns.isDefault, true)
+    .orderBy(columns.id, "desc")
     .first();
 
 const findShopBankAccountByNumber = async (accountNumber) =>
   db(TABLE)
     .select(selectColumns)
-    .whereRaw("TRIM(??) = ?", [COLS.ACCOUNT_NUMBER, accountNumber])
+    .whereRaw("TRIM(??) = ?", [columns.accountNumber, accountNumber])
     .first();
 
 const clearDefaultFlags = async (trx) =>
-  trx(TABLE).where(COLS.IS_DEFAULT, true).update({
-    [COLS.IS_DEFAULT]: false,
-    [COLS.UPDATED_AT]: trx.fn.now(),
+  trx(TABLE).where(columns.isDefault, true).update({
+    [columns.isDefault]: false,
+    [columns.updatedAt]: trx.fn.now(),
   });
 
 const insertShopBankAccount = async (trx, payload) => {
@@ -65,20 +84,22 @@ const insertShopBankAccount = async (trx, payload) => {
 
 const updateShopBankAccount = async (trx, id, payload) => {
   const rows = await trx(TABLE)
-    .where(COLS.ID, id)
+    .where(columns.id, id)
     .update({
       ...payload,
-      [COLS.UPDATED_AT]: trx.fn.now(),
+      [columns.updatedAt]: trx.fn.now(),
     })
     .returning(selectColumns);
   return rows[0] || null;
 };
 
-const deleteShopBankAccount = async (id) => db(TABLE).where(COLS.ID, id).del();
+const deleteShopBankAccount = async (id) => db(TABLE).where(columns.id, id).del();
 
 module.exports = {
-  SHOP_BANK_ACCOUNTS_DEF: DEF,
-  COLS,
+  SHOP_BANK_ACCOUNTS_DEF,
+  /** Tên cột snake_case cho insert/update payload (use-cases) */
+  COLS: SCHEMA_COLS,
+  columns,
   TABLE,
   selectColumns,
   listShopBankAccounts,
