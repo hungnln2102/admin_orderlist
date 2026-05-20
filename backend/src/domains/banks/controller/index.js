@@ -70,20 +70,23 @@ const normalizeBanks = (items = []) => {
         item?.code ??
         ""
     ).trim();
-    const name = String(
-      item?.shortName ??
-        item?.short_name ??
-        item?.name ??
-        item?.bankName ??
-        item?.bank_name ??
-        item?.bank ??
-        item?.code ??
-        ""
+    const shortName = String(
+      item?.shortName ?? item?.short_name ?? ""
     ).trim();
+    const fullName = String(
+      item?.name ?? item?.bankName ?? item?.bank_name ?? ""
+    ).trim();
+    const bankCode = String(item?.code ?? "").trim().toUpperCase();
+    const label = shortName || fullName || bankCode;
 
-    if (!bin || !name || seen.has(bin)) return;
+    if (!bin || !label || seen.has(bin)) return;
     seen.add(bin);
-    output.push({ bin, bank_name: name });
+    output.push({
+      bin,
+      bank_name: label,
+      bank_code: bankCode || undefined,
+      bank_full_name: fullName || shortName || label,
+    });
   });
 
   output.sort((a, b) => a.bank_name.localeCompare(b.bank_name, "vi"));

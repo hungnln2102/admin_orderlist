@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import GradientButton from "@/components/ui/GradientButton";
+import { useBankList } from "@/shared/hooks/useBankList";
 import type { ShopBankAccountItem, ShopBankAccountPayload } from "../types";
+import {
+  bankFieldsFromSelection,
+  orphanBankOption,
+} from "../utils/applyBankSelection";
 
 type ShopBankAccountFormModalProps = {
   isOpen: boolean;
@@ -34,6 +39,7 @@ export function ShopBankAccountFormModal({
 }: ShopBankAccountFormModalProps) {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const { banks, loading: banksLoading, error: banksError } = useBankList();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,10 +61,43 @@ export function ShopBankAccountFormModal({
     setError(null);
   }, [isOpen, item]);
 
+  const bankOptions = useMemo(() => {
+    const list = [...banks];
+    const orphan = orphanBankOption({
+      bankBin: form.bankBin,
+      bankShortCode: form.bankShortCode,
+      bankDisplayName: form.bankDisplayName,
+    });
+    if (orphan && !list.some((b) => b.bin === orphan.bin)) {
+      list.unshift(orphan);
+    }
+    return list;
+  }, [banks, form.bankBin, form.bankShortCode, form.bankDisplayName]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "create" || item || banksLoading) return;
+    if (form.bankBin || bankOptions.length === 0) return;
+    setForm((f) => ({ ...f, ...bankFieldsFromSelection(bankOptions[0]) }));
+  }, [isOpen, mode, item, banksLoading, bankOptions, form.bankBin]);
+
   if (!isOpen) return null;
 
   const title = mode === "create" ? "Thêm STK nhận tiền" : "Cập nhật STK";
   const submitLabel = mode === "create" ? "Tạo mới" : "Lưu thay đổi";
+
+  const handleBankChange = (bin: string) => {
+    const bank = bankOptions.find((b) => b.bin === bin);
+    if (!bank) {
+      setForm((f) => ({
+        ...f,
+        bankBin: "",
+        bankShortCode: "",
+        bankDisplayName: "",
+      }));
+      return;
+    }
+    setForm((f) => ({ ...f, ...bankFieldsFromSelection(bank) }));
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -66,11 +105,11 @@ export function ShopBankAccountFormModal({
     const accountHolder = form.accountHolder.trim();
     const bankBin = form.bankBin.trim().replace(/\D/g, "");
     if (!accountNumber || !accountHolder || !bankBin) {
-      setError("STK, tên chủ TK và mã BIN là bắt buộc.");
+      setError("STK, tên chủ TK và ngân hàng là bắt buộc.");
       return;
     }
     if (!/^\d{6}$/.test(bankBin)) {
-      setError("Mã BIN phải gồm đúng 6 chữ số.");
+      setError("Mã BIN ngân hàng không hợp lệ — hãy chọn lại từ danh sách.");
       return;
     }
     setError(null);
@@ -86,6 +125,8 @@ export function ShopBankAccountFormModal({
       isActive: form.isActive,
     });
   };
+
+  const selectedBank = bankOptions.find((b) => b.bin === form.bankBin);
 
   return (
     <ModalPortal>
@@ -139,39 +180,43 @@ export function ShopBankAccountFormModal({
                 required
               />
             </div>
-            <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55">
-                Mã BIN (6 số) *
-              </label>
-              <input
-                value={form.bankBin}
-                onChange={(e) => setForm((f) => ({ ...f, bankBin: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white font-mono"
-                placeholder="970432"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55">
-                Mã NH VietQR (ngắn)
-              </label>
-              <input
-                value={form.bankShortCode}
-                onChange={(e) => setForm((f) => ({ ...f, bankShortCode: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white font-mono"
-                placeholder="VPB"
-              />
-            </div>
             <div className="sm:col-span-2">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55">
-                Tên ngân hàng hiển thị
+              <label
+                htmlFor="shop-bank-select"
+                className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55"
+              >
+                Ngân hàng *
               </label>
-              <input
-                value={form.bankDisplayName}
-                onChange={(e) => setForm((f) => ({ ...f, bankDisplayName: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white"
-                placeholder="VP Bank"
-              />
+              <select
+                id="shop-bank-select"
+                value={form.bankBin}
+                onChange={(e) => handleBankChange(e.target.value)}
+                disabled={banksLoading || bankOptions.length === 0}
+                className="w-full cursor-pointer rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white"
+                required
+              >
+                <option value="">
+                  {banksLoading ? "Đang tải danh sách..." : "— Chọn ngân hàng —"}
+                </option>
+                {bankOptions.map((bank) => (
+                  <option key={bank.bin} value={bank.bin}>
+                    {bank.name} · BIN {bank.bin}
+                    {bank.code ? ` · ${bank.code}` : ""}
+                  </option>
+                ))}
+              </select>
+              {banksError && (
+                <p className="mt-2 text-xs text-amber-300/90">
+                  {banksError}. Kiểm tra kết nối hoặc thử tải lại trang.
+                </p>
+              )}
+              {selectedBank && (
+                <p className="mt-2 text-xs text-white/45">
+                  VietQR: <span className="font-mono text-white/70">{selectedBank.code || "—"}</span>
+                  {" · "}
+                  Hiển thị: {selectedBank.fullName || selectedBank.name}
+                </p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55">
@@ -210,7 +255,7 @@ export function ShopBankAccountFormModal({
               <button type="button" onClick={onClose} className="text-sm text-white/50 hover:text-white">
                 Hủy
               </button>
-              <GradientButton type="submit" disabled={submitting} className="!rounded-2xl">
+              <GradientButton type="submit" disabled={submitting || banksLoading} className="!rounded-2xl">
                 {submitting ? "Đang lưu..." : submitLabel}
               </GradientButton>
             </div>
