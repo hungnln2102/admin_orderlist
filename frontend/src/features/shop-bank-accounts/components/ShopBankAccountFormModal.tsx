@@ -120,7 +120,8 @@ export function ShopBankAccountFormModal({
       bankBin,
       bankShortCode: form.bankShortCode.trim() || null,
       bankDisplayName: form.bankDisplayName.trim() || null,
-      qrNotePrefix: form.qrNotePrefix.trim() || null,
+      qrNotePrefix:
+        mode === "edit" ? (item?.qrNotePrefix?.trim() || null) : null,
       isDefault: form.isDefault,
       isActive: form.isActive,
     });
@@ -217,16 +218,10 @@ export function ShopBankAccountFormModal({
                   Hiển thị: {selectedBank.fullName || selectedBank.name}
                 </p>
               )}
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-indigo-200/55">
-                Prefix nội dung CK (tùy chọn)
-              </label>
-              <input
-                value={form.qrNotePrefix}
-                onChange={(e) => setForm((f) => ({ ...f, qrNotePrefix: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white"
-              />
+              <p className="mt-2 text-xs text-white/40">
+                Nội dung chuyển khoản trên QR chỉ cần mã giao dịch 8 ký tự của đơn — không cần thêm
+                prefix.
+              </p>
             </div>
             <label className="flex items-center gap-2 text-sm text-white/80">
               <input
