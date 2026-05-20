@@ -285,8 +285,13 @@ const computeWebhookAmountDecision = computeDashboardPaymentDecision;
 const resolveOrderPriceForWebhookMatch = async (client, orderCode, state, statusValue) => {
   const stored = normalizeMoney(state?.[ORDER_COLS.price]);
   const storedGross = normalizeMoney(state?.[ORDER_COLS.grossSellingPrice]);
-  // Đơn có áp credit khi tạo: `price` đã là số còn thu; webhook cần đối chiếu theo giá gốc.
-  const baseOrderPrice = storedGross > 0 ? storedGross : stored;
+  const creditApplied = normalizeMoney(state?.credit_applied_amount);
+  const netSalePrice = normalizeMoney(stored + creditApplied);
+  // Đơn có áp credit: `price` là số còn thu qua NH; gross có thể lệch — ưu tiên net sale.
+  let baseOrderPrice = storedGross > 0 ? storedGross : stored;
+  if (storedGross > 0 && netSalePrice > 0 && storedGross > netSalePrice) {
+    baseOrderPrice = netSalePrice;
+  }
   if (statusValue !== ORDER_STATUS.RENEWAL || !state) {
     return baseOrderPrice;
   }

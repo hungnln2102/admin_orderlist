@@ -65,6 +65,11 @@ const {
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
+  buildWebhookLoopOrderCodes,
+  createWebhookAmountForCodeResolver,
+  resolveWebhookPostedRevenue,
+} = require("./orderCodeResolution");
+const {
   applyEstimatedBankBalanceDelta,
 } = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
 const { STATUS } = require("../../../../src/utils/statuses");
@@ -394,18 +399,27 @@ async function handleWebhookPost(req, res) {
           orderCodesFromTransaction,
         });
       }
-      const expandedOrderCodes = [
-        ...new Set([
-          ...orderCodesFromTransaction,
-          ...orderCodes.filter((code) => !isBatchCode(code)),
-          ...[...batchOrderMap.values()].flat(),
-        ]),
-      ];
-      loopOrderCodes = expandedOrderCodes.length
-        ? expandedOrderCodes
-        : orderCode && !isBatchCode(orderCode)
-          ? [orderCode]
-          : [];
+      loopOrderCodes = buildWebhookLoopOrderCodes({
+        orderCodesFromTransaction,
+        orderCodes,
+        batchOrderMap,
+        orderCode,
+        batchCodes,
+      });
+
+      if (
+        orderCodesFromTransaction.length > 0 &&
+        orderCodes.some((code) => !isBatchCode(code))
+      ) {
+        logger.info(
+          "[Webhook] Matched by transaction — ignore extra MAV codes in CK content",
+          {
+            paymentReferenceCodes,
+            orderCodesFromTransaction,
+            ignoredMavCodes: orderCodes.filter((code) => !isBatchCode(code)),
+          }
+        );
+      }
 
       if (batchCodes.length > 0) {
         logger.info("[Webhook] Resolve MAVG batch codes", {
@@ -415,10 +429,21 @@ async function handleWebhookPost(req, res) {
         });
       }
 
-      const getCurrentAmountForCode = (code) => {
-        if (batchCodes.length === 0) return transferAmountNormalized;
-        return Math.max(0, normalizeMoney(batchOrderAmountMap.get(code) || 0));
-      };
+      if (loopOrderCodes.length > 1 && batchCodes.length === 0) {
+        logger.warn("[Webhook] Multiple orders in one receipt — split transfer amount", {
+          receiptAmount: transferAmountNormalized,
+          loopOrderCodes,
+          resolvedByTransaction: orderCodesFromTransaction.length > 0,
+        });
+      }
+
+      const getCurrentAmountForCode = createWebhookAmountForCodeResolver({
+        batchCodes,
+        batchOrderAmountMap,
+        loopOrderCodes,
+        orderCodesFromTransaction,
+        transferAmountNormalized,
+      });
 
       for (const code of loopOrderCodes) {
         const stateRes = await client.query(
@@ -692,17 +717,9 @@ async function handleWebhookPost(req, res) {
             );
             if (statusUpdateResult.rowCount > 0) {
               const wireNow =
-                amountDecision?.recognizedRevenueForOrder !== undefined
-                  ? normalizeMoney(
-                      amountDecision.recognizedRevenueForOrder +
-                        (amountDecision.creditedAmount || 0)
-                    )
-                  : amountDecision?.recognizedRevenueCurrent !== undefined
-                    ? normalizeMoney(
-                        amountDecision.recognizedRevenueCurrent +
-                          (amountDecision.creditedAmount || 0)
-                      )
-                    : currentAmountForCode;
+                amountDecision != null
+                  ? resolveWebhookPostedRevenue(amountDecision)
+                  : currentAmountForCode;
               const {
                 revenue: rev,
                 profit: prof,
