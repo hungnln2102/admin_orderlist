@@ -1,10 +1,11 @@
-import type { MatchableOrder } from "../../helpers";
+import type { MatchableOrder, ShopBankDisplay } from "../../helpers";
 
 export type QrModalProps = {
   open: boolean;
   amount: string;
   note: string;
   matchableOrders: MatchableOrder[];
+  shopBank: ShopBankDisplay;
   onClose: () => void;
   onAmountChange: (value: string) => void;
   onNoteChange: (value: string) => void;

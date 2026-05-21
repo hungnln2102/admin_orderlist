@@ -9,13 +9,14 @@ const {
   formatCurrency,
   toInlineCode,
 } = require("./formatters");
-const {
-  QR_ACCOUNT_NUMBER,
-  QR_ACCOUNT_NAME,
-  QR_BANK_CODE,
-} = require("./constants");
+const normalizeBankInfo = (bankInfo = {}) => ({
+  accountNumber: String(bankInfo.accountNumber || "").trim(),
+  accountHolder: String(bankInfo.accountHolder || "").trim(),
+  bankCode: String(bankInfo.bankShortCode || bankInfo.bankCode || "").trim(),
+});
 
-function buildOrderCreatedMessage(order, paymentNote) {
+function buildOrderCreatedMessage(order, paymentNote, bankInfo) {
+  const bank = normalizeBankInfo(bankInfo);
   if (!order) return "";
   const orderCode = toSafeString(
     order.id_order || order.idOrder || order.order_code || order.orderCode
@@ -45,7 +46,7 @@ function buildOrderCreatedMessage(order, paymentNote) {
   const escExpiry = expiryDate ? escapeHtml(expiryDate) : "";
   const escDays = days > 0 ? escapeHtml(`${days} ngày`) : "";
   const escPrice = escapeHtml(priceValue);
-  const escStk = QR_ACCOUNT_NUMBER ? escapeHtml(QR_ACCOUNT_NUMBER) : "";
+  const escStk = bank.accountNumber ? escapeHtml(bank.accountNumber) : "";
   const escPayment = paymentNote ? escapeHtml(paymentNote) : "";
 
   const separator1 = "━━━━━━ 📦 ━━━━━━";
@@ -154,7 +155,8 @@ function buildCopyKeyboard(_payload) {
 /**
  * Build message thông báo đơn cần gia hạn (còn 4 ngày). Plain text.
  */
-function buildDueOrderMessage(order, index, total) {
+function buildDueOrderMessage(order, index, total, bankInfo) {
+  const bank = normalizeBankInfo(bankInfo);
   const orderCode = toSafeString(
     order.id_order || order.idOrder || order.order_code || order.orderCode
   ).trim();
@@ -197,9 +199,9 @@ function buildDueOrderMessage(order, index, total) {
     `👤 Tên: ${customer}`,
     contact ? `📞 Liên hệ: ${contact}` : null,
     `——— ℹ️ THÔNG TIN THANH TOÁN ———`,
-    QR_BANK_CODE ? `🏦 Ngân hàng: ${QR_BANK_CODE}` : null,
-    QR_ACCOUNT_NUMBER ? `🏧 STK: ${QR_ACCOUNT_NUMBER}` : null,
-    QR_ACCOUNT_NAME ? `👤 Tên: ${QR_ACCOUNT_NAME}` : null,
+    bank.bankCode ? `🏦 Ngân hàng: ${bank.bankCode}` : null,
+    bank.accountNumber ? `🏧 STK: ${bank.accountNumber}` : null,
+    bank.accountHolder ? `👤 Tên: ${bank.accountHolder}` : null,
     `📝 Nội dung: ${orderCode || "..."}`,
     ``,
     `⚠️ Vui lòng ghi đúng mã đơn trong nội dung chuyển khoản để xử lý nhanh.`,

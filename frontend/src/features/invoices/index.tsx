@@ -4,6 +4,8 @@ import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { apiFetch } from "@/shared/api/client";
 import { showAppNotification } from "@/lib/notifications";
 import * as Helpers from "@/shared/utils";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 import {
   MatchableOrder,
   PaymentReceipt,
@@ -25,6 +27,9 @@ import { QrModal } from "./components/QrModal";
 import { ReceiptDetailModal } from "./components/ReceiptDetailModal";
 
 export default function Invoices() {
+  const { config: shopBankConfig } = useDefaultShopBankAccount();
+  const shopBank = useMemo(() => toShopBankDisplay(shopBankConfig), [shopBankConfig]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
@@ -282,6 +287,7 @@ export default function Invoices() {
         amount={qrAmount}
         note={qrNote}
         matchableOrders={matchableOrders}
+        shopBank={shopBank}
         onClose={() => setIsQrModalOpen(false)}
         onAmountChange={setQrAmount}
         onNoteChange={setQrNote}
@@ -342,6 +348,7 @@ export default function Invoices() {
           onToggle={toggleRowDetails}
           onSelectReceipt={handleSelectReceipt}
           showOrderCode={categoryFilter !== "out-of-flow"}
+          shopBank={shopBank}
         />
 
         {!loading && filteredReceipts.length === 0 && (

@@ -12,10 +12,6 @@ const {
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
   SEND_ORDER_COPY_BUTTONS,
-  QR_NOTE_PREFIX,
-  QR_ACCOUNT_NUMBER,
-  QR_BANK_CODE,
-  QR_ACCOUNT_NAME,
 } = require("./constants");
 const { toSafeString, roundGiaBanValue } = require("./formatters");
 const {
@@ -85,10 +81,10 @@ async function sendOrderCreatedNotification(order) {
     }
   }
   const bank = await resolveDefaultShopBankAccount();
-  const qrAccountNumber = bank.accountNumber || QR_ACCOUNT_NUMBER;
-  const qrBankCode = bank.bankShortCode || QR_BANK_CODE;
-  const qrAccountName = bank.accountHolder || QR_ACCOUNT_NAME;
-  const notePrefix = String(bank.qrNotePrefix || QR_NOTE_PREFIX || "")
+  const qrAccountNumber = bank.accountNumber;
+  const qrBankCode = bank.bankShortCode;
+  const qrAccountName = bank.accountHolder;
+  const notePrefix = String(bank.qrNotePrefix || "")
     .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
     .replace(/\bTT\b/gi, " ")
     .replace(/\s+/g, " ")
@@ -106,7 +102,7 @@ async function sendOrderCreatedNotification(order) {
       });
   const caption = isImport
     ? buildImportOrderCreatedMessage(order)
-    : buildOrderCreatedMessage(order, paymentNote);
+    : buildOrderCreatedMessage(order, paymentNote, bank);
 
   if (!caption) return;
 

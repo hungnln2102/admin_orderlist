@@ -6,13 +6,13 @@ import { QrBatchToolsPanel } from "./qr-modal/QrBatchToolsPanel";
 import { QrPreviewPanel } from "./qr-modal/QrPreviewPanel";
 import { useQrModalController } from "./qr-modal/useQrModalController";
 import type { QrModalProps } from "./qr-modal/types";
-import { QR_BANK_INFO } from "../helpers";
 
 export const QrModal: React.FC<QrModalProps> = ({
   open,
   amount,
   note,
   matchableOrders,
+  shopBank,
   onClose,
   onAmountChange,
   onNoteChange,
@@ -22,6 +22,7 @@ export const QrModal: React.FC<QrModalProps> = ({
     amount,
     note,
     matchableOrders,
+    shopBank,
     onAmountChange,
     onNoteChange,
   });
@@ -71,9 +72,11 @@ export const QrModal: React.FC<QrModalProps> = ({
                   Tài khoản nhận
                 </p>
                 <p className="font-mono text-sm font-semibold text-white tracking-tight truncate">
-                  {QR_BANK_INFO.accountNumber}
+                  {shopBank.accountNumber || "—"}
                 </p>
-                <p className="text-xs text-slate-400 truncate">{QR_BANK_INFO.accountHolder}</p>
+                <p className="text-xs text-slate-400 truncate">
+                  {shopBank.accountHolder || "—"}
+                </p>
               </div>
             </div>
 
@@ -108,6 +111,7 @@ export const QrModal: React.FC<QrModalProps> = ({
               qrImageUrl={controller.qrImageUrl}
               formattedAmountDisplay={controller.formattedAmountDisplay}
               noteDisplay={controller.noteDisplay}
+              shopBank={shopBank}
             />
           </div>
         </div>

@@ -32,10 +32,6 @@ describe("sendOrderCreatedNotification chat routing", () => {
         TELEGRAM_IMPORT_ORDER_TOPIC_ID: NaN,
         SEND_ORDER_TO_TOPIC: true,
         SEND_ORDER_COPY_BUTTONS: false,
-        QR_NOTE_PREFIX: "Thanh toan",
-        QR_ACCOUNT_NUMBER: "",
-        QR_BANK_CODE: "VPB",
-        QR_ACCOUNT_NAME: "",
       })
     );
     jest.doMock(

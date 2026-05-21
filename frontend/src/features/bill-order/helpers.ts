@@ -1,9 +1,4 @@
 import { ORDER_CODE_PREFIXES } from "@/constants";
-import {
-  ACCOUNT_NAME,
-  ACCOUNT_NO,
-  BANK_DISPLAY_NAME,
-} from "@/components/modals/ViewOrderModal/constants";
 
 export type InvoiceForm = {
   invoiceCode: string;
@@ -111,9 +106,13 @@ export const COMPANY_INFO = {
   name: "MAVRYK PREMIUM",
   address: "Phan Văn Trị, Phường 11, Quận Bình Thạnh",
   phone: "(0378.304.963)",
-  bank: BANK_DISPLAY_NAME,
-  accountNumber: ACCOUNT_NO,
-  accountHolder: ACCOUNT_NAME,
+};
+
+export type CompanyBankInfo = {
+  bank: string;
+  accountNumber: string;
+  accountHolder: string;
+  receiver: string;
 };
 
 export const DEFAULT_FORM: InvoiceForm = {

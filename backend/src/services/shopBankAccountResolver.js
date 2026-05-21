@@ -1,18 +1,23 @@
 /**
- * Lấy STK shop mặc định từ DB; fallback biến môi trường khi chưa migrate / chưa có dữ liệu.
+ * Lấy STK shop mặc định từ DB (shop_bank_accounts).
  */
 
 const {
   findDefaultActiveAccount,
 } = require("../domains/shop-bank-accounts/repositories/shopBankAccountRepository");
 
-const ENV_FALLBACK = {
-  accountNumber: (process.env.ORDER_QR_ACCOUNT_NUMBER || process.env.VITE_ORDER_QR_ACCOUNT_NUMBER || "").trim(),
-  accountHolder: (process.env.ORDER_QR_ACCOUNT_NAME || process.env.VITE_ORDER_QR_ACCOUNT_NAME || "").trim(),
-  bankBin: (process.env.ORDER_QR_BANK_BIN || process.env.VITE_ORDER_QR_BANK_BIN || "").trim(),
-  bankShortCode: (process.env.ORDER_QR_BANK_CODE || process.env.VITE_ORDER_QR_BANK_CODE || "VPB").trim(),
-  bankDisplayName: (process.env.ORDER_QR_BANK_NAME || process.env.VITE_ORDER_QR_BANK_NAME || "VP Bank").trim(),
-  qrNotePrefix: (process.env.ORDER_QR_NOTE_PREFIX || process.env.VITE_ORDER_QR_NOTE_PREFIX || "").trim(),
+const EMPTY_BANK = {
+  id: null,
+  label: null,
+  accountNumber: "",
+  accountHolder: "",
+  bankBin: "",
+  bankShortCode: "",
+  bankDisplayName: "",
+  qrNotePrefix: "",
+  isDefault: false,
+  isActive: false,
+  source: "none",
 };
 
 const mapRowToDto = (row) => ({
@@ -29,20 +34,6 @@ const mapRowToDto = (row) => ({
   source: "database",
 });
 
-const mapEnvFallback = () => ({
-  id: null,
-  label: "ENV",
-  accountNumber: ENV_FALLBACK.accountNumber,
-  accountHolder: ENV_FALLBACK.accountHolder,
-  bankBin: ENV_FALLBACK.bankBin,
-  bankShortCode: ENV_FALLBACK.bankShortCode,
-  bankDisplayName: ENV_FALLBACK.bankDisplayName,
-  qrNotePrefix: ENV_FALLBACK.qrNotePrefix,
-  isDefault: true,
-  isActive: true,
-  source: "env",
-});
-
 /**
  * @returns {Promise<ReturnType<typeof mapRowToDto>>}
  */
@@ -53,20 +44,14 @@ async function resolveDefaultShopBankAccount() {
       return mapRowToDto(row);
     }
   } catch {
-    // Bảng chưa có hoặc lỗi kết nối — dùng env
+    // Bảng chưa có hoặc lỗi kết nối — trả empty.
   }
 
-  const env = mapEnvFallback();
-  if (!env.accountNumber || !env.accountHolder) {
-    return env;
-  }
-  if (!env.bankBin && env.bankShortCode.toUpperCase() === "VPB") {
-    env.bankBin = "970432";
-  }
-  return env;
+  return { ...EMPTY_BANK };
 }
 
 module.exports = {
   resolveDefaultShopBankAccount,
   mapRowToDto,
+  EMPTY_BANK,
 };

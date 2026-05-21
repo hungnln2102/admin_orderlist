@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as Helpers from "@/shared/utils";
 import { apiFetch } from "@/shared/api/client";
-import { QR_BANK_INFO } from "../../helpers";
+import type { ShopBankDisplay } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
 import type { BatchItem, BatchSummary } from "./types";
 
@@ -10,6 +10,7 @@ type Params = {
   amount: string;
   note: string;
   matchableOrders: Array<{ orderCode: string }>;
+  shopBank: ShopBankDisplay;
   onAmountChange: (value: string) => void;
   onNoteChange: (value: string) => void;
 };
@@ -19,6 +20,7 @@ export const useQrModalController = ({
   amount,
   note,
   matchableOrders,
+  shopBank,
   onAmountChange,
   onNoteChange,
 }: Params) => {
@@ -115,13 +117,13 @@ export const useQrModalController = ({
 
   const qrImageUrl = useMemo(() => {
     return Helpers.buildSepayQrUrl({
-      accountNumber: QR_BANK_INFO.accountNumber,
-      bankCode: QR_BANK_INFO.bankCode,
+      accountNumber: shopBank.accountNumber,
+      bankCode: shopBank.bankCode,
       amount: parsedAmount,
       description: noteDraft.trim(),
-      accountName: QR_BANK_INFO.accountHolder,
+      accountName: shopBank.accountHolder,
     });
-  }, [parsedAmount, noteDraft]);
+  }, [parsedAmount, noteDraft, shopBank]);
 
   const noteDisplay = noteDraft.trim() || "Chưa có nội dung";
 

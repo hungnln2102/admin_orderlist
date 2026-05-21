@@ -4,9 +4,9 @@ import {
   extractTransactionCodeFromNote,
   MatchableOrder,
   PaymentReceipt,
-  QR_BANK_INFO,
   formatCurrencyVnd,
   resolveSender,
+  type ShopBankDisplay,
 } from "../helpers";
 import ReceiptsExpandedDetailsRow from "./receipts-table/ReceiptsExpandedDetailsRow";
 import ReceiptsMatchConfirmModal from "./receipts-table/ReceiptsMatchConfirmModal";
@@ -22,6 +22,7 @@ type ReceiptsTableProps = {
   onSelectReceipt?: (receipt: PaymentReceipt) => void;
   showOrderCode?: boolean;
   enableOrderCodeEdit?: boolean;
+  shopBank: ShopBankDisplay;
 };
 
 export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
@@ -35,6 +36,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
   onSelectReceipt,
   showOrderCode = true,
   enableOrderCodeEdit = false,
+  shopBank,
 }) => {
   const [selectionByReceiptId, setSelectionByReceiptId] = useState<
     Record<number, string>
@@ -321,7 +323,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                     </td>
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
                       <div className="text-xs font-medium text-white/80">
-                        {receipt.receiver || QR_BANK_INFO.accountNumber}
+                        {receipt.receiver || shopBank.accountNumber}
                       </div>
                     </td>
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
@@ -353,6 +355,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                       expandedColSpan={expandedColSpan}
                       expandedGridClass={expandedGridClass}
                       showOrderCode={showOrderCode}
+                      shopBank={shopBank}
                     />
                   ) : null}
                 </React.Fragment>

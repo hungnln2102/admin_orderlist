@@ -1,13 +1,7 @@
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "@/constants";
 import * as Helpers from "@/shared/utils";
 import { buildSepayQrUrl } from "@/shared/utils/sepay";
-import {
-  ACCOUNT_NAME,
-  ACCOUNT_NO,
-  BANK_DISPLAY_NAME,
-  BANK_SHORT_CODE,
-  ORDER_QR_NOTE_PREFIX,
-} from "./constants";
+import { EMPTY_SHOP_BANK_QR_CONFIG } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 
 export type ShopBankQrOverride = {
   accountNumber: string;
@@ -69,11 +63,14 @@ export const buildViewOrderPaymentQrPayload = ({
   )
     .trim()
     .toUpperCase();
-  const accountNo = shopBank?.accountNumber || ACCOUNT_NO;
-  const accountName = shopBank?.accountHolder || ACCOUNT_NAME;
-  const bankCode = shopBank?.bankCode || BANK_SHORT_CODE;
-  const bankDisplay = shopBank?.bankDisplayName || BANK_DISPLAY_NAME || BANK_SHORT_CODE;
-  const qrPrefix = shopBank?.qrNotePrefix ?? ORDER_QR_NOTE_PREFIX;
+  const accountNo = shopBank?.accountNumber || EMPTY_SHOP_BANK_QR_CONFIG.accountNumber;
+  const accountName = shopBank?.accountHolder || EMPTY_SHOP_BANK_QR_CONFIG.accountHolder;
+  const bankCode = shopBank?.bankCode || EMPTY_SHOP_BANK_QR_CONFIG.bankCode;
+  const bankDisplay =
+    shopBank?.bankDisplayName ||
+    EMPTY_SHOP_BANK_QR_CONFIG.bankDisplayName ||
+    bankCode;
+  const qrPrefix = shopBank?.qrNotePrefix ?? EMPTY_SHOP_BANK_QR_CONFIG.qrNotePrefix;
   /** Nội dung CK shop: prefix + mã transaction (đơn mới); fallback id_order nếu chưa có. */
   const notePrefix = String(qrPrefix || "")
     .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")

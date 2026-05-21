@@ -1,17 +1,19 @@
 import React from "react";
-import { QR_BANK_INFO } from "../../helpers";
+import type { ShopBankDisplay } from "../../helpers";
 import { panelSurface } from "./helpers";
 
 type Props = {
   qrImageUrl: string;
   formattedAmountDisplay: string;
   noteDisplay: string;
+  shopBank: ShopBankDisplay;
 };
 
 export const QrPreviewPanel: React.FC<Props> = ({
   qrImageUrl,
   formattedAmountDisplay,
   noteDisplay,
+  shopBank,
 }) => (
   <div
     className={`${panelSurface} p-6 sm:p-8 flex flex-col items-center gap-8 relative overflow-hidden`}
@@ -53,18 +55,18 @@ export const QrPreviewPanel: React.FC<Props> = ({
     <dl className="relative w-full max-w-lg mx-auto space-y-0 rounded-2xl border border-white/[0.07] bg-slate-950/55 px-4 py-1 divide-y divide-white/[0.06]">
       <div className="flex justify-between gap-4 py-3">
         <dt className="text-slate-500 shrink-0 text-sm">Ngân hàng</dt>
-        <dd className="font-medium text-slate-100 text-right text-sm">{QR_BANK_INFO.bankName}</dd>
+        <dd className="font-medium text-slate-100 text-right text-sm">{shopBank.bankName || "—"}</dd>
       </div>
       <div className="flex justify-between gap-4 py-3">
         <dt className="text-slate-500 shrink-0 text-sm">Số tài khoản</dt>
         <dd className="font-mono font-semibold text-slate-100 text-right break-all text-sm">
-          {QR_BANK_INFO.accountNumber}
+          {shopBank.accountNumber || "—"}
         </dd>
       </div>
       <div className="flex justify-between gap-4 py-3">
         <dt className="text-slate-500 shrink-0 text-sm">Chủ TK</dt>
         <dd className="font-medium text-slate-100 text-right uppercase text-xs sm:text-sm leading-snug">
-          {QR_BANK_INFO.accountHolder}
+          {shopBank.accountHolder || "—"}
         </dd>
       </div>
       <div className="flex justify-between gap-4 py-3 items-baseline">

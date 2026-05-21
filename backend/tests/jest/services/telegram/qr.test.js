@@ -38,24 +38,11 @@ describe("qr (URL builders + fetcher)", () => {
       expect(urls[1]).toContain("amount=149000");
     });
 
-    test("Thiếu cả bank lẫn acc (args + env mặc định rỗng) → trả mảng rỗng", () => {
-      // QR_BANK_CODE mặc định = "VPB" trong constants nhưng QR_ACCOUNT_NUMBER
-      // mặc định rỗng → truyền args không có acc và không set env → empty.
-      const prevAcc = process.env.ORDER_QR_ACCOUNT_NUMBER;
-      const prevBank = process.env.ORDER_QR_BANK_CODE;
-      delete process.env.ORDER_QR_ACCOUNT_NUMBER;
-      process.env.ORDER_QR_BANK_CODE = "";
-      try {
-        const { buildQrProviderUrls } = requireFreshQr();
-        expect(buildQrProviderUrls({})).toEqual([]);
-        expect(buildQrProviderUrls({ accountNumber: "" })).toEqual([]);
-        expect(buildQrProviderUrls({ bankCode: "VPB" })).toEqual([]);
-      } finally {
-        if (prevAcc === undefined) delete process.env.ORDER_QR_ACCOUNT_NUMBER;
-        else process.env.ORDER_QR_ACCOUNT_NUMBER = prevAcc;
-        if (prevBank === undefined) delete process.env.ORDER_QR_BANK_CODE;
-        else process.env.ORDER_QR_BANK_CODE = prevBank;
-      }
+    test("Thiếu bank hoặc acc → trả mảng rỗng", () => {
+      const { buildQrProviderUrls } = requireFreshQr();
+      expect(buildQrProviderUrls({})).toEqual([]);
+      expect(buildQrProviderUrls({ accountNumber: "" })).toEqual([]);
+      expect(buildQrProviderUrls({ bankCode: "VPB" })).toEqual([]);
     });
 
     test("Không có amount → không thêm tham số amount", () => {

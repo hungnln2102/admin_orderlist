@@ -5,6 +5,7 @@ import {
   INVOICE_FONT_STACK,
   InvoiceForm,
   InvoiceLine,
+  type CompanyBankInfo,
   formatCurrency,
 } from "../helpers";
 import signImage from "@/assets/sign.png";
@@ -16,6 +17,7 @@ type InvoicePreviewProps = {
   dateDisplay: string;
   invoiceCodesDisplay: string;
   orderStatusDisplay: string;
+  companyBank: CompanyBankInfo;
   onDownload: () => void;
 };
 
@@ -26,6 +28,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   dateDisplay,
   invoiceCodesDisplay,
   orderStatusDisplay,
+  companyBank,
   onDownload,
 }) => {
   const { productTotal, discountTotal, subTotal } = useMemo(() => {
@@ -163,13 +166,13 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 Điện thoại: {COMPANY_INFO.phone}
               </p>
               <p className="inv-muted" style={{ margin: "4px 0 0", fontSize: 14, lineHeight: "24px", color: "#cbd5e1" }}>
-                Ngân hàng: {COMPANY_INFO.bank}
+                Ngân hàng: {companyBank.bank}
               </p>
               <p className="inv-muted" style={{ margin: "4px 0 0", fontSize: 14, lineHeight: "24px", color: "#cbd5e1" }}>
-                STK: {COMPANY_INFO.accountNumber}
+                STK: {companyBank.accountNumber}
               </p>
               <p className="inv-muted" style={{ margin: "4px 0 0", fontSize: 14, lineHeight: "24px", color: "#cbd5e1" }}>
-                Tên người nhận: {COMPANY_INFO.accountHolder}
+                Tên người nhận: {companyBank.accountHolder}
               </p>
             </div>
 
@@ -378,7 +381,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                         />
                       </div>
                       <div className="inv-link-name" style={{ marginTop: 8, fontStyle: "italic", color: "#93c5fd" }}>
-                        {COMPANY_INFO.receiver}
+                        {companyBank.receiver}
                       </div>
                     </td>
                   </tr>

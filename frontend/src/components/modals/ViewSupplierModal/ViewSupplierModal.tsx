@@ -12,7 +12,7 @@ import StatCard from "./components/StatCard";
 import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";
 import { showAppNotification } from "@/lib/notifications";
-import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "../ViewOrderModal/constants";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
@@ -30,6 +30,7 @@ export default function ViewSupplierModal({
   onClose,
   supplyId,
 }: ViewSupplierModalProps) {
+  const { config: shopBank } = useDefaultShopBankAccount();
   const {
     loading,
     data,
@@ -103,11 +104,11 @@ export default function ViewSupplierModal({
     if (amount <= 0) return null;
     if (isNegative) {
       return Helpers.buildSepayQrUrl({
-        accountNumber: ACCOUNT_NO,
-        bankCode: BANK_SHORT_CODE,
+        accountNumber: shopBank.accountNumber,
+        bankCode: shopBank.bankCode,
         amount,
         description: desc,
-        accountName: ACCOUNT_NAME,
+        accountName: shopBank.accountHolder,
       });
     }
     if (!supply.numberBank || !supply.binBank) return null;
@@ -118,7 +119,7 @@ export default function ViewSupplierModal({
       description: desc,
       accountName: supply.nameBank || "",
     });
-  }, [supply, selectedPayment]);
+  }, [supply, selectedPayment, shopBank]);
 
   if (!isOpen) return null;
 

@@ -1,12 +1,8 @@
 import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
 import * as Helpers from "@/shared/utils";
-import {
-  ACCOUNT_NAME,
-  ACCOUNT_NO,
-  BANK_BIN,
-  BANK_DISPLAY_NAME,
-  BANK_SHORT_CODE,
-} from "@/components/modals/ViewOrderModal/constants";
+
+export type { ShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
+export { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 
 export interface PaymentReceipt {
   id: number;
@@ -120,14 +116,6 @@ export const CATEGORY_OPTIONS: {
     description: "Tiền thừa sau Đã TT, không mã đơn, hoặc không MAV",
   },
 ];
-
-export const QR_BANK_INFO = {
-  bankName: BANK_DISPLAY_NAME,
-  accountHolder: ACCOUNT_NAME,
-  accountNumber: ACCOUNT_NO,
-  bankBin: BANK_BIN,
-  bankCode: BANK_SHORT_CODE, // VietQR short code
-};
 
 export const parseDMYDate = (value: string): number | null => {
   const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);

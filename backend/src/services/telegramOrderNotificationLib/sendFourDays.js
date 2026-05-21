@@ -8,14 +8,10 @@ const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   FOUR_DAYS_TOPIC_ID,
-  QR_ACCOUNT_NUMBER,
-  QR_BANK_CODE,
-  QR_ACCOUNT_NAME,
-  QR_NOTE_PREFIX,
 } = require("./constants");
 const { toSafeString } = require("./formatters");
 const { buildDueOrderMessage } = require("./messageBuilders");
-const { buildVietQrUrl, fetchQrImageBytes } = require("./qr");
+const { buildSepayQrUrl, fetchQrImageBytes } = require("./qr");
 const { resolveDefaultShopBankAccount } = require("../shopBankAccountResolver");
 const {
   ensureOrderTransactionForPayment,
@@ -39,13 +35,6 @@ async function sendFourDaysRemainingNotification(orders = []) {
     hasBotToken: !!TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     FOUR_DAYS_TOPIC_ID,
-  });
-  logger.info("[Order][Telegram] QR runtime config", {
-    accountNumber: QR_ACCOUNT_NUMBER,
-    bankCode: QR_BANK_CODE,
-    accountName: QR_ACCOUNT_NAME,
-    notePrefix: QR_NOTE_PREFIX,
-    pid: process.pid,
   });
 
   if (!SEND_ORDER_NOTIFICATION || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -84,7 +73,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
   }
 
   const bank = await resolveDefaultShopBankAccount();
-  const qrNotePrefix = String(bank.qrNotePrefix || QR_NOTE_PREFIX || "").trim();
+  const qrNotePrefix = String(bank.qrNotePrefix || "").trim();
 
   for (let i = 0; i < deduped.length; i++) {
     const order = deduped[i];
@@ -103,7 +92,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
     }
     if (!transferCode) {
       try {
-        const captionOnly = buildDueOrderMessage(order, index, total);
+        const captionOnly = buildDueOrderMessage(order, index, total, bank);
         if (captionOnly) {
           await sendWithRetry(() =>
             sendTelegramMessage({
@@ -122,8 +111,15 @@ async function sendFourDaysRemainingNotification(orders = []) {
       continue;
     }
     const price = Number(order.price || 0) || 0;
-    const caption = buildDueOrderMessage(order, index, total);
-    const qrUrl = buildVietQrUrl({ amount: price, orderCode: transferCode });
+    const paymentNote = [qrNotePrefix, transferCode].filter(Boolean).join(" ").trim();
+    const caption = buildDueOrderMessage(order, index, total, bank);
+    const qrUrl = buildSepayQrUrl({
+      accountNumber: bank.accountNumber,
+      bankCode: bank.bankShortCode,
+      amount: price,
+      description: paymentNote,
+      accountName: bank.accountHolder,
+    });
 
     // Pre-fetch QR bytes (xem comment trong sendOrderCreated.js).
     let qrPhotoBuffer = null;
@@ -131,10 +127,10 @@ async function sendFourDaysRemainingNotification(orders = []) {
       try {
         const fetched = await fetchQrImageBytes({
           amount: price,
-          addInfo: [qrNotePrefix, transferCode].filter(Boolean).join(" ").trim(),
-          accountName: bank.accountHolder || QR_ACCOUNT_NAME,
-          bankCode: bank.bankShortCode || QR_BANK_CODE,
-          accountNumber: bank.accountNumber || QR_ACCOUNT_NUMBER,
+          addInfo: paymentNote,
+          accountName: bank.accountHolder,
+          bankCode: bank.bankShortCode,
+          accountNumber: bank.accountNumber,
         });
         if (fetched?.buffer) {
           qrPhotoBuffer = fetched.buffer;

@@ -8,6 +8,7 @@ import { apiFetch } from "@/shared/api/client";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";
 import { InvoicePreview } from "./components/InvoicePreview";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import {
   DEFAULT_FORM,
   InvoiceEntry,
@@ -25,6 +26,17 @@ import {
 } from "./helpers";
 
 export default function BillOrder() {
+  const { config: shopBankConfig } = useDefaultShopBankAccount();
+  const companyBank = useMemo(
+    () => ({
+      bank: shopBankConfig.bankDisplayName || shopBankConfig.bankCode || "—",
+      accountNumber: shopBankConfig.accountNumber || "—",
+      accountHolder: shopBankConfig.accountHolder || "—",
+      receiver: shopBankConfig.accountHolder || "—",
+    }),
+    [shopBankConfig]
+  );
+
   useEffect(() => {
     const previousTitle = document.title;
     document.title = "Mavryk Premium Store";
@@ -257,6 +269,7 @@ export default function BillOrder() {
         dateDisplay={dateDisplay}
         invoiceCodesDisplay={invoiceCodesDisplay}
         orderStatusDisplay={orderStatusDisplay}
+        companyBank={companyBank}
         onDownload={handleDownload}
       />
     </div>

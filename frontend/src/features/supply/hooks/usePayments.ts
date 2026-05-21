@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { buildSepayQrUrl } from "../utils/supplies";
-import {
-  ACCOUNT_NAME,
-  ACCOUNT_NO,
-  BANK_SHORT_CODE,
-} from "@/components/modals/ViewOrderModal/constants";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
 export interface QrPayment {
@@ -38,6 +34,7 @@ export const usePayments = ({
   fetchOverview: () => Promise<void> | void;
   onRefreshList?: () => void;
 }) => {
+  const { config: shopBank } = useDefaultShopBankAccount();
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [qrPayment, setQrPayment] = useState<QrPayment | null>(null);
 
@@ -96,9 +93,9 @@ export const usePayments = ({
     const isPositive = diff > 0;
     const supplierName = String(supply?.sourceName || "").trim() || "NCC";
 
-    const accountNumber = isPositive ? supply?.numberBank || "" : ACCOUNT_NO;
-    const bankCode = isPositive ? supply?.binBank || "" : BANK_SHORT_CODE; // VietQR short code
-    const accountName = isPositive ? supply?.nameBank || "" : ACCOUNT_NAME;
+    const accountNumber = isPositive ? supply?.numberBank || "" : shopBank.accountNumber;
+    const bankCode = isPositive ? supply?.binBank || "" : shopBank.bankCode;
+    const accountName = isPositive ? supply?.nameBank || "" : shopBank.accountHolder;
 
     const description = buildNccTransferContentByBalance({
       balanceSigned: diff,

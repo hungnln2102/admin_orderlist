@@ -10,12 +10,6 @@
 const https = require("https");
 const { URL } = require("url");
 
-const {
-  QR_ACCOUNT_NUMBER,
-  QR_BANK_CODE,
-  QR_ACCOUNT_NAME,
-  QR_NOTE_PREFIX,
-} = require("./constants");
 const { preferIpv4Lookup } = require("./dnsHelpers");
 
 const VIETQR_IMAGE_TEMPLATE = "compact";
@@ -62,32 +56,6 @@ function buildSepayQrUrl({
 }
 
 /**
- * Build VietQR URL for due order notifications (giống mavrykstore_bot)
- */
-function buildVietQrUrl({ amount, orderCode }) {
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount <= 0) return "";
-
-  const params = new URLSearchParams();
-  params.set("amount", Math.round(numericAmount).toString());
-  const notePrefix = String(QR_NOTE_PREFIX || "")
-    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
-    .replace(/\bTT\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const note = [notePrefix, String(orderCode || "").trim()]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  if (note) {
-    params.set("addInfo", note);
-  }
-  params.set("accountName", QR_ACCOUNT_NAME);
-
-  return `https://img.vietqr.io/image/${QR_BANK_CODE}-${QR_ACCOUNT_NUMBER}-${VIETQR_IMAGE_TEMPLATE}.png?${params.toString()}`;
-}
-
-/**
  * Danh sách provider URL theo thứ tự ưu tiên: vietqr.io → qr.sepay.vn.
  * Trả mảng rỗng nếu thiếu bank/acc (không build được URL hợp lệ).
  */
@@ -98,12 +66,12 @@ function buildQrProviderUrls({
   bankCode,
   accountNumber,
 }) {
-  const bank = String(bankCode || QR_BANK_CODE || "").trim();
-  const acc = String(accountNumber || QR_ACCOUNT_NUMBER || "").trim();
+  const bank = String(bankCode || "").trim();
+  const acc = String(accountNumber || "").trim();
   if (!bank || !acc) return [];
 
   const desc = String(addInfo || "").trim();
-  const name = String(accountName || QR_ACCOUNT_NAME || "").trim();
+  const name = String(accountName || "").trim();
   const numericAmount = Number(amount);
   const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
   const amountStr = hasAmount ? Math.round(numericAmount).toString() : "";
@@ -298,7 +266,6 @@ async function fetchQrImageBytes(args, options = {}) {
 
 module.exports = {
   buildSepayQrUrl,
-  buildVietQrUrl,
   buildQrProviderUrls,
   fetchQrImageBytes,
   httpsGetBuffer,

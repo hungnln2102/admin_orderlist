@@ -5,7 +5,7 @@ import * as Helpers from "@/shared/utils";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
-import { ACCOUNT_NO, BANK_SHORT_CODE, ACCOUNT_NAME } from "@/components/modals/ViewOrderModal/constants";
+import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { buildNccTransferContentByBalance } from "../utils/supplierPaymentContent";
 
 interface Props {
@@ -26,6 +26,7 @@ type UnpaidPayment = {
 };
 
 const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks = [], onRefreshList }) => {
+  const { config: shopBank } = useDefaultShopBankAccount();
   const { overview, loading, error, fetchOverview, setError } = useSupplyDetail(supplyId, isOpen);
   const { confirmingId, confirmPayment } = usePayments({
     supply: overview?.supply,
@@ -68,11 +69,11 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     if (amount <= 0) return null;
     if (isNegative) {
       return Helpers.buildSepayQrUrl({
-        accountNumber: ACCOUNT_NO,
-        bankCode: BANK_SHORT_CODE,
+        accountNumber: shopBank.accountNumber,
+        bankCode: shopBank.bankCode,
         amount,
         description: desc,
-        accountName: ACCOUNT_NAME,
+        accountName: shopBank.accountHolder,
       });
     }
     if (!supply.numberBank || !supply.binBank) return null;
@@ -83,7 +84,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       description: desc,
       accountName: supply.nameBank || supply.sourceName || "",
     });
-  }, [supply, selectedPayment]);
+  }, [supply, selectedPayment, shopBank]);
 
   const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
     const raw = Number(p.totalImport ?? p.import_value ?? 0);

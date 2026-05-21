@@ -5,8 +5,8 @@ import * as Helpers from "@/shared/utils";
 import {
   extractTransactionCodeFromNote,
   type PaymentReceipt,
-  QR_BANK_INFO,
   resolveSender,
+  type ShopBankDisplay,
 } from "../../helpers";
 
 type ReceiptsExpandedDetailsRowProps = {
@@ -14,6 +14,7 @@ type ReceiptsExpandedDetailsRowProps = {
   expandedColSpan: number;
   expandedGridClass: string;
   showOrderCode: boolean;
+  shopBank: ShopBankDisplay;
 };
 
 const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
@@ -21,6 +22,7 @@ const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
   expandedColSpan,
   expandedGridClass,
   showOrderCode,
+  shopBank,
 }) => (
   <tr className="animate-in fade-in slide-in-from-top-2 duration-300 relative z-0">
     <td colSpan={expandedColSpan} className="px-6 pb-8 pt-2">
@@ -45,7 +47,7 @@ const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
               Người nhận
             </p>
             <p className="text-sm font-medium text-indigo-200/80">
-              {QR_BANK_INFO.accountNumber}
+              {shopBank.accountNumber || "—"}
             </p>
           </div>
           <div className="space-y-1">
