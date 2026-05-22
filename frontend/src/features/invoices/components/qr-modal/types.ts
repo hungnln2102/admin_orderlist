@@ -25,6 +25,7 @@ export type BatchSummary = {
 export type BatchItem = {
   id: number;
   orderCode: string;
+  transaction?: string;
   orderListId: number | null;
   amount: number;
   status: string;

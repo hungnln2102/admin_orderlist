@@ -4,6 +4,9 @@ const {
   BATCH_CODE_REGEX_STRICT,
   BATCH_CODE_PREFIX,
 } = require("./constants");
+const {
+  parseTransactionCodesInput,
+} = require("./parseTransactionCodesInput");
 
 const normalizeMoney = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
@@ -62,6 +65,7 @@ const toMonthKey = (value) => {
 module.exports = {
   normalizeMoney,
   parseOrderCodesInput,
+  parseTransactionCodesInput,
   generateCandidateBatchCode,
   hasMissingTableError,
   isMissingBatchTablesError,

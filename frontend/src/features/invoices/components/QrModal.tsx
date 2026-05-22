@@ -83,7 +83,7 @@ export const QrModal: React.FC<QrModalProps> = ({
             <QrBatchToolsPanel
               amountDraft={controller.amountDraft}
               noteDraft={controller.noteDraft}
-              orderHint={controller.orderHint}
+              transactionHint={controller.transactionHint}
               batchCodesDraft={controller.batchCodesDraft}
               batchLoading={controller.batchLoading}
               batchError={controller.batchError}

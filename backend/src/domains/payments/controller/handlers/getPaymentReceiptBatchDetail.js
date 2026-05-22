@@ -22,17 +22,24 @@ const getPaymentReceiptBatchDetail = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy batch MAVG." });
     }
 
-    const items = await db(TABLES.paymentReceiptBatchItem)
-      .select(
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID,
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE,
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID,
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT,
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS,
-        PAYMENT_RECEIPT_BATCH_ITEM_COLS.CREATED_AT
-      )
-      .whereRaw(`UPPER(${PAYMENT_RECEIPT_BATCH_ITEM_COLS.BATCH_CODE}::text) = ?`, [batchCode])
-      .orderBy(PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID, "asc");
+    const items = await db({ bi: TABLES.paymentReceiptBatchItem })
+      .leftJoin({ o: TABLES.orderList }, function joinOrder() {
+        this.on(
+          `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID}`,
+          `o.${ORDER_COLS.id}`
+        );
+      })
+      .select({
+        id: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID}`,
+        orderCode: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE}`,
+        orderListId: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID}`,
+        amount: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT}`,
+        status: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS}`,
+        createdAt: `bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.CREATED_AT}`,
+        transaction: `o.${ORDER_COLS.transaction}`,
+      })
+      .whereRaw(`UPPER(bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.BATCH_CODE}::text) = ?`, [batchCode])
+      .orderBy(`bi.${PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID}`, "asc");
 
     return res.json({
       batch: {
@@ -49,15 +56,13 @@ const getPaymentReceiptBatchDetail = async (req, res) => {
         createdAt: batch?.[PAYMENT_RECEIPT_BATCH_COLS.CREATED_AT] || null,
       },
       items: (items || []).map((row) => ({
-        id: Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ID]) || 0,
-        orderCode: String(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_CODE] || "")
-          .trim()
-          .toUpperCase(),
-        orderListId:
-          Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.ORDER_LIST_ID]) || null,
-        amount: Number(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.AMOUNT]) || 0,
-        status: String(row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.STATUS] || "pending"),
-        createdAt: row?.[PAYMENT_RECEIPT_BATCH_ITEM_COLS.CREATED_AT] || null,
+        id: Number(row?.id) || 0,
+        orderCode: String(row?.orderCode || "").trim().toUpperCase(),
+        transaction: String(row?.transaction || "").trim().toUpperCase(),
+        orderListId: Number(row?.orderListId) || null,
+        amount: Number(row?.amount) || 0,
+        status: String(row?.status || "pending"),
+        createdAt: row?.createdAt || null,
       })),
     });
   } catch (error) {

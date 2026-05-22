@@ -5,7 +5,7 @@ import type { BatchItem, BatchSummary } from "./types";
 type Props = {
   amountDraft: string;
   noteDraft: string;
-  orderHint: string;
+  transactionHint: string;
   batchCodesDraft: string;
   batchLoading: boolean;
   batchError: string | null;
@@ -32,7 +32,7 @@ type Props = {
 export const QrBatchToolsPanel: React.FC<Props> = ({
   amountDraft,
   noteDraft,
-  orderHint,
+  transactionHint,
   batchCodesDraft,
   batchLoading,
   batchError,
@@ -120,23 +120,27 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
               Mã nhóm biên lai (MAVG)
             </h3>
             <p className="text-xs text-emerald-200/65 mt-0.5 leading-relaxed">
-              Dán mã đơn MAV… — hệ thống tạo MAVG và điền nội dung + tổng tiền.
+              Dán mã giao dịch 8 ký tự — hệ thống tạo MAVG và điền nội dung CK + tổng tiền.
             </p>
           </div>
         </div>
         <textarea
           id="qr-modal-batch-codes"
           rows={3}
-          placeholder="MAVC…, MAVK… (phẩy hoặc xuống dòng)"
+          placeholder="A1B2C3D4, X9Y8Z7W6 (phẩy hoặc xuống dòng)"
           className={`${inputCls} resize-y min-h-[6rem] border-emerald-500/20 focus:border-emerald-400/50 focus:ring-emerald-500/15 flex-1`}
           value={batchCodesDraft}
           onChange={(event) => onBatchCodesDraftChange(event.target.value)}
         />
-        {orderHint ? (
+        {transactionHint ? (
           <p className="text-[11px] text-slate-500 leading-snug">
-            <span className="text-slate-400 font-semibold">Gợi ý:</span> {orderHint}
+            <span className="text-slate-400 font-semibold">Gợi ý mã GD:</span> {transactionHint}
           </p>
-        ) : null}
+        ) : (
+          <p className="text-[11px] text-slate-500 leading-snug">
+            Mã giao dịch lấy từ chi tiết đơn (QR) hoặc cột transaction trên đơn Chưa TT / Cần GH.
+          </p>
+        )}
         {batchError ? (
           <p className="text-xs text-rose-300">{batchError}</p>
         ) : null}
@@ -214,7 +218,12 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
                     key={item.id}
                     className="flex justify-between gap-2 rounded-md bg-slate-900/70 px-2 py-1.5"
                   >
-                    <span className="text-slate-200 font-medium">{item.orderCode}</span>
+                    <span className="text-slate-200 font-mono font-medium">
+                      {item.transaction || item.orderCode}
+                    </span>
+                    {item.transaction && item.orderCode ? (
+                      <span className="block text-[10px] text-slate-500 mt-0.5">{item.orderCode}</span>
+                    ) : null}
                     <span className="text-slate-400 tabular-nums shrink-0">
                       {(Number(item.amount) || 0).toLocaleString("vi-VN")}
                     </span>

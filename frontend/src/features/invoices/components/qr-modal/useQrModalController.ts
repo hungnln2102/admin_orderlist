@@ -3,13 +3,14 @@ import * as Helpers from "@/shared/utils";
 import { apiFetch } from "@/shared/api/client";
 import type { ShopBankDisplay } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
+import { parseBatchTransactionCodes } from "./parseBatchTransactionCodes";
 import type { BatchItem, BatchSummary } from "./types";
 
 type Params = {
   open: boolean;
   amount: string;
   note: string;
-  matchableOrders: Array<{ orderCode: string }>;
+  matchableOrders: Array<{ orderCode: string; transaction?: string }>;
   shopBank: ShopBankDisplay;
   onAmountChange: (value: string) => void;
   onNoteChange: (value: string) => void;
@@ -94,11 +95,11 @@ export const useQrModalController = ({
     };
   }, [open, batchInfo]);
 
-  const orderHint = useMemo(() => {
+  const transactionHint = useMemo(() => {
     const preview = matchableOrders
-      .slice(0, 10)
-      .map((item) => item.orderCode)
+      .map((item) => String(item.transaction || "").trim().toUpperCase())
       .filter(Boolean)
+      .slice(0, 10)
       .join(", ");
     return preview;
   }, [matchableOrders]);
@@ -156,12 +157,11 @@ export const useQrModalController = ({
   };
 
   const createBatchFromOrders = async () => {
-    const orderCodes = (
-      batchCodesDraft.toUpperCase().match(/MAV[A-Z0-9]{3,20}/g) || []
-    ).filter((code) => !/^MAVG/i.test(code));
-    const uniqueOrderCodes = [...new Set(orderCodes)];
-    if (uniqueOrderCodes.length === 0) {
-      setBatchError("Vui lòng nhập ít nhất 1 mã đơn MAV để tạo mã nhóm.");
+    const transactionCodes = parseBatchTransactionCodes(batchCodesDraft);
+    if (transactionCodes.length === 0) {
+      setBatchError(
+        "Vui lòng nhập ít nhất 1 mã giao dịch 8 ký tự (không dùng mã MAV/MAVG)."
+      );
       return;
     }
     setBatchLoading(true);
@@ -172,7 +172,7 @@ export const useQrModalController = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderCodes: uniqueOrderCodes,
+          transactionCodes,
           note: noteDraft.trim() || null,
         }),
       });
@@ -201,7 +201,7 @@ export const useQrModalController = ({
 
       setBatchInfo({
         batchCode: nextBatchCode,
-        orderCount: Number((body as { orderCount?: number })?.orderCount) || uniqueOrderCodes.length,
+        orderCount: Number((body as { orderCount?: number })?.orderCount) || transactionCodes.length,
         totalAmount: nextAmount,
       });
       setSelectedBatchCode(nextBatchCode);
@@ -236,7 +236,12 @@ export const useQrModalController = ({
         ? ((body as { items: BatchItem[] }).items)
         : [];
       setSelectedBatchItems(items);
-      setBatchCodesDraft(items.map((item: BatchItem) => item.orderCode).join(", "));
+      setBatchCodesDraft(
+        items
+          .map((item) => String(item.transaction || item.orderCode || "").trim().toUpperCase())
+          .filter(Boolean)
+          .join(", ")
+      );
       setNoteDraft(normalized);
       onNoteChange(normalized);
       const totalAmount = Number((body as { batch?: { totalAmount?: number } })?.batch?.totalAmount) || 0;
@@ -269,7 +274,7 @@ export const useQrModalController = ({
     selectedBatchItems,
     selectedBatchLoading,
     selectedBatchError,
-    orderHint,
+    transactionHint,
     formattedAmountDisplay,
     qrImageUrl,
     noteDisplay,

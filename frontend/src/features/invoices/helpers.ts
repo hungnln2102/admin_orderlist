@@ -24,6 +24,7 @@ export interface PaymentReceipt {
 export interface MatchableOrder {
   id: number;
   orderCode: string;
+  transaction: string;
   status: string;
   customer: string;
   informationOrder: string;

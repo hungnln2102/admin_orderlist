@@ -81,6 +81,7 @@ export default function Invoices() {
             .map((item: Partial<MatchableOrder>) => ({
               id: Number(item?.id) || 0,
               orderCode: String(item?.orderCode || "").trim().toUpperCase(),
+              transaction: String(item?.transaction || "").trim().toUpperCase(),
               status: String(item?.status || ""),
               customer: String(item?.customer || ""),
               informationOrder: String(item?.informationOrder || ""),

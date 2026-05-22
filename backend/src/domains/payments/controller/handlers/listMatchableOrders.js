@@ -15,6 +15,7 @@ const listMatchableOrders = async (req, res) => {
       .select({
         id: `o.${ORDER_COLS.id}`,
         orderCode: `o.${ORDER_COLS.idOrder}`,
+        transaction: `o.${ORDER_COLS.transaction}`,
         status: `o.${ORDER_COLS.status}`,
         customer: `o.${ORDER_COLS.customer}`,
         informationOrder: `o.${ORDER_COLS.informationOrder}`,
@@ -31,10 +32,11 @@ const listMatchableOrders = async (req, res) => {
       query = query.whereRaw(
         `(
           COALESCE(o.${ORDER_COLS.idOrder}::text, '') ILIKE ?
+          OR COALESCE(o.${ORDER_COLS.transaction}::text, '') ILIKE ?
           OR COALESCE(o.${ORDER_COLS.customer}::text, '') ILIKE ?
           OR COALESCE(o.${ORDER_COLS.informationOrder}::text, '') ILIKE ?
         )`,
-        [`%${q}%`, `%${q}%`, `%${q}%`]
+        [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`]
       );
     }
 
@@ -42,6 +44,7 @@ const listMatchableOrders = async (req, res) => {
     const orders = (rows || []).map((row) => ({
       id: Number(row.id) || 0,
       orderCode: String(row.orderCode || "").trim().toUpperCase(),
+      transaction: String(row.transaction || "").trim().toUpperCase(),
       status: String(row.status || ""),
       customer: String(row.customer || ""),
       informationOrder: String(row.informationOrder || ""),
