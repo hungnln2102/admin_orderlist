@@ -22,6 +22,7 @@
         "start:api": "node src/server.js",
         "start:webhook": "node webhook-server.js",
         "simulate:sepay-webhook": "node scripts/ops/simulate-sepay-webhook.js",
+        "test:mb-bank-webhook": "node scripts/ops/test-mb-bank-webhook.js",
         "test:webhook-finance": "node tests/manual/run-webhook-financial-reconcile-tests.js",
         "test:webhook-profit": "node tests/manual/run-webhook-profit-scenarios-tests.js",
         "test:webhook-scenarios": "node tests/manual/run-scenario-webhook-validation-suite.js",
