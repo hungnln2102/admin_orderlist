@@ -11,6 +11,7 @@ describe("shopBankAccountRepository column mapping", () => {
     expect(columns.id).toBe("id");
     expect(columns.accountNumber).toBe("account_number");
     expect(columns.isDefault).toBe("is_default");
+    expect(columns.totalWithdrawn).toBe("total_withdrawn");
   });
 
   test("selectColumns map aliases to real column names (not undefined)", () => {
@@ -24,5 +25,6 @@ describe("shopBankAccountRepository column mapping", () => {
   test("COLS export remains snake_case for use-cases payloads", () => {
     expect(COLS.ACCOUNT_NUMBER).toBe("account_number");
     expect(COLS.IS_DEFAULT).toBe("is_default");
+    expect(COLS.TOTAL_WITHDRAWN).toBe("total_withdrawn");
   });
 });

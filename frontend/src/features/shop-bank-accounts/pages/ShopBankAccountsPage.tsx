@@ -7,19 +7,30 @@ import {
   createShopBankAccount,
   deleteShopBankAccount,
   fetchShopBankAccounts,
+  fetchShopBankAccountBalances,
   setDefaultShopBankAccount,
   updateShopBankAccount,
+  updateShopBankAccountWithdrawn,
 } from "../api/shopBankAccountApi";
 import { DeleteShopBankAccountModal } from "../components/DeleteShopBankAccountModal";
+import { ShopBankBalanceTable } from "../components/ShopBankBalanceTable";
 import { ShopBankAccountFormModal } from "../components/ShopBankAccountFormModal";
 import { ShopBankAccountTable } from "../components/ShopBankAccountTable";
-import type { ShopBankAccountItem, ShopBankAccountPayload } from "../types";
+import {
+  formatShopBankMoneyInput,
+  parseShopBankMoneyInput,
+} from "../helpers/formatShopBankMoney";
+import type { ShopBankAccountBalanceItem, ShopBankAccountItem, ShopBankAccountPayload } from "../types";
 
 const PAGE_SIZE = 10;
 
 export function ShopBankAccountsPage() {
   const [items, setItems] = useState<ShopBankAccountItem[]>([]);
+  const [balanceItems, setBalanceItems] = useState<ShopBankAccountBalanceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [balancesLoading, setBalancesLoading] = useState(true);
+  const [balancesRefreshing, setBalancesRefreshing] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,6 +41,40 @@ export function ShopBankAccountsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
+  const [savingWithdrawnId, setSavingWithdrawnId] = useState<number | null>(null);
+  const [withdrawnDrafts, setWithdrawnDrafts] = useState<Record<number, string>>({});
+
+  const loadBalances = useCallback(async (options?: { refreshOnly?: boolean }) => {
+    const refreshOnly = options?.refreshOnly === true;
+    try {
+      if (refreshOnly) {
+        setBalancesRefreshing(true);
+      } else {
+        setBalancesLoading(true);
+      }
+      setBalanceError(null);
+      const rows = await fetchShopBankAccountBalances();
+      setBalanceItems(rows);
+      setWithdrawnDrafts(() => {
+        const next: Record<number, string> = {};
+        for (const row of rows) {
+          next[row.id] = formatShopBankMoneyInput(row.totalWithdrawn);
+        }
+        return next;
+      });
+    } catch (err) {
+      setBalanceItems([]);
+      setBalanceError(
+        err instanceof Error ? err.message : "Không thể tải số dư STK."
+      );
+    } finally {
+      if (refreshOnly) {
+        setBalancesRefreshing(false);
+      } else {
+        setBalancesLoading(false);
+      }
+    }
+  }, []);
 
   const loadItems = useCallback(async () => {
     try {
@@ -46,7 +91,8 @@ export function ShopBankAccountsPage() {
 
   useEffect(() => {
     void loadItems();
-  }, [loadItems]);
+    void loadBalances();
+  }, [loadItems, loadBalances]);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -98,7 +144,7 @@ export function ShopBankAccountsPage() {
         showAppNotification({ type: "success", message: "Đã cập nhật STK." });
       }
       setFormOpen(false);
-      await loadItems();
+      await Promise.all([loadItems(), loadBalances()]);
     } catch (err) {
       showAppNotification({
         type: "error",
@@ -115,7 +161,7 @@ export function ShopBankAccountsPage() {
     try {
       await setDefaultShopBankAccount(item.id);
       showAppNotification({ type: "success", message: "Đã đặt STK mặc định." });
-      await loadItems();
+      await Promise.all([loadItems(), loadBalances()]);
     } catch (err) {
       showAppNotification({
         type: "error",
@@ -126,6 +172,33 @@ export function ShopBankAccountsPage() {
     }
   };
 
+  const handleWithdrawnDraftChange = (id: number, value: string) => {
+    setWithdrawnDrafts((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSaveWithdrawn = async (item: ShopBankAccountBalanceItem) => {
+    const amount = parseShopBankMoneyInput(withdrawnDrafts[item.id] ?? "");
+    setSavingWithdrawnId(item.id);
+    try {
+      const updated = await updateShopBankAccountWithdrawn(item.id, amount);
+      setBalanceItems((prev) =>
+        prev.map((row) => (row.id === updated.id ? updated : row))
+      );
+      setWithdrawnDrafts((prev) => ({
+        ...prev,
+        [item.id]: formatShopBankMoneyInput(updated.totalWithdrawn),
+      }));
+      showAppNotification({ type: "success", message: "Đã cập nhật số tiền đã rút." });
+    } catch (err) {
+      showAppNotification({
+        type: "error",
+        message: err instanceof Error ? err.message : "Không thể lưu số tiền đã rút.",
+      });
+    } finally {
+      setSavingWithdrawnId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteItem) return;
     setDeleting(true);
@@ -133,7 +206,7 @@ export function ShopBankAccountsPage() {
       await deleteShopBankAccount(deleteItem.id);
       showAppNotification({ type: "success", message: "Đã xóa STK." });
       setDeleteItem(null);
-      await loadItems();
+      await Promise.all([loadItems(), loadBalances()]);
     } catch (err) {
       showAppNotification({
         type: "error",
@@ -161,6 +234,18 @@ export function ShopBankAccountsPage() {
           Thêm STK
         </GradientButton>
       </div>
+
+      <ShopBankBalanceTable
+        items={balanceItems}
+        loading={balancesLoading}
+        error={balanceError}
+        savingId={savingWithdrawnId}
+        draftWithdrawn={withdrawnDrafts}
+        onWithdrawnDraftChange={handleWithdrawnDraftChange}
+        onSaveWithdrawn={handleSaveWithdrawn}
+        onRefresh={() => void loadBalances({ refreshOnly: true })}
+        refreshing={balancesRefreshing}
+      />
 
       <div className="relative max-w-md">
         <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/35" />

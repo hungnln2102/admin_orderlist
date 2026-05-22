@@ -95,8 +95,10 @@ export const API_ENDPOINTS = {
   IP_WHITELISTS: "/api/ip-whitelists",
   IP_WHITELIST_BY_ID: (id: number) => `/api/ip-whitelists/${id}`,
   SHOP_BANK_ACCOUNTS: "/api/shop-bank-accounts",
+  SHOP_BANK_ACCOUNT_BALANCES: "/api/shop-bank-accounts/balances",
   SHOP_BANK_ACCOUNT_DEFAULT: "/api/shop-bank-accounts/default",
   SHOP_BANK_ACCOUNT_BY_ID: (id: number) => `/api/shop-bank-accounts/${id}`,
+  SHOP_BANK_ACCOUNT_WITHDRAWN: (id: number) => `/api/shop-bank-accounts/${id}/withdrawn`,
   SHOP_BANK_ACCOUNT_SET_DEFAULT: (id: number) =>
     `/api/shop-bank-accounts/${id}/set-default`,
   SITE_MAINTENANCE: "/api/site-maintenance",

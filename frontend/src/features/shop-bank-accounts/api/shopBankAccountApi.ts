@@ -1,6 +1,10 @@
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
-import type { ShopBankAccountItem, ShopBankAccountPayload } from "../types";
+import type {
+  ShopBankAccountItem,
+  ShopBankAccountBalanceItem,
+  ShopBankAccountPayload,
+} from "../types";
 
 type ListResponse = { items?: unknown[] };
 
@@ -39,6 +43,7 @@ export const normalizeShopBankAccountItem = (value: unknown): ShopBankAccountIte
           : null,
     isDefault: toBool(row.isDefault ?? row.is_default, false),
     isActive: toBool(row.isActive ?? row.is_active, true),
+    totalWithdrawn: Number(row.totalWithdrawn ?? row.total_withdrawn) || 0,
     createdAt:
       row.createdAt != null
         ? String(row.createdAt)
@@ -51,6 +56,20 @@ export const normalizeShopBankAccountItem = (value: unknown): ShopBankAccountIte
         : row.updated_at != null
           ? String(row.updated_at)
           : null,
+  };
+};
+
+export const normalizeShopBankAccountBalanceItem = (
+  value: unknown
+): ShopBankAccountBalanceItem => {
+  const base = normalizeShopBankAccountItem(value);
+  const row = (value ?? {}) as Record<string, unknown>;
+  return {
+    ...base,
+    totalReceived: Number(row.totalReceived ?? row.total_received) || 0,
+    totalWithdrawn:
+      Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
+    balanceRemaining: Number(row.balanceRemaining ?? row.balance_remaining) || 0,
   };
 };
 
@@ -72,6 +91,29 @@ export async function fetchShopBankAccounts(): Promise<ShopBankAccountItem[]> {
     ? (data as ListResponse).items
     : [];
   return items.map(normalizeShopBankAccountItem);
+}
+
+export async function fetchShopBankAccountBalances(): Promise<ShopBankAccountBalanceItem[]> {
+  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BALANCES);
+  const data = await parseResponse(response, (payload) => payload);
+  const items = Array.isArray((data as ListResponse)?.items)
+    ? (data as ListResponse).items
+    : [];
+  return items.map(normalizeShopBankAccountBalanceItem);
+}
+
+export async function updateShopBankAccountWithdrawn(
+  id: number,
+  totalWithdrawn: number
+): Promise<ShopBankAccountBalanceItem> {
+  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAWN(id), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ totalWithdrawn }),
+  });
+  return parseResponse(response, (payload) =>
+    normalizeShopBankAccountBalanceItem((payload as { item?: unknown })?.item)
+  );
 }
 
 export async function fetchDefaultShopBankAccount(): Promise<ShopBankAccountItem> {

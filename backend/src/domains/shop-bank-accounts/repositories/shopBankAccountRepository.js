@@ -21,6 +21,7 @@ const FALLBACK_COLUMNS = {
   qrNotePrefix: SCHEMA_COLS.QR_NOTE_PREFIX,
   isDefault: SCHEMA_COLS.IS_DEFAULT,
   isActive: SCHEMA_COLS.IS_ACTIVE,
+  totalWithdrawn: SCHEMA_COLS.TOTAL_WITHDRAWN,
   createdAt: SCHEMA_COLS.CREATED_AT,
   updatedAt: SCHEMA_COLS.UPDATED_AT,
 };
@@ -43,6 +44,7 @@ const selectColumns = {
   qrNotePrefix: columns.qrNotePrefix,
   isDefault: columns.isDefault,
   isActive: columns.isActive,
+  totalWithdrawn: columns.totalWithdrawn,
   createdAt: columns.createdAt,
   updatedAt: columns.updatedAt,
 };

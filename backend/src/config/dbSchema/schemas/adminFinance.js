@@ -41,6 +41,7 @@ const ADMIN_SCHEMA = {
       QR_NOTE_PREFIX: "qr_note_prefix",
       IS_DEFAULT: "is_default",
       IS_ACTIVE: "is_active",
+      TOTAL_WITHDRAWN: "total_withdrawn",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
     },

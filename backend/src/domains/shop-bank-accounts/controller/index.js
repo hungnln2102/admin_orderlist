@@ -7,6 +7,8 @@ const {
   setDefaultShopBankAccountItem,
   deleteShopBankAccountItem,
 } = require("../use-cases");
+const { listShopBankAccountBalances } = require("../use-cases/listShopBankAccountBalances");
+const { updateShopBankAccountWithdrawn } = require("../use-cases/updateShopBankAccountWithdrawn");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;
@@ -88,6 +90,28 @@ const removeShopBankAccount = async (req, res) => {
   }
 };
 
+const listShopBankAccountBalancesHandler = async (_req, res) => {
+  try {
+    const items = await listShopBankAccountBalances();
+    return res.json({ items });
+  } catch (error) {
+    return handleControllerError(res, error, "[shop-bank-accounts] balances failed");
+  }
+};
+
+const patchShopBankAccountWithdrawn = async (req, res) => {
+  try {
+    const item = await updateShopBankAccountWithdrawn(req.params.id, req.body);
+    return res.json({ item });
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      `[shop-bank-accounts] update withdrawn failed (id=${req.params.id})`
+    );
+  }
+};
+
 module.exports = {
   listShopBankAccounts,
   getDefaultShopBankAccountHandler,
@@ -95,4 +119,6 @@ module.exports = {
   updateShopBankAccount,
   setDefaultShopBankAccount,
   removeShopBankAccount,
+  listShopBankAccountBalancesHandler,
+  patchShopBankAccountWithdrawn,
 };

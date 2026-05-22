@@ -9,8 +9,16 @@ export interface ShopBankAccountItem {
   qrNotePrefix: string | null;
   isDefault: boolean;
   isActive: boolean;
+  totalWithdrawn?: number;
   createdAt?: string | null;
   updatedAt?: string | null;
+}
+
+/** STK kèm số dư: tổng CK Sepay, đã rút, còn lại. */
+export interface ShopBankAccountBalanceItem extends ShopBankAccountItem {
+  totalReceived: number;
+  totalWithdrawn: number;
+  balanceRemaining: number;
 }
 
 export interface ShopBankAccountPayload {
