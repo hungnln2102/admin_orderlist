@@ -11,11 +11,13 @@ const {
 const {
   parseOrderCodesInput,
   parseTransactionCodesInput,
-  generateCandidateBatchCode,
   isMissingBatchTablesError,
   createHttpError,
   normalizeMoney,
 } = require("../shared/helpers");
+const {
+  generateUniqueBatchTransferCode,
+} = require("../shared/batchTransferCode");
 
 const resolveOrdersForBatch = async (trx, { transactionCodes, legacyOrderCodes }) => {
   if (transactionCodes.length > 0) {
@@ -144,20 +146,7 @@ const createPaymentReceiptBatch = async (req, res) => {
         );
       }
 
-      let batchCode = "";
-      for (let i = 0; i < 8; i += 1) {
-        const candidate = generateCandidateBatchCode();
-        const exists = await trx(TABLES.paymentReceiptBatch)
-          .where(PAYMENT_RECEIPT_BATCH_COLS.BATCH_CODE, candidate)
-          .first();
-        if (!exists) {
-          batchCode = candidate;
-          break;
-        }
-      }
-      if (!batchCode) {
-        throw createHttpError(500, "Không thể tạo mã MAVG. Vui lòng thử lại.");
-      }
+      const batchCode = await generateUniqueBatchTransferCode(trx);
 
       const totalAmount = rows.reduce(
         (sum, row) => sum + normalizeMoney(row?.[ORDER_COLS.price]),
@@ -208,7 +197,7 @@ const createPaymentReceiptBatch = async (req, res) => {
       logger.warn("[payments] Create receipt batch skipped: missing batch tables");
       return res.status(503).json({
         error:
-          "Tính năng batch MAVG chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
+          "Tính năng mã gộp CK chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
       });
     }
     const statusCode = Number(error?.status) || 500;

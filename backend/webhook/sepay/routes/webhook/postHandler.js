@@ -69,6 +69,7 @@ const {
   createWebhookAmountForCodeResolver,
   resolveWebhookPostedRevenue,
 } = require("./orderCodeResolution");
+const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
 const {
   applyEstimatedBankBalanceDelta,
 } = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
@@ -358,6 +359,23 @@ async function handleWebhookPost(req, res) {
     try {
       await client.query("BEGIN");
 
+      const batchCodesFromTransfer = await resolveBatchCodesByTransferTokens(
+        client,
+        paymentReferenceCodes
+      );
+      const resolvedBatchCodes = [
+        ...new Set([
+          ...(batchCodes || []),
+          ...batchCodesFromTransfer,
+        ]),
+      ];
+      if (batchCodesFromTransfer.length > 0) {
+        logger.info("[Webhook] Resolved batch by transfer code", {
+          paymentReferenceCodes,
+          batchCodesFromTransfer,
+        });
+      }
+
       const transitionedOrderCodesToPaid = new Set();
       if (!orderCodes.length && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
         logger.info("[Webhook] No MAV order code found, trying amount-based fallback", {
@@ -383,10 +401,10 @@ async function handleWebhookPost(req, res) {
         });
       }
 
-      const batchOrderMap = await resolveOrderCodesByBatchCodes(client, batchCodes);
+      const batchOrderMap = await resolveOrderCodesByBatchCodes(client, resolvedBatchCodes);
       const batchOrderAmountMap = await resolveBatchOrderAmountsByBatchCodes(
         client,
-        batchCodes,
+        resolvedBatchCodes,
         normalizeMoney
       );
       const orderCodesFromTransaction = await resolveOrderCodesByTransaction(
@@ -404,7 +422,7 @@ async function handleWebhookPost(req, res) {
         orderCodes,
         batchOrderMap,
         orderCode,
-        batchCodes,
+        batchCodes: resolvedBatchCodes,
       });
 
       if (
@@ -421,15 +439,15 @@ async function handleWebhookPost(req, res) {
         );
       }
 
-      if (batchCodes.length > 0) {
-        logger.info("[Webhook] Resolve MAVG batch codes", {
-          batchCodes,
+      if (resolvedBatchCodes.length > 0) {
+        logger.info("[Webhook] Resolve batch codes", {
+          batchCodes: resolvedBatchCodes,
           expandedOrderCodes: loopOrderCodes,
           amountByOrder: Object.fromEntries(batchOrderAmountMap.entries()),
         });
       }
 
-      if (loopOrderCodes.length > 1 && batchCodes.length === 0) {
+      if (loopOrderCodes.length > 1 && resolvedBatchCodes.length === 0) {
         logger.warn("[Webhook] Multiple orders in one receipt — split transfer amount", {
           receiptAmount: transferAmountNormalized,
           loopOrderCodes,
@@ -438,7 +456,7 @@ async function handleWebhookPost(req, res) {
       }
 
       const getCurrentAmountForCode = createWebhookAmountForCodeResolver({
-        batchCodes,
+        batchCodes: resolvedBatchCodes,
         batchOrderAmountMap,
         loopOrderCodes,
         orderCodesFromTransaction,
@@ -497,7 +515,7 @@ async function handleWebhookPost(req, res) {
       }
 
       // Dùng mã đơn đã resolve (fallback hoặc extract) thay vì orderCode gốc
-      const resolvedOrderCode = batchCodes[0] || loopOrderCodes[0] || orderCode;
+      const resolvedOrderCode = resolvedBatchCodes[0] || loopOrderCodes[0] || orderCode;
       receiptResult = await insertPaymentReceipt(transaction, { client, orderCode: resolvedOrderCode });
       const receiptId = receiptResult?.id ?? receiptResult?.existingId ?? null;
       const receiptState = await getReceiptFinancialState(client, receiptId);
@@ -959,7 +977,7 @@ async function handleWebhookPost(req, res) {
         }
       }
 
-      if (receiptId && batchCodes.length > 0) {
+      if (receiptId && resolvedBatchCodes.length > 0) {
         try {
           await client.query(
             `
@@ -971,7 +989,7 @@ async function handleWebhookPost(req, res) {
               WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($2::text[])
                 AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
             `,
-            [receiptId, batchCodes]
+            [receiptId, resolvedBatchCodes]
           );
 
           // Đồng bộ trạng thái item theo batch: khi batch đã paid thì item không nên giữ pending.
@@ -982,7 +1000,7 @@ async function handleWebhookPost(req, res) {
               WHERE UPPER(COALESCE(batch_code::text, '')) = ANY($1::text[])
                 AND LOWER(COALESCE(status::text, 'pending')) NOT IN ('paid', 'cancelled')
             `,
-            [batchCodes]
+            [resolvedBatchCodes]
           );
         } catch (error) {
           if (isMissingBatchTablesError(error)) {

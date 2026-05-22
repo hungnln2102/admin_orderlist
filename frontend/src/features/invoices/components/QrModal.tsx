@@ -54,7 +54,7 @@ export const QrModal: React.FC<QrModalProps> = ({
                 Tạo thông tin thanh toán qua QR Code
               </h2>
               <p className="text-sm text-slate-400/95 leading-relaxed max-w-xl mx-auto">
-                Trên: nhập số tiền và nội dung hoặc gộp đơn MAVG. Dưới: mã QR và thông tin giao dịch
+                Trên: nhập số tiền và nội dung hoặc gộp nhiều đơn thành một mã CK. Dưới: mã QR và thông tin giao dịch
                 khớp với các ô đã nhập.
               </p>
             </div>

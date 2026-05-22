@@ -92,7 +92,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         <input
           id="qr-modal-note"
           type="text"
-          placeholder="VD: NCC KY … hoặc mã MAVG"
+          placeholder="VD: NCC KY … hoặc mã gộp CK 8 ký tự"
           className={inputCls}
           value={noteDraft}
           onChange={(event) => onNoteDraftChange(event.target.value)}
@@ -117,10 +117,11 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           </span>
           <div>
             <h3 className="text-sm font-bold text-emerald-100 tracking-tight">
-              Mã nhóm biên lai (MAVG)
+              Gộp nhiều đơn — một mã CK
             </h3>
             <p className="text-xs text-emerald-200/65 mt-0.5 leading-relaxed">
-              Dán mã giao dịch 8 ký tự — hệ thống tạo MAVG và điền nội dung CK + tổng tiền.
+              Dán mã giao dịch 8 ký tự của từng đơn — hệ thống sinh một mã CK gộp (8 ký tự)
+              và điền nội dung + tổng tiền.
             </p>
           </div>
         </div>
@@ -146,7 +147,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         ) : null}
         {batchInfo ? (
           <p className="text-xs text-emerald-300 font-medium">
-            Đã tạo {batchInfo.batchCode} · {batchInfo.orderCount} đơn ·{" "}
+            Đã tạo mã {batchInfo.batchCode} · {batchInfo.orderCount} đơn ·{" "}
             {batchInfo.totalAmount.toLocaleString("vi-VN")} VND
           </p>
         ) : null}
@@ -156,14 +157,14 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           onClick={onCreateBatchFromOrders}
           disabled={batchLoading}
         >
-          {batchLoading ? "Đang tạo MAVG…" : "Tạo mã MAVG"}
+          {batchLoading ? "Đang tạo mã gộp…" : "Tạo mã gộp CK"}
         </button>
       </div>
 
       <div className={`${panelSurface} p-4 sm:p-5 space-y-3`}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            MAVG gần đây
+            Mã gộp gần đây
           </h3>
           {batchListLoading ? (
             <span className="text-[11px] text-slate-500">Đang tải…</span>

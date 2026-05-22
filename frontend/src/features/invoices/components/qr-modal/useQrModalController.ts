@@ -179,7 +179,7 @@ export const useQrModalController = ({
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(
-          String((body as { error?: string })?.error || "Không thể tạo mã biên lai nhóm (MAVG).")
+          String((body as { error?: string })?.error || "Không thể tạo mã gộp CK.")
         );
       }
       const nextBatchCode = String((body as { batchCode?: string })?.batchCode || "")

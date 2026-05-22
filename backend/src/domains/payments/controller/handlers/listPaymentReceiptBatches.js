@@ -49,14 +49,14 @@ const listPaymentReceiptBatches = async (req, res) => {
         limit,
         disabled: true,
         message:
-          "Tính năng batch MAVG chưa sẵn sàng trên database. Vui lòng chạy migration backend.",
+          "Tính năng mã gộp CK chưa sẵn sàng trên database. Vui lòng chạy migration backend.",
       });
     }
     logger.error("[payments] List receipt batches failed", {
       error: error.message,
       stack: error.stack,
     });
-    return res.status(500).json({ error: "Không thể tải danh sách batch MAVG." });
+    return res.status(500).json({ error: "Không thể tải danh sách mã gộp CK." });
   }
 };
 
