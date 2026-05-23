@@ -56,6 +56,8 @@ const RENEW_ADOBE_SCHEMA = {
       ID_PRODUCT: "id_product",
       /** Hệ thống fix tương ứng (renew_adobe, fix_adobe_edu, ...). Default 'renew_adobe'. */
       SYSTEM_NOTE: "system_note",
+      /** Nguồn OTP cho email user của đơn (imap, tinyhost, hdsd, ades). */
+      OTP_SOURCE: "otp_source",
     },
   },
 };

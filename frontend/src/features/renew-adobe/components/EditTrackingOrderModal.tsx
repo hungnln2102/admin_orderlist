@@ -1,6 +1,5 @@
 /**
- * Modal sửa nhanh hệ thống fix của 1 đơn trong `order_user_tracking`.
- * Hiện chỉ cho sửa `system_note`. Mở rộng sau (customer/account) khi nghiệp vụ cần.
+ * Modal sửa nhanh hệ thống fix và nguồn OTP của 1 đơn trong `order_user_tracking`.
  */
 
 import { useEffect, useState } from "react";
@@ -13,11 +12,18 @@ import {
   isAdobeSystemCode,
   type AdobeSystemCode,
 } from "@/features/renew-adobe/user-orders/system-options";
+import {
+  DEFAULT_OTP_SOURCE,
+  OTP_SOURCE_OPTIONS,
+  isOtpSource,
+} from "@/features/renew-adobe/user-orders/otp-options";
+import type { OtpSource } from "@/features/renew-adobe/types";
 
 export type EditTrackingOrderModalProps = {
   open: boolean;
   orderCode: string;
   initialSystemNote?: string | null;
+  initialOtpSource?: string | null;
   onClose: () => void;
   onSaved?: () => void;
 };
@@ -26,28 +32,34 @@ export function EditTrackingOrderModal({
   open,
   orderCode,
   initialSystemNote,
+  initialOtpSource,
   onClose,
   onSaved,
 }: EditTrackingOrderModalProps) {
   const initialCode: AdobeSystemCode = isAdobeSystemCode(initialSystemNote)
     ? initialSystemNote
     : DEFAULT_ADOBE_SYSTEM_CODE;
+  const initialOtp: OtpSource = isOtpSource(initialOtpSource)
+    ? initialOtpSource
+    : DEFAULT_OTP_SOURCE;
   const [systemNote, setSystemNote] = useState<AdobeSystemCode>(initialCode);
+  const [otpSource, setOtpSource] = useState<OtpSource>(initialOtp);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setSystemNote(initialCode);
+    setOtpSource(initialOtp);
     setError(null);
     setSubmitting(false);
-  }, [open, initialCode]);
+  }, [open, initialCode, initialOtp]);
 
   const handleSubmit = async () => {
     setError(null);
     setSubmitting(true);
     try {
-      await updateTrackingOrder(orderCode, { systemNote });
+      await updateTrackingOrder(orderCode, { systemNote, otpSource });
       onSaved?.();
       onClose();
     } catch (err) {
@@ -99,6 +111,24 @@ export function EditTrackingOrderModal({
                 disabled={submitting}
               >
                 {ADOBE_SYSTEM_OPTIONS.map((opt) => (
+                  <option key={opt.code} value={opt.code}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-white/60">
+                Nguồn OTP
+              </label>
+              <select
+                className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500/40 outline-none"
+                value={otpSource}
+                onChange={(e) => setOtpSource(e.target.value as OtpSource)}
+                disabled={submitting}
+              >
+                {OTP_SOURCE_OPTIONS.map((opt) => (
                   <option key={opt.code} value={opt.code}>
                     {opt.label}
                   </option>

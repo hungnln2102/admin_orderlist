@@ -23,6 +23,7 @@ const {
 const {
   normalizeAdobeSystemCode,
 } = require("../../../services/renew-adobe/adobeSystemConstants");
+const { normalizeOtpSource } = require("../../../services/otpProviderService");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
@@ -164,10 +165,19 @@ const addOrdersToTracking = async (req, res) => {
     const systemNote = normalizeAdobeSystemCode(
       req.body?.system_note ?? req.body?.systemNote
     );
+    const otpSourceRaw = req.body?.otp_source ?? req.body?.otpSource;
+    const otpSource =
+      otpSourceRaw != null && String(otpSourceRaw).trim() !== ""
+        ? normalizeOtpSource(otpSourceRaw)
+        : null;
 
     const upserted = await upsertRenewAdobeOrderUserTrackingForOrderIds(
       acceptedIds,
-      { enforceRenewAdobeVariant: false, systemNote }
+      {
+        enforceRenewAdobeVariant: false,
+        systemNote,
+        ...(otpSource ? { otpSource } : {}),
+      }
     );
 
     logger.info(
@@ -184,6 +194,7 @@ const addOrdersToTracking = async (req, res) => {
       accepted: acceptedIds.length,
       skipped,
       system_note: systemNote,
+      ...(otpSource ? { otp_source: otpSource } : {}),
     });
   } catch (error) {
     logger.error("[renew-adobe] addOrdersToTracking failed", {
@@ -220,6 +231,16 @@ const updateTrackingOrder = async (req, res) => {
       );
       updates[TRACK_COLS.SYSTEM_NOTE] = systemNote;
       loggableUpdates.system_note = systemNote;
+    }
+    if (
+      req.body?.otp_source !== undefined ||
+      req.body?.otpSource !== undefined
+    ) {
+      const otpSource = normalizeOtpSource(
+        req.body?.otp_source ?? req.body?.otpSource
+      );
+      updates[TRACK_COLS.OTP_SOURCE] = otpSource;
+      loggableUpdates.otp_source = otpSource;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -1,5 +1,5 @@
 import type { UserOrderRow } from "@/features/renew-adobe/user-orders/types";
-import { StatusBadge, SystemBadge } from "./badges";
+import { StatusBadge, SystemBadge, OtpSourceBadge } from "./badges";
 import { RowActionButtons } from "./row-actions";
 import type { UserOrdersTableActionProps } from "./types";
 
@@ -22,6 +22,9 @@ export function UserOrdersTableDesktopRow({ row, ...actionProps }: Props) {
       <td className="px-2 sm:px-4 py-3 text-sm text-white/80">{row.profile}</td>
       <td className="px-2 sm:px-4 py-3">
         <SystemBadge code={row.systemNote} />
+      </td>
+      <td className="px-2 sm:px-4 py-3">
+        <OtpSourceBadge code={row.otpSource} />
       </td>
       <td className="px-2 sm:px-4 py-3">
         <StatusBadge status={row.display_status} />

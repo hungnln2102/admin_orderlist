@@ -173,7 +173,7 @@ export function UserOrdersTable({
         Danh sách user & đơn hàng
       </h3>
       <p className="text-xs text-white/50 mb-4">
-        Mã đơn hàng, Tên Khách Hàng, Email, Profile, Tình trạng Gói, Hạn Sử Dụng
+        Mã đơn hàng, Tên Khách Hàng, Email, Profile, Hệ thống, OTP, Tình trạng Gói, Hạn Sử Dụng
       </p>
 
       <UserOrdersTableControls
@@ -199,6 +199,7 @@ export function UserOrdersTable({
         open={editTarget !== null}
         orderCode={editTarget?.order_code ?? ""}
         initialSystemNote={editTarget?.systemNote}
+        initialOtpSource={editTarget?.otpSource}
         onClose={() => setEditTarget(null)}
         onSaved={() => {
           setEditTarget(null);
@@ -206,7 +207,7 @@ export function UserOrdersTable({
           showAppNotification({
             type: "success",
             title: "Đã cập nhật",
-            message: "Hệ thống fix của đơn đã được lưu.",
+            message: "Hệ thống fix và nguồn OTP của đơn đã được lưu.",
           });
         }}
       />
@@ -260,6 +261,7 @@ export function UserOrdersTable({
                 <th className="min-w-[200px]">EMAIL</th>
                 <th className="min-w-[140px]">PROFILE</th>
                 <th className="min-w-[140px]">HỆ THỐNG</th>
+                <th className="min-w-[120px]">OTP</th>
                 <th className="min-w-[12rem] whitespace-nowrap">TÌNH TRẠNG GÓI</th>
                 <th className="min-w-[110px]">HẠN SỬ DỤNG</th>
                 <th className="min-w-[10rem] text-center">THAO TÁC</th>
@@ -268,7 +270,7 @@ export function UserOrdersTable({
             <tbody className="divide-y divide-white/5">
               {currentRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-white/70">
+                  <td colSpan={9} className="px-4 py-12 text-center text-white/70">
                     Chưa có dữ liệu. Chạy Check để đồng bộ users từ Adobe.
                   </td>
                 </tr>

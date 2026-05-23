@@ -10,6 +10,7 @@ const {
   TELEGRAM_CHAT_ID,
   TELEGRAM_ORDER_TOPIC_ID,
   TELEGRAM_IMPORT_ORDER_TOPIC_ID,
+  ORDER_CREATED_TOPIC_ID,
   SEND_ORDER_TO_TOPIC,
   SEND_ORDER_COPY_BUTTONS,
 } = require("./constants");
@@ -38,6 +39,7 @@ async function sendOrderCreatedNotification(order) {
     targetChatId,
     hasDefaultChatId: !!TELEGRAM_CHAT_ID,
     TELEGRAM_ORDER_TOPIC_ID,
+    ORDER_CREATED_TOPIC_ID,
     TELEGRAM_IMPORT_ORDER_TOPIC_ID,
     SEND_ORDER_TO_TOPIC,
   });
@@ -145,9 +147,9 @@ async function sendOrderCreatedNotification(order) {
       } else if (
         !isImport &&
         SEND_ORDER_TO_TOPIC &&
-        Number.isFinite(TELEGRAM_ORDER_TOPIC_ID)
+        Number.isFinite(ORDER_CREATED_TOPIC_ID)
       ) {
-        payload.message_thread_id = TELEGRAM_ORDER_TOPIC_ID;
+        payload.message_thread_id = ORDER_CREATED_TOPIC_ID;
       }
     }
     return payload;

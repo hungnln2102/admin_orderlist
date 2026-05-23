@@ -55,6 +55,13 @@ const FOUR_DAYS_TOPIC_ID = Number.parseInt(
   10
 );
 
+/** Topic đơn mới: ưu tiên TELEGRAM_ORDER_TOPIC_ID; nếu không set thì dùng FOUR_DAYS_TOPIC_ID để cùng kênh gia hạn. */
+const ORDER_CREATED_TOPIC_ID = (() => {
+  if (Number.isFinite(TELEGRAM_ORDER_TOPIC_ID)) return TELEGRAM_ORDER_TOPIC_ID;
+  if (Number.isFinite(FOUR_DAYS_TOPIC_ID)) return FOUR_DAYS_TOPIC_ID;
+  return NaN;
+})();
+
 module.exports = {
   HTTP_TIMEOUT_MS,
   TELEGRAM_BOT_TOKEN,
@@ -68,4 +75,5 @@ module.exports = {
   SEND_ORDER_COPY_BUTTONS,
   ZERO_DAYS_TOPIC_ID,
   FOUR_DAYS_TOPIC_ID,
+  ORDER_CREATED_TOPIC_ID,
 };

@@ -1,9 +1,21 @@
 import { getAdobeSystemOption } from "@/features/renew-adobe/user-orders/system-options";
+import { getOtpSourceOption } from "@/features/renew-adobe/user-orders/otp-options";
 import type { DisplayStatus } from "@/features/renew-adobe/user-orders/types";
 import { DISPLAY_LABELS } from "./constants";
 
 export function SystemBadge({ code }: { code: string | null | undefined }) {
   const opt = getAdobeSystemOption(code);
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${opt.badge}`}
+    >
+      {opt.label}
+    </span>
+  );
+}
+
+export function OtpSourceBadge({ code }: { code: string | null | undefined }) {
+  const opt = getOtpSourceOption(code);
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${opt.badge}`}

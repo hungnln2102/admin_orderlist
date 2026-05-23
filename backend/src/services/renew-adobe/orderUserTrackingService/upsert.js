@@ -19,6 +19,10 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
     options && typeof options.systemNote === "string"
       ? options.systemNote.trim()
       : "";
+  const explicitOtpSource =
+    options && typeof options.otpSource === "string"
+      ? options.otpSource.trim()
+      : "";
 
   const orderCodes = orders
     .map((o) => String(o[ORD_COLS.ID_ORDER] || "").trim())
@@ -129,6 +133,10 @@ async function upsertTrackingRowsFromOrderRows(orders, options = undefined) {
         insertRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
         mergeRow[TRACK_COLS.SYSTEM_NOTE] = explicitSystemNote;
       }
+      if (TRACK_COLS.OTP_SOURCE && explicitOtpSource) {
+        insertRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
+        mergeRow[TRACK_COLS.OTP_SOURCE] = explicitOtpSource;
+      }
 
       await trx(TRACK_TABLE).insert(insertRow).onConflict(TRACK_COLS.ORDER_ID).merge(mergeRow);
       upserted += 1;
@@ -146,6 +154,8 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds, options) {
   const enforceVariant = options?.enforceRenewAdobeVariant !== false;
   const systemNote =
     typeof options?.systemNote === "string" ? options.systemNote.trim() : "";
+  const otpSource =
+    typeof options?.otpSource === "string" ? options.otpSource.trim() : "";
 
   const ids = [
     ...new Set(
@@ -180,14 +190,15 @@ async function upsertRenewAdobeOrderUserTrackingForOrderIds(orderIds, options) {
   const orders = await query.orderBy(ORD_COLS.ID_ORDER, "asc");
   const n = await upsertTrackingRowsFromOrderRows(
     orders,
-    systemNote ? { systemNote } : undefined
+    systemNote || otpSource ? { systemNote, otpSource } : undefined
   );
   if (n > 0) {
     logger.info(
-      "[order-user-tracking] Đã upsert %d đơn (theo danh sách order_id, enforceVariant=%s, systemNote=%s).",
+      "[order-user-tracking] Đã upsert %d đơn (theo danh sách order_id, enforceVariant=%s, systemNote=%s, otpSource=%s).",
       n,
       String(enforceVariant),
-      systemNote || "(default)"
+      systemNote || "(default)",
+      otpSource || "(default)"
     );
   }
   return n;

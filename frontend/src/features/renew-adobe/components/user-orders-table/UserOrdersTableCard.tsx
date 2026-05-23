@@ -1,6 +1,6 @@
 import { TableCard } from "@/components/ui/ResponsiveTable";
 import type { UserOrderRow } from "@/features/renew-adobe/user-orders/types";
-import { StatusBadge, SystemBadge } from "./badges";
+import { StatusBadge, SystemBadge, OtpSourceBadge } from "./badges";
 import { RowActionButtons } from "./row-actions";
 import type { UserOrdersTableActionProps } from "./types";
 
@@ -31,7 +31,10 @@ export function UserOrdersTableCard({ rows, ...actionProps }: Props) {
             <p className="text-sm font-medium text-white">{row.customer_name}</p>
             <p className="text-xs text-white/80 break-all">{row.email}</p>
             <p className="text-xs text-white/60">Profile: {row.profile}</p>
-            <StatusBadge status={row.display_status} />
+            <div className="flex flex-wrap items-center gap-2">
+              <OtpSourceBadge code={row.otpSource} />
+              <StatusBadge status={row.display_status} />
+            </div>
             <p className="text-xs text-white/70">Hạn: {row.expiry}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <RowActionButtons

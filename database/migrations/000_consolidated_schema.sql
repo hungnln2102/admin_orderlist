@@ -1625,6 +1625,9 @@ CREATE TABLE system_automation.order_user_tracking (
     status text DEFAULT 'chưa add'::text NOT NULL,
     update_at timestamp with time zone DEFAULT now() NOT NULL,
     id_product text,
+    system_note character varying(64) DEFAULT 'renew_adobe'::character varying NOT NULL,
+    otp_source text DEFAULT 'imap'::text NOT NULL,
+    CONSTRAINT order_user_tracking_otp_source_check CHECK ((otp_source = ANY (ARRAY['imap'::text, 'tinyhost'::text, 'hdsd'::text, 'ades'::text]))),
     CONSTRAINT order_user_tracking_status_check CHECK ((status = ANY (ARRAY['có gói'::text, 'chưa cấp quyền'::text, 'chưa add'::text])))
 );
 

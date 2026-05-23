@@ -1,4 +1,4 @@
-import type { LicenseStatus } from "../types";
+import type { LicenseStatus, OtpSource } from "../types";
 import type { AdobeSystemCode } from "./system-options";
 
 /** not_added = chưa gán admin; no_product = đã gán nhưng chưa cấp quyền Adobe */
@@ -15,6 +15,7 @@ export type UserOrderRow = {
   expirySortTs: number | null;
   accountId: number;
   systemNote: AdobeSystemCode;
+  otpSource: OtpSource;
 };
 
 export type OrderInfo = {
@@ -28,6 +29,7 @@ export type OrderInfo = {
   tracking_status?: string | null;
   tracking_id_product?: string | null;
   system_note?: AdobeSystemCode | string | null;
+  otp_source?: OtpSource | string | null;
   adobe_account_id?: number | null;
   admin_license_status?: string | null;
   admin_org_name?: string | null;

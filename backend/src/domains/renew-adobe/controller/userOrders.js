@@ -68,6 +68,7 @@ const listUserOrders = async (_req, res) => {
         `t.${TRACK_COLS.STATUS} as tracking_status`,
         `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
         `t.${TRACK_COLS.SYSTEM_NOTE} as system_note`,
+        `t.${TRACK_COLS.OTP_SOURCE} as otp_source`,
         `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_account_id`,
         `acc.${ACC_COLS.LICENSE_STATUS} as admin_license_status`,
         `acc.${ACC_COLS.ORG_NAME} as admin_org_name`
