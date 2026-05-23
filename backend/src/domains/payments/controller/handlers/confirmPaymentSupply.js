@@ -10,8 +10,14 @@ const {
 } = require("../shared/constants");
 const { createHttpError, toMonthKey } = require("../shared/helpers");
 const {
-  applyEstimatedBankBalanceDelta,
-} = require("../../../orders/controller/finance/dashboardSummary");
+  findDefaultActiveAccount,
+  findShopBankAccountById,
+} = require("../../../shop-bank-accounts/repositories/shopBankAccountRepository");
+const {
+  creditShopBankFromPaymentReceipt,
+  debitShopBankSupplierPayment,
+  SOURCE_KINDS,
+} = require("../../../shop-bank-accounts/services/shopBankLedgerService");
 
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;
@@ -32,6 +38,9 @@ const confirmPaymentSupply = async (req, res) => {
   };
 
   const supplyIdFromBody = parsePositiveInt(req.body?.supplyId);
+  const shopBankAccountIdFromBody = parsePositiveInt(
+    req.body?.shopBankAccountId ?? req.body?.shop_bank_account_id
+  );
   const paymentContent = parsePaymentContent(req.body?.paymentContent);
 
   try {
@@ -102,6 +111,26 @@ const confirmPaymentSupply = async (req, res) => {
       }
       const isSupplierRefundToShop = netUnpaidAmount < 0;
       const expectedPaidAmount = Math.abs(Math.round(netUnpaidAmount));
+      const resolveShopBankAccount = async () => {
+        if (shopBankAccountIdFromBody) {
+          const account = await findShopBankAccountById(shopBankAccountIdFromBody);
+          if (!account) {
+            throw createHttpError(404, "Không tìm thấy STK shop đã chọn.");
+          }
+          if (account.isActive === false) {
+            throw createHttpError(400, "STK shop đã chọn đang tạm dừng.");
+          }
+          return account;
+        }
+        const account = await findDefaultActiveAccount();
+        if (!account) {
+          throw createHttpError(400, "Vui lòng chọn STK shop để ghi nhận thanh toán NCC.");
+        }
+        return account;
+      };
+
+      const shopBankAccount = await resolveShopBankAccount();
+      const shopBankAccountId = Number(shopBankAccount?.id) || null;
       let matchedReceipt = null;
 
       if (isSupplierRefundToShop) {
@@ -118,6 +147,7 @@ const confirmPaymentSupply = async (req, res) => {
             pr.${receiptCols.id} AS id,
             pr.${receiptCols.amount} AS amount,
             pr.${receiptCols.paidDate} AS paid_date,
+            pr.${receiptCols.receiver} AS receiver,
             pr.${receiptCols.note} AS note
           FROM ${TABLES.paymentReceipt} pr
           WHERE COALESCE(pr.${receiptCols.note}::text, '') ILIKE ?
@@ -154,16 +184,18 @@ const confirmPaymentSupply = async (req, res) => {
       await trx.raw(`DROP INDEX IF EXISTS ${SCHEMA_PARTNER}.uq_supplier_payments_supplier_id;`);
       const insertResult = await trx.raw(
         `
-        INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid})
-        VALUES (?, ?, ?, ?)
+        INSERT INTO ${TABLES.paymentSupply} (${PS.sourceId}, ${PS.round}, ${PS.status}, ${PS.paid}, ${PS.shopBankAccountId})
+        VALUES (?, ?, ?, ?, ?)
         RETURNING ${PS.id} AS id,
                   ${PS.sourceId} AS source_id,
                   ${PS.round} AS round,
                   ${PS.status} AS status,
-                  COALESCE(${PS.paid}::numeric, 0) AS paid;
+                  COALESCE(${PS.paid}::numeric, 0) AS paid,
+                  ${PS.shopBankAccountId} AS shop_bank_account_id;
       `,
-        [resolvedSupplyId, periodLabel, STATUS.PAID, addAmount]
+        [resolvedSupplyId, periodLabel, STATUS.PAID, addAmount, shopBankAccountId]
       );
+      const paymentSupplyId = Number(insertResult.rows?.[0]?.id) || null;
 
       await trx.raw(
         `
@@ -176,10 +208,26 @@ const confirmPaymentSupply = async (req, res) => {
         [STATUS.PAID, resolvedSupplyId, STATUS.PAID]
       );
 
-      const paidMonthKey = toMonthKey(paymentDate);
-      if (paidMonthKey && expectedPaidAmount > 0) {
-        await applyEstimatedBankBalanceDelta(trx, paidMonthKey, -expectedPaidAmount);
+      if (paymentSupplyId && expectedPaidAmount > 0) {
+        if (isSupplierRefundToShop) {
+          await creditShopBankFromPaymentReceipt(trx, {
+            receiptId: matchedReceipt?.id,
+            receiverAccount: matchedReceipt?.receiver || "",
+            accountId: shopBankAccountId,
+            amount: expectedPaidAmount,
+            note: paymentContent || `NCC refund supply ${resolvedSupplyId}`,
+          });
+        } else {
+          await debitShopBankSupplierPayment(trx, {
+            accountId: shopBankAccountId,
+            amount: expectedPaidAmount,
+            sourceKind: SOURCE_KINDS.PAYMENT_SUPPLY,
+            sourceId: paymentSupplyId,
+            note: `Thanh toán NCC supply ${resolvedSupplyId}`,
+          });
+        }
       }
+      const paidMonthKey = toMonthKey(paymentDate);
 
       return {
         paymentRow: insertResult.rows?.[0] || null,
@@ -192,6 +240,9 @@ const confirmPaymentSupply = async (req, res) => {
           paymentContent: paymentContent || null,
           paymentPeriod: periodLabel,
           matchedReceiptId: matchedReceipt?.id || null,
+          shopBankAccountId,
+          shopBankAccountNumber: shopBankAccount?.accountNumber || null,
+          monthKey: paidMonthKey,
         },
       };
     });

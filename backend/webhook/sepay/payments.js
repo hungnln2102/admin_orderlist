@@ -15,7 +15,6 @@ const { STATUS } = require("../../src/utils/statuses");
 const {
   normalizeAmount,
   parsePaidDate,
-  extractOrderCodeFromText,
   normalizeOrderCode,
   extractSenderFromContent,
   extractReferenceCodeFromText,
@@ -29,6 +28,10 @@ const {
   calculateOrderPricingFromResolvedValues,
 } = require("../../src/services/pricing/core");
 const { withSavepoint } = require("./savepoint");
+const {
+  resolveOrderByExpectedAmount,
+  markPaymentSlotMatched,
+} = require("../../src/domains/payment-slots");
 
 let paymentReceiptOrderColCache = null;
 let paymentReceiptColumnsCache = null;
@@ -290,16 +293,10 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       ? String(options.orderCode || "")
       : "";
   const normalizedExplicitOrderCode = normalizeOrderCode(explicitOrderCodeRaw);
-  const orderCode =
-    normalizedExplicitOrderCode ||
-    normalizeOrderCode(
-      extractOrderCodeFromText(
-      transaction.transaction_content,
-      transaction.note,
-      transaction.description
-    )
-    ) ||
-    "";
+  // Slot-suffix matching: KHÔNG còn extract orderCode từ nội dung CK.
+  // OrderCode resolve theo thứ tự:
+  //   1. options.orderCode (explicit từ caller)
+  //   2. Slot tra theo (receiver_account, expected_amount) — bên trong transaction
   const paidDate = parsePaidDate(
     transaction.transaction_date || transaction.transaction_date_raw
   );
@@ -324,9 +321,8 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     transaction.transfer_type || transaction.transferType
   );
   const gateway = normalizeOptionalText(transaction.gateway);
-  /** Giao dịch gốc. Cột `note` DB: khi có `options.orderCode` (mã đơn đã resolve, thường là đơn mới) thì ghi đúng mã đó — khớp `id_order`; ngược lại giữ text CK. */
+  /** Giao dịch gốc. Cột `note` DB: khi orderCode đã resolve (explicit hoặc qua slot) thì ghi đúng mã đó — khớp `id_order`; ngược lại giữ text CK. */
   const transferNote = transaction.note || transaction.description || "";
-  const noteValue = normalizedExplicitOrderCode ? normalizedExplicitOrderCode : transferNote;
 
   const orderCodeColumn =
     (await getPaymentReceiptOrderColumn()) ||
@@ -340,22 +336,61 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
   const client = externalClient || (await pool.connect());
   const manageTransaction = !externalClient;
 
-  const receiptKey = buildReceiptIdempotencyKey({
-    sepayTransactionId,
-    referenceCode,
-    transferType,
-    orderCode,
-    paidDate,
-    amount,
-    receiverAccount,
-    senderParsed,
-    noteValue,
-  });
-
   try {
     if (manageTransaction) {
       await client.query("BEGIN");
     }
+
+    // Resolve orderCode + slot match qua (receiver_account, amount). Slot lookup
+    // dùng FOR UPDATE SKIP LOCKED → phải nằm trong transaction.
+    // - Caller có explicit orderCode (manual webhook, legacy resolution): tin caller, vẫn
+    //   tra slot để mark matched nếu khớp; mismatch chỉ log cảnh báo.
+    // - Caller không có explicit: slot match là nguồn duy nhất resolve orderCode.
+    let orderCode = normalizedExplicitOrderCode;
+    let resolvedSlot = null;
+    if (amount > 0 && receiverAccount) {
+      const slotMatch = await resolveOrderByExpectedAmount(client, {
+        receiverAccount,
+        amount,
+      });
+      if (slotMatch?.orderCode) {
+        const slotOrderCode = normalizeOrderCode(slotMatch.orderCode);
+        if (orderCode && orderCode !== slotOrderCode) {
+          logger.warn("[Webhook] slot vs explicit orderCode mismatch", {
+            explicit: orderCode,
+            slot: slotOrderCode,
+            slotId: slotMatch.slot?.id,
+            amount,
+            receiverAccount,
+          });
+        } else {
+          orderCode = slotOrderCode;
+          resolvedSlot = slotMatch.slot;
+          logger.info("[Webhook] orderCode resolved via payment slot", {
+            orderCode,
+            slotId: resolvedSlot?.id,
+            cycleIndex: resolvedSlot?.cycle_index,
+            slotKind: resolvedSlot?.slot_kind,
+            amount,
+            receiverAccount,
+          });
+        }
+      }
+    }
+
+    const noteValue = orderCode ? orderCode : transferNote;
+
+    const receiptKey = buildReceiptIdempotencyKey({
+      sepayTransactionId,
+      referenceCode,
+      transferType,
+      orderCode,
+      paidDate,
+      amount,
+      receiverAccount,
+      senderParsed,
+      noteValue,
+    });
 
     // Ensure concurrent identical webhooks cannot double-insert / double-update.
     await client.query(
@@ -517,6 +552,26 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
     // Cập nhật total_revenue / total_profit trên dashboard_monthly_summary do luồng ứng dụng
     // (webhook Sepay, manual webhook, reconcile, renewal, …), không còn trigger receipt→dashboard.
 
+    // Đánh dấu payment slot matched (nếu order resolve qua slot) — gắn link
+    // receipt id để audit. Idempotent: slot đã matched / đã cancelled trả về null.
+    if (resolvedSlot && insertedId) {
+      try {
+        await markPaymentSlotMatched(client, {
+          slotId: resolvedSlot.id,
+          paymentReceiptId: insertedId,
+        });
+      } catch (slotErr) {
+        // Slot không match được → log warn, KHÔNG rollback receipt
+        // (receipt đã ghi nhận; admin có thể reconcile slot sau).
+        logger.warn("[Webhook] markPaymentSlotMatched failed (receipt vẫn được ghi)", {
+          slotId: resolvedSlot.id,
+          paymentReceiptId: insertedId,
+          orderCode,
+          error: slotErr.message,
+        });
+      }
+    }
+
     if (manageTransaction) {
       await client.query("COMMIT");
     }
@@ -528,6 +583,14 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       orderCode,
       paidDate,
       amount,
+      matchedSlot: resolvedSlot
+        ? {
+            id: resolvedSlot.id,
+            cycle_index: resolvedSlot.cycle_index,
+            slot_kind: resolvedSlot.slot_kind,
+            expected_amount: Number(resolvedSlot.expected_amount),
+          }
+        : null,
     };
   } catch (err) {
     if (manageTransaction) {

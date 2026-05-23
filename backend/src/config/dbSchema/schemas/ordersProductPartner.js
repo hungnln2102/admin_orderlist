@@ -7,7 +7,7 @@ const ORDERS_SCHEMA = {
     COLS: {
       ID: "id",
       ID_ORDER: "id_order",
-      /** Mã nội dung CK / webhook (chữ+số, unique). */
+      /** Legacy — không còn sinh mã CK; match qua payment slot (suffix trên price). */
       TRANSACTION: "transaction",
       ID_PRODUCT: "id_product",
       INFORMATION_ORDER: "information_order",
@@ -170,6 +170,7 @@ const PARTNER_SCHEMA = {
       STATUS: "payment_status",
       CONTENT: "payment_status",
       PAID: "amount_paid",
+      SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
     },
   },
   /** Log NCC: thanh toán (Chưa TT→Đã TT), gia hạn (Cần GH→ĐXL/Đã TT), archive xóa; đồng bộ cost trên dòng mới nhất khi ĐXL/Đã TT. */

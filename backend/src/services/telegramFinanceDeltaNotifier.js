@@ -13,6 +13,9 @@ const {
 const {
   sendTelegramMessage,
 } = require("./telegramOrderNotificationLib/telegramApi");
+const {
+  sumActiveShopBankBalances,
+} = require("../domains/shop-bank-accounts/repositories/shopBankBalanceRepository");
 
 const monthlySummaryTable = tableName(
   FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE,
@@ -83,8 +86,7 @@ const fetchMonthlySnapshot = async (executor, monthKey) => {
       COALESCE(${monthlyCols.TOTAL_IMPORT}::numeric, 0) AS total_import,
       COALESCE(${monthlyCols.TOTAL_REFUND}::numeric, 0) AS total_refund,
       COALESCE(${monthlyCols.TOTAL_TAX}::numeric, 0) AS total_tax,
-      COALESCE(${monthlyCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt,
-      COALESCE(${monthlyCols.ESTIMATED_BANK_BALANCE}::numeric, 0) AS estimated_bank_balance
+      COALESCE(${monthlyCols.TOTAL_OFF_FLOW_BANK_RECEIPT}::numeric, 0) AS total_off_flow_bank_receipt
      FROM ${monthlySummaryTable}
      WHERE ${monthlyCols.MONTH_KEY} = $1
      LIMIT 1`,
@@ -211,10 +213,12 @@ const notifyFinanceMonthlyDelta = async ({
   if (!revenue && !profit && !imp && !refund && !offFlow && !bankBalance) return;
 
   try {
-    const [monthlySnapshot, previousLogSnapshot] = await Promise.all([
+    const [monthlySnapshot, previousLogSnapshot, shopBankTotal] = await Promise.all([
       fetchMonthlySnapshot(executor, monthKey).catch(() => null),
       fetchPreviousFinanceLogSnapshot(executor, monthKey).catch(() => null),
+      sumActiveShopBankBalances().catch(() => 0),
     ]);
+    const bankBalanceAfter = toNumber(shopBankTotal);
     const snapshotAfter = {
       revenue: toNumber(monthlySnapshot?.total_revenue),
       profit: toNumber(monthlySnapshot?.total_profit),
@@ -222,7 +226,7 @@ const notifyFinanceMonthlyDelta = async ({
       refund: toNumber(monthlySnapshot?.total_refund),
       tax: toNumber(monthlySnapshot?.total_tax),
       offFlow: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
-      bankBalance: toNumber(monthlySnapshot?.estimated_bank_balance),
+      bankBalance: bankBalanceAfter,
     };
     const snapshotBefore = {
       revenue: snapshotAfter.revenue - revenue,
@@ -252,7 +256,7 @@ const notifyFinanceMonthlyDelta = async ({
       bankBalanceDelta: bankBalance,
       taxSnapshot: toNumber(monthlySnapshot?.total_tax),
       offFlowSnapshot: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
-      bankBalanceSnapshot: toNumber(monthlySnapshot?.estimated_bank_balance),
+      bankBalanceSnapshot: bankBalanceAfter,
       context,
     });
     if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
@@ -270,7 +274,7 @@ const notifyFinanceMonthlyDelta = async ({
         offFlow
       ),
       buildFlowLine(
-        "🏦 Số dư bank ước tính",
+        "🏦 Số dư bank shop",
         snapshotBefore.bankBalance,
         snapshotAfter.bankBalance,
         bankBalanceDeltaEffective

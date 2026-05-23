@@ -18,7 +18,6 @@ type OrderPaymentQrSectionProps = {
   missingSupplierBank?: boolean;
   canUseQr?: boolean;
   qrLockReason?: string;
-  transferCodeLoading?: boolean;
 };
 
 export const OrderPaymentQrSection = ({
@@ -37,7 +36,6 @@ export const OrderPaymentQrSection = ({
   missingSupplierBank = false,
   canUseQr = true,
   qrLockReason = "",
-  transferCodeLoading = false,
 }: OrderPaymentQrSectionProps) => {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -55,12 +53,9 @@ export const OrderPaymentQrSection = ({
           {qrLockReason || "QR này đã bị khóa và không thể sử dụng."}
         </p>
       )}
-      {transferCodeLoading && (
-        <p className="text-sm text-indigo-200/80 mb-3">Đang tạo mã thanh toán…</p>
-      )}
-      {!transferCodeLoading && canUseQr && !qrCodeImageUrl && !missingSupplierBank && (
+      {canUseQr && !qrCodeImageUrl && !missingSupplierBank && (
         <p className="text-sm text-amber-200/90 mb-3">
-          Chưa có mã transaction — không tạo được QR. Thử tải lại trang.
+          Không tạo được QR. Kiểm tra STK shop mặc định hoặc số tiền đơn.
         </p>
       )}
       {isSupplierPayout && (
@@ -120,10 +115,11 @@ export const OrderPaymentQrSection = ({
         {!isSupplierPayout && priceError && (
           <p className="text-xs text-red-500">{priceError}</p>
         )}
-        <p>
-          Nội dung: <strong className="text-indigo-200">{qrMessage}</strong>{" "}
-          (Vui lòng điền đúng)
-        </p>
+        {!isSupplierPayout && (
+          <p className="text-xs text-indigo-200/90">
+            Chuyển khoản đúng số tiền trên QR — không cần ghi nội dung chuyển khoản.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -241,9 +241,14 @@ const updateDashboardMonthlySummaryOnStatusChange = async (
     trx,
     beforeRow,
     afterRow,
-    options = {}
+    _options = {}
 ) => {
-    const skipBankBalanceDelta = Boolean(options?.skipBankBalanceDelta);
+    /**
+     * Bank shop chỉ thay đổi khi admin bấm "Đã Hoàn" trên phiếu credit (refundCreditRoutes
+     * action=complete) — lúc đó chọn STK rồi trừ STK đúng số tiền.
+     * Đường này (vào/rời lifecycle hoàn) chỉ ghi báo cáo doanh thu/refund/canceled_orders,
+     * KHÔNG đụng số dư bank để tránh trừ hai lần.
+     */
     const prevStatus = beforeRow?.status || STATUS.UNPAID;
     const nextStatus = afterRow?.status || STATUS.UNPAID;
 
@@ -255,35 +260,22 @@ const updateDashboardMonthlySummaryOnStatusChange = async (
     if (!birthMonthKey && !refundMonthKey) return;
 
     const refundUpdates = {};
-    let bankBalanceDelta = 0;
 
-    // Order left refund lifecycle → -1 canceled, -refund (chỉ MAVC/MAVL/MAVK/MAVS)
     if (isDashboardSalesOrder(beforeRow) && isRefundCounted(prevStatus) && !isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(beforeRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) - 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) - refund;
-        if (!skipBankBalanceDelta) {
-            bankBalanceDelta += refund;
-        }
     }
 
-    // Vào hoàn (Model A): ghi tháng hiện tại, trừ thẳng doanh thu theo refund và cộng tracking total_refund.
     if (isDashboardSalesOrder(afterRow) && prevStatus === STATUS.PAID && isRefundCounted(nextStatus)) {
         const refund = toNullableNumber(afterRow?.refund) || 0;
         refundUpdates.canceled_orders = (refundUpdates.canceled_orders || 0) + 1;
         refundUpdates.total_refund = (refundUpdates.total_refund || 0) + refund;
         refundUpdates.total_revenue = (refundUpdates.total_revenue || 0) - refund;
-        if (!skipBankBalanceDelta) {
-            bankBalanceDelta -= refund;
-        }
     }
 
     if (Object.keys(refundUpdates).length > 0 && refundMonthKey) {
         await mergeSummaryUpdates(trx, refundMonthKey, refundUpdates, { notify: false });
-    }
-
-    if (refundMonthKey && bankBalanceDelta !== 0) {
-        await applyEstimatedBankBalanceDelta(trx, refundMonthKey, bankBalanceDelta, { notify: false });
     }
 
     let refundProfitDelta = 0;
@@ -315,12 +307,10 @@ const updateDashboardMonthlySummaryOnStatusChange = async (
     if (!refundMonthKey) return;
     const notifyRevenueDelta = Number(refundUpdates.total_revenue || 0);
     const notifyRefundDelta = Number(refundUpdates.total_refund || 0);
-    const notifyBankBalanceDelta = Number(bankBalanceDelta || 0);
     const notifyProfitDelta = Number(refundProfitDelta || 0);
     if (
         notifyRevenueDelta !== 0 ||
         notifyRefundDelta !== 0 ||
-        notifyBankBalanceDelta !== 0 ||
         notifyProfitDelta !== 0
     ) {
         await notifyFinanceMonthlyDelta({
@@ -330,7 +320,7 @@ const updateDashboardMonthlySummaryOnStatusChange = async (
             importDelta: 0,
             refundDelta: notifyRefundDelta,
             offFlowDelta: 0,
-            bankBalanceDelta: notifyBankBalanceDelta,
+            bankBalanceDelta: 0,
             context: "dashboardSummary.refund.statusChange",
             executor: trx,
         });

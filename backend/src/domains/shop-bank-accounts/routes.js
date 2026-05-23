@@ -8,6 +8,7 @@ const {
   removeShopBankAccount,
   listShopBankAccountBalancesHandler,
   patchShopBankAccountWithdrawn,
+  postShopBankAccountWithdraw,
 } = require("./controller");
 const { createShopBankAccountRules } = require("./validators/shopBankAccountValidator");
 
@@ -19,6 +20,7 @@ router.get("/default", getDefaultShopBankAccountHandler);
 router.post("/", ...createShopBankAccountRules, createShopBankAccount);
 router.put("/:id", updateShopBankAccount);
 router.patch("/:id/withdrawn", patchShopBankAccountWithdrawn);
+router.post("/:id/withdraw", postShopBankAccountWithdraw);
 router.post("/:id/set-default", setDefaultShopBankAccount);
 router.delete("/:id", removeShopBankAccount);
 

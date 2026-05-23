@@ -8,18 +8,15 @@ import {
   deleteShopBankAccount,
   fetchShopBankAccounts,
   fetchShopBankAccountBalances,
+  recordShopBankAccountWithdrawal,
   setDefaultShopBankAccount,
   updateShopBankAccount,
-  updateShopBankAccountWithdrawn,
 } from "../api/shopBankAccountApi";
 import { DeleteShopBankAccountModal } from "../components/DeleteShopBankAccountModal";
 import { ShopBankBalanceTable } from "../components/ShopBankBalanceTable";
+import { ShopBankWithdrawModal } from "../components/ShopBankWithdrawModal";
 import { ShopBankAccountFormModal } from "../components/ShopBankAccountFormModal";
 import { ShopBankAccountTable } from "../components/ShopBankAccountTable";
-import {
-  formatShopBankMoneyInput,
-  parseShopBankMoneyInput,
-} from "../helpers/formatShopBankMoney";
 import type { ShopBankAccountBalanceItem, ShopBankAccountItem, ShopBankAccountPayload } from "../types";
 
 const PAGE_SIZE = 10;
@@ -29,9 +26,10 @@ export function ShopBankAccountsPage() {
   const [balanceItems, setBalanceItems] = useState<ShopBankAccountBalanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [balancesLoading, setBalancesLoading] = useState(true);
-  const [balancesRefreshing, setBalancesRefreshing] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
@@ -41,38 +39,19 @@ export function ShopBankAccountsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
-  const [savingWithdrawnId, setSavingWithdrawnId] = useState<number | null>(null);
-  const [withdrawnDrafts, setWithdrawnDrafts] = useState<Record<number, string>>({});
 
-  const loadBalances = useCallback(async (options?: { refreshOnly?: boolean }) => {
-    const refreshOnly = options?.refreshOnly === true;
+  const loadBalances = useCallback(async () => {
     try {
-      if (refreshOnly) {
-        setBalancesRefreshing(true);
-      } else {
-        setBalancesLoading(true);
-      }
+      setBalancesLoading(true);
       setBalanceError(null);
-      const rows = await fetchShopBankAccountBalances();
-      setBalanceItems(rows);
-      setWithdrawnDrafts(() => {
-        const next: Record<number, string> = {};
-        for (const row of rows) {
-          next[row.id] = formatShopBankMoneyInput(row.totalWithdrawn);
-        }
-        return next;
-      });
+      setBalanceItems(await fetchShopBankAccountBalances());
     } catch (err) {
       setBalanceItems([]);
       setBalanceError(
         err instanceof Error ? err.message : "Không thể tải số dư STK."
       );
     } finally {
-      if (refreshOnly) {
-        setBalancesRefreshing(false);
-      } else {
-        setBalancesLoading(false);
-      }
+      setBalancesLoading(false);
     }
   }, []);
 
@@ -172,30 +151,21 @@ export function ShopBankAccountsPage() {
     }
   };
 
-  const handleWithdrawnDraftChange = (id: number, value: string) => {
-    setWithdrawnDrafts((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const handleSaveWithdrawn = async (item: ShopBankAccountBalanceItem) => {
-    const amount = parseShopBankMoneyInput(withdrawnDrafts[item.id] ?? "");
-    setSavingWithdrawnId(item.id);
+  const handleWithdraw = async (accountId: number, amount: number) => {
+    setWithdrawing(true);
     try {
-      const updated = await updateShopBankAccountWithdrawn(item.id, amount);
-      setBalanceItems((prev) =>
-        prev.map((row) => (row.id === updated.id ? updated : row))
-      );
-      setWithdrawnDrafts((prev) => ({
-        ...prev,
-        [item.id]: formatShopBankMoneyInput(updated.totalWithdrawn),
-      }));
-      showAppNotification({ type: "success", message: "Đã cập nhật số tiền đã rút." });
+      await recordShopBankAccountWithdrawal(accountId, amount);
+      showAppNotification({ type: "success", message: "Đã ghi nhận rút tiền." });
+      setWithdrawOpen(false);
+      await loadBalances();
     } catch (err) {
       showAppNotification({
         type: "error",
-        message: err instanceof Error ? err.message : "Không thể lưu số tiền đã rút.",
+        message: err instanceof Error ? err.message : "Không thể ghi nhận rút tiền.",
       });
+      throw err;
     } finally {
-      setSavingWithdrawnId(null);
+      setWithdrawing(false);
     }
   };
 
@@ -239,12 +209,7 @@ export function ShopBankAccountsPage() {
         items={balanceItems}
         loading={balancesLoading}
         error={balanceError}
-        savingId={savingWithdrawnId}
-        draftWithdrawn={withdrawnDrafts}
-        onWithdrawnDraftChange={handleWithdrawnDraftChange}
-        onSaveWithdrawn={handleSaveWithdrawn}
-        onRefresh={() => void loadBalances({ refreshOnly: true })}
-        refreshing={balancesRefreshing}
+        onOpenWithdraw={() => setWithdrawOpen(true)}
       />
 
       <div className="relative max-w-md">
@@ -301,6 +266,14 @@ export function ShopBankAccountsPage() {
         submitting={deleting}
         onClose={() => setDeleteItem(null)}
         onConfirm={handleDelete}
+      />
+
+      <ShopBankWithdrawModal
+        open={withdrawOpen}
+        items={balanceItems}
+        submitting={withdrawing}
+        onClose={() => setWithdrawOpen(false)}
+        onSubmit={handleWithdraw}
       />
     </div>
   );

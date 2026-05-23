@@ -14,7 +14,11 @@ const {
 } = require("../domains/orders/controller/helpers");
 const { nextId } = require("./idService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
-const { generateUniqueTransactionCode } = require("./transactionCodeService");
+const {
+  openPaymentSlot,
+  SLOT_KIND,
+} = require("../domains/payment-slots");
+const { resolveDefaultShopBankAccount } = require("./shopBankAccountResolver");
 const { todayYMDInVietnam } = require("../utils/normalizers");
 const { ORDER_PREFIXES } = require("../utils/orderHelpers");
 
@@ -45,7 +49,6 @@ const createOrder = async (orderData, trx = null) => {
     }
 
     const idOrderCol = ORDERS_SCHEMA.ORDER_LIST.COLS.ID_ORDER;
-    const transactionCol = ORDERS_SCHEMA.ORDER_LIST.COLS.TRANSACTION;
     const priceCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PRICE;
     const provisionalIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
     const giftPrefix = String(ORDER_PREFIXES.gift || "MAVT").toUpperCase();
@@ -64,7 +67,20 @@ const createOrder = async (orderData, trx = null) => {
     const clientIdOrder = String(payload[idOrderCol] || "").trim().toUpperCase();
     const detectedPrefix = VALID_PREFIXES.find((p) => clientIdOrder.startsWith(p)) || "MAVC";
     payload[idOrderCol] = await generateUniqueOrderCode(detectedPrefix, transaction);
-    payload[transactionCol] = await generateUniqueTransactionCode(transaction);
+
+    if (payload.status === STATUS.UNPAID && Number(payload[priceCol]) > 0) {
+      const defaultBank = await resolveDefaultShopBankAccount();
+      const receiverAccount = String(defaultBank?.accountNumber || "").trim();
+      if (receiverAccount) {
+        const slot = await openPaymentSlot(transaction, {
+          orderCode: payload[idOrderCol],
+          receiverAccount,
+          baseAmount: Number(payload[priceCol]),
+          slotKind: SLOT_KIND.NEW,
+        });
+        payload[priceCol] = Number(slot.expected_amount);
+      }
+    }
 
     const [newOrder] = await transaction(TABLES.orderList).insert(payload).returning("*");
 

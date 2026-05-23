@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
+import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import { apiFetch } from "@/shared/api/client";
 import * as Helpers from "@/shared/utils";
 
@@ -24,11 +26,30 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const [accounts, setAccounts] = useState<ShopBankAccountItem[]>([]);
+  const [accountId, setAccountId] = useState(0);
   const [amountInput, setAmountInput] = useState("");
   const [reason, setReason] = useState("");
   const [linkedOrderCode, setLinkedOrderCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingAccounts(true);
+    void fetchShopBankAccounts()
+      .then((items) => {
+        setAccounts(items);
+        setAccountId(items[0]?.id ?? 0);
+      })
+      .catch(() => setAccounts([]))
+      .finally(() => setLoadingAccounts(false));
+    setAmountInput("");
+    setReason("");
+    setLinkedOrderCode("");
+    setError(null);
+  }, [isOpen]);
 
   const amountValue = useMemo(
     () => Number(String(amountInput || "").replace(/\./g, "")) || 0,
@@ -37,16 +58,16 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
 
   const closeAndReset = () => {
     if (loading) return;
-    setAmountInput("");
-    setReason("");
-    setLinkedOrderCode("");
-    setError(null);
     onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!accountId) {
+      setError("Vui lòng chọn STK.");
+      return;
+    }
     if (!amountValue || amountValue <= 0) {
       setError("Số tiền nhập hàng phải lớn hơn 0.");
       return;
@@ -56,11 +77,10 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
     try {
       const trimmedReason = reason.trim();
       const trimmedLinkedOrderCode = linkedOrderCode.trim();
-      // Mã đơn liên kết và meta là TUỲ CHỌN — chỉ gửi khi có giá trị thực sự
-      // để tránh validator/Knex phải xử lý null thừa.
       const payload: Record<string, unknown> = {
         amount: amountValue,
         expense_type: "external_import",
+        shop_bank_account_id: accountId,
       };
       if (trimmedReason) payload.reason = trimmedReason;
       if (trimmedLinkedOrderCode) {
@@ -107,6 +127,26 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
           <h2 className="mb-5 text-xl font-bold text-white">Tạo log nhập hàng</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white/80">STK chi trả</label>
+              <select
+                value={accountId || ""}
+                onChange={(e) => setAccountId(Number(e.target.value) || 0)}
+                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white"
+                disabled={loading || loadingAccounts}
+              >
+                {accounts.length === 0 ? (
+                  <option value="">Chưa có STK</option>
+                ) : (
+                  accounts.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.accountNumber} · {item.accountHolder}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             <div>
               <label className="mb-2 block text-sm font-medium text-white/80">
                 Số tiền nhập
@@ -169,7 +209,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
               <button
                 type="submit"
                 className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white hover:from-indigo-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={loading}
+                disabled={loading || loadingAccounts || !accountId}
               >
                 {loading ? "Đang lưu..." : "Tạo log"}
               </button>

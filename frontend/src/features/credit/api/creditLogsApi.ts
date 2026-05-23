@@ -14,11 +14,23 @@ type CreditActionResponse = {
   error?: string;
 };
 
-export async function submitCreditLogAction(id: number, action: CreditActionType) {
+type SubmitCreditLogActionOptions = {
+  shopBankAccountId?: number | null;
+};
+
+export async function submitCreditLogAction(
+  id: number,
+  action: CreditActionType,
+  options: SubmitCreditLogActionOptions = {}
+) {
+  const payload: Record<string, unknown> = { action };
+  if (action === "complete" && options.shopBankAccountId != null) {
+    payload.shopBankAccountId = options.shopBankAccountId;
+  }
   const response = await apiFetch(API_ENDPOINTS.CREDIT_LOG_ACTION(id), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify(payload),
   });
   const body = (await response.json().catch(() => ({}))) as CreditActionResponse;
   if (!response.ok || !body?.success) {

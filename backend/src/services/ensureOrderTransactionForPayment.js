@@ -1,24 +1,17 @@
 /**
- * Re-export mỏng cho Telegram / scheduler — tránh require sâu vào domains từ services.
+ * Legacy shim — không còn sinh mã transaction cho QR/Telegram.
+ * Match thanh toán qua payment slot (suffix + số tiền).
  */
 
-const {
-  ensureOrderTransaction,
-} = require("../domains/orders/use-cases/ensureOrderTransaction");
+const { ensureOrderTransaction } = require("../domains/orders/use-cases/ensureOrderTransaction");
 
 /**
- * Trước khi build QR: đảm bảo có transaction; gắn lại lên object order trong bộ nhớ.
  * @param {object} order
- * @returns {Promise<string>} mã transaction
+ * @returns {Promise<string>} luôn rỗng (không dùng nội dung CK)
  */
 async function ensureOrderTransactionForPayment(order) {
-  const result = await ensureOrderTransaction({ order });
-  if (order && typeof order === "object") {
-    order.transaction = result.transaction;
-    order[require("../config/dbSchema").ORDERS_SCHEMA.ORDER_LIST.COLS.TRANSACTION] =
-      result.transaction;
-  }
-  return result.transaction;
+  await ensureOrderTransaction({ order });
+  return "";
 }
 
 module.exports = {

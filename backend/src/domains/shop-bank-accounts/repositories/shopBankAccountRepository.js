@@ -22,6 +22,8 @@ const FALLBACK_COLUMNS = {
   isDefault: SCHEMA_COLS.IS_DEFAULT,
   isActive: SCHEMA_COLS.IS_ACTIVE,
   totalWithdrawn: SCHEMA_COLS.TOTAL_WITHDRAWN,
+  totalReceived: SCHEMA_COLS.TOTAL_RECEIVED,
+  balance: SCHEMA_COLS.BALANCE,
   createdAt: SCHEMA_COLS.CREATED_AT,
   updatedAt: SCHEMA_COLS.UPDATED_AT,
 };
@@ -45,6 +47,8 @@ const selectColumns = {
   isDefault: columns.isDefault,
   isActive: columns.isActive,
   totalWithdrawn: columns.totalWithdrawn,
+  totalReceived: columns.totalReceived,
+  balance: columns.balance,
   createdAt: columns.createdAt,
   updatedAt: columns.updatedAt,
 };
@@ -72,6 +76,43 @@ const findShopBankAccountByNumber = async (accountNumber) =>
     .select(selectColumns)
     .whereRaw("TRIM(??) = ?", [columns.accountNumber, accountNumber])
     .first();
+
+const MAVRYK_DEFAULT_ACCOUNT_NUMBER = "9183400998";
+const MAVRYK_FALLBACK_HOLDER = "NGO LE NGOC HUNG";
+
+/**
+ * Mục 3 (MAVN nội bộ) + mục 4 (renewal Mavryk auto) trừ STK Mavryk shop.
+ * Ưu tiên 1: STK `9183400998` (mặc định Mavryk).
+ * Fallback: bất kỳ STK active nào có chủ tài khoản "NGO LE NGOC HUNG", ưu tiên STK đủ tiền.
+ * Cả hai đường đều chỉ chọn STK đang bật. Trả null nếu không tìm thấy.
+ */
+const resolveMavrykDefaultBankAccount = async (amount = 0, executor = db) => {
+  const primary = await executor(TABLE)
+    .select(selectColumns)
+    .where(columns.isActive, true)
+    .whereRaw("TRIM(REGEXP_REPLACE(??, '\\s+', '', 'g')) = ?", [
+      columns.accountNumber,
+      MAVRYK_DEFAULT_ACCOUNT_NUMBER,
+    ])
+    .first();
+  if (primary) return primary;
+
+  const minAmount = Number.isFinite(Number(amount)) ? Math.max(0, Number(amount)) : 0;
+  const fallbackRows = await executor(TABLE)
+    .select(selectColumns)
+    .where(columns.isActive, true)
+    .whereRaw("UPPER(TRIM(??)) = ?", [
+      columns.accountHolder,
+      MAVRYK_FALLBACK_HOLDER.toUpperCase(),
+    ])
+    .orderBy(columns.balance, "desc")
+    .orderBy(columns.id, "asc");
+
+  const sufficient = fallbackRows.find(
+    (row) => Number(row.balance) >= minAmount
+  );
+  return sufficient || fallbackRows[0] || null;
+};
 
 const clearDefaultFlags = async (trx) =>
   trx(TABLE).where(columns.isDefault, true).update({
@@ -108,6 +149,9 @@ module.exports = {
   findShopBankAccountById,
   findDefaultActiveAccount,
   findShopBankAccountByNumber,
+  resolveMavrykDefaultBankAccount,
+  MAVRYK_DEFAULT_ACCOUNT_NUMBER,
+  MAVRYK_FALLBACK_HOLDER,
   clearDefaultFlags,
   insertShopBankAccount,
   updateShopBankAccount,

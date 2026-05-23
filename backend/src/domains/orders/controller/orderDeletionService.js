@@ -103,11 +103,7 @@ const deleteOrderWithArchive = async ({
         if (updatePayload[canceledAtCol] !== undefined) {
             afterOrder[canceledAtCol] = updatePayload[canceledAtCol];
         }
-        await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder, {
-            // Luồng hủy -> Đã Hoàn nhưng chi trả thực tế thực hiện khi bấm "Đã Hoàn" ở credit log.
-            // Vì vậy không trừ bank ở bước đổi trạng thái đơn để tránh trừ kép.
-            skipBankBalanceDelta: archiveStatus === STATUS.REFUNDED && refundValue > 0,
-        });
+        await updateDashboardMonthlySummaryOnStatusChange(trx, order, afterOrder);
 
         if (archiveStatus === STATUS.REFUNDED && refundValue > 0) {
             await createOrGetRefundCreditNoteForOrder(trx, {

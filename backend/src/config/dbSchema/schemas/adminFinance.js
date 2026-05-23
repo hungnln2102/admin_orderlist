@@ -42,8 +42,25 @@ const ADMIN_SCHEMA = {
       IS_DEFAULT: "is_default",
       IS_ACTIVE: "is_active",
       TOTAL_WITHDRAWN: "total_withdrawn",
+      TOTAL_RECEIVED: "total_received",
+      BALANCE: "balance",
       CREATED_AT: "created_at",
       UPDATED_AT: "updated_at",
+    },
+  },
+  SHOP_BANK_ACCOUNT_LEDGER: {
+    TABLE: "shop_bank_account_ledger",
+    COLS: {
+      ID: "id",
+      SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
+      ENTRY_TYPE: "entry_type",
+      AMOUNT: "amount",
+      SIGNED_AMOUNT: "signed_amount",
+      BALANCE_AFTER: "balance_after",
+      SOURCE_KIND: "source_kind",
+      SOURCE_ID: "source_id",
+      NOTE: "note",
+      CREATED_AT: "created_at",
     },
   },
 };
@@ -158,6 +175,7 @@ const FINANCE_SCHEMA = {
       /** Gắn mã đơn MAVN khi `expense_type = mavn_import` (migration 088). */
       LINKED_ORDER_CODE: "linked_order_code",
       EXPENSE_META: "expense_meta",
+      SHOP_BANK_ACCOUNT_ID: "shop_bank_account_id",
     },
   },
 };

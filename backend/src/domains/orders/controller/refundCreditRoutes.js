@@ -2,8 +2,6 @@ const { db } = require("../../../db");
 const { TABLES, STATUS, COLS } = require("./constants");
 const { orderIdParam } = require("../validators/orderValidator");
 const logger = require("../../../utils/logger");
-const { todayYMDInVietnam } = require("../../../utils/normalizers");
-const { applyEstimatedBankBalanceDelta } = require("./finance/dashboardSummary");
 const {
     parseRefundCreditLogsQuery,
     listRefundCreditLogs,
@@ -18,6 +16,12 @@ const {
 } = require("./finance/refundCredits");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("../../../services/orderCodeService");
 const { ORDER_PREFIXES } = require("../../../utils/orderHelpers");
+const {
+    findShopBankAccountById,
+} = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
+const {
+    debitShopBankRefundCashout,
+} = require("../../shop-bank-accounts/services/shopBankLedgerService");
 
 const detectPreviewPrefix = (orderCodeRaw) => {
     const normalized = String(orderCodeRaw || "").trim().toUpperCase();
@@ -45,11 +49,6 @@ const appendNote = (baseNote, suffix) => {
     if (!next) return base || null;
     if (!base) return next;
     return `${base} — ${next}`;
-};
-
-const monthKeyCurrentVietnam = () => {
-    const ymd = todayYMDInVietnam();
-    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.slice(0, 7) : null;
 };
 
 const attachRefundCreditRoutes = (router) => {
@@ -193,6 +192,21 @@ const attachRefundCreditRoutes = (router) => {
             return res.status(400).json({ error: "Action không hợp lệ. Dùng delete hoặc complete." });
         }
 
+        const rawShopBankAccountId = req.body?.shopBankAccountId ?? req.body?.shop_bank_account_id;
+        const shopBankAccountId = Number(rawShopBankAccountId);
+        const hasShopBankAccountId =
+            rawShopBankAccountId !== undefined &&
+            rawShopBankAccountId !== null &&
+            rawShopBankAccountId !== "" &&
+            Number.isFinite(shopBankAccountId) &&
+            shopBankAccountId > 0;
+
+        if (action === CREDIT_ACTIONS.COMPLETE && !hasShopBankAccountId) {
+            return res.status(400).json({
+                error: "Vui lòng chọn STK để trừ tiền hoàn trước khi xác nhận.",
+            });
+        }
+
         const trx = await db.transaction();
         try {
             const current = await trx(REFUND_CREDIT_NOTES_TABLE)
@@ -210,16 +224,36 @@ const attachRefundCreditRoutes = (router) => {
                 availableAmount <= 0 || [CREDIT_STATUS.FULLY_APPLIED, CREDIT_STATUS.VOID].includes(currentStatus);
 
             let nextNote = current?.[RCN.NOTE] ?? null;
-            let bankBalanceDelta = 0;
+            let cashoutAmount = 0;
+            let cashoutAccount = null;
 
             if (action === CREDIT_ACTIONS.DELETE) {
                 nextNote = appendNote(nextNote, "Ẩn credit khỏi danh sách khả dụng (thao tác Xóa).");
             } else if (action === CREDIT_ACTIONS.COMPLETE) {
+                cashoutAmount = Math.max(0, availableAmount);
+                if (cashoutAmount <= 0) {
+                    await trx.rollback();
+                    return res.status(400).json({
+                        error: "Credit không còn số dư khả dụng để hoàn.",
+                    });
+                }
+
+                cashoutAccount = await findShopBankAccountById(shopBankAccountId);
+                if (!cashoutAccount || cashoutAccount.isActive === false) {
+                    await trx.rollback();
+                    return res.status(400).json({
+                        error: "STK không hợp lệ hoặc đang bị tắt.",
+                    });
+                }
+
+                const accountLabel =
+                    String(cashoutAccount.label || "").trim() ||
+                    String(cashoutAccount.accountNumber || "").trim() ||
+                    `STK ${cashoutAccount.id}`;
                 nextNote = appendNote(
                     nextNote,
-                    "Đã hoàn tiền theo credit (thao tác Đã Hoàn)."
+                    `Đã hoàn tiền theo credit (thao tác Đã Hoàn) — trừ ${accountLabel}.`
                 );
-                bankBalanceDelta = -Math.max(0, availableAmount);
             }
 
             if (!isAlreadyUnavailable || action === CREDIT_ACTIONS.COMPLETE) {
@@ -237,11 +271,22 @@ const attachRefundCreditRoutes = (router) => {
                     .update(updatePayload);
             }
 
-            if (action === CREDIT_ACTIONS.COMPLETE && bankBalanceDelta !== 0) {
-                const monthKey = monthKeyCurrentVietnam();
-                if (monthKey) {
-                    await applyEstimatedBankBalanceDelta(trx, monthKey, bankBalanceDelta, {
-                        context: "refundCredits.completeAction",
+            if (action === CREDIT_ACTIONS.COMPLETE && cashoutAmount > 0 && cashoutAccount) {
+                const creditCode = String(current?.[RCN.CREDIT_CODE] || "").trim();
+                const accountLabel =
+                    String(cashoutAccount.label || "").trim() ||
+                    String(cashoutAccount.accountNumber || "").trim() ||
+                    `STK ${cashoutAccount.id}`;
+                const ledgerResult = await debitShopBankRefundCashout(trx, {
+                    accountId: Number(cashoutAccount.id),
+                    amount: cashoutAmount,
+                    sourceId: id,
+                    note: `Hoàn tiền credit ${creditCode || `#${id}`} — ${accountLabel}`,
+                });
+                if (!ledgerResult || ledgerResult.skipped) {
+                    logger.warn("Refund cashout ledger skipped", {
+                        creditId: id,
+                        reason: ledgerResult?.reason || "unknown",
                     });
                 }
             }

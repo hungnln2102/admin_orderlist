@@ -44,7 +44,6 @@ const {
   resolveOrderCodesByBatchCodes,
   resolveBatchOrderAmountsByBatchCodes,
 } = require("./matchPhase");
-const { resolveOrderCodesByTransaction } = require("../../paymentReference");
 const {
   isBatchCode,
   PAYMENT_RECEIPT_BATCH_TABLE,
@@ -62,6 +61,7 @@ const {
   resolveOrderPriceForWebhookMatch,
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
+const { creditShopBankFromPaymentReceipt } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
@@ -70,9 +70,6 @@ const {
   resolveWebhookPostedRevenue,
 } = require("./orderCodeResolution");
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
-const {
-  applyEstimatedBankBalanceDelta,
-} = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
 const { STATUS } = require("../../../../src/utils/statuses");
 
 const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(
@@ -280,10 +277,6 @@ async function tryAutoSettleSupplierRefundByReceipt({
     [STATUS.PAID, target.supplyId]
   );
 
-  if (paidMonthKey) {
-    await applyEstimatedBankBalanceDelta(client, paidMonthKey, -incoming);
-  }
-
   if (receiptId) {
     await insertFinancialAuditLog(client, {
       payment_receipt_id: receiptId,
@@ -407,37 +400,13 @@ async function handleWebhookPost(req, res) {
         resolvedBatchCodes,
         normalizeMoney
       );
-      const orderCodesFromTransaction = await resolveOrderCodesByTransaction(
-        client,
-        paymentReferenceCodes
-      );
-      if (orderCodesFromTransaction.length > 0) {
-        logger.info("[Webhook] Resolved orders by transaction code", {
-          paymentReferenceCodes,
-          orderCodesFromTransaction,
-        });
-      }
       loopOrderCodes = buildWebhookLoopOrderCodes({
-        orderCodesFromTransaction,
+        orderCodesFromTransaction: [],
         orderCodes,
         batchOrderMap,
         orderCode,
         batchCodes: resolvedBatchCodes,
       });
-
-      if (
-        orderCodesFromTransaction.length > 0 &&
-        orderCodes.some((code) => !isBatchCode(code))
-      ) {
-        logger.info(
-          "[Webhook] Matched by transaction — ignore extra MAV codes in CK content",
-          {
-            paymentReferenceCodes,
-            orderCodesFromTransaction,
-            ignoredMavCodes: orderCodes.filter((code) => !isBatchCode(code)),
-          }
-        );
-      }
 
       if (resolvedBatchCodes.length > 0) {
         logger.info("[Webhook] Resolve batch codes", {
@@ -528,7 +497,6 @@ async function handleWebhookPost(req, res) {
       let postedProfitDelta = 0;
       let postedImportDelta = 0;
       let postedOffFlowBankReceiptDelta = 0;
-      let postedBankBalanceDelta = 0;
       // Snapshot tài chính tháng TRƯỚC khi xử lý webhook + renewal — để cuối
       // luồng gửi 1 tin nhắn BIẾN ĐỘNG THÁNG tổng hợp.
       const financeSnapshotBefore = paidMonthKey && !alreadyFinancialPosted
@@ -550,17 +518,28 @@ async function handleWebhookPost(req, res) {
       }
 
       if (!alreadyFinancialPosted && receiptResult?.inserted && transferAmountNormalized > 0) {
-        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-          bankBalanceDelta: transferAmountNormalized,
-          notify: false,
-        });
-        postedBankBalanceDelta += transferAmountNormalized;
-        logger.info("[Webhook][FinancialDebug] Applied bank balance seed from receipt", {
+        logger.info("[Webhook][FinancialDebug] Credit shop bank ledger from receipt", {
           receiptId,
           monthKey: paidMonthKey,
           transferAmount: transferAmountNormalized,
-          postedBankBalanceDelta,
         });
+
+        try {
+          await creditShopBankFromPaymentReceipt(client, {
+            receiptId,
+            receiverAccount:
+              transaction.account_number || transaction.accountNumber || "",
+            amount: transferAmountNormalized,
+            note: transaction.note || transaction.description || null,
+          });
+        } catch (ledgerError) {
+          logger.error("[Webhook][ShopBankLedger] credit from receipt failed", {
+            receiptId,
+            error: ledgerError.message,
+            stack: ledgerError.stack,
+          });
+          throw ledgerError;
+        }
       }
 
       // Chưa Thanh Toán → Đã Thanh Toán khi có biên lai.

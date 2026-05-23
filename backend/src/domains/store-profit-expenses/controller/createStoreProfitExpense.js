@@ -16,10 +16,27 @@ const {
   MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED,
 } = require("./shared");
 
+const {
+  debitShopBankExternalOut,
+  SOURCE_KINDS,
+} = require("../../shop-bank-accounts/services/shopBankLedgerService");
+const { findShopBankAccountById } = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
+
+const parseShopBankAccountId = (body) => {
+  const raw =
+    body?.shop_bank_account_id ??
+    body?.shopBankAccountId ??
+    body?.shop_bank_accountId;
+  const id = Number(raw);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+};
+
 const createStoreProfitExpense = async (req, res) => {
   const amount = parseAmount(req.body?.amount);
   const reason = normalizeTextInput(req.body?.reason || "");
   const expenseType = normalizeExpenseType(req.body?.expense_type) || "withdraw_profit";
+  const shopBankAccountId = parseShopBankAccountId(req.body);
   const linkedOrderCodeRaw = normalizeTextInput(
     req.body?.linked_order_code || req.body?.linkedOrderCode || ""
   );
@@ -30,6 +47,23 @@ const createStoreProfitExpense = async (req, res) => {
     return res.status(400).json({
       error: "Loại mavn_import chỉ được tạo tự động từ đơn MAVN Đã Thanh Toán.",
     });
+  }
+
+  if (expenseType === "withdraw_profit") {
+    return res.status(400).json({
+      error: "Rút tiền phải chọn STK qua Quản lý STK hoặc POST /api/shop-bank-accounts/:id/withdraw.",
+    });
+  }
+
+  if (!shopBankAccountId) {
+    return res.status(400).json({
+      error: "Vui lòng chọn STK cho giao dịch này.",
+    });
+  }
+
+  const shopBankAccount = await findShopBankAccountById(shopBankAccountId);
+  if (!shopBankAccount) {
+    return res.status(404).json({ error: "Không tìm thấy STK đã chọn." });
   }
 
   try {
@@ -43,6 +77,7 @@ const createStoreProfitExpense = async (req, res) => {
         [COLS.AMOUNT]: amount,
         [COLS.REASON]: reason || null,
         [COLS.EXPENSE_TYPE]: expenseType,
+        [COLS.SHOP_BANK_ACCOUNT_ID]: shopBankAccountId,
       };
 
       if (hasMavnCols && linkedOrderCode) {
@@ -63,6 +98,17 @@ const createStoreProfitExpense = async (req, res) => {
 
       const [created] = await trx(TABLE).insert(insertPayload).returning([COLS.ID]);
       const createdId = Number(created?.id ?? created?.[COLS.ID] ?? 0);
+
+      if (expenseType === "external_import" && amount > 0) {
+        await debitShopBankExternalOut(trx, {
+          accountId: shopBankAccountId,
+          amount,
+          sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+          sourceId: createdId,
+          note: reason || null,
+        });
+      }
+
       const inserted = await trx(TABLE)
         .select(
           COLS.ID,
@@ -76,17 +122,10 @@ const createStoreProfitExpense = async (req, res) => {
         .where(COLS.ID, createdId)
         .first();
 
-      if (
-        (expenseType === "external_import" || expenseType === "withdraw_profit") &&
-        amount > 0 &&
-        inserted?.[COLS.CREATED_AT]
-      ) {
+      if (expenseType === "external_import" && amount > 0 && inserted?.[COLS.CREATED_AT]) {
         const mk = await monthKeyVietnamFromDbTimestamp(trx, inserted[COLS.CREATED_AT]);
         if (mk) {
-          const updates = { estimated_bank_balance: -amount };
-          if (expenseType === "external_import") {
-            updates.total_profit = -amount;
-          }
+          const updates = { total_profit: -amount };
           await mergeSummaryUpdates(trx, mk, updates, {
             context: `createStoreProfitExpense.${expenseType}`,
           });

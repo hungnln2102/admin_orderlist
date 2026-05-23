@@ -40,7 +40,12 @@ export const usePayments = ({
 
   const confirmPayment = async (
     paymentId: number,
-    opts?: { paidAmount?: number; paymentContent?: string; supplyId?: number }
+    opts?: {
+      paidAmount?: number;
+      paymentContent?: string;
+      supplyId?: number;
+      shopBankAccountId?: number;
+    }
   ) => {
     setConfirmingId(paymentId);
     try {
@@ -57,6 +62,13 @@ export const usePayments = ({
       }
       if (opts?.supplyId != null && Number.isFinite(opts.supplyId) && opts.supplyId > 0) {
         bodyPayload.supplyId = Math.round(opts.supplyId);
+      }
+      if (
+        opts?.shopBankAccountId != null &&
+        Number.isFinite(opts.shopBankAccountId) &&
+        opts.shopBankAccountId > 0
+      ) {
+        bodyPayload.shopBankAccountId = Math.round(opts.shopBankAccountId);
       }
       const body =
         Object.keys(bodyPayload).length > 0

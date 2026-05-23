@@ -185,7 +185,7 @@ export default function ViewSupplierModal({
                              const displayAmount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
                              return (
                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                 <div><p className="text-white/60">Chủ TK</p><p>{isNegative ? ACCOUNT_NAME : supply.sourceName}</p></div>
+                                 <div><p className="text-white/60">Chủ TK</p><p>{isNegative ? shopBank.accountHolder : supply.sourceName}</p></div>
                                  <div><p className="text-white/60">Số Tiền</p><p className="text-rose-400 font-bold text-lg">{Helpers.formatCurrency(displayAmount)}{isNegative ? " (NCC chuyển cho bạn)" : ""}</p></div>
                                  <div className="col-span-2"><p className="text-white/60">Nội dung</p><p className="font-mono bg-black/30 p-2 rounded">{selectedPayment.round}</p></div>
                                </div>

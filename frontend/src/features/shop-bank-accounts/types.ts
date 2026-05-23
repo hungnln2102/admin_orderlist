@@ -9,7 +9,9 @@ export interface ShopBankAccountItem {
   qrNotePrefix: string | null;
   isDefault: boolean;
   isActive: boolean;
+  totalReceived?: number;
   totalWithdrawn?: number;
+  balance?: number;
   createdAt?: string | null;
   updatedAt?: string | null;
 }

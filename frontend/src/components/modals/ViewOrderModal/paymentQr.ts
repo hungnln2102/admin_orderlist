@@ -18,8 +18,6 @@ export type ViewOrderPaymentQrBuildInput = {
   isGift: boolean;
   overrideCustomerQrAmount?: number | null;
   shopBank?: ShopBankQrOverride | null;
-  /** Mã CK (transaction) — đã ensure từ API nếu đơn cũ chưa có. */
-  transferCodeOverride?: string | null;
 };
 
 export type ViewOrderPaymentQrPayload = {
@@ -55,14 +53,8 @@ export const buildViewOrderPaymentQrPayload = ({
   isGift,
   overrideCustomerQrAmount = null,
   shopBank = null,
-  transferCodeOverride = null,
 }: ViewOrderPaymentQrBuildInput): ViewOrderPaymentQrPayload => {
   const idOrder = String(order[ORDER_FIELDS.ID_ORDER] ?? "");
-  const transferCode = String(
-    transferCodeOverride ?? order[ORDER_FIELDS.TRANSACTION] ?? ""
-  )
-    .trim()
-    .toUpperCase();
   const accountNo = shopBank?.accountNumber || EMPTY_SHOP_BANK_QR_CONFIG.accountNumber;
   const accountName = shopBank?.accountHolder || EMPTY_SHOP_BANK_QR_CONFIG.accountHolder;
   const bankCode = shopBank?.bankCode || EMPTY_SHOP_BANK_QR_CONFIG.bankCode;
@@ -70,19 +62,6 @@ export const buildViewOrderPaymentQrPayload = ({
     shopBank?.bankDisplayName ||
     EMPTY_SHOP_BANK_QR_CONFIG.bankDisplayName ||
     bankCode;
-  const qrPrefix = shopBank?.qrNotePrefix ?? EMPTY_SHOP_BANK_QR_CONFIG.qrNotePrefix;
-  /** Nội dung CK shop: prefix + mã transaction (đơn mới); fallback id_order nếu chưa có. */
-  const notePrefix = String(qrPrefix || "")
-    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
-    .replace(/\bTT\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const shopTransferContent = [notePrefix, transferCode]
-    .map((s) => String(s || "").trim())
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-  const qrMessage = shopTransferContent;
   const supplyName = String(order[ORDER_FIELDS.SUPPLY] ?? order.supply ?? "").trim();
   const accountHolder = String(order.supplier_account_holder ?? "").trim();
   const holderLabel = accountHolder || supplyName;
@@ -133,19 +112,18 @@ export const buildViewOrderPaymentQrPayload = ({
   }
 
   const effectiveQrAmount = Helpers.roundGiaBanValue(displayPriceAmount);
-  const canBuildShopQr = Boolean(transferCode && accountNo && bankCode);
+  const canBuildShopQr = Boolean(accountNo && bankCode && effectiveQrAmount > 0);
   return {
     qrCodeImageUrl: canBuildShopQr
       ? buildSepayQrUrl({
           accountNumber: accountNo,
           bankCode,
           amount: effectiveQrAmount,
-          description: qrMessage,
           accountName,
         })
       : "",
     effectiveQrAmount,
-    qrMessage,
+    qrMessage: "",
     bankDisplay,
     accountNoDisplay: accountNo,
     holderDisplay: accountName,

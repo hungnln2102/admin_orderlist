@@ -13,9 +13,6 @@ const { toSafeString } = require("./formatters");
 const { buildDueOrderMessage } = require("./messageBuilders");
 const { buildSepayQrUrl, fetchQrImageBytes } = require("./qr");
 const { resolveDefaultShopBankAccount } = require("../shopBankAccountResolver");
-const {
-  ensureOrderTransactionForPayment,
-} = require("../ensureOrderTransactionForPayment");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 
@@ -73,7 +70,6 @@ async function sendFourDaysRemainingNotification(orders = []) {
   }
 
   const bank = await resolveDefaultShopBankAccount();
-  const qrNotePrefix = String(bank.qrNotePrefix || "").trim();
 
   for (let i = 0; i < deduped.length; i++) {
     const order = deduped[i];
@@ -81,43 +77,12 @@ async function sendFourDaysRemainingNotification(orders = []) {
     const orderCode = toSafeString(
       order.id_order || order.idOrder || order.order_code || order.orderCode
     ).trim();
-    let transferCode = "";
-    try {
-      transferCode = await ensureOrderTransactionForPayment(order);
-    } catch (ensureErr) {
-      logger.warn("[Order][Telegram] ensure transaction failed — text-only notify", {
-        orderCode,
-        error: ensureErr?.message,
-      });
-    }
-    if (!transferCode) {
-      try {
-        const captionOnly = buildDueOrderMessage(order, index, total, bank);
-        if (captionOnly) {
-          await sendWithRetry(() =>
-            sendTelegramMessage({
-              chatId: TELEGRAM_CHAT_ID,
-              text: captionOnly,
-              topicId: FOUR_DAYS_TOPIC_ID,
-            })
-          );
-        }
-      } catch (textErr) {
-        logger.warn("[Order][Telegram] Due order text-only failed", {
-          orderCode,
-          error: textErr?.message,
-        });
-      }
-      continue;
-    }
     const price = Number(order.price || 0) || 0;
-    const paymentNote = [qrNotePrefix, transferCode].filter(Boolean).join(" ").trim();
     const caption = buildDueOrderMessage(order, index, total, bank);
     const qrUrl = buildSepayQrUrl({
       accountNumber: bank.accountNumber,
       bankCode: bank.bankShortCode,
       amount: price,
-      description: paymentNote,
       accountName: bank.accountHolder,
     });
 
@@ -127,7 +92,6 @@ async function sendFourDaysRemainingNotification(orders = []) {
       try {
         const fetched = await fetchQrImageBytes({
           amount: price,
-          addInfo: paymentNote,
           accountName: bank.accountHolder,
           bankCode: bank.bankShortCode,
           accountNumber: bank.accountNumber,

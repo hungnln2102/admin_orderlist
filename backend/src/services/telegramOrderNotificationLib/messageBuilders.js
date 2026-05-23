@@ -15,7 +15,7 @@ const normalizeBankInfo = (bankInfo = {}) => ({
   bankCode: String(bankInfo.bankShortCode || bankInfo.bankCode || "").trim(),
 });
 
-function buildOrderCreatedMessage(order, paymentNote, bankInfo) {
+function buildOrderCreatedMessage(order, bankInfo) {
   const bank = normalizeBankInfo(bankInfo);
   if (!order) return "";
   const orderCode = toSafeString(
@@ -47,7 +47,6 @@ function buildOrderCreatedMessage(order, paymentNote, bankInfo) {
   const escDays = days > 0 ? escapeHtml(`${days} ngày`) : "";
   const escPrice = escapeHtml(priceValue);
   const escStk = bank.accountNumber ? escapeHtml(bank.accountNumber) : "";
-  const escPayment = paymentNote ? escapeHtml(paymentNote) : "";
 
   const separator1 = "━━━━━━ 📦 ━━━━━━";
   const separator2 = "━━━━━━ 👤 ━━━━━━";
@@ -73,7 +72,7 @@ function buildOrderCreatedMessage(order, paymentNote, bankInfo) {
     separator3,
     "💳 <b>HƯỚNG DẪN THANH TOÁN</b>",
     escStk ? `🏦 STK: <code>${escStk}</code>` : null,
-    escPayment ? `📝 Nội dung: <code>${escPayment}</code>` : null,
+    "ℹ️ Chuyển khoản <b>đúng số tiền</b> hiển thị trên QR (không cần ghi nội dung).",
   ].filter(Boolean);
 
   return lines.join("\n");
@@ -202,9 +201,8 @@ function buildDueOrderMessage(order, index, total, bankInfo) {
     bank.bankCode ? `🏦 Ngân hàng: ${bank.bankCode}` : null,
     bank.accountNumber ? `🏧 STK: ${bank.accountNumber}` : null,
     bank.accountHolder ? `👤 Tên: ${bank.accountHolder}` : null,
-    `📝 Nội dung: ${orderCode || "..."}`,
+    `ℹ️ Chuyển khoản đúng số tiền trên QR (không cần ghi nội dung chuyển khoản).`,
     ``,
-    `⚠️ Vui lòng ghi đúng mã đơn trong nội dung chuyển khoản để xử lý nhanh.`,
     `🙏 Trân trọng cảm ơn quý khách!`,
   ].filter((line) => line !== null);
 

@@ -44,6 +44,8 @@ export const normalizeShopBankAccountItem = (value: unknown): ShopBankAccountIte
     isDefault: toBool(row.isDefault ?? row.is_default, false),
     isActive: toBool(row.isActive ?? row.is_active, true),
     totalWithdrawn: Number(row.totalWithdrawn ?? row.total_withdrawn) || 0,
+    totalReceived: Number(row.totalReceived ?? row.total_received) || 0,
+    balance: Number(row.balance) || 0,
     createdAt:
       row.createdAt != null
         ? String(row.createdAt)
@@ -69,7 +71,8 @@ export const normalizeShopBankAccountBalanceItem = (
     totalReceived: Number(row.totalReceived ?? row.total_received) || 0,
     totalWithdrawn:
       Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
-    balanceRemaining: Number(row.balanceRemaining ?? row.balance_remaining) || 0,
+    balanceRemaining:
+      Number(row.balanceRemaining ?? row.balance_remaining ?? row.balance) || 0,
   };
 };
 
@@ -100,6 +103,21 @@ export async function fetchShopBankAccountBalances(): Promise<ShopBankAccountBal
     ? (data as ListResponse).items
     : [];
   return items.map(normalizeShopBankAccountBalanceItem);
+}
+
+export async function recordShopBankAccountWithdrawal(
+  id: number,
+  amount: number,
+  reason?: string | null
+): Promise<ShopBankAccountBalanceItem> {
+  const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_WITHDRAW(id), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, reason: reason?.trim() || null }),
+  });
+  return parseResponse(response, (payload) =>
+    normalizeShopBankAccountBalanceItem((payload as { item?: unknown })?.item)
+  );
 }
 
 export async function updateShopBankAccountWithdrawn(

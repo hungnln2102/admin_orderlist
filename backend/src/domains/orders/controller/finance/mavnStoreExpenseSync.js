@@ -17,6 +17,13 @@ const {
   mergeSummaryUpdates,
   monthKeyVietnamFromDbTimestamp,
 } = require("./dashboardSummary");
+const {
+  resolveMavrykDefaultBankAccount,
+} = require("../../../shop-bank-accounts/repositories/shopBankAccountRepository");
+const {
+  recordMavnInternalSettlement,
+} = require("../../../shop-bank-accounts/services/shopBankLedgerService");
+const logger = require("../../../../utils/logger");
 
 const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
 const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
@@ -82,6 +89,37 @@ async function resolveIsInternalSupplier(trx, row) {
   return isMavrykShopSupplierName(supplier?.[supplierCols.SUPPLIER_NAME]);
 }
 
+async function settleMavnInternalBankDelta(trx, { signedAmount, orderRow }) {
+  const numericDelta = Number(signedAmount);
+  if (!Number.isFinite(numericDelta) || numericDelta === 0) return;
+
+  const absAmount = Math.abs(numericDelta);
+  const mavrykAccount = await resolveMavrykDefaultBankAccount(absAmount, trx);
+  if (!mavrykAccount?.id) {
+    logger.warn(
+      "[mavnStoreExpenseSync] Không tìm thấy STK Mavryk mặc định — bỏ qua trừ/cộng STK.",
+      {
+        orderCode: orderRow?.[COLS.ORDER.ID_ORDER] ?? orderRow?.id_order ?? null,
+        signedAmount: numericDelta,
+      }
+    );
+    return;
+  }
+
+  const orderListId = Number(orderRow?.[COLS.ORDER.ID] ?? orderRow?.id);
+  const sourceId = Number.isFinite(orderListId) && orderListId > 0 ? orderListId : null;
+  const noteParts = [
+    `MAVN nội bộ ${orderRow?.[COLS.ORDER.ID_ORDER] ?? orderRow?.id_order ?? ""}`.trim(),
+    numericDelta > 0 ? "đảo PAID (cộng lại)" : "vào PAID / tăng giá",
+  ].filter(Boolean);
+  await recordMavnInternalSettlement(trx, {
+    accountId: Number(mavrykAccount.id),
+    signedAmount: numericDelta,
+    sourceId,
+    note: noteParts.join(" — "),
+  });
+}
+
 async function applyInternalMavnDashboardDelta({
   trx,
   beforeRow,
@@ -104,9 +142,13 @@ async function applyInternalMavnDashboardDelta({
     await mergeSummaryUpdates(
       trx,
       beforeMonthKey,
-      { total_profit: net, estimated_bank_balance: net },
+      { total_profit: net },
       { context: "mavnStoreExpenseSync.internal.sameMonth" }
     );
+    await settleMavnInternalBankDelta(trx, {
+      signedAmount: net,
+      orderRow: afterRow || beforeRow,
+    });
     return;
   }
 
@@ -114,18 +156,26 @@ async function applyInternalMavnDashboardDelta({
     await mergeSummaryUpdates(
       trx,
       beforeMonthKey,
-      { total_profit: beforeAmount, estimated_bank_balance: beforeAmount },
+      { total_profit: beforeAmount },
       { context: "mavnStoreExpenseSync.internal.removeBefore" }
     );
+    await settleMavnInternalBankDelta(trx, {
+      signedAmount: beforeAmount,
+      orderRow: beforeRow,
+    });
   }
 
   if (afterMonthKey && afterAmount > 0) {
     await mergeSummaryUpdates(
       trx,
       afterMonthKey,
-      { total_profit: -afterAmount, estimated_bank_balance: -afterAmount },
+      { total_profit: -afterAmount },
       { context: "mavnStoreExpenseSync.internal.applyAfter" }
     );
+    await settleMavnInternalBankDelta(trx, {
+      signedAmount: -afterAmount,
+      orderRow: afterRow,
+    });
   }
 }
 

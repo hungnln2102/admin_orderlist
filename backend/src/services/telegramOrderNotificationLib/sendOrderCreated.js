@@ -23,9 +23,6 @@ const { buildSepayQrUrl, fetchQrImageBytes } = require("./qr");
 const { sendTelegramMessage, sendTelegramPhoto } = require("./telegramApi");
 const { sendWithRetry } = require("./sendWithRetry");
 const { resolveDefaultShopBankAccount } = require("../shopBankAccountResolver");
-const {
-  ensureOrderTransactionForPayment,
-} = require("../ensureOrderTransactionForPayment");
 
 async function sendOrderCreatedNotification(order) {
   const isImport = isMavnImportOrder(order);
@@ -68,28 +65,10 @@ async function sendOrderCreatedNotification(order) {
   const orderCode = toSafeString(
     order.id_order || order.idOrder || order.order_code || order.orderCode
   ).trim();
-  let transferCode = "";
-  if (!isImport) {
-    try {
-      transferCode = await ensureOrderTransactionForPayment(order);
-    } catch (ensureErr) {
-      logger.warn("[Order][Telegram] ensure transaction on create notify failed", {
-        orderCode: order?.id_order || order?.idOrder,
-        error: ensureErr?.message,
-      });
-      return;
-    }
-  }
   const bank = await resolveDefaultShopBankAccount();
   const qrAccountNumber = bank.accountNumber;
   const qrBankCode = bank.bankShortCode;
   const qrAccountName = bank.accountHolder;
-  const notePrefix = String(bank.qrNotePrefix || "")
-    .replace(/\bTHANH[\s_]*TOAN\b/gi, " ")
-    .replace(/\bTT\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const paymentNote = [notePrefix, transferCode].filter(Boolean).join(" ").trim();
   const amount = roundGiaBanValue(order.price || 0);
   const qrUrl = isImport
     ? null
@@ -97,12 +76,11 @@ async function sendOrderCreatedNotification(order) {
         accountNumber: qrAccountNumber,
         bankCode: qrBankCode,
         amount,
-        description: paymentNote,
         accountName: qrAccountName,
       });
   const caption = isImport
     ? buildImportOrderCreatedMessage(order)
-    : buildOrderCreatedMessage(order, paymentNote, bank);
+    : buildOrderCreatedMessage(order, bank);
 
   if (!caption) return;
 
@@ -113,7 +91,6 @@ async function sendOrderCreatedNotification(order) {
     try {
       const fetched = await fetchQrImageBytes({
         amount,
-        addInfo: paymentNote,
         accountName: qrAccountName,
         bankCode: qrBankCode,
         accountNumber: qrAccountNumber,
@@ -154,7 +131,7 @@ async function sendOrderCreatedNotification(order) {
       payload.text = caption;
     }
     if (includeButtons && SEND_ORDER_COPY_BUTTONS) {
-      const keyboard = buildCopyKeyboard({ orderCode, paymentNote });
+      const keyboard = buildCopyKeyboard({ orderCode });
       if (keyboard) {
         payload.reply_markup = keyboard;
       }

@@ -9,6 +9,7 @@ const {
 } = require("../use-cases");
 const { listShopBankAccountBalances } = require("../use-cases/listShopBankAccountBalances");
 const { updateShopBankAccountWithdrawn } = require("../use-cases/updateShopBankAccountWithdrawn");
+const { recordShopBankAccountWithdrawal } = require("../use-cases/recordShopBankAccountWithdrawal");
 
 const handleControllerError = (res, error, context) => {
   const status = Number.isInteger(error?.status) ? error.status : 500;
@@ -112,6 +113,19 @@ const patchShopBankAccountWithdrawn = async (req, res) => {
   }
 };
 
+const postShopBankAccountWithdraw = async (req, res) => {
+  try {
+    const item = await recordShopBankAccountWithdrawal(req.params.id, req.body);
+    return res.status(201).json({ item });
+  } catch (error) {
+    return handleControllerError(
+      res,
+      error,
+      `[shop-bank-accounts] withdraw failed (id=${req.params.id})`
+    );
+  }
+};
+
 module.exports = {
   listShopBankAccounts,
   getDefaultShopBankAccountHandler,
@@ -121,4 +135,5 @@ module.exports = {
   removeShopBankAccount,
   listShopBankAccountBalancesHandler,
   patchShopBankAccountWithdrawn,
+  postShopBankAccountWithdraw,
 };

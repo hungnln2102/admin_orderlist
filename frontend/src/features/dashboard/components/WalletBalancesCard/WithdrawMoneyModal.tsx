@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { apiFetch } from "@/shared/api/client";
+import { fetchShopBankAccounts, recordShopBankAccountWithdrawal } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
+import { formatShopBankMoneyDraft, parseShopBankMoneyInput } from "@/features/shop-bank-accounts/helpers/formatShopBankMoney";
+import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import * as Helpers from "@/shared/utils";
 
 type WithdrawMoneyModalProps = {
@@ -10,63 +12,59 @@ type WithdrawMoneyModalProps = {
   onSuccess: () => void;
 };
 
-const readError = async (res: Response) => {
-  try {
-    const data = (await res.json()) as { error?: string };
-    return data?.error || `HTTP ${res.status}`;
-  } catch {
-    return `HTTP ${res.status}`;
-  }
-};
-
 const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
+  const [accounts, setAccounts] = useState<ShopBankAccountItem[]>([]);
+  const [accountId, setAccountId] = useState(0);
   const [amountInput, setAmountInput] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const amountValue = useMemo(
-    () => Number(String(amountInput || "").replace(/\./g, "")) || 0,
-    [amountInput]
-  );
-
-  const closeAndReset = () => {
-    if (loading) return;
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingAccounts(true);
+    void fetchShopBankAccounts()
+      .then((items) => {
+        setAccounts(items);
+        setAccountId(items[0]?.id ?? 0);
+      })
+      .catch(() => setAccounts([]))
+      .finally(() => setLoadingAccounts(false));
     setAmountInput("");
     setReason("");
     setError(null);
+  }, [isOpen]);
+
+  const amountValue = useMemo(() => parseShopBankMoneyInput(amountInput), [amountInput]);
+
+  const closeAndReset = () => {
+    if (loading) return;
     onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!accountId) {
+      setError("Vui lòng chọn STK.");
+      return;
+    }
     if (!amountValue || amountValue <= 0) {
       setError("Số tiền rút phải lớn hơn 0.");
       return;
     }
     setLoading(true);
     try {
-      const response = await apiFetch("/api/store-profit-expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: amountValue,
-          reason: reason.trim() || null,
-        }),
-      });
-      if (!response.ok) {
-        setError(await readError(response));
-        return;
-      }
+      await recordShopBankAccountWithdrawal(accountId, amountValue, reason.trim() || null);
       onSuccess();
       closeAndReset();
-    } catch {
-      setError("Không thể tạo phiếu rút tiền. Vui lòng thử lại.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể tạo phiếu rút tiền. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -91,15 +89,31 @@ const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-white/80">
-                Số tiền rút
-              </label>
+              <label className="mb-2 block text-sm font-medium text-white/80">STK rút tiền</label>
+              <select
+                value={accountId || ""}
+                onChange={(e) => setAccountId(Number(e.target.value) || 0)}
+                className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white"
+                disabled={loading || loadingAccounts}
+              >
+                {accounts.length === 0 ? (
+                  <option value="">Chưa có STK</option>
+                ) : (
+                  accounts.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.accountNumber} · {item.accountHolder}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white/80">Số tiền rút</label>
               <input
                 type="text"
                 value={amountInput}
-                onChange={(e) =>
-                  setAmountInput(Helpers.formatNumberOnTyping(e.target.value))
-                }
+                onChange={(e) => setAmountInput(formatShopBankMoneyDraft(e.target.value))}
                 placeholder="0"
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                 disabled={loading}
@@ -107,9 +121,7 @@ const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-white/80">
-                Lý do rút
-              </label>
+              <label className="mb-2 block text-sm font-medium text-white/80">Lý do rút</label>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -138,7 +150,7 @@ const WithdrawMoneyModal: React.FC<WithdrawMoneyModalProps> = ({
               <button
                 type="submit"
                 className="flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white hover:from-indigo-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={loading}
+                disabled={loading || loadingAccounts || !accountId}
               >
                 {loading ? "Đang lưu..." : "Xác nhận rút"}
               </button>

@@ -55,8 +55,23 @@ const {
   processRenewalTask,
   runRenewalBatch,
 } = require("./renewalQueue");
+const {
+  findActiveSlotByOrder,
+  openPaymentSlot,
+  SLOT_KIND,
+} = require("../../src/domains/payment-slots");
+const {
+  resolveDefaultShopBankAccount,
+} = require("../../src/services/shopBankAccountResolver");
 
 const { recomputeSummaryMonthTotalTax } = require("../../src/domains/orders/controller/finance/dashboardSummary");
+const {
+  resolveMavrykDefaultBankAccount,
+} = require("../../src/domains/shop-bank-accounts/repositories/shopBankAccountRepository");
+const {
+  debitShopBankExternalOut,
+  SOURCE_KINDS: LEDGER_SOURCE_KINDS,
+} = require("../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const storeExpenseTable = tableName(
@@ -178,12 +193,26 @@ const createAutoMavrykExternalImportLog = async ({
     }
   }
 
+  const mavrykAccount = await resolveMavrykDefaultBankAccount(
+    normalizedAmount,
+    client
+  );
+  const mavrykAccountId = mavrykAccount?.id ? Number(mavrykAccount.id) : null;
+  if (!mavrykAccountId) {
+    logger.warn(
+      "[renewal.mavryk] Không tìm thấy STK Mavryk mặc định — bỏ qua trừ STK; chi phí vẫn được tạo cho audit.",
+      { orderCode, amount: normalizedAmount, supplierName: supplierName || null }
+    );
+  }
+
+  let insertedExpenseId = null;
   if (hasMetaCols) {
-    await client.query(
+    const insertResult = await client.query(
       `
         INSERT INTO ${storeExpenseTable}
-          (${storeExpenseCols.AMOUNT}, ${storeExpenseCols.REASON}, ${storeExpenseCols.EXPENSE_TYPE}, ${storeExpenseCols.LINKED_ORDER_CODE}, ${storeExpenseCols.EXPENSE_META})
-        VALUES ($1, $2, $3, $4, $5::jsonb)
+          (${storeExpenseCols.AMOUNT}, ${storeExpenseCols.REASON}, ${storeExpenseCols.EXPENSE_TYPE}, ${storeExpenseCols.LINKED_ORDER_CODE}, ${storeExpenseCols.EXPENSE_META}, ${storeExpenseCols.SHOP_BANK_ACCOUNT_ID})
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+        RETURNING ${storeExpenseCols.ID}
       `,
       [
         normalizedAmount,
@@ -196,18 +225,43 @@ const createAutoMavrykExternalImportLog = async ({
           renewal_start_date: startYmd || null,
           renewal_end_date: endYmd || null,
           supplier_name: supplierName || null,
+          shop_bank_account_id: mavrykAccountId,
         }),
+        mavrykAccountId,
       ]
     );
+    insertedExpenseId = Number(insertResult.rows?.[0]?.[storeExpenseCols.ID]) || null;
   } else {
-    await client.query(
+    const insertResult = await client.query(
       `
         INSERT INTO ${storeExpenseTable}
           (${storeExpenseCols.AMOUNT}, ${storeExpenseCols.REASON}, ${storeExpenseCols.EXPENSE_TYPE})
         VALUES ($1, $2, $3)
+        RETURNING ${storeExpenseCols.ID}
       `,
       [normalizedAmount, reason, expenseType]
     );
+    insertedExpenseId = Number(insertResult.rows?.[0]?.[storeExpenseCols.ID]) || null;
+  }
+
+  if (mavrykAccountId && insertedExpenseId) {
+    try {
+      await debitShopBankExternalOut(client, {
+        accountId: mavrykAccountId,
+        amount: normalizedAmount,
+        sourceKind: LEDGER_SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+        sourceId: insertedExpenseId,
+        note: reason,
+      });
+    } catch (ledgerError) {
+      logger.error("[renewal.mavryk] Trừ STK Mavryk thất bại", {
+        orderCode,
+        accountId: mavrykAccountId,
+        amount: normalizedAmount,
+        error: ledgerError.message,
+      });
+      throw ledgerError;
+    }
   }
 
   const mkRes = await client.query(
@@ -218,15 +272,14 @@ const createAutoMavrykExternalImportLog = async ({
     await client.query(
       `
         INSERT INTO ${summaryTable}
-          (${summaryCols.MONTH_KEY}, ${summaryCols.TOTAL_PROFIT}, ${summaryCols.ESTIMATED_BANK_BALANCE}, ${summaryCols.UPDATED_AT})
-        VALUES ($1, $2, $3, NOW())
+          (${summaryCols.MONTH_KEY}, ${summaryCols.TOTAL_PROFIT}, ${summaryCols.UPDATED_AT})
+        VALUES ($1, $2, NOW())
         ON CONFLICT (${summaryCols.MONTH_KEY})
         DO UPDATE SET
           ${summaryCols.TOTAL_PROFIT} = ${summaryTable}.${summaryCols.TOTAL_PROFIT} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
-          ${summaryCols.ESTIMATED_BANK_BALANCE} = ${summaryTable}.${summaryCols.ESTIMATED_BANK_BALANCE} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
           ${summaryCols.UPDATED_AT} = NOW()
       `,
-      [monthKey, -normalizedAmount, -normalizedAmount]
+      [monthKey, -normalizedAmount]
     );
 
     if (!suppressFinanceNotify) {
@@ -237,7 +290,7 @@ const createAutoMavrykExternalImportLog = async ({
         importDelta: 0,
         refundDelta: 0,
         offFlowDelta: 0,
-        bankBalanceDelta: -normalizedAmount,
+        bankBalanceDelta: 0,
         context: `renewal.mavryk.external_import:${orderCode}`,
         executor: client,
       });
@@ -463,7 +516,46 @@ const runRenewal = async (
 
     // Gói khuyến mãi (MAVK) hết hạn → gia hạn theo giá khách lẻ
     let finalGiaNhap = pricing.cost;
-    const finalGiaBan = pricing.price;
+    // Suffix matching: lấy giá đã chốt từ payment slot (cộng suffix) nếu có.
+    // - Slot matched: webhook vừa nhận CK với expected_amount → giá thanh toán thực.
+    // - Slot pending: cron flip RENEWAL đã chốt từ trước → dùng tiếp.
+    // - Không slot (manual renewal trước cron): mở slot mới ngay với pricing.price làm base.
+    // MAVN bỏ qua slot — không có CK khách hàng.
+    const isMavnPreliminary = isMavnImportOrder({ id_order: orderCode });
+    let finalGiaBan = pricing.price;
+    let renewalSlot = null;
+    if (!isMavnPreliminary) {
+      renewalSlot = await findActiveSlotByOrder(client, orderCode);
+      if (renewalSlot) {
+        finalGiaBan = Number(renewalSlot.expected_amount);
+      } else {
+        try {
+          const defaultBank = await resolveDefaultShopBankAccount();
+          const receiverAccount = String(defaultBank?.accountNumber || "").trim();
+          if (receiverAccount && Number(pricing.price) > 0) {
+            renewalSlot = await openPaymentSlot(client, {
+              orderCode,
+              receiverAccount,
+              baseAmount: Number(pricing.price),
+              slotKind: SLOT_KIND.RENEWAL,
+            });
+            finalGiaBan = Number(renewalSlot.expected_amount);
+            logger.info("[Renewal] Mở slot ngay trong runRenewal (no prior slot)", {
+              orderCode,
+              source,
+              cycleIndex: renewalSlot.cycle_index,
+              suffix: renewalSlot.amount_suffix,
+              expectedAmount: finalGiaBan,
+            });
+          }
+        } catch (slotErr) {
+          logger.warn("[Renewal] Không mở được slot trong runRenewal — dùng pricing.price thô", {
+            orderCode,
+            error: slotErr.message,
+          });
+        }
+      }
+    }
     let internalSupplierAccountingImport = 0;
 
     const ngayHetHanCu = new Date(hetHan.getTime());

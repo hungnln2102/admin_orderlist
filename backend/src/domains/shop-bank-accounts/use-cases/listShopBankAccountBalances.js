@@ -2,10 +2,6 @@ const {
   listShopBankAccounts,
   SHOP_BANK_ACCOUNTS_DEF,
 } = require("../repositories/shopBankAccountRepository");
-const {
-  normalizeAccountNumber,
-  sumReceivedByReceiver,
-} = require("../repositories/shopBankReceiptTotalsRepository");
 const { createHttpError } = require("../validators/shopBankAccountValidator");
 
 const toMoney = (value) => {
@@ -22,16 +18,12 @@ const listShopBankAccountBalances = async () => {
     );
   }
 
-  const [accounts, receivedByStk] = await Promise.all([
-    listShopBankAccounts(),
-    sumReceivedByReceiver(),
-  ]);
+  const accounts = await listShopBankAccounts();
 
   return (accounts || []).map((account) => {
-    const stkKey = normalizeAccountNumber(account.accountNumber);
-    const totalReceived = toMoney(receivedByStk.get(stkKey) || 0);
+    const totalReceived = toMoney(account.totalReceived);
     const totalWithdrawn = toMoney(account.totalWithdrawn);
-    const balanceRemaining = totalReceived - totalWithdrawn;
+    const balanceRemaining = toMoney(account.balance);
 
     return {
       ...account,

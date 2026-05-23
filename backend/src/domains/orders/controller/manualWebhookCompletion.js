@@ -31,6 +31,13 @@ const {
 const {
   completeMavnProcessingOrderPaidWithoutWebhook,
 } = require("./finance/mavnCompleteProcessingPaidWithoutWebhook");
+const {
+  creditShopBankFromPaymentReceipt,
+} = require("../../shop-bank-accounts/services/shopBankLedgerService");
+const {
+  findDefaultActiveAccount,
+  findShopBankAccountById,
+} = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
 const logger = require("../../../utils/logger");
 
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
@@ -103,7 +110,18 @@ const fetchSupplierNameBySupplyId = async (client, supplyIdRaw) => {
   return String(rows[0]?.[SUPPLIER_COLS.supplierName] ?? "").trim();
 };
 
-const buildManualWebhookTransaction = ({ orderCode, amount }) => {
+const resolveManualWebhookShopBankAccount = async (shopBankAccountId) => {
+  const normalizedId = Number(shopBankAccountId);
+  if (Number.isFinite(normalizedId) && normalizedId > 0) {
+    const account = await findShopBankAccountById(normalizedId);
+    if (!account) return null;
+    if (account.isActive === false) return null;
+    return account;
+  }
+  return findDefaultActiveAccount();
+};
+
+const buildManualWebhookTransaction = ({ orderCode, amount, shopBankAccount }) => {
   const now = new Date();
   return {
     transaction_id: "",
@@ -111,7 +129,8 @@ const buildManualWebhookTransaction = ({ orderCode, amount }) => {
     reference_number: "",
     transfer_type: "in",
     gateway: "manual_webhook",
-    account_number: "",
+    account_number: shopBankAccount?.accountNumber || "",
+    accountNumber: shopBankAccount?.accountNumber || "",
     transaction_date: now.toISOString(),
     transaction_date_raw: now.toISOString(),
     transfer_amount: amount,
@@ -122,7 +141,7 @@ const buildManualWebhookTransaction = ({ orderCode, amount }) => {
   };
 };
 
-const completeProcessingOrderWithManualWebhook = async (orderId) => {
+const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) => {
   const normalizedId = Number(orderId);
   if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
     return { status: 400, body: { error: "orderId không hợp lệ." } };
@@ -181,9 +200,21 @@ const completeProcessingOrderWithManualWebhook = async (orderId) => {
       };
     }
 
+    const shopBankAccount = await resolveManualWebhookShopBankAccount(
+      options.shopBankAccountId ?? options.shop_bank_account_id
+    );
+    if (!shopBankAccount) {
+      await client.query("ROLLBACK");
+      return {
+        status: 400,
+        body: { error: "Vui lòng khai báo STK mặc định trước khi hoàn thành webhook thủ công." },
+      };
+    }
+
     const transaction = buildManualWebhookTransaction({
       orderCode,
       amount: saleAmount,
+      shopBankAccount,
     });
     const receiptResult = await insertPaymentReceipt(transaction, {
       client,
@@ -192,6 +223,16 @@ const completeProcessingOrderWithManualWebhook = async (orderId) => {
     const receiptId = receiptResult?.id ?? receiptResult?.existingId ?? null;
     const receiptState = await getReceiptFinancialState(client, receiptId);
     const alreadyFinancialPosted = !!receiptState?.is_financial_posted;
+
+    if (!alreadyFinancialPosted && (receiptResult?.inserted || receiptResult?.duplicate)) {
+      await creditShopBankFromPaymentReceipt(client, {
+        receiptId,
+        receiverAccount: shopBankAccount.accountNumber,
+        accountId: shopBankAccount.id,
+        amount: saleAmount,
+        note: orderCode,
+      });
+    }
 
     const statusUpdateResult = await client.query(
       `UPDATE ${ORDER_TABLE}
@@ -328,7 +369,7 @@ const completeProcessingOrderWithManualWebhook = async (orderId) => {
 
 const attachManualWebhookCompletionRoute = (router) => {
   router.post("/:id/complete-manual-webhook", async (req, res) => {
-    const result = await completeProcessingOrderWithManualWebhook(req.params.id);
+    const result = await completeProcessingOrderWithManualWebhook(req.params.id, req.body || {});
     return res.status(result.status).json(result.body);
   });
 };

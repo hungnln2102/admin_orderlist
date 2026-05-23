@@ -32,10 +32,12 @@ export const formatValue = (
   assetCode: string | undefined,
   currencyFormatter: Intl.NumberFormat
 ) => {
-  if (!val) return "-";
+  const amount = Number(val);
+  if (!Number.isFinite(amount)) return "-";
   const code = (assetCode || "").toUpperCase();
-  if (code === "VND") return currencyFormatter.format(val);
-  return formatNonVnd(val);
+  if (code === "VND") return currencyFormatter.format(amount);
+  if (amount === 0) return "0";
+  return formatNonVnd(amount);
 };
 
 export const resolveValue = (

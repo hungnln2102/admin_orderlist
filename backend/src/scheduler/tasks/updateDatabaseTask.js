@@ -6,6 +6,9 @@ const { COL, TABLES, ORDER_COLS, expiryDateSQL } = require("../sqlHelpers");
 const {
   removeMappingsByOrders,
 } = require("../../services/userAccountMappingService/mappingCrud");
+const {
+  openRenewalSlotsForFlippedOrders,
+} = require("./shared/openRenewalSlots");
 
 let lastRunAt = null;
 
@@ -66,17 +69,32 @@ function createUpdateDatabaseTask(pool, getSqlCurrentDate, enableDbBackup) {
       }
 
       // 0 <= số ngày còn lại <= 4 → Cần Gia Hạn (RENEWAL); < 0 → đã xử lý ở markExpired (Hết Hạn)
+      // RETURNING các cột cần để recompute giá renewal + mở payment slot mới.
       const paidToRenewal = await client.query(`
       UPDATE ${TABLES.orderList}
       SET ${COL.status} = '${STATUS.RENEWAL}'
       WHERE ( ${expiryDateSQL()} - ${sqlDate} ) BETWEEN 0 AND 4
-        AND (${COL.status} = '${STATUS.PAID}');
+        AND (${COL.status} = '${STATUS.PAID}')
+      RETURNING
+        ${ORDER_COLS.id} AS id,
+        ${ORDER_COLS.idOrder} AS id_order,
+        ${ORDER_COLS.idProduct} AS id_product,
+        ${ORDER_COLS.idSupply} AS supply_id,
+        ${ORDER_COLS.cost} AS cost,
+        ${ORDER_COLS.price} AS price;
     `);
       logger.info(`Updated ${paidToRenewal.rowCount} orders to '${STATUS.RENEWAL}' (0 <= days left <= 4)`);
 
       await client.query("COMMIT");
       logger.info("[CRON] Hoàn thành cập nhật");
       lastRunAt = new Date();
+
+      // Sau khi commit status flip, mở payment slot mới cho từng đơn renewal:
+      // recompute giá theo bảng giá hiện hành rồi cộng suffix → set order_list.price.
+      // Mỗi đơn chạy trong savepoint riêng — slot lỗi không vỡ cả batch.
+      if (paidToRenewal.rows.length > 0) {
+        await openRenewalSlotsForFlippedOrders(client, paidToRenewal.rows);
+      }
 
       if (enableDbBackup) {
         try {

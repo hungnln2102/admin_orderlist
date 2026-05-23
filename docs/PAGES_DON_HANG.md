@@ -151,7 +151,7 @@ frontend/src/features/orders/
 
 - **Quy ước**: MAVN **không** gắn NCC Mavryk/Shop — luôn NCC nhà cung cấp thật (không ép `cost = 0` vì Mavryk khi prefix MAVN; `orderPricingService` không bật `mavryk_profit_mode` cho MAVN).
 - **Tạo đơn thành công** → **Đã Thanh Toán** và ghi **1 dòng** `supplier_order_cost_log` (trừ NCC Mavryk).
-- **Sepay webhook**: **không** đổi trạng thái đơn MAVN qua Sepay; **không** chạy renewal tự động từ webhook cho mã MAVN; fallback match theo số tiền (`resolveOrderByPayment`) **loại** đơn MAVN. Biên lai có thể được ghi nếu có mã trong nội dung — **không** dùng để chốt trạng thái MAVN.
+- **Sepay webhook**: **không** đổi trạng thái đơn MAVN qua Sepay; **không** chạy renewal tự động từ webhook cho mã MAVN; fallback match theo số tiền (`resolveOrderByPayment`) **loại** đơn MAVN.
 - **Cần Gia Hạn** → **Gia hạn** (`runRenewal`) → chuyển **Đã Thanh Toán** + **cộng** NCC (`updatePaymentSupplyBalance` trong `renewal.js`) + **INSERT** `supplier_order_cost_log`.
 - `POST /api/payment-supply/:paymentId/confirm` vẫn dùng để đối soát chu kỳ NCC, nhưng MAVN không cần đợi bước này để lên trạng thái **Đã Thanh Toán**.
 
@@ -166,3 +166,9 @@ frontend/src/features/orders/
 - **NCC / MAVN / Mavryk**: `Order/finance/supplierDebt.js` (`findSupplyIdByName`; công nợ theo đơn chỉ qua DB trigger + log), `Order/crud/createOrder.js`, `services/orderService.js`, `services/pricing/orderPricingService.js`, `Order/orderDeletionService`, `Order/finance/dashboardSummary.js`, `PaymentsController` (xác nhận thanh toán NCC).
 - **Sepay webhook & renewal tự động**: `backend/webhook/sepay/routes/webhook.js`, `backend/webhook/sepay/utils.js` (`resolveOrderByPayment`), `backend/webhook/sepay/renewal.js`; gia hạn tay: `backend/src/domains/orders/controller/renewRoutes.js`.
 - UI tạo đơn: `createOrderPricingCopy.ts` như mục trên.
+
+### Thanh toán khách — suffix số tiền (không nội dung CK)
+
+Đơn bán (MAVC/MAVL/…) và đơn **Cần Gia Hạn** dùng **payment slot**: `order_list.price` = giá bảng + suffix (1..100). Webhook và QR match theo **đúng số tiền**, không sinh cột `transaction`, Telegram/frontend không hiển thị «nội dung CK».
+
+Chi tiết: [payment-slot-suffix-matching.md](./payment-slot-suffix-matching.md).

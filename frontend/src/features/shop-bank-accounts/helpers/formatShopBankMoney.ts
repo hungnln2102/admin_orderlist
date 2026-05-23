@@ -15,3 +15,12 @@ export function formatShopBankMoneyInput(value: number): string {
   if (!value) return "";
   return formatShopBankMoney(value);
 }
+
+/** Định dạng chuỗi đang gõ (chỉ giữ chữ số → 500.000). */
+export function formatShopBankMoneyDraft(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  const amount = Number(digits);
+  if (!Number.isFinite(amount)) return "";
+  return amount.toLocaleString("vi-VN");
+}

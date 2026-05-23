@@ -1,5 +1,6 @@
 const {
   validateWithdrawnPayload,
+  validateWithdrawPayload,
   parseWithdrawnAmount,
 } = require("../../../../src/domains/shop-bank-accounts/validators/shopBankWithdrawnValidator");
 
@@ -18,6 +19,17 @@ describe("shopBankWithdrawnValidator", () => {
       id: 5,
       totalWithdrawn: 0,
     });
+  });
+
+  test("validateWithdrawPayload requires positive amount", () => {
+    expect(validateWithdrawPayload(2, { amount: "500000" })).toEqual({
+      id: 2,
+      amount: 500000,
+    });
+    expect(() => validateWithdrawPayload(2, { amount: 0 })).toThrow(
+      "Số tiền rút phải lớn hơn 0."
+    );
+    expect(() => validateWithdrawPayload(2, {})).toThrow("Số tiền rút là bắt buộc.");
   });
 
   test("rejects invalid id and negative amounts", () => {

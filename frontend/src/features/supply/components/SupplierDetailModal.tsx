@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import * as Helpers from "@/shared/utils";
@@ -6,7 +6,10 @@ import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
+import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
+import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import { buildNccTransferContentByBalance } from "../utils/supplierPaymentContent";
+import { SupplierSettlementPanel } from "./SupplierSettlementPanel";
 
 interface Props {
   isOpen: boolean;
@@ -35,6 +38,9 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
   });
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
   const [expandedMonth, setExpandedMonth] = useState<number | null>(null);
+  const [shopBankAccounts, setShopBankAccounts] = useState<ShopBankAccountItem[]>([]);
+  const [selectedShopBankAccountId, setSelectedShopBankAccountId] = useState<number>(0);
+  const [shopBankAccountsLoading, setShopBankAccountsLoading] = useState(false);
 
   // Tính toán các giá trị từ overview (phải đặt trước useMemo)
   const supply = overview?.supply;
@@ -52,6 +58,29 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     }>;
   }> = overview?.logOrdersByMonth || [];
   const selectedPayment = unpaidPayments.find((p) => p.id === selectedPaymentId) || unpaidPayments[0] || null;
+  const selectedShopBankAccount =
+    shopBankAccounts.find((item) => item.id === selectedShopBankAccountId) ||
+    shopBankAccounts.find((item) => item.isDefault && item.isActive) ||
+    shopBankAccounts.find((item) => item.isActive) ||
+    null;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setShopBankAccountsLoading(true);
+    void fetchShopBankAccounts()
+      .then((items) => {
+        const activeItems = items.filter((item) => item.isActive);
+        setShopBankAccounts(activeItems);
+        const preferred =
+          activeItems.find((item) => item.isDefault) || activeItems[0] || null;
+        setSelectedShopBankAccountId(preferred?.id ?? 0);
+      })
+      .catch(() => {
+        setShopBankAccounts([]);
+        setSelectedShopBankAccountId(0);
+      })
+      .finally(() => setShopBankAccountsLoading(false));
+  }, [isOpen]);
 
   // useMemo phải được gọi trước conditional return
   // Còn nợ âm = NCC trả mình → QR dùng STK của tôi; số tiền = số dương.
@@ -69,11 +98,14 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     if (amount <= 0) return null;
     if (isNegative) {
       return Helpers.buildSepayQrUrl({
-        accountNumber: shopBank.accountNumber,
-        bankCode: shopBank.bankCode,
+        accountNumber: selectedShopBankAccount?.accountNumber || shopBank.accountNumber,
+        bankCode:
+          selectedShopBankAccount?.bankShortCode ||
+          selectedShopBankAccount?.bankBin ||
+          shopBank.bankCode,
         amount,
         description: desc,
-        accountName: shopBank.accountHolder,
+        accountName: selectedShopBankAccount?.accountHolder || shopBank.accountHolder,
       });
     }
     if (!supply.numberBank || !supply.binBank) return null;
@@ -84,7 +116,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       description: desc,
       accountName: supply.nameBank || supply.sourceName || "",
     });
-  }, [supply, selectedPayment, shopBank]);
+  }, [supply, selectedPayment, shopBank, selectedShopBankAccount]);
 
   const amountDueForPayment = (p: { totalImport?: number; import_value?: number; paid?: number }) => {
     const raw = Number(p.totalImport ?? p.import_value ?? 0);
@@ -112,10 +144,15 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     paid?: number;
   }) => {
     if (p.id == null || !Number.isFinite(Number(p.id))) return;
+    if (!selectedShopBankAccount?.id) {
+      setError("Vui lòng chọn STK shop để ghi nhận thanh toán NCC.");
+      return;
+    }
     const result = await confirmPayment(p.id, {
       paidAmount: amountDueForPayment(p),
       paymentContent: paymentContentForConfirm(p),
       supplyId: supply?.id,
+      shopBankAccountId: selectedShopBankAccount.id,
     });
     if (!result.success) {
       setError(result.error || "Không thể thanh toán chu kỳ");
@@ -259,76 +296,21 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
               </div>
 
               <div className="grid md:grid-cols-2 gap-3 mt-3 items-start">
-                {/* Chu kỳ chưa thanh toán + QR code */}
-                <div className="bg-white/5 rounded-xl border border-white/10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
-                    <span className="text-xs text-white/60">
-                      Cần chi {Helpers.formatCurrency(totalUnpaid)} | Hoàn về shop {Helpers.formatCurrency(totalSupplierRefund)}
-                    </span>
-                  </div>
-                  {unpaidPayments.length === 0 ? (
-                    <p className="text-white/50 text-sm">Không có chu kỳ nợ.</p>
-                  ) : (
-                    <>
-                      {/* Danh sách chu kỳ với nút thanh toán */}
-                      <div className="space-y-1.5 max-h-28 overflow-y-auto custom-scroll scroll-overlay mb-3">
-                        {unpaidPayments.map((p) => (
-                          <div
-                            key={p.id}
-                            onClick={() => setSelectedPaymentId(p.id)}
-                            className={`w-full flex items-center justify-between rounded-lg px-3 py-2 border transition cursor-pointer ${
-                              (selectedPayment?.id === p.id) 
-                                ? "border-indigo-500 bg-indigo-500/20" 
-                                : "border-white/5 bg-white/5 hover:bg-white/10"
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-sm truncate">{p.round || "Chu kỳ"}</p>
-                              <p className="text-xs text-white/60">{p.status}</p>
-                            </div>
-                            <div className="text-right text-sm mr-2">
-                              {(() => {
-                                const raw = Number(p.totalImport ?? p.import_value ?? 0);
-                                const display = amountDueForPayment(p);
-                                return (
-                                  <>
-                                    <p className={raw < 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
-                                      {Helpers.formatCurrency(display)}{raw < 0 ? " (Hoàn về bạn)" : ""}
-                                    </p>
-                                    <p className="text-white/40 text-xs">Đã trả: {Helpers.formatCurrency(p.paid || 0)}</p>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            <button
-                              disabled={confirmingId === p.id}
-                              onClick={(e) => { e.stopPropagation(); void handleConfirmPayment(p); }}
-                              className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60 font-semibold transition flex-shrink-0"
-                            >
-                              {confirmingId === p.id ? "..." : "Thanh toán"}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* QR Code hiển thị trực tiếp */}
-                      {selectedPayment && (
-                        <div className="flex justify-center mt-2">
-                          {qrImageUrl ? (
-                            <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
-                          ) : (
-                            <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">
-                              {Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0) < 0
-                                ? "QR Shop chưa sẵn sàng"
-                                : "Thiếu thông tin NH NCC"}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                <SupplierSettlementPanel
+                  unpaidPayments={unpaidPayments}
+                  selectedPayment={selectedPayment}
+                  totalUnpaid={totalUnpaid}
+                  totalSupplierRefund={totalSupplierRefund}
+                  confirmingId={confirmingId}
+                  qrImageUrl={qrImageUrl}
+                  shopBankAccounts={shopBankAccounts}
+                  selectedShopBankAccount={selectedShopBankAccount}
+                  shopBankAccountsLoading={shopBankAccountsLoading}
+                  amountDueForPayment={amountDueForPayment}
+                  onSelectPayment={setSelectedPaymentId}
+                  onConfirmPayment={(payment) => void handleConfirmPayment(payment)}
+                  onShopBankAccountChange={setSelectedShopBankAccountId}
+                />
 
                 {/* Đơn theo tháng */}
                 <div className="bg-white/5 rounded-xl border border-white/10 p-4">

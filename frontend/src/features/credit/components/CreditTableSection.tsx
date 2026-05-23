@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CreditLogItem, CreditLogsPagination } from "../types";
 import { CreditTableBlock, type CreditActionType } from "./CreditTableBlock";
 import { submitCreditLogAction } from "../api/creditLogsApi";
+import CreditCashoutStkModal from "./CreditCashoutStkModal";
 
 type CreditTableSectionProps = {
   loading: boolean;
@@ -22,25 +23,58 @@ export function CreditTableSection({
   const canNext = pagination.page < pagination.total_pages;
   const [actionBusyIds, setActionBusyIds] = useState<Record<number, boolean>>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  const [cashoutTarget, setCashoutTarget] = useState<CreditLogItem | null>(null);
+  const [cashoutSubmitting, setCashoutSubmitting] = useState(false);
 
   const availableDisplayItems = items.filter((item) => item.is_available);
   const appliedOrUnavailableDisplayItems = items.filter((item) => !item.is_available);
 
-  const handleAction = async (item: CreditLogItem, action: CreditActionType) => {
+  const runAction = async (
+    item: CreditLogItem,
+    action: CreditActionType,
+    options: { shopBankAccountId?: number } = {}
+  ) => {
     if (actionBusyIds[item.id]) return;
     setActionError(null);
     setActionBusyIds((prev) => ({ ...prev, [item.id]: true }));
     try {
-      await submitCreditLogAction(item.id, action);
+      await submitCreditLogAction(item.id, action, options);
       onReload?.();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Không thể cập nhật credit log.");
+      throw error;
     } finally {
       setActionBusyIds((prev) => {
         const next = { ...prev };
         delete next[item.id];
         return next;
       });
+    }
+  };
+
+  const handleAction = async (item: CreditLogItem, action: CreditActionType) => {
+    if (action === "complete") {
+      setActionError(null);
+      setCashoutTarget(item);
+      return;
+    }
+    try {
+      await runAction(item, action);
+    } catch {
+      // error đã được set trong runAction; nuốt để không phá UI.
+    }
+  };
+
+  const handleCashoutConfirm = async (shopBankAccountId: number) => {
+    if (!cashoutTarget) return;
+    setCashoutSubmitting(true);
+    try {
+      await runAction(cashoutTarget, "complete", { shopBankAccountId });
+      setCashoutTarget(null);
+    } catch {
+      // error giữ trong actionError + modal vẫn mở để retry chọn STK khác.
+    } finally {
+      setCashoutSubmitting(false);
     }
   };
 
@@ -102,6 +136,17 @@ export function CreditTableSection({
           </div>
         </div>
       </div>
+
+      <CreditCashoutStkModal
+        isOpen={Boolean(cashoutTarget)}
+        item={cashoutTarget}
+        onClose={() => {
+          if (cashoutSubmitting) return;
+          setCashoutTarget(null);
+        }}
+        onConfirm={handleCashoutConfirm}
+        submitting={cashoutSubmitting}
+      />
     </div>
   );
 }

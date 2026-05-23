@@ -20,16 +20,13 @@ const deleteStoreProfitExpense = async (req, res) => {
       const n = await trx(TABLE).where(COLS.ID, id).del();
       if (
         n &&
-        (expType === "external_import" || expType === "withdraw_profit") &&
+        expType === "external_import" &&
         amt > 0 &&
         row[COLS.CREATED_AT]
       ) {
         const mk = await monthKeyVietnamFromDbTimestamp(trx, row[COLS.CREATED_AT]);
         if (mk) {
-          const updates = { estimated_bank_balance: amt };
-          if (expType === "external_import") {
-            updates.total_profit = amt;
-          }
+          const updates = { total_profit: amt };
           await mergeSummaryUpdates(trx, mk, updates, {
             context: `deleteStoreProfitExpense.${expType}`,
           });
