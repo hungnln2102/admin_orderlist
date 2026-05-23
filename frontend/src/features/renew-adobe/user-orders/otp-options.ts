@@ -1,16 +1,21 @@
 /**
- * Đồng bộ với `backend/src/services/otpProviderService.js` (OTP_SOURCES).
+ * Nguồn OTP cho `order_user_tracking` — gồm `none` (mail chính chủ, khách tự lấy OTP).
  */
 
-import type { OtpSource } from "../types";
+import type { TrackingOtpSource } from "./types";
 
-export type OtpSourceOption = {
-  code: OtpSource;
+export type TrackingOtpSourceOption = {
+  code: TrackingOtpSource;
   label: string;
   badge: string;
 };
 
-export const OTP_SOURCE_OPTIONS: ReadonlyArray<OtpSourceOption> = [
+export const TRACKING_OTP_SOURCE_OPTIONS: ReadonlyArray<TrackingOtpSourceOption> = [
+  {
+    code: "none",
+    label: "Không cần OTP",
+    badge: "bg-slate-600/20 text-slate-300 border-slate-500/30",
+  },
   {
     code: "imap",
     label: "IMAP",
@@ -33,17 +38,18 @@ export const OTP_SOURCE_OPTIONS: ReadonlyArray<OtpSourceOption> = [
   },
 ];
 
-export const DEFAULT_OTP_SOURCE: OtpSource = "imap";
+export const DEFAULT_TRACKING_OTP_SOURCE: TrackingOtpSource = "imap";
 
-export function isOtpSource(value: unknown): value is OtpSource {
-  return OTP_SOURCE_OPTIONS.some((opt) => opt.code === value);
+export function isTrackingOtpSource(value: unknown): value is TrackingOtpSource {
+  return TRACKING_OTP_SOURCE_OPTIONS.some((opt) => opt.code === value);
 }
 
-export function getOtpSourceOption(
+export function getTrackingOtpSourceOption(
   value: string | null | undefined
-): OtpSourceOption {
+): TrackingOtpSourceOption {
   const code = String(value || "").trim().toLowerCase();
   return (
-    OTP_SOURCE_OPTIONS.find((opt) => opt.code === code) || OTP_SOURCE_OPTIONS[0]
+    TRACKING_OTP_SOURCE_OPTIONS.find((opt) => opt.code === code) ||
+    TRACKING_OTP_SOURCE_OPTIONS.find((opt) => opt.code === "imap")!
   );
 }

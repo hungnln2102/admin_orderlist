@@ -13,11 +13,11 @@ import {
   type AdobeSystemCode,
 } from "@/features/renew-adobe/user-orders/system-options";
 import {
-  DEFAULT_OTP_SOURCE,
-  OTP_SOURCE_OPTIONS,
-  isOtpSource,
+  DEFAULT_TRACKING_OTP_SOURCE,
+  TRACKING_OTP_SOURCE_OPTIONS,
+  isTrackingOtpSource,
 } from "@/features/renew-adobe/user-orders/otp-options";
-import type { OtpSource } from "@/features/renew-adobe/types";
+import type { TrackingOtpSource } from "@/features/renew-adobe/user-orders/types";
 
 export type EditTrackingOrderModalProps = {
   open: boolean;
@@ -39,11 +39,11 @@ export function EditTrackingOrderModal({
   const initialCode: AdobeSystemCode = isAdobeSystemCode(initialSystemNote)
     ? initialSystemNote
     : DEFAULT_ADOBE_SYSTEM_CODE;
-  const initialOtp: OtpSource = isOtpSource(initialOtpSource)
+  const initialOtp: TrackingOtpSource = isTrackingOtpSource(initialOtpSource)
     ? initialOtpSource
-    : DEFAULT_OTP_SOURCE;
+    : DEFAULT_TRACKING_OTP_SOURCE;
   const [systemNote, setSystemNote] = useState<AdobeSystemCode>(initialCode);
-  const [otpSource, setOtpSource] = useState<OtpSource>(initialOtp);
+  const [otpSource, setOtpSource] = useState<TrackingOtpSource>(initialOtp);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,10 +125,10 @@ export function EditTrackingOrderModal({
               <select
                 className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500/40 outline-none"
                 value={otpSource}
-                onChange={(e) => setOtpSource(e.target.value as OtpSource)}
+                onChange={(e) => setOtpSource(e.target.value as TrackingOtpSource)}
                 disabled={submitting}
               >
-                {OTP_SOURCE_OPTIONS.map((opt) => (
+                {TRACKING_OTP_SOURCE_OPTIONS.map((opt) => (
                   <option key={opt.code} value={opt.code}>
                     {opt.label}
                   </option>

@@ -3,6 +3,9 @@ const {
   readMaintenanceSetting,
   writeMaintenanceSetting,
 } = require("../repositories/siteMaintenanceRepository");
+const {
+  invalidateWebsiteMaintenanceCache,
+} = require("../helpers/invalidateWebsiteMaintenanceCache");
 
 const createHttpError = (status, message) => {
   const error = new Error(message);
@@ -39,6 +42,7 @@ const updateSiteMaintenanceStatus = async (payload) => {
   }
 
   const saved = await writeMaintenanceSetting(payload.enabled);
+  await invalidateWebsiteMaintenanceCache();
   return normalizeMaintenanceRow(saved);
 };
 

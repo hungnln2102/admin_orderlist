@@ -24,6 +24,9 @@ const {
   normalizeAdobeSystemCode,
 } = require("../../../services/renew-adobe/adobeSystemConstants");
 const { normalizeOtpSource } = require("../../../services/otpProviderService");
+const {
+  normalizeTrackingOtpSource,
+} = require("../helpers/normalizeTrackingOtpSource");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
@@ -167,8 +170,8 @@ const addOrdersToTracking = async (req, res) => {
     );
     const otpSourceRaw = req.body?.otp_source ?? req.body?.otpSource;
     const otpSource =
-      otpSourceRaw != null && String(otpSourceRaw).trim() !== ""
-        ? normalizeOtpSource(otpSourceRaw)
+      otpSourceRaw !== undefined && otpSourceRaw !== null
+        ? normalizeTrackingOtpSource(otpSourceRaw)
         : null;
 
     const upserted = await upsertRenewAdobeOrderUserTrackingForOrderIds(
@@ -236,7 +239,7 @@ const updateTrackingOrder = async (req, res) => {
       req.body?.otp_source !== undefined ||
       req.body?.otpSource !== undefined
     ) {
-      const otpSource = normalizeOtpSource(
+      const otpSource = normalizeTrackingOtpSource(
         req.body?.otp_source ?? req.body?.otpSource
       );
       updates[TRACK_COLS.OTP_SOURCE] = otpSource;

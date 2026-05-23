@@ -18,10 +18,10 @@ import {
   type AdobeSystemCode,
 } from "@/features/renew-adobe/user-orders/system-options";
 import {
-  DEFAULT_OTP_SOURCE,
-  OTP_SOURCE_OPTIONS,
-  type OtpSource,
+  DEFAULT_TRACKING_OTP_SOURCE,
+  TRACKING_OTP_SOURCE_OPTIONS,
 } from "@/features/renew-adobe/user-orders/otp-options";
+import type { TrackingOtpSource } from "@/features/renew-adobe/user-orders/types";
 
 export type AddTrackingOrdersModalProps = {
   open: boolean;
@@ -63,7 +63,9 @@ export function AddTrackingOrdersModal({
   const [systemNote, setSystemNote] = useState<AdobeSystemCode>(
     DEFAULT_ADOBE_SYSTEM_CODE
   );
-  const [otpSource, setOtpSource] = useState<OtpSource>(DEFAULT_OTP_SOURCE);
+  const [otpSource, setOtpSource] = useState<TrackingOtpSource>(
+    DEFAULT_TRACKING_OTP_SOURCE
+  );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitInfo, setSubmitInfo] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export function AddTrackingOrdersModal({
     setItems([]);
     setSelected(new Set());
     setSystemNote(DEFAULT_ADOBE_SYSTEM_CODE);
-    setOtpSource(DEFAULT_OTP_SOURCE);
+    setOtpSource(DEFAULT_TRACKING_OTP_SOURCE);
     setLoadError(null);
     setSubmitError(null);
     setSubmitInfo(null);
@@ -265,11 +267,11 @@ export function AddTrackingOrdersModal({
               </label>
               <select
                 value={otpSource}
-                onChange={(e) => setOtpSource(e.target.value as OtpSource)}
+                onChange={(e) => setOtpSource(e.target.value as TrackingOtpSource)}
                 disabled={submitting}
                 className="w-full sm:w-72 px-3 py-2 rounded-xl border border-white/10 bg-slate-950/50 text-sm text-white focus:ring-2 focus:ring-emerald-500/40 outline-none"
               >
-                {OTP_SOURCE_OPTIONS.map((opt) => (
+                {TRACKING_OTP_SOURCE_OPTIONS.map((opt) => (
                   <option key={opt.code} value={opt.code}>
                     {opt.label}
                   </option>

@@ -47,7 +47,7 @@ export async function fetchMatchableOrders(params?: {
 }
 
 import type { AdobeSystemCode } from "./system-options";
-import type { OtpSource } from "../types";
+import type { TrackingOtpSource } from "./types";
 
 export type AddOrdersToTrackingResult = {
   upserted: number;
@@ -55,13 +55,13 @@ export type AddOrdersToTrackingResult = {
   accepted: number;
   skipped: string[];
   system_note?: AdobeSystemCode;
-  otp_source?: OtpSource;
+  otp_source?: TrackingOtpSource;
 };
 
 export async function addOrdersToTracking(
   orderIds: string[],
   systemNote?: AdobeSystemCode,
-  otpSource?: OtpSource
+  otpSource?: TrackingOtpSource
 ): Promise<AddOrdersToTrackingResult> {
   const res = await apiFetch(API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS_TRACK, {
     method: "POST",
@@ -84,11 +84,11 @@ export async function addOrdersToTracking(
 
 export async function updateTrackingOrder(
   orderCode: string,
-  payload: { systemNote?: AdobeSystemCode; otpSource?: OtpSource }
+  payload: { systemNote?: AdobeSystemCode; otpSource?: TrackingOtpSource }
 ): Promise<{ ok: boolean; orderCode: string; updated_count: number }> {
   const body: Record<string, unknown> = {};
   if (payload.systemNote) body.system_note = payload.systemNote;
-  if (payload.otpSource) body.otp_source = payload.otpSource;
+  if (payload.otpSource !== undefined) body.otp_source = payload.otpSource;
   const res = await apiFetch(
     API_ENDPOINTS.RENEW_ADOBE_USER_ORDERS_BY_CODE(orderCode),
     {

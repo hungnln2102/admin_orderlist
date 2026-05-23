@@ -6,7 +6,10 @@ import {
   isAdobeSystemCode,
   type AdobeSystemCode,
 } from "./system-options";
-import { DEFAULT_OTP_SOURCE, isOtpSource } from "./otp-options";
+import {
+  DEFAULT_TRACKING_OTP_SOURCE,
+  isTrackingOtpSource,
+} from "./otp-options";
 import type { DisplayStatus, OrderInfo, UserOrderRow } from "./types";
 
 /**
@@ -118,9 +121,9 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
     const systemNote: AdobeSystemCode = isAdobeSystemCode(order.system_note)
       ? order.system_note
       : DEFAULT_ADOBE_SYSTEM_CODE;
-    const otpSource = isOtpSource(order.otp_source)
+    const otpSource = isTrackingOtpSource(order.otp_source)
       ? order.otp_source
-      : DEFAULT_OTP_SOURCE;
+      : DEFAULT_TRACKING_OTP_SOURCE;
     rows.push({
       id: aid > 0 ? `acc-${aid}-${email}` : `order-${email}`,
       order_code: order.order_code ?? "—",

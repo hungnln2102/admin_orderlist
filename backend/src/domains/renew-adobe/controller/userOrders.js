@@ -20,6 +20,33 @@ const MAP_COLS = RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.COLS;
 const ACC_TABLE = tableName(RENEW_ADOBE_SCHEMA.ACCOUNT.TABLE, SCHEMA_RENEW_ADOBE);
 const ACC_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
+let otpSourceColumnExistsCache = null;
+
+async function trackingHasOtpSourceColumn() {
+  if (otpSourceColumnExistsCache !== null) return otpSourceColumnExistsCache;
+  if (!TRACK_COLS.OTP_SOURCE) {
+    otpSourceColumnExistsCache = false;
+    return false;
+  }
+  try {
+    const row = await db.raw(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = ?
+        AND table_name = ?
+        AND column_name = ?
+      LIMIT 1
+      `,
+      [SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE, TRACK_COLS.OTP_SOURCE]
+    );
+    otpSourceColumnExistsCache = Boolean(row?.rows?.length);
+  } catch {
+    otpSourceColumnExistsCache = false;
+  }
+  return otpSourceColumnExistsCache;
+}
+
 /**
  * Nguồn dữ liệu là `order_user_tracking` (bảng tracking) — không lọc renew_adobe variant
  * để đơn admin tự thêm tay (không thuộc nhóm renew_adobe) vẫn hiển thị.
@@ -31,6 +58,8 @@ const ACC_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
  */
 const listUserOrders = async (_req, res) => {
   try {
+    const hasOtpSource = await trackingHasOtpSourceColumn();
+
     const rows = await db({ t: TRACK_TABLE })
       .leftJoin({ o: TBL_ORDER }, function joinOrder() {
         this.on(
@@ -68,7 +97,9 @@ const listUserOrders = async (_req, res) => {
         `t.${TRACK_COLS.STATUS} as tracking_status`,
         `t.${TRACK_COLS.ID_PRODUCT} as tracking_id_product`,
         `t.${TRACK_COLS.SYSTEM_NOTE} as system_note`,
-        `t.${TRACK_COLS.OTP_SOURCE} as otp_source`,
+        ...(hasOtpSource
+          ? [`t.${TRACK_COLS.OTP_SOURCE} as otp_source`]
+          : [db.raw(`'imap' as otp_source`)]),
         `m.${MAP_COLS.ADOBE_ACCOUNT_ID} as adobe_account_id`,
         `acc.${ACC_COLS.LICENSE_STATUS} as admin_license_status`,
         `acc.${ACC_COLS.ORG_NAME} as admin_org_name`
