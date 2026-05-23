@@ -1,10 +1,12 @@
 export type LicenseStatus = "paid" | "active" | "expired" | "unknown";
 
+export type OtpSource = "imap" | "tinyhost" | "hdsd" | "ades";
+
 export type AdobeAdminAccount = {
   id: number;
   email: string;
   password_encrypted: string;
-  otp_source?: "imap" | "tinyhost" | "hdsd";
+  otp_source?: OtpSource;
   /** mail_backup.alias_prefix (OTP / Gmail +alias) */
   alias?: string | null;
   org_name: string | null;

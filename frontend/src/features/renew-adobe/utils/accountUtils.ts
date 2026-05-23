@@ -1,4 +1,4 @@
-import type { AdobeAdminAccount, LicenseStatus } from "../types";
+import type { AdobeAdminAccount, LicenseStatus, OtpSource } from "../types";
 
 /** Chuẩn hóa trạng thái gói từ API/SSE (DB có thể là Paid, paid, …). */
 export function normalizeIncomingLicenseStatus(raw: unknown): LicenseStatus {
@@ -25,8 +25,10 @@ export function normalizeAdobeAdminAccount(
 
   const aliasRaw = row.alias;
   const rawOtpSource = String(row.otp_source ?? "imap").trim().toLowerCase();
-  const otpSource: "imap" | "tinyhost" | "hdsd" =
-    rawOtpSource === "tinyhost" || rawOtpSource === "hdsd"
+  const otpSource: OtpSource =
+    rawOtpSource === "tinyhost" ||
+    rawOtpSource === "hdsd" ||
+    rawOtpSource === "ades"
       ? rawOtpSource
       : "imap";
   return {

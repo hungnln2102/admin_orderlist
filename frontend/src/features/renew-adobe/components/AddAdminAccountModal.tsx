@@ -7,6 +7,7 @@ import {
   fetchRenewAdobeMailBackupMailboxes,
   type MailBackupMailboxOption,
 } from "../api/renewAdobeApi";
+import type { OtpSource } from "../types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,9 +30,7 @@ export function AddAdminAccountModal({
 }: AddAdminAccountModalProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otpSource, setOtpSource] = useState<"imap" | "tinyhost" | "hdsd">(
-    "imap"
-  );
+  const [otpSource, setOtpSource] = useState<OtpSource>("imap");
   const [mailBackupId, setMailBackupId] = useState("");
   const [newAliasPrefix, setNewAliasPrefix] = useState("");
   const [mailboxes, setMailboxes] = useState<MailBackupMailboxOption[]>([]);
@@ -209,13 +208,14 @@ export function AddAdminAccountModal({
               className={selectClass}
               value={otpSource}
               onChange={(ev) =>
-                setOtpSource(ev.target.value as "imap" | "tinyhost" | "hdsd")
+                setOtpSource(ev.target.value as OtpSource)
               }
               disabled={loading}
             >
               <option value="imap">IMAP (mail_backup/alias)</option>
               <option value="tinyhost">TinyHost API</option>
               <option value="hdsd">otp.hdsd.net API</option>
+              <option value="ades">OTP Ades</option>
             </select>
           </div>
 

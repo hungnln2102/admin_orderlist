@@ -1,6 +1,7 @@
 import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import { normalizeAdobeAdminAccount } from "../utils/accountUtils";
+import type { OtpSource } from "../types";
 
 export type MailBackupMailboxOption = {
   id: number;
@@ -132,7 +133,7 @@ export function deleteAdobeAdminAccount(id: number): Promise<{ success: boolean;
 export function createAdobeAdminAccount(payload: {
   email: string;
   password: string;
-  otp_source?: "imap" | "tinyhost" | "hdsd";
+  otp_source?: OtpSource;
   mail_backup_id?: number | null;
 }) {
   return apiFetch(API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS, {
@@ -165,7 +166,7 @@ export function updateAdobeAccount(
     email?: string;
     password_encrypted?: string;
     org_name?: string;
-    otp_source?: "imap" | "tinyhost" | "hdsd";
+    otp_source?: OtpSource;
   }
 ): Promise<{ success: boolean; account?: Record<string, unknown>; error?: string }> {
   return apiFetch(`${API_ENDPOINTS.RENEW_ADOBE_ACCOUNTS}/${id}`, {

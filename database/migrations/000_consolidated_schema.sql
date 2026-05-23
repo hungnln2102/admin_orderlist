@@ -1559,7 +1559,7 @@ CREATE TABLE system_automation.accounts_admin (
     otp_source text DEFAULT 'imap'::text,
     id_product text,
     users_snapshot text,
-    CONSTRAINT accounts_admin_otp_source_check CHECK ((otp_source = ANY (ARRAY['imap'::text, 'tinyhost'::text, 'hdsd'::text])))
+    CONSTRAINT accounts_admin_otp_source_check CHECK ((otp_source = ANY (ARRAY['imap'::text, 'tinyhost'::text, 'hdsd'::text, 'ades'::text])))
 );
 
 CREATE SEQUENCE system_automation.accounts_id_seq

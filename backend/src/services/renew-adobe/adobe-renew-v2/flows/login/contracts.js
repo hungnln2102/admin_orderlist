@@ -7,7 +7,7 @@
  * @property {import("playwright").Page} page
  * @property {string} accountEmail
  * @property {string} passwordEncrypted
- * @property {"imap" | "tinyhost" | "hdsd"} [otpSource]
+ * @property {"imap" | "tinyhost" | "hdsd" | "ades"} [otpSource]
  * @property {number | null} [mailBackupId]
  * @property {string | null} [proxyUrl]
  */

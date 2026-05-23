@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AdobeAdminAccount } from "../types";
+import type { AdobeAdminAccount, OtpSource } from "../types";
 import { updateAdobeAccount } from "../api/renewAdobeApi";
 
 type EditAccountModalProps = {
@@ -12,9 +12,9 @@ export function EditAccountModal({ account, onClose, onSaved }: EditAccountModal
   const [email, setEmail] = useState(account.email);
   const [password, setPassword] = useState(account.password_encrypted);
   const [orgName, setOrgName] = useState(account.org_name ?? "");
-  const [otpSource, setOtpSource] = useState<
-    "imap" | "tinyhost" | "hdsd"
-  >(account.otp_source ?? "imap");
+  const [otpSource, setOtpSource] = useState<OtpSource>(
+    account.otp_source ?? "imap"
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,13 +83,14 @@ export function EditAccountModal({ account, onClose, onSaved }: EditAccountModal
             <select
               value={otpSource}
               onChange={(e) =>
-                setOtpSource(e.target.value as "imap" | "tinyhost" | "hdsd")
+                setOtpSource(e.target.value as OtpSource)
               }
               className="w-full rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none"
             >
               <option value="imap">IMAP (mail_backup/alias)</option>
               <option value="tinyhost">TinyHost API</option>
               <option value="hdsd">otp.hdsd.net API</option>
+              <option value="ades">OTP Ades</option>
             </select>
           </div>
           <div>

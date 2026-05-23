@@ -1,11 +1,13 @@
 const logger = require("../utils/logger");
 const mailOtpService = require("./mailOtpService");
+const { fetchOtpFromAdesApi } = require("./fix-ades/otpReader");
 const { readOtpFromTinyHost } = require("./tinyhost");
 
 const OTP_SOURCES = {
   IMAP: "imap",
   TINYHOST: "tinyhost",
   HDSD: "hdsd",
+  ADES: "ades",
 };
 
 function normalizeOtpSource(rawValue, { hasMailBackupId = false } = {}) {
@@ -16,7 +18,8 @@ function normalizeOtpSource(rawValue, { hasMailBackupId = false } = {}) {
   if (
     normalized === OTP_SOURCES.IMAP ||
     normalized === OTP_SOURCES.TINYHOST ||
-    normalized === OTP_SOURCES.HDSD
+    normalized === OTP_SOURCES.HDSD ||
+    normalized === OTP_SOURCES.ADES
   ) {
     return normalized;
   }
@@ -184,6 +187,14 @@ async function fetchOtpBySource({
       senderFilter,
       timeoutMs: 10000,
       minTimestampMs,
+    });
+  }
+
+  if (normalizedSource === OTP_SOURCES.ADES) {
+    if (!accountEmail) return null;
+    return fetchOtpFromAdesApi({
+      accountEmail,
+      timeoutMs: 10000,
     });
   }
 

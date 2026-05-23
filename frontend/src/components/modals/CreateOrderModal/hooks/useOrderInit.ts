@@ -19,8 +19,8 @@ type UseOrderInitParams = {
   setSupplies: React.Dispatch<React.SetStateAction<Supply[]>>;
   setSupplyPrices: React.Dispatch<React.SetStateAction<SupplyPrice[]>>;
   setCustomProductTouched: React.Dispatch<React.SetStateAction<boolean>>;
-  fetchProducts: () => void;
-  fetchAllSupplies: () => void;
+  fetchProducts: (force?: boolean) => void;
+  fetchAllSupplies: (force?: boolean) => void;
   prefillContext?: CreateOrderPrefillContext | null;
 };
 
@@ -72,8 +72,9 @@ export const useOrderInit = ({
     setSupplies([]);
     setSupplyPrices([]);
     setCustomProductTouched(false);
-    fetchProducts();
-    fetchAllSupplies();
+    // Luôn bypass cache frontend — tránh dropdown sản phẩm cũ sau khi tạo SP mới ở trang Giá.
+    fetchProducts(true);
+    fetchAllSupplies(true);
   }, [
     prefillContext,
     orderCreationKind,

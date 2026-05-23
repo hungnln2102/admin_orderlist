@@ -69,6 +69,7 @@ export function RenewAdobeAccountsTable({
   const otpSourceLabel = (source?: AdobeAdminAccount["otp_source"]) => {
     if (source === "tinyhost") return "TinyHost";
     if (source === "hdsd") return "otp.hdsd.net";
+    if (source === "ades") return "OTP Ades";
     return "IMAP";
   };
 
