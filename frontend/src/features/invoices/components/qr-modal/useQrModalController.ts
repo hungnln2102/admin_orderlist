@@ -3,13 +3,12 @@ import * as Helpers from "@/shared/utils";
 import { apiFetch } from "@/shared/api/client";
 import type { ShopBankDisplay } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
-import { parseBatchTransactionCodes } from "./parseBatchTransactionCodes";
+import { parseBatchOrderCodes } from "./parseBatchOrderCodes";
 import type { BatchItem, BatchSummary } from "./types";
 
 type Params = {
   open: boolean;
   amount: string;
-  note: string;
   matchableOrders: Array<{ orderCode: string; transaction?: string }>;
   shopBank: ShopBankDisplay;
   onAmountChange: (value: string) => void;
@@ -19,20 +18,20 @@ type Params = {
 export const useQrModalController = ({
   open,
   amount,
-  note,
   matchableOrders,
   shopBank,
   onAmountChange,
   onNoteChange,
 }: Params) => {
   const [amountDraft, setAmountDraft] = useState(amount);
-  const [noteDraft, setNoteDraft] = useState(note);
   const [batchCodesDraft, setBatchCodesDraft] = useState("");
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [batchInfo, setBatchInfo] = useState<{
     batchCode: string;
     orderCount: number;
+    baseTotal: number;
+    amountSuffix: number | null;
     totalAmount: number;
   } | null>(null);
   const [batchListLoading, setBatchListLoading] = useState(false);
@@ -47,7 +46,6 @@ export const useQrModalController = ({
     if (open) {
       const digits = digitsOnly(amount);
       setAmountDraft(digits ? formatVndThousands(digits) : "");
-      setNoteDraft(note);
       setBatchCodesDraft("");
       setBatchError(null);
       setBatchInfo(null);
@@ -55,8 +53,9 @@ export const useQrModalController = ({
       setSelectedBatchCode("");
       setSelectedBatchItems([]);
       setSelectedBatchError(null);
+      onNoteChange("");
     }
-  }, [open, amount, note]);
+  }, [open, amount, onNoteChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -95,9 +94,9 @@ export const useQrModalController = ({
     };
   }, [open, batchInfo]);
 
-  const transactionHint = useMemo(() => {
+  const orderCodeHint = useMemo(() => {
     const preview = matchableOrders
-      .map((item) => String(item.transaction || "").trim().toUpperCase())
+      .map((item) => String(item.orderCode || "").trim().toUpperCase())
       .filter(Boolean)
       .slice(0, 10)
       .join(", ");
@@ -121,12 +120,9 @@ export const useQrModalController = ({
       accountNumber: shopBank.accountNumber,
       bankCode: shopBank.bankCode,
       amount: parsedAmount,
-      description: noteDraft.trim(),
       accountName: shopBank.accountHolder,
     });
-  }, [parsedAmount, noteDraft, shopBank]);
-
-  const noteDisplay = noteDraft.trim() || "Chưa có nội dung";
+  }, [parsedAmount, shopBank]);
 
   const commitAmount = () => {
     const digits = digitsOnly(amountDraft);
@@ -145,22 +141,16 @@ export const useQrModalController = ({
     setAmountDraft(formatVndThousands(digits));
   };
 
-  const commitNote = () => {
-    const nextNote = noteDraft.trim();
-    setNoteDraft(nextNote);
-    onNoteChange(nextNote);
-  };
-
-  const applyAll = () => {
+  const applyAmount = () => {
     commitAmount();
-    commitNote();
+    onNoteChange("");
   };
 
   const createBatchFromOrders = async () => {
-    const transactionCodes = parseBatchTransactionCodes(batchCodesDraft);
-    if (transactionCodes.length === 0) {
+    const orderCodes = parseBatchOrderCodes(batchCodesDraft);
+    if (orderCodes.length === 0) {
       setBatchError(
-        "Vui lòng nhập ít nhất 1 mã giao dịch 8 ký tự (không dùng mã MAV/MAVG)."
+        "Vui lòng nhập ít nhất 1 mã đơn (MAVC, MAVL, …)."
       );
       return;
     }
@@ -171,15 +161,12 @@ export const useQrModalController = ({
       const response = await apiFetch("/api/payment-receipts/batches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactionCodes,
-          note: noteDraft.trim() || null,
-        }),
+        body: JSON.stringify({ orderCodes }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(
-          String((body as { error?: string })?.error || "Không thể tạo mã gộp CK.")
+          String((body as { error?: string })?.error || "Không thể gộp đơn.")
         );
       }
       const nextBatchCode = String((body as { batchCode?: string })?.batchCode || "")
@@ -190,8 +177,7 @@ export const useQrModalController = ({
         throw new Error("Không nhận được batchCode từ server.");
       }
 
-      setNoteDraft(nextBatchCode);
-      onNoteChange(nextBatchCode);
+      onNoteChange("");
 
       if (nextAmount > 0) {
         const nextDigits = String(Math.round(nextAmount));
@@ -201,7 +187,10 @@ export const useQrModalController = ({
 
       setBatchInfo({
         batchCode: nextBatchCode,
-        orderCount: Number((body as { orderCount?: number })?.orderCount) || transactionCodes.length,
+        orderCount: Number((body as { orderCount?: number })?.orderCount) || orderCodes.length,
+        baseTotal: Number((body as { baseTotal?: number })?.baseTotal) || 0,
+        amountSuffix:
+          (body as { amountSuffix?: number | null }).amountSuffix ?? null,
         totalAmount: nextAmount,
       });
       setSelectedBatchCode(nextBatchCode);
@@ -211,7 +200,7 @@ export const useQrModalController = ({
       setBatchError(
         error instanceof Error
           ? error.message
-          : "Không thể tạo mã biên lai nhóm."
+          : "Không thể gộp đơn."
       );
     } finally {
       setBatchLoading(false);
@@ -238,12 +227,11 @@ export const useQrModalController = ({
       setSelectedBatchItems(items);
       setBatchCodesDraft(
         items
-          .map((item) => String(item.transaction || item.orderCode || "").trim().toUpperCase())
+          .map((item) => String(item.orderCode || "").trim().toUpperCase())
           .filter(Boolean)
           .join(", ")
       );
-      setNoteDraft(normalized);
-      onNoteChange(normalized);
+      onNoteChange("");
       const totalAmount = Number((body as { batch?: { totalAmount?: number } })?.batch?.totalAmount) || 0;
       if (totalAmount > 0) {
         const digits = String(Math.round(totalAmount));
@@ -262,7 +250,6 @@ export const useQrModalController = ({
 
   return {
     amountDraft,
-    noteDraft,
     batchCodesDraft,
     batchLoading,
     batchError,
@@ -274,16 +261,13 @@ export const useQrModalController = ({
     selectedBatchItems,
     selectedBatchLoading,
     selectedBatchError,
-    transactionHint,
+    orderCodeHint,
     formattedAmountDisplay,
     qrImageUrl,
-    noteDisplay,
-    setNoteDraft,
     setBatchCodesDraft,
     handleAmountInputChange,
     commitAmount,
-    commitNote,
-    applyAll,
+    applyAmount,
     createBatchFromOrders,
     openBatchDetail,
   };

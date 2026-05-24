@@ -5,14 +5,12 @@ import { panelSurface } from "./helpers";
 type Props = {
   qrImageUrl: string;
   formattedAmountDisplay: string;
-  noteDisplay: string;
   shopBank: ShopBankDisplay;
 };
 
 export const QrPreviewPanel: React.FC<Props> = ({
   qrImageUrl,
   formattedAmountDisplay,
-  noteDisplay,
   shopBank,
 }) => (
   <div
@@ -76,9 +74,9 @@ export const QrPreviewPanel: React.FC<Props> = ({
         </dd>
       </div>
       <div className="flex justify-between gap-4 py-3 items-start">
-        <dt className="text-slate-500 shrink-0 text-sm pt-0.5">Nội dung</dt>
-        <dd className="font-medium text-violet-200 text-right break-words max-w-[70%] text-sm">
-          {noteDisplay}
+        <dt className="text-slate-500 shrink-0 text-sm pt-0.5">Nội dung CK</dt>
+        <dd className="font-medium text-slate-400 text-right text-sm italic">
+          Không cần ghi
         </dd>
       </div>
     </dl>

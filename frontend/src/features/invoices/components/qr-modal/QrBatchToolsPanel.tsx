@@ -4,12 +4,17 @@ import type { BatchItem, BatchSummary } from "./types";
 
 type Props = {
   amountDraft: string;
-  noteDraft: string;
-  transactionHint: string;
+  orderCodeHint: string;
   batchCodesDraft: string;
   batchLoading: boolean;
   batchError: string | null;
-  batchInfo: { batchCode: string; orderCount: number; totalAmount: number } | null;
+  batchInfo: {
+    batchCode: string;
+    orderCount: number;
+    baseTotal: number;
+    amountSuffix: number | null;
+    totalAmount: number;
+  } | null;
   batchListLoading: boolean;
   batchListError: string | null;
   batchList: BatchSummary[];
@@ -20,10 +25,7 @@ type Props = {
   onAmountDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onAmountDraftBlur: () => void;
   onAmountDraftEnter: () => void;
-  onNoteDraftChange: (value: string) => void;
-  onNoteDraftBlur: () => void;
-  onNoteDraftEnter: () => void;
-  onApplyAll: () => void;
+  onApplyAmount: () => void;
   onBatchCodesDraftChange: (value: string) => void;
   onCreateBatchFromOrders: () => void;
   onOpenBatchDetail: (batchCode: string) => void;
@@ -31,8 +33,7 @@ type Props = {
 
 export const QrBatchToolsPanel: React.FC<Props> = ({
   amountDraft,
-  noteDraft,
-  transactionHint,
+  orderCodeHint,
   batchCodesDraft,
   batchLoading,
   batchError,
@@ -47,10 +48,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
   onAmountDraftChange,
   onAmountDraftBlur,
   onAmountDraftEnter,
-  onNoteDraftChange,
-  onNoteDraftBlur,
-  onNoteDraftEnter,
-  onApplyAll,
+  onApplyAmount,
   onBatchCodesDraftChange,
   onCreateBatchFromOrders,
   onOpenBatchDetail,
@@ -64,7 +62,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         <div>
           <h3 className="text-sm font-bold text-white tracking-tight">Cập nhật mã QR</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Số tiền và nội dung hiển thị trên VietQR bên dưới.
+            Chỉ cần số tiền — VietQR không ghi nội dung chuyển khoản.
           </p>
         </div>
       </div>
@@ -77,7 +75,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="Ví dụ: 65000"
+          placeholder="Ví dụ: 660017"
           className={inputCls}
           value={amountDraft}
           onChange={onAmountDraftChange}
@@ -85,27 +83,16 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           onKeyDown={(e) => e.key === "Enter" && onAmountDraftEnter()}
         />
       </div>
-      <div>
-        <label htmlFor="qr-modal-note" className={labelCls}>
-          Nội dung chuyển khoản
-        </label>
-        <input
-          id="qr-modal-note"
-          type="text"
-          placeholder="VD: NCC KY … hoặc mã gộp CK 8 ký tự"
-          className={inputCls}
-          value={noteDraft}
-          onChange={(event) => onNoteDraftChange(event.target.value)}
-          onBlur={onNoteDraftBlur}
-          onKeyDown={(e) => e.key === "Enter" && onNoteDraftEnter()}
-        />
-      </div>
+      <p className="text-[11px] text-slate-500 leading-snug">
+        Khách chuyển khoản <strong className="text-slate-400">đúng số tiền trên QR</strong> — không
+        cần (và không nên) ghi nội dung CK.
+      </p>
       <button
         type="button"
         className="w-full mt-auto rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 py-3 text-sm font-semibold text-white shadow-md shadow-sky-900/40 transition hover:from-sky-400 hover:to-blue-500 active:scale-[0.99]"
-        onClick={onApplyAll}
+        onClick={onApplyAmount}
       >
-        Áp dụng số tiền & nội dung
+        Áp dụng số tiền
       </button>
     </div>
 
@@ -117,29 +104,29 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           </span>
           <div>
             <h3 className="text-sm font-bold text-emerald-100 tracking-tight">
-              Gộp nhiều đơn — một mã CK
+              Gộp nhiều đơn — một lần CK
             </h3>
             <p className="text-xs text-emerald-200/65 mt-0.5 leading-relaxed">
-              Dán mã giao dịch 8 ký tự của từng đơn — hệ thống sinh một mã CK gộp (8 ký tự)
-              và điền nội dung + tổng tiền.
+              Dán mã đơn (MAVC, MAVL, …) — hệ thống cộng tổng tiền (đã gồm suffix) và tạo QR không
+              nội dung CK.
             </p>
           </div>
         </div>
         <textarea
           id="qr-modal-batch-codes"
           rows={3}
-          placeholder="A1B2C3D4, X9Y8Z7W6 (phẩy hoặc xuống dòng)"
+          placeholder="MAVC88QFY, MAVC8LNXQ, MAVCRPZT4 (phẩy hoặc xuống dòng)"
           className={`${inputCls} resize-y min-h-[6rem] border-emerald-500/20 focus:border-emerald-400/50 focus:ring-emerald-500/15 flex-1`}
           value={batchCodesDraft}
           onChange={(event) => onBatchCodesDraftChange(event.target.value)}
         />
-        {transactionHint ? (
+        {orderCodeHint ? (
           <p className="text-[11px] text-slate-500 leading-snug">
-            <span className="text-slate-400 font-semibold">Gợi ý mã GD:</span> {transactionHint}
+            <span className="text-slate-400 font-semibold">Gợi ý mã đơn:</span> {orderCodeHint}
           </p>
         ) : (
           <p className="text-[11px] text-slate-500 leading-snug">
-            Mã giao dịch lấy từ chi tiết đơn (QR) hoặc cột transaction trên đơn Chưa TT / Cần GH.
+            Mã đơn lấy từ cột ID trên các đơn Chưa TT / Cần GH.
           </p>
         )}
         {batchError ? (
@@ -147,8 +134,17 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         ) : null}
         {batchInfo ? (
           <p className="text-xs text-emerald-300 font-medium">
-            Đã tạo mã {batchInfo.batchCode} · {batchInfo.orderCount} đơn ·{" "}
+            Đã gộp {batchInfo.orderCount} đơn · CK{" "}
             {batchInfo.totalAmount.toLocaleString("vi-VN")} VND
+            {batchInfo.amountSuffix != null && batchInfo.baseTotal > 0 ? (
+              <span className="block text-[10px] text-emerald-200/70 font-normal mt-0.5">
+                Base {batchInfo.baseTotal.toLocaleString("vi-VN")} + suffix{" "}
+                {batchInfo.amountSuffix}
+              </span>
+            ) : null}
+            <span className="block text-[10px] text-emerald-200/60 font-normal mt-0.5">
+              Mã đối chiếu: {batchInfo.batchCode} (không ghi vào nội dung CK)
+            </span>
           </p>
         ) : null}
         <button
@@ -157,14 +153,14 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
           onClick={onCreateBatchFromOrders}
           disabled={batchLoading}
         >
-          {batchLoading ? "Đang tạo mã gộp…" : "Tạo mã gộp CK"}
+          {batchLoading ? "Đang gộp đơn…" : "Gộp đơn & tính tổng tiền"}
         </button>
       </div>
 
       <div className={`${panelSurface} p-4 sm:p-5 space-y-3`}>
         <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Mã gộp gần đây
+            Batch gần đây
           </h3>
           {batchListLoading ? (
             <span className="text-[11px] text-slate-500">Đang tải…</span>
@@ -220,11 +216,8 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
                     className="flex justify-between gap-2 rounded-md bg-slate-900/70 px-2 py-1.5"
                   >
                     <span className="text-slate-200 font-mono font-medium">
-                      {item.transaction || item.orderCode}
+                      {item.orderCode}
                     </span>
-                    {item.transaction && item.orderCode ? (
-                      <span className="block text-[10px] text-slate-500 mt-0.5">{item.orderCode}</span>
-                    ) : null}
                     <span className="text-slate-400 tabular-nums shrink-0">
                       {(Number(item.amount) || 0).toLocaleString("vi-VN")}
                     </span>

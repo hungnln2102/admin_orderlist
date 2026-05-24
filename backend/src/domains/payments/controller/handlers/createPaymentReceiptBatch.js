@@ -1,7 +1,7 @@
 const { withTransaction } = require("../../../../db");
 const { STATUS } = require("../../../../utils/statuses");
 const logger = require("../../../../utils/logger");
-const { ensureOrderTransaction } = require("../../../orders/use-cases/ensureOrderTransaction");
+const { resolveDefaultShopBankAccount } = require("../../../../services/shopBankAccountResolver");
 const {
   TABLES,
   ORDER_COLS,
@@ -15,11 +15,44 @@ const {
   createHttpError,
   normalizeMoney,
 } = require("../shared/helpers");
-const {
-  generateUniqueBatchTransferCode,
-} = require("../shared/batchTransferCode");
+const { generateUniqueMavgBatchCode } = require("../shared/batchTransferCode");
+const { computeBatchPaymentTotal } = require("../batch/computeBatchPaymentTotal");
 
-const resolveOrdersForBatch = async (trx, { transactionCodes, legacyOrderCodes }) => {
+const resolveOrdersForBatch = async (trx, { transactionCodes, orderCodes }) => {
+  if (orderCodes.length > 0) {
+    const rows = await trx(TABLES.orderList)
+      .select(
+        ORDER_COLS.id,
+        ORDER_COLS.idOrder,
+        ORDER_COLS.status,
+        ORDER_COLS.price,
+        ORDER_COLS.transaction
+      )
+      .whereRaw(
+        `UPPER(TRIM(${ORDER_COLS.idOrder}::text)) IN (${orderCodes.map(() => "?").join(",")})`,
+        orderCodes
+      );
+
+    const byOrderCode = new Map(
+      (rows || []).map((row) => [
+        String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase(),
+        row,
+      ])
+    );
+    const missingOrderCodes = orderCodes.filter((code) => !byOrderCode.has(code));
+    if (missingOrderCodes.length > 0) {
+      throw createHttpError(
+        400,
+        `Không tìm thấy ${missingOrderCodes.length} mã đơn: ${missingOrderCodes.join(", ")}`
+      );
+    }
+
+    return {
+      rows: orderCodes.map((code) => byOrderCode.get(code)).filter(Boolean),
+      orderCodes,
+    };
+  }
+
   if (transactionCodes.length > 0) {
     const rows = await trx(TABLES.orderList)
       .select(
@@ -50,57 +83,15 @@ const resolveOrdersForBatch = async (trx, { transactionCodes, legacyOrderCodes }
 
     return {
       rows: transactionCodes.map((code) => byTransaction.get(code)).filter(Boolean),
-      transactionCodes,
+      orderCodes: transactionCodes
+        .map((code) =>
+          String(byTransaction.get(code)?.[ORDER_COLS.idOrder] || "").trim().toUpperCase()
+        )
+        .filter(Boolean),
     };
   }
 
-  if (legacyOrderCodes.length > 0) {
-    const rows = await trx(TABLES.orderList)
-      .select(
-        ORDER_COLS.id,
-        ORDER_COLS.idOrder,
-        ORDER_COLS.status,
-        ORDER_COLS.price,
-        ORDER_COLS.transaction
-      )
-      .whereRaw(
-        `UPPER(TRIM(${ORDER_COLS.idOrder}::text)) IN (${legacyOrderCodes.map(() => "?").join(",")})`,
-        legacyOrderCodes
-      );
-
-    const byOrderCode = new Map(
-      (rows || []).map((row) => [
-        String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase(),
-        row,
-      ])
-    );
-    const missingOrderCodes = legacyOrderCodes.filter((code) => !byOrderCode.has(code));
-    if (missingOrderCodes.length > 0) {
-      throw createHttpError(
-        400,
-        `Không tìm thấy ${missingOrderCodes.length} mã đơn: ${missingOrderCodes.join(", ")}`
-      );
-    }
-
-    const resolvedRows = [];
-    const resolvedTransactionCodes = [];
-    for (const code of legacyOrderCodes) {
-      const row = byOrderCode.get(code);
-      const ensured = await ensureOrderTransaction({ order: row, trx });
-      resolvedRows.push({
-        ...row,
-        [ORDER_COLS.transaction]: ensured.transaction,
-      });
-      resolvedTransactionCodes.push(ensured.transaction);
-    }
-
-    return {
-      rows: resolvedRows,
-      transactionCodes: resolvedTransactionCodes,
-    };
-  }
-
-  return { rows: [], transactionCodes: [] };
+  return { rows: [], orderCodes: [] };
 };
 
 const createPaymentReceiptBatch = async (req, res) => {
@@ -113,23 +104,22 @@ const createPaymentReceiptBatch = async (req, res) => {
     req.body?.orderCodes ?? req.body?.orders ?? req.body?.orderCode ?? "";
   const note = String(req.body?.note || "").trim();
 
-  let transactionCodes = parseTransactionCodesInput(rawTransactionCodes);
-  if (transactionCodes.length === 0) {
-    transactionCodes = parseTransactionCodesInput(rawOrderCodes);
-  }
-  const legacyOrderCodes =
-    transactionCodes.length > 0 ? [] : parseOrderCodesInput(rawOrderCodes);
+  const orderCodes = parseOrderCodesInput(rawOrderCodes);
+  const transactionCodes =
+    orderCodes.length > 0 ? [] : parseTransactionCodesInput(rawTransactionCodes);
 
-  if (transactionCodes.length === 0 && legacyOrderCodes.length === 0) {
+  if (orderCodes.length === 0 && transactionCodes.length === 0) {
     return res.status(400).json({
-      error: "Thiếu danh sách mã giao dịch 8 ký tự hợp lệ.",
+      error: "Thiếu danh sách mã đơn (MAVC, MAVL, …) hợp lệ.",
     });
   }
 
   try {
     const result = await withTransaction(async (trx) => {
-      const { rows, transactionCodes: resolvedTransactionCodes } =
-        await resolveOrdersForBatch(trx, { transactionCodes, legacyOrderCodes });
+      const { rows, orderCodes: resolvedOrderCodes } = await resolveOrdersForBatch(trx, {
+        transactionCodes,
+        orderCodes,
+      });
 
       const disallowed = rows.filter((row) => {
         const status = String(row?.[ORDER_COLS.status] || "").trim();
@@ -138,7 +128,7 @@ const createPaymentReceiptBatch = async (req, res) => {
       if (disallowed.length > 0) {
         const preview = disallowed
           .slice(0, 5)
-          .map((row) => String(row?.[ORDER_COLS.transaction] || row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase())
+          .map((row) => String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase())
           .join(", ");
         throw createHttpError(
           409,
@@ -146,12 +136,33 @@ const createPaymentReceiptBatch = async (req, res) => {
         );
       }
 
-      const batchCode = await generateUniqueBatchTransferCode(trx);
+      const defaultBank = await resolveDefaultShopBankAccount();
+      const receiverAccount = String(defaultBank?.accountNumber || "").trim();
 
-      const totalAmount = rows.reduce(
-        (sum, row) => sum + normalizeMoney(row?.[ORDER_COLS.price]),
-        0
-      );
+      let batchCode;
+      let totalAmount;
+      let baseTotal;
+      let amountSuffix;
+
+      if (orderCodes.length > 0) {
+        const batchPricing = await computeBatchPaymentTotal(trx, {
+          orderRows: rows,
+          idOrderCol: ORDER_COLS.idOrder,
+          receiverAccount,
+        });
+        baseTotal = batchPricing.baseTotal;
+        amountSuffix = batchPricing.amountSuffix;
+        totalAmount = batchPricing.totalAmount;
+        batchCode = await generateUniqueMavgBatchCode(trx);
+      } else {
+        batchCode = await generateUniqueMavgBatchCode(trx);
+        totalAmount = rows.reduce(
+          (sum, row) => sum + normalizeMoney(row?.[ORDER_COLS.price]),
+          0
+        );
+        baseTotal = totalAmount;
+        amountSuffix = null;
+      }
 
       const insertedBatchRows = await trx(TABLES.paymentReceiptBatch)
         .insert({
@@ -178,11 +189,10 @@ const createPaymentReceiptBatch = async (req, res) => {
 
       return {
         batchCode,
-        transactionCodes: resolvedTransactionCodes,
-        orderCodes: rows.map((row) =>
-          String(row?.[ORDER_COLS.idOrder] || "").trim().toUpperCase()
-        ),
+        orderCodes: resolvedOrderCodes,
         orderCount: rows.length,
+        baseTotal,
+        amountSuffix,
         totalAmount,
       };
     });
@@ -190,14 +200,14 @@ const createPaymentReceiptBatch = async (req, res) => {
     return res.json({
       success: true,
       ...result,
-      noteForTransfer: result.batchCode,
+      noteForTransfer: "",
     });
   } catch (error) {
     if (isMissingBatchTablesError(error)) {
       logger.warn("[payments] Create receipt batch skipped: missing batch tables");
       return res.status(503).json({
         error:
-          "Tính năng mã gộp CK chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
+          "Tính năng gộp đơn chưa sẵn sàng trên database. Vui lòng chạy migration backend rồi thử lại.",
       });
     }
     const statusCode = Number(error?.status) || 500;
@@ -206,7 +216,7 @@ const createPaymentReceiptBatch = async (req, res) => {
       stack: error.stack,
     });
     return res.status(statusCode).json({
-      error: error.message || "Không thể tạo mã biên lai nhóm.",
+      error: error.message || "Không thể tạo batch gộp đơn.",
     });
   }
 };

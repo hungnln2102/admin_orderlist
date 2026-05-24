@@ -70,6 +70,7 @@ const {
   resolveWebhookPostedRevenue,
 } = require("./orderCodeResolution");
 const { resolveBatchCodesByTransferTokens } = require("./resolveBatchCodesByTransfer");
+const { resolveBatchCodesByExpectedAmount } = require("./resolveBatchCodesByExpectedAmount");
 const { STATUS } = require("../../../../src/utils/statuses");
 
 const SUPPLIER_ORDER_COST_LOG_TABLE = tableName(
@@ -369,8 +370,30 @@ async function handleWebhookPost(req, res) {
         });
       }
 
+      if (
+        resolvedBatchCodes.length === 0 &&
+        transferAmountNormalized > 0 &&
+        !supplierSettlementTransfer
+      ) {
+        const batchByAmount = await resolveBatchCodesByExpectedAmount(client, {
+          amount: transferAmountNormalized,
+        });
+        if (batchByAmount.length > 0) {
+          resolvedBatchCodes.push(...batchByAmount);
+          logger.info("[Webhook] Resolved batch by total amount (no transfer content)", {
+            amount: transferAmountNormalized,
+            batchCodes: batchByAmount,
+          });
+        }
+      }
+
       const transitionedOrderCodesToPaid = new Set();
-      if (!orderCodes.length && transferAmountNormalized > 0 && !supplierSettlementTransfer) {
+      if (
+        !orderCodes.length &&
+        resolvedBatchCodes.length === 0 &&
+        transferAmountNormalized > 0 &&
+        !supplierSettlementTransfer
+      ) {
         logger.info("[Webhook] No MAV order code found, trying amount-based fallback", {
           amount: transferAmountNormalized,
           content: transaction.transaction_content,

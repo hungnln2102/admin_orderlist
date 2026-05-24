@@ -11,6 +11,7 @@ const {
   normalizeTransactionCode,
   TRANSACTION_CODE_LENGTH,
 } = require("../../../../services/transactionCodeService");
+const { generateCandidateBatchCode } = require("./helpers");
 const logger = require("../../../../utils/logger");
 
 const MAX_RETRIES = 12;
@@ -25,7 +26,7 @@ const BATCH_CODE_COL = RECEIPT_SCHEMA.PAYMENT_RECEIPT_BATCH.COLS.BATCH_CODE;
 const isLegacyBatchTransferCode = (value) =>
   LEGACY_BATCH_CODE_RE.test(String(value || "").trim().toUpperCase());
 
-/** Mã CK gộp batch: 8 ký tự (giống transaction đơn) hoặc MAVG… (batch cũ). */
+/** Mã batch: MAVG… (chuẩn mới) hoặc 8 ký tự (legacy). */
 const isBatchTransferCodeFormat = (value) => {
   const normalized = String(value || "").trim().toUpperCase();
   if (!normalized) return false;
@@ -36,9 +37,29 @@ const isBatchTransferCodeFormat = (value) => {
 };
 
 /**
- * Sinh mã CK gộp batch — unique trên order_list.transaction và payment_receipt_batch.batch_code.
+ * Sinh mã MAVG… — đối chiếu nội bộ, không ghi nội dung CK.
  * @param {import("knex").Knex.Transaction|null} trx
  */
+async function generateUniqueMavgBatchCode(trx = null) {
+  const queryBuilder = trx || db;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
+    const code = generateCandidateBatchCode();
+    const batchHit = await queryBuilder(BATCH_TABLE)
+      .whereRaw(`UPPER(TRIM(??::text)) = ?`, [BATCH_CODE_COL, code])
+      .select(BATCH_CODE_COL)
+      .first();
+
+    if (!batchHit) return code;
+    logger.warn("[BatchTransferCode] MAVG collision, retrying", { code, attempt });
+  }
+
+  throw new Error(
+    "Không thể tạo mã MAVG batch duy nhất sau nhiều lần thử. Vui lòng thử lại."
+  );
+}
+
+/** Legacy: mã 8 ký tự (batch cũ). */
 async function generateUniqueBatchTransferCode(trx = null) {
   const queryBuilder = trx || db;
 
@@ -67,5 +88,6 @@ async function generateUniqueBatchTransferCode(trx = null) {
 module.exports = {
   isLegacyBatchTransferCode,
   isBatchTransferCodeFormat,
+  generateUniqueMavgBatchCode,
   generateUniqueBatchTransferCode,
 };

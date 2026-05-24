@@ -54,8 +54,8 @@ export const QrModal: React.FC<QrModalProps> = ({
                 Tạo thông tin thanh toán qua QR Code
               </h2>
               <p className="text-sm text-slate-400/95 leading-relaxed max-w-xl mx-auto">
-                Trên: nhập số tiền và nội dung hoặc gộp nhiều đơn thành một mã CK. Dưới: mã QR và thông tin giao dịch
-                khớp với các ô đã nhập.
+                Nhập số tiền hoặc gộp nhiều đơn theo mã đơn. QR VietQR chỉ mang số tiền — khách không
+                cần ghi nội dung chuyển khoản.
               </p>
             </div>
 
@@ -82,8 +82,7 @@ export const QrModal: React.FC<QrModalProps> = ({
 
             <QrBatchToolsPanel
               amountDraft={controller.amountDraft}
-              noteDraft={controller.noteDraft}
-              transactionHint={controller.transactionHint}
+              orderCodeHint={controller.orderCodeHint}
               batchCodesDraft={controller.batchCodesDraft}
               batchLoading={controller.batchLoading}
               batchError={controller.batchError}
@@ -98,10 +97,7 @@ export const QrModal: React.FC<QrModalProps> = ({
               onAmountDraftChange={controller.handleAmountInputChange}
               onAmountDraftBlur={controller.commitAmount}
               onAmountDraftEnter={controller.commitAmount}
-              onNoteDraftChange={controller.setNoteDraft}
-              onNoteDraftBlur={controller.commitNote}
-              onNoteDraftEnter={controller.commitNote}
-              onApplyAll={controller.applyAll}
+              onApplyAmount={controller.applyAmount}
               onBatchCodesDraftChange={controller.setBatchCodesDraft}
               onCreateBatchFromOrders={controller.createBatchFromOrders}
               onOpenBatchDetail={controller.openBatchDetail}
@@ -110,7 +106,6 @@ export const QrModal: React.FC<QrModalProps> = ({
             <QrPreviewPanel
               qrImageUrl={controller.qrImageUrl}
               formattedAmountDisplay={controller.formattedAmountDisplay}
-              noteDisplay={controller.noteDisplay}
               shopBank={shopBank}
             />
           </div>
