@@ -15,6 +15,7 @@
         "proxy:local": "node scripts/local-proxy.js",
         "sync:dashboard-summary": "node scripts/ops/rebuild-dashboard-monthly-summary.js",
         "sync:daily-revenue-summary": "node scripts/ops/backfill-daily-revenue-summary.js",
+        "backfill:payment-slots": "node scripts/ops/backfill-payment-slots.js",
         "compare:dashboard-ledgers": "node scripts/ops/compare-dashboard-summary-ledgers.js",
         "verify:key-active-legacy": "node scripts/ops/verify-key-active-legacy-deps.js",
         "compare:dump-dbschema": "node scripts/ops/compare-pgdump-toc-dbschema.js",

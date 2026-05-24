@@ -102,3 +102,32 @@ cd backend && npx knex migrate:latest
 ```
 
 Sau migrate, đơn **mới** và đơn **gia hạn** (sau cron flip) tự có `price` mang suffix.
+
+## Backfill đơn cũ (một lần)
+
+Đơn đã ở `Chưa Thanh Toán` / `Cần Gia Hạn` **trước** khi bật payment slot thường còn giá tròn (vd. `65.000`) và **không có** row slot pending → webhook chỉ fallback theo `price = amount` (dễ trùng nếu nhiều đơn cùng mức).
+
+Chạy backfill (từ thư mục `backend`):
+
+```bash
+# Xem trước, không ghi DB
+node scripts/ops/backfill-payment-slots.js --dry-run
+
+# Một đơn thử
+node scripts/ops/backfill-payment-slots.js --dry-run --order=MAVCHMB3R
+
+# Ghi thật (mặc định tối đa 500 đơn/lần)
+node scripts/ops/backfill-payment-slots.js
+
+# Batch lớn hơn
+node scripts/ops/backfill-payment-slots.js --limit=2000
+```
+
+Script:
+
+- Quét đơn `Chưa Thanh Toán` / `Cần Gia Hạn`, `price > 0`, không MAVN, **chưa có slot pending**.
+- **Cần GH**: recompute giá từ bảng giá (`computeOrderCurrentPrice`) rồi mở slot `renewal`.
+- **Chưa TT**: lấy giá gốc từ `order_list.price` (tách suffix 1..100 nếu có) → slot `new`.
+- Cập nhật `order_list.price = expected_amount` (QR/Telegram hiển thị số có suffix).
+
+Code: `backend/src/domains/payment-slots/use-cases/backfillPendingPaymentSlots.js`.

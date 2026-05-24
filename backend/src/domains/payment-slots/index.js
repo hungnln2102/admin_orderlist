@@ -28,12 +28,16 @@ const {
   findLatestMatchedSlotByOrder,
   findActiveSlotByOrder,
 } = require("./repositories/paymentSlotRepository");
+const {
+  backfillPendingPaymentSlots,
+} = require("./use-cases/backfillPendingPaymentSlots");
 
 module.exports = {
   openPaymentSlot,
   resolveOrderByExpectedAmount,
   markPaymentSlotMatched,
   expirePaymentSlots,
+  backfillPendingPaymentSlots,
   findLatestPendingSlotByOrder,
   findLatestMatchedSlotByOrder,
   findActiveSlotByOrder,
