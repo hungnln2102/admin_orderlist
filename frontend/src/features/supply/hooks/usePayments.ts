@@ -2,7 +2,6 @@ import { useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { buildSepayQrUrl } from "../utils/supplies";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
-import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
 export interface QrPayment {
   id: number;
@@ -103,22 +102,15 @@ export const usePayments = ({
     const diff = (payment.totalImport || 0) - (payment.paid || 0);
     const amount = Math.abs(diff);
     const isPositive = diff > 0;
-    const supplierName = String(supply?.sourceName || "").trim() || "NCC";
 
     const accountNumber = isPositive ? supply?.numberBank || "" : shopBank.accountNumber;
     const bankCode = isPositive ? supply?.binBank || "" : shopBank.bankCode;
     const accountName = isPositive ? supply?.nameBank || "" : shopBank.accountHolder;
 
-    const description = buildNccTransferContentByBalance({
-      balanceSigned: diff,
-      supplierName,
-    });
-
     const url = buildSepayQrUrl({
       accountNumber,
       bankCode,
       amount,
-      description,
       accountName,
     });
 

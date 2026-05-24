@@ -133,9 +133,12 @@ export function SupplierSettlementPanel({
                   )}
                 </select>
               </div>
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-1.5">
                 {qrImageUrl ? (
-                  <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
+                  <>
+                    <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
+                    <p className="text-[11px] text-white/45">Không cần ghi nội dung CK</p>
+                  </>
                 ) : (
                   <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">
                     {Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0) < 0

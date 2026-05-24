@@ -5,7 +5,6 @@ const logger = require("../../../../utils/logger");
 const {
   TABLES,
   PS,
-  PAYMENT_RECEIPT_DEF,
   SCHEMA_PARTNER,
 } = require("../shared/constants");
 const { createHttpError, toMonthKey } = require("../shared/helpers");
@@ -18,6 +17,10 @@ const {
   debitShopBankSupplierPayment,
   SOURCE_KINDS,
 } = require("../../../shop-bank-accounts/services/shopBankLedgerService");
+const {
+  findSupplierRefundReceipt,
+  SUPPLIER_REFUND_MATCH_TOLERANCE,
+} = require("../helpers/matchSupplierRefundReceipt");
 
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;
@@ -134,34 +137,15 @@ const confirmPaymentSupply = async (req, res) => {
       let matchedReceipt = null;
 
       if (isSupplierRefundToShop) {
-        if (!paymentContent) {
-          throw createHttpError(
-            400,
-            "Thiếu nội dung thanh toán để đối soát log Sepay (NCC nợ Shop)."
-          );
-        }
-        const receiptCols = PAYMENT_RECEIPT_DEF.columns;
-        const receiptLookup = await trx.raw(
-          `
-          SELECT
-            pr.${receiptCols.id} AS id,
-            pr.${receiptCols.amount} AS amount,
-            pr.${receiptCols.paidDate} AS paid_date,
-            pr.${receiptCols.receiver} AS receiver,
-            pr.${receiptCols.note} AS note
-          FROM ${TABLES.paymentReceipt} pr
-          WHERE COALESCE(pr.${receiptCols.note}::text, '') ILIKE ?
-            AND COALESCE(pr.${receiptCols.amount}::numeric, 0) >= ?
-          ORDER BY pr.${receiptCols.paidDate} DESC, pr.${receiptCols.id} DESC
-          LIMIT 1;
-        `,
-          [`%${paymentContent}%`, expectedPaidAmount]
-        );
-        matchedReceipt = receiptLookup.rows?.[0] || null;
+        matchedReceipt = await findSupplierRefundReceipt(trx, {
+          expectedPaidAmount,
+          shopBankAccountNumber: shopBankAccount?.accountNumber || "",
+          paymentContent,
+        });
         if (!matchedReceipt) {
           throw createHttpError(
             409,
-            `Chưa thấy giao dịch Sepay khớp nội dung "${paymentContent}" với số tiền >= ${expectedPaidAmount}.`
+            `Chưa thấy giao dịch Sepay khớp số tiền ${expectedPaidAmount} (sai lệch tối đa ${SUPPLIER_REFUND_MATCH_TOLERANCE} đ).`
           );
         }
       }

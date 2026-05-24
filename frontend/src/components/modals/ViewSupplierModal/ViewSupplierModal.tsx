@@ -14,7 +14,6 @@ import { ViewSupplierModalProps } from "./types";
 import { showAppNotification } from "@/lib/notifications";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { buildNccTransferContentByBalance } from "@/features/supply/utils/supplierPaymentContent";
 
 type PaymentItem = {
   id: number;
@@ -51,11 +50,6 @@ export default function ViewSupplierModal({
       const raw = Number(payment?.totalImport ?? payment?.import_value ?? 0);
       const paid = Number(payment?.paid ?? 0);
       const amountDue = raw < 0 ? Math.abs(raw) : Math.max(0, raw - paid);
-      const supplierName = String(supply?.sourceName || "").trim() || "NCC";
-      const paymentContent = buildNccTransferContentByBalance({
-        balanceSigned: raw,
-        supplierName,
-      });
       const res = await apiFetch(`/api/payment-supply/${selectedPaymentId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -64,7 +58,6 @@ export default function ViewSupplierModal({
             ? {
               supplyId: supply?.id,
               paidAmount: Math.round(amountDue),
-              paymentContent,
             }
             : { supplyId: supply?.id }
         ),
@@ -94,12 +87,7 @@ export default function ViewSupplierModal({
     if (!supply || !selectedPayment) return null;
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
-    const supplierName = String(supply.sourceName || "").trim() || "NCC";
     const isNegative = raw < 0;
-    const desc = buildNccTransferContentByBalance({
-      balanceSigned: raw,
-      supplierName,
-    });
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
     if (isNegative) {
@@ -107,7 +95,6 @@ export default function ViewSupplierModal({
         accountNumber: shopBank.accountNumber,
         bankCode: shopBank.bankCode,
         amount,
-        description: desc,
         accountName: shopBank.accountHolder,
       });
     }
@@ -116,7 +103,6 @@ export default function ViewSupplierModal({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
       amount,
-      description: desc,
       accountName: supply.nameBank || "",
     });
   }, [supply, selectedPayment, shopBank]);

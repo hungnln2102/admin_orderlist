@@ -39,8 +39,7 @@ export type NccTransferContentParams = {
 };
 
 /**
- * Hai luồng nội dung chuyển khoản (VietQR / Sepay đối soái).
- * Chưa thanh toán dương → `<NCC> KY ...`; âm → RF MAVRYK.
+ * Legacy helpers — QR NCC không còn gắn nội dung CK; webhook vẫn có thể đọc mẫu cũ nếu có.
  */
 export function buildNccTransferContentByBalance({
   balanceSigned,

@@ -8,7 +8,6 @@ import { usePayments } from "../hooks/usePayments";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
-import { buildNccTransferContentByBalance } from "../utils/supplierPaymentContent";
 import { SupplierSettlementPanel } from "./SupplierSettlementPanel";
 
 interface Props {
@@ -88,12 +87,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     if (!supply || !selectedPayment) return null;
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
-    const supplierName = String(supply.sourceName || "").trim() || "NCC";
     const isNegative = raw < 0;
-    const desc = buildNccTransferContentByBalance({
-      balanceSigned: raw,
-      supplierName,
-    });
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
     if (isNegative) {
@@ -104,7 +98,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
           selectedShopBankAccount?.bankBin ||
           shopBank.bankCode,
         amount,
-        description: desc,
         accountName: selectedShopBankAccount?.accountHolder || shopBank.accountHolder,
       });
     }
@@ -113,7 +106,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
       amount,
-      description: desc,
       accountName: supply.nameBank || supply.sourceName || "",
     });
   }, [supply, selectedPayment, shopBank, selectedShopBankAccount]);
@@ -123,18 +115,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     const paid = Number(p.paid ?? 0);
     if (raw < 0) return Math.max(0, Math.abs(raw) - paid);
     return Math.max(0, raw - paid);
-  };
-
-  const paymentContentForConfirm = (p: {
-    totalImport?: number;
-    import_value?: number;
-  }) => {
-    const raw = Number(p.totalImport ?? p.import_value ?? 0);
-    const supplierName = String(supply?.sourceName || "").trim() || "NCC";
-    return buildNccTransferContentByBalance({
-      balanceSigned: raw,
-      supplierName,
-    });
   };
 
   const handleConfirmPayment = async (p: {
@@ -150,7 +130,6 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     }
     const result = await confirmPayment(p.id, {
       paidAmount: amountDueForPayment(p),
-      paymentContent: paymentContentForConfirm(p),
       supplyId: supply?.id,
       shopBankAccountId: selectedShopBankAccount.id,
     });
