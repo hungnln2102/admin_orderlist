@@ -5,9 +5,22 @@ const toFiniteNumber = (value: number | string): number => {
 
 export const roundGiaBanValue = (value: number | string): number => {
   const numeric = toFiniteNumber(value);
-  const divisor = 1000;
   if (!Number.isFinite(numeric)) return 0;
-  return Math.round(numeric / divisor) * divisor;
+  if (numeric >= 0) {
+    return Math.floor(numeric + 0.5);
+  }
+  return -Math.floor(Math.abs(numeric) + 0.5);
+};
+
+/** Số tiền CK chính xác từng đồng — giữ payment slot suffix, không làm tròn nghìn. */
+export const normalizeExactVnd = (value: number | string): number => {
+  const numeric = toFiniteNumber(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.round(numeric));
+};
+
+export const formatExactVnd = (value: number | string): string => {
+  return `${normalizeExactVnd(value).toLocaleString("vi-VN")} ₫`;
 };
 
 export const formatCurrency = (value: number | string): string => {

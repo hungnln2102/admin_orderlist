@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback } from "react";
+import { formatExactVnd } from "@/shared/utils/money";
 
 type OrderPaymentQrSectionProps = {
   orderId: string;
@@ -9,7 +10,6 @@ type OrderPaymentQrSectionProps = {
   keepOrderPrice: boolean;
   priceLoading: boolean;
   priceError: string | null;
-  formatCurrency: (value: number | string) => string;
   bankDisplay: string;
   accountNoDisplay: string;
   holderDisplay: string;
@@ -28,7 +28,6 @@ export const OrderPaymentQrSection = ({
   keepOrderPrice,
   priceLoading,
   priceError,
-  formatCurrency,
   bankDisplay,
   accountNoDisplay,
   holderDisplay,
@@ -106,7 +105,7 @@ export const OrderPaymentQrSection = ({
         <p>
           Số tiền:{" "}
           <strong className="text-xl text-red-600">
-            {formatCurrency(effectiveQrAmount)}
+            {formatExactVnd(effectiveQrAmount)}
           </strong>
         </p>
         {!isSupplierPayout && !keepOrderPrice && priceLoading && (

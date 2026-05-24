@@ -14,7 +14,7 @@ const {
   SEND_ORDER_TO_TOPIC,
   SEND_ORDER_COPY_BUTTONS,
 } = require("./constants");
-const { toSafeString, roundGiaBanValue } = require("./formatters");
+const { toSafeString, normalizeExactVnd } = require("./formatters");
 const {
   buildOrderCreatedMessage,
   buildImportOrderCreatedMessage,
@@ -71,7 +71,7 @@ async function sendOrderCreatedNotification(order) {
   const qrAccountNumber = bank.accountNumber;
   const qrBankCode = bank.bankShortCode;
   const qrAccountName = bank.accountHolder;
-  const amount = roundGiaBanValue(order.price || 0);
+  const amount = normalizeExactVnd(order.price || 0);
   const qrUrl = isImport
     ? null
     : buildSepayQrUrl({

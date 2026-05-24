@@ -48,8 +48,8 @@ export const isImportOrderId = (orderId: unknown): boolean => {
 
 export const buildViewOrderPaymentQrPayload = ({
   order,
-  keepOrderPrice,
-  calculatedPrice,
+  keepOrderPrice: _keepOrderPrice,
+  calculatedPrice: _calculatedPrice,
   isGift,
   overrideCustomerQrAmount = null,
   shopBank = null,
@@ -69,12 +69,11 @@ export const buildViewOrderPaymentQrPayload = ({
   const orderAmountPrice = isGift ? 0 : Math.max(0, Number(order[ORDER_FIELDS.PRICE]) || 0);
   const orderAmountCost = isGift ? 0 : Math.max(0, Number(order[ORDER_FIELDS.COST]) || 0);
 
+  /** Shop QR: luôn dùng giá đã lưu trên đơn (đã gồm payment suffix). Không dùng giá tính lại. */
   const displayPriceAmount =
     overrideCustomerQrAmount !== null && Number.isFinite(Number(overrideCustomerQrAmount))
       ? Math.max(0, Number(overrideCustomerQrAmount) || 0)
-      : keepOrderPrice
-        ? orderAmountPrice
-        : (calculatedPrice ?? orderAmountPrice);
+      : orderAmountPrice;
 
   const importOrder = isImportOrderId(idOrder);
   const { num: supplierAccount, bin: supplierBin } = readSupplierBank(order);
@@ -83,7 +82,7 @@ export const buildViewOrderPaymentQrPayload = ({
     if (!supplierAccount || !supplierBin) {
       return {
         qrCodeImageUrl: "",
-        effectiveQrAmount: Helpers.roundGiaBanValue(orderAmountCost),
+        effectiveQrAmount: Helpers.normalizeExactVnd(orderAmountCost),
         qrMessage: idOrder,
         bankDisplay: "—",
         accountNoDisplay: "—",
@@ -92,7 +91,7 @@ export const buildViewOrderPaymentQrPayload = ({
         missingSupplierBank: true,
       };
     }
-    const effectiveQrAmount = Helpers.roundGiaBanValue(orderAmountCost);
+    const effectiveQrAmount = Helpers.normalizeExactVnd(orderAmountCost);
     return {
       qrCodeImageUrl: buildSepayQrUrl({
         accountNumber: supplierAccount,
@@ -111,7 +110,7 @@ export const buildViewOrderPaymentQrPayload = ({
     };
   }
 
-  const effectiveQrAmount = Helpers.roundGiaBanValue(displayPriceAmount);
+  const effectiveQrAmount = Helpers.normalizeExactVnd(displayPriceAmount);
   const canBuildShopQr = Boolean(accountNo && bankCode && effectiveQrAmount > 0);
   return {
     qrCodeImageUrl: canBuildShopQr

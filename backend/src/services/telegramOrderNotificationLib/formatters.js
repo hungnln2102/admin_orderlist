@@ -33,7 +33,17 @@ const toPlainText = (value) =>
 const roundGiaBanValue = (value) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return 0;
-  return Math.round(num / 1000) * 1000;
+  if (num >= 0) {
+    return Math.floor(num + 0.5);
+  }
+  return -Math.floor(Math.abs(num) + 0.5);
+};
+
+/** Số tiền CK chính xác từng đồng — giữ payment slot suffix, không làm tròn nghìn. */
+const normalizeExactVnd = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.max(0, Math.round(num));
 };
 
 const formatCurrency = (value) => {
@@ -78,6 +88,7 @@ module.exports = {
   toInlineCode,
   toPlainText,
   roundGiaBanValue,
+  normalizeExactVnd,
   formatCurrency,
   formatDateDMY,
 };

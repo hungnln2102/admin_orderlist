@@ -17,7 +17,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   isOpen,
   onClose,
   order,
-  formatCurrency,
   keepOrderPrice = false,
 }) => {
   const orderId = order?.[ORDER_FIELDS.ID_ORDER] as string | undefined;
@@ -63,6 +62,11 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     ).trim() || "Chưa Thanh Toán";
   const shouldForceTargetedCreditQr =
     hasCreditApplication && targetedStatusForceQrPriceSet.has(displayStatus);
+  const payableQrStatuses = new Set([
+    ORDER_STATUSES.CHUA_THANH_TOAN,
+    ORDER_STATUSES.CAN_GIA_HAN,
+  ]);
+  const shouldUseStoredPaymentAmount = payableQrStatuses.has(displayStatus);
 
   const { config: shopBankConfig } = useDefaultShopBankAccount();
 
@@ -74,7 +78,12 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     customerType,
     basePrice,
     normalizedOrderDate,
-    skipRecalc: keepOrderPrice || isGift || importOrder || shouldForceTargetedCreditQr,
+    skipRecalc:
+      keepOrderPrice ||
+      isGift ||
+      importOrder ||
+      shouldForceTargetedCreditQr ||
+      shouldUseStoredPaymentAmount,
   });
 
   if (!isOpen || !order) return null;
@@ -97,7 +106,8 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       ? unpaidCreditQrAmount
       : currentPrice
     : null;
-  const effectiveKeepOrderPrice = keepOrderPrice || shouldForceTargetedCreditQr;
+  const effectiveKeepOrderPrice =
+    keepOrderPrice || shouldForceTargetedCreditQr || shouldUseStoredPaymentAmount;
 
   const remainingFromBackend =
     order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] !== undefined &&
@@ -210,7 +220,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
             keepOrderPrice={effectiveKeepOrderPrice}
             priceLoading={priceLoading}
             priceError={priceError}
-            formatCurrency={formatCurrency}
             bankDisplay={bankDisplay}
             accountNoDisplay={accountNoDisplay}
             holderDisplay={holderDisplay}
