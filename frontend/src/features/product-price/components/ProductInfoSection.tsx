@@ -47,9 +47,6 @@ export const ProductInfoSection: React.FC<ProductInfoSectionProps> = ({
       <div className={`${block} !border-t !pt-4`}>
         <p className="quote-ink font-semibold">Liên hệ</p>
         <ul className="quote-muted mt-2 list-none space-y-1 pl-0">
-          <li>Fanpage: Mavryk - Tài Khoản Premium</li>
-          <li>Zalo: 0378.304.963</li>
-          <li>Telegram: @hung_culi</li>
         </ul>
       </div>
     </div>
