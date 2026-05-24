@@ -348,6 +348,8 @@ async function handleWebhookPost(req, res) {
     const stateByOrderCode = new Map();
     const amountDecisionByOrderCode = new Map();
     let loopOrderCodes = [];
+    /** Legacy: resolve qua cột transaction — luồng suffix/batch không dùng. */
+    const orderCodesFromTransaction = [];
 
     const client = await pool.connect();
     try {
@@ -424,7 +426,7 @@ async function handleWebhookPost(req, res) {
         normalizeMoney
       );
       loopOrderCodes = buildWebhookLoopOrderCodes({
-        orderCodesFromTransaction: [],
+        orderCodesFromTransaction,
         orderCodes,
         batchOrderMap,
         orderCode,
