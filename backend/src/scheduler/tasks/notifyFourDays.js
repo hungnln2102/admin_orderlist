@@ -5,6 +5,7 @@ const { computeOrderCurrentPrice } = require("../../../webhook/sepay/renewal");
 const { fetchVariantDisplayNames } = require("../variantDisplayNames");
 const { ORDER_PREFIXES } = require("../../utils/orderHelpers");
 const { buildRenewalQuery, normalizeNotifyRow } = require("./shared");
+const { resolveRenewalNotifyPrice } = require("./shared/resolveRenewalNotifyPrice");
 const {
   claimDailyNotificationRun,
   releaseDailyNotificationRun,
@@ -99,7 +100,13 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         const candidates = [];
         for (const row of uniqueRows) {
           const computed = await computeOrderCurrentPrice(client, row);
-          candidates.push(normalizeNotifyRow(row, today, nameMap, computed));
+          const notifyPrice = await resolveRenewalNotifyPrice(client, row, computed);
+          candidates.push(
+            normalizeNotifyRow(row, today, nameMap, {
+              ...computed,
+              price: notifyPrice,
+            })
+          );
         }
 
         if (candidates.length === 0) {
