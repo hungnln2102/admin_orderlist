@@ -36,6 +36,7 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
     const client = await pool.connect();
     let hasLock = false;
     let dailyGuardKey = null;
+    const isManual = trigger === "manual";
     try {
       const lockResult = await client.query(
         "SELECT pg_try_advisory_lock($1, $2) AS locked",
@@ -56,12 +57,19 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
         trigger,
       });
       dailyGuardKey = dailyGuard.key;
-      if (!dailyGuard.claimed) {
+      if (!isManual && !dailyGuard.claimed) {
         logger.warn(
           "[CRON] notifyFourDays đã gửi trong ngày — bỏ qua lần gọi trùng",
           { trigger, pid: process.pid, dateYmd, dailyGuardKey }
         );
         return;
+      }
+      if (isManual && !dailyGuard.claimed) {
+        logger.info(
+          "[CRON] notifyFourDays manual — bỏ qua chốt ngày, gửi lại thông báo 4 ngày",
+          { dateYmd, dailyGuardKey, trigger }
+        );
+        dailyGuardKey = null;
       }
 
       // Chỉ check đúng điều kiện: số ngày còn lại = 4 VÀ status = Cần Gia Hạn.
@@ -116,6 +124,10 @@ function createNotifyFourDaysTask(pool, getSqlCurrentDate) {
           for (const o of candidates) {
             const code = String(o.id_order || o.idOrder || "").trim();
             if (!code) {
+              pending.push({ order: o, perOrderKey: null });
+              continue;
+            }
+            if (isManual) {
               pending.push({ order: o, perOrderKey: null });
               continue;
             }

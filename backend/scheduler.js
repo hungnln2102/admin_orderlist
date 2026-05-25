@@ -13,6 +13,8 @@
  *   npm run start:scheduler:cron-once
  *   node scheduler.js --run-daily-revenue-once   # một lần: UPSERT dashboard.daily_revenue_summary (mốc thuế → hôm nay)
  *   npm run start:scheduler:daily-revenue-once
+ *   node scheduler.js --run-four-days-once   # một lần: Telegram đơn cần gia hạn (còn 4 ngày), bỏ qua chốt ngày
+ *   npm run start:scheduler:four-days-once
  */
 // Cùng .env + .env.local với API — không phụ thuộc cwd khi systemd/docker đổi thư mục làm việc.
 const { loadBackendEnv } = require("./src/config/loadEnv");
@@ -87,6 +89,23 @@ if (process.argv.includes("--run-cron-once")) {
     })
     .catch((err) => {
       logger.error("[Scheduler] CLI --run-daily-revenue-once thất bại", {
+        error: err.message,
+        stack: err.stack,
+      });
+      process.exit(1);
+    });
+} else if (process.argv.includes("--run-four-days-once")) {
+  const { notifyFourDaysRemainingTask } = require("./src/scheduler/taskInstances");
+  logger.info(
+    "[Scheduler] CLI --run-four-days-once: gửi Telegram đơn cần gia hạn (còn 4 ngày), trigger=manual"
+  );
+  notifyFourDaysRemainingTask("manual")
+    .then(() => {
+      logger.info("[Scheduler] CLI --run-four-days-once hoàn thành.");
+      process.exit(0);
+    })
+    .catch((err) => {
+      logger.error("[Scheduler] CLI --run-four-days-once thất bại", {
         error: err.message,
         stack: err.stack,
       });

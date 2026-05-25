@@ -31,6 +31,7 @@
         "start:scheduler": "node scheduler.js",
         "start:scheduler:cron-once": "node scheduler.js --run-cron-once",
         "start:scheduler:daily-revenue-once": "node scheduler.js --run-daily-revenue-once",
+        "start:scheduler:four-days-once": "node scheduler.js --run-four-days-once",
         "dev": "nodemon src/server.js",
         "dev:api": "nodemon src/server.js",
         "start:new": "node src/server.js",
