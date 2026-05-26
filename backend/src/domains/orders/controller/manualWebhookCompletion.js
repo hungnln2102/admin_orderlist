@@ -54,15 +54,23 @@ const toMonthKey = (value) => {
 const incrementDashboardSummaryByDelta = async (
   client,
   monthKey,
-  { revenueDelta = 0, profitDelta = 0, ordersDelta = 0, importDelta = 0, offFlowDelta = 0 } = {}
+  {
+    revenueDelta = 0,
+    profitDelta = 0,
+    ordersDelta = 0,
+    importDelta = 0,
+    offFlowDelta = 0,
+    bankBalanceDelta = 0,
+  } = {}
 ) => {
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
   const imp = normalizeMoney(importDelta);
   const offFlow = normalizeMoney(offFlowDelta);
+  const bankBalance = normalizeMoney(bankBalanceDelta);
   if (!monthKey) return;
-  if (!revenue && !profit && !orders && !imp && !offFlow) return;
+  if (!revenue && !profit && !orders && !imp && !offFlow && !bankBalance) return;
 
   await client.query(
     `
@@ -73,9 +81,10 @@ const incrementDashboardSummaryByDelta = async (
         ${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT},
         ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
+        ${summaryCols.ESTIMATED_BANK_BALANCE},
         ${summaryCols.UPDATED_AT}
       )
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       ON CONFLICT (${summaryCols.MONTH_KEY})
       DO UPDATE SET
         ${summaryCols.TOTAL_ORDERS} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_ORDERS)} + EXCLUDED.${summaryCols.TOTAL_ORDERS}),
@@ -83,9 +92,10 @@ const incrementDashboardSummaryByDelta = async (
         ${summaryCols.TOTAL_PROFIT} = ${qualifiedSummaryCol(summaryCols.TOTAL_PROFIT)} + EXCLUDED.${summaryCols.TOTAL_PROFIT},
         ${summaryCols.TOTAL_IMPORT} = GREATEST(0, ${qualifiedSummaryCol(summaryCols.TOTAL_IMPORT)} + EXCLUDED.${summaryCols.TOTAL_IMPORT}),
         ${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT} = ${qualifiedSummaryCol(summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT)} + EXCLUDED.${summaryCols.TOTAL_OFF_FLOW_BANK_RECEIPT},
+        ${summaryCols.ESTIMATED_BANK_BALANCE} = ${qualifiedSummaryCol(summaryCols.ESTIMATED_BANK_BALANCE)} + EXCLUDED.${summaryCols.ESTIMATED_BANK_BALANCE},
         ${summaryCols.UPDATED_AT} = NOW()
     `,
-    [monthKey, orders, revenue, profit, imp, offFlow]
+    [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
   );
   await recomputeSummaryMonthTotalTax(client, monthKey);
   await notifyFinanceMonthlyDelta({
@@ -95,6 +105,7 @@ const incrementDashboardSummaryByDelta = async (
     importDelta: imp,
     refundDelta: 0,
     offFlowDelta: offFlow,
+    bankBalanceDelta: bankBalance,
     context: "manualWebhook.incrementDashboardSummaryByDelta",
     executor: client,
   });
@@ -262,11 +273,6 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
       const cost = normalizeMoney(state[ORDER_COLS.cost]);
       postedRevenueDelta = saleAmount;
       postedProfitDelta = normalizeMoney(saleAmount - cost);
-      await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-        revenueDelta: postedRevenueDelta,
-        profitDelta: postedRevenueDelta,
-        ordersDelta: 1,
-      });
       let manualImportDelta = 0;
       if (cost > 0) {
         manualImportDelta = await resolveDashboardImportDeltaOnPaid(
@@ -276,11 +282,14 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
           fetchSupplierNameBySupplyId,
           paidMonthKey
         );
-        await incrementDashboardSummaryByDelta(client, paidMonthKey, {
-          profitDelta: -cost,
-          importDelta: manualImportDelta,
-        });
       }
+      await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+        revenueDelta: postedRevenueDelta,
+        profitDelta: postedProfitDelta,
+        ordersDelta: 1,
+        importDelta: manualImportDelta,
+        bankBalanceDelta: saleAmount,
+      });
 
       if (receiptId) {
         await insertFinancialAuditLog(client, {

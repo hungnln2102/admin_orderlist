@@ -8,8 +8,9 @@ const {
 const ACCOUNT_TABLE = tableName(ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.TABLE, SCHEMA_ADMIN);
 const ACCOUNT_COLS = ADMIN_SCHEMA.SHOP_BANK_ACCOUNTS.COLS;
 
-const sumActiveShopBankBalances = async () => {
-  const row = await db(ACCOUNT_TABLE)
+const sumActiveShopBankBalances = async (executor = null) => {
+  const queryBuilder = executor && typeof executor === "function" ? executor : db;
+  const row = await queryBuilder(ACCOUNT_TABLE)
     .sum({ total: ACCOUNT_COLS.BALANCE })
     .where(ACCOUNT_COLS.IS_ACTIVE, true)
     .first();

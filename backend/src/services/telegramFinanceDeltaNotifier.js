@@ -216,7 +216,7 @@ const notifyFinanceMonthlyDelta = async ({
     const [monthlySnapshot, previousLogSnapshot, shopBankTotal] = await Promise.all([
       fetchMonthlySnapshot(executor, monthKey).catch(() => null),
       fetchPreviousFinanceLogSnapshot(executor, monthKey).catch(() => null),
-      sumActiveShopBankBalances().catch(() => 0),
+      sumActiveShopBankBalances(executor).catch(() => 0),
     ]);
     const bankBalanceAfter = toNumber(shopBankTotal);
     const snapshotAfter = {
@@ -246,6 +246,14 @@ const notifyFinanceMonthlyDelta = async ({
     const taxDelta = snapshotAfter.tax - snapshotBefore.tax;
     const bankBalanceDeltaEffective =
       snapshotAfter.bankBalance - snapshotBefore.bankBalance;
+    const bankDeltaForDisplay =
+      bankBalance !== 0 ? bankBalance : bankBalanceDeltaEffective;
+    const bankBeforeForDisplay =
+      bankBalance !== 0
+        ? bankBalanceAfter - bankBalance
+        : snapshotBefore.bankBalance;
+    const bankAfterForDisplay =
+      bankBalance !== 0 ? bankBalanceAfter : snapshotAfter.bankBalance;
     await appendFinanceChangeLog(executor, {
       monthKey,
       revenueDelta: revenue,
@@ -256,7 +264,7 @@ const notifyFinanceMonthlyDelta = async ({
       bankBalanceDelta: bankBalance,
       taxSnapshot: toNumber(monthlySnapshot?.total_tax),
       offFlowSnapshot: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
-      bankBalanceSnapshot: bankBalanceAfter,
+      bankBalanceSnapshot: bankAfterForDisplay,
       context,
     });
     if (!SEND_FINANCE_DELTA_NOTIFICATION) return;
@@ -275,9 +283,9 @@ const notifyFinanceMonthlyDelta = async ({
       ),
       buildFlowLine(
         "🏦 Số dư bank shop",
-        snapshotBefore.bankBalance,
-        snapshotAfter.bankBalance,
-        bankBalanceDeltaEffective
+        bankBeforeForDisplay,
+        bankAfterForDisplay,
+        bankDeltaForDisplay
       ),
     ];
     const payload = {

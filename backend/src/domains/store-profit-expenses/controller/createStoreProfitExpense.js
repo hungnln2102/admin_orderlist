@@ -125,7 +125,10 @@ const createStoreProfitExpense = async (req, res) => {
       if (expenseType === "external_import" && amount > 0 && inserted?.[COLS.CREATED_AT]) {
         const mk = await monthKeyVietnamFromDbTimestamp(trx, inserted[COLS.CREATED_AT]);
         if (mk) {
-          const updates = { total_profit: -amount };
+          const updates = {
+            total_profit: -amount,
+            estimated_bank_balance: -amount,
+          };
           await mergeSummaryUpdates(trx, mk, updates, {
             context: `createStoreProfitExpense.${expenseType}`,
           });
