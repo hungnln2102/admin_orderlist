@@ -204,9 +204,14 @@ const addOrdersToTracking = async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    return res
-      .status(500)
-      .json({ error: "Không thể thêm đơn vào tracking." });
+    const msg = String(error?.message || "");
+    const hint =
+      /otp_source/i.test(msg) && /(does not exist|column)/i.test(msg)
+        ? "Database thiếu cột otp_source trên order_user_tracking — chạy migration backend mới nhất (npm run migrate)."
+        : null;
+    return res.status(500).json({
+      error: hint || "Không thể thêm đơn vào tracking.",
+    });
   }
 };
 
