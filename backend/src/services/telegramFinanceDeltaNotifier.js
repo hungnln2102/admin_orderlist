@@ -192,6 +192,24 @@ const appendFinanceChangeLog = async (
   }
 };
 
+const resolveBankBeforeBalance = ({
+  previousLogSnapshot,
+  bankBalanceAfter,
+  bankBalanceDelta = 0,
+  revenueDelta = 0,
+}) => {
+  if (previousLogSnapshot != null) {
+    return toNumber(previousLogSnapshot.bank_balance_snapshot);
+  }
+  if (bankBalanceDelta !== 0) {
+    return bankBalanceAfter - bankBalanceDelta;
+  }
+  if (revenueDelta !== 0) {
+    return bankBalanceAfter - revenueDelta;
+  }
+  return bankBalanceAfter;
+};
+
 const notifyFinanceMonthlyDelta = async ({
   monthKey,
   revenueDelta = 0,
@@ -219,6 +237,12 @@ const notifyFinanceMonthlyDelta = async ({
       sumActiveShopBankBalances(executor).catch(() => 0),
     ]);
     const bankBalanceAfter = toNumber(shopBankTotal);
+    const bankBeforeSnapshot = resolveBankBeforeBalance({
+      previousLogSnapshot,
+      bankBalanceAfter,
+      bankBalanceDelta: bankBalance,
+      revenueDelta: revenue,
+    });
     const snapshotAfter = {
       revenue: toNumber(monthlySnapshot?.total_revenue),
       profit: toNumber(monthlySnapshot?.total_profit),
@@ -238,22 +262,21 @@ const notifyFinanceMonthlyDelta = async ({
         previousLogSnapshot == null
           ? snapshotAfter.tax
           : toNumber(previousLogSnapshot.tax_snapshot),
-      bankBalance:
-        previousLogSnapshot == null
-          ? snapshotAfter.bankBalance - bankBalance
-          : toNumber(previousLogSnapshot.bank_balance_snapshot),
+      bankBalance: bankBeforeSnapshot,
     };
     const taxDelta = snapshotAfter.tax - snapshotBefore.tax;
     const bankBalanceDeltaEffective =
       snapshotAfter.bankBalance - snapshotBefore.bankBalance;
-    const bankDeltaForDisplay =
-      bankBalance !== 0 ? bankBalance : bankBalanceDeltaEffective;
-    const bankBeforeForDisplay =
-      bankBalance !== 0
-        ? bankBalanceAfter - bankBalance
-        : snapshotBefore.bankBalance;
-    const bankAfterForDisplay =
-      bankBalance !== 0 ? bankBalanceAfter : snapshotAfter.bankBalance;
+    const useLedgerBankDelta = bankBalanceDeltaEffective !== 0 || bankBalance === 0;
+    const bankDeltaForDisplay = useLedgerBankDelta
+      ? bankBalanceDeltaEffective
+      : bankBalance;
+    const bankBeforeForDisplay = useLedgerBankDelta
+      ? snapshotBefore.bankBalance
+      : bankBalanceAfter - bankBalance;
+    const bankAfterForDisplay = useLedgerBankDelta
+      ? snapshotAfter.bankBalance
+      : bankBalanceAfter;
     await appendFinanceChangeLog(executor, {
       monthKey,
       revenueDelta: revenue,
@@ -261,7 +284,7 @@ const notifyFinanceMonthlyDelta = async ({
       importDelta: imp,
       refundDelta: refund,
       offFlowDelta: offFlow,
-      bankBalanceDelta: bankBalance,
+      bankBalanceDelta: bankDeltaForDisplay,
       taxSnapshot: toNumber(monthlySnapshot?.total_tax),
       offFlowSnapshot: toNumber(monthlySnapshot?.total_off_flow_bank_receipt),
       bankBalanceSnapshot: bankAfterForDisplay,

@@ -288,7 +288,6 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
         profitDelta: postedProfitDelta,
         ordersDelta: 1,
         importDelta: manualImportDelta,
-        bankBalanceDelta: saleAmount,
       });
 
       if (receiptId) {
