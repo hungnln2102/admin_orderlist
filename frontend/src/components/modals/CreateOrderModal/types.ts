@@ -106,6 +106,8 @@ export interface UseCreateOrderLogicResult {
   selectedCreditNote: AvailableRefundCredit | null;
   selectCreditNoteRow: (row: AvailableRefundCredit) => void;
   clearSelectedCreditNote: () => void;
+  paymentMethod: import("@/features/usdt-wallets/types").PaymentMethod;
+  setPaymentMethod: (method: import("@/features/usdt-wallets/types").PaymentMethod) => void;
 }
 
 export type SSOption = { value: string | number; label: string };

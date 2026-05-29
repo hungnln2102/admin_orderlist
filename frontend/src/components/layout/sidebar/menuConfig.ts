@@ -164,6 +164,11 @@ export const menuSections: MenuSection[] = [
         href: "/shop-bank-accounts",
         icon: BanknotesIcon,
       },
+      {
+        name: "Quản lý ví USDT",
+        href: "/usdt-wallets",
+        icon: CurrencyDollarIcon,
+      },
     ],
   },
 ];

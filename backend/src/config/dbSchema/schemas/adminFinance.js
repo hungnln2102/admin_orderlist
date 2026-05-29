@@ -63,6 +63,39 @@ const ADMIN_SCHEMA = {
       CREATED_AT: "created_at",
     },
   },
+  USDT_WALLETS: {
+    TABLE: "usdt_wallets",
+    COLS: {
+      ID: "id",
+      LABEL: "label",
+      WALLET_ADDRESS: "wallet_address",
+      NETWORK: "network",
+      IS_DEFAULT: "is_default",
+      IS_ACTIVE: "is_active",
+      TOTAL_RECEIVED: "total_received",
+      TOTAL_WITHDRAWN: "total_withdrawn",
+      BALANCE: "balance",
+      CREATED_AT: "created_at",
+      UPDATED_AT: "updated_at",
+    },
+  },
+  USDT_WALLET_LEDGER: {
+    TABLE: "usdt_wallet_ledger",
+    COLS: {
+      ID: "id",
+      USDT_WALLET_ID: "usdt_wallet_id",
+      ENTRY_TYPE: "entry_type",
+      AMOUNT: "amount",
+      SIGNED_AMOUNT: "signed_amount",
+      BALANCE_AFTER: "balance_after",
+      SOURCE_KIND: "source_kind",
+      SOURCE_ID: "source_id",
+      EXCHANGE_RATE: "exchange_rate",
+      VND_EQUIVALENT: "vnd_equivalent",
+      NOTE: "note",
+      CREATED_AT: "created_at",
+    },
+  },
 };
 
 const FINANCE_SCHEMA = {

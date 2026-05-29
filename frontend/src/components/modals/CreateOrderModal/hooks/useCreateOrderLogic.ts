@@ -21,7 +21,7 @@ import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 import { usePriceCalculation } from "./usePriceCalculation";
 import { useProductSelection } from "./useProductSelection";
 import { useSuppliesData } from "./useSuppliesData";
-import { useSupplySelection } from "./useSupplySelection";
+import type { PaymentMethod } from "@/features/usdt-wallets/types";
 
 export const useCreateOrderLogic = (
   isOpen: boolean,
@@ -37,6 +37,13 @@ export const useCreateOrderLogic = (
   const [creditListLoading, setCreditListLoading] = useState(false);
   const [selectedCreditNote, setSelectedCreditNote] =
     useState<AvailableRefundCredit | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank");
+
+  useEffect(() => {
+    if (isOpen) {
+      setPaymentMethod("bank");
+    }
+  }, [isOpen]);
 
   const {
     formData,
@@ -265,6 +272,7 @@ export const useCreateOrderLogic = (
     products,
     prefillContext,
     creditOrderSelection,
+    paymentMethod,
   });
 
   return {
@@ -293,6 +301,8 @@ export const useCreateOrderLogic = (
     selectedCreditNote,
     selectCreditNoteRow,
     clearSelectedCreditNote,
+    paymentMethod,
+    setPaymentMethod,
   };
 };
 

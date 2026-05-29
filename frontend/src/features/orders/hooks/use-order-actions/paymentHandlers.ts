@@ -104,24 +104,47 @@ export const buildMarkPaidHandler =
 
     const orderCode = String(order[ORDER_FIELDS.ID_ORDER] || "").trim();
     setCompletingOrderCode(orderCode || String(order.id));
+
+    const paymentMethod = String(
+      (order as Record<string, unknown>).payment_method ||
+        (order as Record<string, unknown>)[ORDER_FIELDS.PAYMENT_METHOD] ||
+        "bank"
+    )
+      .trim()
+      .toLowerCase();
+    const isUsdtOrder = paymentMethod === "usdt";
+    const completeEndpoint = isUsdtOrder
+      ? API_ENDPOINTS.ORDER_COMPLETE_MANUAL_USDT(order.id)
+      : API_ENDPOINTS.ORDER_COMPLETE_MANUAL_WEBHOOK(order.id);
+
     try {
-      const response = await apiFetch(API_ENDPOINTS.ORDER_COMPLETE_MANUAL_WEBHOOK(order.id), {
+      const response = await apiFetch(completeEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
       if (!response.ok) {
         const errorMessage = await parseErrorResponse(response);
-        throw new Error(errorMessage || "Không thể hoàn thành đơn bằng webhook thủ công.");
+        throw new Error(
+          errorMessage ||
+            (isUsdtOrder
+              ? "Không thể xác nhận thanh toán USDT."
+              : "Không thể hoàn thành đơn bằng webhook thủ công.")
+        );
       }
-      const data = (await response.json().catch(() => ({}))) as { mavn_import_only?: boolean };
+      const data = (await response.json().catch(() => ({}))) as {
+        mavn_import_only?: boolean;
+        usdt_credited_usd?: number;
+      };
       await fetchOrders();
       emitRefresh(["orders", "dashboard", "payments", "supplies"]);
       showAppNotification({
         type: "success",
         title: "Hoàn thành đơn",
-        message: data?.mavn_import_only
-          ? "Đơn MAVN nhập hàng đã chuyển Đã thanh toán (không tạo receipt / không qua webhook)."
-          : "Đã tạo receipt và hoàn thành đơn bằng webhook thủ công.",
+        message: isUsdtOrder
+          ? `Đã xác nhận USDT và cộng ${data?.usdt_credited_usd ?? ""} USD vào ví.`
+          : data?.mavn_import_only
+            ? "Đơn MAVN nhập hàng đã chuyển Đã thanh toán (không tạo receipt / không qua webhook)."
+            : "Đã tạo receipt và hoàn thành đơn bằng webhook thủ công.",
       });
     } catch (error) {
       showAppNotification({

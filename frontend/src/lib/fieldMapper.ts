@@ -36,6 +36,10 @@ export const ORDER_FIELD_MAP = {
   NOTE: ORDER_COLS.note,
   STATUS: ORDER_COLS.status,
   REFUND: ORDER_COLS.refund,
+  PAYMENT_METHOD: ORDER_COLS.paymentMethod,
+  USDT_AMOUNT_USD: ORDER_COLS.usdtAmountUsd,
+  USDT_EXCHANGE_RATE: ORDER_COLS.usdtExchangeRate,
+  USDT_WALLET_ID: ORDER_COLS.usdtWalletId,
 } as const;
 
 // PURCHASE_ORDER_FIELDS mapping (subset of ORDER fields)

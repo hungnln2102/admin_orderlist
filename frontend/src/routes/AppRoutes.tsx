@@ -31,6 +31,11 @@ const ShopBankAccountsPage = lazy(() =>
     default: m.ShopBankAccountsPage,
   }))
 );
+const UsdtWalletsPage = lazy(() =>
+  import("@/features/usdt-wallets/pages/UsdtWalletsPage").then((m) => ({
+    default: m.UsdtWalletsPage,
+  }))
+);
 const RenewAdobeAdminPage = lazy(() => import("@/features/renew-adobe/pages/RenewAdobeAdminPage"));
 const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/RenewOrdersDeskPage"));
 const RenewProfileCheckDeskPage = lazy(
@@ -66,6 +71,7 @@ export function AppRoutes() {
         <Route path="/active-keys" element={<ActiveKeys />} />
         <Route path="/ip-whitelist" element={<IpWhitelistPage />} />
         <Route path="/shop-bank-accounts" element={<ShopBankAccountsPage />} />
+        <Route path="/usdt-wallets" element={<UsdtWalletsPage />} />
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />

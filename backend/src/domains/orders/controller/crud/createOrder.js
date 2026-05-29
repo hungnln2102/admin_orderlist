@@ -20,6 +20,13 @@ const {
 const {
     resolveDefaultShopBankAccount,
 } = require("../../../../services/shopBankAccountResolver");
+const {
+    resolveDefaultUsdtWallet,
+} = require("../../../../services/usdtWalletResolver");
+const {
+    getUsdtVndRate,
+    convertVndToUsd,
+} = require("../../../usdt-wallets/services/binanceExchangeRateService");
 const { sendOrderCreatedNotification } = require("../../../../services/telegramOrderNotification");
 const logger = require("../../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
@@ -61,6 +68,14 @@ const attachCreateOrderRoute = (router) => {
         ).trim();
         const requestedCreditCode = String(req.body?.refund_credit_code || "").trim();
         const reservedOrderCodeRaw = String(req.body?.reserved_order_code || "").trim().toUpperCase();
+        const requestedPaymentMethod = String(req.body?.payment_method || "bank")
+            .trim()
+            .toLowerCase();
+        const isUsdtPayment = requestedPaymentMethod === "usdt";
+        const paymentMethodCol = ORDERS_SCHEMA.ORDER_LIST.COLS.PAYMENT_METHOD;
+        const usdtAmountUsdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.USDT_AMOUNT_USD;
+        const usdtExchangeRateCol = ORDERS_SCHEMA.ORDER_LIST.COLS.USDT_EXCHANGE_RATE;
+        const usdtWalletIdCol = ORDERS_SCHEMA.ORDER_LIST.COLS.USDT_WALLET_ID;
         const requestedPrefixFromReserved = VALID_PREFIXES.find((prefix) =>
             reservedOrderCodeRaw.startsWith(prefix)
         ) || null;
@@ -208,12 +223,33 @@ const attachCreateOrderRoute = (router) => {
                 payload[idOrderCol] = await generateUniqueOrderCode(effectivePrefix, trx);
             }
 
-            // Mở payment slot cho đơn cần CK: thay nội dung CK bằng suffix
+            // Mở payment slot cho đơn cần CK ngân hàng: thay nội dung CK bằng suffix
             // định danh cộng vào `price`. Đơn gift / MAVN / đã PAID nhờ credit
             // bỏ qua (price = 0 hoặc không cần khách CK).
+            // Đơn USDT: không mở payment slot — admin xác nhận thủ công sau.
             const requiresPaymentSlot =
+                !isUsdtPayment &&
                 payload.status === STATUS.UNPAID &&
                 Number(payload[priceCol]) > 0;
+
+            if (isUsdtPayment && payload.status === STATUS.UNPAID && Number(payload[priceCol]) > 0) {
+                payload[paymentMethodCol] = "usdt";
+                const rateInfo = await getUsdtVndRate();
+                const vndPerUsdt = Number(rateInfo?.vndPerUsdt);
+                const usdAmount = convertVndToUsd(Number(payload[priceCol]), vndPerUsdt);
+                payload[usdtAmountUsdCol] = usdAmount;
+                payload[usdtExchangeRateCol] = vndPerUsdt;
+                const defaultUsdtWallet = await resolveDefaultUsdtWallet();
+                if (!defaultUsdtWallet?.id) {
+                    throw new Error(
+                        `Chưa cấu hình ví USDT mặc định — không thể tạo đơn ${payload[idOrderCol]} thanh toán USDT`
+                    );
+                }
+                payload[usdtWalletIdCol] = Number(defaultUsdtWallet.id);
+            } else if (!isUsdtPayment) {
+                payload[paymentMethodCol] = "bank";
+            }
+
             if (requiresPaymentSlot) {
                 const defaultBank = await resolveDefaultShopBankAccount();
                 const receiverAccount = String(defaultBank?.accountNumber || "").trim();

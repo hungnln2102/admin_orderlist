@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
     `/api/orders/${encodeURIComponent(orderCode)}/renew`,
   ORDER_COMPLETE_MANUAL_WEBHOOK: (id: number) =>
     `/api/orders/${id}/complete-manual-webhook`,
+  ORDER_COMPLETE_MANUAL_USDT: (id: number) =>
+    `/api/orders/${id}/complete-manual-usdt`,
   ORDER_EXPRIED: "/api/orders/expired",
   ORDERS_EXPIRED: "/api/orders/expired",
   ORDERS_CANCELED: "/api/orders/canceled",
@@ -102,6 +104,13 @@ export const API_ENDPOINTS = {
   SHOP_BANK_ACCOUNT_WITHDRAW: (id: number) => `/api/shop-bank-accounts/${id}/withdraw`,
   SHOP_BANK_ACCOUNT_SET_DEFAULT: (id: number) =>
     `/api/shop-bank-accounts/${id}/set-default`,
+  USDT_WALLETS: "/api/usdt-wallets",
+  USDT_WALLET_BALANCES: "/api/usdt-wallets/balances",
+  USDT_WALLET_EXCHANGE_RATE: "/api/usdt-wallets/exchange-rate",
+  USDT_WALLET_DEFAULT: "/api/usdt-wallets/default",
+  USDT_WALLET_BY_ID: (id: number) => `/api/usdt-wallets/${id}`,
+  USDT_WALLET_WITHDRAW: (id: number) => `/api/usdt-wallets/${id}/withdraw`,
+  USDT_WALLET_SET_DEFAULT: (id: number) => `/api/usdt-wallets/${id}/set-default`,
   SITE_MAINTENANCE: "/api/site-maintenance",
   PRICING_TIERS: "/api/pricing-tiers",
 };

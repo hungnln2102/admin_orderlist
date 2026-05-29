@@ -19,6 +19,10 @@ export const ORDER_COLS = {
   price: "price",
   note: "note",
   status: "status",
+  paymentMethod: "payment_method",
+  usdtAmountUsd: "usdt_amount_usd",
+  usdtExchangeRate: "usdt_exchange_rate",
+  usdtWalletId: "usdt_wallet_id",
 };
 
 // 2. REFUND (Backend: REFUND)

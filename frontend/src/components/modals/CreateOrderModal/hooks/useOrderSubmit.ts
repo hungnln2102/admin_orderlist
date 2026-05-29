@@ -25,6 +25,7 @@ type UseOrderSubmitParams = {
     sourceOrderId: number;
     creditCode: string;
   } | null;
+  paymentMethod?: import("@/features/usdt-wallets/types").PaymentMethod;
 };
 
 export const useOrderSubmit = ({
@@ -36,6 +37,7 @@ export const useOrderSubmit = ({
   products,
   prefillContext,
   creditOrderSelection,
+  paymentMethod = "bank",
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
@@ -117,6 +119,14 @@ export const useOrderSubmit = ({
           (dataToSave as Record<string, unknown>).id_product = variantId;
         }
 
+        if (
+          orderTypePrefix !== ORDER_CODE_PREFIXES.GIFT &&
+          orderTypePrefix !== ORDER_CODE_PREFIXES.IMPORT &&
+          paymentMethod === "usdt"
+        ) {
+          (dataToSave as Record<string, unknown>).payment_method = "usdt";
+        }
+
         if (prefillContext?.creditNoteId) {
           const record = dataToSave as Record<string, unknown>;
           record.refund_credit_note_id = Number(prefillContext.creditNoteId);
@@ -173,6 +183,7 @@ export const useOrderSubmit = ({
       products,
       prefillContext,
       creditOrderSelection,
+      paymentMethod,
     ]
   );
 

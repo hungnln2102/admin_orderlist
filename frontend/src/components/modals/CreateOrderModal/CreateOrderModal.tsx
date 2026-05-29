@@ -12,6 +12,7 @@ import { CreateOrderCustomerSection } from "./components/CreateOrderCustomerSect
 import { CreateOrderPricingSection } from "./components/CreateOrderPricingSection";
 import { CreateOrderProductSection } from "./components/CreateOrderProductSection";
 import { CreateOrderCreditPanels } from "./components/CreateOrderCreditPanels";
+import { CreateOrderPaymentMethodSection } from "./components/CreateOrderPaymentMethodSection";
 import { useCreateOrderModalDerived } from "./hooks/useCreateOrderModalDerived";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 
@@ -48,6 +49,8 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     selectedCreditNote,
     selectCreditNoteRow,
     clearSelectedCreditNote,
+    paymentMethod,
+    setPaymentMethod,
   } = useCreateOrderLogic(isOpen, onSave, customMode, prefillContext, orderCreationKind);
 
   const hasPrefillCredit = Boolean(
@@ -211,6 +214,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 onExpiryDateBlur={handleExpiryDateBlur}
                 onCostChange={handlePriceInput(ORDER_FIELDS.COST)}
                 onPriceChange={handlePriceInput(ORDER_FIELDS.PRICE)}
+              />
+
+              <CreateOrderPaymentMethodSection
+                customerType={customerType}
+                orderCreationKind={orderCreationKind}
+                priceValue={priceValue}
+                paymentMethod={paymentMethod}
+                onPaymentMethodChange={setPaymentMethod}
               />
             </div>
 

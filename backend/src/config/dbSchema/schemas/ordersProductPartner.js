@@ -28,6 +28,11 @@ const ORDERS_SCHEMA = {
       CANCELED_AT: "canceled_at",
       /** Mốc tạo bản ghi (dashboard theo thời điểm phát sinh). */
       CREATED_AT: "created_at",
+      /** bank = CK ngân hàng; usdt = ví USDT thủ công. */
+      PAYMENT_METHOD: "payment_method",
+      USDT_AMOUNT_USD: "usdt_amount_usd",
+      USDT_EXCHANGE_RATE: "usdt_exchange_rate",
+      USDT_WALLET_ID: "usdt_wallet_id",
     },
   },
   ORDER_CUSTOMER: {
