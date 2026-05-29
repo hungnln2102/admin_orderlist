@@ -20,6 +20,7 @@ import { fetchAvailableRefundCredits } from "@/lib/refundCreditsApi";
 import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 import { usePriceCalculation } from "./usePriceCalculation";
 import { useProductSelection } from "./useProductSelection";
+import { useSupplySelection } from "./useSupplySelection";
 import { useSuppliesData } from "./useSuppliesData";
 import type { PaymentMethod } from "@/features/usdt-wallets/types";
 
