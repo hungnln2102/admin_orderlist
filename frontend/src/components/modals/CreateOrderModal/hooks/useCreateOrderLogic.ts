@@ -22,22 +22,21 @@ import { usePriceCalculation } from "./usePriceCalculation";
 import { useProductSelection } from "./useProductSelection";
 import { useSupplySelection } from "./useSupplySelection";
 import { useSuppliesData } from "./useSuppliesData";
+import { isDraftOrderComplete } from "../buildOrderPayload";
+import { useOrderDetailLines } from "./useOrderDetailLines";
 import type { PaymentMethod } from "@/features/usdt-wallets/types";
 
 export const useCreateOrderLogic = (
   isOpen: boolean,
-  onSave: (newOrderData: Partial<Order> | Order) => void,
+  onSave: (newOrderData: Partial<Order> | Order | Array<Partial<Order> | Order>) => void,
   customMode: boolean,
   prefillContext?: CreateOrderPrefillContext | null,
   orderCreationKind: CreateOrderCreationKind = "sales"
 ): UseCreateOrderLogicResult => {
   const [creditMode, setCreditMode] = useState(false);
-  const [availableCreditNotes, setAvailableCreditNotes] = useState<
-    AvailableRefundCredit[]
-  >([]);
+  const [availableCreditNotes, setAvailableCreditNotes] = useState<AvailableRefundCredit[]>([]);
   const [creditListLoading, setCreditListLoading] = useState(false);
-  const [selectedCreditNote, setSelectedCreditNote] =
-    useState<AvailableRefundCredit | null>(null);
+  const [selectedCreditNote, setSelectedCreditNote] = useState<AvailableRefundCredit | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank");
 
   useEffect(() => {
@@ -74,16 +73,9 @@ export const useCreateOrderLogic = (
   const productName = formData[ORDER_FIELDS.ID_PRODUCT] as string;
   const orderPrefix = formData[ORDER_FIELDS.ID_ORDER] as string;
   const registerDate = formData[ORDER_FIELDS.ORDER_DATE] as string;
-  const infoValue =
-    (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
+  const infoValue = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
 
-  const {
-    isLoading,
-    isDataLoaded,
-    setIsDataLoaded,
-    recalcPrice,
-    infoRef,
-  } = usePriceCalculation({
+  const { isLoading, isDataLoaded, setIsDataLoaded, recalcPrice, infoRef } = usePriceCalculation({
     customerType,
     setFormData,
     productName,
@@ -165,10 +157,7 @@ export const useCreateOrderLogic = (
     }
     return {
       id: Number(selectedCreditNote.id),
-      availableAmount: Math.max(
-        0,
-        Number(selectedCreditNote.available_amount) || 0
-      ),
+      availableAmount: Math.max(0, Number(selectedCreditNote.available_amount) || 0),
       sourceOrderCode: String(selectedCreditNote.source_order_code || "").trim(),
       sourceOrderId: Number(selectedCreditNote.source_order_list_id || 0),
       creditCode: String(selectedCreditNote.credit_code || "").trim(),
@@ -237,25 +226,20 @@ export const useCreateOrderLogic = (
   });
 
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     updateForm({ [name]: value });
   };
 
-  const handleCustomerTypeChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
+  const handleCustomerTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as CustomerType;
     setCustomerType(newType);
     setIsDataLoaded(false);
     setFormData((prev) => ({
       ...prev,
       [ORDER_FIELDS.ID_ORDER]: newType,
-      [ORDER_FIELDS.PRICE]:
-        newType === ORDER_CODE_PREFIXES.GIFT ? 0 : prev[ORDER_FIELDS.PRICE],
+      [ORDER_FIELDS.PRICE]: newType === ORDER_CODE_PREFIXES.GIFT ? 0 : prev[ORDER_FIELDS.PRICE],
     }));
   };
 
@@ -264,16 +248,49 @@ export const useCreateOrderLogic = (
     setIsDataLoaded(false);
   }, [setIsDataLoaded, setSelectedSupplyId]);
 
+  const multiOrderEnabled = useMemo(
+    () => !prefillContext?.creditNoteId && !creditMode,
+    [creditMode, prefillContext?.creditNoteId]
+  );
+
+  const {
+    detailLines,
+    addDetailLine,
+    removeDetailLine,
+    updateDetailLine,
+    totalOrdersToCreate,
+    estimatedTotalPrice,
+    collectAllPayloads,
+    isMultiReady,
+    completeLineCount,
+  } = useOrderDetailLines({
+    isOpen,
+    multiOrderEnabled,
+    formData,
+    selectedSupplyId,
+    products,
+    paymentMethod,
+    prefillContext,
+    creditOrderSelection,
+    updateForm,
+  });
+
+  const isDraftComplete = useMemo(
+    () => isDraftOrderComplete(formData, selectedSupplyId),
+    [formData, selectedSupplyId]
+  );
+
   const { handleSubmit } = useOrderSubmit({
     formData,
     isLoading,
-    updateForm,
     onSave,
     selectedSupplyId,
     products,
     prefillContext,
     creditOrderSelection,
     paymentMethod,
+    multiOrderEnabled,
+    collectAllPayloads,
   });
 
   return {
@@ -304,6 +321,16 @@ export const useCreateOrderLogic = (
     clearSelectedCreditNote,
     paymentMethod,
     setPaymentMethod,
+    multiOrderEnabled,
+    detailLines,
+    addDetailLine,
+    removeDetailLine,
+    updateDetailLine,
+    isDraftComplete,
+    totalOrdersToCreate,
+    estimatedTotalPrice,
+    completeLineCount,
+    isMultiReady,
   };
 };
 

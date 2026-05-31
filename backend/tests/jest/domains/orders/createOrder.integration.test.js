@@ -66,6 +66,22 @@ describe("POST /orders createOrder flow", () => {
     jest.doMock("../../../../src/services/telegramOrderNotification", () => ({
       sendOrderCreatedNotification,
     }));
+    jest.doMock("../../../../src/domains/payment-slots", () => ({
+      openPaymentSlot: jest.fn().mockResolvedValue({ expected_amount: 100000 }),
+      SLOT_KIND: { NEW: "new" },
+    }));
+    jest.doMock("../../../../src/services/shopBankAccountResolver", () => ({
+      resolveDefaultShopBankAccount: jest
+        .fn()
+        .mockResolvedValue({ id: 1, accountNumber: "0123456789" }),
+    }));
+    jest.doMock("../../../../src/services/usdtWalletResolver", () => ({
+      resolveDefaultUsdtWallet: jest.fn(),
+    }));
+    jest.doMock("../../../../src/domains/usdt-wallets/services/binanceExchangeRateService", () => ({
+      getUsdtVndRate: jest.fn(),
+      convertVndToUsd: jest.fn(),
+    }));
     jest.doMock("../../../../src/utils/normalizers", () => ({
       todayYMDInVietnam: jest.fn(() => "2026-05-15"),
     }));
@@ -87,9 +103,12 @@ describe("POST /orders createOrder flow", () => {
     jest.doMock("../../../../src/domains/orders/controller/finance/dashboardSummary", () => ({
       mergeSummaryUpdates: jest.fn(),
     }));
-    jest.doMock("../../../../src/domains/orders/controller/finance/dashboardImportDeltaOnPaid", () => ({
-      resolveDashboardImportDeltaOnPaid: jest.fn(),
-    }));
+    jest.doMock(
+      "../../../../src/domains/orders/controller/finance/dashboardImportDeltaOnPaid",
+      () => ({
+        resolveDashboardImportDeltaOnPaid: jest.fn(),
+      })
+    );
     jest.doMock("../../../../src/domains/orders/controller/orderFinanceHelpers", () => ({
       syncMavnStoreProfitExpense: jest.fn(),
     }));
@@ -100,7 +119,9 @@ describe("POST /orders createOrder flow", () => {
       debug: jest.fn(),
     }));
 
-    const { attachCreateOrderRoute } = require("../../../../src/domains/orders/controller/crud/createOrder");
+    const {
+      attachCreateOrderRoute,
+    } = require("../../../../src/domains/orders/controller/crud/createOrder");
     const app = express();
     app.use(express.json());
     const router = express.Router();

@@ -76,7 +76,16 @@ const monthKeyFromBirthRow = (beforeRow, afterRow) => {
     return orderDate ? getMonthKey(orderDate) : null;
 };
 
-const monthKeyCurrentVietnam = () => getMonthKey(todayYMDInVietnam());
+/** `YYYY-MM` từ ngày lịch VN — không parse qua `Date` (tránh lệch múi server). */
+const monthKeyFromVietnamYmd = (ymd) => {
+    const s = String(ymd ?? "").trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(0, 7) : null;
+};
+
+/** Tháng lịch VN tại thời điểm gọi (khớp createOrder đã TT / webhook). */
+const monthKeyVietnamNow = () => monthKeyFromVietnamYmd(todayYMDInVietnam());
+
+const monthKeyCurrentVietnam = () => monthKeyVietnamNow();
 
 /**
  * Tính lại total_tax từ total_revenue hiện tại theo DASHBOARD_MONTHLY_TAX_RATE_PERCENT.
@@ -195,7 +204,13 @@ const mergeSummaryUpdates = async (
  */
 const monthKeyVietnamFromDbTimestamp = async (trx, createdAt) => {
     const r = await trx.raw(
-        `SELECT TO_CHAR(DATE_TRUNC('month', COALESCE(?::timestamptz, NOW()) AT TIME ZONE 'Asia/Ho_Chi_Minh'), 'YYYY-MM') AS mk`,
+        `SELECT TO_CHAR(
+            DATE_TRUNC(
+                'month',
+                timezone('Asia/Ho_Chi_Minh', COALESCE(?::timestamptz, NOW()))
+            ),
+            'YYYY-MM'
+        ) AS mk`,
         [createdAt ?? null]
     );
     const mk = String(r.rows?.[0]?.mk || "").trim();
@@ -333,6 +348,8 @@ module.exports = {
     qualifiedSummaryCol,
     recomputeSummaryMonthTotalTax,
     monthKeyFromPaidDateYmd,
+    monthKeyFromVietnamYmd,
+    monthKeyVietnamNow,
     monthKeyVietnamFromDbTimestamp,
     applyExternalImportProfitDelta,
     applyEstimatedBankBalanceDelta,

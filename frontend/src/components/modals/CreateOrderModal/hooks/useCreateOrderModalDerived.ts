@@ -1,49 +1,35 @@
 import { useCallback, useEffect, useMemo } from "react";
-import {
-  ORDER_CODE_PREFIXES,
-  ORDER_FIELDS,
-} from "../../../../constants";
+import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import {
   isImportOrderCodeOption,
+  type OrderCodeSelectOption,
 } from "@/shared/hooks/usePricingTiers";
 import * as Helpers from "../../../../shared/utils";
 import { calculateExpirationDate } from "../helpers";
-import type {
-  CreateOrderCreationKind,
-  Order,
-  Product,
-  Supply,
-} from "../types";
+import type { CreateOrderCreationKind, CustomerType, Order, Product, Supply } from "../types";
 import { isMavrykShopSupplierName } from "@/shared/utils/supply";
 import { formatCurrency } from "@/features/orders/utils/ordersHelpers";
+import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 
 const isCompleteDMY = (value: string): boolean =>
   /^\d{2}\/\d{2}\/\d{4}$/.test((value || "").trim());
-
-type CreditNoteRow = {
-  id: number;
-  customer_name?: string;
-  available_amount?: number;
-  refund_amount?: number;
-  source_order_code?: string;
-};
 
 type Params = {
   formData: Partial<Order>;
   products: Product[];
   supplies: Supply[];
   selectedSupplyId: number | null;
-  customerType: string;
+  customerType: CustomerType;
   updateForm: (patch: Partial<Order>) => void;
   setIsDataLoaded: (v: boolean) => void;
   customMode: boolean;
   customProductTouched: boolean;
   setCustomProductTouched: (v: boolean) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  availableCreditNotes: CreditNoteRow[];
-  selectedCreditNote: CreditNoteRow | null;
+  availableCreditNotes: AvailableRefundCredit[];
+  selectedCreditNote: AvailableRefundCredit | null;
   hasPrefillCredit: boolean;
-  orderCodeOptions: Array<{ value: string; label: string }>;
+  orderCodeOptions: OrderCodeSelectOption[];
   orderCreationKind: CreateOrderCreationKind;
   prefillContext?: {
     creditNoteId?: number;
@@ -91,7 +77,7 @@ export const useCreateOrderModalDerived = ({
   }, [selectedCreditNote, hasPrefillCredit, formData]);
 
   const creditNoteById = useMemo(() => {
-    const m = new Map<number, CreditNoteRow>();
+    const m = new Map<number, AvailableRefundCredit>();
     for (const r of availableCreditNotes) {
       const id = Number(r.id);
       if (Number.isFinite(id) && id > 0) {
@@ -118,22 +104,15 @@ export const useCreateOrderModalDerived = ({
 
   const infoAValue = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
   const infoBValue = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
-  const registerDateValue =
-    (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+  const registerDateValue = (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
   const costValue = formData[ORDER_FIELDS.COST] as string | number | undefined;
-  const priceValue = formData[ORDER_FIELDS.PRICE] as
-    | string
-    | number
-    | undefined;
+  const priceValue = formData[ORDER_FIELDS.PRICE] as string | number | undefined;
 
   const registerDateDMY = useMemo(
     () => (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY(),
     [formData]
   );
-  const totalDays = useMemo(
-    () => Number(formData[ORDER_FIELDS.DAYS] || 0) || 0,
-    [formData]
-  );
+  const totalDays = useMemo(() => Number(formData[ORDER_FIELDS.DAYS] || 0) || 0, [formData]);
 
   const productOptions = useMemo(
     () =>
@@ -169,8 +148,7 @@ export const useCreateOrderModalDerived = ({
   const canSelectCustomerType = useMemo(() => {
     const hasProduct = Boolean(formData[ORDER_FIELDS.ID_PRODUCT]);
     const hasSupply = Boolean(
-      selectedSupplyId !== null ||
-        ((formData[ORDER_FIELDS.SUPPLY] as string) || "").trim()
+      selectedSupplyId !== null || ((formData[ORDER_FIELDS.SUPPLY] as string) || "").trim()
     );
     return hasProduct && hasSupply;
   }, [formData, selectedSupplyId]);
@@ -178,9 +156,7 @@ export const useCreateOrderModalDerived = ({
   const currentProductPctPromo = useMemo(() => {
     const productName = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
     if (!productName) return null;
-    const product = products.find(
-      (p) => p.san_pham.toLowerCase() === productName.toLowerCase()
-    );
+    const product = products.find((p) => p.san_pham.toLowerCase() === productName.toLowerCase());
     return product?.pct_promo ?? null;
   }, [products, formData]);
 
@@ -199,13 +175,18 @@ export const useCreateOrderModalDerived = ({
       }
       return !isImportOrderCodeOption(option);
     });
-    return byKind.filter((option) => {
-      const value = option.value;
-      if (hasPromoPrice) {
-        return value !== ORDER_CODE_PREFIXES.CUSTOMER;
-      }
-      return value !== ORDER_CODE_PREFIXES.PROMO;
-    });
+    return byKind
+      .filter((option) => {
+        const value = option.value;
+        if (hasPromoPrice) {
+          return value !== ORDER_CODE_PREFIXES.CUSTOMER;
+        }
+        return value !== ORDER_CODE_PREFIXES.PROMO;
+      })
+      .map((option) => ({
+        value: option.value as CustomerType,
+        label: option.label,
+      }));
   }, [hasPromoPrice, orderCodeOptions, orderCreationKind]);
 
   useEffect(() => {
@@ -240,9 +221,7 @@ export const useCreateOrderModalDerived = ({
   ]);
 
   const handlePriceInput = useCallback(
-    (
-      field: typeof ORDER_FIELDS.COST | typeof ORDER_FIELDS.PRICE
-    ) =>
+    (field: typeof ORDER_FIELDS.COST | typeof ORDER_FIELDS.PRICE) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value || "";
         const digits = raw.replace(/\D/g, "");
@@ -329,8 +308,7 @@ export const useCreateOrderModalDerived = ({
   useEffect(() => {
     if (!customMode || !customProductTouched) return;
     const months =
-      Helpers.parseMonthsFromInfo(infoAValue) ||
-      Helpers.parseMonthsFromInfo(infoBValue);
+      Helpers.parseMonthsFromInfo(infoAValue) || Helpers.parseMonthsFromInfo(infoBValue);
     const registerDate = registerDateValue;
 
     if (months > 0) {
@@ -341,14 +319,7 @@ export const useCreateOrderModalDerived = ({
         [ORDER_FIELDS.EXPIRY_DATE]: end,
       } as Partial<Order>);
     }
-  }, [
-    customMode,
-    customProductTouched,
-    infoAValue,
-    infoBValue,
-    registerDateValue,
-    updateForm,
-  ]);
+  }, [customMode, customProductTouched, infoAValue, infoBValue, registerDateValue, updateForm]);
 
   const readyToLoad = useMemo(() => {
     const prod = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";

@@ -13,46 +13,91 @@ type BuildSaveNewOrderHandlerArgs = {
   handleViewOrder: (order: Order, source: "create" | "view") => void;
 };
 
+const postSingleOrder = async (outgoing: Record<string, unknown>): Promise<Order> => {
+  const creditSnap = Math.max(0, Number(outgoing.__credit_avail_snapshot) || 0);
+  const creditApply = Math.max(0, Number(outgoing.refund_credit_apply_amount) || 0);
+  const creditNoteId = Number(outgoing.refund_credit_note_id) || 0;
+  delete outgoing.__credit_avail_snapshot;
+
+  const response = await apiFetch(API_ENDPOINTS.ORDERS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(outgoing),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Lỗi khi tạo đơn hàng mới từ Máy chủ");
+  }
+  const createdOrder: Order = await response.json();
+
+  if (creditNoteId > 0 && creditApply > 0) {
+    const remaining = Math.max(0, creditSnap - creditApply);
+    showAppNotification({
+      type: "success",
+      title: "Đã tạo đơn",
+      message:
+        creditSnap > 0
+          ? `Đã áp dụng ${formatCurrency(creditApply)} credit. Dư trên phiếu (ước tính khi gửi form): ${formatCurrency(remaining)}.`
+          : `Đã áp dụng ${formatCurrency(creditApply)} credit vào đơn.`,
+    });
+  }
+
+  return createdOrder;
+};
+
 export const buildSaveNewOrderHandler =
   ({ isCreatingOrderRef, closeCreateModal, fetchOrders, handleViewOrder }: BuildSaveNewOrderHandlerArgs) =>
-  async (newOrderData: CreateOrderPayload) => {
+  async (newOrderData: CreateOrderPayload | CreateOrderPayload[]) => {
     if (isCreatingOrderRef.current) return;
     isCreatingOrderRef.current = true;
     closeCreateModal();
 
-    const outgoing: Record<string, unknown> = {
-      ...(newOrderData as unknown as Record<string, unknown>),
-    };
-    const creditSnap = Math.max(0, Number(outgoing.__credit_avail_snapshot) || 0);
-    const creditApply = Math.max(0, Number(outgoing.refund_credit_apply_amount) || 0);
-    const creditNoteId = Number(outgoing.refund_credit_note_id) || 0;
-    delete outgoing.__credit_avail_snapshot;
+    const payloads = Array.isArray(newOrderData) ? newOrderData : [newOrderData];
 
     try {
-      const response = await apiFetch(API_ENDPOINTS.ORDERS, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(outgoing),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Lỗi khi tạo đơn hàng mới từ Máy chủ");
+      const createdOrders: Order[] = [];
+      const failures: string[] = [];
+
+      for (let i = 0; i < payloads.length; i += 1) {
+        const outgoing: Record<string, unknown> = {
+          ...(payloads[i] as unknown as Record<string, unknown>),
+        };
+        try {
+          const created = await postSingleOrder(outgoing);
+          createdOrders.push(created);
+        } catch (error) {
+          const label = String(outgoing[ORDER_FIELDS.ID_PRODUCT] || `Đơn #${i + 1}`);
+          failures.push(
+            `${label}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
       }
-      const createdOrder: Order = await response.json();
+
       await fetchOrders();
-      handleViewOrder(createdOrder, "create");
       emitRefresh(["orders", "dashboard"]);
 
-      if (creditNoteId > 0 && creditApply > 0) {
-        const remaining = Math.max(0, creditSnap - creditApply);
+      if (createdOrders.length > 0) {
+        handleViewOrder(createdOrders[createdOrders.length - 1], "create");
+      }
+
+      if (createdOrders.length > 1 && failures.length === 0) {
+        const totalPrice = createdOrders.reduce(
+          (sum, order) => sum + (Number(order[ORDER_FIELDS.PRICE]) || 0),
+          0
+        );
         showAppNotification({
           type: "success",
-          title: "Đã tạo đơn",
-          message:
-            creditSnap > 0
-              ? `Đã áp dụng ${formatCurrency(creditApply)} credit. Dư trên phiếu (ước tính khi gửi form): ${formatCurrency(remaining)}.`
-              : `Đã áp dụng ${formatCurrency(creditApply)} credit vào đơn.`,
+          title: `Đã tạo ${createdOrders.length} đơn`,
+          message: `Tổng giá bán: ${formatCurrency(totalPrice)}.`,
         });
+      } else if (createdOrders.length > 0 && failures.length > 0) {
+        showAppNotification({
+          type: "error",
+          title: "Tạo đơn một phần",
+          message: `Thành công ${createdOrders.length}/${payloads.length}. Lỗi: ${failures.join("; ")}`,
+        });
+      } else if (failures.length > 0) {
+        throw new Error(failures.join("; "));
       }
     } catch (error) {
       console.error("Lỗi khi tạo đơn hàng:", error);

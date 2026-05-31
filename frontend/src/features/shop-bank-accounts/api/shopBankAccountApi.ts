@@ -61,25 +61,18 @@ export const normalizeShopBankAccountItem = (value: unknown): ShopBankAccountIte
   };
 };
 
-export const normalizeShopBankAccountBalanceItem = (
-  value: unknown
-): ShopBankAccountBalanceItem => {
+export const normalizeShopBankAccountBalanceItem = (value: unknown): ShopBankAccountBalanceItem => {
   const base = normalizeShopBankAccountItem(value);
   const row = (value ?? {}) as Record<string, unknown>;
   return {
     ...base,
     totalReceived: Number(row.totalReceived ?? row.total_received) || 0,
-    totalWithdrawn:
-      Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
-    balanceRemaining:
-      Number(row.balanceRemaining ?? row.balance_remaining ?? row.balance) || 0,
+    totalWithdrawn: Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
+    balanceRemaining: Number(row.balanceRemaining ?? row.balance_remaining ?? row.balance) || 0,
   };
 };
 
-const parseResponse = async <T>(
-  response: Response,
-  map: (value: unknown) => T
-): Promise<T> => {
+const parseResponse = async <T>(response: Response, map: (value: unknown) => T): Promise<T> => {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(String((body as { error?: string })?.error || response.statusText));
@@ -90,18 +83,16 @@ const parseResponse = async <T>(
 export async function fetchShopBankAccounts(): Promise<ShopBankAccountItem[]> {
   const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNTS);
   const data = await parseResponse(response, (payload) => payload);
-  const items = Array.isArray((data as ListResponse)?.items)
-    ? (data as ListResponse).items
-    : [];
+  const body = data as ListResponse;
+  const items = Array.isArray(body.items) ? body.items : [];
   return items.map(normalizeShopBankAccountItem);
 }
 
 export async function fetchShopBankAccountBalances(): Promise<ShopBankAccountBalanceItem[]> {
   const response = await apiFetch(API_ENDPOINTS.SHOP_BANK_ACCOUNT_BALANCES);
   const data = await parseResponse(response, (payload) => payload);
-  const items = Array.isArray((data as ListResponse)?.items)
-    ? (data as ListResponse).items
-    : [];
+  const body = data as ListResponse;
+  const items = Array.isArray(body.items) ? body.items : [];
   return items.map(normalizeShopBankAccountBalanceItem);
 }
 

@@ -22,7 +22,9 @@ export const normalizeUsdtWalletItem = (value: unknown): UsdtWalletItem => {
     id: Number(row.id) || 0,
     label: row.label != null ? String(row.label) : null,
     walletAddress: String(row.walletAddress ?? row.wallet_address ?? "").trim(),
-    network: String(row.network ?? "TRC20").trim().toUpperCase(),
+    network: String(row.network ?? "TRC20")
+      .trim()
+      .toUpperCase(),
     isDefault: toBool(row.isDefault ?? row.is_default, false),
     isActive: toBool(row.isActive ?? row.is_active, true),
     totalWithdrawn: Number(row.totalWithdrawn ?? row.total_withdrawn) || 0,
@@ -43,25 +45,18 @@ export const normalizeUsdtWalletItem = (value: unknown): UsdtWalletItem => {
   };
 };
 
-export const normalizeUsdtWalletBalanceItem = (
-  value: unknown
-): UsdtWalletBalanceItem => {
+export const normalizeUsdtWalletBalanceItem = (value: unknown): UsdtWalletBalanceItem => {
   const base = normalizeUsdtWalletItem(value);
   const row = (value ?? {}) as Record<string, unknown>;
   return {
     ...base,
     totalReceived: Number(row.totalReceived ?? row.total_received) || 0,
-    totalWithdrawn:
-      Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
-    balanceRemaining:
-      Number(row.balanceRemaining ?? row.balance_remaining ?? row.balance) || 0,
+    totalWithdrawn: Number(row.totalWithdrawn ?? row.total_withdrawn) || base.totalWithdrawn || 0,
+    balanceRemaining: Number(row.balanceRemaining ?? row.balance_remaining ?? row.balance) || 0,
   };
 };
 
-const parseResponse = async <T>(
-  response: Response,
-  map: (value: unknown) => T
-): Promise<T> => {
+const parseResponse = async <T>(response: Response, map: (value: unknown) => T): Promise<T> => {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(String((body as { error?: string })?.error || response.statusText));
@@ -72,24 +67,20 @@ const parseResponse = async <T>(
 export async function fetchUsdtWallets(): Promise<UsdtWalletItem[]> {
   const response = await apiFetch(API_ENDPOINTS.USDT_WALLETS);
   const data = await parseResponse(response, (payload) => payload);
-  const items = Array.isArray((data as ListResponse)?.items)
-    ? (data as ListResponse).items
-    : [];
+  const body = data as ListResponse;
+  const items = Array.isArray(body.items) ? body.items : [];
   return items.map(normalizeUsdtWalletItem);
 }
 
 export async function fetchUsdtWalletBalances(): Promise<UsdtWalletBalanceItem[]> {
   const response = await apiFetch(API_ENDPOINTS.USDT_WALLET_BALANCES);
   const data = await parseResponse(response, (payload) => payload);
-  const items = Array.isArray((data as ListResponse)?.items)
-    ? (data as ListResponse).items
-    : [];
+  const body = data as ListResponse;
+  const items = Array.isArray(body.items) ? body.items : [];
   return items.map(normalizeUsdtWalletBalanceItem);
 }
 
-export async function fetchUsdtExchangeRate(
-  refresh = false
-): Promise<UsdtExchangeRate> {
+export async function fetchUsdtExchangeRate(refresh = false): Promise<UsdtExchangeRate> {
   const url = refresh
     ? `${API_ENDPOINTS.USDT_WALLET_EXCHANGE_RATE}?refresh=1`
     : API_ENDPOINTS.USDT_WALLET_EXCHANGE_RATE;
@@ -110,9 +101,7 @@ export async function fetchUsdtExchangeRate(
   });
 }
 
-export async function createUsdtWallet(
-  payload: UsdtWalletPayload
-): Promise<UsdtWalletItem> {
+export async function createUsdtWallet(payload: UsdtWalletPayload): Promise<UsdtWalletItem> {
   const response = await apiFetch(API_ENDPOINTS.USDT_WALLETS, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

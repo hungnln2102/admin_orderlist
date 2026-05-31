@@ -2,12 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import { fetchUsdtExchangeRate } from "@/features/usdt-wallets/api/usdtWalletApi";
 import { convertVndToUsd, formatUsdtMoney } from "@/features/usdt-wallets/helpers/formatUsdtMoney";
-import {
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethod,
-} from "@/features/usdt-wallets/types";
-import { labelClass, panelClass, panelTitleClass } from "../helpers";
-import type { CustomerType, Order } from "../types";
+import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/usdt-wallets/types";
+import { panelClass, panelTitleClass } from "../helpers";
+import type { CustomerType } from "../types";
 
 type CreateOrderPaymentMethodSectionProps = {
   customerType: CustomerType;

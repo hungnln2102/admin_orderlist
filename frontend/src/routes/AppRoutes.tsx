@@ -26,6 +26,11 @@ const PromoCodes = lazy(() => import("@/features/promo-codes/index.tsx"));
 const AddMcoin = lazy(() => import("@/features/add-mcoin/index.tsx"));
 const ActiveKeys = lazy(() => import("@/features/active-keys/index.tsx"));
 const IpWhitelistPage = lazy(() => import("@/features/ip-whitelist/pages/IpWhitelistPage").then(m => ({ default: m.IpWhitelistPage })));
+const PaymentAccountsPage = lazy(() =>
+  import("@/features/payment-accounts/pages/PaymentAccountsPage").then((m) => ({
+    default: m.PaymentAccountsPage,
+  }))
+);
 const ShopBankAccountsPage = lazy(() =>
   import("@/features/shop-bank-accounts/pages/ShopBankAccountsPage").then((m) => ({
     default: m.ShopBankAccountsPage,
@@ -70,6 +75,7 @@ export function AppRoutes() {
         <Route path="/add-mcoin" element={<AddMcoin />} />
         <Route path="/active-keys" element={<ActiveKeys />} />
         <Route path="/ip-whitelist" element={<IpWhitelistPage />} />
+        <Route path="/payment-accounts" element={<PaymentAccountsPage />} />
         <Route path="/shop-bank-accounts" element={<ShopBankAccountsPage />} />
         <Route path="/usdt-wallets" element={<UsdtWalletsPage />} />
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />

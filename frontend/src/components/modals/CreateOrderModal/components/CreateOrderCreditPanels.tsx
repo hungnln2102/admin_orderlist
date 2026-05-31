@@ -28,7 +28,7 @@ type Props = {
   manualCreditMoney: ManualCreditMoney | null;
   prefillContext?: PrefillContext | null;
   prefillCreditNoteRemaining: number | null;
-  formDataPrice?: string | number;
+  formDataPrice?: string | number | null;
 };
 
 export const CreateOrderCreditPanels: React.FC<Props> = ({
@@ -49,17 +49,13 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
         >
           <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/90">
             Thanh toán bằng credit — đơn nguồn{" "}
-            <span className="text-amber-50">
-              {selectedCreditNote.source_order_code || "—"}
-            </span>
+            <span className="text-amber-50">{selectedCreditNote.source_order_code || "—"}</span>
           </p>
           <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-200/95 [&_li]:flex [&_li]:justify-between [&_li]:gap-3">
             <li>
               <span className="text-slate-400">Giá bán tham chiếu (đơn cũ)</span>
               <span className="shrink-0 font-semibold text-white">
-                {manualCreditMoney.refOld > 0
-                  ? formatCurrency(manualCreditMoney.refOld)
-                  : "—"}
+                {manualCreditMoney.refOld > 0 ? formatCurrency(manualCreditMoney.refOld) : "—"}
               </span>
             </li>
             <li>
@@ -69,17 +65,13 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
               </span>
             </li>
             <li>
-              <span className="text-slate-400">
-                Credit khả dụng (phiếu, lúc mở form)
-              </span>
+              <span className="text-slate-400">Credit khả dụng (phiếu, lúc mở form)</span>
               <span className="shrink-0 font-semibold text-slate-100">
                 {formatCurrency(manualCreditMoney.avail)}
               </span>
             </li>
             <li>
-              <span className="text-slate-400">
-                Credit còn lại trên phiếu (sau đơn này)
-              </span>
+              <span className="text-slate-400">Credit còn lại trên phiếu (sau đơn này)</span>
               <span className="shrink-0 font-semibold text-amber-100/95">
                 {formatCurrency(manualCreditMoney.noteRemainingAfter)}
               </span>
@@ -94,9 +86,8 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
                 </span>
               </div>
               <p className="mt-1.5 text-[11px] text-slate-500/90">
-                Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, các dòng
-                credit cập nhật tương ứng. «Giá bán tham chiếu» lấy từ số liệu phiếu (hoàn gốc)
-                khi có.
+                Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, các dòng credit
+                cập nhật tương ứng. «Giá bán tham chiếu» lấy từ số liệu phiếu (hoàn gốc) khi có.
               </p>
             </li>
           </ul>
@@ -110,17 +101,13 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
         >
           <p className="text-[11px] font-bold uppercase tracking-wider text-amber-200/90">
             Thanh toán bằng credit — đơn nguồn{" "}
-            <span className="text-amber-50">
-              {prefillContext.creditSourceOrderCode || "—"}
-            </span>
+            <span className="text-amber-50">{prefillContext.creditSourceOrderCode || "—"}</span>
           </p>
           <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-200/95 [&_li]:flex [&_li]:justify-between [&_li]:gap-3">
             <li>
               <span className="text-slate-400">Giá bán tham chiếu (đơn cũ)</span>
               <span className="shrink-0 font-semibold text-white">
-                {formatCurrency(
-                  Number(prefillContext.sourceOrderListPrice) || 0
-                )}
+                {formatCurrency(Number(prefillContext.sourceOrderListPrice) || 0)}
               </span>
             </li>
             <li>
@@ -130,17 +117,13 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
               </span>
             </li>
             <li>
-              <span className="text-slate-400">
-                Credit khả dụng (phiếu, lúc mở form)
-              </span>
+              <span className="text-slate-400">Credit khả dụng (phiếu, lúc mở form)</span>
               <span className="shrink-0 font-semibold text-slate-100">
                 {formatCurrency(prefillContext.creditAvailableAmount || 0)}
               </span>
             </li>
             <li>
-              <span className="text-slate-400">
-                Credit còn lại trên phiếu (sau đơn này)
-              </span>
+              <span className="text-slate-400">Credit còn lại trên phiếu (sau đơn này)</span>
               <span className="shrink-0 font-semibold text-amber-100/95">
                 {formatCurrency(prefillCreditNoteRemaining ?? 0)}
               </span>
@@ -155,8 +138,8 @@ export const CreateOrderCreditPanels: React.FC<Props> = ({
                 </span>
               </div>
               <p className="mt-1.5 text-[11px] text-slate-500/90">
-                Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, số
-                dòng này cập nhật tương ứng.
+                Theo ô «Giá bán» sau khi bạn chọn sản phẩm — chọn gói mới, nhập giá, số dòng này cập
+                nhật tương ứng.
               </p>
             </li>
           </ul>

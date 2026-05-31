@@ -62,6 +62,7 @@ const {
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
 const { creditShopBankFromPaymentReceipt } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
@@ -470,6 +471,8 @@ async function handleWebhookPost(req, res) {
             ${ORDER_COLS.grossSellingPrice},
             ${ORDER_COLS.cost},
             ${ORDER_COLS.idSupply},
+            ${ORDER_COLS.customer},
+            ${ORDER_COLS.contact},
             (
               SELECT COALESCE(SUM(rca.applied_amount)::numeric, 0)
               FROM ${REFUND_CREDIT_APPLICATIONS_TABLE} rca
@@ -609,6 +612,23 @@ async function handleWebhookPost(req, res) {
                   month_key: paidMonthKey,
                 },
                 source: "webhook",
+              });
+            }
+            try {
+              await ensureOffFlowRefundCreditNote(client, {
+                paymentReceiptId: receiptId,
+                offFlowAmount: extraVnd,
+                monthKey: paidMonthKey,
+                customerName: state?.[ORDER_COLS.customer],
+                customerContact: state?.[ORDER_COLS.contact],
+                sourceOrderCode: code,
+                ruleBranch: "POST_PAID_ADDITIONAL_OFF_FLOW_BANK_RECEIPT",
+              });
+            } catch (creditErr) {
+              logger.warn("[Webhook] Không tạo credit ngoài luồng (biên thêm sau Đã TT)", {
+                orderCode: code,
+                receiptId,
+                error: creditErr.message,
               });
             }
             logger.debug("[Webhook] Ghi nhận tiền NH ngoài luồng DT/LN (biên thêm sau Đã TT)", {
@@ -834,6 +854,20 @@ async function handleWebhookPost(req, res) {
               month_key: paidMonthKey,
             },
             source: "webhook",
+          });
+        }
+        try {
+          await ensureOffFlowRefundCreditNote(client, {
+            paymentReceiptId: receiptId,
+            offFlowAmount: transferAmountNormalized,
+            monthKey: paidMonthKey,
+            ruleBranch: "NO_ORDER_CODE_OFF_FLOW_BANK_RECEIPT",
+            note: `Credit ngoài luồng — CK không mã đơn (biên lai #${receiptId || "NA"}).`,
+          });
+        } catch (creditErr) {
+          logger.warn("[Webhook] Không tạo credit ngoài luồng (không mã đơn)", {
+            receiptId,
+            error: creditErr.message,
           });
         }
       }

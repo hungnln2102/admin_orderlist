@@ -8,6 +8,9 @@ const {
 const { normalizeMoney, toMonthKey } = require("../../shared/helpers");
 const { applyDashboardDelta } = require("../../shared/dashboardDelta");
 const { insertReconcileAuditLog } = require("./auditLog");
+const { ensureOffFlowRefundCreditNote } = require("../../../../orders/controller/finance/offFlowRefundCredits");
+const { resolveDashboardImportDeltaOnPaid } = require("../../../../orders/controller/finance/dashboardImportDeltaOnPaid");
+const { fetchSupplierNameBySupplyId } = require("./fetchSupplierNameBySupplyId");
 
 /**
  * Áp delta dashboard cho 1 lần reconcile receipt.
@@ -73,6 +76,7 @@ const applyReconcileDashboardAdjustment = async (
   let revenueDelta = 0;
   let profitDelta = 0;
   let offFlowDelta = 0;
+  let importDelta = 0;
 
   if (statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING) {
     // Đơn đã được xử lý trước đó: hoàn tác DT/LN và/hoặc bucket ngoài luồng từ receipt không mã / biên thêm.
@@ -85,18 +89,54 @@ const applyReconcileDashboardAdjustment = async (
       revenueDelta = recognizedRevenue;
       profitDelta = recognizedRevenue - cost;
       offFlowDelta = offFlowForReceipt - postedOffFlowBankReceipt;
+      if (revenueDelta > 0 && cost > 0) {
+        importDelta = await resolveDashboardImportDeltaOnPaid(
+          trx,
+          orderRow,
+          cost,
+          fetchSupplierNameBySupplyId,
+          receiptMonthKey
+        );
+      }
     } else {
       // Legacy: receipt không mã đã cộng thẳng DT/LN — chỉ chỉnh LN − cost.
       profitDelta = -cost;
     }
   }
 
+  const reconcileRuleBranch =
+    statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING
+      ? "RECONCILE_CASE1_REVERSE_TEMP_POST"
+      : "RECONCILE_CASE2_UNPAID_RENEWAL_PROFIT_ADJUST";
+
   await applyDashboardDelta(trx, receiptMonthKey, {
     revenueDelta,
     profitDelta,
     ordersDelta: 0,
+    importDelta,
     offFlowDelta,
   });
+
+  if (offFlowDelta > 0) {
+    try {
+      await ensureOffFlowRefundCreditNote(trx, {
+        paymentReceiptId: receiptId,
+        offFlowAmount: offFlowDelta,
+        monthKey: receiptMonthKey,
+        customerName: orderRow?.[ORDER_COLS.customer] ?? orderRow?.customer,
+        customerContact: orderRow?.[ORDER_COLS.contact] ?? orderRow?.contact,
+        sourceOrderCode: orderCodeRaw,
+        ruleBranch: reconcileRuleBranch,
+      });
+    } catch (creditErr) {
+      // Không chặn reconcile nếu tạo credit lỗi — dashboard đã cập nhật.
+      const logger = require("../../../../../utils/logger");
+      logger.warn("[Reconcile] Không tạo credit ngoài luồng", {
+        receiptId,
+        error: creditErr.message,
+      });
+    }
+  }
 
   const nextPostedRevenue = postedRevenue + revenueDelta;
   const nextPostedProfit = postedProfit + profitDelta;
@@ -114,11 +154,6 @@ const applyReconcileDashboardAdjustment = async (
       [RECEIPT_STATE_COLS.updatedAt]: new Date(),
     });
 
-  const reconcileRuleBranch =
-    statusValue === STATUS.PAID || statusValue === STATUS.PROCESSING
-      ? "RECONCILE_CASE1_REVERSE_TEMP_POST"
-      : "RECONCILE_CASE2_UNPAID_RENEWAL_PROFIT_ADJUST";
-
   await insertReconcileAuditLog(trx, {
     receiptId,
     orderCode: orderCodeRaw,
@@ -127,6 +162,7 @@ const applyReconcileDashboardAdjustment = async (
       revenueDelta,
       profitDelta,
       offFlowDelta,
+      importDelta,
       postedRevenue: nextPostedRevenue,
       postedProfit: nextPostedProfit,
       postedOffFlowBankReceipt: nextPostedOffFlowBankReceipt,
@@ -150,6 +186,7 @@ const applyReconcileDashboardAdjustment = async (
     revenueDelta,
     profitDelta,
     offFlowDelta,
+    importDelta,
     nextPostedRevenue,
     nextPostedProfit,
     nextPostedOffFlowBankReceipt,

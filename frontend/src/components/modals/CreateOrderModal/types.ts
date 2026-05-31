@@ -1,7 +1,7 @@
-import {
-  Order as ApiOrder,
-  ORDER_CODE_PREFIXES,
-} from "../../../constants";
+import { Order as ApiOrder, ORDER_CODE_PREFIXES } from "../../../constants";
+
+import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
+import type { OrderDetailLine } from "./hooks/useOrderDetailLines";
 
 export type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 
@@ -47,10 +47,10 @@ export type RawCalculatedPriceResult = Partial<{
   price: number;
   days: number;
   expiry_date: string;
+  order_expired: string;
 }>;
 
-export type CustomerType =
-  (typeof ORDER_CODE_PREFIXES)[keyof typeof ORDER_CODE_PREFIXES];
+export type CustomerType = (typeof ORDER_CODE_PREFIXES)[keyof typeof ORDER_CODE_PREFIXES];
 
 export type CreateOrderCreationKind = "sales" | "import";
 
@@ -58,7 +58,7 @@ export interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   prefillContext?: CreateOrderPrefillContext | null;
-  onSave: (newOrderData: Partial<Order> | Order) => void;
+  onSave: (newOrderData: Partial<Order> | Order | Array<Partial<Order> | Order>) => void;
   /** `sales` = tab Đơn hàng (ẩn Nhập hàng / MAVN). `import` = tab Nhập hàng (chỉ MAVN). */
   orderCreationKind?: CreateOrderCreationKind;
 }
@@ -90,14 +90,25 @@ export interface UseCreateOrderLogicResult {
   setCustomProductTouched: React.Dispatch<React.SetStateAction<boolean>>;
   clearSelectedSupplySelection: () => void;
   handleChange: (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => void;
   handleProductSelect: (productName: string) => void;
   handleSourceSelect: (sourceId: number) => void;
   handleCustomerTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: (e: React.FormEvent) => boolean;
+  multiOrderEnabled: boolean;
+  detailLines: OrderDetailLine[];
+  addDetailLine: () => void;
+  removeDetailLine: (id: string) => void;
+  updateDetailLine: (
+    id: string,
+    patch: Partial<Pick<OrderDetailLine, "slot" | "informationOrder">>
+  ) => void;
+  isDraftComplete: boolean;
+  totalOrdersToCreate: number;
+  estimatedTotalPrice: number;
+  completeLineCount: number;
+  isMultiReady: boolean;
   /** Chế độ tạo đơn theo phiếu credit (dropdown khách). */
   creditMode: boolean;
   toggleCreditMode: () => void;

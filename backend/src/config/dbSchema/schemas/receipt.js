@@ -94,6 +94,10 @@ const RECEIPT_SCHEMA = {
       UPDATED_AT: "updated_at",
       SPLIT_FROM_NOTE_ID: "split_from_note_id",
       SUCCEEDED_BY_NOTE_ID: "succeeded_by_note_id",
+      /** ORDER_REFUND | OFF_FLOW_BANK */
+      SOURCE_KIND: "source_kind",
+      PAYMENT_RECEIPT_ID: "payment_receipt_id",
+      OFF_FLOW_MONTH_KEY: "off_flow_month_key",
     },
   },
   REFUND_CREDIT_APPLICATIONS: {

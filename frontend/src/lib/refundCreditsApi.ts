@@ -2,7 +2,7 @@ import { API_ENDPOINTS } from "@/constants";
 import { apiFetch } from "./api";
 
 export type AvailableRefundCredit = {
-  id: number;
+  id: number | string;
   credit_code: string;
   customer_name: string | null;
   customer_contact: string | null;
@@ -10,15 +10,13 @@ export type AvailableRefundCredit = {
   /** Tiền hoàn gốc ghi trên phiếu — dùng hiển thị tham chiếu cạnh “đơn cũ”. */
   refund_amount?: number;
   source_order_code: string;
-  source_order_list_id: number | null;
+  source_order_list_id: number | string | null;
   status: string;
 };
 
 type ListResponse = { data?: AvailableRefundCredit[] };
 
-export const fetchAvailableRefundCredits = async (): Promise<
-  AvailableRefundCredit[]
-> => {
+export const fetchAvailableRefundCredits = async (): Promise<AvailableRefundCredit[]> => {
   const res = await apiFetch(API_ENDPOINTS.ORDERS_REFUND_CREDITS_AVAILABLE);
   if (!res.ok) {
     const err = await res.text().catch(() => "");

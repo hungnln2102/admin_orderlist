@@ -19,6 +19,7 @@ const applyDashboardDelta = async (
     revenueDelta = 0,
     profitDelta = 0,
     ordersDelta = 0,
+    importDelta = 0,
     offFlowDelta = 0,
     bankBalanceDelta = 0,
   } = {}
@@ -27,9 +28,10 @@ const applyDashboardDelta = async (
   const revenue = normalizeMoney(revenueDelta);
   const profit = normalizeMoney(profitDelta);
   const orders = Number.isFinite(Number(ordersDelta)) ? Number(ordersDelta) : 0;
+  const imp = normalizeMoney(importDelta);
   const offFlow = normalizeMoney(offFlowDelta);
   const bankBalance = normalizeMoney(bankBalanceDelta);
-  if (!revenue && !profit && !orders && !offFlow && !bankBalance) return;
+  if (!revenue && !profit && !orders && !imp && !offFlow && !bankBalance) return;
 
   await trx.raw(
     `
@@ -38,28 +40,30 @@ const applyDashboardDelta = async (
         ${SUMMARY_COLS.totalOrders},
         ${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalImport},
         ${SUMMARY_COLS.totalOffFlowBankReceipt},
         ${SUMMARY_COLS.estimatedBankBalance},
         ${SUMMARY_COLS.updatedAt}
       )
-      VALUES (?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
       ON CONFLICT (${SUMMARY_COLS.monthKey})
       DO UPDATE SET
         ${SUMMARY_COLS.totalOrders} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOrders} + EXCLUDED.${SUMMARY_COLS.totalOrders}),
         ${SUMMARY_COLS.totalRevenue} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalRevenue} + EXCLUDED.${SUMMARY_COLS.totalRevenue},
         ${SUMMARY_COLS.totalProfit} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalProfit} + EXCLUDED.${SUMMARY_COLS.totalProfit},
+        ${SUMMARY_COLS.totalImport} = GREATEST(0, ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalImport} + EXCLUDED.${SUMMARY_COLS.totalImport}),
         ${SUMMARY_COLS.totalOffFlowBankReceipt} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.totalOffFlowBankReceipt} + EXCLUDED.${SUMMARY_COLS.totalOffFlowBankReceipt},
         ${SUMMARY_COLS.estimatedBankBalance} = ${TABLES.dashboardSummary}.${SUMMARY_COLS.estimatedBankBalance} + EXCLUDED.${SUMMARY_COLS.estimatedBankBalance},
         ${SUMMARY_COLS.updatedAt} = NOW();
     `,
-    [monthKey, orders, revenue, profit, offFlow, bankBalance]
+    [monthKey, orders, revenue, profit, imp, offFlow, bankBalance]
   );
   await recomputeSummaryMonthTotalTax(trx, monthKey);
   await notifyFinanceMonthlyDelta({
     monthKey,
     revenueDelta: revenue,
     profitDelta: profit,
-    importDelta: 0,
+    importDelta: imp,
     refundDelta: 0,
     offFlowDelta: offFlow,
     bankBalanceDelta: bankBalance,

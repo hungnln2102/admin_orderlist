@@ -1,169 +1,90 @@
 import { useCallback } from "react";
-import {
-  ORDER_CODE_PREFIXES,
-  ORDER_FIELDS,
-  Order as ApiOrder,
-} from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
+import { ORDER_FIELDS } from "../../../../constants";
 import { showAppNotification } from "@/lib/notifications";
-import { calculateExpirationDate, convertDMYToYMD } from "../helpers";
+import { buildOrderPayload, isDraftOrderComplete } from "../buildOrderPayload";
 import { CreateOrderPrefillContext, Order, Product } from "../types";
+import type { PaymentMethod } from "@/features/usdt-wallets/types";
+import type { CreditOrderSelection } from "../buildOrderPayload";
 
 type UseOrderSubmitParams = {
   formData: Partial<Order>;
   isLoading: boolean;
-  updateForm: (patch: Partial<Order>) => void;
-  onSave: (newOrderData: Partial<Order> | Order) => void;
+  onSave: (newOrderData: Partial<Order> | Order | Array<Partial<Order> | Order>) => void;
   selectedSupplyId: number | null;
   products: Product[];
   prefillContext?: CreateOrderPrefillContext | null;
-  /** Tạo đơn từ form Credit (chọn phiếu trong dropdown), không dùng khi đã có prefill credit. */
-  creditOrderSelection: {
-    id: number;
-    availableAmount: number;
-    sourceOrderCode: string;
-    sourceOrderId: number;
-    creditCode: string;
-  } | null;
-  paymentMethod?: import("@/features/usdt-wallets/types").PaymentMethod;
+  creditOrderSelection: CreditOrderSelection;
+  paymentMethod?: PaymentMethod;
+  multiOrderEnabled?: boolean;
+  collectAllPayloads?: () => Record<string, unknown>[];
 };
 
 export const useOrderSubmit = ({
   formData,
   isLoading,
-  updateForm,
   onSave,
   selectedSupplyId,
   products,
   prefillContext,
   creditOrderSelection,
   paymentMethod = "bank",
+  multiOrderEnabled = false,
+  collectAllPayloads,
 }: UseOrderSubmitParams) => {
   const handleSubmit = useCallback(
     (e: React.FormEvent): boolean => {
       e.preventDefault();
 
-      const supplyFilled = selectedSupplyId != null || (formData?.[ORDER_FIELDS.SUPPLY] as string);
-      const requiredFieldsFilled =
-        formData &&
-        formData[ORDER_FIELDS.ID_PRODUCT] &&
-        supplyFilled &&
-        formData[ORDER_FIELDS.CUSTOMER] &&
-        formData[ORDER_FIELDS.INFORMATION_ORDER];
+      if (isLoading) return false;
 
-      if (requiredFieldsFilled && !isLoading) {
-        const registerDMY =
-          Helpers.formatDateToDMY(
-            formData[ORDER_FIELDS.ORDER_DATE] as string
-          ) ||
-          (formData[ORDER_FIELDS.ORDER_DATE] as string) ||
-          Helpers.getTodayDMY();
-
-        const currentExpiryDMY =
-          Helpers.formatDateToDMY(
-            formData[ORDER_FIELDS.EXPIRY_DATE] as string
-          ) ||
-          (formData[ORDER_FIELDS.EXPIRY_DATE] as string) ||
-          "";
-
-        const totalDays = Number(formData[ORDER_FIELDS.DAYS] || 0) || 0;
-
-        let expiryDMY = currentExpiryDMY;
-        if (!expiryDMY && registerDMY && totalDays > 0) {
-          const computed = calculateExpirationDate(registerDMY, totalDays);
-          if (computed && computed !== "N/A") {
-            expiryDMY = computed;
-            updateForm({
-              [ORDER_FIELDS.EXPIRY_DATE]: expiryDMY,
-            } as Partial<Order>);
-          }
+      if (multiOrderEnabled && collectAllPayloads) {
+        const payloads = collectAllPayloads();
+        if (payloads.length === 0) {
+          showAppNotification({
+            type: "error",
+            title: "Thiếu thông tin",
+            message:
+              "Chọn sản phẩm, nguồn và điền thông tin sản phẩm cho ít nhất một dòng chi tiết đơn.",
+          });
+          return false;
         }
 
-        const normalizedRegister = convertDMYToYMD(registerDMY);
-        const normalizedExpiry = expiryDMY
-          ? convertDMYToYMD(expiryDMY)
-          : normalizedRegister;
-
-        const productName = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
-        const matchedProduct = products.find(
-          (p) => (p.san_pham || "").trim() === productName.trim()
-        );
-        const variantId = matchedProduct?.id;
-
-        const orderTypePrefix = String(formData[ORDER_FIELDS.ID_ORDER] || "");
-        const rawSelling = Number(formData[ORDER_FIELDS.PRICE]);
-        const sellingPrice =
-          orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
-            ? 0
-            : Number.isFinite(rawSelling)
-              ? Math.max(0, rawSelling)
-              : 0;
-
-        const dataToSave: Partial<ApiOrder> = {
-          ...formData,
-          [ORDER_FIELDS.COST]: Number(formData[ORDER_FIELDS.COST]),
-          [ORDER_FIELDS.PRICE]: sellingPrice,
-          [ORDER_FIELDS.ORDER_DATE]: normalizedRegister,
-          [ORDER_FIELDS.EXPIRY_DATE]: normalizedExpiry,
-          [ORDER_FIELDS.CONTACT]: formData[ORDER_FIELDS.CONTACT] || null,
-          [ORDER_FIELDS.SLOT]: formData[ORDER_FIELDS.SLOT] || null,
-          [ORDER_FIELDS.NOTE]: formData[ORDER_FIELDS.NOTE] || null,
-        };
-
-        if (selectedSupplyId != null) {
-          (dataToSave as Record<string, unknown>).supply_id = selectedSupplyId;
-        }
-        if (variantId != null && Number.isFinite(variantId)) {
-          // Gửi cả variant_id (rõ nghĩa) và id_product (tương thích backend cũ)
-          (dataToSave as Record<string, unknown>).variant_id = variantId;
-          (dataToSave as Record<string, unknown>).id_product = variantId;
+        const customerName = String(formData[ORDER_FIELDS.CUSTOMER] || "").trim();
+        if (!customerName) {
+          showAppNotification({
+            type: "error",
+            title: "Thiếu thông tin",
+            message: "Vui lòng nhập tên khách hàng.",
+          });
+          return false;
         }
 
-        if (
-          orderTypePrefix !== ORDER_CODE_PREFIXES.GIFT &&
-          orderTypePrefix !== ORDER_CODE_PREFIXES.IMPORT &&
-          paymentMethod === "usdt"
-        ) {
-          (dataToSave as Record<string, unknown>).payment_method = "usdt";
+        onSave(payloads as Array<Partial<Order> | Order>);
+        return true;
+      }
+
+      const requiredFieldsFilled = isDraftOrderComplete(formData, selectedSupplyId);
+
+      if (requiredFieldsFilled) {
+        const result = buildOrderPayload({
+          formData,
+          selectedSupplyId,
+          products,
+          prefillContext,
+          creditOrderSelection,
+          paymentMethod,
+        });
+
+        if (!result.ok) {
+          showAppNotification({
+            type: "error",
+            title: "Thiếu thông tin",
+            message: "Vui lòng điền đầy đủ các thông tin.",
+          });
+          return false;
         }
 
-        if (prefillContext?.creditNoteId) {
-          const record = dataToSave as Record<string, unknown>;
-          record.refund_credit_note_id = Number(prefillContext.creditNoteId);
-          record.refund_credit_apply_amount = Number(
-            prefillContext.creditApplyAmount || 0
-          );
-          record.refund_credit_source_order_id = Number(
-            prefillContext.creditSourceOrderId || 0
-          );
-          record.refund_credit_source_order_code =
-            prefillContext.creditSourceOrderCode || "";
-          if (prefillContext.reservedOrderCode) {
-            record.reserved_order_code = prefillContext.reservedOrderCode;
-          }
-          record.__credit_avail_snapshot = Math.max(
-            0,
-            Number(prefillContext.creditAvailableAmount) || 0
-          );
-        } else if (creditOrderSelection?.id) {
-          /** Luôn gửi id phiếu + số áp; nếu `apply` = 0 backend vẫn gán min(dư phiếu, giá) (createOrder). Trước đây `if (apply > 0)` bỏ hết payload khi giá là NaN → không có application. */
-          const record = dataToSave as Record<string, unknown>;
-          record.refund_credit_note_id = creditOrderSelection.id;
-          record.refund_credit_source_order_code =
-            creditOrderSelection.sourceOrderCode || "";
-          record.refund_credit_source_order_id =
-            Number(creditOrderSelection.sourceOrderId || 0);
-          record.refund_credit_code = creditOrderSelection.creditCode || "";
-          const cap = Math.max(0, creditOrderSelection.availableAmount);
-          const apply =
-            orderTypePrefix === ORDER_CODE_PREFIXES.GIFT
-              ? 0
-              : Math.min(cap, sellingPrice);
-          record.refund_credit_apply_amount = apply;
-          record.__credit_avail_snapshot = cap;
-        }
-
-        onSave(dataToSave as Order);
+        onSave(result.payload as Partial<Order>);
         return true;
       }
 
@@ -175,15 +96,16 @@ export const useOrderSubmit = ({
       return false;
     },
     [
+      collectAllPayloads,
+      creditOrderSelection,
       formData,
       isLoading,
+      multiOrderEnabled,
       onSave,
-      updateForm,
-      selectedSupplyId,
-      products,
-      prefillContext,
-      creditOrderSelection,
       paymentMethod,
+      prefillContext,
+      products,
+      selectedSupplyId,
     ]
   );
 

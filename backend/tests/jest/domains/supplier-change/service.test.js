@@ -11,21 +11,16 @@ jest.mock("../../../../src/db", () => ({
   },
 }));
 
-jest.mock(
-  "../../../../src/domains/orders/controller/helpers/normalize",
-  () => ({
-    normalizeOrderRow: jest.fn(),
-  })
-);
+jest.mock("../../../../src/domains/orders/controller/helpers/normalize", () => ({
+  normalizeOrderRow: jest.fn(),
+}));
 
 jest.mock("../../../../src/utils/normalizers", () => ({
   todayYMDInVietnam: () => "2026-05-11",
 }));
 
 jest.mock("../../../../src/domains/supplier-change/repository", () => {
-  const actual = jest.requireActual(
-    "../../../../src/domains/supplier-change/repository"
-  );
+  const actual = jest.requireActual("../../../../src/domains/supplier-change/repository");
   return {
     ...actual,
     enableAppManagedFlag: jest.fn(),
@@ -43,30 +38,23 @@ jest.mock("../../../../src/domains/supplier-change/repository", () => {
 });
 
 // Mock dashboardSummary.mergeSummaryUpdates: kiểm chứng profit_delta đi đúng tháng.
-jest.mock(
-  "../../../../src/domains/orders/controller/finance/dashboardSummary",
-  () => ({
-    mergeSummaryUpdates: jest.fn(async () => {}),
-  })
-);
+jest.mock("../../../../src/domains/orders/controller/finance/dashboardSummary", () => ({
+  mergeSummaryUpdates: jest.fn(async () => {}),
+}));
 
 // Mock notify Telegram BIẾN ĐỘNG THÁNG.
-jest.mock(
-  "../../../../src/services/telegramFinanceDeltaNotifier",
-  () => ({
-    notifyFinanceMonthlyDelta: jest.fn(async () => {}),
-  })
-);
+jest.mock("../../../../src/services/telegramFinanceDeltaNotifier", () => ({
+  notifyFinanceMonthlyDelta: jest.fn(async () => {}),
+}));
 
 const dashboardSummary = require("../../../../src/domains/orders/controller/finance/dashboardSummary");
 const financeNotifier = require("../../../../src/services/telegramFinanceDeltaNotifier");
 
-const { normalizeOrderRow } = require("../../../../src/domains/orders/controller/helpers/normalize");
-const repo = require("../../../../src/domains/supplier-change/repository");
 const {
-  changeOrderSupplier,
-  FLOWS,
-} = require("../../../../src/domains/supplier-change/service");
+  normalizeOrderRow,
+} = require("../../../../src/domains/orders/controller/helpers/normalize");
+const repo = require("../../../../src/domains/supplier-change/repository");
+const { changeOrderSupplier, FLOWS } = require("../../../../src/domains/supplier-change/service");
 
 const buildTrxMock = () => {
   const trx = {
@@ -118,11 +106,7 @@ describe("changeOrderSupplier — Flow A (≤5 ngày)", () => {
     expect(repo.insertCostLog).not.toHaveBeenCalled();
     expect(repo.updateLatestCostLog).not.toHaveBeenCalled();
     // GUC reset (SET LOCAL ... = 'off')
-    expect(
-      trx.raw.mock.calls.some(([sql]) =>
-        String(sql).includes("'off'")
-      )
-    ).toBe(true);
+    expect(trx.raw.mock.calls.some(([sql]) => String(sql).includes("'off'"))).toBe(true);
   });
 
   test("Đơn 3 ngày, có log Đã TT, đổi NCC: update order + update log mới nhất theo NCC + cost mới", async () => {
@@ -342,9 +326,7 @@ describe("changeOrderSupplier — Flow A (≤5 ngày)", () => {
 
     // Cả 2 snapshot giống nhau (do status Chưa TT không tác động dashboard).
     const SAME = { total_revenue: 1, total_profit: 2, total_import: 3, total_refund: 4 };
-    repo.fetchMonthlyTotals
-      .mockResolvedValueOnce(SAME)
-      .mockResolvedValueOnce(SAME);
+    repo.fetchMonthlyTotals.mockResolvedValueOnce(SAME).mockResolvedValueOnce(SAME);
 
     await changeOrderSupplier(42, 5, { trx });
 
@@ -372,8 +354,8 @@ describe("changeOrderSupplier — Flow A (≤5 ngày)", () => {
 
     expect(result.flow).toBe(FLOWS.A);
     expect(result.insertedLog).toBe(true);
-    // 35 000 × 30 / 31 = 33 870,97 → làm tròn về bội 1.000 = 34 000.
-    const expectedCost = 34000;
+    // 35 000 × 30 / 31 = 33 870,97 → làm tròn đến đơn vị VND.
+    const expectedCost = Math.round((35000 * 30) / 31);
     expect(result.newCost).toBe(expectedCost);
     expect(repo.updateOrderSupplyAndCost).toHaveBeenCalledWith(trx, 42, {
       supplyId: 5,

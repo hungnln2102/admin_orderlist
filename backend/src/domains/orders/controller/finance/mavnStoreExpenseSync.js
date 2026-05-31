@@ -8,15 +8,9 @@ const {
   tableName,
 } = require("../../../../config/dbSchema");
 const { STATUS, COLS } = require("../constants");
-const {
-  isMavnImportOrder,
-  isMavrykShopSupplierName,
-} = require("../../../../utils/orderHelpers");
+const { isMavnImportOrder, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
 const { normalizeRawToYMD } = require("../helpers/normalize");
-const {
-  mergeSummaryUpdates,
-  monthKeyVietnamFromDbTimestamp,
-} = require("./dashboardSummary");
+const { mergeSummaryUpdates, monthKeyVietnamNow } = require("./dashboardSummary");
 const {
   resolveMavrykDefaultBankAccount,
 } = require("../../../shop-bank-accounts/repositories/shopBankAccountRepository");
@@ -45,10 +39,7 @@ const normalizeMoney = (value) => {
 async function fetchVariantDisplay(trx, variantId) {
   if (variantId == null || !Number.isFinite(Number(variantId))) return "";
   const row = await trx(variantTable)
-    .select(
-      PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME,
-      PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME
-    )
+    .select(PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME, PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME)
     .where(PRODUCT_SCHEMA.VARIANT.COLS.ID, Number(variantId))
     .first();
   const name =
@@ -60,8 +51,7 @@ async function fetchVariantDisplay(trx, variantId) {
 function buildExpenseMeta(row, productLabel) {
   const days = Number(row[COLS.ORDER.DAYS] ?? row.days ?? 0);
   const termDays = Number.isFinite(days) && days > 0 ? days : 0;
-  const startYmd =
-    normalizeRawToYMD(row[COLS.ORDER.ORDER_DATE] ?? row.order_date) || "";
+  const startYmd = normalizeRawToYMD(row[COLS.ORDER.ORDER_DATE] ?? row.order_date) || "";
   return {
     productLabel: productLabel || "",
     termDays,
@@ -70,13 +60,9 @@ function buildExpenseMeta(row, productLabel) {
   };
 }
 
-async function monthKeyMavnDashboard(trx, row) {
-  const raw =
-    row?.[COLS.ORDER.ORDER_DATE] ??
-    row?.order_date ??
-    row?.[COLS.ORDER.CREATED_AT] ??
-    row?.created_at;
-  return monthKeyVietnamFromDbTimestamp(trx, raw);
+/** Bucket dashboard theo tháng lịch VN hiện tại (không dùng order_date — tránh lệch tháng tương lai). */
+function monthKeyMavnDashboard() {
+  return monthKeyVietnamNow();
 }
 
 async function resolveIsInternalSupplier(trx, row) {
@@ -131,10 +117,8 @@ async function applyInternalMavnDashboardDelta({
   const afterAmount = normalizeMoney(afterAppliedAmount);
   if (!(beforeAmount > 0) && !(afterAmount > 0)) return;
 
-  const beforeMonthKey =
-    beforeAmount > 0 ? await monthKeyMavnDashboard(trx, beforeRow) : null;
-  const afterMonthKey =
-    afterAmount > 0 ? await monthKeyMavnDashboard(trx, afterRow) : null;
+  const beforeMonthKey = beforeAmount > 0 ? monthKeyMavnDashboard() : null;
+  const afterMonthKey = afterAmount > 0 ? monthKeyMavnDashboard() : null;
 
   if (beforeMonthKey && beforeMonthKey === afterMonthKey) {
     const net = beforeAmount - afterAmount;
@@ -179,21 +163,13 @@ async function applyInternalMavnDashboardDelta({
   }
 }
 
-async function applyExternalMavnProfitDelta({
-  trx,
-  beforeRow,
-  afterRow,
-  beforeAppliedAmount,
-  afterAppliedAmount,
-}) {
+async function applyExternalMavnProfitDelta({ trx, beforeAppliedAmount, afterAppliedAmount }) {
   const beforeAmount = normalizeMoney(beforeAppliedAmount);
   const afterAmount = normalizeMoney(afterAppliedAmount);
   if (!(beforeAmount > 0) && !(afterAmount > 0)) return;
 
-  const beforeMonthKey =
-    beforeAmount > 0 ? await monthKeyMavnDashboard(trx, beforeRow) : null;
-  const afterMonthKey =
-    afterAmount > 0 ? await monthKeyMavnDashboard(trx, afterRow) : null;
+  const beforeMonthKey = beforeAmount > 0 ? monthKeyMavnDashboard() : null;
+  const afterMonthKey = afterAmount > 0 ? monthKeyMavnDashboard() : null;
 
   if (beforeMonthKey && beforeMonthKey === afterMonthKey) {
     const net = beforeAmount - afterAmount;
@@ -231,15 +207,13 @@ async function deleteAutoExpenseLogsByOrderCode(trx, orderCode) {
   await trx(expenseTable)
     .where(expenseCols.LINKED_ORDER_CODE, orderCode)
     .where((qb) => {
-      qb.where(expenseCols.EXPENSE_TYPE, "mavn_import")
-        .orWhere((nested) =>
-          nested
-            .where(expenseCols.EXPENSE_TYPE, "external_import")
-            .whereRaw(
-              `COALESCE(${expenseCols.EXPENSE_META}->>'flow', '') = ?`,
-              ["mavn_order_internal"]
-            )
-        );
+      qb.where(expenseCols.EXPENSE_TYPE, "mavn_import").orWhere((nested) =>
+        nested
+          .where(expenseCols.EXPENSE_TYPE, "external_import")
+          .whereRaw(`COALESCE(${expenseCols.EXPENSE_META}->>'flow', '') = ?`, [
+            "mavn_order_internal",
+          ])
+      );
     })
     .del();
 }
@@ -321,9 +295,7 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
   if (isInternal) {
     const orderListId = Number(afterRow?.[COLS.ORDER.ID] ?? afterRow?.id);
     if (Number.isFinite(orderListId) && orderListId > 0) {
-      await trx(supplierCostLogTable)
-        .where(supplierCostLogCols.ORDER_LIST_ID, orderListId)
-        .del();
+      await trx(supplierCostLogTable).where(supplierCostLogCols.ORDER_LIST_ID, orderListId).del();
     }
   }
 
@@ -336,10 +308,7 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
     .select(expenseCols.ID)
     .where(expenseCols.EXPENSE_TYPE, "external_import")
     .where(expenseCols.LINKED_ORDER_CODE, orderCode)
-    .whereRaw(
-      `COALESCE(${expenseCols.EXPENSE_META}->>'flow', '') = ?`,
-      ["mavn_order_internal"]
-    )
+    .whereRaw(`COALESCE(${expenseCols.EXPENSE_META}->>'flow', '') = ?`, ["mavn_order_internal"])
     .first();
 
   if (existing?.id) {

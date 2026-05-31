@@ -28,6 +28,7 @@ const {
 const logger = require("../../../../src/utils/logger");
 const { computeOrderCurrentPrice } = require("../../renewalPricing");
 const { withSavepoint } = require("../../savepoint");
+const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
 const {
   PAYMENT_RECEIPT_TABLE_RESOLVED,
   PAYMENT_RECEIPT_COLS,
@@ -214,6 +215,25 @@ const postWebhookPaymentForOrder = async (
       notify,
       context: notifyContext,
     });
+    if (receiptId) {
+      try {
+        await ensureOffFlowRefundCreditNote(client, {
+          paymentReceiptId: receiptId,
+          offFlowAmount: offFlow,
+          monthKey: paidMonthKey,
+          customerName: state?.[ORDER_COLS.customer],
+          customerContact: state?.[ORDER_COLS.contact],
+          sourceOrderCode: code,
+          ruleBranch: ruleBranch || "WEBHOOK_ORDER_OFF_FLOW_SPLIT",
+        });
+      } catch (creditErr) {
+        logger.warn("[Webhook] Không tạo credit ngoài luồng (chênh CK đơn)", {
+          orderCode: code,
+          receiptId,
+          error: creditErr.message,
+        });
+      }
+    }
   }
 
   if (receiptId) {

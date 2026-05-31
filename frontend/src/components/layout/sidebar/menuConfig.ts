@@ -160,14 +160,9 @@ export const menuSections: MenuSection[] = [
         icon: ShieldCheckIcon,
       },
       {
-        name: "Quản lý STK",
-        href: "/shop-bank-accounts",
+        name: "Quản lý thanh toán",
+        href: "/payment-accounts",
         icon: BanknotesIcon,
-      },
-      {
-        name: "Quản lý ví USDT",
-        href: "/usdt-wallets",
-        icon: CurrencyDollarIcon,
       },
     ],
   },

@@ -16,3 +16,5 @@ export type OrderActionsDeps = {
 };
 
 export type CreateOrderPayload = Partial<EditableOrder> | EditableOrder;
+
+export type CreateOrderPayloadInput = CreateOrderPayload | CreateOrderPayload[];

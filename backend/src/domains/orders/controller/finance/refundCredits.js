@@ -104,6 +104,7 @@ const createOrGetRefundCreditNoteForOrder = async (
         [R.AVAILABLE_AMOUNT]: normalizedRefundAmount,
         [R.STATUS]: CREDIT_STATUS.OPEN,
         [R.NOTE]: note ? String(note).trim() : null,
+        [R.SOURCE_KIND]: "ORDER_REFUND",
     };
 
     const [inserted] = await trx(REFUND_CREDIT_NOTES_TABLE).insert(payload).returning("*");
@@ -201,6 +202,9 @@ const applyRefundCreditToTargetOrder = async (
                 [R.STATUS]: CREDIT_STATUS.OPEN,
                 [R.SPLIT_FROM_NOTE_ID]: parentId,
                 [R.NOTE]: splitNote,
+                [R.SOURCE_KIND]: creditNote[R.SOURCE_KIND] || "ORDER_REFUND",
+                [R.PAYMENT_RECEIPT_ID]: creditNote[R.PAYMENT_RECEIPT_ID] ?? null,
+                [R.OFF_FLOW_MONTH_KEY]: creditNote[R.OFF_FLOW_MONTH_KEY] ?? null,
             })
             .returning("*");
         replacementCreditNote = inserted || null;

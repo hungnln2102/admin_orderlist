@@ -7,6 +7,9 @@ const {
     listRefundCreditLogs,
 } = require("./queries/listRefundCreditLogs");
 const {
+    applyOffFlowCreditCashout,
+} = require("./finance/offFlowRefundCredits");
+const {
     createOrGetRefundCreditNoteForOrder,
     getLatestRefundCreditNoteBySourceOrder,
     normalizeMoney,
@@ -254,6 +257,28 @@ const attachRefundCreditRoutes = (router) => {
                     nextNote,
                     `Đã hoàn tiền theo credit (thao tác Đã Hoàn) — trừ ${accountLabel}.`
                 );
+
+                const creditCode = String(current?.[RCN.CREDIT_CODE] || "").trim();
+                const ledgerResult = await debitShopBankRefundCashout(trx, {
+                    accountId: Number(cashoutAccount.id),
+                    amount: cashoutAmount,
+                    sourceId: id,
+                    note: `Hoàn tiền credit ${creditCode || `#${id}`} — ${accountLabel}`,
+                });
+                if (!ledgerResult || ledgerResult.skipped) {
+                    logger.warn("Refund cashout ledger skipped", {
+                        creditId: id,
+                        reason: ledgerResult?.reason || "unknown",
+                    });
+                }
+
+                const offFlowResult = await applyOffFlowCreditCashout(trx, current, cashoutAmount);
+                if (offFlowResult.applied) {
+                    nextNote = appendNote(
+                        nextNote,
+                        `Đã trừ ${cashoutAmount.toLocaleString("vi-VN")} VND khỏi số tiền ngoài luồng (tháng ${offFlowResult.monthKey}).`
+                    );
+                }
             }
 
             if (!isAlreadyUnavailable || action === CREDIT_ACTIONS.COMPLETE) {
@@ -269,26 +294,6 @@ const attachRefundCreditRoutes = (router) => {
                 await trx(REFUND_CREDIT_NOTES_TABLE)
                     .where({ [RCN.ID]: id })
                     .update(updatePayload);
-            }
-
-            if (action === CREDIT_ACTIONS.COMPLETE && cashoutAmount > 0 && cashoutAccount) {
-                const creditCode = String(current?.[RCN.CREDIT_CODE] || "").trim();
-                const accountLabel =
-                    String(cashoutAccount.label || "").trim() ||
-                    String(cashoutAccount.accountNumber || "").trim() ||
-                    `STK ${cashoutAccount.id}`;
-                const ledgerResult = await debitShopBankRefundCashout(trx, {
-                    accountId: Number(cashoutAccount.id),
-                    amount: cashoutAmount,
-                    sourceId: id,
-                    note: `Hoàn tiền credit ${creditCode || `#${id}`} — ${accountLabel}`,
-                });
-                if (!ledgerResult || ledgerResult.skipped) {
-                    logger.warn("Refund cashout ledger skipped", {
-                        creditId: id,
-                        reason: ledgerResult?.reason || "unknown",
-                    });
-                }
             }
 
             const updated = await trx(REFUND_CREDIT_NOTES_TABLE)
