@@ -21,6 +21,9 @@ const {
   findSupplierRefundReceipt,
   SUPPLIER_REFUND_MATCH_TOLERANCE,
 } = require("../helpers/matchSupplierRefundReceipt");
+const {
+  notifyFinanceMonthlyDelta,
+} = require("../../../../services/telegramFinanceDeltaNotifier");
 
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;
@@ -192,26 +195,42 @@ const confirmPaymentSupply = async (req, res) => {
         [STATUS.PAID, resolvedSupplyId, STATUS.PAID]
       );
 
+      let bankLedgerDelta = 0;
       if (paymentSupplyId && expectedPaidAmount > 0) {
         if (isSupplierRefundToShop) {
-          await creditShopBankFromPaymentReceipt(trx, {
+          const ledgerResult = await creditShopBankFromPaymentReceipt(trx, {
             receiptId: matchedReceipt?.id,
             receiverAccount: matchedReceipt?.receiver || "",
             accountId: shopBankAccountId,
             amount: expectedPaidAmount,
             note: paymentContent || `NCC refund supply ${resolvedSupplyId}`,
           });
+          if (ledgerResult && !ledgerResult.skipped) {
+            bankLedgerDelta = expectedPaidAmount;
+          }
         } else {
-          await debitShopBankSupplierPayment(trx, {
+          const ledgerResult = await debitShopBankSupplierPayment(trx, {
             accountId: shopBankAccountId,
             amount: expectedPaidAmount,
             sourceKind: SOURCE_KINDS.PAYMENT_SUPPLY,
             sourceId: paymentSupplyId,
             note: `Thanh toán NCC supply ${resolvedSupplyId}`,
           });
+          if (ledgerResult && !ledgerResult.skipped) {
+            bankLedgerDelta = -expectedPaidAmount;
+          }
         }
       }
       const paidMonthKey = toMonthKey(paymentDate);
+
+      if (bankLedgerDelta !== 0 && paidMonthKey) {
+        await notifyFinanceMonthlyDelta({
+          monthKey: paidMonthKey,
+          bankBalanceDelta: bankLedgerDelta,
+          context: `payments.confirmPaymentSupply supply=${resolvedSupplyId}`,
+          executor: trx,
+        });
+      }
 
       return {
         paymentRow: insertResult.rows?.[0] || null,

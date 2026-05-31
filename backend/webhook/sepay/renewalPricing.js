@@ -1,200 +1,159 @@
-const {
-  normalizeImportValue,
-  normalizeMoney,
-  fetchProductPricing,
-  fetchSupplyPrice,
-  fetchMaxSupplyPrice,
-} = require("./utils");
+const { normalizeMoney } = require("./utils");
 const { ORDER_COLS } = require("./config");
-const {
-  calculateOrderPricingFromResolvedValues,
-  resolveMoney,
-  normalizePromoRatio,
-} = require("../../src/services/pricing/core");
 const { ORDER_PREFIXES } = require("../../src/utils/orderHelpers");
-const { getTiers, getPrefixMap } = require("../../src/services/pricing/tierCache");
+const {
+  PricingHttpError,
+  calculateOrderPricing,
+  fetchVariantPricing,
+} = require("../../src/services/pricing/orderPricingService");
 const logger = require("../../src/utils/logger");
+
+const resolveRenewalOrderPricing = async ({
+  sanPham,
+  supplierId,
+  orderCode,
+  forceKhachLe = false,
+}) => {
+  const normalizedCode = String(orderCode || "").trim();
+  const customerPrefix = String(ORDER_PREFIXES?.customer || "MAVL").toUpperCase();
+
+  return calculateOrderPricing({
+    supplyId: supplierId,
+    productKey: sanPham,
+    orderId: normalizedCode,
+    customerType: forceKhachLe ? customerPrefix : "",
+  });
+};
+
+/** MAVK hết promo (không có giá tier promo) → gia hạn theo giá khách lẻ. */
+const applyMavkKhachLeFallback = async ({
+  sanPham,
+  supplierId,
+  orderCode,
+  pricing,
+}) => {
+  const promoPrefix = String(ORDER_PREFIXES?.promo || "MAVK").toUpperCase();
+  const code = String(orderCode || "").trim().toUpperCase();
+  if (!promoPrefix || !code.startsWith(promoPrefix)) {
+    return pricing;
+  }
+
+  const variantPricing = await fetchVariantPricing(sanPham);
+  const promoPrice = Number(variantPricing?.tierPrices?.promo) || 0;
+  if (promoPrice > 0) {
+    return pricing;
+  }
+
+  return resolveRenewalOrderPricing({
+    sanPham,
+    supplierId,
+    orderCode,
+    forceKhachLe: true,
+  });
+};
 
 const calculateRenewalPricing = async (
   client,
   { sanPham, supplierId, orderCode, fallbackCost, fallbackPrice, forceKhachLe }
 ) => {
-  const { productId, variantId, pctCtv, pctKhach, pctPromo, pctStu } =
-    await fetchProductPricing(client, sanPham);
-  const giaNhapSource = await fetchSupplyPrice(
-    client,
-    { variantId, productId },
-    supplierId
-  );
-  const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
+  void client;
 
-  const normalizedNhap = normalizeImportValue(giaNhapSource, fallbackCost || undefined);
-  const latestGiaNhap = resolveMoney(
-    normalizedNhap?.value,
-    giaNhapSource,
-    fallbackCost
-  );
+  let pricing = await resolveRenewalOrderPricing({
+    sanPham,
+    supplierId,
+    orderCode,
+    forceKhachLe,
+  });
 
-  const normalizedPriceMax = normalizeImportValue(
-    maxPriceRow,
-    latestGiaNhap || fallbackCost || undefined
-  );
-  const priceMax = resolveMoney(
-    normalizedPriceMax?.value,
-    maxPriceRow,
-    fallbackPrice,
-    latestGiaNhap
-  );
-  const effectivePriceMax = resolveMoney(priceMax, fallbackPrice, latestGiaNhap);
-
-  let tiers, prefixMap;
-  try {
-    [tiers, prefixMap] = await Promise.all([getTiers(), getPrefixMap()]);
-  } catch {
-    tiers = null;
-    prefixMap = null;
+  if (!forceKhachLe) {
+    pricing = await applyMavkKhachLeFallback({
+      sanPham,
+      supplierId,
+      orderCode,
+      pricing,
+    });
   }
 
-  const pricing = calculateOrderPricingFromResolvedValues({
-    orderId: orderCode,
-    pricingBase: effectivePriceMax,
-    importPrice: latestGiaNhap,
-    fallbackPrice,
-    fallbackCost,
-    pctCtv,
-    pctKhach,
-    pctPromo,
-    pctStu,
-    forceKhachLe,
-    roundCostToThousands: false,
-    _tiers: tiers,
-    _prefixMap: prefixMap,
-  });
+  const variantPricing = await fetchVariantPricing(sanPham);
 
   return {
     pricing,
-    productId,
-    variantId,
-    pctCtv,
-    pctKhach,
-    pctPromo,
-    pctStu,
-    giaNhapSource,
-    maxPriceRow,
-    normalizedNhap,
-    normalizedPriceMax,
-    effectivePriceMax,
+    productId: variantPricing?.variantId ?? null,
+    variantId: variantPricing?.variantId ?? null,
+    pctCtv: null,
+    pctKhach: null,
+    pctPromo: null,
+    pctStu: null,
+    giaNhapSource: null,
+    maxPriceRow: null,
+    normalizedNhap: null,
+    normalizedPriceMax: null,
+    effectivePriceMax:
+      normalizeMoney(pricing.price) || normalizeMoney(fallbackPrice),
   };
 };
 
 /**
- * Tính lại giá bán và giá nhập theo giá hiện tại (product/supplier cost).
+ * Tính lại giá bán và giá nhập theo bảng giá hiện hành (tier price tuyệt đối).
  * Dùng trước khi gửi thông báo Telegram "đơn cần gia hạn" để caption và QR dùng đúng giá mới.
  * Không ghi DB.
- * @param {object} client - pg client (từ pool.connect())
- * @param {object} orderRow - 1 row đơn hàng (có id_product, supply, cost, price)
- * @returns {{ price: number, cost: number }} - Giá bán và giá nhập đã tính (fallback về giá cũ nếu lỗi)
+ * @param {object} client - pg client (giữ signature; pricing dùng knex)
+ * @param {object} orderRow - 1 row đơn hàng (có id_product, supply_id, cost, price)
+ * @returns {{ price: number, cost: number }}
  */
 const computeOrderCurrentPrice = async (client, orderRow) => {
+  void client;
+
   const fallbackPrice = normalizeMoney(orderRow?.[ORDER_COLS.price] ?? 0);
   const fallbackCost = normalizeMoney(orderRow?.[ORDER_COLS.cost] ?? 0);
+  const orderCode = String(orderRow?.[ORDER_COLS.idOrder] || "");
 
   try {
     const sanPham = orderRow?.[ORDER_COLS.idProduct];
     const idSupplyRaw = orderRow?.[ORDER_COLS.idSupply];
-    const supplierId = idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
-      ? Number(idSupplyRaw) : null;
-    const giaNhapCu = normalizeMoney(orderRow?.[ORDER_COLS.cost]);
-    const giaBanCu = normalizeMoney(orderRow?.[ORDER_COLS.price]);
+    const supplierId =
+      idSupplyRaw != null && Number.isFinite(Number(idSupplyRaw))
+        ? Number(idSupplyRaw)
+        : null;
 
     if (!sanPham) {
       return { price: fallbackPrice, cost: fallbackCost };
     }
 
-    const orderCode = String(orderRow?.[ORDER_COLS.idOrder] || "");
-    let { pricing, pctCtv, pctKhach, pctPromo } = await calculateRenewalPricing(client, {
+    let pricing = await resolveRenewalOrderPricing({
       sanPham,
       supplierId,
       orderCode,
-      fallbackCost: giaNhapCu,
-      fallbackPrice: giaBanCu,
-      forceKhachLe: false,
+    });
+    pricing = await applyMavkKhachLeFallback({
+      sanPham,
+      supplierId,
+      orderCode,
+      pricing,
     });
 
-    const promoPrefix = String(ORDER_PREFIXES?.promo || "MAVK").toUpperCase();
-    const isMavk = promoPrefix && orderCode.toUpperCase().startsWith(promoPrefix);
-    const promoRatio = normalizePromoRatio(pctPromo);
-    if (isMavk && promoRatio <= 0) {
-      const khachLe = await calculateRenewalPricing(client, {
-        sanPham,
-        supplierId,
-        orderCode,
-        fallbackCost: giaNhapCu,
-        fallbackPrice: giaBanCu,
-        forceKhachLe: true,
-      });
-      pricing = khachLe.pricing;
-      pctCtv = khachLe.pctCtv;
-      pctKhach = khachLe.pctKhach;
+    const price = normalizeMoney(pricing.price);
+    const cost = normalizeMoney(pricing.cost);
+
+    if (price > 0) {
+      return { price, cost: cost > 0 ? cost : fallbackCost };
     }
 
-    const marginsLookValid = (pctCtv != null && pctCtv > 0 && pctCtv < 1) ||
-                              (pctKhach != null && pctKhach > 0 && pctKhach < 1);
-
-    if (!marginsLookValid && fallbackPrice > 0) {
-      logger.warn("[Renewal] computeOrderCurrentPrice: margins missing/invalid, using stored price", {
-        orderCode, pctCtv, pctKhach, computedPrice: pricing.price, storedPrice: fallbackPrice,
-      });
-      return { price: fallbackPrice, cost: pricing.cost > 0 ? pricing.cost : fallbackCost };
+    if (fallbackPrice > 0) {
+      logger.warn(
+        "[Renewal] computeOrderCurrentPrice: chưa resolve được giá tier, dùng giá lưu DB",
+        { orderCode, storedPrice: fallbackPrice }
+      );
+      return { price: fallbackPrice, cost: cost > 0 ? cost : fallbackCost };
     }
 
-    return { price: pricing.price, cost: pricing.cost };
-    /* legacy pricing path removed
-    const maxPriceRow = await fetchMaxSupplyPrice(client, { variantId, productId });
-
-    const normalizedNhap = normalizeImportValue(giaNhapSource, giaNhapCu || undefined);
-    const latestGiaNhap = resolveMoney(normalizedNhap?.value, giaNhapSource, giaNhapCu);
-
-    const normalizedPriceMax = normalizeImportValue(
-      maxPriceRow,
-      latestGiaNhap || giaNhapCu || undefined
-    );
-    const priceMax = resolveMoney(
-      normalizedPriceMax?.value,
-      maxPriceRow,
-      giaBanCu,
-      latestGiaNhap
-    );
-    const effectivePriceMax = resolveMoney(priceMax, giaBanCu, latestGiaNhap);
-
-    // Gói khuyến mãi (MAVK) hết hạn → thông báo theo giá khách lẻ
-    const idOrderForPrice = String(orderRow?.[ORDER_COLS.idOrder] || "");
-    const isPromoOrderForPrice =
-      Boolean(ORDER_PREFIXES?.promo) &&
-      idOrderForPrice.toUpperCase().startsWith(ORDER_PREFIXES.promo.toUpperCase());
-    const finalGiaBanRaw = calcGiaBan({
-      orderId: idOrderForPrice,
-      giaNhap: latestGiaNhap,
-      priceMax: effectivePriceMax,
-      pctCtv,
-      pctKhach,
-      giaBanFallback: giaBanCu,
-      forceKhachLe: isPromoOrderForPrice,
-    });
-
-    const finalGiaNhap = resolveMoney(latestGiaNhap, giaNhapCu);
-    const finalGiaBan = resolveMoney(
-      roundToThousands(finalGiaBanRaw || 0),
-      effectivePriceMax,
-      giaBanCu,
-      latestGiaNhap
-    );
-
-    */
+    return { price: fallbackPrice, cost: fallbackCost };
   } catch (err) {
+    const message =
+      err instanceof PricingHttpError ? err.message : err?.message;
     logger.warn("[Renewal] computeOrderCurrentPrice failed, using stored price", {
-      orderCode: orderRow?.[ORDER_COLS.idOrder],
-      error: err?.message,
+      orderCode,
+      error: message,
     });
     return { price: fallbackPrice, cost: fallbackCost };
   }
