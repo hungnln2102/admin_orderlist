@@ -2,9 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { API_ENDPOINTS } from "@/constants";
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
+import {
+  buildPaginationPages,
+  getWarehousePaginated,
+} from "./utils/pagination";
 import { StorageHeader } from "./components/StorageHeader";
 import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
+import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
 import { WarehouseItem, normalizeText } from "./types";
 
 export default function Storage() {
@@ -12,10 +17,14 @@ export default function Storage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [productFilter, setProductFilter] = useState("");
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
   const [draft, setDraft] = useState<WarehouseItem | null>(null);
   const [warehouseIdPendingDelete, setWarehouseIdPendingDelete] = useState<number | null>(null);
   const [warehouseDeleteSubmitting, setWarehouseDeleteSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     let mounted = true;
@@ -67,11 +76,16 @@ export default function Storage() {
   const startEdit = (item: WarehouseItem) => {
     setEditingId(item.id ?? null);
     setDraft({ ...item });
+    if (item.id != null) setExpandedItemId(item.id);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setDraft(null);
+  };
+
+  const toggleDetails = (id: number) => {
+    setExpandedItemId((prev) => (prev === id ? null : id));
   };
 
   const updateDraft = (key: keyof WarehouseItem, value: string) => {
@@ -136,6 +150,7 @@ export default function Storage() {
       }
       setItems((prev) => prev.filter((it) => it.id !== id));
       if (editingId === id) cancelEdit();
+      if (expandedItemId === id) setExpandedItemId(null);
       setWarehouseIdPendingDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi khi xóa");
@@ -160,9 +175,16 @@ export default function Storage() {
     });
   };
 
+  const { productOptions, loadingProducts } = useWarehouseProducts(items);
+
   const filtered = useMemo(() => {
     return items
       .filter((item) => {
+        if (productFilter.trim()) {
+          const cat = normalizeText(item.category);
+          const filter = normalizeText(productFilter);
+          if (cat !== filter) return false;
+        }
         if (!search.trim()) return true;
         const q = normalizeText(search);
         return [
@@ -180,31 +202,65 @@ export default function Storage() {
         const nameB = normalizeText(b.category);
         return nameA.localeCompare(nameB, "vi");
       });
-  }, [items, search]);
+  }, [items, search, productFilter]);
+
+  const { currentItems, totalPages } = useMemo(
+    () => getWarehousePaginated(filtered, currentPage, rowsPerPage),
+    [filtered, currentPage, rowsPerPage]
+  );
+
+  const paginationPages = useMemo(
+    () => buildPaginationPages(currentPage, totalPages),
+    [currentPage, totalPages]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, productFilter, rowsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 w-full min-w-0 max-w-[1400px]">
+    <div className="w-full min-w-0 max-w-none space-y-5 p-4 lg:p-6">
       <StorageHeader totalItems={items.length} />
 
       <SearchBar
         search={search}
         onSearchChange={setSearch}
+        productFilter={productFilter}
+        onProductFilterChange={setProductFilter}
+        productOptions={productOptions}
+        loadingProducts={loadingProducts}
         onCreate={startCreate}
         loading={loading}
         error={error}
       />
 
       <StorageTable
-        items={filtered}
+        items={currentItems}
+        filteredCount={filtered.length}
+        productOptions={productOptions}
         draft={draft}
         editingId={editingId}
+        expandedItemId={expandedItemId}
         loading={loading}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        rowsPerPage={rowsPerPage}
+        paginationPages={paginationPages}
+        setCurrentPage={setCurrentPage}
+        setRowsPerPage={setRowsPerPage}
         onDraftChange={updateDraft}
         onSave={saveEdit}
         onDelete={requestDeleteRow}
         onCancel={cancelEdit}
         onStartEdit={startEdit}
         onStartCreate={startCreate}
+        onToggleDetails={toggleDetails}
       />
 
       <ConfirmModal
