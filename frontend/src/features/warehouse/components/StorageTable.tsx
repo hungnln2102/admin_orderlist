@@ -75,15 +75,24 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   return (
     <div className="w-full min-w-0 overflow-hidden rounded-[18px] border border-white/12 bg-gradient-to-br from-indigo-900/70 via-slate-900/70 to-slate-950/70 shadow-[0_20px_65px_-30px_rgba(0,0,0,0.85)]">
       <ResponsiveTable className="w-full" showCardOnMobile cardView={mobileList}>
-        <table className="min-w-full table-fixed border-separate border-spacing-y-4 text-white">
+        <div className="overflow-x-auto">
+        <table className="min-w-[920px] w-full table-fixed border-separate border-spacing-y-4 text-white">
+          <colgroup>
+            <col className="w-[28%]" />
+            <col className="w-[26%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[4%]" />
+            <col className="w-[20%]" />
+          </colgroup>
           <thead>
-            <tr className="[&>th]:px-2 [&>th]:pb-2 [&>th]:text-center [&>th]:text-[10px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-[0.1em] [&>th]:text-indigo-300/70 sm:[&>th]:px-4 sm:[&>th]:text-[11px] sm:[&>th]:tracking-[0.2em]">
-              <th className="w-[12%]">Sản phẩm</th>
-              <th className="w-[32%]">Tài khoản</th>
-              <th className="w-[16%]">Trạng thái</th>
-              <th className="w-[14%]">Hạn SD</th>
-              <th className="w-[8%]">V</th>
-              <th className="w-[18%] pr-4 text-right">Thao tác</th>
+            <tr className="[&>th]:px-1.5 [&>th]:pb-2 [&>th]:text-center [&>th]:text-[9px] [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-indigo-300/70 sm:[&>th]:px-2 sm:[&>th]:text-[10px]">
+              <th className="!px-2 sm:!px-3">Sản phẩm</th>
+              <th>Tài khoản</th>
+              <th>Trạng thái</th>
+              <th>Hạn SD</th>
+              <th>V</th>
+              <th className="pr-2 text-right sm:pr-3">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -160,6 +169,7 @@ export const StorageTable: React.FC<StorageTableProps> = ({
             ))}
           </tbody>
         </table>
+        </div>
       </ResponsiveTable>
 
       <OrdersPagination
