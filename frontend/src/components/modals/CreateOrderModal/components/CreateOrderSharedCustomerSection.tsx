@@ -120,7 +120,7 @@ export const CreateOrderSharedCustomerSection = ({
         <div>
           <label className={labelClass}>Link liên hệ</label>
           <input
-            type="url"
+            type="text"
             name={ORDER_FIELDS.CONTACT}
             value={(formData[ORDER_FIELDS.CONTACT] as string) || ""}
             onChange={onFieldChange}
