@@ -1,0 +1,70 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { API_ENDPOINTS } from "@/constants";
+import { apiFetch } from "@/shared/api/client";
+import type { WarehouseItem } from "../types";
+
+type CatalogProduct = {
+  id?: number;
+  san_pham?: string;
+  is_active?: boolean;
+};
+
+export type ProductOption = { value: string; label: string };
+
+export function useWarehouseProducts(items: WarehouseItem[]) {
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  const loadProducts = useCallback(async () => {
+    setLoadingProducts(true);
+    try {
+      const res = await apiFetch(API_ENDPOINTS.PRODUCT_PRICES);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as CatalogProduct[];
+      setProducts(Array.isArray(data) ? data : []);
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
+
+  const productOptions = useMemo((): ProductOption[] => {
+    const fromApi = products
+      .filter((p) => p.is_active !== false && String(p.san_pham || "").trim())
+      .map((p) => {
+        const name = String(p.san_pham).trim();
+        return { value: name, label: name };
+      });
+
+    const fromStock = items
+      .map((it) => String(it.category || "").trim())
+      .filter(Boolean);
+
+    const seen = new Set<string>();
+    const merged: ProductOption[] = [];
+
+    for (const opt of fromApi) {
+      const key = opt.value.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(opt);
+    }
+
+    for (const name of fromStock) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push({ value: name, label: name });
+    }
+
+    merged.sort((a, b) => a.label.localeCompare(b.label, "vi"));
+    return merged;
+  }, [products, items]);
+
+  return { productOptions, loadingProducts, reloadProducts: loadProducts };
+}
