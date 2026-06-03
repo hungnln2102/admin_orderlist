@@ -23,6 +23,7 @@ async function syncMavnFinanceAfterRenewalOrderPaid({ orderCode, beforeRenewalRo
       ...afterRow,
       status: beforeRenewalRow.status,
       cost: beforeRenewalRow.cost,
+      price: beforeRenewalRow.price,
     };
     await syncMavnStoreProfitExpense(trx, beforeRow, afterRow);
   });

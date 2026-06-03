@@ -251,24 +251,29 @@ async function syncMavnStoreProfitExpense(trx, beforeRow, afterRow) {
   const afterAppliedAmount =
     nextStatus === STATUS.PAID && nextPrice > 0 && isInternal ? nextPrice : 0;
 
-  await applyInternalMavnDashboardDelta({
-    trx,
-    beforeRow,
-    afterRow,
-    beforeAppliedAmount,
-    afterAppliedAmount,
-  });
-  const beforeExternalAmount =
-    prevStatus === STATUS.PAID && prevCost > 0 && !wasInternal ? prevCost : 0;
-  const afterExternalAmount =
-    nextStatus === STATUS.PAID && nextCost > 0 && !isInternal ? nextCost : 0;
-  await applyExternalMavnProfitDelta({
-    trx,
-    beforeRow,
-    afterRow,
-    beforeAppliedAmount: beforeExternalAmount,
-    afterAppliedAmount: afterExternalAmount,
-  });
+  // Mutual exclusion: NCC nội bộ (Mavryk/Shop) dùng nhánh internal (trừ theo price + bank),
+  // NCC ngoài dùng nhánh external (trừ theo cost). Không chạy cả hai để tránh 2 lần biến động.
+  if (wasInternal || isInternal) {
+    await applyInternalMavnDashboardDelta({
+      trx,
+      beforeRow,
+      afterRow,
+      beforeAppliedAmount,
+      afterAppliedAmount,
+    });
+  } else {
+    const beforeExternalAmount =
+      prevStatus === STATUS.PAID && prevCost > 0 && !wasInternal ? prevCost : 0;
+    const afterExternalAmount =
+      nextStatus === STATUS.PAID && nextCost > 0 && !isInternal ? nextCost : 0;
+    await applyExternalMavnProfitDelta({
+      trx,
+      beforeRow,
+      afterRow,
+      beforeAppliedAmount: beforeExternalAmount,
+      afterAppliedAmount: afterExternalAmount,
+    });
+  }
 
   if (!(afterAppliedAmount > 0)) {
     await deleteAutoExpenseLogsByOrderCode(trx, orderCode);

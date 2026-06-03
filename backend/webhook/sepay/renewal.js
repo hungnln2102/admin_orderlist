@@ -698,6 +698,7 @@ const runRenewal = async (
         beforeRenewalRow: {
           status: order[ORDER_COLS.status],
           cost: order[ORDER_COLS.cost],
+          price: order[ORDER_COLS.price],
         },
       });
     }
