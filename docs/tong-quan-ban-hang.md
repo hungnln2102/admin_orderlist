@@ -33,7 +33,7 @@ Mục tiêu của file:
 
 - `dashboard.dashboard_monthly_summary`: projection theo tháng (`month_key`) cho dashboard.
 - `dashboard.daily_revenue_summary`: tổng hợp doanh thu theo ngày.
-- `dashboard.store_profit_expenses`: các khoản điều chỉnh lợi nhuận (ví dụ `mavn_import`, `external_import`, `withdraw_profit`).
+- `dashboard.com_profit_expenses`: các khoản điều chỉnh lợi nhuận (ví dụ `mavn_import`, `external_import`, `withdraw_profit`).
 
 ### 2.3 Catalog phục vụ phân tích bán hàng
 

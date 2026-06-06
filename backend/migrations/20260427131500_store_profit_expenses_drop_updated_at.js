@@ -20,7 +20,7 @@ exports.up = async function up(knex) {
 
 exports.down = async function down(knex) {
   await knex.raw(`
-    ALTER TABLE finance.store_profit_expenses
+    ALTER TABLE finance.com_profit_expenses
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
   `);
 };

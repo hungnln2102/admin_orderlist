@@ -864,7 +864,7 @@ CREATE SEQUENCE dashboard.saving_goals_id_seq
 
 ALTER SEQUENCE dashboard.saving_goals_id_seq OWNED BY dashboard.saving_goals.id;
 
-CREATE TABLE dashboard.store_profit_expenses (
+CREATE TABLE dashboard.com_profit_expenses (
     id bigint NOT NULL,
     amount numeric(18,2) NOT NULL,
     reason text,
@@ -874,14 +874,14 @@ CREATE TABLE dashboard.store_profit_expenses (
     CONSTRAINT store_profit_expenses_expense_type_check CHECK (((expense_type)::text = ANY (ARRAY[('withdraw_profit'::character varying)::text, ('external_import'::character varying)::text])))
 );
 
-CREATE SEQUENCE dashboard.store_profit_expenses_id_seq
+CREATE SEQUENCE dashboard.com_profit_expenses_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
     NO MAXVALUE
     CACHE 1;
 
-ALTER SEQUENCE dashboard.store_profit_expenses_id_seq OWNED BY dashboard.store_profit_expenses.id;
+ALTER SEQUENCE dashboard.com_profit_expenses_id_seq OWNED BY dashboard.com_profit_expenses.id;
 
 CREATE TABLE dashboard.trans_dailybalances (
     id bigint NOT NULL,
@@ -1746,7 +1746,7 @@ ALTER TABLE ONLY dashboard.master_wallettypes ALTER COLUMN id SET DEFAULT nextva
 
 ALTER TABLE ONLY dashboard.saving_goals ALTER COLUMN id SET DEFAULT nextval('dashboard.saving_goals_id_seq'::regclass);
 
-ALTER TABLE ONLY dashboard.store_profit_expenses ALTER COLUMN id SET DEFAULT nextval('dashboard.store_profit_expenses_id_seq'::regclass);
+ALTER TABLE ONLY dashboard.com_profit_expenses ALTER COLUMN id SET DEFAULT nextval('dashboard.com_profit_expenses_id_seq'::regclass);
 
 ALTER TABLE ONLY dashboard.trans_dailybalances ALTER COLUMN id SET DEFAULT nextval('dashboard.trans_dailybalances_id_seq'::regclass);
 
@@ -1894,7 +1894,7 @@ ALTER TABLE ONLY dashboard.master_wallettypes
 ALTER TABLE ONLY dashboard.saving_goals
     ADD CONSTRAINT saving_goals_pkey PRIMARY KEY (id);
 
-ALTER TABLE ONLY dashboard.store_profit_expenses
+ALTER TABLE ONLY dashboard.com_profit_expenses
     ADD CONSTRAINT store_profit_expenses_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY dashboard.trans_dailybalances

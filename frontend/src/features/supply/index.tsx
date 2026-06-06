@@ -104,12 +104,17 @@ export default function Sources() {
     });
   };
 
+  const totalUnpaid = supplies.reduce((sum, s) => {
+    const unpaid = Number(s.totalUnpaidImport ?? 0);
+    return sum + (unpaid > 0 ? unpaid : 0);
+  }, 0);
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-white">Quản Lý Nguồn Hàng</h1>
+        <h1 className="text-2xl font-bold text-white">{"Quản Lý Nguồn Hàng"}</h1>
         <p className="text-white/60 text-sm">
-          Theo dõi công nợ và chu kỳ thanh toán từ các đối tác cung cấp.
+          {"Theo dõi công nợ và chu kỳ thanh toán từ các đối tác cung cấp."}
         </p>
       </div>
 
@@ -117,6 +122,7 @@ export default function Sources() {
         orderCount={orderCostTotals.orderCount}
         totalCost={orderCostTotals.totalCost}
         totalRefund={orderCostTotals.totalRefund}
+        totalUnpaid={totalUnpaid}
         loading={orderCostTotalsLoading && viewTab === "summary"}
       />
 

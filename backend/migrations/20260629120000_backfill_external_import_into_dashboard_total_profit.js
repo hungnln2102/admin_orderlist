@@ -33,7 +33,7 @@ WITH ext AS (
   SELECT
     TO_CHAR(DATE_TRUNC('month', created_at::timestamptz), 'YYYY-MM') AS mk,
     COALESCE(SUM(amount::numeric), 0) AS total_ext
-  FROM "${fin}".store_profit_expenses
+  FROM "${fin}".com_profit_expenses
   WHERE expense_type = 'external_import'
   GROUP BY 1
 )

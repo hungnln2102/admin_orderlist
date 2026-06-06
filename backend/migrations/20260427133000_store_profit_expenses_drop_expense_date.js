@@ -20,9 +20,9 @@ exports.up = async function up(knex) {
 
 exports.down = async function down(knex) {
   await knex.raw(`
-    ALTER TABLE finance.store_profit_expenses
+    ALTER TABLE finance.com_profit_expenses
       ADD COLUMN IF NOT EXISTS expense_date DATE NOT NULL DEFAULT CURRENT_DATE;
-    UPDATE finance.store_profit_expenses
+    UPDATE finance.com_profit_expenses
     SET expense_date = COALESCE(expense_date, DATE(created_at))
     WHERE expense_date IS NULL;
   `);

@@ -1,6 +1,8 @@
 services:
   # Biến môi trường Node: local → backend/.env.local (+ .env tùy chọn); stack Docker → backend/.env.docker (xem backend/env.*.example).
-  # ==========================================
+  # API: api.mavrykpremium.com -> 3001.
+# Bot/Webhook: botapi.mavrykpremium.com -> 5000.
+# ==========================================
   # 1. DATABASE SERVICE (PostgreSQL)
   # ==========================================
   postgres:
@@ -168,7 +170,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.store}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://admin.mavrykpremium.com}
     restart: always
     depends_on:
       backend:
@@ -187,7 +189,7 @@ services:
 
 # ==========================================
 # NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
-# Admin: admin.mavrykpremium.store -> 8081 (frontend), 3001 (api), 5000 (webhook).
+# Admin/Main: admin.mavrykpremium.com + mavrykpremium.com + www.mavrykpremium.com -> 8081 (frontend), 3001 (api), 5000 (webhook).
 # ==========================================
 
 # ==========================================

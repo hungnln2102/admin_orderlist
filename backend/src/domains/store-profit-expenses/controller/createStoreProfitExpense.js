@@ -103,7 +103,7 @@ const createStoreProfitExpense = async (req, res) => {
         await debitShopBankExternalOut(trx, {
           accountId: shopBankAccountId,
           amount,
-          sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+          sourceKind: SOURCE_KINDS.com_PROFIT_EXPENSE,
           sourceId: createdId,
           note: reason || null,
         });

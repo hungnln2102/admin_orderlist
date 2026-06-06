@@ -61,13 +61,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_bank_account_ledger_source_unique
 COMMENT ON TABLE admin.shop_bank_account_ledger IS
   'Sổ cái STK shop: receipt_in, withdraw, external_out.';
 
-ALTER TABLE "${fin}".store_profit_expenses
+ALTER TABLE "${fin}".com_profit_expenses
   ADD COLUMN IF NOT EXISTS shop_bank_account_id integer;
 
-ALTER TABLE "${fin}".store_profit_expenses
+ALTER TABLE "${fin}".com_profit_expenses
   DROP CONSTRAINT IF EXISTS store_profit_expenses_shop_bank_account_fkey;
 
-ALTER TABLE "${fin}".store_profit_expenses
+ALTER TABLE "${fin}".com_profit_expenses
   ADD CONSTRAINT store_profit_expenses_shop_bank_account_fkey
   FOREIGN KEY (shop_bank_account_id) REFERENCES admin.shop_bank_accounts(id);
 
@@ -90,10 +90,10 @@ WHERE TRIM(REGEXP_REPLACE(s.account_number, '\\s+', '', 'g')) = r.stk_norm;
 exports.down = async (knex) => {
   const fin = ident(financeSchema);
   await knex.raw(`
-ALTER TABLE "${fin}".store_profit_expenses
+ALTER TABLE "${fin}".com_profit_expenses
   DROP CONSTRAINT IF EXISTS store_profit_expenses_shop_bank_account_fkey;
 
-ALTER TABLE "${fin}".store_profit_expenses
+ALTER TABLE "${fin}".com_profit_expenses
   DROP COLUMN IF EXISTS shop_bank_account_id;
 
 DROP TABLE IF EXISTS admin.shop_bank_account_ledger;

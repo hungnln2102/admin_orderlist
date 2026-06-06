@@ -34,7 +34,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
     0%, 100% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.12); opacity: 0.92; }
   }
-  .storefront-renew-search-title {
+  .comfront-renew-search-title {
     animation: storefront-renew-search-breathe 3.2s ease-in-out infinite;
     transform-origin: center;
   }
@@ -43,7 +43,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
   }
-  .storefront-renew-search-btn {
+  .comfront-renew-search-btn {
     animation: storefront-renew-search-btn-pulse 2.4s ease-in-out infinite;
     transform-origin: center;
   }
@@ -53,7 +53,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
     40% { transform: rotate(-14deg) scale(1.04); }
     70% { transform: rotate(10deg) scale(1.04); }
   }
-  .storefront-renew-refresh-nudge {
+  .comfront-renew-refresh-nudge {
     animation: storefront-renew-refresh-nudge 3.2s ease-in-out infinite;
     transform-origin: center;
   }
@@ -63,7 +63,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
     35% { transform: translateY(-6px) rotate(-4deg); }
     70% { transform: translateY(-2px) rotate(4deg); }
   }
-  .storefront-renew-status-icon-bounce {
+  .comfront-renew-status-icon-bounce {
     animation: storefront-renew-status-icon-bounce 2.6s ease-in-out infinite;
   }
 
@@ -75,7 +75,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
       box-shadow: 0 0 34px -2px rgba(244, 63, 94, 0.62), 0 0 20px -8px rgba(244, 63, 94, 0.35);
     }
   }
-  .storefront-renew-status-glow-rose {
+  .comfront-renew-status-glow-rose {
     animation: storefront-renew-glow-pulse-rose 2.2s ease-in-out infinite;
   }
 
@@ -87,7 +87,7 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
       box-shadow: 0 0 34px -2px rgba(251, 191, 36, 0.58), 0 0 20px -8px rgba(251, 191, 36, 0.3);
     }
   }
-  .storefront-renew-status-glow-amber {
+  .comfront-renew-status-glow-amber {
     animation: storefront-renew-glow-pulse-amber 2.2s ease-in-out infinite;
   }
 
@@ -95,19 +95,19 @@ export const STOREFRONT_RENEW_CHECK_STYLES = `
     0%, 100% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.06); opacity: 0.88; }
   }
-  .storefront-renew-error-icon {
+  .comfront-renew-error-icon {
     animation: storefront-renew-error-ring 2s ease-in-out infinite;
     transform-origin: center;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .storefront-renew-search-title,
-    .storefront-renew-search-btn,
-    .storefront-renew-refresh-nudge,
-    .storefront-renew-status-icon-bounce,
-    .storefront-renew-status-glow-rose,
-    .storefront-renew-status-glow-amber,
-    .storefront-renew-error-icon {
+    .comfront-renew-search-title,
+    .comfront-renew-search-btn,
+    .comfront-renew-refresh-nudge,
+    .comfront-renew-status-icon-bounce,
+    .comfront-renew-status-glow-rose,
+    .comfront-renew-status-glow-amber,
+    .comfront-renew-error-icon {
       animation: none !important;
     }
   }

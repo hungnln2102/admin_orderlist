@@ -47,7 +47,7 @@ async function runDailyRevenueSummaryBackfill(options = {}) {
   );
   const orderTable = tableName("order_list", SCHEMA_ORDERS);
   const expenseTable = tableName(
-    FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
+    FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE,
     SCHEMA_FINANCE
   );
   const refundStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
@@ -66,7 +66,7 @@ async function runDailyRevenueSummaryBackfill(options = {}) {
   await db.raw(sql, bindings);
 
   if (options.closeKnex) {
-    await db.destroy().catch(() => {});
+    await db.destroy().catch(() => { });
   }
 }
 

@@ -10,5 +10,5 @@ export const QUOTE_HEADER = {
     "Địa chỉ: Nhà thương mại dịch vụ số 1.5, khu a1, xã Nhà Bè, huyện Nhà Bè, TP.HCM",
   hotline: "Hotline: 0378.304.963",
   email: "Email: —",
-  website: "Website: mavrykpremium.store",
+  website: "Website: mavrykpremium.com",
 } as const;

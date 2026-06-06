@@ -75,10 +75,10 @@ const {
 const summaryTable = tableName(FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.TABLE, SCHEMA_FINANCE);
 const summaryCols = FINANCE_SCHEMA.DASHBOARD_MONTHLY_SUMMARY.COLS;
 const storeExpenseTable = tableName(
-  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
+  FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE,
   SCHEMA_FINANCE
 );
-const storeExpenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+const storeExpenseCols = FINANCE_SCHEMA.com_PROFIT_EXPENSES.COLS;
 const VARIANT_ID_COL = VARIANT_COLS.id || VARIANT_COLS.ID || "id";
 const VARIANT_DISPLAY_NAME_COL =
   VARIANT_COLS.displayName || VARIANT_COLS.DISPLAY_NAME || "display_name";
@@ -249,7 +249,7 @@ const createAutoMavrykExternalImportLog = async ({
       await debitShopBankExternalOut(client, {
         accountId: mavrykAccountId,
         amount: normalizedAmount,
-        sourceKind: LEDGER_SOURCE_KINDS.STORE_PROFIT_EXPENSE,
+        sourceKind: LEDGER_SOURCE_KINDS.com_PROFIT_EXPENSE,
         sourceId: insertedExpenseId,
         note: reason,
       });

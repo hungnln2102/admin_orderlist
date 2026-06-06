@@ -2,7 +2,7 @@
 -- - Rút lợi nhuận
 -- - Đơn ngoài luồng
 
-CREATE TABLE IF NOT EXISTS finance.store_profit_expenses (
+CREATE TABLE IF NOT EXISTS finance.com_profit_expenses (
   id BIGSERIAL PRIMARY KEY,
   amount NUMERIC(18,2) NOT NULL CHECK (amount >= 0),
   reason TEXT,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS finance.store_profit_expenses (
 );
 
 CREATE INDEX IF NOT EXISTS idx_store_profit_expenses_expense_date
-  ON finance.store_profit_expenses(expense_date DESC);
+  ON finance.com_profit_expenses(expense_date DESC);
 
 CREATE INDEX IF NOT EXISTS idx_store_profit_expenses_expense_type_date
-  ON finance.store_profit_expenses(expense_type, expense_date DESC);
+  ON finance.com_profit_expenses(expense_type, expense_date DESC);

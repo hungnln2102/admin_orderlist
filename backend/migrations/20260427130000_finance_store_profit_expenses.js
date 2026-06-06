@@ -20,6 +20,6 @@ exports.up = async function up(knex) {
 
 exports.down = async function down(knex) {
   await knex.raw(`
-    DROP TABLE IF EXISTS finance.store_profit_expenses;
+    DROP TABLE IF EXISTS finance.com_profit_expenses;
   `);
 };

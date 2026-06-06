@@ -6,10 +6,10 @@ const {
 } = require("../../config/dbSchema");
 
 const expenseTableName = tableName(
-  FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
+  FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE,
   SCHEMA_FINANCE
 );
-const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
+const expenseCols = FINANCE_SCHEMA.com_PROFIT_EXPENSES.COLS;
 
 /**
  * Gộp `mavn_import` + `external_import` theo tháng `created_at` (báo cáo / đối soát).

@@ -26,21 +26,21 @@ describe("appConfig CORS origins", () => {
   it("normalizes configured origins and removes duplicates", () => {
     process.env.NODE_ENV = "production";
     process.env.FRONTEND_ORIGINS = [
-      "https://admin.mavrykpremium.store/",
-      " https://www.mavrykpremium.store ",
-      "https://www.mavrykpremium.store/",
-      "https://mavrykpremium.store/path",
+      "https://admin.mavrykpremium.com/",
+      " https://www.mavrykpremium.com ",
+      "https://www.mavrykpremium.com/",
+      "https://mavrykpremium.com/path",
     ].join(",");
 
     const { allowedOrigins, normalizeOrigin } = require("../../../src/config/appConfig");
 
     expect(allowedOrigins).toEqual([
-      "https://admin.mavrykpremium.store",
-      "https://www.mavrykpremium.store",
-      "https://mavrykpremium.store",
+      "https://admin.mavrykpremium.com",
+      "https://www.mavrykpremium.com",
+      "https://mavrykpremium.com",
     ]);
-    expect(normalizeOrigin("https://www.mavrykpremium.store/")).toBe(
-      "https://www.mavrykpremium.store"
+    expect(normalizeOrigin("https://www.mavrykpremium.com/")).toBe(
+      "https://www.mavrykpremium.com"
     );
   });
 

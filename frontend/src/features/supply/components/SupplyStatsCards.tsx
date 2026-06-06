@@ -3,6 +3,7 @@ import {
   ShoppingBagIcon,
   CurrencyDollarIcon,
   ArrowUturnLeftIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import StatCard, { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import * as Helpers from "@/shared/utils";
@@ -11,6 +12,7 @@ interface Props {
   orderCount: number;
   totalCost: number;
   totalRefund: number;
+  totalUnpaid: number;
   loading?: boolean;
 }
 
@@ -18,31 +20,39 @@ const SupplyStatsCards: React.FC<Props> = ({
   orderCount,
   totalCost,
   totalRefund,
+  totalUnpaid,
   loading = false,
 }) => {
-  const dash = "—";
+  const dash = "?";
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
       <StatCard
-        title="Tổng đơn"
+        title="T?ng ??n"
         value={loading ? dash : orderCount}
         icon={ShoppingBagIcon}
         accent={STAT_CARD_ACCENTS.violet}
       />
       <StatCard
-        title="Tổng nhập"
+        title="T?ng nh?p"
         value={loading ? dash : Helpers.formatCurrency(totalCost)}
         icon={CurrencyDollarIcon}
         accent={STAT_CARD_ACCENTS.emerald}
       />
       <StatCard
-        title="Tổng hoàn"
+        title="T?ng ho?n"
         value={loading ? dash : Helpers.formatCurrency(totalRefund)}
         icon={ArrowUturnLeftIcon}
         accent={STAT_CARD_ACCENTS.amber}
+      />
+      <StatCard
+        title="T?ng ch?a thanh to?n"
+        value={loading ? dash : Helpers.formatCurrency(totalUnpaid)}
+        icon={ClockIcon}
+        accent={STAT_CARD_ACCENTS.rose}
       />
     </div>
   );
 };
 
 export default SupplyStatsCards;
+

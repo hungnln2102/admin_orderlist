@@ -64,15 +64,72 @@ const buildFlowLine = (label, beforeValue, afterValue, deltaValue) => {
   )})`;
 };
 
+const humanizeContext = (context) => {
+  const raw = String(context || "").trim();
+  if (!raw) return "";
+
+  // supplier-change[order=460, flow=A]
+  const supplierChangeMatch = raw.match(
+    /supplier-change\[order=(\d+),?\s*flow=(\w+)\]/i
+  );
+  if (supplierChangeMatch) {
+    const flowMap = {
+      A: "\u0111\u01a1n m\u1edbi (\u2264 5 ng\u00e0y)",
+      B_UNPAID: "ch\u01b0a TT NCC",
+      B_PAID: "\u0111\u00e3 TT NCC",
+    };
+    const flowLabel = flowMap[supplierChangeMatch[2]] || supplierChangeMatch[2];
+    return `\u0110\u1ed5i NCC \u0111\u01a1n ${supplierChangeMatch[1]} (${flowLabel})`;
+  }
+
+  // renewal.mavryk.external_import:ORDER_CODE
+  const mavrykRenewMatch = raw.match(
+    /renewal\.mavryk\.external_import:(.+)/i
+  );
+  if (mavrykRenewMatch) {
+    return `Gia h\u1ea1n Mavryk \u0111\u01a1n ${mavrykRenewMatch[1]}`;
+  }
+
+  // renewal.runRenewal:ORDER_CODE
+  const renewalMatch = raw.match(/renewal\.runRenewal:(.+)/i);
+  if (renewalMatch) {
+    return `Gia h\u1ea1n \u0111\u01a1n ${renewalMatch[1]}`;
+  }
+
+  // payments.confirmPaymentSupply supply=123
+  const confirmSupplyMatch = raw.match(
+    /payments\.confirmPaymentSupply\s+supply=(\d+)/i
+  );
+  if (confirmSupplyMatch) {
+    return `Thanh to\u00e1n NCC (supply #${confirmSupplyMatch[1]})`;
+  }
+
+  // Static mappings
+  const staticMap = {
+    "webhook.sepay.combined": "Webhook Sepay",
+    "payments.applyDashboardDelta": "Thanh to\u00e1n \u0111\u01a1n h\u00e0ng",
+    "manualWebhook.incrementDashboardSummaryByDelta": "Ho\u00e0n th\u00e0nh th\u1ee7 c\u00f4ng (Webhook)",
+    "manualUsdt.incrementDashboardSummaryByDelta": "Ho\u00e0n th\u00e0nh th\u1ee7 c\u00f4ng (USDT)",
+    "dashboardSummary.refund.statusChange": "Ho\u00e0n ti\u1ec1n \u0111\u01a1n h\u00e0ng",
+    "supplier-change.applyProfitDelta": "\u0110\u1ed5i NCC (b\u00f9 l\u1ee3i nhu\u1eadn)",
+    "webhook.outbound_transfer": "Ti\u1ec1n ra (Webhook)",
+  };
+  if (staticMap[raw]) return staticMap[raw];
+
+  // Fallback: return raw but cleaned up
+  return raw;
+};
+
 const buildFinanceDeltaMessage = ({ monthKey, rows = [], context = "" }) => {
   const lines = [
-    `━━━━━━━━━━━━ BIẾN ĐỘNG THÁNG ${String(monthKey || "")} ━━━━━━━━━━━━`,
+    `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 BI\u1EBEN \u0110\u1ED8NG TH\u00C1NG ${String(monthKey || "")} \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`,
     ``,
     ...rows,
     ``,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`,
   ];
-  if (context) lines.push(`Nguồn: ${String(context).trim()}`);
+  const label = humanizeContext(context);
+  if (label) lines.push(`Ngu\u1ED3n: ${label}`);
   return lines.join("\n");
 };
 

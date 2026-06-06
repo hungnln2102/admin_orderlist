@@ -126,7 +126,7 @@ if (redisClient) {
     const connectRedis = require("connect-redis");
     const RedisStore =
       connectRedis.RedisStore || connectRedis.default || connectRedis;
-    sessionOpts.store = new RedisStore({
+    sessionOpts.com = new RedisStore({
       client: createConnectRedisClientAdapter(redisClient),
       prefix: "sess:",
     });
@@ -148,7 +148,7 @@ if (redisClient) {
   logger.info("[Session] Using in-memory store (no Redis)");
 }
 
-if (sessionStoreGuardState.persistentSessionStoreRequired && !sessionOpts.store) {
+if (sessionStoreGuardState.persistentSessionStoreRequired && !sessionOpts.com) {
   throw new Error(
     "[Session] Production requires persistent Redis session store; in-memory fallback blocked"
   );

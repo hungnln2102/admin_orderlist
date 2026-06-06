@@ -3,7 +3,7 @@
  * Smoke test webhook Sepay với STK MB Bank.
  *
  *   node scripts/ops/test-mb-bank-webhook.js
- *   node scripts/ops/test-mb-bank-webhook.js --url https://admin.mavrykpremium.store/webhook
+ *   node scripts/ops/test-mb-bank-webhook.js --url https://admin.mavrykpremium.com/webhook
  *
  * Env: DATABASE_URL, SEPAY_API_KEY hoặc SEPAY_WEBHOOK_SECRET (từ .env backend).
  */
@@ -26,7 +26,7 @@ const ACCOUNT_HOLDER = "MAVRYK PREMIUM";
 
 const DEFAULT_WEBHOOK_URL =
   process.env.WEBHOOK_URL ||
-  "https://admin.mavrykpremium.store/webhook";
+  "https://admin.mavrykpremium.com/webhook";
 
 function parseArgs(argv) {
   const out = { url: DEFAULT_WEBHOOK_URL };

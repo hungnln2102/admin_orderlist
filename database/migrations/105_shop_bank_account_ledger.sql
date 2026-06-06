@@ -37,13 +37,13 @@ COMMENT ON TABLE admin.shop_bank_account_ledger IS
 
 -- Gắn STK cho rút / nhập ngoài luồng dashboard.
 -- Schema finance thực tế: dashboard (local) hoặc finance (prod) — Knex migration 20260821140000 tự resolve.
-ALTER TABLE finance.store_profit_expenses
+ALTER TABLE finance.com_profit_expenses
   ADD COLUMN IF NOT EXISTS shop_bank_account_id integer;
 
-ALTER TABLE finance.store_profit_expenses
+ALTER TABLE finance.com_profit_expenses
   DROP CONSTRAINT IF EXISTS store_profit_expenses_shop_bank_account_fkey;
 
-ALTER TABLE finance.store_profit_expenses
+ALTER TABLE finance.com_profit_expenses
   ADD CONSTRAINT store_profit_expenses_shop_bank_account_fkey
   FOREIGN KEY (shop_bank_account_id) REFERENCES admin.shop_bank_accounts(id);
 
