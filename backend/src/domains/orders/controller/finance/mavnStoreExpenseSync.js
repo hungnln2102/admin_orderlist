@@ -19,8 +19,8 @@ const {
 } = require("../../../shop-bank-accounts/services/shopBankLedgerService");
 const logger = require("../../../../utils/logger");
 
-const expenseTable = tableName(FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
-const expenseCols = FINANCE_SCHEMA.com_PROFIT_EXPENSES.COLS;
+const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
+const expenseCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
 const variantTable = tableName(PRODUCT_SCHEMA.VARIANT.TABLE, SCHEMA_PRODUCT);
 const supplierTable = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_PARTNER);
 const supplierCols = PARTNER_SCHEMA.SUPPLIER.COLS;

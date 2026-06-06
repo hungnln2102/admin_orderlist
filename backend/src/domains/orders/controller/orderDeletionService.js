@@ -38,8 +38,8 @@ const deleteOrderWithArchive = async ({
         normalizedStatus === STATUS.EXPIRED;
 
     if (isHardDelete) {
-        const expenseTable = tableName(FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
-        const eCols = FINANCE_SCHEMA.com_PROFIT_EXPENSES.COLS;
+        const expenseTable = tableName(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE, SCHEMA_FINANCE);
+        const eCols = FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.COLS;
         if (isMavnImportOrder(order) && (await storeProfitExpensesHasMavnColumns())) {
             const code = String(order?.[idOrderCol] ?? "").trim();
             if (code) {

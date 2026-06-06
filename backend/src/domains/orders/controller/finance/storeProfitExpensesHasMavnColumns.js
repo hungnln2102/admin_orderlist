@@ -22,7 +22,7 @@ async function storeProfitExpensesHasMavnColumns() {
     return cache.value;
   }
   const schema = validIdent(SCHEMA_FINANCE);
-  const table = validIdent(FINANCE_SCHEMA.com_PROFIT_EXPENSES.TABLE);
+  const table = validIdent(FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE);
   if (!schema || !table) {
     cache = { value: false, checkedAt: now };
     return false;

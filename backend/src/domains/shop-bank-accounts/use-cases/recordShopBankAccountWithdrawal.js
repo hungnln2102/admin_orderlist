@@ -57,7 +57,7 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
     await debitShopBankWithdraw(trx, {
       accountId: normalizedId,
       amount,
-      sourceKind: SOURCE_KINDS.com_PROFIT_EXPENSE,
+      sourceKind: SOURCE_KINDS.STORE_PROFIT_EXPENSE,
       sourceId: expenseId,
       note: reason,
     });
