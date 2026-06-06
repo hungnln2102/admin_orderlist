@@ -217,14 +217,16 @@ const postWebhookPaymentForOrder = async (
     });
     if (receiptId) {
       try {
-        await ensureOffFlowRefundCreditNote(client, {
-          paymentReceiptId: receiptId,
-          offFlowAmount: offFlow,
-          monthKey: paidMonthKey,
-          customerName: state?.[ORDER_COLS.customer],
-          customerContact: state?.[ORDER_COLS.contact],
-          sourceOrderCode: code,
-          ruleBranch: ruleBranch || "WEBHOOK_ORDER_OFF_FLOW_SPLIT",
+        await withSavepoint(client, "off_flow_credit_order_split", async () => {
+          await ensureOffFlowRefundCreditNote(client, {
+            paymentReceiptId: receiptId,
+            offFlowAmount: offFlow,
+            monthKey: paidMonthKey,
+            customerName: state?.[ORDER_COLS.customer],
+            customerContact: state?.[ORDER_COLS.contact],
+            sourceOrderCode: code,
+            ruleBranch: ruleBranch || "WEBHOOK_ORDER_OFF_FLOW_SPLIT",
+          });
         });
       } catch (creditErr) {
         logger.warn("[Webhook] Không tạo credit ngoài luồng (chênh CK đơn)", {

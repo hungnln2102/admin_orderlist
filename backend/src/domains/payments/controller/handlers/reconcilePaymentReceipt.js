@@ -21,6 +21,9 @@ const {
   applyMarkPaidAction,
   applyRenewAction,
 } = require("./reconcile/actionHandlers");
+const {
+  voidOffFlowCreditByReceiptId,
+} = require("../../../orders/controller/finance/offFlowRefundCredits");
 
 /**
  * Quyết định `effectiveAction` từ `requestedAction` + trạng thái đơn + khả năng cover.
@@ -143,6 +146,24 @@ const reconcilePaymentReceipt = async (req, res) => {
         statusBeforeAction: statusValueInitial,
         statusAfterAction: statusValue,
       };
+
+      // Void credit off-flow gắn biên lai này (nếu có) — tiền đã match đơn,
+      // không còn "ngoài luồng" → credit không còn khả dụng.
+      try {
+        await trx.transaction(async (spTrx) => {
+          await voidOffFlowCreditByReceiptId(
+            spTrx,
+            receiptId,
+            `Reconcile match mã đơn ${orderCodeRaw}.`
+          );
+        });
+      } catch (voidErr) {
+        logger.warn("[payments] Không void được credit off-flow khi reconcile", {
+          receiptId,
+          orderCode: orderCodeRaw,
+          error: voidErr.message,
+        });
+      }
       let shouldRunRenewal = false;
 
       if (effectiveAction === RECONCILE_ACTIONS.MARK_PAID) {

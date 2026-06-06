@@ -99,8 +99,17 @@ const applyReconcileDashboardAdjustment = async (
         );
       }
     } else {
-      // Legacy: receipt không mã đã cộng thẳng DT/LN — chỉ chỉnh LN − cost.
+      // Receipt chưa ghi off-flow trước đó — chỉnh LN − cost + cộng import.
       profitDelta = -cost;
+      if (cost > 0) {
+        importDelta = await resolveDashboardImportDeltaOnPaid(
+          trx,
+          orderRow,
+          cost,
+          fetchSupplierNameBySupplyId,
+          receiptMonthKey
+        );
+      }
     }
   }
 
@@ -119,14 +128,16 @@ const applyReconcileDashboardAdjustment = async (
 
   if (offFlowDelta > 0) {
     try {
-      await ensureOffFlowRefundCreditNote(trx, {
-        paymentReceiptId: receiptId,
-        offFlowAmount: offFlowDelta,
-        monthKey: receiptMonthKey,
-        customerName: orderRow?.[ORDER_COLS.customer] ?? orderRow?.customer,
-        customerContact: orderRow?.[ORDER_COLS.contact] ?? orderRow?.contact,
-        sourceOrderCode: orderCodeRaw,
-        ruleBranch: reconcileRuleBranch,
+      await trx.transaction(async (spTrx) => {
+        await ensureOffFlowRefundCreditNote(spTrx, {
+          paymentReceiptId: receiptId,
+          offFlowAmount: offFlowDelta,
+          monthKey: receiptMonthKey,
+          customerName: orderRow?.[ORDER_COLS.customer] ?? orderRow?.customer,
+          customerContact: orderRow?.[ORDER_COLS.contact] ?? orderRow?.contact,
+          sourceOrderCode: orderCodeRaw,
+          ruleBranch: reconcileRuleBranch,
+        });
       });
     } catch (creditErr) {
       // Không chặn reconcile nếu tạo credit lỗi — dashboard đã cập nhật.

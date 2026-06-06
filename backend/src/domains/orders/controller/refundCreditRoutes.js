@@ -232,6 +232,16 @@ const attachRefundCreditRoutes = (router) => {
 
             if (action === CREDIT_ACTIONS.DELETE) {
                 nextNote = appendNote(nextNote, "Ẩn credit khỏi danh sách khả dụng (thao tác Xóa).");
+                // Trừ tiền ngoài luồng khi void credit off-flow thủ công.
+                if (availableAmount > 0) {
+                    const offFlowResult = await applyOffFlowCreditCashout(trx, current, availableAmount);
+                    if (offFlowResult.applied) {
+                        nextNote = appendNote(
+                            nextNote,
+                            `Đã trừ ${availableAmount.toLocaleString("vi-VN")} VND khỏi số tiền ngoài luồng (tháng ${offFlowResult.monthKey}).`
+                        );
+                    }
+                }
             } else if (action === CREDIT_ACTIONS.COMPLETE) {
                 cashoutAmount = Math.max(0, availableAmount);
                 if (cashoutAmount <= 0) {

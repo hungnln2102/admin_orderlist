@@ -148,6 +148,13 @@ async function executeChangeSupplierInner(trx, { orderId, newSupplyId, today }) 
 
   const latestLog = await findLatestCostLog(trx, orderId);
   if (!latestLog) {
+    // > 5 ngày nhưng không có log NCC → fallback Flow A.
+    // Tính prorated refund từ NCC cũ (không phải full cost).
+    const proratedOldRefund = computeRefundFromOldSupplier({
+      oldImportCost: oldCost,
+      totalDays,
+      remainingDays,
+    });
     return runFlowA(trx, {
       orderId,
       newSupplyId,
@@ -157,6 +164,7 @@ async function executeChangeSupplierInner(trx, { orderId, newSupplyId, today }) 
       orderStatus,
       idOrderText,
       monthKey,
+      effectiveOldCostRefund: proratedOldRefund,
     });
   }
 
@@ -193,6 +201,7 @@ async function executeChangeSupplierInner(trx, { orderId, newSupplyId, today }) 
       idOrderText,
       orderStatus,
       monthKey,
+      effectiveOldCostRefund: refundFromOld,
     });
   }
 

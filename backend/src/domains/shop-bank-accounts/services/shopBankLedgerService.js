@@ -365,6 +365,7 @@ const recordMavnInternalSettlement = async (
 module.exports = {
   ENTRY_TYPES,
   SOURCE_KINDS,
+  findAccountIdByReceiver,
   creditShopBankFromPaymentReceipt,
   debitShopBankWithdraw,
   debitShopBankExternalOut,

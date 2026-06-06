@@ -154,6 +154,59 @@ const applyOffFlowCreditCashout = async (trx, creditNote, cashoutAmount) => {
 
   return { applied: true, monthKey, amount };
 };
+/**
+ * Void phiếu credit off-flow gắn biên lai khi biên lai đã reconcile (match) với mã đơn.
+ * Tiền đó giờ gắn vào đơn hàng → không còn là "ngoài luồng" → credit không còn khả dụng.
+ * @param {import('knex').Knex.Transaction | {query: Function}} executor
+ * @param {number} paymentReceiptId
+ * @param {string} [reason]
+ * @returns {Promise<{voided: boolean, creditNote?: object}>}
+ */
+const voidOffFlowCreditByReceiptId = async (executor, paymentReceiptId, reason) => {
+  const rid = Number(paymentReceiptId);
+  if (!Number.isFinite(rid) || rid <= 0) return { voided: false };
+
+  const existing = await getOffFlowCreditByReceiptId(executor, rid);
+  if (!existing) return { voided: false };
+
+  const currentStatus = String(existing[R.STATUS] || "").trim().toUpperCase();
+  if (currentStatus === CREDIT_STATUS.VOID || currentStatus === CREDIT_STATUS.FULLY_APPLIED) {
+    return { voided: false, creditNote: existing };
+  }
+
+  const suffix = reason
+    ? String(reason).trim()
+    : "Biên lai đã match mã đơn — credit ngoài luồng không còn khả dụng.";
+  const prevNote = existing[R.NOTE] ? String(existing[R.NOTE]).trim() : "";
+  const newNote = prevNote ? `${prevNote} — ${suffix}` : suffix;
+
+  if (typeof executor === "function") {
+    await executor(REFUND_CREDIT_NOTES_TABLE)
+      .where({ [R.ID]: existing[R.ID] })
+      .update({
+        [R.STATUS]: CREDIT_STATUS.VOID,
+        [R.AVAILABLE_AMOUNT]: 0,
+        [R.NOTE]: newNote,
+      });
+  } else {
+    await executor.query(
+      `UPDATE ${REFUND_CREDIT_NOTES_TABLE}
+       SET ${R.STATUS} = $1, ${R.AVAILABLE_AMOUNT} = 0, ${R.NOTE} = $2
+       WHERE ${R.ID} = $3`,
+      [CREDIT_STATUS.VOID, newNote, existing[R.ID]]
+    );
+  }
+
+  logger.info("[OffFlowCredit] Void credit off-flow do reconcile", {
+    creditNoteId: existing[R.ID],
+    creditCode: existing[R.CREDIT_CODE],
+    paymentReceiptId: rid,
+    previousStatus: currentStatus,
+    availableAmount: existing[R.AVAILABLE_AMOUNT],
+  });
+
+  return { voided: true, creditNote: { ...existing, [R.STATUS]: CREDIT_STATUS.VOID, [R.AVAILABLE_AMOUNT]: 0 } };
+};
 
 module.exports = {
   CREDIT_SOURCE_KIND,
@@ -161,4 +214,5 @@ module.exports = {
   ensureOffFlowRefundCreditNote,
   applyOffFlowCreditCashout,
   getOffFlowCreditByReceiptId,
+  voidOffFlowCreditByReceiptId,
 };

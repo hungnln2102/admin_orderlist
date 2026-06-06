@@ -36,11 +36,16 @@ async function fetchMonthlySnapshotSafe(trx, monthKey) {
 
 async function applyProfitDeltaOnCostChange(
   trx,
-  { orderId, oldCost, newCost, orderStatus, monthKey }
+  { orderId, oldCost, newCost, orderStatus, monthKey, effectiveOldCostRefund }
 ) {
   if (!STATUSES_NEEDING_NCC_LOG.has(orderStatus)) return 0;
   if (!monthKey) return 0;
-  const delta = Number(oldCost || 0) - Number(newCost || 0);
+  // Khi có effectiveOldCostRefund (prorated refund từ NCC cũ), dùng nó thay vì full oldCost.
+  // Profit delta = phần cost được hoàn lại (tiết kiệm) - cost NCC mới phải trả.
+  const recoveredCost = effectiveOldCostRefund != null
+    ? Number(effectiveOldCostRefund)
+    : Number(oldCost || 0);
+  const delta = recoveredCost - Number(newCost || 0);
   if (!Number.isFinite(delta) || delta === 0) return 0;
   await mergeSummaryUpdates(
     trx,
@@ -53,6 +58,7 @@ async function applyProfitDeltaOnCostChange(
     monthKey,
     oldCost,
     newCost,
+    effectiveOldCostRefund: effectiveOldCostRefund ?? "(not set, using oldCost)",
     profitDelta: delta,
   });
   return delta;

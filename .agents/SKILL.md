@@ -193,3 +193,46 @@ module.exports = { createMyTask };
 - ⏳ B6: Crawl snapshot sau add → `runCheckForAccountId`
 - ⏳ B7: Update `product` status + lưu `url_active`
 - ⏳ B8: Task tổng hợp `adobeAutoFixTask.js`
+
+---
+
+## 🇻🇳 Vietnamese Encoding Safety — Quy Tắc Bắt Buộc
+
+> **Mọi thao tác ghi/sửa file chứa tiếng Việt → Dùng tool IDE (write_to_file, replace_file_content) hoặc Node.js/Python script. KHÔNG BAO GIỜ dùng PowerShell để ghi nội dung file.**
+
+### Vấn đề
+PowerShell 5.x trên Windows dùng **UTF-16 LE BOM** hoặc **ANSI** khi ghi file → phá hủy ký tự tiếng Việt (mojibake).
+
+### ❌ TUYỆT ĐỐI KHÔNG LÀM
+```powershell
+# CẤM — Tất cả các cách sau gây lỗi encoding tiếng Việt:
+echo "Xin chào" > file.js
+"Xin chào" | Out-File file.js
+Set-Content -Path file.js -Value "Xin chào"
+Add-Content -Path file.js -Value "Xin chào"
+(Get-Content file.js) -replace 'old', 'mới' | Set-Content file.js
+```
+
+### ✅ PHẢI LÀM
+1. **Tool IDE**: `write_to_file`, `replace_file_content`, `multi_replace_file_content` — AN TOÀN 100%
+2. **Node.js script** khi cần logic phức tạp:
+   ```javascript
+   const fs = require('fs');
+   const content = fs.readFileSync('file.js', 'utf8');
+   const updated = content.replace('old', 'Nội dung tiếng Việt mới');
+   fs.writeFileSync('file.js', updated, 'utf8');
+   ```
+3. **Python script** khi cần logic phức tạp:
+   ```python
+   with open('file.js', 'r', encoding='utf-8') as f:
+       content = f.read()
+   content = content.replace('old', 'Nội dung tiếng Việt mới')
+   with open('file.js', 'w', encoding='utf-8') as f:
+       f.write(content)
+   ```
+
+### PowerShell vẫn OK cho
+- `npm run dev`, `npm install`, `git add/commit`, `dir`, `node script.js`, `python script.py`
+- Tức là mọi command **không ghi nội dung tiếng Việt vào file**
+
+> Chi tiết đầy đủ: xem `.agent/skills/vietnamese-encoding/SKILL.md` trong workspace Website

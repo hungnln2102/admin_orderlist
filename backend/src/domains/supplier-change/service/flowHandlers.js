@@ -24,7 +24,7 @@ async function insertMavrykMarkerLog(trx, { orderId, mavrykSupplyId, idOrderText
 
 async function runFlowA(
   trx,
-  { orderId, newSupplyId, newCost, oldCost, isNewMavryk, orderStatus, idOrderText, monthKey }
+  { orderId, newSupplyId, newCost, oldCost, isNewMavryk, orderStatus, idOrderText, monthKey, effectiveOldCostRefund }
 ) {
   await updateOrderSupplyAndCost(trx, orderId, {
     supplyId: newSupplyId,
@@ -37,6 +37,7 @@ async function runFlowA(
     newCost,
     orderStatus,
     monthKey,
+    effectiveOldCostRefund,
   });
 
   if (isNewMavryk) {
@@ -209,6 +210,7 @@ async function runFlowBPaid(
     idOrderText,
     orderStatus,
     monthKey,
+    effectiveOldCostRefund,
   }
 ) {
   if (refundFromOld > 0 && oldSupplyId != null) {
@@ -233,6 +235,7 @@ async function runFlowBPaid(
     newCost,
     orderStatus,
     monthKey,
+    effectiveOldCostRefund,
   });
 
   if (isNewMavryk) {

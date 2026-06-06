@@ -61,8 +61,9 @@ const {
   resolveOrderPriceForWebhookMatch,
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
-const { creditShopBankFromPaymentReceipt } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { creditShopBankFromPaymentReceipt, debitShopBankExternalOut, findAccountIdByReceiver } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
 const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
+const { withSavepoint } = require("../../savepoint");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
 const { notifyCombinedMonthlyDelta } = require("./notifyPhase");
 const {
@@ -615,14 +616,16 @@ async function handleWebhookPost(req, res) {
               });
             }
             try {
-              await ensureOffFlowRefundCreditNote(client, {
-                paymentReceiptId: receiptId,
-                offFlowAmount: extraVnd,
-                monthKey: paidMonthKey,
-                customerName: state?.[ORDER_COLS.customer],
-                customerContact: state?.[ORDER_COLS.contact],
-                sourceOrderCode: code,
-                ruleBranch: "POST_PAID_ADDITIONAL_OFF_FLOW_BANK_RECEIPT",
+              await withSavepoint(client, "off_flow_credit_post_paid", async () => {
+                await ensureOffFlowRefundCreditNote(client, {
+                  paymentReceiptId: receiptId,
+                  offFlowAmount: extraVnd,
+                  monthKey: paidMonthKey,
+                  customerName: state?.[ORDER_COLS.customer],
+                  customerContact: state?.[ORDER_COLS.contact],
+                  sourceOrderCode: code,
+                  ruleBranch: "POST_PAID_ADDITIONAL_OFF_FLOW_BANK_RECEIPT",
+                });
               });
             } catch (creditErr) {
               logger.warn("[Webhook] Không tạo credit ngoài luồng (biên thêm sau Đã TT)", {
@@ -857,12 +860,14 @@ async function handleWebhookPost(req, res) {
           });
         }
         try {
-          await ensureOffFlowRefundCreditNote(client, {
-            paymentReceiptId: receiptId,
-            offFlowAmount: transferAmountNormalized,
-            monthKey: paidMonthKey,
-            ruleBranch: "NO_ORDER_CODE_OFF_FLOW_BANK_RECEIPT",
-            note: `Credit ngoài luồng — CK không mã đơn (biên lai #${receiptId || "NA"}).`,
+          await withSavepoint(client, "off_flow_credit_no_order", async () => {
+            await ensureOffFlowRefundCreditNote(client, {
+              paymentReceiptId: receiptId,
+              offFlowAmount: transferAmountNormalized,
+              monthKey: paidMonthKey,
+              ruleBranch: "NO_ORDER_CODE_OFF_FLOW_BANK_RECEIPT",
+              note: `Credit ngoài luồng — CK không mã đơn (biên lai #${receiptId || "NA"}).`,
+            });
           });
         } catch (creditErr) {
           logger.warn("[Webhook] Không tạo credit ngoài luồng (không mã đơn)", {
@@ -904,6 +909,76 @@ async function handleWebhookPost(req, res) {
             content: String(transaction.transaction_content || ""),
           },
           source: "webhook",
+        });
+      }
+
+      // ===== Tiền ra (transferAmountNormalized < 0) — ghi nhận biến động số dư bank =====
+      if (
+        !alreadyFinancialPosted &&
+        receiptResult?.inserted &&
+        transferAmountNormalized < 0 &&
+        paidMonthKey
+      ) {
+        const outboundAmount = Math.abs(transferAmountNormalized);
+        const contentRaw = String(transaction.transaction_content || "").trim();
+
+        // Phân loại lý do tiền ra dựa trên nội dung chuyển khoản
+        const contentLower = contentRaw.toLowerCase();
+        const isSupplierPayment =
+          /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
+          /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
+        const outboundReason = isSupplierPayment
+          ? "supplier_payment"
+          : "withdrawal";
+        const outboundReasonLabel = isSupplierPayment
+          ? "Nhập hàng / Thanh toán NCC"
+          : "Rút tiền / Chuyển ra";
+
+        // Debit shop bank ledger
+        const senderAccount =
+          transaction.account_number || transaction.accountNumber || "";
+        try {
+          const bankAccountId = await findAccountIdByReceiver(client, senderAccount);
+          if (bankAccountId && outboundAmount > 0) {
+            await debitShopBankExternalOut(client, {
+              accountId: bankAccountId,
+              amount: outboundAmount,
+              sourceKind: "payment_receipt",
+              sourceId: receiptId || null,
+              note: `[${outboundReasonLabel}] ${contentRaw}`.slice(0, 500),
+            });
+          }
+        } catch (ledgerErr) {
+          logger.warn("[Webhook] Debit shop bank ledger for outbound failed (non-fatal)", {
+            receiptId,
+            error: ledgerErr.message,
+          });
+        }
+
+        if (receiptId) {
+          await insertFinancialAuditLog(client, {
+            payment_receipt_id: receiptId,
+            order_code: "",
+            rule_branch: "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT",
+            delta: {
+              bank_balance_delta: transferAmountNormalized,
+              outbound_amount: outboundAmount,
+              outbound_reason: outboundReason,
+              outbound_reason_label: outboundReasonLabel,
+              month_key: paidMonthKey,
+              content: contentRaw,
+            },
+            source: "webhook",
+          });
+        }
+        logger.info("[Webhook] Ghi nhận tiền ra — trừ số dư bank", {
+          receiptId,
+          amount: transferAmountNormalized,
+          outboundAmount,
+          outboundReason,
+          outboundReasonLabel,
+          monthKey: paidMonthKey,
+          content: contentRaw.slice(0, 120),
         });
       }
 
