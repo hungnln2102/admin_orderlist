@@ -61,7 +61,10 @@ const {
   resolveOrderPriceForWebhookMatch,
   fetchSupplierNameBySupplyId,
 } = require("./postingPhase");
-const { creditShopBankFromPaymentReceipt, debitShopBankExternalOut, findAccountIdByReceiver } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { tryAutoSettleSupplierPaymentByOutbound } = require("./autoSettleSupplierPayment");
+const { creditShopBankFromPaymentReceipt, findAccountIdByReceiver, debitShopBankSupplierPayment } = require("../../../../src/domains/shop-bank-accounts/services/shopBankLedgerService");
+const { decodeSupplierSignature } = require("./supplierPaymentSignature");
+const { notifyFinanceMonthlyDelta } = require("../../../../src/services/telegramFinanceDeltaNotifier");
 const { ensureOffFlowRefundCreditNote } = require("../../../../src/domains/orders/controller/finance/offFlowRefundCredits");
 const { withSavepoint } = require("../../savepoint");
 const { dispatchWebhookRenewals } = require("./renewalPhase");
@@ -921,65 +924,75 @@ async function handleWebhookPost(req, res) {
       ) {
         const outboundAmount = Math.abs(transferAmountNormalized);
         const contentRaw = String(transaction.transaction_content || "").trim();
+        const senderAccount = transaction.account_number || transaction.accountNumber || "";
 
-        // Phân loại lý do tiền ra dựa trên nội dung chuyển khoản
-        const contentLower = contentRaw.toLowerCase();
-        const isSupplierPayment =
-          /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
-          /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
-        const outboundReason = isSupplierPayment
-          ? "supplier_payment"
-          : "withdrawal";
-        const outboundReasonLabel = isSupplierPayment
-          ? "Nhập hàng / Thanh toán NCC"
-          : "Rút tiền / Chuyển ra";
-
-        // Debit shop bank ledger
-        const senderAccount =
-          transaction.account_number || transaction.accountNumber || "";
+        let bankAccountId = null;
         try {
-          const bankAccountId = await findAccountIdByReceiver(client, senderAccount);
-          if (bankAccountId && outboundAmount > 0) {
-            await debitShopBankExternalOut(client, {
-              accountId: bankAccountId,
-              amount: outboundAmount,
-              sourceKind: "payment_receipt",
-              sourceId: receiptId || null,
-              note: `[${outboundReasonLabel}] ${contentRaw}`.slice(0, 500),
+          bankAccountId = await findAccountIdByReceiver(client, senderAccount);
+        } catch (e) {
+          logger.warn("[Webhook] findAccountIdByReceiver failed", { error: e.message });
+        }
+
+        let autoSettleResult = null;
+        if (bankAccountId) {
+          try {
+            autoSettleResult = await tryAutoSettleSupplierPaymentByOutbound({
+              client,
+              receiptId,
+              transferAmountNormalized,
+              paidMonthKey,
+              shopBankAccountId: bankAccountId,
+            });
+          } catch (e) {
+            logger.error("[Webhook] tryAutoSettleSupplierPaymentByOutbound error", { error: e.message, stack: e.stack });
+          }
+        }
+
+        if (autoSettleResult) {
+          logger.info("[Webhook] Auto settled supplier payment from outbound", { ...autoSettleResult, receiptId });
+        } else {
+          // Phân loại lý do tiền ra dựa trên nội dung chuyển khoản
+          const contentLower = contentRaw.toLowerCase();
+          const isSupplierPayment =
+            /\btt\s+.+\s+k[yỳ]\s+\d/i.test(contentRaw) ||
+            /nhap\s*hang|nhap\s*kho|thanh\s*toan\s*ncc|chuyen\s*tien\s*ncc|tt\s*ncc/i.test(contentLower);
+          const outboundReason = isSupplierPayment
+            ? "supplier_payment"
+            : "withdrawal";
+          const outboundReasonLabel = isSupplierPayment
+            ? "Nhập hàng / Thanh toán NCC"
+            : "Rút tiền / Chuyển ra";
+
+          // Ghi nhận giao dịch tiền ra vào audit log (đối soát).
+          // KHÔNG gọi debitShopBankExternalOut — các luồng nghiệp vụ (Thanh toán NCC,
+          // chi phí shop, v.v.) đã trừ bank rồi. Webhook chỉ ghi nhận biên lai.
+
+          if (receiptId) {
+            await insertFinancialAuditLog(client, {
+              payment_receipt_id: receiptId,
+              order_code: "",
+              rule_branch: "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT",
+              delta: {
+                bank_balance_delta: transferAmountNormalized,
+                outbound_amount: outboundAmount,
+                outbound_reason: outboundReason,
+                outbound_reason_label: outboundReasonLabel,
+                month_key: paidMonthKey,
+                content: contentRaw,
+              },
+              source: "webhook",
             });
           }
-        } catch (ledgerErr) {
-          logger.warn("[Webhook] Debit shop bank ledger for outbound failed (non-fatal)", {
+          logger.info("[Webhook] Ghi nhận tiền ra — audit log", {
             receiptId,
-            error: ledgerErr.message,
+            amount: transferAmountNormalized,
+            outboundAmount,
+            outboundReason,
+            outboundReasonLabel,
+            monthKey: paidMonthKey,
+            content: contentRaw.slice(0, 120),
           });
         }
-
-        if (receiptId) {
-          await insertFinancialAuditLog(client, {
-            payment_receipt_id: receiptId,
-            order_code: "",
-            rule_branch: "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT",
-            delta: {
-              bank_balance_delta: transferAmountNormalized,
-              outbound_amount: outboundAmount,
-              outbound_reason: outboundReason,
-              outbound_reason_label: outboundReasonLabel,
-              month_key: paidMonthKey,
-              content: contentRaw,
-            },
-            source: "webhook",
-          });
-        }
-        logger.info("[Webhook] Ghi nhận tiền ra — trừ số dư bank", {
-          receiptId,
-          amount: transferAmountNormalized,
-          outboundAmount,
-          outboundReason,
-          outboundReasonLabel,
-          monthKey: paidMonthKey,
-          content: contentRaw.slice(0, 120),
-        });
       }
 
       if (receiptResult?.inserted) {

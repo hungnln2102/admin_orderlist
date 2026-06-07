@@ -2,7 +2,7 @@ import { useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { buildSepayQrUrl } from "../utils/supplies";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
-
+import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
 export interface QrPayment {
   id: number;
   amount: number;
@@ -18,6 +18,7 @@ interface PaymentInput {
 }
 
 interface SupplyBankInfo {
+  id?: number | null;
   numberBank?: string | null;
   binBank?: string | null;
   sourceName?: string | null;
@@ -100,8 +101,12 @@ export const usePayments = ({
 
   const showQrForPayment = (payment: PaymentInput) => {
     const diff = (payment.totalImport || 0) - (payment.paid || 0);
-    const amount = Math.abs(diff);
+    let amount = Math.abs(diff);
     const isPositive = diff > 0;
+
+    if (isPositive && supply?.id) {
+      amount = encodeSupplierSignature(amount, supply.id);
+    }
 
     const accountNumber = isPositive ? supply?.numberBank || "" : shopBank.accountNumber;
     const bankCode = isPositive ? supply?.binBank || "" : shopBank.bankCode;

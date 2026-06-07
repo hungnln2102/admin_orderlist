@@ -9,6 +9,7 @@ import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/u
 import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import { SupplierSettlementPanel } from "./SupplierSettlementPanel";
+import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
 
 interface Props {
   isOpen: boolean;
@@ -88,8 +89,13 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     const raw = Number(selectedPayment.totalImport ?? selectedPayment.import_value ?? 0);
     const paid = Number(selectedPayment.paid ?? 0);
     const isNegative = raw < 0;
-    const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
+    let amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
+    
+    if (!isNegative && supply.id) {
+      amount = encodeSupplierSignature(amount, supply.id);
+    }
+
     if (isNegative) {
       return Helpers.buildSepayQrUrl({
         accountNumber: selectedShopBankAccount?.accountNumber || shopBank.accountNumber,

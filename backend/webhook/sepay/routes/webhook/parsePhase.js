@@ -58,9 +58,16 @@ function parseWebhookTransaction(payload) {
     ]),
   ];
 
-  const transferAmountNormalized = normalizeAmount(
+  const rawAmount = normalizeAmount(
     transaction.transfer_amount || transaction.amount_in
   );
+  // SePay always sends transferAmount as a positive number.
+  // Use transferType to determine direction: "out" = money leaving the account.
+  const transferType = String(
+    transaction.transfer_type || transaction.transferType || ""
+  ).trim().toLowerCase();
+  const isOutbound = transferType === "out";
+  const transferAmountNormalized = isOutbound ? -Math.abs(rawAmount) : rawAmount;
   const supplierSettlementTransfer = isSupplierSettlementTransfer(transaction);
 
   return {
