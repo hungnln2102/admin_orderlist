@@ -47,7 +47,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"   # Redis chi host local truy cap; khong public ra Internet
     networks:
       - app-network
     healthcheck:
@@ -81,7 +81,7 @@ services:
       APP_ENV: docker
       NODE_ENV: production
     ports:
-      - "3001:3001"   # Main API
+      - "127.0.0.1:3001:3001"   # Main API (chi host local truy cap; Internet di qua Nginx)
     volumes:
       # Bind mount: cùng thư mục trên host với ./backend/... (SFTP/file manager, modal chọn ảnh)
       - ./backend/image_product:/app/image_product
@@ -121,7 +121,7 @@ services:
       NODE_ENV: production
     command: ["node", "webhook-server.js"]
     ports:
-      - "5000:5000"   # Sepay webhook (Host Nginx proxy /webhook, /bot/payment_sepay/)
+      - "127.0.0.1:5000:5000"   # Sepay webhook (chi host local truy cap; Internet di qua Nginx)
     networks:
       - app-network
     healthcheck:
@@ -178,7 +178,7 @@ services:
       webhook:
         condition: service_started
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"   # Frontend chi host local truy cap; Internet di qua Host Nginx
     networks:
       - app-network
     deploy:
@@ -189,7 +189,11 @@ services:
 
 # ==========================================
 # NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
+<<<<<<< Updated upstream
 # Admin/Main: admin.mavrykpremium.com + mavrykpremium.com + www.mavrykpremium.com -> 8081 (frontend), 3001 (api), 5000 (webhook).
+=======
+# Admin: admin.mavrykpremium.store -> 127.0.0.1:8081 (frontend), 127.0.0.1:3001 (api), 127.0.0.1:5000 (webhook).
+>>>>>>> Stashed changes
 # ==========================================
 
 # ==========================================

@@ -107,9 +107,12 @@ const errorHandler = (err, req, res, next) => {
 const SILENT_404_PATTERN =
   /^\/($|_next|favicon\.ico|robots\.txt|sitemap\.xml|sitemap_index\.xml|llms\.txt|ads\.txt|\.well-known|image(?:_product|_variant)?\/|(?:v\d+\/)?_catalog(?:\/|$)|\.config\/op\/config(?:\/|$)|mcp(?:\/|$)|sse(?:\/|$))/i;
 
+const SILENT_PROBE_PATTERN =
+  /(^|\/)\.env(?:[A-Za-z0-9._-]*)?$|(^|\/)\.(?:git|svn)(?:\/|$)|(^|\/)\.(?:htaccess|htpasswd)$/i;
+
 const notFoundHandler = (req, res, next) => {
   const pathOnly = String(req.originalUrl || "").split("?")[0];
-  if (SILENT_404_PATTERN.test(pathOnly)) {
+  if (SILENT_404_PATTERN.test(pathOnly) || SILENT_PROBE_PATTERN.test(pathOnly)) {
     return res.status(404).json({ error: "Not Found" });
   }
 
