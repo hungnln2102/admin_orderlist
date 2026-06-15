@@ -189,11 +189,7 @@ services:
 
 # ==========================================
 # NGINX: Chạy qua Host Nginx (Unified). Xem Website/nginx-server.conf.
-<<<<<<< Updated upstream
 # Admin/Main: admin.mavrykpremium.com + mavrykpremium.com + www.mavrykpremium.com -> 8081 (frontend), 3001 (api), 5000 (webhook).
-=======
-# Admin: admin.mavrykpremium.store -> 127.0.0.1:8081 (frontend), 127.0.0.1:3001 (api), 127.0.0.1:5000 (webhook).
->>>>>>> Stashed changes
 # ==========================================
 
 # ==========================================
