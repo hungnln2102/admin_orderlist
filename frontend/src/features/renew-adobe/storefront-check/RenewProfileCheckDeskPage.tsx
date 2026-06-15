@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ChevronRight, Loader2, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
 import { useStorefrontRenewCheck } from "./hooks/useStorefrontRenewCheck";
 import { RenewStatusPanel } from "./components/RenewStatusPanel";
 import { STOREFRONT_RENEW_CHECK_STYLES } from "./styles/storefrontRenewCheck.styles";
@@ -26,6 +26,15 @@ export default function RenewProfileCheckDeskPage() {
   } = useStorefrontRenewCheck();
 
   const [hintOpen, setHintOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  const adobeFixSteps = [
+    "Bước 1: Kiểm tra tài khoản trên web để xem profile đang active.",
+    "Bước 2: Nếu có mục jointeam thì chọn jointeam trước.",
+    "Bước 3: Chọn đúng profile đã kiểm tra ở bước 1.",
+    "Bước 4: Thử lại thao tác kích hoạt / đăng nhập Adobe sau khi đã chọn đúng profile.",
+    "Bước 5: Nếu làm đủ các bước trên mà vẫn lỗi, liên hệ Quản Trị Viên để kiểm tra.",
+  ];
 
   return (
     <div className="space-y-6">
@@ -43,6 +52,13 @@ export default function RenewProfileCheckDeskPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-400/15"
+            onClick={() => setGuideOpen(true)}
+          >
+            Hướng dẫn fix lỗi Adobe
+          </button>
+          <button
+            type="button"
             className="rounded-lg border border-white/15 px-3 py-2 text-xs text-white/75 hover:bg-white/[0.06]"
             onClick={() => setHintOpen((o) => !o)}
           >
@@ -56,6 +72,72 @@ export default function RenewProfileCheckDeskPage() {
           </Link>
         </div>
       </div>
+
+      {guideOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl shadow-black/60">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-purple-500 to-blue-500" />
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/80">Adobe guide</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Hướng dẫn fix lỗi Adobe</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGuideOpen(false)}
+                className="rounded-full border border-white/10 p-2 text-white/65 hover:bg-white/5 hover:text-white"
+                aria-label="Đóng hướng dẫn"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-5 px-6 py-6">
+              <p className="text-sm leading-6 text-white/70">
+                Làm đúng thứ tự bên dưới để tránh chọn sai profile hoặc sai team khi fix Adobe.
+              </p>
+
+              <div className="space-y-3">
+                {adobeFixSteps.map((step) => (
+                  <div
+                    key={step}
+                    className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                  >
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                    <p className="text-sm leading-6 text-white/80">{step}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-sm leading-6 text-amber-50/90">
+                Nếu vẫn không xử lý được sau khi kiểm tra profile và jointeam, vui lòng liên hệ Quản Trị Viên để
+                kiểm tra trạng thái tài khoản.
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setGuideOpen(false)}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/15 px-4 text-sm text-white/80 hover:bg-white/[0.06]"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuideOpen(false);
+                    setHintOpen(true);
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 text-sm font-medium text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
+                >
+                  Xem lưu ý chờ
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hintOpen && (
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-100/90">

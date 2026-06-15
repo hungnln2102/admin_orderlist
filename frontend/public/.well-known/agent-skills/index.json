@@ -1,0 +1,19 @@
+﻿{
+    "$schema":  "https://agentskills.io/schemas/agent-skills-index.schema.json",
+    "skills":  [
+                   {
+                       "name":  "api-catalog",
+                       "type":  "discovery",
+                       "description":  "API catalog for admin_orderlist API endpoints and docs.",
+                       "url":  "https://admin.mavrykpremium.com/.well-known/api-catalog",
+                       "sha256":  "d5475b283f2232b02d499338ae4b794a0b695ba1084170a7bdb6dbb5d8a25899"
+                   },
+                   {
+                       "name":  "auth-md",
+                       "type":  "documentation",
+                       "description":  "Authentication guidance for humans and agents accessing admin_orderlist.",
+                       "url":  "https://admin.mavrykpremium.com/auth.md",
+                       "sha256":  "55e2bde35e37a2bd1de1bc33d5ec30f23742b0821daa018651c23688844d0fbd"
+                   }
+               ]
+}

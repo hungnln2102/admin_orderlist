@@ -5,7 +5,7 @@ const {
   listShopBankAccounts,
   findShopBankAccountById,
   findDefaultActiveAccount,
-  findShopBankAccountByNumber,
+  findShopBankAccountByNumberAndBankBin,
   clearDefaultFlags,
   insertShopBankAccount,
   updateShopBankAccount,
@@ -78,9 +78,12 @@ const createShopBankAccountItem = async (payload) => {
   ensureDefinition();
   const sanitized = validateCreatePayload(payload);
 
-  const duplicate = await findShopBankAccountByNumber(sanitized.accountNumber);
+  const duplicate = await findShopBankAccountByNumberAndBankBin(
+    sanitized.accountNumber,
+    sanitized.bankBin
+  );
   if (duplicate) {
-    throw createHttpError(409, "Số tài khoản đã tồn tại.");
+    throw createHttpError(409, "So tai khoan da ton tai trong ngan hang nay.");
   }
 
   return db.transaction(async (trx) => {
@@ -108,10 +111,15 @@ const updateShopBankAccountItem = async (id, payload) => {
     throw createHttpError(404, "Không tìm thấy tài khoản.");
   }
 
-  if (updatePayload.accountNumber) {
-    const duplicate = await findShopBankAccountByNumber(updatePayload.accountNumber);
+  if (updatePayload.accountNumber || updatePayload.bankBin) {
+    const nextAccountNumber = updatePayload.accountNumber ?? current.accountNumber;
+    const nextBankBin = updatePayload.bankBin ?? current.bankBin;
+    const duplicate = await findShopBankAccountByNumberAndBankBin(
+      nextAccountNumber,
+      nextBankBin
+    );
     if (duplicate && Number(duplicate.id) !== normalizedId) {
-      throw createHttpError(409, "Số tài khoản đã tồn tại.");
+      throw createHttpError(409, "So tai khoan da ton tai trong ngan hang nay.");
     }
   }
 

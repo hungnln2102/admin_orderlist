@@ -11,6 +11,9 @@ const {
   publicRenewFixAdes,
 } = require("./controller/publicFixAdes");
 const {
+  publicGetOtp,
+} = require("./controller/publicOtp");
+const {
   requireRenewAdobePublicActivateKey,
 } = require("../../middleware/renewAdobePublicActivateKey");
 
@@ -18,6 +21,7 @@ const router = express.Router();
 
 router.get("/status", getWebsiteStatus);
 router.get("/resolve-system", resolveSystemByEmail);
+router.post("/get-otp", publicGetOtp);
 router.post("/activate", requireRenewAdobePublicActivateKey, activateWebsiteUser);
 
 /**

@@ -1,0 +1,101 @@
+﻿{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Admin Orderlist API",
+    "version": "1.0.0",
+    "description": "Minimal public API description for agent discovery and operator docs."
+  },
+  "servers": [
+    {
+      "url": "https://admin.mavrykpremium.com"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Healthy service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "uptime": { "type": "number" },
+                    "dbConnected": { "type": "boolean" },
+                    "redisConnected": { "type": "boolean" }
+                  },
+                  "required": ["status", "uptime", "dbConnected", "redisConnected"]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Degraded service"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Create authenticated session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "password": { "type": "string" },
+                  "rememberMe": { "type": "boolean" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Session created" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Destroy authenticated session",
+        "responses": {
+          "200": { "description": "Logged out" }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "Get current user",
+        "responses": {
+          "200": { "description": "Authenticated user" },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    },
+    "/api/auth/csrf-token": {
+      "get": {
+        "summary": "Get CSRF token",
+        "responses": {
+          "200": { "description": "CSRF token returned" }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "summary": "Change current user password",
+        "responses": {
+          "200": { "description": "Password changed" },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    }
+  }
+}

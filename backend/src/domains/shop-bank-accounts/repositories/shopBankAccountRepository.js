@@ -71,10 +71,11 @@ const findDefaultActiveAccount = async () =>
     .orderBy(columns.id, "desc")
     .first();
 
-const findShopBankAccountByNumber = async (accountNumber) =>
+const findShopBankAccountByNumberAndBankBin = async (accountNumber, bankBin) =>
   db(TABLE)
     .select(selectColumns)
     .whereRaw("TRIM(??) = ?", [columns.accountNumber, accountNumber])
+    .whereRaw("TRIM(??) = ?", [columns.bankBin, bankBin])
     .first();
 
 const MAVRYK_DEFAULT_ACCOUNT_NUMBER = "9183400998";
@@ -148,7 +149,7 @@ module.exports = {
   listShopBankAccounts,
   findShopBankAccountById,
   findDefaultActiveAccount,
-  findShopBankAccountByNumber,
+  findShopBankAccountByNumberAndBankBin,
   resolveMavrykDefaultBankAccount,
   MAVRYK_DEFAULT_ACCOUNT_NUMBER,
   MAVRYK_FALLBACK_HOLDER,
