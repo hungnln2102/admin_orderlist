@@ -1,8 +1,8 @@
 /**
- * Mẫu ảnh VietQR thống nhất: compact (540×540) — QR + logo VietQR + Napas + ngân hàng.
+ * Mẫu ảnh VietQR thống nhất: compact2 — QR + logo + caption thông tin chuyển khoản.
  * @see https://www.vietqr.io/danh-sach-api/link-tao-ma-nhanh/api-tao-ma-qr/
  */
-export const VIETQR_IMAGE_TEMPLATE = "compact" as const;
+export const VIETQR_IMAGE_TEMPLATE = "compact2" as const;
 
 export interface SepayQrOptions {
   accountNumber: string;

@@ -8,6 +8,7 @@ const {
   mapExpenseRow,
   storeProfitExpensesHasMavnColumns,
 } = require("./shared");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const updateStoreProfitExpense = async (req, res) => {
   const id = Number(req.params.id);
@@ -100,7 +101,23 @@ const updateStoreProfitExpense = async (req, res) => {
       hasReason: reasonInput !== null,
     });
 
-    return res.json({ item: mapExpenseRow(updated) });
+
+    const mapped = mapExpenseRow(updated);
+    writeUserEventLog(req, {
+      action: "S?a log chi ph?",
+      entity: "Chi ph?",
+      entityId: mapped.id || id,
+      message: `S?a log chi ph? #${mapped.id || id}`,
+      source: "finance.store_profit_expenses",
+      metadata: {
+        expenseId: mapped.id || id,
+        changedFields: Object.keys(req.body || {}),
+        amount: mapped.amount ?? null,
+        reason: mapped.reason || null,
+      },
+    });
+
+    return res.json({ item: mapped });
   } catch (error) {
     logger.error("[store-profit-expenses] update failed", {
       id,

@@ -11,6 +11,7 @@ const { todayYMDInVietnam } = require("../../../../utils/normalizers");
 const { updateOrderWithFinance } = require("../orderUpdateService");
 const logger = require("../../../../utils/logger");
 const { orderIdParam } = require("../../validators/orderValidator");
+const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
 
 const attachUpdateOrderRoute = (router) => {
     router.put("/:id", ...orderIdParam, async (req, res) => {
@@ -44,6 +45,19 @@ const attachUpdateOrderRoute = (router) => {
             }
 
             await trx.commit();
+            writeUserEventLog(req, {
+                action: "S?a ??n h?ng",
+                entity: "??n h?ng",
+                entityId: updated?.id_order || id,
+                message: `S?a ??n h?ng ${updated?.id_order || id}`,
+                source: "orders.order_list",
+                metadata: {
+                    orderId: id,
+                    orderCode: updated?.id_order || null,
+                    changedFields: Object.keys(req.body || {}),
+                },
+            });
+
             res.json(updated);
         } catch (error) {
             await trx.rollback();

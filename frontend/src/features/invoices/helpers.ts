@@ -19,6 +19,10 @@ export interface PaymentReceipt {
   postedOffFlowBankReceipt?: number;
   reconciledAt?: string | null;
   adjustmentApplied?: boolean;
+  outboundAmount?: number;
+  outboundReason?: string;
+  outboundReasonLabel?: string;
+  outboundContent?: string;
 }
 
 export interface MatchableOrder {
@@ -161,6 +165,10 @@ export const normalizeReceiptRow = (
     reconciledAt:
       row?.reconciledAt != null ? String(row.reconciledAt) : null,
     adjustmentApplied: Boolean(row?.adjustmentApplied),
+    outboundAmount: Number(row?.outboundAmount) || 0,
+    outboundReason: toSafeString(row?.outboundReason),
+    outboundReasonLabel: toSafeString(row?.outboundReasonLabel),
+    outboundContent: toSafeString(row?.outboundContent),
   };
 };
 

@@ -378,7 +378,7 @@ const insertPaymentReceipt = async (transaction, options = {}) => {
       }
     }
 
-    const noteValue = orderCode ? orderCode : transferNote;
+    const noteValue = transferNote;
 
     const receiptKey = buildReceiptIdempotencyKey({
       sepayTransactionId,

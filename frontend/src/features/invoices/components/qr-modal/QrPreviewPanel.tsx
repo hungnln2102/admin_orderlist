@@ -73,12 +73,6 @@ export const QrPreviewPanel: React.FC<Props> = ({
           {formattedAmountDisplay}
         </dd>
       </div>
-      <div className="flex justify-between gap-4 py-3 items-start">
-        <dt className="text-slate-500 shrink-0 text-sm pt-0.5">Nội dung CK</dt>
-        <dd className="font-medium text-slate-400 text-right text-sm italic">
-          Không cần ghi
-        </dd>
-      </div>
     </dl>
   </div>
 );

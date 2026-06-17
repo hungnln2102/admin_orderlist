@@ -42,7 +42,7 @@ async function findSupplierRefundReceipt(trx, {
   }
 
   const accountDigits = normalizeAccountDigits(shopBankAccountNumber);
-  const params = [expected, SUPPLIER_REFUND_MATCH_TOLERANCE, expected];
+  const params = [expected, SUPPLIER_REFUND_MATCH_TOLERANCE];
   let receiverFilter = "";
   if (accountDigits) {
     receiverFilter = `
@@ -50,6 +50,7 @@ async function findSupplierRefundReceipt(trx, {
     `;
     params.push(`%${accountDigits}%`);
   }
+  params.push(expected);
 
   const byAmount = await trx.raw(
     `

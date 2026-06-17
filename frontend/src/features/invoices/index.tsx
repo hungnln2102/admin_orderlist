@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { apiFetch } from "@/shared/api/client";
@@ -50,6 +50,9 @@ export default function Invoices() {
   const [selectedReceipt, setSelectedReceipt] =
     useState<PaymentReceipt | null>(null);
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
+  const [receiptPage, setReceiptPage] = useState(1);
+  const [outOfFlowPage, setOutOfFlowPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     const fetchReceipts = async () => {
@@ -177,6 +180,45 @@ export default function Invoices() {
       { receipt: 0, "out-of-flow": 0 } as Record<ReceiptCategory, number>
     );
   }, [receipts]);
+
+  const activePage = categoryFilter === "receipt" ? receiptPage : outOfFlowPage;
+  const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / PAGE_SIZE));
+  const paginationItems = useMemo<(number | "ellipsis")[]>(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const clamp = (value: number, min: number, max: number) =>
+      Math.min(Math.max(value, min), max);
+    const startPage = clamp(activePage - 1, 2, totalPages - 3);
+    const endPage = clamp(activePage + 1, 4, totalPages - 1);
+    const pages: (number | "ellipsis")[] = [1];
+
+    if (startPage > 2) pages.push("ellipsis");
+    for (let page = startPage; page <= endPage; page += 1) {
+      pages.push(page);
+    }
+    if (endPage < totalPages - 1) pages.push("ellipsis");
+    pages.push(totalPages);
+
+    return pages;
+  }, [activePage, totalPages]);
+  const pagedReceipts = filteredReceipts.slice(
+    (activePage - 1) * PAGE_SIZE,
+    activePage * PAGE_SIZE
+  );
+  const setActivePage = (updater: (current: number) => number) => {
+    if (categoryFilter === "receipt") {
+      setReceiptPage(updater);
+      return;
+    }
+    setOutOfFlowPage(updater);
+  };
+
+  useEffect(() => {
+    setReceiptPage(1);
+    setOutOfFlowPage(1);
+  }, [searchTerm, dateStart, dateEnd]);
 
   const handleExportToExcel = async () => {
     if (!filteredReceipts.length) return;
@@ -335,11 +377,18 @@ export default function Invoices() {
         <CategoryToggle
           activeCategory={categoryFilter}
           counts={categoryCounts}
-          onChange={setCategoryFilter}
+          onChange={(category) => {
+            setCategoryFilter(category);
+            if (category === "receipt") {
+              setReceiptPage(1);
+            } else {
+              setOutOfFlowPage(1);
+            }
+          }}
         />
 
         <ReceiptsTable
-          receipts={filteredReceipts}
+          receipts={pagedReceipts}
           matchableOrders={matchableOrders}
           matchingReceiptId={matchingReceiptId}
           onMatchReceipt={handleMatchReceipt}
@@ -351,6 +400,69 @@ export default function Invoices() {
           showOrderCode={categoryFilter !== "out-of-flow"}
           shopBank={shopBank}
         />
+
+        <div className="flex flex-col gap-3 px-1 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            Trang {activePage}/{totalPages} ? {filteredReceipts.length} dòng
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={activePage <= 1}
+              onClick={() => setActivePage(() => 1)}
+            >
+              &lt;&lt;
+            </button>
+            <button
+              type="button"
+              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={activePage <= 1}
+              onClick={() => setActivePage((current) => Math.max(1, current - 1))}
+            >
+              &lt;
+            </button>
+            {paginationItems.map((item, index) =>
+              item === "ellipsis" ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="flex h-10 min-w-7 items-center justify-center font-black text-indigo-100/60"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-black transition ${
+                    item === activePage
+                      ? "border-blue-400/40 bg-blue-600 text-white shadow-[0_0_24px_rgba(37,99,235,0.35)]"
+                      : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                  onClick={() => setActivePage(() => item)}
+                >
+                  {item}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={activePage >= totalPages}
+              onClick={() => setActivePage((current) => Math.min(totalPages, current + 1))}
+            >
+              &gt;
+            </button>
+            <button
+              type="button"
+              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={activePage >= totalPages}
+              onClick={() => setActivePage(() => totalPages)}
+            >
+              &gt;&gt;
+            </button>
+          </div>
+        </div>
 
         {!loading && filteredReceipts.length === 0 && (
           <div className="text-center py-12">

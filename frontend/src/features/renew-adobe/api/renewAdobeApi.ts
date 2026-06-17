@@ -179,3 +179,66 @@ export function updateAdobeAccount(
     return data;
   });
 }
+
+export type RenewSystemLogLevel = "all" | "error" | "warn" | "info" | "debug" | "http";
+export type RenewSystemLogSource = "system" | "user";
+
+export type RenewSystemLogEntry = {
+  timestamp?: string;
+  level: string;
+  message: string;
+  sourceFile?: string;
+  raw?: string;
+  action?: string;
+  entity?: string;
+  entityId?: string | number | null;
+  amount?: string | number | null;
+  actor?: string;
+  [key: string]: unknown;
+};
+
+export type RenewSystemLogsResponse = {
+  logs: RenewSystemLogEntry[];
+  files: string[];
+  summary?: {
+    total: number;
+    errors: number;
+    warnings: number;
+    infos: number;
+  };
+  limit: number;
+  level: string;
+  search: string;
+};
+
+export function fetchRenewSystemLogs(params?: {
+  level?: RenewSystemLogLevel;
+  source?: RenewSystemLogSource;
+  search?: string;
+  limit?: number;
+}): Promise<RenewSystemLogsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.level && params.level !== "all") searchParams.set("level", params.level);
+  if (params?.source) searchParams.set("source", params.source);
+  if (params?.search?.trim()) searchParams.set("search", params.search.trim());
+  searchParams.set("limit", String(params?.limit || 100));
+  const query = searchParams.toString();
+  const url = `${API_ENDPOINTS.RENEW_ADOBE_SYSTEM_LOGS}${query ? `?${query}` : ""}`;
+
+  return apiFetch(url).then(async (res) => {
+    const data = (await res.json().catch(() => ({}))) as RenewSystemLogsResponse & {
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || res.statusText || "Không thể tải log hệ thống.");
+    }
+    return {
+      logs: Array.isArray(data.logs) ? data.logs : [],
+      files: Array.isArray(data.files) ? data.files : [],
+      summary: data.summary,
+      limit: Number(data.limit) || params?.limit || 100,
+      level: data.level || params?.level || "all",
+      search: data.search || params?.search || "",
+    };
+  });
+}

@@ -39,6 +39,7 @@ const {
 const { mergeSummaryUpdates } = require("../finance/dashboardSummary");
 const { resolveDashboardImportDeltaOnPaid } = require("../finance/dashboardImportDeltaOnPaid");
 const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
+const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
@@ -421,6 +422,22 @@ const attachCreateOrderRoute = (router) => {
                     normalized.gross_selling_price = rawPriceBeforeCredit;
                 }
             }
+
+            writeUserEventLog(req, {
+                action: "T?o ??n h?ng",
+                entity: "??n h?ng",
+                entityId: normalized.id_order || normalized.id || newOrder?.[idOrderCol],
+                message: `T?o ??n h?ng ${normalized.id_order || newOrder?.[idOrderCol] || ""} - kh?ch: ${normalized.customer || normalized.contact || "kh?ng r?"}`,
+                source: "orders.order_list",
+                metadata: {
+                    orderId: normalized.id || newOrder?.id || null,
+                    orderCode: normalized.id_order || newOrder?.[idOrderCol] || null,
+                    customer: normalized.customer || null,
+                    contact: normalized.contact || null,
+                    price: normalized.price ?? newOrder?.[priceCol] ?? null,
+                    status: normalized.status || null,
+                },
+            });
 
             res.status(201).json(normalized);
             sendOrderCreatedNotification(normalized).catch((error) => {

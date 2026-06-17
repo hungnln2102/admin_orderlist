@@ -137,7 +137,9 @@ export function SupplierSettlementPanel({
                 {qrImageUrl ? (
                   <>
                     <img src={qrImageUrl} alt="QR" className="w-64 rounded-lg shadow-lg" />
-                    <p className="text-[11px] text-white/45">Không cần ghi nội dung CK</p>
+                    <p className="text-[11px] text-white/55 text-center">
+                      Ảnh VietQR đã kèm thông tin tài khoản và số tiền.
+                    </p>
                   </>
                 ) : (
                   <div className="w-64 h-64 bg-white/10 rounded-lg flex items-center justify-center text-xs text-center p-2">

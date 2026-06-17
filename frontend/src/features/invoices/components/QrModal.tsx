@@ -10,7 +10,6 @@ import type { QrModalProps } from "./qr-modal/types";
 export const QrModal: React.FC<QrModalProps> = ({
   open,
   amount,
-  note,
   matchableOrders,
   shopBank,
   onClose,
@@ -20,7 +19,6 @@ export const QrModal: React.FC<QrModalProps> = ({
   const controller = useQrModalController({
     open,
     amount,
-    note,
     matchableOrders,
     shopBank,
     onAmountChange,
@@ -54,8 +52,7 @@ export const QrModal: React.FC<QrModalProps> = ({
                 Tạo thông tin thanh toán qua QR Code
               </h2>
               <p className="text-sm text-slate-400/95 leading-relaxed max-w-xl mx-auto">
-                Nhập số tiền hoặc gộp nhiều đơn theo mã đơn. QR VietQR chỉ mang số tiền — khách không
-                cần ghi nội dung chuyển khoản.
+                Nhập số tiền hoặc gộp nhiều đơn theo mã đơn. Ảnh VietQR sẽ hiển thị thông tin tài khoản và số tiền.
               </p>
             </div>
 

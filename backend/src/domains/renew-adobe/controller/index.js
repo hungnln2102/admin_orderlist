@@ -42,6 +42,7 @@ const {
   getWebsiteStatus,
   activateWebsiteUser,
 } = require("./publicWebsite");
+const { listSystemLogs } = require("./systemLogs");
 
 const runAutoDeleteUsers = (req, res) =>
   runAutoDeleteUsersHandler({
@@ -87,4 +88,5 @@ module.exports = {
   deleteProductSystem,
   getWebsiteStatus,
   activateWebsiteUser,
+  listSystemLogs,
 };

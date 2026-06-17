@@ -111,7 +111,6 @@ export const usePayments = ({
     const accountNumber = isPositive ? supply?.numberBank || "" : shopBank.accountNumber;
     const bankCode = isPositive ? supply?.binBank || "" : shopBank.bankCode;
     const accountName = isPositive ? supply?.nameBank || "" : shopBank.accountHolder;
-
     const url = buildSepayQrUrl({
       accountNumber,
       bankCode,

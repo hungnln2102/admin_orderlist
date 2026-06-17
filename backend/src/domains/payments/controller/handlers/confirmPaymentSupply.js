@@ -24,6 +24,9 @@ const {
 const {
   notifyFinanceMonthlyDelta,
 } = require("../../../../services/telegramFinanceDeltaNotifier");
+const {
+  creditSupplierRefundToDailyWallet,
+} = require("../../../wallet/repositories/dailyBalanceRepository");
 
 const confirmPaymentSupply = async (req, res) => {
   const { paymentId } = req.params;
@@ -207,6 +210,10 @@ const confirmPaymentSupply = async (req, res) => {
           });
           if (ledgerResult && !ledgerResult.skipped) {
             bankLedgerDelta = expectedPaidAmount;
+            await creditSupplierRefundToDailyWallet(trx, {
+              recordDate: paymentDate,
+              amount: expectedPaidAmount,
+            });
           }
         } else {
           const ledgerResult = await debitShopBankSupplierPayment(trx, {

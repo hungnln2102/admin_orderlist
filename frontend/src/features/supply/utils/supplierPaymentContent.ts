@@ -39,7 +39,7 @@ export type NccTransferContentParams = {
 };
 
 /**
- * Legacy helpers — QR NCC không còn gắn nội dung CK; webhook vẫn có thể đọc mẫu cũ nếu có.
+ * Nội dung CK legacy cho webhook đối soát khi cần.
  */
 export function buildNccTransferContentByBalance({
   balanceSigned,

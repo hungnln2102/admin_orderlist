@@ -62,7 +62,7 @@ export const QrBatchToolsPanel: React.FC<Props> = ({
         <div>
           <h3 className="text-sm font-bold text-white tracking-tight">Cập nhật mã QR</h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Chỉ cần số tiền — VietQR không ghi nội dung chuyển khoản.
+            VietQR hiển thị tài khoản và số tiền — không cần nội dung chuyển khoản.
           </p>
         </div>
       </div>

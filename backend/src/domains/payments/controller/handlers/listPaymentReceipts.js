@@ -3,8 +3,47 @@ const logger = require("../../../../utils/logger");
 const {
   TABLES,
   PAYMENT_RECEIPT_DEF,
+  PAYMENT_RECEIPT_AUDIT_DEF,
   RECEIPT_STATE_COLS,
 } = require("../shared/constants");
+
+const OUTBOUND_RULE_BRANCH = "OUTBOUND_TRANSFER_BANK_BALANCE_DEBIT";
+
+const loadOutboundAuditMap = async (receiptIds = []) => {
+  const uniqueIds = Array.from(
+    new Set((receiptIds || []).map((value) => Number(value)).filter((value) => Number.isFinite(value) && value > 0))
+  );
+  if (!uniqueIds.length) return new Map();
+
+  const auditRows = await db({ audit: TABLES.paymentReceiptAudit })
+    .select({
+      paymentReceiptId: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.paymentReceiptId}`,
+      ruleBranch: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.ruleBranch}`,
+      delta: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.delta}`,
+      createdAt: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.createdAt}`,
+    })
+    .whereIn(`audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.paymentReceiptId}`, uniqueIds)
+    .andWhere(`audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.ruleBranch}`, OUTBOUND_RULE_BRANCH)
+    .orderBy([
+      { column: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.paymentReceiptId}`, order: "asc" },
+      { column: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.createdAt}`, order: "desc" },
+      { column: `audit.${PAYMENT_RECEIPT_AUDIT_DEF.columns.id}`, order: "desc" },
+    ]);
+
+  const auditMap = new Map();
+  for (const row of auditRows || []) {
+    const paymentReceiptId = Number(row.paymentReceiptId) || 0;
+    if (!paymentReceiptId || auditMap.has(paymentReceiptId)) continue;
+    const delta = row.delta && typeof row.delta === "object" ? row.delta : {};
+    auditMap.set(paymentReceiptId, {
+      outboundAmount: Number(delta.outbound_amount) || Math.abs(Number(delta.bank_balance_delta) || 0),
+      outboundReason: String(delta.outbound_reason || "").trim(),
+      outboundReasonLabel: String(delta.outbound_reason_label || "").trim(),
+      outboundContent: String(delta.content || "").trim(),
+    });
+  }
+  return auditMap;
+};
 
 const listPaymentReceipts = async (req, res) => {
   const limitParam = Number.parseInt(req.query.limit, 10);
@@ -51,6 +90,7 @@ const listPaymentReceipts = async (req, res) => {
       .limit(limit);
 
     const normalizedRows = (rows || []).filter(Boolean);
+    const outboundAuditMap = await loadOutboundAuditMap(normalizedRows.map((row) => row.id));
     const receipts = normalizedRows.map((row) => ({
       id: row.id,
       orderCode: row.orderCode,
@@ -65,6 +105,7 @@ const listPaymentReceipts = async (req, res) => {
       postedOffFlowBankReceipt: Number(row.postedOffFlowBankReceipt) || 0,
       reconciledAt: row.reconciledAt || null,
       adjustmentApplied: !!row.adjustmentApplied,
+      ...(outboundAuditMap.get(Number(row.id)) || {}),
     }));
 
     res.json({ receipts, count: receipts.length, offset, limit });
@@ -96,6 +137,7 @@ const listPaymentReceipts = async (req, res) => {
           .offset(offset)
           .limit(limit);
 
+        const outboundAuditMap = await loadOutboundAuditMap((fallbackRows || []).map((row) => row.id));
         const receipts = (fallbackRows || []).map((row) => ({
           id: row.id,
           orderCode: row.orderCode,
@@ -110,6 +152,7 @@ const listPaymentReceipts = async (req, res) => {
           postedOffFlowBankReceipt: 0,
           reconciledAt: null,
           adjustmentApplied: false,
+          ...(outboundAuditMap.get(Number(row.id)) || {}),
         }));
         logger.warn("[payments] payment_receipt_financial_state missing, fallback query used");
         return res.json({ receipts, count: receipts.length, offset, limit });

@@ -116,7 +116,7 @@ export const OrderPaymentQrSection = ({
         )}
         {!isSupplierPayout && (
           <p className="text-xs text-indigo-200/90">
-            Chuyển khoản đúng số tiền trên QR — không cần ghi nội dung chuyển khoản.
+            Ảnh VietQR đã kèm thông tin tài khoản và số tiền — khách không cần ghi nội dung chuyển khoản.
           </p>
         )}
       </div>

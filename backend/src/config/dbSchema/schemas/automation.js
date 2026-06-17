@@ -42,6 +42,27 @@ const RENEW_ADOBE_SCHEMA = {
       URL_ACTIVE: "url_active",
     },
   },
+  SYSTEM_EVENT_LOGS: {
+    TABLE: "system_event_logs",
+    COLS: {
+      ID: "id",
+      LOG_TYPE: "log_type",
+      LEVEL: "level",
+      ACTION: "action",
+      ENTITY: "entity",
+      ENTITY_ID: "entity_id",
+      MESSAGE: "message",
+      ACTOR_ID: "actor_id",
+      ACTOR_NAME: "actor_name",
+      SOURCE: "source",
+      REQUEST_METHOD: "request_method",
+      REQUEST_PATH: "request_path",
+      IP_ADDRESS: "ip_address",
+      USER_AGENT: "user_agent",
+      METADATA: "metadata",
+      CREATED_AT: "created_at",
+    },
+  },
   ORDER_USER_TRACKING: {
     TABLE: "order_user_tracking",
     COLS: {

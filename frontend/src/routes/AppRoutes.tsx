@@ -42,6 +42,7 @@ const UsdtWalletsPage = lazy(() =>
   }))
 );
 const RenewAdobeAdminPage = lazy(() => import("@/features/renew-adobe/pages/RenewAdobeAdminPage"));
+const RenewSystemLogsPage = lazy(() => import("@/features/renew-adobe/pages/RenewSystemLogsPage"));
 const RenewOrdersDeskPage = lazy(() => import("@/features/renew-adobe/desk/RenewOrdersDeskPage"));
 const RenewProfileCheckDeskPage = lazy(
   () => import("@/features/renew-adobe/storefront-check/RenewProfileCheckDeskPage"),
@@ -79,6 +80,7 @@ export function AppRoutes() {
         <Route path="/shop-bank-accounts" element={<ShopBankAccountsPage />} />
         <Route path="/usdt-wallets" element={<UsdtWalletsPage />} />
         <Route path="/renew-adobe-admin" element={<RenewAdobeAdminPage />} />
+        <Route path="/renew-adobe-system-logs" element={<RenewSystemLogsPage />} />
         <Route path="/renew-orders" element={<RenewOrdersDeskPage />} />
         <Route path="/renew-adobe-check" element={<RenewProfileCheckDeskPage />} />
         <Route path="/content/articles" element={<ArticlesPage />} />

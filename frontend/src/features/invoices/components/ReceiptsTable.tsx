@@ -173,6 +173,10 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
               const isMatching = matchingReceiptId === receipt.id;
               const isEditingOrderCode =
                 enableOrderCodeEdit && editingReceiptId === receipt.id;
+              const isOutboundTransfer = Boolean(receipt.outboundReasonLabel || receipt.outboundAmount);
+              const amountClassName = isOutboundTransfer
+                ? "text-red-400"
+                : "text-emerald-400";
               return (
                 <React.Fragment key={receipt.id}>
                   <tr
@@ -327,13 +331,18 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                       </div>
                     </td>
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">
-                      <span className="text-sm font-bold text-emerald-400 tracking-tight">
-                        {formatCurrencyVnd(receipt.amount)}
+                      <span className={`text-sm font-bold ${amountClassName} tracking-tight`}>
+                        {formatCurrencyVnd(isOutboundTransfer ? -Math.abs(receipt.outboundAmount || receipt.amount) : receipt.amount)}
                       </span>
                     </td>
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 max-w-xs">
+                      {isOutboundTransfer ? (
+                        <div className="mb-1 inline-flex items-center rounded-full border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-red-200">
+                          {receipt.outboundReasonLabel || "Tiền ra"}
+                        </div>
+                      ) : null}
                       <span className="block truncate text-[13px] text-white/60 font-medium">
-                        {receipt.note || "—"}
+                        {receipt.outboundContent || receipt.note || "—"}
                       </span>
                     </td>
                     <td className="px-5 py-5 glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500">

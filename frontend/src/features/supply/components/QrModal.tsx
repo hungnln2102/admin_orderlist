@@ -39,7 +39,7 @@ const QrModal: React.FC<Props> = ({ payment, onClose }) => {
         )}
 
         <p className="text-[11px] font-medium text-white/60 text-center mt-6 leading-relaxed">
-          Quét mã QR bằng ứng dụng ngân hàng<br/>để thanh toán chu kỳ này.
+          Ảnh VietQR đã kèm thông tin tài khoản và số tiền.<br/>Khách chỉ cần quét và xác nhận.
         </p>
       </div>
     </div>

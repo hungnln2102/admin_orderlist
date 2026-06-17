@@ -201,7 +201,7 @@ const publicCheckFixAdes = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    logger.error("[fix-ades/public] check failed", {
+    logger.error("[fix-ades/public] check failed email=%s", email, {
       email,
       error: error?.message,
       status: error?.status,
@@ -248,7 +248,7 @@ const publicRenewFixAdes = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    logger.error("[fix-ades/public] renew failed", {
+    logger.error("[fix-ades/public] renew failed email=%s", email, {
       email,
       error: error?.message,
       status: error?.status,

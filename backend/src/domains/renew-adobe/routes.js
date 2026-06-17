@@ -1,5 +1,5 @@
 const express = require("express");
-const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem } = require("./controller");
+const { listMailBackupMailboxes, createMailBackupMailbox, listAccounts, lookupAccountByEmail, createAccount, deleteAccount, runCheck, runCheckWithCookies, runAddUsersBatch, runAutoDeleteUsers, adobeQueueStatus, checkAllAccounts, listUserOrders, listMatchableOrders, addOrdersToTracking, updateTrackingOrder, deleteTrackingOrder, runAutoAssign, fixSingleUser, fixUsersRound, updateUrlAccess, updateAccount, listVariants, listProductSystem, createProductSystem, deleteProductSystem, listSystemLogs } = require("./controller");
 
 const router = express.Router();
 
@@ -30,5 +30,6 @@ router.get("/variants", listVariants);
 router.get("/product-system", listProductSystem);
 router.post("/product-system", createProductSystem);
 router.delete("/product-system/:id", deleteProductSystem);
+router.get("/system-logs", listSystemLogs);
 
 module.exports = router;

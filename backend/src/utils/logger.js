@@ -122,6 +122,55 @@ if (process.env.NODE_ENV === "production" || process.env.LOG_FILE) {
   );
 }
 
+
+// Database transport for system logs (best-effort, skip if migration has not run yet)
+try {
+  const { pool } = require("../config/database");
+  const { SCHEMA_RENEW_ADOBE, RENEW_ADOBE_SCHEMA } = require("../config/dbSchema");
+  const eventLogDef = RENEW_ADOBE_SCHEMA.SYSTEM_EVENT_LOGS;
+  const eventLogCols = eventLogDef.COLS;
+  const quoteIdent = (value) => `"${String(value).replace(/"/g, '""')}"`;
+  const eventLogTable = `${quoteIdent(SCHEMA_RENEW_ADOBE)}.${quoteIdent(eventLogDef.TABLE)}`;
+
+  const DbSystemLogTransport = class extends winston.Transport {
+    log(info, callback) {
+      setImmediate(() => {
+        const { level, message, timestamp, ...meta } = info || {};
+        const metadata = { ...meta };
+        if (timestamp) metadata.timestamp = timestamp;
+        const values = [
+          "system",
+          String(level || "info").toLowerCase(),
+          String(message || "System log"),
+          metadata.source || "backend",
+          JSON.stringify(metadata),
+        ];
+        const sql = `
+          INSERT INTO ${eventLogTable} (
+            ${eventLogCols.LOG_TYPE}, ${eventLogCols.LEVEL}, ${eventLogCols.MESSAGE},
+            ${eventLogCols.SOURCE}, ${eventLogCols.METADATA}
+          ) VALUES ($1, $2, $3, $4, $5::jsonb)
+        `;
+        pool.query(sql, values).catch((error) => {
+          if (error?.code !== "42P01") {
+            // Avoid recursive logger calls from inside logger transport.
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("[DbSystemLogTransport] write failed:", error.message);
+            }
+          }
+        });
+      });
+      callback();
+    }
+  };
+
+  if (process.env.NODE_ENV !== "test" && process.env.DB_SYSTEM_LOGS_DISABLED !== "1") {
+    transports.push(new DbSystemLogTransport({ level: logLevel }));
+  }
+} catch (err) {
+  console.warn("[Logger] Could not load DB system log transport:", err.message);
+}
+
 // Telegram notification transport (error + warn)
 try {
   const { notifyError, notifyWarn } = require("./telegramErrorNotifier");
@@ -148,10 +197,27 @@ try {
   };
 
   const extractPayload = (info) => {
-    const splat = info[splatKey]?.[0] || {};
+    const splatItems = Array.isArray(info[splatKey]) ? info[splatKey] : [];
+    const splat = splatItems.find((item) => item && typeof item === "object") || {};
     const status = info.status ?? info.statusCode ?? splat.status;
     const body = info.body ?? splat.body;
+    const contextKeys = [
+      "email",
+      "account",
+      "username",
+      "userId",
+      "orderId",
+      "orderCode",
+      "paymentId",
+      "supplyId",
+    ];
     const extraParts = [];
+    for (const key of contextKeys) {
+      const value = info[key] ?? splat[key];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        extraParts.push(`${key}=${String(value).trim()}`);
+      }
+    }
     if (status != null) extraParts.push(`HTTP ${status}`);
     if (body != null && String(body).trim()) {
       const b = String(body).replace(/\s+/g, " ").trim();

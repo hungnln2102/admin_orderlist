@@ -10,6 +10,7 @@ import {
   CurrencyDollarIcon,
   DocumentIcon,
   DocumentTextIcon,
+  RectangleStackIcon,
   FolderIcon,
   InformationCircleIcon,
   KeyIcon,
@@ -158,6 +159,11 @@ export const menuSections: MenuSection[] = [
         name: "IP whitelist",
         href: "/ip-whitelist",
         icon: ShieldCheckIcon,
+      },
+      {
+        name: "Log H\u1ec7 Th\u1ed1ng",
+        href: "/renew-adobe-system-logs",
+        icon: RectangleStackIcon,
       },
       {
         name: "Quản lý thanh toán",

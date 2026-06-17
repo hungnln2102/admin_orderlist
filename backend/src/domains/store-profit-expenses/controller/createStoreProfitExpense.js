@@ -21,6 +21,7 @@ const {
   SOURCE_KINDS,
 } = require("../../shop-bank-accounts/services/shopBankLedgerService");
 const { findShopBankAccountById } = require("../../shop-bank-accounts/repositories/shopBankAccountRepository");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const parseShopBankAccountId = (body) => {
   const raw =
@@ -138,7 +139,24 @@ const createStoreProfitExpense = async (req, res) => {
       return inserted;
     });
 
-    res.status(201).json({ item: mapExpenseRow(row || {}) });
+
+    const mapped = mapExpenseRow(row || {});
+    writeUserEventLog(req, {
+      action: "T?o log chi ph?",
+      entity: "Chi ph?",
+      entityId: mapped.id || row?.[COLS.ID],
+      message: `T?o log chi ph? ${mapped.reason || reason || "kh?ng c? l? do"} - s? ti?n: ${mapped.amount ?? amount}`,
+      source: "finance.store_profit_expenses",
+      metadata: {
+        expenseId: mapped.id || row?.[COLS.ID] || null,
+        amount: mapped.amount ?? amount,
+        reason: mapped.reason || reason || null,
+        expenseType,
+        linkedOrderCode: linkedOrderCode || null,
+      },
+    });
+
+    res.status(201).json({ item: mapped });
   } catch (error) {
     if (error?.code === MAVN_INTERNAL_EXTERNAL_IMPORT_BLOCKED) {
       return res.status(409).json({
