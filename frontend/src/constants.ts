@@ -86,6 +86,7 @@ export const API_ENDPOINTS = {
     `/api/renew-adobe/user-orders/${encodeURIComponent(orderCode)}`,
   RENEW_ADOBE_ORDER_LIST_MATCH: "/api/renew-adobe/order-list/match",
   FIX_ADES_CHECK: "/api/fix-ades/check",
+  FIX_ADES_CHECK_TRANSFER_STATUS: "/api/fix-ades/check-transfer-status",
   FIX_ADES_RENEW: "/api/fix-ades/renew",
   RENEW_ADOBE_FIX_USER: "/api/renew-adobe/fix-user",
   RENEW_ADOBE_SYSTEM_LOGS: "/api/renew-adobe/system-logs",

@@ -49,6 +49,10 @@ export function checkFixAdesAccount(email: string) {
   return callJson<unknown>(API_ENDPOINTS.FIX_ADES_CHECK, { email });
 }
 
+export function checkFixAdesTransferStatus(email: string) {
+  return callJson<unknown>(API_ENDPOINTS.FIX_ADES_CHECK_TRANSFER_STATUS, { email });
+}
+
 export function renewFixAdesAccount(email: string) {
   return callJson<FixAdesRenewData>(API_ENDPOINTS.FIX_ADES_RENEW, { email });
 }

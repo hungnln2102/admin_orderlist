@@ -204,14 +204,37 @@ const updateOrderWithFinance = async ({
     updatedOrder.order_date_raw = toISO(updatedOrder.order_date);
     updatedOrder.expiry_date_raw = toISO(updatedOrder.expiry_date);
 
+    const beforeNormalized = normalizeOrderRow(beforeOrder, todayYMDInVietnam());
     const normalized = normalizeOrderRow(updatedOrder, todayYMDInVietnam());
     const supplyIdVal = updatedOrder?.[supplyIdCol];
+    const beforeSupplyIdVal = beforeOrder?.[supplyIdCol];
+    if (beforeSupplyIdVal != null) {
+        const supplier = await db(TABLES.supplier)
+            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
+            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyIdVal)
+            .first();
+        beforeNormalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
+    }
     if (supplyIdVal != null) {
         const supplier = await db(TABLES.supplier)
             .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
             .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, supplyIdVal)
             .first();
         normalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
+    }
+    const beforeVariantIdVal = beforeOrder?.[productIdCol];
+    if (beforeVariantIdVal != null && Number.isFinite(Number(beforeVariantIdVal))) {
+        const variant = await db(TABLES.variant)
+            .select(PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME, PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME)
+            .where(PRODUCT_SCHEMA.VARIANT.COLS.ID, beforeVariantIdVal)
+            .first();
+        const displayName = variant?.[PRODUCT_SCHEMA.VARIANT.COLS.DISPLAY_NAME]
+            ?? variant?.[PRODUCT_SCHEMA.VARIANT.COLS.VARIANT_NAME];
+        beforeNormalized.variant_id = Number(beforeVariantIdVal);
+        if (displayName != null) {
+            beforeNormalized.product_display_name = displayName;
+            beforeNormalized.id_product = displayName;
+        }
     }
     const variantIdVal = updatedOrder?.[productIdCol];
     if (variantIdVal != null && Number.isFinite(Number(variantIdVal))) {
@@ -231,7 +254,14 @@ const updateOrderWithFinance = async ({
     if (supplierChangeResult) {
         normalized.supplier_change = supplierChangeResult;
     }
-    return { updated: normalized };
+    return {
+        updated: normalized,
+        audit: {
+            before: beforeNormalized,
+            after: normalized,
+            changedFields: Object.keys(payload || {}),
+        },
+    };
 };
 
 module.exports = {

@@ -5,7 +5,7 @@
  *   1) POST /auth/token  body `{}` → trả `{ data: { token } }` (JWT)
  *   2) POST /account/check  header `Authorization: <token>` (RAW, không Bearer)
  *      body `{ email }` → trả thông tin gói.
- *   3) POST /renew-adobe/<email>  header `Authorization: <token>` body `{}` → renew.
+ *   3) POST /renew-adobe/<email>  header `Authorization: Bearer <token>` body `{}` → renew.
  *
  * Token short-lived (Ades cấp ~ vài giây/phút) → mặc định không cache.
  */
@@ -55,9 +55,8 @@ const HTTP_TIMEOUT_MS = (() => {
 let tokenCache = null; // { token, expiresAt }
 let tokenInflight = null;
 
-function buildRefererForEmail(email) {
-  const safe = encodeURIComponent(String(email || "").trim());
-  return `${REFERER_BASE}/${safe}`;
+function buildRefererForEmail() {
+  return `${REFERER_BASE.replace(/\/+$/, "")}/`;
 }
 
 function buildCommonHeaders(email) {
@@ -177,7 +176,7 @@ function normalizeEmail(email) {
  */
 function buildAuthHeaders(token) {
   return {
-    Authorization: token,
+    Authorization: `Bearer ${token}`,
     "x-access-token": token,
   };
 }
@@ -214,6 +213,43 @@ async function checkAdesAccount(email) {
 
   if (!result.ok) {
     logger.warn("[fix-ades] check failed", {
+      email: e,
+      status: result.status,
+      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+    });
+  }
+
+  return {
+    ok: result.ok,
+    status: result.status,
+    data: result.json,
+    raw: result.raw,
+  };
+}
+
+/**
+ * Check transfer profile status for the Ades `/additional/account/transfer` flow.
+ *
+ * @param {string} email
+ * @returns {Promise<{ ok: boolean, status: number, data: any, raw: string }>}
+ */
+async function checkAdesTransferStatus(email) {
+  const e = normalizeEmail(email);
+  const result = await callWithToken(async (token) => {
+    const headers = {
+      ...buildCommonHeaders(e),
+      ...buildAuthHeaders(token),
+    };
+    logger.debug("[fix-ades] POST /check-transfer-status", {
+      email: e,
+      tokenLen: token?.length || 0,
+      tokenHead: token ? token.slice(0, 6) + "..." : null,
+    });
+    return postJson(BASE_URL + "/check-transfer-status", { email: e }, headers);
+  }, e);
+
+  if (!result.ok) {
+    logger.warn("[fix-ades] check transfer status failed", {
       email: e,
       status: result.status,
       body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
@@ -274,5 +310,6 @@ module.exports = {
   BASE_URL,
   getAdesToken,
   checkAdesAccount,
+  checkAdesTransferStatus,
   renewAdesAccount,
 };

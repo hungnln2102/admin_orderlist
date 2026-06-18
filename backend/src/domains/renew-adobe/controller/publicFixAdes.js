@@ -17,6 +17,7 @@ const {
 } = require("../../../config/dbSchema");
 const {
   checkAdesAccount,
+  checkAdesTransferStatus,
   renewAdesAccount,
 } = require("../../../services/fix-ades/checkService");
 
@@ -58,6 +59,34 @@ const ADES_NOT_ACTIVE_HINTS = [
   "chua kich hoat",
   "chưa kích hoạt",
 ];
+
+function isAdesSyncRequiredPayload(adesData) {
+  const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : null;
+  return Boolean(data?.existedInSystem) && !data?.transferTeamResponse;
+}
+
+function getTransferTeamResponse(adesData) {
+  const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : adesData;
+  const transfer =
+    data?.transferTeamResponse && typeof data.transferTeamResponse === "object"
+      ? data.transferTeamResponse
+      : null;
+  return transfer;
+}
+
+function normalizeTransferDataForTracking(adesData) {
+  const transfer = getTransferTeamResponse(adesData);
+  if (!transfer) return adesData;
+  return {
+    ...adesData,
+    email: transfer.email || adesData?.email,
+    teamName: transfer.teamName || adesData?.teamName,
+    status: transfer.status || adesData?.status,
+    organizationId: transfer.organizationId || adesData?.organizationId,
+    switchAvailable: transfer.switchAvailable,
+    switchTargetTeamName: transfer.switchTargetTeamName,
+  };
+}
 
 /** Map status từ Ades sang chuỗi `tracking_status` hợp lệ theo DB constraint. */
 function mapAdesStatusToTracking(status) {
@@ -187,13 +216,28 @@ async function ensureFixAdesEligible(email, res) {
 
 const publicCheckFixAdes = async (req, res) => {
   const email = normalizeEmail(req.body?.email);
-  const eligible = await ensureFixAdesEligible(email, res);
-  if (!eligible) return;
+  if (!email || !EMAIL_RE.test(email)) {
+    return res.status(400).json({ ok: false, error: "Email kh?ng h?p l?." });
+  }
+  const eligible = await findFixAdesTrackingRow(email);
   try {
-    const rawResult = await checkAdesAccount(email);
+    const rawResult = await checkAdesTransferStatus(email);
     const result = normalizeCheckResultForRenewFlow(rawResult);
-    if (result.data && typeof result.data === "object") {
-      await syncTrackingFromAdesCheckData(email, result.data, eligible);
+
+    if (!eligible && !isAdesSyncRequiredPayload(result.data)) {
+      return res.status(403).json({
+        ok: false,
+        error:
+          "Email kh?ng thu?c h? th?ng Fix Ades ho?c ch?a ???c k?ch ho?t. Vui l?ng ki?m tra l?i.",
+      });
+    }
+
+    if (eligible && result.data && typeof result.data === "object") {
+      await syncTrackingFromAdesCheckData(
+        email,
+        normalizeTransferDataForTracking(result.data),
+        eligible
+      );
     }
     return res.status(result.ok ? 200 : 502).json({
       ok: result.ok,

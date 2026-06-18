@@ -47,6 +47,26 @@ const levelClassName = (level: string) => {
   return "border-emerald-400/30 bg-emerald-500/10 text-emerald-200";
 };
 
+const orderCodeClassName = "border-cyan-300/30 bg-cyan-500/10 text-cyan-100";
+
+const isMetadataRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === "object" && !Array.isArray(value)
+);
+
+const getUserLogBadgeText = (item: RenewSystemLogEntry): string => {
+  const metadata = isMetadataRecord(item.metadata) ? item.metadata : {};
+  const candidates = [metadata.orderCode, item.entityId, item.entity_id];
+  const orderCode = candidates
+    .map((value) => (value == null ? "" : String(value).trim()))
+    .find(Boolean);
+  return orderCode || item.level || "info";
+};
+
+const getUserLogActionText = (item: RenewSystemLogEntry): string => {
+  const action = item.action == null ? "" : String(item.action).trim();
+  return action || "Thao tác người dùng";
+};
+
 const formatMetaValue = (value: unknown): string => {
   if (value == null || value === "") return "";
   if (typeof value === "string") return value;
@@ -350,14 +370,14 @@ export default function RenewSystemLogsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${levelClassName(
-                        item.level
-                      )}`}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
+                        activeTab === "user" ? orderCodeClassName : levelClassName(item.level)
+                      }`}
                     >
-                      {item.level || "info"}
+                      {activeTab === "user" ? getUserLogBadgeText(item) : item.level || "info"}
                     </span>
                     <span className="text-xs font-semibold text-white/40">
-                      {item.sourceFile || "runtime"}
+                      {activeTab === "user" ? getUserLogActionText(item) : item.sourceFile || "runtime"}
                     </span>
                     {item.timestamp ? (
                       <span className="text-xs font-semibold text-white/40">

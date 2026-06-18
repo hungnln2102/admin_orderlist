@@ -140,6 +140,12 @@ const readUserActivityLogs = async ({ limit, search }) => {
   return result.rows.map(normalizeUserLogRow);
 };
 
+const sortLogsByTimestampDesc = (logs) => [...logs].sort((a, b) => {
+  const left = a?.timestamp ? Date.parse(a.timestamp) : 0;
+  const right = b?.timestamp ? Date.parse(b.timestamp) : 0;
+  return right - left;
+});
+
 
 const parseLogLine = (line, sourceFile) => {
   const trimmed = String(line || "").trim();
@@ -184,6 +190,12 @@ const listSystemLogs = async (req, res) => {
 
   try {
     const eventLogs = await readEventLogs({ source, level, search, limit });
+    if (source === "user") {
+      const fallbackLogs = await readUserActivityLogs({ limit, search });
+      const logs = sortLogsByTimestampDesc([...(eventLogs || []), ...fallbackLogs]).slice(0, limit);
+      return res.json({ logs, files: [], summary: summarizeLogs(logs), limit, level, search, source });
+    }
+
     if (eventLogs) {
       return res.json({
         logs: eventLogs,
@@ -194,11 +206,6 @@ const listSystemLogs = async (req, res) => {
         search,
         source,
       });
-    }
-
-    if (source === "user") {
-      const logs = await readUserActivityLogs({ limit, search });
-      return res.json({ logs, files: [], summary: summarizeLogs(logs), limit, level: "all", search, source });
     }
 
     if (!fs.existsSync(logsDir)) {

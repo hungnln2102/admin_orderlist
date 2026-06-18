@@ -29,6 +29,7 @@ router.post("/activate", requireRenewAdobePublicActivateKey, activateWebsiteUser
  * forward sang api.ades.support. Tránh user public spam credit.
  */
 router.post("/fix-ades/check", publicCheckFixAdes);
+router.post("/fix-ades/check-transfer-status", publicCheckFixAdes);
 router.post("/fix-ades/renew", publicRenewFixAdes);
 
 module.exports = router;

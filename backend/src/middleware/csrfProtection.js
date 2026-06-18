@@ -35,6 +35,19 @@ function isPublicPricingPost(req) {
   );
 }
 
+function isRenewAdobePublicPost(req) {
+  const stripped = String(req.path || "");
+  const orig = String(req.originalUrl || "").split("?")[0];
+  const url = String(req.url || "").split("?")[0];
+  const needle = "/renew-adobe/public/";
+  return (
+    stripped.startsWith(needle) ||
+    url.startsWith(needle) ||
+    /^\/api\/renew-adobe\/public(\/|$)/.test(orig) ||
+    /^\/api\/renew-adobe\/public(\/|$)/.test(url)
+  );
+}
+
 /**
  * Generate CSRF token for the session
  * Call this on GET requests to provide token to frontend
@@ -101,7 +114,7 @@ const verifyToken = (req, res, next) => {
     return next();
   }
 
-  if (isPublicPricingPost(req)) {
+  if (isPublicPricingPost(req) || isRenewAdobePublicPost(req)) {
     return next();
   }
 

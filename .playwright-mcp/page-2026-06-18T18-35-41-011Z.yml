@@ -1,0 +1,49 @@
+- generic [ref=e6]:
+  - generic [ref=e8]:
+    - img [ref=e10]
+    - generic [ref=e13]:
+      - heading "Verification And Renew" [level=1] [ref=e14]
+      - paragraph [ref=e15]: Kiểm tra trạng thái tài khoản và sử dụng các công cụ hỗ trợ
+  - generic [ref=e16]:
+    - tablist [ref=e17]:
+      - generic [ref=e19]:
+        - tab "Kiểm tra tài khoản" [selected] [ref=e21] [cursor=pointer]
+        - tab "Bộ công cụ (OTP, Reinvite,...)" [ref=e23] [cursor=pointer]
+    - tabpanel "Kiểm tra tài khoản" [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e29]:
+          - img [ref=e31]
+          - generic [ref=e34]:
+            - heading "Check Account." [level=1] [ref=e35]
+            - paragraph [ref=e36]: Kiểm tra trạng thái tài khoản và thực hiện chuyển Profile.
+        - generic [ref=e37]:
+          - generic [ref=e40]:
+            - img [ref=e41]
+            - textbox "Nhập email để kiểm tra..." [ref=e44]: vyvy28022002@gmail.com
+            - button [ref=e45] [cursor=pointer]:
+              - img [ref=e51]
+          - button "Đang chuyển..." [disabled] [ref=e82]:
+            - img [ref=e83]
+            - text: Đang chuyển...
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - heading "Thông tin tài khoản" [level=3] [ref=e56]
+            - paragraph [ref=e57]: Kết quả kiểm tra từ hệ thống.
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic [ref=e60]:
+                - img [ref=e61]
+                - generic [ref=e64]: Email
+              - generic [ref=e65]: vyvy28022002@gmail.com
+            - generic [ref=e66]:
+              - generic [ref=e67]: Trạng thái
+              - generic [ref=e68]: 🟠 Cần chuyển Profile
+            - generic [ref=e69]:
+              - generic [ref=e70]:
+                - img [ref=e71]
+                - generic [ref=e75]: Profile hiện tại
+              - generic [ref=e76]: Atelo-VisionForge
+              - generic [ref=e78]:
+                - img [ref=e79]
+                - generic [ref=e81]: "Có thể chuyển sang: Personal Profile"
+  - generic [ref=e50]: Nếu đã chọn đúng Profile Tổ Chức Mà Không Sử Dụng Được Ứng Dụng, Hãy Sử Dụng Tool Reinvite Trong Bộ Công Cụ

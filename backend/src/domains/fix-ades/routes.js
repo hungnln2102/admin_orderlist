@@ -7,6 +7,7 @@ const express = require("express");
 const logger = require("../../utils/logger");
 const {
   checkAdesAccount,
+  checkAdesTransferStatus,
   renewAdesAccount,
 } = require("../../services/fix-ades/checkService");
 
@@ -87,6 +88,31 @@ router.post("/check", async (req, res) => {
     });
     return res.status(500).json({
       error: error?.message || "Không gọi được API Fix Ades.",
+    });
+  }
+});
+
+
+router.post("/check-transfer-status", async (req, res) => {
+  const email = String(req.body?.email || "").trim();
+  if (!email) {
+    return res.status(400).json({ error: "Thi?u email." });
+  }
+  try {
+    const result = await checkAdesTransferStatus(email);
+    return res.status(result.ok ? 200 : 502).json({
+      ok: result.ok,
+      status: result.status,
+      data: result.data,
+    });
+  } catch (error) {
+    logger.error("[fix-ades] /check-transfer-status failed", {
+      email,
+      error: error?.message,
+      status: error?.status,
+    });
+    return res.status(500).json({
+      error: error?.message || "Kh?ng g?i ???c API check transfer Fix Ades.",
     });
   }
 });
