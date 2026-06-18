@@ -2,7 +2,7 @@
  * Public endpoint cho Website storefront — lookup `order_user_tracking.system_note`
  * theo email, để frontend biết cần gọi API hệ thống nào (renew_adobe / fix_adobe_edu / fix_ades).
  *
- * Email không có trong tracking → 404 (đúng yêu cầu: chỉ phục vụ user đã mua gói).
+ * Email không có trong tracking → 200 ok=false để Website hiển thị thông báo gọn, không tạo lỗi đỏ trong DevTools.
  */
 
 const { db } = require("../../../db");
@@ -54,9 +54,9 @@ const resolveSystemByEmail = async (req, res) => {
       .first();
 
     if (!row) {
-      return res.status(404).json({
+      return res.json({
         ok: false,
-        error: "Email không có trong hệ thống. Vui lòng kiểm tra lại hoặc đặt gói trước.",
+        error: "Email không có trong hệ thống.",
       });
     }
 
