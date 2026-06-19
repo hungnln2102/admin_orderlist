@@ -62,6 +62,28 @@ function normalizeCheckResultForRenewFlow(result) {
   };
 }
 
+function getTransferTeamResponse(adesData) {
+  const data =
+    adesData?.data && typeof adesData.data === "object" ? adesData.data : adesData;
+  return data?.transferTeamResponse && typeof data.transferTeamResponse === "object"
+    ? data.transferTeamResponse
+    : null;
+}
+
+function normalizeTransferStatusData(adesData) {
+  const transfer = getTransferTeamResponse(adesData);
+  if (!transfer) return adesData;
+  return {
+    ...adesData,
+    email: transfer.email || adesData?.email,
+    teamName: transfer.teamName || adesData?.teamName,
+    status: transfer.status || adesData?.status,
+    organizationId: transfer.organizationId || adesData?.organizationId,
+    switchAvailable: transfer.switchAvailable,
+    switchTargetTeamName: transfer.switchTargetTeamName,
+  };
+}
+
 /**
  * POST /api/fix-ades/check
  * Body: { email: string }
@@ -100,10 +122,11 @@ router.post("/check-transfer-status", async (req, res) => {
   }
   try {
     const result = await checkAdesTransferStatus(email);
+    const data = normalizeTransferStatusData(result.data);
     return res.status(result.ok ? 200 : 502).json({
       ok: result.ok,
       status: result.status,
-      data: result.data,
+      data,
     });
   } catch (error) {
     logger.error("[fix-ades] /check-transfer-status failed", {
