@@ -221,7 +221,7 @@ const publicCheckFixAdes = async (req, res) => {
   }
   const eligible = await findFixAdesTrackingRow(email);
   try {
-    const rawResult = await checkAdesTransferStatus(email);
+    const rawResult = await checkAdesAccount(email);
     const result = normalizeCheckResultForRenewFlow(rawResult);
 
     if (!eligible && !isAdesSyncRequiredPayload(result.data)) {
@@ -235,7 +235,7 @@ const publicCheckFixAdes = async (req, res) => {
     if (eligible && result.data && typeof result.data === "object") {
       await syncTrackingFromAdesCheckData(
         email,
-        normalizeTransferDataForTracking(result.data),
+        result.data,
         eligible
       );
     }
