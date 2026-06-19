@@ -5,6 +5,7 @@ import {
   enrichOrdersWithVirtualFields,
   filterAndSortOrders,
   computeOrderStats,
+  computeOrderFinancialStats,
   getPaginated,
   buildPaginationPages,
 } from "../utils/orderListTransform";
@@ -53,6 +54,7 @@ export function useOrdersList({
       dataset,
     });
     const { updatedStats, totalRecords } = computeOrderStats(narrowed, dataset);
+    const financialStats = computeOrderFinancialStats(filteredOrders);
     const { currentOrders, totalPages } = getPaginated(
       filteredOrders,
       currentPage,
@@ -64,6 +66,7 @@ export function useOrdersList({
       currentOrders,
       totalPages,
       updatedStats,
+      financialStats,
       totalRecords,
     };
   }, [

@@ -29,6 +29,7 @@ export default function Orders() {
     currentOrders,
     totalPages,
     updatedStats,
+    financialStats,
     filteredOrders,
     paginationPages,
     searchTerm,
@@ -119,6 +120,7 @@ export default function Orders() {
         totalRecords={totalRecords}
         isCanceled={isCanceled}
         updatedStats={updatedStats}
+        financialStats={financialStats}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
       />

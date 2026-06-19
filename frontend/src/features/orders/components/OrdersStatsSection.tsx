@@ -1,12 +1,21 @@
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-import StatCard from "@/components/ui/StatCard";
+import {
+  BanknotesIcon,
+  CalculatorIcon,
+  CurrencyDollarIcon,
+  ExclamationTriangleIcon,
+  ScaleIcon,
+} from "@heroicons/react/24/outline";
+import StatCard, { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
 import { STAT_FILTER_MAP, type BaseStat, type StatFilterKey } from "../constants";
+import { formatCurrency } from "../utils/ordersHelpers";
+import type { OrderFinancialStats } from "../utils/orderListTransform";
 
 type OrdersStatsSectionProps = {
   isExpiredDataset: boolean;
   totalRecords: number;
   isCanceled: boolean;
   updatedStats: BaseStat[];
+  financialStats: OrderFinancialStats;
   statusFilter: string;
   setStatusFilter: (value: string) => void;
 };
@@ -16,12 +25,39 @@ export function OrdersStatsSection({
   totalRecords,
   isCanceled,
   updatedStats,
+  financialStats,
   statusFilter,
   setStatusFilter,
 }: OrdersStatsSectionProps) {
   const statsGridClass = isCanceled
     ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
     : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4";
+  const financialCards = [
+    {
+      title: "Tổng Giá Bán",
+      value: financialStats.totalSellingPrice,
+      icon: CurrencyDollarIcon,
+      accent: STAT_CARD_ACCENTS.emerald,
+    },
+    {
+      title: "Tổng Giá Nhập",
+      value: financialStats.totalCostPrice,
+      icon: BanknotesIcon,
+      accent: STAT_CARD_ACCENTS.amber,
+    },
+    {
+      title: "Tổng Giá Trị Còn Lại",
+      value: financialStats.totalRemainingValue,
+      icon: CalculatorIcon,
+      accent: STAT_CARD_ACCENTS.violet,
+    },
+    {
+      title: "Tổng Giá Trị NCC Còn Lại",
+      value: financialStats.totalSupplierRemainingValue,
+      icon: ScaleIcon,
+      accent: STAT_CARD_ACCENTS.teal,
+    },
+  ];
 
   return (
     <div className="rounded-[24px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
@@ -46,29 +82,43 @@ export function OrdersStatsSection({
           </div>
         </div>
       ) : (
-        <div className={statsGridClass}>
-          {updatedStats.map((stat) => {
-            const filterKey = stat.filterKey as StatFilterKey;
-            const filterValue = STAT_FILTER_MAP[filterKey] ?? "all";
-            const isActive = statusFilter === filterValue;
+        <div className="space-y-4">
+          <div className={statsGridClass}>
+            {updatedStats.map((stat) => {
+              const filterKey = stat.filterKey as StatFilterKey;
+              const filterValue = STAT_FILTER_MAP[filterKey] ?? "all";
+              const isActive = statusFilter === filterValue;
 
-            return (
-              <button
-                key={stat.name}
-                type="button"
-                onClick={() => setStatusFilter(isActive ? "all" : filterValue)}
-                className="w-full text-left transition-all duration-200"
-              >
+              return (
+                <button
+                  key={stat.name}
+                  type="button"
+                  onClick={() => setStatusFilter(isActive ? "all" : filterValue)}
+                  className="w-full text-left transition-all duration-200"
+                >
+                  <StatCard
+                    title={stat.name}
+                    value={stat.value}
+                    icon={stat.icon}
+                    accent={stat.accent}
+                    isActive={isActive}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {financialCards.map((card) => (
                 <StatCard
-                  title={stat.name}
-                  value={stat.value}
-                  icon={stat.icon}
-                  accent={stat.accent}
-                  isActive={isActive}
+                  key={card.title}
+                  title={card.title}
+                  value={formatCurrency(card.value)}
+                  icon={card.icon}
+                  accent={card.accent}
                 />
-              </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
     </div>
