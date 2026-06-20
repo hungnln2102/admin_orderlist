@@ -11,6 +11,7 @@ import { OrdersDatasetTabs } from "./components/OrdersDatasetTabs";
 import { OrdersStatsSection } from "./components/OrdersStatsSection";
 import { OrdersFiltersBar } from "./components/OrdersFiltersBar";
 import { OrdersTableSection } from "./components/OrdersTableSection";
+import { exportFilteredOrdersToExcel } from "./utils/exportFilteredOrders";
 import type { DashboardDateRangeValue } from "@/features/dashboard/components/DashboardDateRangeFilter";
 
 export default function Orders() {
@@ -87,6 +88,10 @@ export default function Orders() {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
   }, []);
 
+  const handleExportFilteredOrders = useCallback(() => {
+    exportFilteredOrdersToExcel(filteredOrders, datasetKey);
+  }, [datasetKey, filteredOrders]);
+
   const isActiveDataset = datasetKey === "active" || datasetKey === "import";
   const showRemainingColumn = datasetKey !== "expired";
   const showActionButtons = true;
@@ -132,6 +137,8 @@ export default function Orders() {
         setSearchField={setSearchField}
         isActiveDataset={isActiveDataset}
         openCreateModal={openCreateModal}
+        onExportExcel={handleExportFilteredOrders}
+        exportDisabled={filteredOrders.length === 0}
         durationRange={orderDurationRange}
         onDurationRangeChange={setOrderDurationRange}
       />

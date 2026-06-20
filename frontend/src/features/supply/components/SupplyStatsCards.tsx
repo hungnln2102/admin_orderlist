@@ -27,25 +27,25 @@ const SupplyStatsCards: React.FC<Props> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
       <StatCard
-        title="T?ng ??n"
+        title="Tổng đơn"
         value={loading ? dash : orderCount}
         icon={ShoppingBagIcon}
         accent={STAT_CARD_ACCENTS.violet}
       />
       <StatCard
-        title="T?ng nh?p"
+        title="Tổng nhập"
         value={loading ? dash : Helpers.formatCurrency(totalCost)}
         icon={CurrencyDollarIcon}
         accent={STAT_CARD_ACCENTS.emerald}
       />
       <StatCard
-        title="T?ng ho?n"
+        title="Tổng hoàn"
         value={loading ? dash : Helpers.formatCurrency(totalRefund)}
         icon={ArrowUturnLeftIcon}
         accent={STAT_CARD_ACCENTS.amber}
       />
       <StatCard
-        title="T?ng ch?a thanh to?n"
+        title="Tổng chưa thanh toán"
         value={loading ? dash : Helpers.formatCurrency(totalUnpaid)}
         icon={ClockIcon}
         accent={STAT_CARD_ACCENTS.rose}

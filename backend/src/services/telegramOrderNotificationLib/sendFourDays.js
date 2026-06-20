@@ -83,6 +83,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
       accountNumber: bank.accountNumber,
       bankCode: bank.bankShortCode,
       amount: price,
+      description: orderCode,
       accountName: bank.accountHolder,
     });
 
@@ -92,6 +93,7 @@ async function sendFourDaysRemainingNotification(orders = []) {
       try {
         const fetched = await fetchQrImageBytes({
           amount: price,
+          addInfo: orderCode,
           accountName: bank.accountHolder,
           bankCode: bank.bankShortCode,
           accountNumber: bank.accountNumber,

@@ -2,6 +2,7 @@ const { db } = require("../../../db");
 const { SCHEMA_PRODUCT, PRICING_TIER_SCHEMA } = require("../../../config/dbSchema");
 const logger = require("../../../utils/logger");
 const { invalidate: invalidateTierCache } = require("../../../services/pricing/tierCache");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const TIER_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.PRICING_TIER.TABLE}`;
 const MARGIN_TABLE = `${SCHEMA_PRODUCT}.${PRICING_TIER_SCHEMA.VARIANT_MARGIN.TABLE}`;
@@ -35,6 +36,19 @@ const createTier = async (req, res) => {
       })
       .returning("*");
     invalidateTierCache();
+    writeUserEventLog(req, {
+      action: "Them nhom bang gia",
+      entity: "Bang gia",
+      entityId: row?.[TIER_COLS.ID] || row?.id || row?.key,
+      message: `Them nhom bang gia ${row?.[TIER_COLS.LABEL] || label}`,
+      source: "products.pricing_tiers",
+      metadata: {
+        tierId: row?.[TIER_COLS.ID] || row?.id || null,
+        key: row?.[TIER_COLS.KEY] || key || null,
+        label: row?.[TIER_COLS.LABEL] || label || null,
+        pricingRule: row?.[TIER_COLS.PRICING_RULE] || pricing_rule || null,
+      },
+    });
     res.status(201).json(row);
   } catch (err) {
     logger.error("[PricingTier] createTier failed", { error: err.message });
@@ -67,6 +81,18 @@ const updateTier = async (req, res) => {
 
     if (!row) return res.status(404).json({ error: "Không tìm thấy tier." });
     invalidateTierCache();
+    writeUserEventLog(req, {
+      action: "Sua nhom bang gia",
+      entity: "Bang gia",
+      entityId: row?.[TIER_COLS.ID] || row?.id || id,
+      message: `Sua nhom bang gia ${row?.[TIER_COLS.LABEL] || id}`,
+      source: "products.pricing_tiers",
+      metadata: {
+        tierId: row?.[TIER_COLS.ID] || row?.id || id,
+        key: row?.[TIER_COLS.KEY] || null,
+        changedFields: Object.keys(updates),
+      },
+    });
     res.json(row);
   } catch (err) {
     logger.error("[PricingTier] updateTier failed", { error: err.message });
@@ -117,6 +143,17 @@ const upsertVariantMargins = async (req, res) => {
       );
     }
     await trx.commit();
+    writeUserEventLog(req, {
+      action: "Sua bien loi nhuan bang gia",
+      entity: "Bang gia",
+      entityId: variantId,
+      message: `Sua bien loi nhuan bang gia cho s?n ph?m ${variantId}`,
+      source: "products.variant_pricing_margins",
+      metadata: {
+        variantId,
+        margins,
+      },
+    });
     res.json({ success: true });
   } catch (err) {
     await trx.rollback();

@@ -1,4 +1,8 @@
-import { MagnifyingGlassIcon, PlusIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowDownTrayIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+} from "@heroicons/react/24/outline";
 import GradientButton from "@/components/ui/GradientButton";
 import {
   DashboardDateRangeFilter,
@@ -13,6 +17,8 @@ type OrdersFiltersBarProps = {
   setSearchField: (value: string) => void;
   isActiveDataset: boolean;
   openCreateModal: () => void;
+  onExportExcel: () => void;
+  exportDisabled?: boolean;
   durationRange: DashboardDateRangeValue | null;
   onDurationRangeChange: (next: DashboardDateRangeValue | null) => void;
 };
@@ -24,6 +30,8 @@ export function OrdersFiltersBar({
   setSearchField,
   isActiveDataset,
   openCreateModal,
+  onExportExcel,
+  exportDisabled = false,
   durationRange,
   onDurationRangeChange,
 }: OrdersFiltersBarProps) {
@@ -81,6 +89,17 @@ export function OrdersFiltersBar({
                 ))}
               </select>
             </div>
+
+            <button
+              type="button"
+              onClick={onExportExcel}
+              disabled={exportDisabled}
+              className="inline-flex min-w-0 shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-bold text-emerald-100 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.85)] transition-all hover:border-emerald-300/60 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 sm:text-sm"
+              title="Xuất Excel các đơn đang được lọc"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">Xuất Excel</span>
+            </button>
 
             {isActiveDataset && (
               <div className="min-w-0 shrink-0 self-center">

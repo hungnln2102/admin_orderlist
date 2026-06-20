@@ -1,24 +1,26 @@
-/**
- * Supplier Payment Signature — encode supplier_id vào đuôi số tiền.
+﻿/**
+ * Supplier Payment Signature — tạo lệch âm nhỏ cho khoản chi NCC.
  *
  * Quy tắc:
- *   signedAmount = floor(baseAmount / 1000) * 1000 + (supplierId % 1000)
+ *   signedAmount = baseAmount - offset
+ *   offset = 1..100đ, ổn định theo supplierId để QR không đổi liên tục khi re-render.
  */
 
-const SIGNATURE_MODULUS = 1000;
+const SIGNATURE_MODULUS = 100;
 
 /**
- * Encode supplier_id vào đuôi số tiền.
+ * Tạo số tiền chi NCC nhỏ hơn số nợ gốc từ 1đ đến 100đ.
  * @param baseAmount — Số tiền nợ gốc (VND, luôn dương).
- * @param supplierId — ID supplier (1..999).
- * @returns Số tiền đã encode signature.
+ * @param supplierId — ID supplier, dùng để tạo offset ổn định.
+ * @returns Số tiền đã trừ signature.
  */
 export const encodeSupplierSignature = (
   baseAmount: number,
   supplierId: number
 ): number => {
-  const base =
-    Math.floor(Math.abs(baseAmount) / SIGNATURE_MODULUS) * SIGNATURE_MODULUS;
-  const suffix = Math.abs(Number(supplierId) || 0) % SIGNATURE_MODULUS;
-  return base + suffix;
+  const base = Math.round(Math.abs(baseAmount));
+  if (base <= 0) return 0;
+  const normalizedSupplierId = Math.max(1, Math.abs(Math.trunc(Number(supplierId) || 1)));
+  const offset = ((normalizedSupplierId - 1) % SIGNATURE_MODULUS) + 1;
+  return Math.max(1, base - offset);
 };

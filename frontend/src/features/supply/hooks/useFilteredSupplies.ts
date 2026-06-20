@@ -31,6 +31,10 @@ export function useFilteredSupplies({
     };
 
     return filtered.sort((a, b) => {
+      if (a.isActive !== b.isActive) {
+        return a.isActive ? -1 : 1;
+      }
+
       const payableA = Number(
         a.payableToSupplier ?? Math.max(0, Number(a.totalUnpaidImport) || 0)
       );

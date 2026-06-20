@@ -16,6 +16,7 @@ const {
   TABLES,
 } = require("../../constants");
 const { getTiers } = require("../../../../../services/pricing/tierCache");
+const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
 const {
   fetchVariantView,
   hasProductCategoryColor,
@@ -211,7 +212,21 @@ const createProductPrice = async (req, res) => {
     pricingCache.clear();
     supplierCache.clear();
     const viewRow = await fetchVariantView(inserted);
-    res.status(201).json(viewRow ? mapProductPriceRow(viewRow) : {});
+    const mapped = viewRow ? mapProductPriceRow(viewRow) : {};
+    writeUserEventLog(req, {
+      action: "Them bang gia san pham",
+      entity: "Bang gia",
+      entityId: mapped?.id || inserted,
+      message: `Them bang gia san pham ${mapped?.sanPham || productCode}`,
+      source: "products.product_prices",
+      metadata: {
+        productId: mapped?.id || inserted || null,
+        productCode,
+        packageName: rawPackageName || null,
+        basePrice: basePriceVal,
+      },
+    });
+    res.status(201).json(mapped);
   } catch (error) {
     logger.error("Insert failed (POST /api/product-prices)", {
       error: error.message,

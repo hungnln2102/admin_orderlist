@@ -78,6 +78,7 @@ async function sendOrderCreatedNotification(order) {
         accountNumber: qrAccountNumber,
         bankCode: qrBankCode,
         amount,
+        description: orderCode,
         accountName: qrAccountName,
       });
   const caption = isImport
@@ -93,6 +94,7 @@ async function sendOrderCreatedNotification(order) {
     try {
       const fetched = await fetchQrImageBytes({
         amount,
+        addInfo: orderCode,
         accountName: qrAccountName,
         bankCode: qrBankCode,
         accountNumber: qrAccountNumber,

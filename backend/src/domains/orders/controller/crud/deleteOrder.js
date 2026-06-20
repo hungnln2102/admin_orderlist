@@ -5,6 +5,7 @@ const { ORDERS_SCHEMA } = require("../../../../config/dbSchema");
 const { deleteOrderWithArchive } = require("../orderDeletionService");
 const { todayYMDInVietnam } = require("../../../../utils/normalizers");
 const logger = require("../../../../utils/logger");
+const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
 
 const { orderIdParam } = require("../../validators/orderValidator");
 
@@ -46,6 +47,19 @@ const attachDeleteOrderRoute = (router) => {
                     TABLES,
                     ORDERS_SCHEMA,
                     STATUS,
+                },
+            });
+
+            writeUserEventLog(req, {
+                action: "Xóa đơn hàng",
+                entity: "Đơn hàng",
+                entityId: normalized?.id_order || id,
+                message: `Xóa đơn hàng ${normalized?.id_order || id}`,
+                source: "orders.order_list",
+                metadata: {
+                    orderId: id,
+                    orderCode: normalized?.id_order || null,
+                    status: currentStatus || null,
                 },
             });
 

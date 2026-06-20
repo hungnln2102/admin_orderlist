@@ -118,7 +118,7 @@ router.post("/check", async (req, res) => {
 router.post("/check-transfer-status", async (req, res) => {
   const email = String(req.body?.email || "").trim();
   if (!email) {
-    return res.status(400).json({ error: "Thi?u email." });
+    return res.status(400).json({ error: "Thiếu email." });
   }
   try {
     const result = await checkAdesTransferStatus(email);
@@ -135,7 +135,7 @@ router.post("/check-transfer-status", async (req, res) => {
       status: error?.status,
     });
     return res.status(500).json({
-      error: error?.message || "Kh?ng g?i ???c API check transfer Fix Ades.",
+      error: error?.message || "Không gọi được API check transfer Fix Ades.",
     });
   }
 });

@@ -12,7 +12,7 @@ const { URL } = require("url");
 
 const { preferIpv4Lookup } = require("./dnsHelpers");
 
-const VIETQR_IMAGE_TEMPLATE = "compact";
+const VIETQR_IMAGE_TEMPLATE = "compact2";
 
 // ============================================================================
 // URL builders (pure)

@@ -8,6 +8,7 @@ const {
   resolveSupplierNameColumn,
 } = require("../helpers");
 const logger = require("../../../../utils/logger");
+const { quoteIdent } = require("../../../../utils/sql");
 const { supplierCache } = require("../../../../utils/cache");
 const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
 
@@ -220,17 +221,25 @@ const toggleSupplyActive = async (req, res) => {
   }
 
   const statusColumn = await resolveSupplyStatusColumn();
-  const statusColumnName = statusColumn || QUOTED_COLS.supplier.activeSupply;
+  const statusColumnName = statusColumn || "active_supply";
+  const statusColumnIdent = quoteIdent(statusColumnName);
+  const activeValue = req.body?.active ?? req.body?.is_active ?? req.body?.isActive ?? req.body?.active_supply;
   const statusValue =
-    statusColumn === "status" ? req.body?.status : req.body?.active ?? req.body?.is_active;
+    statusColumnName === "status" || statusColumnName === "trang_thai"
+      ? req.body?.status ?? (activeValue === undefined ? undefined : activeValue ? "active" : "inactive")
+      : activeValue;
+
+  if (statusValue === undefined) {
+    return res.status(400).json({ error: "Thi?u tr?ng th?i nh? cung c?p." });
+  }
 
   try {
     const result = await db.raw(
       `
       UPDATE ${TABLES.supply}
-      SET "${statusColumnName}" = ?
+      SET ${statusColumnIdent} = ?
       WHERE ${QUOTED_COLS.supplier.id} = ?
-      RETURNING ${QUOTED_COLS.supplier.id} AS id, "${statusColumnName}" AS raw_status;
+      RETURNING ${QUOTED_COLS.supplier.id} AS id, ${statusColumnIdent} AS raw_status;
     `,
       [statusValue, parsedSupplyId]
     );
@@ -243,11 +252,12 @@ const toggleSupplyActive = async (req, res) => {
 
     supplierCache.clear();
     const normalizedStatus = normalizeSupplyStatus(result.rows[0].raw_status);
+    const isActive = normalizedStatus !== "tam dung";
     res.json({
       id: parsedSupplyId,
-      status: normalizedStatus,
+      status: isActive ? "active" : "inactive",
       rawStatus: result.rows[0].raw_status,
-      isActive: normalizedStatus !== "inactive",
+      isActive,
     });
   } catch (error) {
     logger.error("Mutation failed (PATCH /api/supplies/:id/active)", { supplyId, error: error.message, stack: error.stack });

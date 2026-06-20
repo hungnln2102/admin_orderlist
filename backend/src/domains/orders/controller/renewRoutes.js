@@ -4,6 +4,7 @@ const { TABLES, STATUS } = require("./constants");
 const logger = require("../../../utils/logger");
 const { orderCodeParam, orderIdParam } = require("../validators/orderValidator");
 const { voidOpenRefundCreditNotesForSourceOrder } = require("./finance/refundCredits");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const attachRenewRoutes = (router) => {
     router.post("/:orderCode/renew", ...orderCodeParam, async(req, res) => {
@@ -19,6 +20,18 @@ const attachRenewRoutes = (router) => {
                 if (typeof sepayWebhookApp.sendRenewalNotification === "function") {
                     sepayWebhookApp.sendRenewalNotification(orderCode, result).catch((err) => logger.error("sendRenewalNotification failed", { orderCode, error: err?.message }));
                 }
+                writeUserEventLog(req, {
+                    action: "Gia hạn đơn hàng",
+                    entity: "Đơn hàng",
+                    entityId: orderCode,
+                    message: `Gia hạn đơn hàng ${orderCode}`,
+                    source: "orders.order_list",
+                    metadata: {
+                        orderCode,
+                        forceRenewal,
+                        result,
+                    },
+                });
                 return res.json(result);
             }
             const status = result?.processType === "skipped" ? 409 : 400;
@@ -76,6 +89,19 @@ const attachRenewRoutes = (router) => {
                 );
 
                 await trx.commit();
+                writeUserEventLog(req, {
+                    action: "Xác nhận hoàn tiền đơn hàng",
+                    entity: "Đơn hàng",
+                    entityId: updated?.[idOrderCol] || id,
+                    message: `Xác nhận hoàn tiền đơn hàng ${updated?.[idOrderCol] || id}`,
+                    source: "orders.order_list",
+                    metadata: {
+                        orderId: id,
+                        orderCode: updated?.[idOrderCol] || null,
+                        refundReferenceCode,
+                        voidedCreditNotes: voided,
+                    },
+                });
                 return res.json({ success: true, refundReferenceCode, voided_credit_notes: voided, ...updated });
             } catch (inner) {
                 await trx.rollback();

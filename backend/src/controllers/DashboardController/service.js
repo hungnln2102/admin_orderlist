@@ -1,6 +1,6 @@
 /**
- * Entry m?ng cho Dashboard service.
- * Gi? nguy�n API export cu d? controller/index kh�ng ph?i d?i import.
+ * Entry mạng cho Dashboard service.
+ * Giữ nguyên API export cũ để controller/index không phải đổi import.
  */
 
 const {

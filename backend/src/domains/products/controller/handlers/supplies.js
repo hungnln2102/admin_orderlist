@@ -11,6 +11,7 @@ const { isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
 const { updateOrderCostsOnSupplyPriceChange } = require("../../../../services/updateOrderCostsOnSupplyPriceChange");
 const logger = require("../../../../utils/logger");
 const { pricingCache, supplierCache } = require("../../../../utils/cache");
+const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
 
 const getSuppliesByProductName = async (req, res) => {
   const { productName } = req.params;
@@ -135,6 +136,20 @@ const updateSupplyPriceForProduct = async (req, res) => {
         ordersUpdated: updateResult.updatedCount,
         debtAdjustment: updateResult.debtAdjustment || 0,
       });
+      writeUserEventLog(req, {
+        action: "Sửa giá NCC của sản phẩm",
+        entity: "Bảng giá",
+        entityId: result.productId,
+        message: `Sửa giá NCC ${result.supplierId} của sản phẩm ${result.productId}`,
+        source: "products.supply_prices",
+        metadata: {
+          productId: result.productId,
+          supplierId: result.supplierId,
+          price: result.price,
+          ordersUpdated: updateResult.updatedCount,
+          debtAdjustment: updateResult.debtAdjustment || 0,
+        },
+      });
     } catch (updateError) {
       // Log error but don't fail the price update
       logger.error("Failed to auto-update order costs", { productId, sourceId, error: updateError?.message, stack: updateError?.stack });
@@ -147,6 +162,20 @@ const updateSupplyPriceForProduct = async (req, res) => {
         price: result.price,
         ordersUpdated: 0,
         updateError: "Failed to update orders",
+      });
+      writeUserEventLog(req, {
+        action: "Sửa giá NCC của sản phẩm",
+        entity: "Bảng giá",
+        entityId: result.productId,
+        message: `Sửa giá NCC ${result.supplierId} của sản phẩm ${result.productId}`,
+        source: "products.supply_prices",
+        metadata: {
+          productId: result.productId,
+          supplierId: result.supplierId,
+          price: result.price,
+          ordersUpdated: 0,
+          updateError: "Failed to update orders",
+        },
       });
     }
   } catch (error) {
@@ -175,6 +204,19 @@ const createSupplyPriceForProduct = async (req, res) => {
     const result = await upsertSupplyPrice({ productId: parsedProductId }, resolvedSourceId, price);
     pricingCache.clear();
     supplierCache.clear();
+    writeUserEventLog(req, {
+      action: "Thêm giá NCC cho sản phẩm",
+      entity: "Bảng giá",
+      entityId: result.productId,
+      message: `Thêm giá NCC ${result.supplierId} cho sản phẩm ${result.productId}`,
+      source: "products.supply_prices",
+      metadata: {
+        productId: result.productId,
+        supplierId: result.supplierId,
+        sourceName: sourceName || null,
+        price: result.price,
+      },
+    });
     res.status(201).json({
       productId: result.productId,
       sourceId: result.supplierId,
@@ -206,6 +248,17 @@ const deleteSupplyPriceForProduct = async (req, res) => {
       [parsedProductId, parsedSourceId]
     );
     pricingCache.clear();
+    writeUserEventLog(req, {
+      action: "Xóa giá NCC của sản phẩm",
+      entity: "Bảng giá",
+      entityId: parsedProductId,
+      message: `Xóa giá NCC ${parsedSourceId} của sản phẩm ${parsedProductId}`,
+      source: "products.supply_prices",
+      metadata: {
+        productId: parsedProductId,
+        supplierId: parsedSourceId,
+      },
+    });
     res.json({ success: true });
   } catch (error) {
     logger.error("Delete failed (DELETE /api/products/:productId/suppliers/:sourceId)", { productId, sourceId, error: error.message, stack: error.stack });

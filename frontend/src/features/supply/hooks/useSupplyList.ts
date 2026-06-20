@@ -25,14 +25,36 @@ export const useSupplyList = () => {
         : [];
 
       const items: Supply[] = suppliesRaw.map((item) => {
-        const isActive = item.isActive ?? (item.status !== "inactive" && item.status !== "tạm dừng");
+        const rawActive = item.isActive ?? item.active_supply;
+        const activeText = String(rawActive ?? item.status ?? "active").trim().toLowerCase();
+        const isActive =
+          typeof rawActive === "boolean"
+            ? rawActive
+            : activeText !== "inactive" &&
+              activeText !== "tạm dừng" &&
+              activeText !== "tam dung" &&
+              activeText !== "false";
         return {
-          ...(item as Partial<Supply>),
-          isActive: Boolean(isActive),
+          id: Number(item.id) || 0,
+          sourceName: String(item.sourceName ?? ""),
+          numberBank: item.numberBank == null ? null : String(item.numberBank),
+          binBank: item.binBank == null ? null : String(item.binBank),
+          nameBank: item.nameBank == null ? null : String(item.nameBank),
+          bankName: item.bankName == null ? null : String(item.bankName),
+          isActive,
           status: isActive ? "active" : "inactive",
           products: Array.isArray(item.products)
             ? (item.products as unknown[]).filter(Boolean)
+              .map((product) => String(product))
             : [],
+          monthlyOrders: Number(item.monthlyOrders) || 0,
+          monthlyImportValue: Number(item.monthlyImportValue) || 0,
+          lastOrderDate: item.lastOrderDate == null ? null : String(item.lastOrderDate),
+          totalOrders: Number(item.totalOrders) || 0,
+          totalPaidImport: Number(item.totalPaidImport) || 0,
+          totalUnpaidImport: Number(item.totalUnpaidImport) || 0,
+          payableToSupplier: Number(item.payableToSupplier) || 0,
+          supplierRefundToShop: Number(item.supplierRefundToShop) || 0,
         };
       });
 
@@ -58,7 +80,12 @@ export const useSupplyList = () => {
       await apiFetch(`/api/supplies/${id}/active`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !currentStatus }),
+        body: JSON.stringify({
+          isActive: !currentStatus,
+          is_active: !currentStatus,
+          active: !currentStatus,
+          active_supply: !currentStatus,
+        }),
       });
       await fetchSupplies();
     } catch {

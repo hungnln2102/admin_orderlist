@@ -296,6 +296,7 @@ const getSupplyInsights = async (_req, res) => {
         total_unpaid_import: 0,
       };
       const normalizedStatus = normalizeSupplyStatus(row.raw_status);
+      const isActive = normalizedStatus !== "tam dung";
       const totalUnpaidImport = payments.total_unpaid_import;
       const payableToSupplier = Math.max(0, totalUnpaidImport);
       const supplierRefundToShop = Math.max(0, -totalUnpaidImport);
@@ -306,9 +307,9 @@ const getSupplyInsights = async (_req, res) => {
         numberBank: row.number_bank || null,
         binBank: row.bin_bank || null,
         nameBank: row.account_holder || null,
-        status: normalizedStatus || "inactive",
+        status: isActive ? "active" : "inactive",
         rawStatus: row.raw_status || null,
-        isActive: normalizedStatus !== "inactive",
+        isActive,
         products: productsMap.get(row.id) || [],
         monthlyOrders: monthly.monthly_orders,
         monthlyImportValue: monthly.monthly_import_value,

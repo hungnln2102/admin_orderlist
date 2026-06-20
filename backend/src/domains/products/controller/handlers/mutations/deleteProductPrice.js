@@ -4,6 +4,7 @@ const logger = require("../../../../../utils/logger");
 const { pricingCache } = require("../../../../../utils/cache");
 const { isVariantReferencedByOrders } = require("../../../../../services/orderReferenceCheck");
 const { supplyPriceCols, TABLES } = require("../../constants");
+const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
 
 const deleteProductPrice = async (req, res) => {
   const { productId } = req.params;
@@ -36,6 +37,16 @@ const deleteProductPrice = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     pricingCache.clear();
+    writeUserEventLog(req, {
+      action: "Xoa bang gia san pham",
+      entity: "Bang gia",
+      entityId: parsedId,
+      message: `Xoa bang gia san pham ${parsedId}`,
+      source: "products.product_prices",
+      metadata: {
+        productId: parsedId,
+      },
+    });
     res.json({ success: true, id: parsedId });
   } catch (error) {
     logger.error("Delete failed (DELETE /api/product-prices/:productId)", {

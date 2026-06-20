@@ -1,4 +1,5 @@
 const logger = require("../../../utils/logger");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 const {
   listSavingGoals: listSavingGoalsUseCase,
   createSavingGoal: createSavingGoalUseCase,
@@ -25,6 +26,18 @@ const createSavingGoal = async (req, res) => {
     const createdGoal = await createSavingGoalUseCase({
       goal_name: req.body.goal_name,
       target_amount: req.body.target_amount,
+    });
+    writeUserEventLog(req, {
+      action: "Thêm mục tiêu tiết kiệm",
+      entity: "Mục tiêu tiết kiệm",
+      entityId: createdGoal.id,
+      message: `Thêm mục tiêu tiết kiệm ${createdGoal.goal_name} - số tiền: ${createdGoal.target_amount}`,
+      source: "finance.saving_goals",
+      metadata: {
+        goalId: createdGoal.id,
+        goalName: createdGoal.goal_name,
+        targetAmount: createdGoal.target_amount,
+      },
     });
     res.status(201).json(createdGoal);
   } catch (error) {

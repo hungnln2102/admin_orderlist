@@ -128,16 +128,21 @@ const normalizeStatusKey = (value) => {
 
 const normalizeSupplyStatus = (value) => {
   if (value === undefined || value === null) return "hoat dong";
+  if (typeof value === "boolean") return value ? "hoat dong" : "tam dung";
+  if (typeof value === "number") {
+    if (value === 1) return "hoat dong";
+    if (value === 0) return "tam dung";
+  }
   const normalized = String(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
   if (!normalized) return "hoat dong";
-  if (["active", "dang hoat dong", "hoat dong", "running"].includes(normalized)) {
+  if (["active", "dang hoat dong", "hoat dong", "running", "true", "t", "yes", "y", "1"].includes(normalized)) {
     return "hoat dong";
   }
-  if (["inactive", "tam ngung", "tam dung", "pause", "paused"].includes(normalized)) {
+  if (["inactive", "tam ngung", "tam dung", "pause", "paused", "false", "f", "no", "n", "0"].includes(normalized)) {
     return "tam dung";
   }
   return normalized;

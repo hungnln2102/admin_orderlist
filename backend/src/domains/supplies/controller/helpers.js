@@ -94,8 +94,9 @@ const resolveSupplyStatusColumn = async () => {
         CASE column_name
           WHEN 'status' THEN 1
           WHEN 'trang_thai' THEN 2
-          WHEN 'is_active' THEN 3
-          ELSE 4 END
+          WHEN 'active_supply' THEN 3
+          WHEN 'is_active' THEN 4
+          ELSE 5 END
       `)
       .limit(1);
     supplyStatusColumnNameCache =

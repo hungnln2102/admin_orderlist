@@ -39,7 +39,7 @@ const TABLES = {
   ),
 };
 
-const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "is_active"];
+const SUPPLY_STATUS_CANDIDATES = ["status", "trang_thai", "active_supply", "is_active"];
 
 module.exports = {
   ORDER_DEF,

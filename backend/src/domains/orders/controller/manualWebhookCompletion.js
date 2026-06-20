@@ -15,7 +15,11 @@ const {
 } = require("../../../../webhook/sepay/payments");
 const { normalizeMoney, parseFlexibleDate } = require("../../../../webhook/sepay/utils");
 const { STATUS: ORDER_STATUS } = require("../../../utils/statuses");
-const { isMavnImportOrder, isMavrykShopSupplierName } = require("../../../utils/orderHelpers");
+const {
+  isDashboardSalesOrder,
+  isMavnImportOrder,
+  isMavrykShopSupplierName,
+} = require("../../../utils/orderHelpers");
 const {
   resolveDashboardImportDeltaOnPaid,
 } = require("./finance/dashboardImportDeltaOnPaid");
@@ -204,10 +208,60 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
 
     const saleAmount = normalizeMoney(state[ORDER_COLS.price]);
     if (saleAmount <= 0) {
-      await client.query("ROLLBACK");
+      if (!isDashboardSalesOrder({ id_order: orderCode })) {
+        await client.query("ROLLBACK");
+        return {
+          status: 400,
+          body: { error: "Order price must be greater than 0 to create receipt." },
+        };
+      }
+
+      const statusUpdateResult = await client.query(
+        `UPDATE ${ORDER_TABLE}
+         SET ${ORDER_COLS.status} = $2
+         WHERE ${ORDER_COLS.id} = $1
+           AND ${ORDER_COLS.status} = $3
+         RETURNING *`,
+        [normalizedId, ORDER_STATUS.PAID, ORDER_STATUS.PROCESSING]
+      );
+      if (!statusUpdateResult.rowCount) {
+        await client.query("ROLLBACK");
+        return {
+          status: 409,
+          body: { error: "Order status changed, please reload the list." },
+        };
+      }
+
+      const cost = normalizeMoney(state[ORDER_COLS.cost]);
+      const paidMonthKey = toMonthKey(new Date().toISOString());
+      let manualImportDelta = 0;
+      if (cost > 0) {
+        manualImportDelta = await resolveDashboardImportDeltaOnPaid(
+          client,
+          state,
+          cost,
+          fetchSupplierNameBySupplyId,
+          paidMonthKey
+        );
+      }
+      const postedProfitDelta = normalizeMoney(0 - cost);
+      await incrementDashboardSummaryByDelta(client, paidMonthKey, {
+        revenueDelta: 0,
+        profitDelta: postedProfitDelta,
+        ordersDelta: 1,
+        importDelta: manualImportDelta,
+      });
+
+      await client.query("COMMIT");
       return {
-        status: 400,
-        body: { error: "Giá bán của đơn phải lớn hơn 0 để tạo receipt." },
+        status: 200,
+        body: {
+          message: "Completed zero-price order without creating receipt.",
+          order: statusUpdateResult.rows[0],
+          receipt_id: null,
+          posted_revenue: 0,
+          posted_profit: postedProfitDelta,
+        },
       };
     }
 
@@ -378,6 +432,20 @@ const completeProcessingOrderWithManualWebhook = async (orderId, options = {}) =
 const attachManualWebhookCompletionRoute = (router) => {
   router.post("/:id/complete-manual-webhook", async (req, res) => {
     const result = await completeProcessingOrderWithManualWebhook(req.params.id, req.body || {});
+    if (result.status >= 200 && result.status < 300) {
+      const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
+      writeUserEventLog(req, {
+        action: "Xac nhan thanh toan bank thu cong",
+        entity: "Don hang",
+        entityId: req.params.id,
+        message: `Xac nhan thanh toan bank thu cong cho ??n ${req.params.id}`,
+        source: "orders.order_list",
+        metadata: {
+          orderId: Number(req.params.id),
+          body: result.body || null,
+        },
+      });
+    }
     return res.status(result.status).json(result.body);
   });
 };

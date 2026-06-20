@@ -14,6 +14,7 @@ const {
   TABLES,
 } = require("../../constants");
 const { getTiers } = require("../../../../../services/pricing/tierCache");
+const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
 const {
   fetchVariantView,
   hasProductCategoryColor,
@@ -242,7 +243,20 @@ const updateProductPrice = async (req, res) => {
 
     pricingCache.clear();
     const viewRow = await fetchVariantView(parsedId);
-    res.json(viewRow ? mapProductPriceRow(viewRow) : {});
+    const mapped = viewRow ? mapProductPriceRow(viewRow) : {};
+    writeUserEventLog(req, {
+      action: "Sua bang gia san pham",
+      entity: "Bang gia",
+      entityId: parsedId,
+      message: `Sua bang gia san pham ${mapped?.sanPham || productId}`,
+      source: "products.product_prices",
+      metadata: {
+        productId: parsedId,
+        productCode: mapped?.sanPham || null,
+        changedFields: Object.keys(req.body || {}),
+      },
+    });
+    res.json(mapped);
   } catch (error) {
     logger.error("Update failed (PATCH /api/product-prices/:productId)", {
       productId,

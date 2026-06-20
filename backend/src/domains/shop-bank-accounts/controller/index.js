@@ -7,6 +7,7 @@ const {
   setDefaultShopBankAccountItem,
   deleteShopBankAccountItem,
 } = require("../use-cases");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 const { listShopBankAccountBalances } = require("../use-cases/listShopBankAccountBalances");
 const { updateShopBankAccountWithdrawn } = require("../use-cases/updateShopBankAccountWithdrawn");
 const { recordShopBankAccountWithdrawal } = require("../use-cases/recordShopBankAccountWithdrawal");
@@ -116,6 +117,19 @@ const patchShopBankAccountWithdrawn = async (req, res) => {
 const postShopBankAccountWithdraw = async (req, res) => {
   try {
     const item = await recordShopBankAccountWithdrawal(req.params.id, req.body);
+    writeUserEventLog(req, {
+      action: "R?t ti?n STK",
+      entity: "R?t ti?n",
+      entityId: req.params.id,
+      message: `R?t ti?n STK ${item?.accountNumber || req.params.id} - s? ti?n: ${item?.withdrawnAmount ?? req.body?.amount}`,
+      source: "finance.shop_bank_accounts.withdraw",
+      metadata: {
+        shopBankAccountId: Number(req.params.id) || null,
+        accountNumber: item?.accountNumber || null,
+        amount: item?.withdrawnAmount ?? req.body?.amount ?? null,
+        reason: req.body?.reason || null,
+      },
+    });
     return res.status(201).json({ item });
   } catch (error) {
     return handleControllerError(

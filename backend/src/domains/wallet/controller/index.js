@@ -2,6 +2,7 @@ const { db } = require("../../../db");
 const { FINANCE_SCHEMA, SCHEMA_FINANCE, tableName } = require("../../../config/dbSchema");
 const { normalizeTextInput } = require("../../../utils/normalizers");
 const logger = require("../../../utils/logger");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const WALLET_TYPES_TABLE = tableName(
   FINANCE_SCHEMA.MASTER_WALLETTYPES.TABLE,
@@ -223,6 +224,26 @@ const saveDailyBalance = async (req, res) => {
       .where(BALANCE_COLS.RECORD_DATE, dateStr)
       .groupBy(BALANCE_COLS.RECORD_DATE, BALANCE_COLS.WALLET_ID)
       .orderBy(BALANCE_COLS.WALLET_ID, "asc");
+
+    const changedWallets = normalizedWallets
+      .filter((wallet) => incomingByWallet.has(wallet.id))
+      .map((wallet) => ({
+        id: wallet.id,
+        name: wallet.name,
+        amount: incomingByWallet.get(wallet.id),
+      }));
+
+    writeUserEventLog(req, {
+      action: "Th?m d?ng ti?n theo ng?y",
+      entity: "D?ng ti?n theo ng?y",
+      entityId: dateStr,
+      message: `Th?m/c?p nh?t d?ng ti?n ng?y ${dateStr} (${changedWallets.length} c?t)`,
+      source: "finance.wallet_daily_balances",
+      metadata: {
+        recordDate: dateStr,
+        wallets: changedWallets,
+      },
+    });
 
     res.json({ ok: true, recordDate: dateStr, entries: balances });
   } catch (error) {

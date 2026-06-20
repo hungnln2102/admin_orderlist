@@ -3,6 +3,7 @@ const { quoteIdent } = require("../../../../../utils/sql");
 const logger = require("../../../../../utils/logger");
 const { pricingCache } = require("../../../../../utils/cache");
 const { variantCols, TABLES } = require("../../constants");
+const { writeUserEventLog } = require("../../../../renew-adobe/services/systemEventLogService");
 
 const toggleProductPriceStatus = async (req, res) => {
   const { productId } = req.params;
@@ -29,6 +30,17 @@ const toggleProductPriceStatus = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy sản phẩm." });
     }
     pricingCache.clear();
+    writeUserEventLog(req, {
+      action: isActive ? "Bat bang gia san pham" : "Tat bang gia san pham",
+      entity: "Bang gia",
+      entityId: parsedId,
+      message: `${isActive ? "Bat" : "Tat"} bang gia san pham ${parsedId}`,
+      source: "products.product_prices",
+      metadata: {
+        productId: parsedId,
+        isActive,
+      },
+    });
     res.json({
       id: result.rows[0].id,
       is_active: result.rows[0].is_active,

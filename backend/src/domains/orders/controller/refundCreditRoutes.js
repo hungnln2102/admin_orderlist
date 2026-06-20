@@ -25,6 +25,7 @@ const {
 const {
     debitShopBankRefundCashout,
 } = require("../../shop-bank-accounts/services/shopBankLedgerService");
+const { writeUserEventLog } = require("../../renew-adobe/services/systemEventLogService");
 
 const detectPreviewPrefix = (orderCodeRaw) => {
     const normalized = String(orderCodeRaw || "").trim().toUpperCase();
@@ -169,6 +170,20 @@ const attachRefundCreditRoutes = (router) => {
             const previewOrderCode = await generateUniqueOrderCode(previewPrefix, trx);
 
             await trx.commit();
+            writeUserEventLog(req, {
+                action: "Tạo credit bù đơn",
+                entity: "Credit",
+                entityId: creditNote?.[RCN.ID] || creditNote?.id || id,
+                message: `Tạo credit bù đơn ${order.id_order || id}`,
+                source: "orders.refund_credit_notes",
+                metadata: {
+                    orderId: id,
+                    orderCode: order.id_order || null,
+                    creditId: creditNote?.[RCN.ID] || creditNote?.id || null,
+                    creditCode: creditNote?.[RCN.CREDIT_CODE] || creditNote?.credit_code || null,
+                    refundAmount,
+                },
+            });
             return res.json({
                 success: true,
                 credit_note: creditNote,
@@ -310,6 +325,21 @@ const attachRefundCreditRoutes = (router) => {
                 .where({ [RCN.ID]: id })
                 .first();
             await trx.commit();
+            writeUserEventLog(req, {
+                action: action === CREDIT_ACTIONS.COMPLETE ? "Xác nhận hoàn credit" : "Xóa credit",
+                entity: "Credit",
+                entityId: id,
+                message: `${action === CREDIT_ACTIONS.COMPLETE ? "Xác nhận hoàn credit" : "Xóa credit"} ${current?.[RCN.CREDIT_CODE] || `#${id}`}`,
+                source: "orders.refund_credit_notes",
+                metadata: {
+                    creditId: id,
+                    creditCode: current?.[RCN.CREDIT_CODE] || null,
+                    action,
+                    availableAmount,
+                    cashoutAmount,
+                    shopBankAccountId: hasShopBankAccountId ? shopBankAccountId : null,
+                },
+            });
             return res.json({
                 success: true,
                 item: {
