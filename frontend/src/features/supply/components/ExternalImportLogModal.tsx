@@ -21,6 +21,13 @@ const readError = async (res: Response) => {
   }
 };
 
+const formatShopBankAccountOption = (item: ShopBankAccountItem) => {
+  const bankLabel = item.bankDisplayName || item.bankShortCode || item.bankBin;
+  return [item.accountNumber, bankLabel, item.accountHolder]
+    .filter(Boolean)
+    .join(" · ");
+};
+
 const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
   isOpen,
   onClose,
@@ -140,7 +147,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
                 ) : (
                   accounts.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.accountNumber} · {item.accountHolder}
+                      {formatShopBankAccountOption(item)}
                     </option>
                   ))
                 )}

@@ -26,6 +26,13 @@ type Props = {
   onShopBankAccountChange: (accountId: number) => void;
 };
 
+const formatShopBankAccountOption = (item: ShopBankAccountItem) => {
+  const bankLabel = item.bankDisplayName || item.bankShortCode || item.bankBin;
+  return [item.accountNumber, bankLabel, item.accountHolder]
+    .filter(Boolean)
+    .join(" · ");
+};
+
 export function SupplierSettlementPanel({
   unpaidPayments,
   selectedPayment,
@@ -126,7 +133,7 @@ export function SupplierSettlementPanel({
                   ) : (
                     shopBankAccounts.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.accountNumber} · {item.accountHolder}
+                        {formatShopBankAccountOption(item)}
                         {item.isDefault ? " (mặc định)" : ""}
                       </option>
                     ))

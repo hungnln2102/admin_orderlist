@@ -212,6 +212,38 @@ const creditShopBankFromPaymentReceipt = async (
   return { accountId: resolvedAccountId, ...result };
 };
 
+const creditShopBankSupplierRefund = async (
+  executor,
+  { accountId, amount, sourceId, note = null }
+) => {
+  const normalizedAmount = toMoney(amount);
+  const normalizedAccountId = Number(accountId);
+  if (!normalizedAccountId || normalizedAmount <= 0) {
+    throw new Error("Invalid supplier refund ledger payload.");
+  }
+
+  if (sourceId) {
+    const existing = await findLedgerBySource(
+      executor,
+      SOURCE_KINDS.PAYMENT_SUPPLY,
+      sourceId
+    );
+    if (existing) return { skipped: true, reason: "duplicate" };
+  }
+
+  return insertLedgerAndUpdateAccount(executor, {
+    accountId: normalizedAccountId,
+    entryType: ENTRY_TYPES.RECEIPT_IN,
+    amount: normalizedAmount,
+    signedAmount: normalizedAmount,
+    sourceKind: SOURCE_KINDS.PAYMENT_SUPPLY,
+    sourceId,
+    note,
+    incrementReceived: normalizedAmount,
+    incrementWithdrawn: 0,
+  });
+};
+
 const debitShopBankWithdraw = async (
   executor,
   { accountId, amount, sourceKind, sourceId, note = null }
@@ -367,6 +399,7 @@ module.exports = {
   SOURCE_KINDS,
   findAccountIdByReceiver,
   creditShopBankFromPaymentReceipt,
+  creditShopBankSupplierRefund,
   debitShopBankWithdraw,
   debitShopBankExternalOut,
   debitShopBankSupplierPayment,

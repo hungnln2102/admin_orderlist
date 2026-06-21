@@ -14,12 +14,12 @@ const {
 } = require("../../../shop-bank-accounts/repositories/shopBankAccountRepository");
 const {
   creditShopBankFromPaymentReceipt,
+  creditShopBankSupplierRefund,
   debitShopBankSupplierPayment,
   SOURCE_KINDS,
 } = require("../../../shop-bank-accounts/services/shopBankLedgerService");
 const {
   findSupplierRefundReceipt,
-  SUPPLIER_REFUND_MATCH_TOLERANCE,
 } = require("../helpers/matchSupplierRefundReceipt");
 const {
   notifyFinanceMonthlyDelta,
@@ -148,12 +148,6 @@ const confirmPaymentSupply = async (req, res) => {
           shopBankAccountNumber: shopBankAccount?.accountNumber || "",
           paymentContent,
         });
-        if (!matchedReceipt) {
-          throw createHttpError(
-            409,
-            `Chưa thấy giao dịch Sepay khớp số tiền ${expectedPaidAmount} (sai lệch tối đa ${SUPPLIER_REFUND_MATCH_TOLERANCE} đ).`
-          );
-        }
       }
 
       const oldestDate = summary.oldest_date ? new Date(summary.oldest_date) : null;
@@ -201,13 +195,20 @@ const confirmPaymentSupply = async (req, res) => {
       let bankLedgerDelta = 0;
       if (paymentSupplyId && expectedPaidAmount > 0) {
         if (isSupplierRefundToShop) {
-          const ledgerResult = await creditShopBankFromPaymentReceipt(trx, {
-            receiptId: matchedReceipt?.id,
-            receiverAccount: matchedReceipt?.receiver || "",
-            accountId: shopBankAccountId,
-            amount: expectedPaidAmount,
-            note: paymentContent || `NCC refund supply ${resolvedSupplyId}`,
-          });
+          const ledgerResult = matchedReceipt
+            ? await creditShopBankFromPaymentReceipt(trx, {
+                receiptId: matchedReceipt.id,
+                receiverAccount: matchedReceipt.receiver || "",
+                accountId: shopBankAccountId,
+                amount: expectedPaidAmount,
+                note: paymentContent || `NCC refund supply ${resolvedSupplyId}`,
+              })
+            : await creditShopBankSupplierRefund(trx, {
+                accountId: shopBankAccountId,
+                amount: expectedPaidAmount,
+                sourceId: paymentSupplyId,
+                note: paymentContent || `NCC refund supply ${resolvedSupplyId} (manual)`,
+              });
           if (ledgerResult && !ledgerResult.skipped) {
             bankLedgerDelta = expectedPaidAmount;
             await creditSupplierRefundToDailyWallet(trx, {
