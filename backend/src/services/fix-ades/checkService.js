@@ -306,10 +306,55 @@ async function renewAdesAccount(email) {
   };
 }
 
+
+/**
+ * Sync dữ liệu ADO cho 1 email qua hệ thống Fix Ades.
+ * Endpoint: POST `${BASE_URL}/sync-ado-account` body `{ email }`.
+ *
+ * @param {string} email
+ * @returns {Promise<{ ok, status, data, raw }>}
+ */
+async function syncAdesAccount(email) {
+  const e = normalizeEmail(email);
+  const result = await callWithToken(async (token) => {
+    const headers = {
+      ...buildCommonHeaders(e),
+      ...buildAuthHeaders(token),
+    };
+    logger.debug("[fix-ades] POST /sync-ado-account", {
+      email: e,
+      tokenLen: token?.length || 0,
+      tokenHead: token ? token.slice(0, 6) + "..." : null,
+    });
+    return postJson(`${BASE_URL}/sync-ado-account`, { email: e }, headers);
+  }, e);
+
+  if (!result.ok) {
+    logger.warn("[fix-ades] sync ADO failed", {
+      email: e,
+      status: result.status,
+      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+    });
+  } else {
+    logger.info("[fix-ades] sync ADO success", {
+      email: e,
+      success: result.json?.success ?? result.json?.data?.success,
+    });
+  }
+
+  return {
+    ok: result.ok,
+    status: result.status,
+    data: result.json,
+    raw: result.raw,
+  };
+}
+
 module.exports = {
   BASE_URL,
   getAdesToken,
   checkAdesAccount,
   checkAdesTransferStatus,
   renewAdesAccount,
+  syncAdesAccount,
 };

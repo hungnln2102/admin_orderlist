@@ -19,6 +19,7 @@ const {
   checkAdesAccount,
   checkAdesTransferStatus,
   renewAdesAccount,
+  syncAdesAccount,
 } = require("../../../services/fix-ades/checkService");
 
 const TRACK_TABLE = tableName(
@@ -306,9 +307,47 @@ const publicRenewFixAdes = async (req, res) => {
   }
 };
 
+const publicSyncFixAdes = async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const eligible = await ensureFixAdesEligible(email, res);
+  if (!eligible) return;
+  try {
+    const result = await syncAdesAccount(email);
+    if (result.ok) {
+      const checkResult = await checkAdesTransferStatus(email).catch((err) => {
+        logger.warn("[fix-ades/public] check after sync failed", {
+          email,
+          error: err?.message,
+        });
+        return null;
+      });
+      if (checkResult?.ok && checkResult.data && typeof checkResult.data === "object") {
+        const normalizedData = normalizeTransferDataForTracking(checkResult.data);
+        await syncTrackingFromAdesCheckData(email, normalizedData, eligible);
+      }
+    }
+    return res.status(result.ok ? 200 : 502).json({
+      ok: result.ok,
+      status: result.status,
+      data: result.data,
+    });
+  } catch (error) {
+    logger.error("[fix-ades/public] sync failed email=%s", email, {
+      email,
+      error: error?.message,
+      status: error?.status,
+    });
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || "Không gọi được API đồng bộ Fix Ades.",
+    });
+  }
+};
+
 module.exports = {
   publicCheckFixAdes,
   publicRenewFixAdes,
+  publicSyncFixAdes,
   __test__: {
     mapAdesStatusToTracking,
     isLikelyNotActivePayload,

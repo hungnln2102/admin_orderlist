@@ -9,6 +9,7 @@ const {
 const {
   publicCheckFixAdes,
   publicRenewFixAdes,
+  publicSyncFixAdes,
 } = require("./controller/publicFixAdes");
 const {
   publicGetOtp,
@@ -31,5 +32,6 @@ router.post("/activate", requireRenewAdobePublicActivateKey, activateWebsiteUser
 router.post("/fix-ades/check", publicCheckFixAdes);
 router.post("/fix-ades/check-transfer-status", publicCheckFixAdes);
 router.post("/fix-ades/renew", publicRenewFixAdes);
+router.post("/fix-ades/sync", publicSyncFixAdes);
 
 module.exports = router;

@@ -61,7 +61,7 @@ async function writeSystemEventLog(payload = {}) {
     return result.rows?.[0] || null;
   } catch (error) {
     if (error?.code === "42P01") {
-      logger.warn("[system-event-log] table missing, skip write", { error: error.message });
+      logger.debug("[system-event-log] table missing, skip write", { error: error.message });
       return null;
     }
     logger.warn("[system-event-log] write failed", { error: error.message, stack: error.stack });

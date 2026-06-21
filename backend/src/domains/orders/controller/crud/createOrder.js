@@ -445,8 +445,19 @@ const attachCreateOrderRoute = (router) => {
             });
         } catch (error) {
             await trx.rollback();
-            logger.error("Create order failed", { error: error.message, stack: error.stack });
-            res.status(500).json({ error: "Không thể tạo đơn hàng mới." });
+            logger.error("Create order failed", {
+                error: error.message,
+                code: error.code,
+                detail: error.detail,
+                constraint: error.constraint,
+                stack: error.stack,
+            });
+            const safeDetail = error.code === "23505"
+                ? "Mã định danh đơn hàng bị trùng. Vui lòng thử tạo lại."
+                : error.message;
+            res.status(500).json({
+                error: safeDetail || "Không thể tạo đơn hàng mới.",
+            });
         }
     });
 };
