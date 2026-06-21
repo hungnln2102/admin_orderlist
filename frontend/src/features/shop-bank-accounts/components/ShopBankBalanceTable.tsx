@@ -1,3 +1,4 @@
+import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import GradientButton from "@/components/ui/GradientButton";
 import { formatShopBankMoney } from "../helpers/formatShopBankMoney";
@@ -8,18 +9,26 @@ type ShopBankBalanceTableProps = {
   loading: boolean;
   error: string | null;
   onOpenWithdraw: () => void;
+  onEdit: (item: ShopBankAccountBalanceItem) => void;
+  onDelete: (item: ShopBankAccountBalanceItem) => void;
 };
+
+const actionBtn =
+  "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white";
 
 export function ShopBankBalanceTable({
   items,
   loading,
   error,
   onOpenWithdraw,
+  onEdit,
+  onDelete,
 }: ShopBankBalanceTableProps) {
   const totalRemaining = items.reduce(
     (sum, item) => sum + (Number(item.balanceRemaining) || 0),
     0
   );
+
   return (
     <div className="rounded-[28px] border border-emerald-500/20 bg-emerald-950/10 overflow-hidden">
       <div className="flex flex-col gap-2 border-b border-white/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -53,12 +62,13 @@ export function ShopBankBalanceTable({
                 <th className="text-right">Tổng tiền CK</th>
                 <th className="text-right">Số tiền đã rút</th>
                 <th className="text-right">Số tiền còn lại</th>
+                <th className="text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-white/60">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-white/60">
                     Chưa có STK. Thêm tài khoản bên dưới để theo dõi số dư.
                   </td>
                 </tr>
@@ -71,7 +81,7 @@ export function ShopBankBalanceTable({
                       </p>
                       <p className="mt-1 text-sm text-white/70">{item.accountHolder}</p>
                       <p className="mt-1 text-xs text-white/45">
-                        {item.bankDisplayName || "—"}
+                        {item.bankShortCode || item.bankDisplayName || "—"}
                         {item.isDefault ? " · Mặc định" : ""}
                       </p>
                     </td>
@@ -102,6 +112,28 @@ export function ShopBankBalanceTable({
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-4 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className={actionBtn}
+                          onClick={() => onEdit(item)}
+                          aria-label="Sửa STK"
+                          title="Sửa STK"
+                        >
+                          <PencilSquareIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          className={`${actionBtn} border-rose-500/20 text-rose-200/80 hover:border-rose-400/40 hover:text-rose-100`}
+                          onClick={() => onDelete(item)}
+                          aria-label="Xóa STK"
+                          title="Xóa STK"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -119,6 +151,7 @@ export function ShopBankBalanceTable({
                     </span>
                     <span className="block text-[11px] text-white/40 mt-0.5">VND</span>
                   </td>
+                  <td />
                 </tr>
               </tfoot>
             ) : null}

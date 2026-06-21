@@ -22,7 +22,7 @@ const readError = async (res: Response) => {
 };
 
 const formatShopBankAccountOption = (item: ShopBankAccountItem) => {
-  const bankLabel = item.bankDisplayName || item.bankShortCode || item.bankBin;
+  const bankLabel = item.bankShortCode || item.bankBin || item.bankDisplayName;
   return [item.accountNumber, bankLabel, item.accountHolder]
     .filter(Boolean)
     .join(" · ");

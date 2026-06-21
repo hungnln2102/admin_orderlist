@@ -11,6 +11,7 @@ import { SearchBar } from "./components/SearchBar";
 import { StorageTable } from "./components/StorageTable";
 import { useWarehouseProducts } from "./hooks/useWarehouseProducts";
 import { WarehouseItem, normalizeText } from "./types";
+import { useImportPackageSubmit } from "./hooks/useImportPackageSubmit";
 
 export default function Storage() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -25,6 +26,8 @@ export default function Storage() {
   const [warehouseDeleteSubmitting, setWarehouseDeleteSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const { expireStock } = useImportPackageSubmit();
 
   useEffect(() => {
     let mounted = true;
@@ -169,10 +172,24 @@ export default function Storage() {
       backup_email: "",
       two_fa: "",
       note: "",
-      status: "Tồn",
+      status: "Ton",
       expires_at: "",
       is_verified: false,
     });
+  };
+
+  const handleCreatePackage = (_item: WarehouseItem) => {
+    // Mo form Package Product hien tai - navigate hoac open modal
+    // Hien tai: dieu huong sang trang package-product
+    window.location.hash = "package-product";
+  };
+
+  const handleExpireStock = async (stockId: number, deleteStock: boolean) => {
+    const result = await expireStock(stockId, deleteStock);
+    if (result) {
+      // Refresh lai danh sach
+      setItems((prev) => prev.filter((it) => it.id !== stockId || !deleteStock));
+    }
   };
 
   const { productOptions, loadingProducts } = useWarehouseProducts(items);
@@ -261,6 +278,8 @@ export default function Storage() {
         onStartEdit={startEdit}
         onStartCreate={startCreate}
         onToggleDetails={toggleDetails}
+        onCreatePackage={handleCreatePackage}
+        onExpireStock={handleExpireStock}
       />
 
       <ConfirmModal

@@ -156,6 +156,17 @@ const parseWalletAmountsFromBody = (values) => {
   return map;
 };
 
+const buildLatestBalancesByWallet = (rows) => {
+  const latestByWallet = new Map();
+  for (const row of rows || []) {
+    const wid = Number(row[BALANCE_COLS.WALLET_ID] ?? row.wallet_id);
+    if (!Number.isFinite(wid) || latestByWallet.has(wid)) continue;
+    const amt = Number(row[BALANCE_COLS.AMOUNT] ?? row.amount);
+    latestByWallet.set(wid, Number.isFinite(amt) ? amt : 0);
+  }
+  return latestByWallet;
+};
+
 const saveDailyBalance = async (req, res) => {
   const rawDate = normalizeTextInput(req.body?.recordDate || "");
   const values = req.body?.values || {};
@@ -193,6 +204,12 @@ const saveDailyBalance = async (req, res) => {
         }
       }
 
+      const previousRows = await trx(DAILY_BALANCES_TABLE)
+        .select(BALANCE_COLS.RECORD_DATE, BALANCE_COLS.WALLET_ID, BALANCE_COLS.AMOUNT)
+        .where(BALANCE_COLS.RECORD_DATE, "<", dateStr)
+        .orderBy(BALANCE_COLS.RECORD_DATE, "desc");
+
+      const previousByWallet = buildLatestBalancesByWallet(previousRows);
       await trx(DAILY_BALANCES_TABLE).where(BALANCE_COLS.RECORD_DATE, dateStr).del();
 
       const inserts = [];
@@ -201,6 +218,7 @@ const saveDailyBalance = async (req, res) => {
         let amount;
         if (incomingByWallet.has(wid)) amount = incomingByWallet.get(wid);
         else if (existingByWallet.has(wid)) amount = existingByWallet.get(wid);
+        else if (previousByWallet.has(wid)) amount = previousByWallet.get(wid);
         else continue;
 
         inserts.push({
@@ -443,4 +461,7 @@ module.exports = {
   createWalletType,
   updateWalletType,
   deleteWalletType,
+  __private: {
+    buildLatestBalancesByWallet,
+  },
 };

@@ -30,6 +30,8 @@ type StorageTableProps = {
   onStartEdit: (item: WarehouseItem) => void;
   onStartCreate: () => void;
   onToggleDetails: (id: number) => void;
+  onCreatePackage?: (item: WarehouseItem) => void;
+  onExpireStock?: (stockId: number, deleteStock: boolean) => Promise<void>;
 };
 
 export const StorageTable: React.FC<StorageTableProps> = ({
@@ -53,6 +55,8 @@ export const StorageTable: React.FC<StorageTableProps> = ({
   onStartEdit,
   onStartCreate: _onStartCreate,
   onToggleDetails,
+  onCreatePackage,
+  onExpireStock,
 }) => {
   const mobileList = (
     <StorageMobileList
@@ -69,6 +73,8 @@ export const StorageTable: React.FC<StorageTableProps> = ({
       onCancel={onCancel}
       onStartEdit={onStartEdit}
       onToggleDetails={onToggleDetails}
+      onCreatePackage={onCreatePackage}
+      onExpireStock={onExpireStock}
     />
   );
 

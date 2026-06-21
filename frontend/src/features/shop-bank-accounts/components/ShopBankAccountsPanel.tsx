@@ -203,6 +203,8 @@ export function ShopBankAccountsPanel() {
         loading={balancesLoading}
         error={balanceError}
         onOpenWithdraw={() => setWithdrawOpen(true)}
+        onEdit={openEdit}
+        onDelete={setDeleteItem}
       />
 
       <div className="relative max-w-md">

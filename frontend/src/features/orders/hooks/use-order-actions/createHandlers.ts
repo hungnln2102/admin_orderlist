@@ -2,9 +2,40 @@ import { API_ENDPOINTS, ORDER_FIELDS, type Order } from "@/constants";
 import { apiFetch } from "@/shared/api/client";
 import { emitRefresh } from "@/lib/refreshBus";
 import { showAppNotification } from "@/lib/notifications";
+import { createImportPackage } from "@/features/warehouse/api/importPackageApi";
 import { formatCurrency, parseErrorResponse } from "../../utils/ordersHelpers";
 import type { RefundCreatePrefill } from "../useOrdersModals";
 import type { CreateOrderPayload } from "./types";
+
+type ImportPackageMeta = {
+  productId?: number | string | null;
+  supplierId?: number | string | null;
+  importPrice?: number | string | null;
+  data?: Record<string, unknown> | null;
+};
+
+const toOptionalNumber = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const postImportPackage = async (meta: ImportPackageMeta | null | undefined) => {
+  const productId = toOptionalNumber(meta?.productId);
+  if (!productId) return;
+
+  const data = meta?.data ?? {};
+  await createImportPackage({
+    productId,
+    supplierId: toOptionalNumber(meta?.supplierId),
+    importPrice: toOptionalNumber(meta?.importPrice),
+    account: typeof data.account === "string" ? data.account : null,
+    password: typeof data.password === "string" ? data.password : null,
+    backup_email: typeof data.backup_email === "string" ? data.backup_email : null,
+    two_fa: typeof data.two_fa === "string" ? data.two_fa : null,
+    expires_at: typeof data.expires_at === "string" ? data.expires_at : null,
+    note: typeof data.note === "string" ? data.note : null,
+  });
+};
 
 type BuildSaveNewOrderHandlerArgs = {
   isCreatingOrderRef: React.MutableRefObject<boolean>;
@@ -63,7 +94,10 @@ export const buildSaveNewOrderHandler =
           ...(payloads[i] as unknown as Record<string, unknown>),
         };
         try {
+          const importPackageMeta = outgoing.__import_package as ImportPackageMeta | undefined;
+          delete outgoing.__import_package;
           const created = await postSingleOrder(outgoing);
+          await postImportPackage(importPackageMeta);
           createdOrders.push(created);
         } catch (error) {
           const label = String(outgoing[ORDER_FIELDS.ID_PRODUCT] || `Đơn #${i + 1}`);

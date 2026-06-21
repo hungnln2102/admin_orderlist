@@ -5,6 +5,8 @@ import {
   TrashIcon,
   XMarkIcon,
   XCircleIcon,
+  CubeIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
 import type { ProductOption } from "../hooks/useWarehouseProducts";
@@ -16,6 +18,7 @@ import {
 } from "./storageItemCardUtils";
 import { CopyableValue } from "./CopyableValue";
 import { WarehouseEditFields } from "./warehouse-row/WarehouseEditFields";
+import { ExpireModal } from "./ExpireModal";
 
 type MobileProps = {
   items: WarehouseItem[];
@@ -31,6 +34,8 @@ type MobileProps = {
   onCancel: () => void;
   onStartEdit: (item: WarehouseItem) => void;
   onToggleDetails: (id: number) => void;
+  onCreatePackage?: (item: WarehouseItem) => void;
+  onExpireStock?: (stockId: number, deleteStock: boolean) => Promise<void>;
 };
 
 const FormActions: React.FC<{
@@ -88,6 +93,8 @@ export const StorageMobileList: React.FC<MobileProps> = ({
   onCancel,
   onStartEdit,
   onToggleDetails,
+  onCreatePackage,
+  onExpireStock,
 }) => {
   if (loading && filteredCount === 0 && editingId !== "new") {
     return (
@@ -163,6 +170,8 @@ export const StorageMobileList: React.FC<MobileProps> = ({
               onToggle={() => item.id != null && onToggleDetails(item.id)}
               onStartEdit={onStartEdit}
               onDelete={onDelete}
+              onCreatePackage={onCreatePackage}
+              onExpireStock={onExpireStock}
             />
           );
         })
@@ -178,7 +187,10 @@ const ViewCard: React.FC<{
   onToggle: () => void;
   onStartEdit: (item: WarehouseItem) => void;
   onDelete: (id?: number) => void;
-}> = ({ item, isExpanded, loading, onToggle, onStartEdit, onDelete }) => {
+  onCreatePackage?: (item: WarehouseItem) => void;
+  onExpireStock?: (stockId: number, deleteStock: boolean) => Promise<void>;
+}> = ({ item, isExpanded, loading, onToggle, onStartEdit, onDelete, onCreatePackage, onExpireStock }) => {
+  const [expireModalOpen, setExpireModalOpen] = useState(false);
   const theme = getWarehouseTheme(item.status);
   const [rowCopied, setRowCopied] = useState(false);
   const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -283,7 +295,7 @@ const ViewCard: React.FC<{
         </div>
       )}
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onStartEdit(item)}
@@ -291,8 +303,30 @@ const ViewCard: React.FC<{
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 py-2 text-sm font-medium text-amber-200/90"
         >
           <PencilSquareIcon className="h-4 w-4" />
-          Sửa
+          Sua
         </button>
+        {onCreatePackage && (
+          <button
+            type="button"
+            onClick={() => onCreatePackage(item)}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-500/15 py-2 text-sm font-medium text-indigo-300"
+          >
+            <CubeIcon className="h-4 w-4" />
+            Tao Goi
+          </button>
+        )}
+        {onExpireStock && item.id != null && (
+          <button
+            type="button"
+            onClick={() => setExpireModalOpen(true)}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-orange-500/25 bg-orange-500/10 py-2 text-sm font-medium text-orange-300/90"
+          >
+            <ClockIcon className="h-4 w-4" />
+            Het Han
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onDelete(item.id)}
@@ -300,9 +334,21 @@ const ViewCard: React.FC<{
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 py-2 text-sm font-medium text-rose-300/90"
         >
           <TrashIcon className="h-4 w-4" />
-          Xoá
+          Xoa
         </button>
       </div>
+
+      {onExpireStock && item.id != null && (
+        <ExpireModal
+          isOpen={expireModalOpen}
+          stockId={item.id}
+          onClose={() => setExpireModalOpen(false)}
+          onConfirm={async (deleteStock) => {
+            await onExpireStock(item.id!, deleteStock);
+            setExpireModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

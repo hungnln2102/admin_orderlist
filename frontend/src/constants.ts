@@ -67,6 +67,12 @@ export const API_ENDPOINTS = {
   REFUNDS: "/api/refunds",
   BANK_LIST: "/api/banks",
   WAREHOUSE: "/api/warehouse",
+  IMPORT_PACKAGES: "/api/import-packages",
+  IMPORT_PACKAGES_EXPIRE: (stockId: number) =>
+    `/api/import-packages/${stockId}/expire`,
+  IMPORT_PACKAGES_RULES: "/api/import-packages/rules",
+  IMPORT_PACKAGES_RULE_BY_PRODUCT: (productId: number) =>
+    `/api/import-packages/rules/${productId}`,
 
   RENEW_ADOBE_ACCOUNTS: "/api/renew-adobe/accounts",
   RENEW_ADOBE_ACCOUNT_DELETE: (id: number) => `/api/renew-adobe/accounts/${id}`,

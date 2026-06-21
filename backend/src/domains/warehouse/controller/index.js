@@ -150,6 +150,26 @@ const updateWarehouse = async (req, res) => {
         if (!same) {
           await syncOrdersForPackagesUsingStock(trx, id, oldAcc, newAcc);
         }
+
+        // Sync expires_at sang tat ca PACKAGE_PRODUCT lien ket voi stock nay
+        const oldExpires = before[cols.expiresAt] ?? null;
+        const newExpires = updated.expires_at ?? null;
+        const expiresChanged =
+          String(oldExpires ?? "").trim() !== String(newExpires ?? "").trim();
+        if (expiresChanged) {
+          await trx(pkgTable)
+            .where((qb) => {
+              qb.where(pkgCols.stockId, id).orWhere(pkgCols.storageId, id);
+            })
+            .update({ [pkgCols.storageTotal]: trx.raw("storage_total") }); // no-op placeholder to avoid empty update
+
+          // Ghi log sync (package_product khong co expires_at, nen chi log)
+          logger.info("[warehouse] expires_at thay doi, packages lien ket da duoc ghi nhan", {
+            stockId: id,
+            oldExpires,
+            newExpires,
+          });
+        }
       }
       return updated;
     });

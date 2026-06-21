@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../constants";
 import { usePricingTiers } from "@/shared/hooks/usePricingTiers";
@@ -12,6 +12,8 @@ import { CreateOrderCreditPanels } from "./components/CreateOrderCreditPanels";
 import { CreateOrderPaymentMethodSection } from "./components/CreateOrderPaymentMethodSection";
 import { useCreateOrderModalDerived } from "./hooks/useCreateOrderModalDerived";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import ImportPackageBlock from "@/features/warehouse/components/ImportPackageBlock";
+import { useImportPackageSubmit } from "@/features/warehouse/hooks/useImportPackageSubmit";
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   isOpen,
   onClose,
@@ -20,6 +22,25 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   orderCreationKind = "sales",
 }) => {
   const [customMode, setCustomMode] = useState(false);
+  const pendingImportPackageRef = useRef<Record<string, unknown> | null>(null);
+  const handleSaveWithImportPackage = useCallback(
+    (newOrderData: Parameters<CreateOrderModalProps["onSave"]>[0]) => {
+      const meta = pendingImportPackageRef.current;
+      pendingImportPackageRef.current = null;
+      if (!meta) {
+        onSave(newOrderData);
+        return;
+      }
+
+      const attachMeta = (payload: Partial<Order> | Order) => ({
+        ...(payload as Record<string, unknown>),
+        __import_package: meta,
+      });
+
+      onSave(Array.isArray(newOrderData) ? newOrderData.map(attachMeta) : attachMeta(newOrderData));
+    },
+    [onSave]
+  );
   const { orderCodeOptions } = usePricingTiers();
   const {
     formData,
@@ -57,8 +78,45 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     estimatedTotalPrice,
     completeLineCount,
     isMultiReady,
-  } = useCreateOrderLogic(isOpen, onSave, customMode, prefillContext, orderCreationKind);
+  } = useCreateOrderLogic(isOpen, handleSaveWithImportPackage, customMode, prefillContext, orderCreationKind);
   const hasPrefillCredit = Boolean(prefillContext && Number(prefillContext.creditNoteId) > 0);
+
+  // Import-package block: hien khi orderCreationKind = "import"
+  const isImportOrder = orderCreationKind === "import";
+  const {
+    rule: importRule,
+    ruleLoading: importRuleLoading,
+    data: importPackageData,
+    updateField: updateImportField,
+    loadRule: loadImportRule,
+  } = useImportPackageSubmit();
+
+  // Khi san pham thay doi trong don nhap hang -> tai rule
+  const selectedProductId = products.find(
+    (p) => p.san_pham === (formData[ORDER_FIELDS.ID_PRODUCT] as string)
+  )?.id ?? null;
+
+  React.useEffect(() => {
+    if (isImportOrder && isOpen) {
+      void loadImportRule(typeof selectedProductId === "number" ? selectedProductId : null);
+    }
+  }, [isImportOrder, isOpen, selectedProductId, loadImportRule]);
+
+  // Override handleSubmit de sau khi tao don -> tao import package
+  const originalHandleSubmit = handleSubmit;
+  const handleSubmitWithPackage = (e: React.FormEvent) => {
+    if (isImportOrder && importRule?.enabled && selectedProductId) {
+      pendingImportPackageRef.current = {
+        productId: selectedProductId,
+        supplierId: selectedSupplyId,
+        importPrice: Number(formData[ORDER_FIELDS.COST]) || null,
+        data: importPackageData,
+      };
+    } else {
+      pendingImportPackageRef.current = null;
+    }
+    originalHandleSubmit(e);
+  };
   const {
     prefillCreditNoteRemaining,
     manualCreditMoney,
@@ -162,7 +220,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-3 sm:px-4 lg:px-4 py-3">
-            <form id="create-order-form" onSubmit={handleSubmit}>
+            <form id="create-order-form" onSubmit={handleSubmitWithPackage}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                 <CreateOrderSharedCustomerSection
                   formData={formData}
@@ -250,6 +308,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   onPaymentMethodChange={setPaymentMethod}
                 />
               </div>
+              {/* Import Package Block: chi hien voi don nhap hang va san pham co rule */}
+              {isImportOrder && !importRuleLoading && (
+                <ImportPackageBlock
+                  rule={importRule}
+                  data={importPackageData}
+                  onChange={updateImportField}
+                />
+              )}
               <CreateOrderCreditPanels
                 creditMode={creditMode}
                 hasPrefillCredit={hasPrefillCredit}
