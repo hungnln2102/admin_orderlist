@@ -8,6 +8,25 @@ import { Link } from "react-router-dom";
 /**
  * Kiểm tra / kích hoạt profile Renew qua API public storefront (`/api/renew-adobe/public/*`).
  */
+function isServiceConnectionErrorMessage(message: string | null) {
+  const normalized = String(message || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+  return [
+    "khong ket noi",
+    "khong the ket noi",
+    "khong goi duoc",
+    "khong the kiem tra",
+    "loi ket noi",
+    "cannot connect",
+    "network",
+    "timeout",
+    "failed to fetch",
+  ].some((keyword) => normalized.includes(keyword));
+}
+
 export default function RenewProfileCheckDeskPage() {
   const {
     email,
@@ -27,6 +46,10 @@ export default function RenewProfileCheckDeskPage() {
 
   const [hintOpen, setHintOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const canShowActivateButton =
+    resultType === "expired" &&
+    canActivate &&
+    !isServiceConnectionErrorMessage(message);
 
   const adobeFixSteps = [
     "Bước 1: Kiểm tra tài khoản trên web để xem profile đang active.",
@@ -192,7 +215,7 @@ export default function RenewProfileCheckDeskPage() {
                 urlAccess={urlAccess}
               />
 
-              {resultType === "expired" && canActivate ? (
+              {canShowActivateButton ? (
                 <button
                   type="button"
                   onClick={handleActivate}

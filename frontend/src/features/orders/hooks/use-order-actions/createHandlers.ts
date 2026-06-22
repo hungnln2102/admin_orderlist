@@ -37,6 +37,14 @@ const postImportPackage = async (meta: ImportPackageMeta | null | undefined) => 
   });
 };
 
+type CreatedReceiptBatch = {
+  batchCode: string;
+  orderCount: number;
+  totalAmount: number;
+  baseTotal?: number;
+  amountSuffix?: number | null;
+};
+
 type BuildSaveNewOrderHandlerArgs = {
   isCreatingOrderRef: React.MutableRefObject<boolean>;
   closeCreateModal: () => void;
@@ -74,6 +82,40 @@ const postSingleOrder = async (outgoing: Record<string, unknown>): Promise<Order
   }
 
   return createdOrder;
+};
+
+const createReceiptBatchFromCreatedOrders = async (
+  createdOrders: Order[]
+): Promise<CreatedReceiptBatch | null> => {
+  const orderCodes = createdOrders
+    .map((order) => String(order?.[ORDER_FIELDS.ID_ORDER] || "").trim().toUpperCase())
+    .filter(Boolean);
+
+  if (orderCodes.length < 2) return null;
+
+  const response = await apiFetch("/api/payment-receipts/batches", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderCodes }),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(body?.error || "Khong the gop don theo luong gop bien nhan."));
+  }
+
+  const batchCode = String(body?.batchCode || "").trim().toUpperCase();
+  if (!batchCode) {
+    throw new Error("Khong nhan duoc ma batch gop don tu server.");
+  }
+
+  return {
+    batchCode,
+    orderCount: Number(body?.orderCount) || orderCodes.length,
+    totalAmount: Number(body?.totalAmount) || 0,
+    baseTotal: Number(body?.baseTotal) || 0,
+    amountSuffix: body?.amountSuffix ?? null,
+  };
 };
 
 export const buildSaveNewOrderHandler =
@@ -119,10 +161,13 @@ export const buildSaveNewOrderHandler =
           (sum, order) => sum + (Number(order[ORDER_FIELDS.PRICE]) || 0),
           0
         );
+        const batch = await createReceiptBatchFromCreatedOrders(createdOrders);
         showAppNotification({
           type: "success",
-          title: `Đã tạo ${createdOrders.length} đơn`,
-          message: `Tổng giá bán: ${formatCurrency(totalPrice)}.`,
+          title: `Da tao ${createdOrders.length} don gop`,
+          message: batch
+            ? `Tong gia ban: ${formatCurrency(totalPrice)}. Da gop bien nhan thanh batch ${batch.batchCode} voi so tien ${formatCurrency(batch.totalAmount)}.`
+            : `Tong gia ban: ${formatCurrency(totalPrice)}.`,
         });
       } else if (createdOrders.length > 0 && failures.length > 0) {
         showAppNotification({

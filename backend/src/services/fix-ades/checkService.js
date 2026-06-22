@@ -191,6 +191,23 @@ async function callWithToken(sendOnce, refererEmail) {
   return result;
 }
 
+function buildAuthedHeaders(email, token) {
+  return {
+    ...buildCommonHeaders(email),
+    ...buildAuthHeaders(token),
+  };
+}
+
+async function postAccountCheck(email, token) {
+  const headers = buildAuthedHeaders(email, token);
+  logger.debug("[fix-ades] POST /account/check", {
+    email,
+    tokenLen: token?.length || 0,
+    tokenHead: token ? token.slice(0, 6) + "..." : null,
+  });
+  return postJson(BASE_URL + "/account/check", { email }, headers);
+}
+
 /**
  * Check 1 email qua hệ thống Fix Ades.
  * @param {string} email
@@ -198,18 +215,7 @@ async function callWithToken(sendOnce, refererEmail) {
  */
 async function checkAdesAccount(email) {
   const e = normalizeEmail(email);
-  const result = await callWithToken(async (token) => {
-    const headers = {
-      ...buildCommonHeaders(e),
-      ...buildAuthHeaders(token),
-    };
-    logger.debug("[fix-ades] POST /account/check", {
-      email: e,
-      tokenLen: token?.length || 0,
-      tokenHead: token ? token.slice(0, 6) + "…" : null,
-    });
-    return postJson(`${BASE_URL}/account/check`, { email: e }, headers);
-  }, e);
+  const result = await callWithToken((token) => postAccountCheck(e, token), e);
 
   if (!result.ok) {
     logger.warn("[fix-ades] check failed", {
@@ -236,16 +242,22 @@ async function checkAdesAccount(email) {
 async function checkAdesTransferStatus(email) {
   const e = normalizeEmail(email);
   const result = await callWithToken(async (token) => {
-    const headers = {
-      ...buildCommonHeaders(e),
-      ...buildAuthHeaders(token),
-    };
+    const headers = buildAuthedHeaders(e, token);
     logger.debug("[fix-ades] POST /check-transfer-status", {
       email: e,
       tokenLen: token?.length || 0,
       tokenHead: token ? token.slice(0, 6) + "..." : null,
     });
-    return postJson(BASE_URL + "/check-transfer-status", { email: e }, headers);
+    const transferResult = await postJson(`${BASE_URL}/check-transfer-status`, { email: e }, headers);
+    if (transferResult.status === 404 || transferResult.status === 405) {
+      logger.warn("[fix-ades] /check-transfer-status unavailable; fallback to /account/check", {
+        email: e,
+        status: transferResult.status,
+        body: typeof transferResult.raw === "string" ? transferResult.raw.slice(0, 200) : null,
+      });
+      return postAccountCheck(e, token);
+    }
+    return transferResult;
   }, e);
 
   if (!result.ok) {
