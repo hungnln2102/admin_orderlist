@@ -65,9 +65,16 @@ function normalizeCheckResultForRenewFlow(result) {
 function getTransferTeamResponse(adesData) {
   const data =
     adesData?.data && typeof adesData.data === "object" ? adesData.data : adesData;
-  return data?.transferTeamResponse && typeof data.transferTeamResponse === "object"
-    ? data.transferTeamResponse
-    : null;
+  if (data?.transferTeamResponse && typeof data.transferTeamResponse === "object") {
+    return data.transferTeamResponse;
+  }
+  if (
+    data?.adesSource?.transferTeamResponse &&
+    typeof data.adesSource.transferTeamResponse === "object"
+  ) {
+    return data.adesSource.transferTeamResponse;
+  }
+  return null;
 }
 
 function normalizeTransferStatusData(adesData) {

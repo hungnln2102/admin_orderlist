@@ -236,28 +236,21 @@ async function checkAdesAccount(email) {
 /**
  * Check transfer profile status for the Ades `/additional/account/transfer` flow.
  *
+ * Ades web currently checks the account via `/account/check`; keep this
+ * exported function as a compatibility wrapper for our internal route name.
+ *
  * @param {string} email
  * @returns {Promise<{ ok: boolean, status: number, data: any, raw: string }>}
  */
 async function checkAdesTransferStatus(email) {
   const e = normalizeEmail(email);
   const result = await callWithToken(async (token) => {
-    const headers = buildAuthedHeaders(e, token);
-    logger.debug("[fix-ades] POST /check-transfer-status", {
+    logger.debug("[fix-ades] POST /account/check for transfer status", {
       email: e,
       tokenLen: token?.length || 0,
       tokenHead: token ? token.slice(0, 6) + "..." : null,
     });
-    const transferResult = await postJson(`${BASE_URL}/check-transfer-status`, { email: e }, headers);
-    if (transferResult.status === 404 || transferResult.status === 405) {
-      logger.warn("[fix-ades] /check-transfer-status unavailable; fallback to /account/check", {
-        email: e,
-        status: transferResult.status,
-        body: typeof transferResult.raw === "string" ? transferResult.raw.slice(0, 200) : null,
-      });
-      return postAccountCheck(e, token);
-    }
-    return transferResult;
+    return postAccountCheck(e, token);
   }, e);
 
   if (!result.ok) {

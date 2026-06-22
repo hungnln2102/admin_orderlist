@@ -63,7 +63,7 @@ const ADES_NOT_ACTIVE_HINTS = [
 
 function isAdesSyncRequiredPayload(adesData) {
   const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : null;
-  return Boolean(data?.existedInSystem) && !data?.transferTeamResponse;
+  return Boolean(data?.existedInSystem) && !getTransferTeamResponse(adesData);
 }
 
 function getTransferTeamResponse(adesData) {
@@ -71,7 +71,10 @@ function getTransferTeamResponse(adesData) {
   const transfer =
     data?.transferTeamResponse && typeof data.transferTeamResponse === "object"
       ? data.transferTeamResponse
-      : null;
+      : data?.adesSource?.transferTeamResponse &&
+          typeof data.adesSource.transferTeamResponse === "object"
+        ? data.adesSource.transferTeamResponse
+        : null;
   return transfer;
 }
 
