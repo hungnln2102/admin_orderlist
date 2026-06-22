@@ -208,6 +208,77 @@ async function postAccountCheck(email, token) {
   return postJson(BASE_URL + "/account/check", { email }, headers);
 }
 
+async function postTransferStatusCheck(email, token) {
+  const headers = buildAuthedHeaders(email, token);
+  logger.debug("[fix-ades] POST /check-transfer-status", {
+    email,
+    tokenLen: token?.length || 0,
+    tokenHead: token ? token.slice(0, 6) + "..." : null,
+  });
+  return postJson(BASE_URL + "/check-transfer-status", { email }, headers);
+}
+
+function getAdesPayloadData(json) {
+  return json?.data && typeof json.data === "object" ? json.data : json;
+}
+
+function getAdesTransferTeamResponse(json) {
+  const data = getAdesPayloadData(json);
+  if (data?.transferTeamResponse && typeof data.transferTeamResponse === "object") {
+    return data.transferTeamResponse;
+  }
+  if (
+    data?.adesSource?.transferTeamResponse &&
+    typeof data.adesSource.transferTeamResponse === "object"
+  ) {
+    return data.adesSource.transferTeamResponse;
+  }
+  return null;
+}
+
+function isUsableAdesCheckResult(result) {
+  if (!result?.ok || !result.json || typeof result.json !== "object") return false;
+  const data = getAdesPayloadData(result.json);
+  if (!data || typeof data !== "object") return false;
+  if (getAdesTransferTeamResponse(result.json)) return true;
+  return Boolean(
+    data.email ||
+      data.status ||
+      data.accountStatus ||
+      data.productName ||
+      data.groupName ||
+      data.teamName ||
+      data.product ||
+      data.user
+  );
+}
+
+async function pickUsableAdesCheckResult(email, token) {
+  const checks = [
+    { name: "/check-transfer-status", send: () => postTransferStatusCheck(email, token) },
+    { name: "/account/check", send: () => postAccountCheck(email, token) },
+  ];
+  const settled = await Promise.allSettled(checks.map((check) => check.send()));
+  const results = settled.map((item, index) => ({
+    name: checks[index].name,
+    result: item.status === "fulfilled" ? item.value : null,
+    error: item.status === "rejected" ? item.reason : null,
+  }));
+  const okResult = results.find((item) => item.result?.ok);
+  if (okResult) {
+    logger.debug("[fix-ades] selected ok check endpoint", {
+      email,
+      endpoint: okResult.name,
+      status: okResult.result.status,
+      usable: isUsableAdesCheckResult(okResult.result),
+    });
+    return okResult.result;
+  }
+  const failed = results.find((item) => item.result) || results.find((item) => item.error);
+  if (failed?.result) return failed.result;
+  throw failed?.error || new Error("Không gọi được API check Fix Ades.");
+}
+
 /**
  * Check 1 email qua hệ thống Fix Ades.
  * @param {string} email
@@ -244,28 +315,22 @@ async function checkAdesAccount(email) {
  */
 async function checkAdesTransferStatus(email) {
   const e = normalizeEmail(email);
-  const result = await callWithToken(async (token) => {
-    logger.debug("[fix-ades] POST /account/check for transfer status", {
-      email: e,
-      tokenLen: token?.length || 0,
-      tokenHead: token ? token.slice(0, 6) + "..." : null,
-    });
-    return postAccountCheck(e, token);
-  }, e);
+  const result = await callWithToken((token) => pickUsableAdesCheckResult(e, token), e);
 
-  if (!result.ok) {
-    logger.warn("[fix-ades] check transfer status failed", {
+  if (!isUsableAdesCheckResult(result)) {
+    logger.warn("[fix-ades] check transfer status failed or unusable", {
       email: e,
-      status: result.status,
-      body: typeof result.raw === "string" ? result.raw.slice(0, 320) : null,
+      status: result?.status,
+      ok: result?.ok,
+      body: typeof result?.raw === "string" ? result.raw.slice(0, 320) : null,
     });
   }
 
   return {
-    ok: result.ok,
-    status: result.status,
-    data: result.json,
-    raw: result.raw,
+    ok: Boolean(result?.ok),
+    status: result?.status || 502,
+    data: result?.json,
+    raw: result?.raw,
   };
 }
 
