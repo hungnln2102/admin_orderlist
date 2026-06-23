@@ -25,7 +25,7 @@ export const useSupplyOverview = (
     setLoading(true);
     try {
       const res = await apiFetch(`/api/supplies/${supplyId}/overview`);
-      if (!res.ok) throw new Error("KhA'ng th��� t���i thA'ng tin chi ti���t");
+      if (!res.ok) throw new Error("Không thể tải thông tin chi tiết");
       const json = await res.json();
 
       const supply = json.supply || {};
@@ -37,7 +37,7 @@ export const useSupplyOverview = (
       setData({ supply, stats, unpaidPayments: unpaid });
       if (unpaid.length > 0) setSelectedPaymentId(unpaid[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "L��-i t���i d��_ li���u");
+      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }

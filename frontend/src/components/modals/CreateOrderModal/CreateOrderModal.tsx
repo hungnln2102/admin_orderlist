@@ -90,7 +90,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   } = useCreateOrderLogic(isOpen, handleSaveWithImportPackage, customMode, prefillContext, orderCreationKind);
   const hasPrefillCredit = Boolean(prefillContext && Number(prefillContext.creditNoteId) > 0);
 
-  // Import-package block: hiá»ƒn thá»‹ khi orderCreationKind = "import"
+  // Import-package block: hiển thị khi orderCreationKind = "import"
   const isImportOrder = orderCreationKind === "import";
   const {
     rule: importRule,
@@ -100,7 +100,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     loadRule: loadImportRule,
   } = useImportPackageSubmit();
 
-  // Khi sáº£n pháº©m thay Ä‘á»•i trong Ä‘Æ¡n nháº­p hÃ ng -> táº£i rule
+  // Khi sản phẩm thay đổi trong đơn nhập hàng -> tải rule
   const selectedProductId = products.find(
     (p) => p.san_pham === (formData[ORDER_FIELDS.ID_PRODUCT] as string)
   )?.id ?? null;
@@ -111,7 +111,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     }
   }, [isImportOrder, isOpen, selectedProductId, loadImportRule]);
 
-  // Override handleSubmit Ä‘á»ƒ sau khi táº¡o Ä‘Æ¡n -> táº¡o import package
+  // Override handleSubmit để sau khi tạo đơn -> tạo import package
   const originalHandleSubmit = handleSubmit;
   const handleSubmitWithPackage = (e: React.FormEvent) => {
     if (isImportOrder && importRule?.enabled && selectedProductId) {
@@ -172,13 +172,13 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const canSubmit = multiOrderEnabled ? canSubmitMulti : canSubmitSingle;
   const submitLabel = multiOrderEnabled
     ? isLoading
-      ? "Äang tÃ­nh giÃ¡..."
+      ? "Đang tính giá..."
       : totalOrdersToCreate > 1
-        ? `Táº¡o Ä‘Æ¡n hÃ ng gá»™p (${totalOrdersToCreate} Ä‘Æ¡n)`
-        : "Táº¡o Ä‘Æ¡n hÃ ng gá»™p"
+        ? `Tạo đơn hàng gộp (${totalOrdersToCreate} đơn)`
+        : "Tạo đơn hàng gộp"
     : isLoading
-      ? "Äang tÃ­nh giÃ¡..."
-      : "Táº¡o Ä‘Æ¡n hÃ ng";
+      ? "Đang tính giá..."
+      : "Tạo đơn hàng";
   const unitPrice = Number(formData[ORDER_FIELDS.PRICE]) || 0;
   return (
     <ModalPortal>
@@ -190,16 +190,16 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                 Order Builder
               </p>
               <h3 className="mt-1 text-base sm:text-lg font-black text-white tracking-tight">
-                {multiOrderEnabled ? "Táº¡o Ä‘Æ¡n hÃ ng gá»™p" : "Táº¡o Ä‘Æ¡n hÃ ng má»›i"}
+                {multiOrderEnabled ? "Tạo đơn hàng gộp" : "Tạo đơn hàng mới"}
               </h3>
               <p className="mt-2 text-xs text-slate-300/75">
                 {multiOrderEnabled
-                  ? "Nháº­p nhiá»u dÃ²ng chi tiáº¿t cho cÃ¹ng má»™t khÃ¡ch; há»‡ thá»‘ng sáº½ táº¡o cÃ¡c Ä‘Æ¡n thÃ nh pháº§n rá»“i tá»± gá»™p theo Ä‘Ãºng luá»“ng gá»™p biÃªn nháº­n."
-                  : "HoÃ n thiá»‡n thÃ´ng tin khÃ¡ch hÃ ng, sáº£n pháº©m vÃ  chi phÃ­ trong má»™t form duy nháº¥t."}
+                  ? "Nhập nhiều dòng chi tiết cho cùng một khách; hệ thống sẽ tạo các đơn thành phần rồi tự gộp theo đúng luồng gộp biên nhận."
+                  : "Hoàn thiện thông tin khách hàng, sản phẩm và chi phí trong một form duy nhất."}
               </p>
               {reservedOrderCode ? (
                 <p className="mt-2 text-[11px] font-semibold text-cyan-200/90">
-                  MÃ£ Ä‘Æ¡n dá»± kiáº¿n: {reservedOrderCode}
+                  Mã đơn dự kiến: {reservedOrderCode}
                 </p>
               ) : null}
             </div>
@@ -213,7 +213,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       ? "border-amber-400/60 bg-amber-500/20 text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
                       : "border-slate-500/70 bg-slate-800/90 text-slate-200 hover:bg-slate-700 hover:text-white"
                   }`}
-                  title="Chuyá»ƒn Ä‘á»•i: chá»n khÃ¡ch tá»« phiáº¿u credit cÃ²n kháº£ dá»¥ng"
+                  title="Chuyển đổi: chọn khách từ phiếu credit còn khả dụng"
                 >
                   Credit
                 </button>
@@ -317,7 +317,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                   onPaymentMethodChange={setPaymentMethod}
                 />
               </div>
-              {/* Import Package Block: chá»‰ hiá»ƒn thá»‹ vá»›i Ä‘Æ¡n nháº­p hÃ ng vÃ  sáº£n pháº©m cÃ³ rule */}
+              {/* Import Package Block: chỉ hiển thị với đơn nhập hàng và sản phẩm có rule */}
               {isImportOrder && !importRuleLoading && (
                 <ImportPackageBlock
                   rule={importRule}
@@ -342,7 +342,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               onClick={onClose}
               className="px-6 py-2.5 text-sm font-bold text-slate-100 bg-slate-800 border border-slate-600 rounded-xl hover:bg-slate-700 transition-colors"
             >
-              Há»§y
+              Hủy
             </button>
             <button
               type="submit"
