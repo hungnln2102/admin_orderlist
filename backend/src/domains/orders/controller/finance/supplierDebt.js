@@ -1,20 +1,9 @@
-const { resolveSupplierNameColumn } = require("../../../supplies/controller/helpers");
-const { TABLES } = require("../constants");
+const {
+  findSupplierIdByName,
+} = require("../../../supplies/services/supplierLookupService");
 
-const findSupplyIdByName = async (trx, supplyNameRaw) => {
-  const supplyName =
-    supplyNameRaw === undefined || supplyNameRaw === null
-      ? ""
-      : String(supplyNameRaw);
-  if (!supplyName) return null;
-
-  const supplierNameCol = await resolveSupplierNameColumn();
-  const row = await trx(TABLES.supplier)
-    .select("id")
-    .where(supplierNameCol, supplyName)
-    .first();
-  return row && row.id !== undefined ? Number(row.id) || null : null;
-};
+const findSupplyIdByName = (trx, supplyNameRaw) =>
+  findSupplierIdByName(supplyNameRaw, trx);
 
 /**
  * Công nợ / import NCC theo đơn: chỉ `partner.supplier_order_cost_log` (trigger trên `orders.order_list`).

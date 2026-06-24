@@ -13,20 +13,14 @@ const {
 const { createHttpError } = require("../validators/shopBankAccountValidator");
 const { validateWithdrawPayload } = require("../validators/shopBankWithdrawnValidator");
 const {
+  normalizeOptionalText,
+  normalizeRoundedMoney,
+} = require("../helpers/shopBankInputs");
+const {
   TABLE: EXPENSE_TABLE,
   COLS: EXPENSE_COLS,
 } = require("../../store-profit-expenses/controller/shared");
 
-const toMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num);
-};
-
-const normalizeOptionalText = (value) => {
-  const text = String(value || "").trim();
-  return text || null;
-};
 
 const recordShopBankAccountWithdrawal = async (id, payload) => {
   if (!SHOP_BANK_ACCOUNTS_DEF) {
@@ -69,9 +63,9 @@ const recordShopBankAccountWithdrawal = async (id, payload) => {
   const account = result.account;
   return {
     ...account,
-    totalReceived: toMoney(account?.totalReceived),
-    totalWithdrawn: toMoney(account?.totalWithdrawn),
-    balanceRemaining: toMoney(account?.balance),
+    totalReceived: normalizeRoundedMoney(account?.totalReceived),
+    totalWithdrawn: normalizeRoundedMoney(account?.totalWithdrawn),
+    balanceRemaining: normalizeRoundedMoney(account?.balance),
     withdrawnAmount: amount,
   };
 };

@@ -74,6 +74,19 @@ Mục đích: map đường đi từ code cũ sang kiến trúc mới. File này
 | Renew Adobe | `backend/src/domains/renew-adobe`, `backend/src/services/renew-adobe`, `backend/src/services/fix-ades` | `backend/src/domains/renew-adobe` + adapters nếu cần | `shared/integrations/adobe`, `shared/logger` | `not-started` | Scheduler chỉ gọi use-case |
 | Users/Auth | auth/users/roles/ip whitelist routes | `backend/src/domains/auth`, `backend/src/domains/users` | `shared/errors`, `shared/validation` | `not-started` | Cần map quyền frontend/backend |
 
+## 5A. Migration Map Database
+
+| DB Area | Owner Domain | Code owner cần có trước | Trạng thái | Ghi chú |
+| --- | --- | --- | --- | --- |
+| `orders.order_list` | `orders` | Order use-cases/repositories | `in-progress` | `transaction` là legacy; payment slot là hướng mới |
+| `orders.order_payment_slots` | `orders/payment-slots` | Payment slot service/repository | `in-progress` | Không match payment bằng cột legacy nếu slot đủ dữ liệu |
+| `product.product/variant/desc_variant` | `products` | Product lookup service/repository | `planned` | Cần xác nhận alias `product_desc` cũ |
+| `partner.supplier` | `supplies` | `supplierLookupService` | `in-progress` | Chưa rename `supplier_name/source_name`; resolver đang che khác biệt |
+| `partner.supplier_cost` | `supplies` | `supplierCostService` | `in-progress` | Cần quyết định duplicate vs unique `variant_id + supplier_id` |
+| `partner.supplier_order_cost_log` | `supplies/dashboard` | Supplier-change + dashboard projection service | `planned` | Không đổi trigger/log nếu chưa có query đối soát |
+| `dashboard.dashboard_monthly_summary` | `dashboard` | Dashboard projection query/service | `planned` | Projection, không phải event source |
+| `receipt.payment_receipt*` | `payments/invoices` | Receipt/payment domain service | `planned` | Ưu tiên index/financial audit trước rename/drop |
+
 ## 6. Cutover Checklist Cho Mỗi Feature/Domain
 
 - [ ] Docs page/domain đã hoàn thành.

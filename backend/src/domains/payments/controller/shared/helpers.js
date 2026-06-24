@@ -1,5 +1,8 @@
 const crypto = require("crypto");
 const {
+  normalizeIntegerVndAmount,
+} = require("../../../../shared/money/normalizers");
+const {
   ORDER_CODE_REGEX_GLOBAL,
   BATCH_CODE_REGEX_STRICT,
   BATCH_CODE_PREFIX,
@@ -8,15 +11,7 @@ const {
   parseTransactionCodesInput,
 } = require("./parseTransactionCodesInput");
 
-const normalizeMoney = (value) => {
-  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
-  const cleaned = String(value ?? "")
-    .replace(/,/g, "")
-    .replace(/[^\d.-]/g, "")
-    .trim();
-  const numeric = Number.parseFloat(cleaned || "0");
-  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
-};
+const normalizeMoney = normalizeIntegerVndAmount;
 
 const parseOrderCodesInput = (rawValue) => {
   const parts = Array.isArray(rawValue)

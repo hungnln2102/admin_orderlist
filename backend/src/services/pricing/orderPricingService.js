@@ -8,6 +8,14 @@ const {
 } = require("./core");
 const { getTiers } = require("./tierCache");
 const { isMavrykShopSupplierName, isMavnImportOrder } = require("../../utils/orderHelpers");
+const {
+  findSupplierById,
+  findSupplierIdByName,
+} = require("../../domains/supplies/services/supplierLookupService");
+const {
+  findMaxSupplierCostPrice,
+  findSupplierCostPrice,
+} = require("../../domains/supplies/services/supplierCostService");
 
 class PricingHttpError extends Error {
   constructor(statusCode, message) {
@@ -75,12 +83,7 @@ const resolveEffectiveSupplyId = async ({ suppliedId, orderRow, customerType }) 
   }
 
   if (!effectiveSupplyId && customerType) {
-    const supplier = await db(TABLES.supplier)
-      .where({ supplier_name: customerType })
-      .first();
-    if (supplier?.id) {
-      effectiveSupplyId = Number(supplier.id) || 0;
-    }
+    effectiveSupplyId = (await findSupplierIdByName(customerType)) || 0;
   }
 
   return effectiveSupplyId;
@@ -117,10 +120,7 @@ const calculateOrderPricing = async ({
 
   let isMavrykProfit = false;
   if (effectiveSupplyId) {
-    const supRow = await db(TABLES.supplier)
-      .select(COLS.SUPPLIER.SUPPLIER_NAME)
-      .where(COLS.SUPPLIER.ID, effectiveSupplyId)
-      .first();
+    const supRow = await findSupplierById(effectiveSupplyId);
     isMavrykProfit = isMavrykShopSupplierName(
       String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] ?? "").trim()
     );
@@ -136,17 +136,14 @@ const calculateOrderPricing = async ({
 
   let importBySource = 0;
   if (effectiveSupplyId && !isMavrykProfit) {
-    const latestBySource = await db(TABLES.supplierCost)
-      .select(COLS.SUPPLIER_COST.PRICE)
-      .where(COLS.SUPPLIER_COST.VARIANT_ID, variantPricing.variantId)
-      .andWhere(COLS.SUPPLIER_COST.SUPPLIER_ID, effectiveSupplyId)
-      .orderBy(COLS.SUPPLIER_COST.ID, "desc")
-      .first();
+    const latestPriceBySource = await findSupplierCostPrice({
+      supplierId: effectiveSupplyId,
+      variantId: variantPricing.variantId,
+      latest: true,
+    });
 
-    if (latestBySource?.[COLS.SUPPLIER_COST.PRICE] !== undefined) {
-      importBySource = normalizeMoney(
-        latestBySource[COLS.SUPPLIER_COST.PRICE]
-      );
+    if (latestPriceBySource !== null) {
+      importBySource = normalizeMoney(latestPriceBySource);
     }
   }
 
@@ -154,11 +151,9 @@ const calculateOrderPricing = async ({
     importBySource = normalizeMoney(orderRow.cost);
   }
 
-  const maxPriceRow = await db(TABLES.supplierCost)
-    .max(`${COLS.SUPPLIER_COST.PRICE} as maxPrice`)
-    .where(COLS.SUPPLIER_COST.VARIANT_ID, variantPricing.variantId)
-    .first();
-  const maxSupplyPrice = normalizeMoney(maxPriceRow?.maxPrice || 0);
+  const maxSupplyPrice = normalizeMoney(
+    await findMaxSupplierCostPrice(variantPricing.variantId)
+  );
 
   if (maxSupplyPrice <= 0 && importBySource <= 0) {
     if (isMavrykProfit) {

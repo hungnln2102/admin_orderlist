@@ -4,6 +4,7 @@ const {
   SCHEMA_RECEIPT,
   tableName,
 } = require("../../../config/dbSchema");
+const { normalizeAccountNumber } = require("../helpers/shopBankInputs");
 
 const PAYMENT_RECEIPT_TABLE = tableName(
   RECEIPT_SCHEMA.PAYMENT_RECEIPT.TABLE,
@@ -12,10 +13,6 @@ const PAYMENT_RECEIPT_TABLE = tableName(
 const RECEIVER_COL = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.RECEIVER;
 const AMOUNT_COL = RECEIPT_SCHEMA.PAYMENT_RECEIPT.COLS.AMOUNT;
 
-const normalizeAccountNumber = (value) =>
-  String(value || "")
-    .trim()
-    .replace(/\s+/g, "");
 
 /**
  * Tổng tiền CK Sepay vào từng STK (theo payment_receipt.receiver).
@@ -39,6 +36,5 @@ const sumReceivedByReceiver = async () => {
 };
 
 module.exports = {
-  normalizeAccountNumber,
   sumReceivedByReceiver,
 };

@@ -1,5 +1,6 @@
 const { db } = require("../../../db");
 const logger = require("../../../utils/logger");
+const { normalizeEmail } = require("../helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
@@ -21,11 +22,6 @@ const ACCOUNT_COLS = RENEW_ADOBE_SCHEMA.ACCOUNT.COLS;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function normalizeEmail(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
 
 const publicGetOtp = async (req, res) => {
   const email = normalizeEmail(req.body?.email);

@@ -10,6 +10,7 @@
 
 const { db } = require("../../../db");
 const logger = require("../../../utils/logger");
+const { normalizeEmail } = require("../helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
@@ -21,6 +22,10 @@ const {
   renewAdesAccount,
   syncAdesAccount,
 } = require("../../../services/fix-ades/checkService");
+const {
+  isLikelyNotActivePayload,
+  normalizeCheckResultForRenewFlow,
+} = require("../../fix-ades/helpers/renewFlowResult");
 
 const TRACK_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.TABLE,
@@ -50,16 +55,6 @@ const ADES_DEAD_STATUSES = new Set([
   "hết hạn",
   "hết gói",
 ]);
-const ADES_NOT_ACTIVE_HINTS = [
-  "inactive",
-  "not active",
-  "not_active",
-  "not-active",
-  "chua active",
-  "chưa active",
-  "chua kich hoat",
-  "chưa kích hoạt",
-];
 
 function isAdesSyncRequiredPayload(adesData) {
   const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : adesData;
@@ -115,44 +110,6 @@ function mapAdesStatusToTracking(status) {
   return "chưa cấp quyền";
 }
 
-function isLikelyNotActivePayload(data) {
-  if (!data || typeof data !== "object") return false;
-  const candidates = [
-    data.status,
-    data.accountStatus,
-    data.state,
-    data.message,
-    data.error,
-    data.reason,
-    data?.user?.status,
-  ];
-  return candidates.some((item) => {
-    const text = String(item || "").trim().toLowerCase();
-    return ADES_NOT_ACTIVE_HINTS.some((hint) => text.includes(hint));
-  });
-}
-
-function normalizeCheckResultForRenewFlow(result) {
-  const shouldTreatAsNoPackage =
-    !result?.ok && isLikelyNotActivePayload(result?.data);
-  if (!shouldTreatAsNoPackage) {
-    return result;
-  }
-  const normalizedData =
-    result?.data && typeof result.data === "object"
-      ? {
-          ...result.data,
-          status: String(result.data.status || "inactive")
-            .trim()
-            .toLowerCase(),
-        }
-      : { status: "inactive", message: "Tài khoản chưa active." };
-  return {
-    ok: true,
-    status: result?.status || 200,
-    data: normalizedData,
-  };
-}
 
 /**
  * Sync kết quả check từ Ades về `order_user_tracking`:
@@ -198,11 +155,6 @@ function applyFixAdesTrackingFilter(query, email, trackingRow) {
   return scopedQuery;
 }
 
-function normalizeEmail(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
 
 /** Tìm 1 row tracking khớp email + system_note=fix_ades. */
 async function findFixAdesTrackingRow(email) {

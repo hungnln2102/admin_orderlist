@@ -2,28 +2,9 @@
  * Supplier service — resolve supplier id; ghi chú NCC theo đơn: `partner.supplier_order_cost_log`.
  */
 
-const { db } = require("../db");
-const { TABLES } = require("../domains/orders/controller/constants");
-const { PARTNER_SCHEMA } = require("../config/dbSchema");
-const { resolveSupplierNameColumn } = require("../domains/supplies/controller/helpers");
-
-const findSupplierIdByName = async (supplyName, trx = null) => {
-  const query = trx || db;
-  const name =
-    supplyName === undefined || supplyName === null ? "" : String(supplyName);
-
-  if (!name) return null;
-
-  const supplierNameCol = await resolveSupplierNameColumn();
-  const row = await query(TABLES.supplier)
-    .select(PARTNER_SCHEMA.SUPPLIER.COLS.ID)
-    .where(supplierNameCol, name)
-    .first();
-
-  return row && row[PARTNER_SCHEMA.SUPPLIER.COLS.ID] !== undefined
-    ? Number(row[PARTNER_SCHEMA.SUPPLIER.COLS.ID]) || null
-    : null;
-};
+const {
+  findSupplierIdByName,
+} = require("../domains/supplies/services/supplierLookupService");
 
 const formatPaymentNote = (date = new Date()) => {
   const dt = date instanceof Date ? date : new Date();

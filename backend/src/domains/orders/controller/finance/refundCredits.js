@@ -12,6 +12,9 @@ const {
     SCHEMA_RECEIPT,
     tableName,
 } = require("../../../../config/dbSchema");
+const {
+    normalizeNonNegativeIntegerVndAmount,
+} = require("../../../../shared/money/normalizers");
 
 const R = RECEIPT_SCHEMA.REFUND_CREDIT_NOTES.COLS;
 const A = RECEIPT_SCHEMA.REFUND_CREDIT_APPLICATIONS.COLS;
@@ -33,11 +36,7 @@ const CREDIT_STATUS = {
     VOID: "VOID",
 };
 
-const normalizeMoney = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return 0;
-    return Math.max(0, Math.round(numeric));
-};
+const normalizeMoney = normalizeNonNegativeIntegerVndAmount;
 
 const normalizeCodeToken = (value) =>
     String(value || "")

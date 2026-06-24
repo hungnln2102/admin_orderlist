@@ -7,15 +7,10 @@
  */
 
 const repo = require("../repositories/paymentSlotRepository");
-
-const normalizeAccount = (value) =>
-  String(value ?? "").replace(/\s+/g, "").trim();
-
-const normalizeMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return num;
-};
+const {
+  normalizeAccount,
+  normalizeExactAmount,
+} = require("../helpers/paymentSlotInputs");
 
 /**
  * @param {import('pg').PoolClient | import('knex').Knex.Transaction} executor
@@ -26,7 +21,7 @@ const normalizeMoney = (value) => {
  */
 async function resolveOrderByExpectedAmount(executor, params) {
   const receiverAccount = normalizeAccount(params?.receiverAccount);
-  const amount = normalizeMoney(params?.amount);
+  const amount = normalizeExactAmount(params?.amount);
 
   if (!receiverAccount || !(amount > 0)) {
     return { slot: null, orderCode: null };

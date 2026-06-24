@@ -6,6 +6,7 @@ const {
   isMavrykShopSupplierName,
 } = require("../../../utils/orderHelpers");
 const { STATUS, COLS } = require("./constants");
+const { findSupplierById } = require("../../supplies/services/supplierLookupService");
 const {
   changeOrderSupplier,
   ChangeSupplierError,
@@ -119,10 +120,7 @@ const updateOrderWithFinance = async ({
         if (newPriceRaw != null) {
             let isInternalSupplier = false;
             if (beforeSupplyId != null) {
-                const supRow = await trx(TABLES.supplier)
-                    .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
-                    .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
-                    .first();
+                const supRow = await findSupplierById(beforeSupplyId, trx);
                 isInternalSupplier = isMavrykShopSupplierName(
                     supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME]
                 );
@@ -141,10 +139,7 @@ const updateOrderWithFinance = async ({
     ) {
         // Đơn bán supply không đổi nhưng user update cost trực tiếp — nếu NCC
         // hiện tại là Mavryk/Shop thì ép cost = 0 (giữ rule cũ cho đơn bán nội bộ).
-        const supRow = await trx(TABLES.supplier)
-            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
-            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyId)
-            .first();
+        const supRow = await findSupplierById(beforeSupplyId, trx);
         if (isMavrykShopSupplierName(supRow?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME])) {
             sanitized[ORDERS_SCHEMA.ORDER_LIST.COLS.COST] = 0;
         }
@@ -209,17 +204,11 @@ const updateOrderWithFinance = async ({
     const supplyIdVal = updatedOrder?.[supplyIdCol];
     const beforeSupplyIdVal = beforeOrder?.[supplyIdCol];
     if (beforeSupplyIdVal != null) {
-        const supplier = await db(TABLES.supplier)
-            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
-            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, beforeSupplyIdVal)
-            .first();
+        const supplier = await findSupplierById(beforeSupplyIdVal);
         beforeNormalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
     }
     if (supplyIdVal != null) {
-        const supplier = await db(TABLES.supplier)
-            .select(PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME)
-            .where(PARTNER_SCHEMA.SUPPLIER.COLS.ID, supplyIdVal)
-            .first();
+        const supplier = await findSupplierById(supplyIdVal);
         normalized.supply = supplier?.[PARTNER_SCHEMA.SUPPLIER.COLS.SUPPLIER_NAME] ?? "";
     }
     const beforeVariantIdVal = beforeOrder?.[productIdCol];

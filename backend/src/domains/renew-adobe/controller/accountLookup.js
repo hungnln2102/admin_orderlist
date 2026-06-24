@@ -5,6 +5,7 @@ const {
   tableName,
 } = require("../../../config/dbSchema");
 const { TABLE, COLS } = require("./accountTable");
+const { normalizeEmail } = require("../helpers/email");
 
 const MAP_TABLE = tableName(
   RENEW_ADOBE_SCHEMA.USER_ACCOUNT_MAPPING.TABLE,
@@ -25,9 +26,6 @@ const LOOKUP_COLUMNS = [
   ...(COLS.ID_PRODUCT ? [`${TABLE}.${COLS.ID_PRODUCT}`] : []),
 ];
 
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
-}
 
 function createLookupQuery() {
   return db(TABLE).select(...LOOKUP_COLUMNS);

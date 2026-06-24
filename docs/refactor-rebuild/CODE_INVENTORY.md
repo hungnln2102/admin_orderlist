@@ -98,3 +98,20 @@ Mục đích: phân loại toàn bộ code hiện tại trước khi rebuild. Fi
 - Chưa dùng file này để xóa code ngay ở giai đoạn hiện tại.
 - Mọi dòng chuyển sang `delete` phải có bằng chứng: không import, không route, không runtime dependency, hoặc đã có replacement mới.
 
+
+
+## 8. Inventory Cập Nhật Khi Thực Thi
+
+| Khu vực | File/Folder | Owner | Trạng thái | Hành động đề xuất | Ghi chú |
+| --- | --- | --- | --- | --- | --- |
+| Backend | `backend/src/domains/payment-slots/helpers/paymentSlotInputs.js` | `orders` | `keep` | Source-of-truth domain-local cho exact amount/account normalizer | Không gom vào integer VND parser. |
+| Backend | `backend/src/domains/payment-slots/use-cases/openPaymentSlot.js` | `orders` | `keep` | Đã merge duplicate normalizer sang helper domain-local | Public export không đổi. |
+| Backend | `backend/src/domains/payment-slots/use-cases/resolveOrderByExpectedAmount.js` | `orders` | `keep` | Đã merge duplicate normalizer sang helper domain-local | Public export không đổi. |
+| Backend | `backend/src/domains/shop-bank-accounts/helpers/shopBankInputs.js` | `wallet` | `keep` | Source-of-truth domain-local cho account/bank-bin/rounded money input contract | Text/boolean primitive đã chuyển sang `backend/src/shared/text` và `backend/src/shared/validation`. |
+| Backend | `backend/src/domains/usdt-wallets/helpers/usdtWalletInputs.js` | `wallet` | `keep` | Source-of-truth domain-local cho wallet address input contract | Text/boolean primitive đã chuyển sang `backend/src/shared/text` và `backend/src/shared/validation`. |
+
+| Backend | `backend/src/shared/money/normalizers.js` | `shared` | `keep` | Source-of-truth cho integer VND parser dùng bởi nhiều domain | Không dùng cho payment-slot exact amount hoặc pricing-specific logic. |
+| Backend | `backend/src/shared/text/normalizeOptionalText.js` | `shared` | `keep` | Source-of-truth cho optional text primitive dùng bởi nhiều domain | Không chứa rule nghiệp vụ wallet/shop-bank. |
+| Backend | `backend/src/shared/validation/normalizeBoolean.js` | `shared` | `keep` | Source-of-truth cho boolean primitive dùng bởi nhiều domain | Không chứa rule nghiệp vụ wallet/shop-bank. |
+| Backend | `backend/src/domains/supplies/services/supplierLookupService.js` | `supplies` | `keep` | Source-of-truth cho supplier/NCC lookup by id/name dùng bởi nhiều domain | Caller legacy `services/supplierService.js`, orders finance/create/update/catalog, product finder, pricing đã bắt đầu cutover. |
+| Backend | `backend/src/domains/supplies/services/supplierCostService.js` | `supplies` | `keep` | Source-of-truth cho supplier_cost/import price by variant/supplier | Pricing, supplier-change, orders catalog và product price finder đã bắt đầu cutover. |

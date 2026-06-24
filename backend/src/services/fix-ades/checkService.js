@@ -11,6 +11,7 @@
  */
 
 const logger = require("../../utils/logger");
+const { assertValidEmail } = require("../../domains/renew-adobe/helpers/email");
 
 const DEFAULT_BASE_URL = "https://api-2026-02.ades.support/ades-support";
 const DEFAULT_ORIGIN = "https://var.ctv.ac";
@@ -160,20 +161,7 @@ async function getAdesToken({ forceRefresh = false, refererEmail = "" } = {}) {
   return tokenInflight;
 }
 
-function normalizeEmail(email) {
-  const e = String(email || "").trim();
-  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-    const err = new Error("Email không hợp lệ.");
-    err.status = 400;
-    throw err;
-  }
-  return e;
-}
 
-/**
- * Build header `Authorization` cho Ades. Ades nhận RAW token (không có "Bearer ").
- * Truyền cả `x-access-token` để back-compat — nếu Ades đổi về key cũ vẫn pass.
- */
 function buildAuthHeaders(token) {
   return {
     Authorization: `Bearer ${token}`,
@@ -249,7 +237,7 @@ function isUsableAdesCheckResult(result) {
  * @returns {Promise<{ ok: boolean, status: number, data: any, raw: string }>}
  */
 async function checkAdesAccount(email) {
-  const e = normalizeEmail(email);
+  const e = assertValidEmail(email);
   const result = await callWithToken((token) => postAccountCheck(e, token), e);
 
   if (!result.ok) {
@@ -278,7 +266,7 @@ async function checkAdesAccount(email) {
  * @returns {Promise<{ ok: boolean, status: number, data: any, raw: string }>}
  */
 async function checkAdesTransferStatus(email) {
-  const e = normalizeEmail(email);
+  const e = assertValidEmail(email);
   const result = await callWithToken((token) => postAccountCheck(e, token), e);
 
   if (!isUsableAdesCheckResult(result)) {
@@ -307,7 +295,7 @@ async function checkAdesTransferStatus(email) {
  * @returns {Promise<{ ok, status, data, raw }>}
  */
 async function renewAdesAccount(email) {
-  const e = normalizeEmail(email);
+  const e = assertValidEmail(email);
   const url = `${BASE_URL}/renew-adobe/${encodeURIComponent(e)}`;
   const result = await callWithToken(async (token) => {
     const headers = {
@@ -349,7 +337,7 @@ async function renewAdesAccount(email) {
  * @returns {Promise<{ ok, status, data, raw }>}
  */
 async function syncAdesAccount(email) {
-  const e = normalizeEmail(email);
+  const e = assertValidEmail(email);
   const result = await callWithToken(async (token) => {
     const headers = {
       ...buildCommonHeaders(e),

@@ -213,6 +213,9 @@ Trước khi tạo shared mới, trả lời đủ các câu hỏi:
 | `backend/src/shared/errors` | backend infra | `shared` | TBD | `planned` | Error response rời rạc |
 | `backend/src/shared/pagination` | backend infra | `shared` | TBD | `planned` | Parse pagination lặp |
 | `backend/src/shared/audit` | backend infra | `shared` | TBD | `planned` | Audit/log rời rạc |
+| `backend/src/shared/text/normalizeOptionalText.js` | backend text primitive | `shared` | `shop-bank-accounts`, `usdt-wallets` | `keep` | Optional text normalizer trùng trong wallet-related domains |
+| `backend/src/shared/validation/normalizeBoolean.js` | backend validation primitive | `shared` | `shop-bank-accounts`, `usdt-wallets` | `keep` | Boolean input normalizer trùng trong wallet-related domains |
+| `backend/src/shared/money/normalizers.js` | backend money primitive | `shared` | `orders/finance`, `payments` | `keep` | Integer VND parser trùng; không dùng cho payment-slot exact amount hoặc pricing-specific parser |
 
 ## 7. Điều Cấm Trong Giai Đoạn Rebuild
 
@@ -222,3 +225,24 @@ Trước khi tạo shared mới, trả lời đủ các câu hỏi:
 - Không đưa API endpoint cụ thể vào `shared/api/httpClient.ts`.
 - Không dùng tên file mơ hồ như `common`, `helper`, `util`, `temp`, `new`, `old`.
 
+
+
+## 7A. Rule Domain Service Dùng Chung Theo Nghiệp Vụ
+
+- Không copy query/calculation sản phẩm, NCC, giá bán, giá nhập vào từng flow.
+- Flow cần thông tin sản phẩm phải gọi domain product/product-info service hoặc repository owner.
+- Flow cần NCC/supplier phải gọi domain supplies/supplier service hoặc repository owner.
+- Flow cần giá bán/giá nhập/pricing phải gọi pricing/product pricing service owner.
+- Shared chỉ chứa primitive generic; business capability phải thuộc domain owner.
+- Không tạo helper global nếu đó thực chất là product/pricing/supplier/wallet business rule.
+- Khi một domain capability đã có owner, caller khác chỉ phụ thuộc qua service/repository public contract; không tự dựng lại query, parser hoặc calculation trong caller.
+
+Ví dụ hướng đích:
+
+```txt
+backend/src/domains/products/services/productLookupService.js
+backend/src/domains/supplies/services/supplierLookupService.js
+backend/src/domains/pricing/services/pricingCalculationService.js
+backend/src/shared/text/normalizeOptionalText.js
+backend/src/shared/validation/normalizeBoolean.js
+```

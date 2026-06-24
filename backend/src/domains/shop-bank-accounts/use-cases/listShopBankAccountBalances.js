@@ -3,12 +3,8 @@ const {
   SHOP_BANK_ACCOUNTS_DEF,
 } = require("../repositories/shopBankAccountRepository");
 const { createHttpError } = require("../validators/shopBankAccountValidator");
+const { normalizeRoundedMoney } = require("../helpers/shopBankInputs");
 
-const toMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num);
-};
 
 const listShopBankAccountBalances = async () => {
   if (!SHOP_BANK_ACCOUNTS_DEF) {
@@ -21,9 +17,9 @@ const listShopBankAccountBalances = async () => {
   const accounts = await listShopBankAccounts();
 
   return (accounts || []).map((account) => {
-    const totalReceived = toMoney(account.totalReceived);
-    const totalWithdrawn = toMoney(account.totalWithdrawn);
-    const balanceRemaining = toMoney(account.balance);
+    const totalReceived = normalizeRoundedMoney(account.totalReceived);
+    const totalWithdrawn = normalizeRoundedMoney(account.totalWithdrawn);
+    const balanceRemaining = normalizeRoundedMoney(account.balance);
 
     return {
       ...account,

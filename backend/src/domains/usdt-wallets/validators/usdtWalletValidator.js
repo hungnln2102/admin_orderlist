@@ -1,4 +1,9 @@
 const { body, validate } = require("../../../middleware/validateRequest");
+const {
+  normalizeBoolean,
+  normalizeOptionalText,
+  normalizeWalletAddress,
+} = require("../helpers/usdtWalletInputs");
 
 const SUPPORTED_NETWORKS = ["TRC20", "ERC20", "BEP20", "SOL", "TON"];
 
@@ -8,13 +13,6 @@ const createHttpError = (status, message) => {
   return error;
 };
 
-const normalizeOptionalText = (value) => {
-  if (value == null) return null;
-  const text = String(value).trim();
-  return text || null;
-};
-
-const normalizeWalletAddress = (value) => String(value || "").trim();
 
 const normalizeNetwork = (value, fallback = "TRC20") => {
   const text = String(value || fallback).trim().toUpperCase();
@@ -27,14 +25,6 @@ const normalizeNetwork = (value, fallback = "TRC20") => {
   return text;
 };
 
-const normalizeBoolean = (value, fallback) => {
-  if (value === undefined || value === null) return fallback;
-  if (typeof value === "boolean") return value;
-  const text = String(value).trim().toLowerCase();
-  if (text === "true" || text === "1" || text === "yes") return true;
-  if (text === "false" || text === "0" || text === "no") return false;
-  return fallback;
-};
 
 const buildWritePayload = (payload, { forCreate }) => {
   const walletAddress = normalizeWalletAddress(payload?.walletAddress);

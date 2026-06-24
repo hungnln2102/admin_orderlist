@@ -5,18 +5,14 @@ const {
   findShopBankAccountById,
   updateShopBankAccount,
 } = require("../repositories/shopBankAccountRepository");
+const { sumReceivedByReceiver } = require("../repositories/shopBankReceiptTotalsRepository");
 const {
   normalizeAccountNumber,
-  sumReceivedByReceiver,
-} = require("../repositories/shopBankReceiptTotalsRepository");
+  normalizeRoundedMoney,
+} = require("../helpers/shopBankInputs");
 const { createHttpError } = require("../validators/shopBankAccountValidator");
 const { validateWithdrawnPayload } = require("../validators/shopBankWithdrawnValidator");
 
-const toMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num);
-};
 
 const updateShopBankAccountWithdrawn = async (id, payload) => {
   if (!SHOP_BANK_ACCOUNTS_DEF) {
@@ -40,8 +36,8 @@ const updateShopBankAccountWithdrawn = async (id, payload) => {
 
   const receivedByStk = await sumReceivedByReceiver();
   const stkKey = normalizeAccountNumber(updated.accountNumber);
-  const totalReceived = toMoney(receivedByStk.get(stkKey) || 0);
-  const totalWithdrawnOut = toMoney(updated.totalWithdrawn);
+  const totalReceived = normalizeRoundedMoney(receivedByStk.get(stkKey) || 0);
+  const totalWithdrawnOut = normalizeRoundedMoney(updated.totalWithdrawn);
 
   return {
     ...updated,

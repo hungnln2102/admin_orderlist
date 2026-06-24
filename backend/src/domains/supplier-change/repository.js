@@ -12,10 +12,9 @@ const {
   SCHEMA_ORDERS,
   SCHEMA_PARTNER,
   SCHEMA_FINANCE,
-  SCHEMA_SUPPLIER_COST,
   tableName,
 } = require("../../config/dbSchema");
-const { SUPPLIER_COST_DEF } = require("../../config/dbSchema/shared");
+const { findSupplierCostPrice } = require("../supplies/services/supplierCostService");
 
 const ORDER_LIST_TABLE = tableName(
   ORDERS_SCHEMA.ORDER_LIST.TABLE,
@@ -29,11 +28,6 @@ const SUPPLIER_TABLE = tableName(
 );
 const SUPPLIER_COLS = PARTNER_SCHEMA.SUPPLIER.COLS;
 
-const SUPPLIER_COST_TABLE = tableName(
-  SUPPLIER_COST_DEF.TABLE,
-  SCHEMA_SUPPLIER_COST
-);
-const SUPPLIER_COST_COLS = SUPPLIER_COST_DEF.COLS;
 
 const COST_LOG_TABLE = tableName(
   PARTNER_SCHEMA.SUPPLIER_ORDER_COST_LOG.TABLE,
@@ -68,15 +62,7 @@ async function findSupplierById(trx, supplyId) {
  * Trả null nếu chưa cấu hình giá.
  */
 async function findSupplyPriceForVariant(trx, supplyId, variantId) {
-  const row = await trx(SUPPLIER_COST_TABLE)
-    .where({
-      [SUPPLIER_COST_COLS.SUPPLIER_ID]: supplyId,
-      [SUPPLIER_COST_COLS.VARIANT_ID]: variantId,
-    })
-    .first();
-  if (!row) return null;
-  const price = Number(row[SUPPLIER_COST_COLS.PRICE]);
-  return Number.isFinite(price) ? price : null;
+  return findSupplierCostPrice({ supplierId: supplyId, variantId }, trx);
 }
 
 async function findLatestCostLog(trx, orderListId) {

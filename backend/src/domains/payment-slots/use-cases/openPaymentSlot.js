@@ -16,18 +16,14 @@ const {
   PG_UNIQUE_VIOLATION,
 } = require("../constants");
 const repo = require("../repositories/paymentSlotRepository");
+const {
+  normalizeAccount,
+  normalizeExactAmount,
+} = require("../helpers/paymentSlotInputs");
 const logger = require("../../../utils/logger");
 
 const VALID_KINDS = new Set([SLOT_KIND.NEW, SLOT_KIND.RENEWAL]);
 
-const normalizeMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return num;
-};
-
-const normalizeAccount = (value) =>
-  String(value ?? "").replace(/\s+/g, "").trim();
 
 const normalizeOrderCode = (value) =>
   String(value ?? "").trim();
@@ -45,7 +41,7 @@ const normalizeOrderCode = (value) =>
 async function openPaymentSlot(executor, params) {
   const orderCode = normalizeOrderCode(params.orderCode);
   const receiverAccount = normalizeAccount(params.receiverAccount);
-  const baseAmount = normalizeMoney(params.baseAmount);
+  const baseAmount = normalizeExactAmount(params.baseAmount);
   const slotKind = String(params.slotKind || "").trim();
 
   if (!orderCode) {

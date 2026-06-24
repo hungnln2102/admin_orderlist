@@ -1,10 +1,6 @@
+const { normalizeEmail } = require("../../../domains/renew-adobe/helpers/email");
 const { MAP_COLS } = require("./tables");
 
-function normalizeEmail(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
 
 function normalizeOrgKeyForTracking(orgName) {
   const s = String(orgName ?? "").trim().toLowerCase();

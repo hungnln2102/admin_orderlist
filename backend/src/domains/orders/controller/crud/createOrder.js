@@ -30,23 +30,22 @@ const {
 const { sendOrderCreatedNotification } = require("../../../../services/telegramOrderNotification");
 const logger = require("../../../../utils/logger");
 const { ORDER_PREFIXES, isMavrykShopSupplierName } = require("../../../../utils/orderHelpers");
-const { supplierHasAccountHolderColumn } = require("../../../../utils/supplierAccountHolderColumn");
 const {
     lockRefundCreditNoteById,
     applyRefundCreditToTargetOrder,
     normalizeMoney,
 } = require("../finance/refundCredits");
-const { mergeSummaryUpdates } = require("../finance/dashboardSummary");
+const {
+    mergeSummaryUpdates,
+    monthKeyFromVietnamYmd,
+} = require("../finance/dashboardSummary");
 const { resolveDashboardImportDeltaOnPaid } = require("../finance/dashboardImportDeltaOnPaid");
 const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
 const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
+const { findSupplierById } = require("../../../supplies/services/supplierLookupService");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
-const monthKeyFromYmd = (value) => {
-    const ymd = String(value || "").trim();
-    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd.slice(0, 7) : null;
-};
 
 const attachCreateOrderRoute = (router) => {
     router.post("/", async(req, res) => {
@@ -148,10 +147,7 @@ const attachCreateOrderRoute = (router) => {
         // Đơn bán (MAVL/MAVC/MAVT/MAVK/MAVS) với NCC Mavryk/Shop nội bộ → cost = 0.
         let isInternalSupplier = false;
         if (payload[supplyIdCol] != null) {
-            const supRow = await db(TABLES.supplier)
-                .select(COLS.SUPPLIER.SUPPLIER_NAME)
-                .where(COLS.SUPPLIER.ID, payload[supplyIdCol])
-                .first();
+            const supRow = await findSupplierById(payload[supplyIdCol]);
             isInternalSupplier = isMavrykShopSupplierName(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME]);
             if (!isMavnCreate && isInternalSupplier) {
                 payload[costCol] = 0;
@@ -307,7 +303,7 @@ const attachCreateOrderRoute = (router) => {
                 Number(appliedCreditAmount) > 0 &&
                 String(newOrder?.status || "").trim() === STATUS.PAID
             ) {
-                const paidMonthKey = monthKeyFromYmd(todayYMDInVietnam());
+                const paidMonthKey = monthKeyFromVietnamYmd(todayYMDInVietnam());
                 if (paidMonthKey) {
                     const grossRevenue = Math.max(
                         0,
@@ -317,10 +313,7 @@ const attachCreateOrderRoute = (router) => {
                     const orderProfit = grossRevenue - orderCost;
                     const fetchSupplierNameBySupplyId = async (executor, supplyIdRaw) => {
                         if (supplyIdRaw == null || !Number.isFinite(Number(supplyIdRaw))) return "";
-                        const supRow = await executor(TABLES.supplier)
-                            .select(COLS.SUPPLIER.SUPPLIER_NAME)
-                            .where(COLS.SUPPLIER.ID, Number(supplyIdRaw))
-                            .first();
+                        const supRow = await findSupplierById(Number(supplyIdRaw), executor);
                         return String(supRow?.[COLS.SUPPLIER.SUPPLIER_NAME] || "").trim();
                     };
                     const importDelta = await resolveDashboardImportDeltaOnPaid(
@@ -359,27 +352,11 @@ const attachCreateOrderRoute = (router) => {
             const supplyIdVal = newOrder?.[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY];
             if (supplyIdVal != null) {
                 const sCols = PARTNER_SCHEMA.SUPPLIER.COLS;
-                const includeAccountHolder =
-                    Boolean(sCols.ACCOUNT_HOLDER) &&
-                    await supplierHasAccountHolderColumn(db, TABLES.supplier);
-                const selectCols = [
-                    sCols.SUPPLIER_NAME,
-                    sCols.NUMBER_BANK,
-                    sCols.BIN_BANK,
-                ];
-                if (includeAccountHolder) {
-                    selectCols.push(sCols.ACCOUNT_HOLDER);
-                }
-                const supplier = await db(TABLES.supplier)
-                    .select(...selectCols)
-                    .where(sCols.ID, supplyIdVal)
-                    .first();
+                const supplier = await findSupplierById(supplyIdVal);
                 normalized.supply = supplier?.[sCols.SUPPLIER_NAME] ?? "";
                 normalized.supplier_number_bank = supplier?.[sCols.NUMBER_BANK] ?? null;
                 normalized.supplier_bin_bank = supplier?.[sCols.BIN_BANK] ?? null;
-                normalized.supplier_account_holder = includeAccountHolder
-                    ? (supplier?.[sCols.ACCOUNT_HOLDER] ?? null)
-                    : null;
+                normalized.supplier_account_holder = supplier?.[sCols.ACCOUNT_HOLDER] ?? null;
             }
 
             const variantIdVal = newOrder?.[productIdCol];
@@ -454,9 +431,9 @@ const attachCreateOrderRoute = (router) => {
             });
             const safeDetail = error.code === "23505"
                 ? "Mã định danh đơn hàng bị trùng. Vui lòng thử tạo lại."
-                : error.message;
+                : "Không thể tạo đơn hàng mới.";
             res.status(500).json({
-                error: safeDetail || "Không thể tạo đơn hàng mới.",
+                error: safeDetail,
             });
         }
     });

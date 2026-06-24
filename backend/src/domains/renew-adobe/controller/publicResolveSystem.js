@@ -7,6 +7,7 @@
 
 const { db } = require("../../../db");
 const logger = require("../../../utils/logger");
+const { normalizeEmail } = require("../helpers/email");
 const {
   SCHEMA_RENEW_ADOBE,
   RENEW_ADOBE_SCHEMA,
@@ -25,11 +26,6 @@ const TRACK_COLS = RENEW_ADOBE_SCHEMA.ORDER_USER_TRACKING.COLS;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function normalizeEmail(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
 
 const resolveSystemByEmail = async (req, res) => {
   const email = normalizeEmail(req.query?.email);

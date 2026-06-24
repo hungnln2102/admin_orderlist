@@ -1,9 +1,11 @@
 const { getNextSupplyId, nextId } = require("../../../../services/idService");
 const { db } = require("../../../../db");
-const { TABLES, COLS } = require("../constants");
+const { TABLES } = require("../constants");
 const { PARTNER_SCHEMA, PRODUCT_SCHEMA, SCHEMA_PRODUCT } = require("../../../../config/dbSchema");
 const { findProductIdByName } = require("../../../products/controller/finders");
 const { getTiers } = require("../../../../services/pricing/tierCache");
+const { findSupplierIdByName } = require("../../../supplies/services/supplierLookupService");
+const { upsertSupplierCostPrice } = require("../../../supplies/services/supplierCostService");
 
 const resolveProductToVariantId = async(productNameOrId) => {
     if (productNameOrId == null) return null;
@@ -29,8 +31,8 @@ const ensureSupplyRecord = async(sourceName) => {
     if (!sourceName) return null;
     const name = sourceName.trim();
 
-    const exist = await db(TABLES.supplier).where({ supplier_name: name }).first();
-    if (exist) return exist.id;
+    const existingId = await findSupplierIdByName(name);
+    if (existingId) return existingId;
 
     const nextSupplyId = await getNextSupplyId();
     const supplyTableName = PARTNER_SCHEMA.SUPPLIER.TABLE;
@@ -57,28 +59,7 @@ const ensureSupplierCost = async(variantId, supplierId, cost) => {
     const price = Number(cost);
     if (!Number.isFinite(price) || price <= 0) return;
 
-    const scCols = COLS.SUPPLIER_COST;
-    const existing = await db(TABLES.supplierCost)
-        .where(scCols.VARIANT_ID, variantId)
-        .andWhere(scCols.SUPPLIER_ID, supplierId)
-        .first();
-
-    if (existing) {
-        if (Number(existing[scCols.PRICE]) !== price) {
-            await db(TABLES.supplierCost)
-                .where(scCols.ID, existing[scCols.ID])
-                .update({ [scCols.PRICE]: price });
-        }
-        return;
-    }
-
-    const newId = await nextId(TABLES.supplierCost, scCols.ID);
-    await db(TABLES.supplierCost).insert({
-        [scCols.ID]: newId,
-        [scCols.VARIANT_ID]: variantId,
-        [scCols.SUPPLIER_ID]: supplierId,
-        [scCols.PRICE]: price,
-    });
+    await upsertSupplierCostPrice({ variantId, supplierId, price });
 };
 
 const ensureVariantRecord = async(productName, options = {}) => {

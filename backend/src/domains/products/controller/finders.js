@@ -3,7 +3,11 @@ const { QUOTED_COLS } = require("./constants");
 const { quoteIdent } = require("../../../utils/sql");
 const { normalizeTextInput, toNullableNumber } = require("../../../utils/normalizers");
 const { getNextSupplyId } = require("../../../services/idService");
-const { TABLES, variantCols, supplyPriceCols, productCols } = require("./constants");
+const {
+  findSupplierIdByNormalizedName,
+} = require("../../supplies/services/supplierLookupService");
+const { upsertSupplierCostPrice } = require("../../supplies/services/supplierCostService");
+const { TABLES, variantCols, productCols } = require("./constants");
 
 const findProductIdByName = async (nameRaw) => {
   const normalizedInput = normalizeTextInput(nameRaw);
@@ -43,20 +47,8 @@ const findProductIdByName = async (nameRaw) => {
 };
 
 const findSupplyIdByName = async (nameRaw) => {
-  const normalized = normalizeTextInput(nameRaw).toLowerCase();
-  if (!normalized) return null;
-  const sql = `
-    SELECT ${QUOTED_COLS.supplier.id} AS id
-    FROM ${TABLES.supply}
-    WHERE LOWER(TRIM(${QUOTED_COLS.supplier.supplierName}::text)) = ?
-    LIMIT 1;
-  `;
-  const result = await db.raw(sql, [normalized]);
-  if (result.rows && result.rows[0] && result.rows[0].id !== undefined) {
-    const parsed = Number(result.rows[0].id);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+  const normalized = normalizeTextInput(nameRaw);
+  return findSupplierIdByNormalizedName(normalized);
 };
 
 const ensureSupplyRecord = async (nameRaw, numberBank, binBank) => {
@@ -128,56 +120,16 @@ const upsertSupplyPrice = async (identifiers, supplierId, price, trx = db) => {
 
   const client = trx || db;
 
-  const existing = await client.raw(
-    `
-    SELECT id
-    FROM ${TABLES.supplyPrice}
-    WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?
-      AND ${quoteIdent(supplyPriceCols.supplierId)} = ?
-    LIMIT 1;
-  `,
-    [variantId, parsedSupplierId]
+  const result = await upsertSupplierCostPrice(
+    { variantId, supplierId: parsedSupplierId, price: normalizedPrice },
+    client
   );
 
-  if (existing.rows && existing.rows.length) {
-    await client.raw(
-      `
-      UPDATE ${TABLES.supplyPrice}
-      SET ${quoteIdent(supplyPriceCols.price)} = ?
-      WHERE ${quoteIdent(supplyPriceCols.variantId)} = ?
-        AND ${quoteIdent(supplyPriceCols.supplierId)} = ?;
-    `,
-      [normalizedPrice, variantId, parsedSupplierId]
-    );
-    return {
-      id: existing.rows[0].id,
-      productId: variantId,
-      supplierId: parsedSupplierId,
-      price: normalizedPrice,
-    };
-  }
-
-  const inserted = await client.raw(
-    `
-    INSERT INTO ${TABLES.supplyPrice} (
-      ${quoteIdent(supplyPriceCols.variantId)},
-      ${quoteIdent(supplyPriceCols.supplierId)},
-      ${quoteIdent(supplyPriceCols.price)}
-    )
-    VALUES (?, ?, ?)
-    RETURNING id;
-  `,
-    [variantId, parsedSupplierId, normalizedPrice]
-  );
-  const newId =
-    inserted.rows && inserted.rows[0] && inserted.rows[0].id !== undefined
-      ? inserted.rows[0].id
-      : null;
   return {
-    id: newId,
-    productId: variantId,
-    supplierId: parsedSupplierId,
-    price: normalizedPrice,
+    id: result.id,
+    productId: result.variantId,
+    supplierId: result.supplierId,
+    price: result.price,
   };
 };
 

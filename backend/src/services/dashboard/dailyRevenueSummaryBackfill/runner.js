@@ -1,20 +1,12 @@
 const { db } = require("../../../db");
-const {
-  SCHEMA_FINANCE,
-  SCHEMA_ORDERS,
-  FINANCE_SCHEMA,
-  PARTNER_SCHEMA,
-  SCHEMA_SUPPLIER,
-  tableName,
-} = require("../../../config/dbSchema");
-const { STATUS } = require("../../../utils/statuses");
+
 const {
   defaultFrom22nd,
   vnTodayYmd,
   TAX_ORDER_LIST_FROM_DEFAULT,
   IMPORT_SPREAD_FALLBACK_DAYS_DEFAULT,
 } = require("./shared");
-const { buildBackfillSql } = require("./sqlBuilder");
+const { executeDailyRevenueSummaryBackfill } = require("./queryRepository");
 
 /**
  * @param {object} [options]
@@ -41,29 +33,12 @@ async function runDailyRevenueSummaryBackfill(options = {}) {
     throw new Error(`daily_revenue_summary: from phải <= to (${from} .. ${to})`);
   }
 
-  const summaryTable = tableName(
-    FINANCE_SCHEMA.DAILY_REVENUE_SUMMARY.TABLE,
-    SCHEMA_FINANCE
-  );
-  const orderTable = tableName("order_list", SCHEMA_ORDERS);
-  const expenseTable = tableName(
-    FINANCE_SCHEMA.STORE_PROFIT_EXPENSES.TABLE,
-    SCHEMA_FINANCE
-  );
-  const refundStatuses = [STATUS.PENDING_REFUND, STATUS.REFUNDED];
-  const supplierTable = tableName(PARTNER_SCHEMA.SUPPLIER.TABLE, SCHEMA_SUPPLIER);
-
-  const sql = buildBackfillSql({
-    summaryTable,
-    orderTable,
-    supplierTable,
-    expenseTable,
-    refundStatuses,
+  await executeDailyRevenueSummaryBackfill(db, {
+    from,
+    to,
+    taxFrom,
+    importSpreadDays,
   });
-
-  const bindings = [from, to, taxFrom, importSpreadDays, ...refundStatuses];
-
-  await db.raw(sql, bindings);
 
   if (options.closeKnex) {
     await db.destroy().catch(() => { });

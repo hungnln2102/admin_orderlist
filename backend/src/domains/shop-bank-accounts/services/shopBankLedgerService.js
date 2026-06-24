@@ -3,7 +3,10 @@ const {
   SCHEMA_ADMIN,
   tableName,
 } = require("../../../config/dbSchema");
-const { normalizeAccountNumber } = require("../repositories/shopBankReceiptTotalsRepository");
+const {
+  normalizeAccountNumber,
+  normalizeRoundedMoney,
+} = require("../helpers/shopBankInputs");
 
 const LEDGER_TABLE = tableName(
   ADMIN_SCHEMA.SHOP_BANK_ACCOUNT_LEDGER.TABLE,
@@ -32,11 +35,6 @@ const SOURCE_KINDS = {
   RENEWAL_MAVRYK_AUTO: "renewal_mavryk_auto",
 };
 
-const toMoney = (value) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num);
-};
 
 const runQuery = async (executor, text, params = []) => {
   if (executor && typeof executor.query === "function" && typeof executor.raw !== "function") {
@@ -117,7 +115,7 @@ const insertLedgerAndUpdateAccount = async (
     incrementWithdrawn = 0,
   }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   if (normalizedAmount <= 0) {
     throw new Error("Ledger amount must be positive.");
   }
@@ -127,10 +125,10 @@ const insertLedgerAndUpdateAccount = async (
     throw new Error("Shop bank account not found.");
   }
 
-  const currentBalance = toMoney(account.balance);
-  const nextBalance = currentBalance + toMoney(signedAmount);
-  const nextReceived = toMoney(account.total_received) + toMoney(incrementReceived);
-  const nextWithdrawn = toMoney(account.total_withdrawn) + toMoney(incrementWithdrawn);
+  const currentBalance = normalizeRoundedMoney(account.balance);
+  const nextBalance = currentBalance + normalizeRoundedMoney(signedAmount);
+  const nextReceived = normalizeRoundedMoney(account.total_received) + normalizeRoundedMoney(incrementReceived);
+  const nextWithdrawn = normalizeRoundedMoney(account.total_withdrawn) + normalizeRoundedMoney(incrementWithdrawn);
 
   await runQuery(
     executor,
@@ -160,7 +158,7 @@ const insertLedgerAndUpdateAccount = async (
       accountId,
       entryType,
       normalizedAmount,
-      toMoney(signedAmount),
+      normalizeRoundedMoney(signedAmount),
       nextBalance,
       sourceKind,
       sourceId,
@@ -180,7 +178,7 @@ const creditShopBankFromPaymentReceipt = async (
   executor,
   { receiptId, receiverAccount, accountId = null, amount, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedReceiptId = Number(receiptId);
   if (!normalizedReceiptId || normalizedAmount <= 0) return null;
 
@@ -216,7 +214,7 @@ const creditShopBankSupplierRefund = async (
   executor,
   { accountId, amount, sourceId, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedAccountId = Number(accountId);
   if (!normalizedAccountId || normalizedAmount <= 0) {
     throw new Error("Invalid supplier refund ledger payload.");
@@ -248,7 +246,7 @@ const debitShopBankWithdraw = async (
   executor,
   { accountId, amount, sourceKind, sourceId, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedAccountId = Number(accountId);
   if (!normalizedAccountId || normalizedAmount <= 0) {
     throw new Error("Invalid withdraw ledger payload.");
@@ -276,7 +274,7 @@ const debitShopBankExternalOut = async (
   executor,
   { accountId, amount, sourceKind, sourceId, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedAccountId = Number(accountId);
   if (!normalizedAccountId || normalizedAmount <= 0) {
     throw new Error("Invalid external_out ledger payload.");
@@ -304,7 +302,7 @@ const debitShopBankSupplierPayment = async (
   executor,
   { accountId, amount, sourceKind = SOURCE_KINDS.PAYMENT_SUPPLY, sourceId, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedAccountId = Number(accountId);
   if (!normalizedAccountId || normalizedAmount <= 0) {
     throw new Error("Invalid supplier payment ledger payload.");
@@ -335,7 +333,7 @@ const debitShopBankRefundCashout = async (
   executor,
   { accountId, amount, sourceId, note = null }
 ) => {
-  const normalizedAmount = toMoney(amount);
+  const normalizedAmount = normalizeRoundedMoney(amount);
   const normalizedAccountId = Number(accountId);
   if (!normalizedAccountId || normalizedAmount <= 0) {
     throw new Error("Invalid refund cashout ledger payload.");
@@ -379,7 +377,7 @@ const recordMavnInternalSettlement = async (
     return { skipped: true, reason: "no_delta" };
   }
 
-  const absAmount = Math.abs(toMoney(numericDelta));
+  const absAmount = Math.abs(normalizeRoundedMoney(numericDelta));
   const isCredit = numericDelta > 0;
   return insertLedgerAndUpdateAccount(executor, {
     accountId: normalizedAccountId,

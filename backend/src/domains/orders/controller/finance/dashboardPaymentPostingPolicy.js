@@ -1,16 +1,10 @@
+const {
+  normalizeIntegerVndAmount,
+} = require("../../../../shared/money/normalizers");
+
 const UNDERPAY_TOLERANCE_VND = 5000;
 
-const normalizeMoney = (value) => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.round(value);
-  }
-  const cleaned = String(value ?? "")
-    .replace(/,/g, "")
-    .replace(/[^\d.-]/g, "")
-    .trim();
-  const numeric = Number.parseFloat(cleaned || "0");
-  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
-};
+const normalizeMoney = normalizeIntegerVndAmount;
 
 const maxAcceptedShortfall = () => Math.max(0, UNDERPAY_TOLERANCE_VND - 1);
 

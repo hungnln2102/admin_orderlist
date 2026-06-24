@@ -4,8 +4,8 @@ const { attachRenewRoutes } = require("./renewRoutes");
 const { attachCalculatePriceRoute } = require("./calculatePriceRoute");
 const { attachCrudRoutes } = require("./crudRoutes");
 const { attachRefundCreditRoutes } = require("./refundCreditRoutes");
-const { attachManualWebhookCompletionRoute } = require("./manualWebhookCompletion");
-const { attachManualUsdtCompletionRoute } = require("./manualUsdtCompletion");
+const { attachManualWebhookCompletionRoute } = require("./manualWebhookCompletionRoute");
+const { attachManualUsdtCompletionRoute } = require("./manualUsdtCompletionRoute");
 
 const router = express.Router();
 

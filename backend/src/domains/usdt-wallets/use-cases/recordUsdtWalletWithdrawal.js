@@ -13,11 +13,8 @@ const {
 } = require("../services/usdtWalletLedgerService");
 const { createHttpError } = require("../validators/usdtWalletValidator");
 const { validateWithdrawPayload } = require("../validators/usdtWalletWithdrawValidator");
+const { normalizeOptionalText } = require("../helpers/usdtWalletInputs");
 
-const normalizeOptionalText = (value) => {
-  const text = String(value || "").trim();
-  return text || null;
-};
 
 const recordUsdtWalletWithdrawal = async (id, payload) => {
   if (!USDT_WALLETS_DEF) {
