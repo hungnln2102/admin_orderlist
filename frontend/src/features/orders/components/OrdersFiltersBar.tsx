@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowDownTrayIcon,
   MagnifyingGlassIcon,
   PlusIcon,
@@ -36,37 +36,31 @@ export function OrdersFiltersBar({
   onDurationRangeChange,
 }: OrdersFiltersBarProps) {
   return (
-    <div className="min-w-0 rounded-[32px] bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 border border-white/15 p-4 lg:p-5 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm">
-      {/* Tới lg: xếp cột để khối co theo chiều ngang; từ lg: một hàng + wrap phần filter phải khi thiếu chỗ. */}
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
+    <div className="min-w-0 rounded-[24px] border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-3 shadow-[0_20px_55px_-30px_rgba(0,0,0,0.7),0_14px_34px_-26px_rgba(255,255,255,0.2)] backdrop-blur-sm sm:rounded-[32px] sm:p-4 lg:p-5">
+      <div className="flex min-w-0 flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-3">
         <div className="relative w-full min-w-0 lg:min-w-[11rem] lg:flex-1 lg:basis-0 xl:min-w-[14rem]">
-          <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-300 pointer-events-none z-10 opacity-70" />
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-indigo-300 opacity-70" />
           <input
             type="text"
             placeholder="Tìm kiếm đơn hàng, khách hàng..."
-            className="w-full min-w-0 pr-4 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-400/70"
+            className="w-full min-w-0 rounded-2xl border border-white/10 bg-slate-950/40 py-2.5 pr-4 text-sm text-white outline-none transition-all placeholder:text-slate-400/70 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50"
             style={{ paddingLeft: "3.25rem" }}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
         </div>
 
-        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-3 lg:ml-auto lg:w-auto lg:max-w-full lg:flex-1 lg:basis-0 lg:justify-end">
-          <div
-            className="hidden h-8 w-px shrink-0 self-center bg-white/10 lg:block"
-            aria-hidden
-          />
-
+        <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-center sm:gap-3 lg:ml-auto lg:w-auto lg:max-w-full lg:flex-1 lg:basis-0 lg:grid-cols-[minmax(12rem,18rem)_auto] lg:justify-end">
           <DashboardDateRangeFilter
             value={durationRange}
             onChange={onDurationRangeChange}
-            className="w-full min-w-0 max-w-full flex-[1_1_12rem] sm:min-w-0 lg:max-w-[min(18rem,100%)] lg:shrink"
+            className="w-full min-w-0 max-w-full"
           />
 
-          <div className="flex min-w-0 w-full flex-[1_1_14rem] flex-wrap items-stretch gap-2 sm:w-auto sm:min-w-0 sm:justify-end">
-            <div className="relative min-w-0 flex-1 basis-[8.5rem] sm:max-w-[11rem] sm:flex-none">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto sm:min-w-0 sm:justify-end">
+            <div className="relative min-w-0 sm:w-[11rem]">
               <select
-                className="w-full min-w-0 px-3.5 py-2.5 border border-white/10 rounded-2xl bg-slate-950/40 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 outline-none cursor-pointer transition-all appearance-none"
+                className="h-11 w-full min-w-0 cursor-pointer appearance-none rounded-2xl border border-white/10 bg-slate-950/40 px-3.5 text-sm text-white outline-none transition-all focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50"
                 style={{
                   backgroundImage:
                     'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke-width=\'2\' stroke=\'%23818cf8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\' /%3E%3C/svg%3E")',
@@ -94,19 +88,21 @@ export function OrdersFiltersBar({
               type="button"
               onClick={onExportExcel}
               disabled={exportDisabled}
-              className="inline-flex min-w-0 shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-bold text-emerald-100 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.85)] transition-all hover:border-emerald-300/60 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 sm:text-sm"
+              className="inline-flex h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-100 shadow-[0_12px_26px_-18px_rgba(16,185,129,0.85)] transition-all hover:border-emerald-300/60 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm"
               title="Xuất Excel các đơn đang được lọc"
             >
               <ArrowDownTrayIcon className="h-4 w-4 shrink-0" />
-              <span className="whitespace-nowrap">Xuất Excel</span>
+              <span className="hidden whitespace-nowrap min-[390px]:inline sm:inline">
+                Xuất Excel
+              </span>
             </button>
 
             {isActiveDataset && (
-              <div className="min-w-0 shrink-0 self-center">
+              <div className="col-span-2 mt-1 min-w-0 shrink-0 justify-self-start sm:col-span-1 sm:mt-0 sm:self-center">
                 <GradientButton
                   icon={PlusIcon}
                   onClick={openCreateModal}
-                  className="!px-4 !py-2 text-xs sm:!px-5 sm:!py-2.5 sm:text-sm whitespace-nowrap max-w-full"
+                  className="whitespace-nowrap !px-4 !py-2 text-xs sm:!px-5 sm:!py-2.5 sm:text-sm"
                 >
                   Tạo Đơn
                 </GradientButton>
@@ -118,3 +114,5 @@ export function OrdersFiltersBar({
     </div>
   );
 }
+
+
