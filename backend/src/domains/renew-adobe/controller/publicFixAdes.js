@@ -62,8 +62,21 @@ const ADES_NOT_ACTIVE_HINTS = [
 ];
 
 function isAdesSyncRequiredPayload(adesData) {
-  const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : null;
-  return Boolean(data?.existedInSystem) && !getTransferTeamResponse(adesData);
+  const data = adesData?.data && typeof adesData.data === "object" ? adesData.data : adesData;
+  if (!data || typeof data !== "object") return false;
+
+  const existedInSystem = Boolean(
+    data.existedInSystem || data?.adesSource?.existedInSystem
+  );
+  const hasTransferTeamResponseField =
+    Object.prototype.hasOwnProperty.call(data, "transferTeamResponse") ||
+    Boolean(
+      data.adesSource &&
+        typeof data.adesSource === "object" &&
+        Object.prototype.hasOwnProperty.call(data.adesSource, "transferTeamResponse")
+    );
+
+  return existedInSystem && hasTransferTeamResponseField && !getTransferTeamResponse(data);
 }
 
 function getTransferTeamResponse(adesData) {
@@ -353,6 +366,7 @@ module.exports = {
   publicSyncFixAdes,
   __test__: {
     mapAdesStatusToTracking,
+    isAdesSyncRequiredPayload,
     isLikelyNotActivePayload,
     normalizeCheckResultForRenewFlow,
     applyFixAdesTrackingFilter,
