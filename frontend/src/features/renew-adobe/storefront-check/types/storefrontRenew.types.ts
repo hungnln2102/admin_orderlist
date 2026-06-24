@@ -1,8 +1,11 @@
-/** Payload public API `/api/renew-adobe/public/*` — trùng hợp đồng với storefront. */
+﻿/** Payload public API `/api/renew-adobe/public/*` — đồng bộ với storefront. */
+
+export type AdobeSystemCode = "renew_adobe" | "fix_adobe_edu" | "fix_ades";
 
 export type StorefrontRenewStatusCode =
   | "active"
   | "needs_activation"
+  | "needs_sync"
   | "order_expired"
   | "no_order";
 
@@ -10,6 +13,8 @@ export type RenewCheckResultKind =
   | "check-success"
   | "expired"
   | "outside-order"
+  | "needs-sync"
+  | "needs-profile-switch"
   | "activate-success"
   | "error"
   | "info"
@@ -42,6 +47,7 @@ export type StorefrontRenewStatusPayload = {
   message: string;
   order: StorefrontRenewOrderSnapshot | null;
   account: StorefrontRenewAccountSnapshot | null;
+  systemNote?: AdobeSystemCode;
   activatedAccount?: {
     id: number;
     email: string;

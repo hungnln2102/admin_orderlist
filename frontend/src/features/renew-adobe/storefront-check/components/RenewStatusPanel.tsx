@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertTriangle,
   ExternalLink,
   Loader2,
@@ -14,6 +14,7 @@ import type {
 export type RenewStatusPanelProps = {
   loading: boolean;
   activating: boolean;
+  syncing: boolean;
   resultType: RenewCheckResultKind;
   message: string | null;
   profileName: string | null;
@@ -29,30 +30,28 @@ export type RenewStatusPanelProps = {
 function ActivatingSpinner({
   email,
   profileName,
+  label = "Đang chuyển profile...",
 }: {
   email: string;
   profileName: string | null;
+  label?: string;
 }) {
   return (
     <div className="rounded-2xl border border-sky-500/30 bg-sky-950/60 px-5 py-5 text-center">
       <Loader2 className="mx-auto mb-3 h-10 w-10 animate-spin text-sky-400" />
-      <p className="text-base font-semibold text-sky-200">
-        Đang chuyển profile...
-      </p>
+      <p className="text-base font-semibold text-sky-200">{label}</p>
       <div className="mt-3 space-y-1 text-xs text-slate-400">
         <p>
-          Email:{" "}
-          <span className="font-medium text-slate-200">{email.trim()}</span>
+          Email: <span className="font-medium text-slate-200">{email.trim()}</span>
         </p>
         {profileName && (
           <p>
-            Profile:{" "}
-            <span className="font-medium text-slate-200">{profileName}</span>
+            Profile: <span className="font-medium text-slate-200">{profileName}</span>
           </p>
         )}
       </div>
       <p className="mt-3 text-xs italic text-slate-500">
-        Đang mở trình duyệt và đăng nhập...
+        Vui lòng chờ hệ thống xử lý...
       </p>
     </div>
   );
@@ -89,7 +88,7 @@ function CheckSuccessCard({
           Login lại và chọn đúng Profile
         </p>
       )}
-      {successNeedsProductLink && message && (
+      {message && (
         <p className="mt-3 max-w-md text-xs leading-relaxed text-emerald-100/85">
           {message}
         </p>
@@ -196,6 +195,76 @@ function ExpiredCard({
   );
 }
 
+function NeedsSyncCard({
+  profileName,
+  message,
+}: {
+  profileName: string | null;
+  message: string | null;
+}) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-5 text-center text-sm text-sky-50 shadow-lg shadow-sky-500/20 ring-1 ring-sky-400/15"
+      role="alert"
+    >
+      <div className="relative flex flex-col items-center gap-3">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/25 ring-1 ring-sky-300/45 shadow-[0_0_24px_-4px_rgba(56,189,248,0.45)]">
+          <AlertTriangle className="h-7 w-7 text-sky-200" strokeWidth={2} />
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">
+          Cần đồng bộ dữ liệu
+        </p>
+        <span className="text-base font-bold text-sky-100">
+          Ades chưa có dữ liệu chuyển profile
+        </span>
+        {profileName && (
+          <p className="text-lg font-bold tracking-wide text-sky-100">
+            {profileName}
+          </p>
+        )}
+        <p className="max-w-md border-t border-sky-500/25 pt-3 text-xs leading-relaxed text-sky-100/90">
+          {message}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function NeedsProfileSwitchCard({
+  profileName,
+  message,
+}: {
+  profileName: string | null;
+  message: string | null;
+}) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl border border-violet-500/40 bg-violet-500/10 px-4 py-5 text-center text-sm text-violet-50 shadow-lg shadow-violet-500/20 ring-1 ring-violet-400/15"
+      role="alert"
+    >
+      <div className="relative flex flex-col items-center gap-3">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/25 ring-1 ring-violet-300/45 shadow-[0_0_24px_-4px_rgba(139,92,246,0.45)]">
+          <AlertTriangle className="h-7 w-7 text-violet-200" strokeWidth={2} />
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-violet-300">
+          Cần chuyển Profile
+        </p>
+        <span className="text-base font-bold text-violet-100">
+          Chọn đúng profile trong Creative Cloud
+        </span>
+        {profileName && (
+          <p className="rounded-xl border border-violet-300/20 bg-violet-950/35 px-3 py-2 text-lg font-bold tracking-wide text-violet-100">
+            {profileName}
+          </p>
+        )}
+        <p className="max-w-md border-t border-violet-500/25 pt-3 text-xs leading-relaxed text-violet-100/90">
+          {message}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ActivateSuccessCard({ profileName }: { profileName: string | null }) {
   return (
     <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-5 text-center text-sm text-emerald-50">
@@ -241,6 +310,7 @@ export function RenewStatusPanel(props: RenewStatusPanelProps) {
   const {
     loading,
     activating,
+    syncing,
     resultType,
     message,
     profileName,
@@ -252,6 +322,16 @@ export function RenewStatusPanel(props: RenewStatusPanelProps) {
 
   if (activating) {
     return <ActivatingSpinner email={email} profileName={profileName} />;
+  }
+
+  if (syncing) {
+    return (
+      <ActivatingSpinner
+        email={email}
+        profileName={profileName}
+        label="Đang đồng bộ dữ liệu Ades..."
+      />
+    );
   }
 
   if (loading || !resultType || (resultType !== "outside-order" && !message)) {
@@ -273,6 +353,12 @@ export function RenewStatusPanel(props: RenewStatusPanelProps) {
       )}
       {resultType === "expired" && (
         <ExpiredCard profileName={profileName} message={message} />
+      )}
+      {resultType === "needs-sync" && (
+        <NeedsSyncCard profileName={profileName} message={message} />
+      )}
+      {resultType === "needs-profile-switch" && (
+        <NeedsProfileSwitchCard profileName={profileName} message={message} />
       )}
       {resultType === "activate-success" && (
         <ActivateSuccessCard profileName={profileName} />

@@ -33,19 +33,26 @@ export default function RenewProfileCheckDeskPage() {
     setEmail,
     loading,
     activating,
+    syncing,
     resultType,
     message,
     profileName,
     canActivate,
+    canSync,
     outsideOrderStatus,
     successNeedsProductLink,
     urlAccess,
     handleCheckSubmit,
     handleActivate,
+    handleSyncFixAdes,
   } = useStorefrontRenewCheck();
 
   const [hintOpen, setHintOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const canShowSyncButton =
+    resultType === "needs-sync" &&
+    canSync &&
+    !isServiceConnectionErrorMessage(message);
   const canShowActivateButton =
     resultType === "expired" &&
     canActivate &&
@@ -206,6 +213,7 @@ export default function RenewProfileCheckDeskPage() {
               <RenewStatusPanel
                 loading={loading}
                 activating={activating}
+                syncing={syncing}
                 resultType={resultType}
                 message={message}
                 profileName={profileName}
@@ -215,11 +223,30 @@ export default function RenewProfileCheckDeskPage() {
                 urlAccess={urlAccess}
               />
 
-              {canShowActivateButton ? (
+              {canShowSyncButton ? (
+                <button
+                  type="button"
+                  onClick={handleSyncFixAdes}
+                  disabled={syncing || loading || activating}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-500 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition-all hover:shadow-sky-500/45 disabled:opacity-60"
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang đồng bộ dữ liệu...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 storefront-renew-refresh-nudge" strokeWidth={2} />
+                      Đồng bộ dữ liệu Ades
+                    </>
+                  )}
+                </button>
+              ) : canShowActivateButton ? (
                 <button
                   type="button"
                   onClick={handleActivate}
-                  disabled={activating}
+                  disabled={activating || syncing}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-sm font-semibold text-white shadow-lg shadow-amber-500/30 transition-all hover:shadow-amber-500/45 disabled:opacity-60"
                 >
                   {activating ? (
@@ -237,7 +264,7 @@ export default function RenewProfileCheckDeskPage() {
               ) : (
                 <button
                   type="submit"
-                  disabled={loading || activating}
+                  disabled={loading || activating || syncing}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-sm font-semibold text-white shadow-lg shadow-purple-500/35 transition-all hover:shadow-purple-500/50 disabled:opacity-60"
                 >
                   {loading ? (
@@ -249,6 +276,11 @@ export default function RenewProfileCheckDeskPage() {
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Đang kích hoạt...
+                    </>
+                  ) : syncing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang đồng bộ dữ liệu...
                     </>
                   ) : (
                     <>

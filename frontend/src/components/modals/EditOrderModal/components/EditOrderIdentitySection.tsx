@@ -57,20 +57,18 @@ export const EditOrderIdentitySection = ({
             type="text"
             name={ORDER_FIELDS.CUSTOMER}
             value={stringField(ORDER_FIELDS.CUSTOMER as keyof Order)}
-            readOnly
-            disabled
-            className={`${inputClass} ${readOnlyClass}`}
+            onChange={onInputChange}
+            className={inputClass}
           />
         </div>
         <div>
-          <label className={labelClass}>Liên hệ</label>
+          <label className={labelClass}>Link liên hệ</label>
           <input
             type="text"
             name={ORDER_FIELDS.CONTACT}
             value={stringField(ORDER_FIELDS.CONTACT as keyof Order)}
-            readOnly
-            disabled
-            className={`${inputClass} ${readOnlyClass}`}
+            onChange={onInputChange}
+            className={inputClass}
           />
         </div>
         <div>

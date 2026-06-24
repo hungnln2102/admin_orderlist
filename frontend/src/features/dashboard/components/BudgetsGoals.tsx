@@ -114,8 +114,8 @@ const BudgetsGoals: React.FC<BudgetsGoalsProps> = ({
   }, [availableCurrent, availablePrevious, columnStats]);
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
-      <div className="rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 lg:p-6 space-y-5 sm:space-y-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+    <div className="grid min-w-0 grid-cols-1 gap-5 sm:gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <div className="min-w-0 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-slate-900/50 to-slate-950/40 border border-indigo-400/20 backdrop-blur-xl p-4 sm:p-5 lg:p-6 space-y-5 sm:space-y-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-white">Chi tiêu hàng tháng</p>
