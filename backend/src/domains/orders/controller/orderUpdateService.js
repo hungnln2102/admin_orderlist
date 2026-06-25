@@ -7,6 +7,7 @@ const {
 } = require("../../../utils/orderHelpers");
 const { STATUS, COLS } = require("./constants");
 const { findSupplierById } = require("../../supplies/services/supplierLookupService");
+const { resolveProductToVariantId } = require("../../products/services/productVariantService");
 const {
   changeOrderSupplier,
   ChangeSupplierError,
@@ -23,9 +24,8 @@ const updateOrderWithFinance = async ({
         sanitizeOrderWritePayload,
         normalizeOrderRow,
         todayYMDInVietnam,
-        ensureSupplyRecord,
+        ensureSupplierRecord,
         normalizeTextInput,
-        resolveProductToVariantId,
     } = helpers;
     const {
         updateDashboardMonthlySummaryOnStatusChange,
@@ -40,7 +40,7 @@ const updateOrderWithFinance = async ({
     if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
         const name = normalizeTextInput(String(raw.supply));
         if (name) {
-            const resolvedId = await ensureSupplyRecord(name);
+            const resolvedId = await ensureSupplierRecord(name);
             raw[supplyIdCol] = resolvedId;
         }
         delete raw.supply;

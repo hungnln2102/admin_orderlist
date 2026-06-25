@@ -3,8 +3,6 @@ const { TABLES, STATUS } = require("../constants");
 const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
-    ensureSupplyRecord,
-    resolveProductToVariantId,
     normalizeTextInput,
 } = require("../helpers");
 const { todayYMDInVietnam } = require("../../../../utils/normalizers");
@@ -12,6 +10,7 @@ const { updateOrderWithFinance } = require("../orderUpdateService");
 const logger = require("../../../../utils/logger");
 const { orderIdParam } = require("../../validators/orderValidator");
 const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
+const { ensureSupplierRecord } = require("../../../supplies/services/supplierLookupService");
 
 const AUDIT_FIELD_LABELS = {
     customer: "Khách hàng",
@@ -102,9 +101,8 @@ const attachUpdateOrderRoute = (router) => {
                     sanitizeOrderWritePayload,
                     normalizeOrderRow,
                     todayYMDInVietnam,
-                    ensureSupplyRecord,
+                    ensureSupplierRecord,
                     normalizeTextInput,
-                    resolveProductToVariantId,
                 },
             });
 

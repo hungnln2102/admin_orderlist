@@ -1,5 +1,5 @@
-import { apiFetch } from "./api";
-import { normalizeErrorMessage } from "./textUtils";
+import { apiFetch } from "@/lib/api";
+import { normalizeErrorMessage } from "@/lib/textUtils";
 
 export interface ProductDescription {
   id: number;

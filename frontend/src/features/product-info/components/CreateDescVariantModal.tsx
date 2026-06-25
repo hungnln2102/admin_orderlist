@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { createProductDescription } from "@/lib/productDescApi";
+import { createProductDescription } from "@/features/product-info/api/productDescApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import {
   normalizeRichHtmlForSave,
   normalizeShortDescriptionForSave,
 } from "../utils/productInfoHelpers";
-import RichTextEditor from "./EditProductModal/RichTextEditor";
-import { SeoPreviewPanel } from "./EditProductModal/SeoPreviewPanel";
+import { DescVariantContentFields } from "./DescVariantContentFields";
 import { useWebsiteSeoAudit } from "./EditProductModal/useWebsiteSeoAudit";
 
 type CreateDescVariantModalProps = {
@@ -112,97 +111,18 @@ export const CreateDescVariantModal: React.FC<CreateDescVariantModalProps> = ({
             </p>
           </div>
 
-          <section className="product-edit-modal__panel product-edit-modal__panel--editor mt-6 p-5">
-            <div className="product-edit-modal__editor-stack">
-              <section className="product-edit-modal__content-block">
-                <div className="product-edit-modal__content-head">
-                  <div className="product-edit-modal__content-copy">
-                    <p className="product-edit-modal__content-kicker">
-                      short_desc
-                    </p>
-                    <h3 className="product-edit-modal__content-title">
-                      Mô tả ngắn
-                    </h3>
-                    <p className="product-edit-modal__content-summary">
-                      Meta / teaser — giữ ngắn.
-                    </p>
-                  </div>
-                  <span className="product-edit-modal__content-badge product-edit-modal__content-badge--description">
-                    Plain text
-                  </span>
-                </div>
-                <textarea
-                  className="product-edit-modal__textarea max-h-[140px] min-h-[88px] w-full rounded-[18px]"
-                  value={shortDescription}
-                  onChange={(e) => setShortDescription(e.target.value)}
-                  placeholder="Nhập mô tả ngắn…"
-                  rows={3}
-                />
-              </section>
-
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-                <section className="product-edit-modal__content-block flex h-full min-h-0 flex-col">
-                  <div className="product-edit-modal__content-head">
-                    <div className="product-edit-modal__content-copy">
-                      <p className="product-edit-modal__content-kicker">rules</p>
-                      <h3 className="product-edit-modal__content-title">
-                        Quy tắc
-                      </h3>
-                      <p className="product-edit-modal__content-summary">
-                        Điều kiện, lưu ý — HTML.
-                      </p>
-                    </div>
-                    <span className="product-edit-modal__content-badge product-edit-modal__content-badge--rules">
-                      HTML / CMS
-                    </span>
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <RichTextEditor
-                      label="Quy tắc (rules)"
-                      value={rulesHtml}
-                      onChange={setRulesHtml}
-                      placeholder="Soạn quy tắc, điều kiện…"
-                      minHeight="280px"
-                    />
-                  </div>
-                </section>
-
-                <section className="product-edit-modal__content-block flex h-full min-h-0 flex-col">
-                  <div className="product-edit-modal__content-head">
-                    <div className="product-edit-modal__content-copy">
-                      <p className="product-edit-modal__content-kicker">
-                        description
-                      </p>
-                      <h3 className="product-edit-modal__content-title">
-                        Thông tin / mô tả
-                      </h3>
-                      <p className="product-edit-modal__content-summary">
-                        Nội dung chi tiết — HTML.
-                      </p>
-                    </div>
-                    <span className="product-edit-modal__content-badge product-edit-modal__content-badge--description">
-                      HTML / CMS
-                    </span>
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <RichTextEditor
-                      label="Thông tin / mô tả (description)"
-                      value={descriptionHtml}
-                      onChange={setDescriptionHtml}
-                      placeholder="Soạn nội dung chi tiết…"
-                      minHeight="280px"
-                    />
-                  </div>
-                </section>
-              </div>
-
-              <SeoPreviewPanel
-                evaluation={seoEvaluation}
-                loading={seoAuditLoading}
-                error={seoAuditError}
-              />
-            </div>
-          </section>
+          <DescVariantContentFields
+            shortDescription={shortDescription}
+            rulesHtml={rulesHtml}
+            descriptionHtml={descriptionHtml}
+            onShortDescriptionChange={setShortDescription}
+            onRulesHtmlChange={setRulesHtml}
+            onDescriptionHtmlChange={setDescriptionHtml}
+            seoEvaluation={seoEvaluation}
+            seoAuditLoading={seoAuditLoading}
+            seoAuditError={seoAuditError}
+            panelClassName="mt-6 p-5"
+          />
         </div>
 
         {saveError ? (

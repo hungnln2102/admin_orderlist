@@ -1,4 +1,4 @@
-import type { ProductDescription } from "@/lib/productDescApi";
+import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 
 export const PAGE_SIZE = 10;
 

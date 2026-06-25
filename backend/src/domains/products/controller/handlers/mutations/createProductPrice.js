@@ -7,7 +7,8 @@ const {
 const logger = require("../../../../../utils/logger");
 const { mapProductPriceRow } = require("../../mappers");
 const { pricingCache, supplierCache } = require("../../../../../utils/cache");
-const { ensureSupplyRecord, upsertSupplyPrice } = require("../../finders");
+const { ensureSupplierRecord } = require("../../../../supplies/services/supplierLookupService");
+const { upsertProductSupplierPrice } = require("../../../services/productSupplierMutationService");
 const {
   productSchemaCols,
   productCategoryCols,
@@ -181,14 +182,14 @@ const createProductPrice = async (req, res) => {
                   : supplier?.name;
               const supplyId = Number.isFinite(Number(sourceIdRaw))
                 ? Number(sourceIdRaw)
-                : await ensureSupplyRecord(
+                : await ensureSupplierRecord(
                     sourceNameRaw,
                     supplier?.numberBank,
                     supplier?.binBank
                   );
               if (!supplyId) continue;
               const priceValue = toNullableNumber(supplier?.price);
-              await upsertSupplyPrice({ variantId }, supplyId, priceValue, trx);
+              await upsertProductSupplierPrice({ variantId }, supplyId, priceValue, trx);
             }
           }
 

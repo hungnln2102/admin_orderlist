@@ -4,7 +4,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import {
   fetchProductDescriptions,
   ProductDescription,
-} from "@/lib/productDescApi";
+} from "@/features/product-info/api/productDescApi";
 import { htmlToPlainText } from "../../utils/productInfoHelpers";
 import { BasicInfoPanel } from "./BasicInfoPanel";
 import ImageUpload from "./ImageUpload";

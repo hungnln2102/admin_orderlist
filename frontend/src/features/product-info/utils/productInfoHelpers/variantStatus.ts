@@ -1,4 +1,4 @@
-import type { ProductDescription } from "@/lib/productDescApi";
+import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import type { MergedProduct } from "./types";
 import { toHtmlFromPlain } from "./basic";
 import { htmlToPlainText, sanitizeHtmlForDisplay } from "./htmlSanitize";

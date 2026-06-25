@@ -1,5 +1,7 @@
 const { db } = require("../../../db");
 const { PARTNER_SCHEMA } = require("../../../config/dbSchema");
+const { getNextSupplyId } = require("../../../services/idService");
+const { normalizeTextInput } = require("../../../utils/normalizers");
 const {
   resolveSupplierNameColumn,
   resolveSupplierTableName,
@@ -71,7 +73,39 @@ const findSupplierIdByNormalizedName = async (supplierName, trxOrDb = null) => {
   return row && row.id !== undefined ? Number(row.id) || null : null;
 };
 
+const ensureSupplierRecord = async (supplierName, numberBank, binBank, trxOrDb = null) => {
+  const normalizedName = normalizeTextInput(supplierName);
+  if (!normalizedName) return null;
+
+  const existingId = await findSupplierIdByNormalizedName(normalizedName, trxOrDb);
+  if (existingId) return existingId;
+
+  const query = getQuery(trxOrDb);
+  const supplierTable = await resolveSupplierTableName();
+  const cols = PARTNER_SCHEMA.SUPPLIER.COLS;
+  const nextSupplierId = await getNextSupplyId();
+  const payload = {
+    [cols.ID]: nextSupplierId,
+    [cols.SUPPLIER_NAME]: normalizedName,
+    [cols.NUMBER_BANK]: normalizeTextInput(numberBank) || null,
+    [cols.BIN_BANK]: normalizeTextInput(binBank) || null,
+  };
+
+  try {
+    const [inserted] = await query(supplierTable)
+      .insert({ ...payload, [cols.ACTIVE_SUPPLY]: true })
+      .returning(cols.ID);
+    const insertedId = typeof inserted === "object" ? inserted?.[cols.ID] : inserted;
+    return Number(insertedId) || nextSupplierId;
+  } catch (_error) {
+    const [inserted] = await query(supplierTable).insert(payload).returning(cols.ID);
+    const insertedId = typeof inserted === "object" ? inserted?.[cols.ID] : inserted;
+    return Number(insertedId) || nextSupplierId;
+  }
+};
+
 module.exports = {
+  ensureSupplierRecord,
   findSupplierById,
   findSupplierByName,
   findSupplierIdByName,

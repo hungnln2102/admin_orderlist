@@ -570,10 +570,11 @@ Mục đích: ghi từng clean-code/refactor slice, source-of-truth đã chọn,
 
 ### Thay Đổi
 
-- Thêm `findSupplierCostPrice`, `findMaxSupplierCostPrice`, `upsertSupplierCostPrice` trong domain `supplies`.
+- Thêm `findSupplierCostPrice`, `findMaxSupplierCostPrice`, `upsertSupplierCostPrice`, `deleteSupplierCostPrice` trong domain `supplies`.
 - `pricing/orderPricingService.js` dùng service cho latest supplier cost và max supplier cost.
 - `supplier-change/repository.js` delegate `findSupplyPriceForVariant` sang service nhưng giữ export để test/caller cũ không đổi.
 - `orders/helpers/catalog.js` và `products/controller/finders.js` dùng service upsert thay vì tự query/insert/update `supplier_cost`.
+- `products/controller/handlers/supplies.js` dùng service delete thay vì tự chạy SQL delete `supplier_cost`.
 
 ### Contract Giữ Nguyên
 
@@ -618,3 +619,449 @@ Mục đích: ghi từng clean-code/refactor slice, source-of-truth đã chọn,
 ### Rủi Ro Còn Lại
 
 - Cần chạy inventory trên DB thật trước khi quyết định index/constraint/drop cụ thể.
+
+
+## 2026-06-25 - Products - Supplier Read Model
+
+### Mục Tiêu
+
+- Tách SQL đọc danh sách NCC/giá NCC theo sản phẩm ra khỏi controller.
+- Giữ controller mỏng, không tạo helper rời kiểu `normalizers`; read-model thuộc owner `products`.
+
+### Source-Of-Truth
+
+| Trách nhiệm | Hàm/File chính | Hàm/File duplicate/patch | Quyết định |
+| --- | --- | --- | --- |
+| Product supplier read-model | `backend/src/domains/products/services/productSupplierReadService.js` | Inline SQL trong `products/controller/handlers/supplies.js` | extract |
+
+### Thay Đổi
+
+- Thêm `productLookupService.js` cho lookup product/variant by name, tránh service phụ thuộc controller.
+- Thêm `listProductSuppliersByName` và `listProductSupplierPricesByName`.
+- `getSuppliesByProductName` và `getSupplyPricesByProductName` chỉ gọi service và trả response.
+- Giữ logic merge Mavryk/Shop và sort tiếng Việt trong read service.
+
+### Contract Giữ Nguyên
+
+- API path không đổi.
+- Response danh sách NCC và bảng giá NCC giữ shape cũ.
+- Mutation create/update/delete supplier price chưa đổi trong slice này.
+
+### Validation
+
+- [x] `node --check backend/src/domains/products/services/productLookupService.js backend/src/domains/products/services/productSupplierReadService.js backend/src/domains/products/controller/finders.js backend/src/domains/products/controller/handlers/supplies.js`
+- [x] `cd backend; npx jest tests/jest/domains/orders/createOrder.integration.test.js tests/jest/services/pricingCoreNormalizers.test.js --runInBand`
+- [x] `git diff --check`
+
+### Rủi Ro Còn Lại
+
+- Chưa có focused Jest cho read-model SQL vì hiện repo chưa có test cho endpoint này; cần smoke API khi có DB/dev server.
+
+## 2026-06-25 - Products - Supplier Mutation Service
+
+### Mục Tiêu
+
+- Tách orchestration thêm/sửa/xóa giá NCC khỏi HTTP handler.
+- Đặt capability mutation giá NCC trong owner `products`, reuse được từ các luồng khác mà không copy query/cache/update-cost.
+
+### Source-Of-Truth
+
+| Trách nhiệm | Hàm/File chính | Hàm/File duplicate/patch | Quyết định |
+| --- | --- | --- | --- |
+| Product supplier mutation | `backend/src/domains/products/services/productSupplierMutationService.js` | Inline mutation logic trong `products/controller/handlers/supplies.js` | extract |
+
+### Thay Đổi
+
+- Thêm `updateProductSupplierPrice`, `createProductSupplierPrice`, `deleteProductSupplierPrice`.
+- Handler `supplies.js` chỉ còn đọc params/body, gọi service, trả HTTP status/response và ghi event log theo `req`.
+- Logic clear cache, ensure NCC, upsert/delete supplier cost, auto-update order cost nằm trong domain service.
+- Giữ behavior lỗi auto-update order cost: log lỗi nhưng vẫn trả update giá thành công với `ordersUpdated: 0` và `updateError`.
+
+### Contract Giữ Nguyên
+
+- API path/status/response shape giữ nguyên.
+- Event log payload giữ cùng action/entity/source/metadata.
+- Validation bad request vẫn trả 400 cho productId/sourceId/NCC thiếu hoặc không hợp lệ.
+
+### Validation
+
+- [x] `node --check backend/src/domains/products/services/productSupplierMutationService.js`
+- [x] `node --check backend/src/domains/products/controller/handlers/supplies.js`
+- [x] `git diff --check`
+- [x] `cd backend; npx jest tests/jest/domains/orders/createOrder.integration.test.js tests/jest/domains/supplier-change/service.test.js tests/jest/services/pricingCoreNormalizers.test.js --runInBand`
+
+### Rủi Ro Còn Lại
+
+- Chưa có focused Jest cho endpoint mutation sản phẩm/NCC vì hiện repo chưa có test route này; cần smoke API khi có DB/dev server.
+- `writeUserEventLog(req, event)` vẫn ở handler vì cần `req`; service chỉ trả event object để tránh phụ thuộc HTTP layer.
+
+## 2026-06-25 - Supplies/Products - Supplier Ensure Capability
+
+### Mục Tiêu
+
+- Loại duplicate tạo NCC (`ensureSupplyRecord`) khỏi controller/helper caller.
+- Đưa rule lookup/create NCC về owner `supplies`, còn rule ghi giá NCC theo product nằm ở owner `products`.
+
+### Source-Of-Truth
+
+| Trách nhiệm | Hàm/File chính | Hàm/File duplicate/patch | Quyết định |
+| --- | --- | --- | --- |
+| Lookup/create NCC | `backend/src/domains/supplies/services/supplierLookupService.js` | `products/controller/finders.js`, `orders/controller/helpers/catalog.js` | consolidate |
+| Upsert giá NCC cho variant | `backend/src/domains/products/services/productSupplierMutationService.js` | `products/controller/finders.js` | consolidate |
+
+### Thay Đổi
+
+- Thêm `ensureSupplierRecord` vào `supplierLookupService.js` để lookup theo normalized name rồi insert NCC nếu thiếu.
+- Thêm/export `upsertProductSupplierPrice` trong `productSupplierMutationService.js` để caller ghi `supplier_cost` qua một contract product-domain.
+- `products/controller/finders.js` chỉ còn compatibility re-export, không tự chứa SQL tạo NCC/giá.
+- `createProductPrice.js` gọi trực tiếp `ensureSupplierRecord` và `upsertProductSupplierPrice`.
+- `orders/controller/helpers/catalog.js` bỏ implementation tạo NCC riêng, gọi `ensureSupplierRecord`.
+
+### Contract Giữ Nguyên
+
+- API/response không đổi.
+- `ensureSupplyRecord` legacy export vẫn còn để các caller cũ không gãy.
+- Insert NCC vẫn thử kèm `active_supply`, fallback insert không có cột nếu DB không hỗ trợ.
+
+### Validation
+
+- [x] `node --check backend/src/domains/supplies/services/supplierLookupService.js`
+- [x] `node --check backend/src/domains/products/services/productSupplierMutationService.js`
+- [x] `node --check backend/src/domains/products/controller/finders.js`
+- [x] `node --check backend/src/domains/products/controller/handlers/mutations/createProductPrice.js`
+- [x] `node --check backend/src/domains/orders/controller/helpers/catalog.js`
+- [x] `git diff --check`
+- [x] `cd backend; npx jest tests/jest/domains/orders/createOrder.integration.test.js tests/jest/domains/supplier-change/service.test.js tests/jest/services/pricingCoreNormalizers.test.js --runInBand`
+
+### Rủi Ro Còn Lại
+
+- `orders/controller/helpers.js` và một số CRUD vẫn import `ensureSupplyRecord` qua helper barrel; behavior không đổi nhưng có thể cutover dần sang `ensureSupplierRecord` khi refactor orders controller sâu hơn.
+
+## 2026-06-26 - Orders/Products - Remove Legacy Supplier Finder Aliases
+
+### M?c Ti?u
+
+- Ho?n t?t cutover source code kh?i c?c alias c? `ensureSupplyRecord`, `upsertSupplyPrice`, `findSupplyIdByName`.
+- X?a wrapper kh?ng c?n caller ?? tr?nh m?i lu?ng t? gi? m?t b?n lookup/t?o NCC ri?ng.
+
+### Source-Of-Truth
+
+| Tr?ch nhi?m | H?m/File ch?nh | H?m/File duplicate/patch | Quy?t ??nh |
+| --- | --- | --- | --- |
+| Lookup/create NCC | `backend/src/domains/supplies/services/supplierLookupService.js` | `orders/controller/helpers/catalog.js`, `orders/controller/finance/supplierDebt.js`, `products/controller/finders.js` | delete legacy aliases |
+| Upsert gi? NCC cho variant | `backend/src/domains/products/services/productSupplierMutationService.js` | `products/controller/finders.js` | delete legacy alias |
+
+### Thay ??i
+
+- `createOrder.js`, `updateOrder.js`, `orderUpdateService.js`, `services/orderService.js` g?i tr?c ti?p `ensureSupplierRecord`.
+- X?a export `ensureSupplyRecord` kh?i `orders/controller/helpers.js` v? `orders/controller/helpers/catalog.js`.
+- X?a `backend/src/domains/orders/controller/finance/supplierDebt.js` v? kh?ng c?n caller.
+- X?a `backend/src/domains/products/controller/finders.js` v? product lookup/read/mutation ?? c? service owner.
+- D?n mock test `createOrder.integration.test.js` kh?i `ensureSupplyRecord`.
+
+### Contract Gi? Nguy?n
+
+- Public API route/response kh?ng ??i.
+- Logic t?o NCC v?n d?ng `ensureSupplierRecord`, gi? fallback insert khi DB kh?ng c? `active_supply`.
+- Logic upsert gi? NCC v?n ?i qua `upsertProductSupplierPrice` v? `supplierCostService`.
+
+### Validation
+
+- [x] `node --check` cho c?c file orders/products/supplies ?? ch?m.
+- [x] `git diff --check`
+- [x] `cd backend; npx jest tests/jest/domains/orders/createOrder.integration.test.js tests/jest/domains/supplier-change/service.test.js tests/jest/services/pricingCoreNormalizers.test.js --runInBand`
+
+### R?i Ro C?n L?i
+
+- M?t s? docs c? v?n nh?c `supplierDebt.js`/`finders.js`; ?? ghi log x?a alias, c? th? d?n docs l?ch s? ? slice documentation ri?ng n?u c?n.
+
+## 2026-06-26 - Orders/Products - Product Variant Capability Cutover
+
+### M?c Ti?u
+
+- T?ch logic resolve/create variant kh?i orders catalog sang owner `products`.
+- X?a orders catalog helper sau khi caller runtime ?? cutover h?t.
+
+### Source-Of-Truth
+
+| Tr?ch nhi?m | H?m/File ch?nh | H?m/File duplicate/patch | Quy?t ??nh |
+| --- | --- | --- | --- |
+| Resolve/create product variant | `backend/src/domains/products/services/productVariantService.js` | `orders/controller/helpers/catalog.js` | consolidate |
+| Supplier cost ensure | `backend/src/domains/supplies/services/supplierCostService.js` | `orders/controller/helpers/catalog.js` | consolidate |
+
+### Thay ??i
+
+- Th?m `ensureVariantRecord` v? `resolveProductToVariantId` v?o `productVariantService.js`.
+- `createOrder.js` v? `orderUpdateService.js` g?i tr?c ti?p capability products/supplies thay v? qua catalog helper.
+- X?a `backend/src/domains/orders/controller/helpers/catalog.js` v? kh?ng c?n caller runtime.
+
+### Contract Gi? Nguy?n
+
+- API route/response kh?ng ??i.
+- Logic t?o variant m?i v?n insert product + desc_variant + variant + margins nh? c?.
+- Logic supplier cost ensure v?n skip n?u input kh?ng h?p l?.
+
+### Validation
+
+- [x] `node --check backend/src/domains/products/services/productVariantService.js`
+- [x] `node --check backend/src/domains/supplies/services/supplierCostService.js`
+- [x] `node --check backend/src/domains/orders/controller/helpers.js`
+- [x] `node --check backend/src/domains/orders/controller/crud/createOrder.js`
+- [x] `node --check backend/src/domains/orders/controller/crud/updateOrder.js`
+- [x] `node --check backend/src/domains/orders/controller/orderUpdateService.js`
+- [x] `git diff --check`
+- [x] `cd backend; npx jest tests/jest/domains/orders/createOrder.integration.test.js tests/jest/domains/supplier-change/service.test.js tests/jest/services/pricingCoreNormalizers.test.js --runInBand`
+
+### R?i Ro C?n L?i
+
+- `orders/controller/helpers.js` hi?n ch? c?n normalize/write payload exports; c?c capability product/supplier ?? r?i kh?i helper barrel.
+
+## 2026-06-26 - Frontend Product Info - Product Description API Owner
+
+### Muc Tieu
+
+- Move product description API client out of global `frontend/src/lib`.
+- Keep public HTTP routes and response mapping unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Legacy file | Decision |
+| --- | --- | --- | --- |
+| Product description API client | `frontend/src/features/product-info/api/productDescApi.ts` | `frontend/src/lib/productDescApi.ts` | move to feature owner |
+
+### Thay Doi
+
+- Created `frontend/src/features/product-info/api/productDescApi.ts` with the same API functions/types.
+- Updated all `product-info` imports to use the feature-local API path.
+- Deleted `frontend/src/lib/productDescApi.ts` because no runtime caller remains.
+
+### Contract Giu Nguyen
+
+- API paths stay unchanged: `/api/product-descriptions*`.
+- Type exports and function names stay unchanged for product-info callers.
+- UI behavior is unchanged.
+
+### Validation
+
+- [x] `rg "@/lib/productDescApi" frontend/src` returns no runtime callers.
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+## 2026-06-26 - Frontend Shared Pricing Primitive
+
+### Muc Tieu
+
+- Remove cross-feature import from `bill-order` to `features/pricing/utils`.
+- Keep pricing feature compatibility for existing pricing callers.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Legacy/caller | Decision |
+| --- | --- | --- | --- |
+| Direct value or fallback pricing primitive | `frontend/src/shared/utils/pricing.ts` | `frontend/src/features/pricing/utils.ts`, `frontend/src/features/bill-order/index.tsx` | move generic primitive to shared |
+
+### Thay Doi
+
+- Added `resolveDirectNumberOrFallback` and `multiplyValue` to shared pricing utils.
+- `bill-order` imports `multiplyValue` from shared instead of pricing feature.
+- `features/pricing/utils.ts` re-exports `multiplyValue` to keep pricing callers unchanged.
+
+### Contract Giu Nguyen
+
+- `multiplyValue(value, ratio)` behavior stays unchanged.
+- No UI/API behavior change.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+## 2026-06-26 - Frontend Product Info - Image Upload Modal Split
+
+### Muc Tieu
+
+- Reduce size of `ImageUpload.tsx` without changing UI behavior.
+- Keep image picker modal as a focused presentational component inside `product-info`.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product image picker modal | `frontend/src/features/product-info/components/EditProductModal/ImagePickerModal.tsx` | Inline inside `ImageUpload.tsx` | extract component |
+
+### Thay Doi
+
+- Extracted `ImagePickerModal` into its own component file.
+- `ImageUpload.tsx` now owns preview/upload/delete state and renders the modal component.
+- No API, route, or visual behavior change intended.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+## 2026-06-26 - Frontend Product Info - Variant Content Actions Hook
+
+### Muc Tieu
+
+- Reduce `VariantContentView.tsx` by moving edit/view/create/delete orchestration out of render component.
+- Keep table UI and modal behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Variant content modal/action state | `frontend/src/features/product-info/views/variant-content-view/useVariantContentActions.ts` | `VariantContentView.tsx` | extract hook |
+
+### Thay Doi
+
+- Added `useVariantContentActions` for edit/view/create/delete state and save/delete API calls.
+- `VariantContentView.tsx` now focuses on data table rendering and passes actions to modal/table controls.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+## 2026-06-26 - Frontend Product Info - Product Image Picker Modal Split
+
+### Muc Tieu
+
+- Reduce `ProductImagePicker.tsx` by extracting the image picker modal UI.
+- Keep product image upload/select/delete behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product image picker modal | `frontend/src/features/product-info/components/ProductImagePickerModal.tsx` | Inline inside `ProductImagePicker.tsx` | extract component |
+
+### Thay Doi
+
+- Extracted `ProductImagePickerModal` into a focused presentational component.
+- `ProductImagePicker.tsx` now keeps server image state and delegates modal rendering.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+
+## 2026-06-26 - Frontend Product Info - Desc Variant Content Fields
+
+### Muc Tieu
+
+- Remove duplicated editor/SEO layout between create and edit desc variant modals.
+- Keep each modal owning its own form state and submit flow.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Desc variant rich content editor fields | `frontend/src/features/product-info/components/DescVariantContentFields.tsx` | Inline in create/edit desc variant modals | extract feature-local presentational component |
+
+### Thay Doi
+
+- Added `DescVariantContentFields` for short description, rules editor, description editor and SEO preview layout.
+- Updated `CreateDescVariantModal.tsx` and `DescVariantEditModal.tsx` to reuse the component without changing submit/state ownership.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-26 - Frontend Product Info - Category Tag Card Split
+
+### Muc Tieu
+
+- Reduce `CategoryTagManager.tsx` by extracting the category display/delete action card.
+- Keep add/edit form state and CRUD orchestration in the manager component.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product category tag display card | `frontend/src/features/product-info/components/CategoryTagCard.tsx` | Inline in `CategoryTagManager.tsx` | extract feature-local presentational component |
+
+### Thay Doi
+
+- Added `CategoryTagCard` for color preview, display metadata, edit action and delete confirmation controls.
+- Updated `CategoryTagManager.tsx` to delegate item rendering while preserving existing state handlers.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+- [x] `git diff --check`
+
+
+## 2026-06-26 - Frontend Product Info - Product Row Component Split
+
+### Muc Tieu
+
+- Reduce `ProductRow.tsx` and remove repeated expanded-row HTML normalization.
+- Keep row click, expand, edit and delete-button behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product row avatar | `frontend/src/features/product-info/components/ProductAvatar.tsx` | Inline in `ProductRow.tsx` | extract component |
+| Product row action buttons | `frontend/src/features/product-info/components/ProductRowActions.tsx` | Inline in `ProductRow.tsx` | extract component |
+| Product expanded row details | `frontend/src/features/product-info/components/ProductRowExpandedDetails.tsx` | Inline in `ProductRow.tsx` | extract component |
+
+### Thay Doi
+
+- `ProductRow.tsx` now computes display HTML once and passes it to expanded details.
+- Extracted avatar, action buttons and expanded details into feature-local components.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-26 - Frontend Product Info - Category Tag Form Reuse
+
+### Muc Tieu
+
+- Remove duplicated add/edit category form markup in `CategoryTagManager.tsx`.
+- Keep category create/update/delete state and hook ownership in the manager.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Category add/edit form UI | `frontend/src/features/product-info/components/CategoryTagForm.tsx` | Inline in `CategoryTagManager.tsx` | extract feature-local form component |
+
+### Thay Doi
+
+- Added `CategoryTagForm` shared by add and edit modes.
+- `CategoryTagManager.tsx` now coordinates state/actions and delegates form rendering.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-26 - Frontend Product Info - Edit Category Modal Split
+
+### Muc Tieu
+
+- Reduce `EditCategoryModal.tsx` by moving tab, footer and category selection UI out of the modal orchestration.
+- Keep modal tabs, save/cancel actions, package edit and category selection behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Category selection chips | `frontend/src/features/product-info/components/CategorySelectionGrid.tsx` | Inline in `EditCategoryModal.tsx` | extract component |
+| Edit category modal tabs | `frontend/src/features/product-info/components/EditCategoryModalTabs.tsx` | Inline in `EditCategoryModal.tsx` | extract component |
+| Edit category modal footer | `frontend/src/features/product-info/components/EditCategoryModalFooter.tsx` | Inline in `EditCategoryModal.tsx` | extract component |
+
+### Thay Doi
+
+- `EditCategoryModal.tsx` now coordinates modal state and delegates large UI sections.
+- No API, route, or visible behavior change intended.
+
+### Validation
+
+- [x] `cd frontend; npm run build`

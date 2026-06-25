@@ -58,6 +58,31 @@ const findMaxSupplierCostPrice = async (variantId, trxOrDb = null) => {
   return price === null ? 0 : price;
 };
 
+const deleteSupplierCostPrice = async ({ supplierId, variantId }, trxOrDb = null) => {
+  const normalizedSupplierId = normalizePositiveId(supplierId);
+  const normalizedVariantId = normalizePositiveId(variantId);
+
+  if (!normalizedSupplierId || !normalizedVariantId) {
+    throw new Error("Invalid supplier cost delete payload.");
+  }
+
+  return getQuery(trxOrDb)(SUPPLIER_COST_TABLE)
+    .where({
+      [SUPPLIER_COST_COLS.SUPPLIER_ID]: normalizedSupplierId,
+      [SUPPLIER_COST_COLS.VARIANT_ID]: normalizedVariantId,
+    })
+    .del();
+};
+
+
+const ensureSupplierCost = async (variantId, supplierId, cost, trxOrDb = null) => {
+  const price = Number(cost);
+  if (!normalizePositiveId(variantId) || !normalizePositiveId(supplierId) || !Number.isFinite(price) || price <= 0) {
+    return;
+  }
+  await upsertSupplierCostPrice({ supplierId, variantId, price }, trxOrDb);
+};
+
 const upsertSupplierCostPrice = async ({ supplierId, variantId, price }, trxOrDb = null) => {
   const normalizedSupplierId = normalizePositiveId(supplierId);
   const normalizedVariantId = normalizePositiveId(variantId);
@@ -106,8 +131,10 @@ const upsertSupplierCostPrice = async ({ supplierId, variantId, price }, trxOrDb
 module.exports = {
   SUPPLIER_COST_COLS,
   SUPPLIER_COST_TABLE,
+  deleteSupplierCostPrice,
   findSupplierCostPrice,
   findSupplierCostRow,
   findMaxSupplierCostPrice,
+  ensureSupplierCost,
   upsertSupplierCostPrice,
 };

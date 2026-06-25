@@ -1,7 +1,7 @@
 import type React from "react";
 
 import ConfirmModal from "@/components/modals/ConfirmModal/ConfirmModal";
-import type { ProductDescription } from "@/lib/productDescApi";
+import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 
 import { CreateDescVariantModal } from "../../components/CreateDescVariantModal";
 import { DescVariantEditModal } from "../../components/DescVariantEditModal";

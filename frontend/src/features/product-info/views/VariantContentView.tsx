@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React from "react";
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -10,15 +10,11 @@ import {
   ResponsiveTable,
   TableCard,
 } from "@/components/ui/ResponsiveTable";
-import {
-  ProductDescription,
-  deleteProductDescriptionRecord,
-  saveProductDescription,
-} from "@/lib/productDescApi";
-import { normalizeErrorMessage } from "@/lib/textUtils";
+import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import { useVariantContent } from "../hooks/useVariantContent";
 import { PAGE_SIZE, htmlToPlainText } from "../utils/productInfoHelpers";
 import VariantContentModals from "./variant-content-view/VariantContentModals";
+import { useVariantContentActions } from "./variant-content-view/useVariantContentActions";
 
 const preview = (html: string | undefined | null, max = 96) => {
   const plain = htmlToPlainText(html ?? "")
@@ -59,123 +55,31 @@ export const VariantContentView: React.FC<VariantContentViewProps> = ({
     reload,
   } = useVariantContent({ searchTerm, active });
 
-  const [editing, setEditing] = useState<ProductDescription | null>(null);
-  const [viewing, setViewing] = useState<ProductDescription | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ProductDescription | null>(
-    null
-  );
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
-
-  const openEdit = useCallback(
-    (row: ProductDescription) => {
-      onOpenEditor();
-      setViewing(null);
-      setSaveError(null);
-      setEditing(row);
-    },
-    [onOpenEditor]
-  );
-
-  const openView = useCallback(
-    (row: ProductDescription) => {
-      onOpenEditor();
-      setEditing(null);
-      setSaveError(null);
-      setViewing(row);
-    },
-    [onOpenEditor]
-  );
-
-  const closeEdit = useCallback(() => {
-    setEditing(null);
-    setSaveError(null);
-    setSaving(false);
-  }, []);
-
-  const closeView = useCallback(() => {
-    setViewing(null);
-  }, []);
-
-  const openCreate = useCallback(() => {
-    setEditing(null);
-    setViewing(null);
-    setSaveError(null);
-    onOpenEditor();
-    setCreateOpen(true);
-  }, [onOpenEditor]);
-
-  const handleCreated = useCallback(async () => {
-    await reload();
-    await onReloadProductList();
-  }, [reload, onReloadProductList]);
-
-  const handleSave = useCallback(
-    async (payload: {
-      productId: string;
-      descVariantId: number | null;
-      rules: string;
-      description: string;
-      shortDesc: string;
-      imageUrl: string | null;
-    }) => {
-      setSaving(true);
-      setSaveError(null);
-      try {
-        await saveProductDescription({
-          ...(payload.productId.trim()
-            ? { productId: payload.productId.trim() }
-            : {}),
-          descVariantId: payload.descVariantId,
-          rules: payload.rules,
-          description: payload.description,
-          shortDesc: payload.shortDesc,
-          imageUrl: payload.imageUrl,
-        });
-        closeEdit();
-        await reload();
-        await onReloadProductList();
-      } catch (e) {
-        setSaveError(
-          normalizeErrorMessage(
-            e instanceof Error ? e.message : String(e ?? ""),
-            { fallback: "Không thể lưu desc_variant." }
-          )
-        );
-      } finally {
-        setSaving(false);
-      }
-    },
-    [closeEdit, reload, onReloadProductList]
-  );
-
-  const handleConfirmDelete = useCallback(async () => {
-    const id = deleteTarget?.descVariantId;
-    if (id == null || id <= 0) {
-      setDeleteTarget(null);
-      return;
-    }
-    setDeleteSubmitting(true);
-    setDeleteError(null);
-    try {
-      await deleteProductDescriptionRecord(id);
-      setDeleteTarget(null);
-      await reload();
-      await onReloadProductList();
-    } catch (e) {
-      setDeleteError(
-        normalizeErrorMessage(
-          e instanceof Error ? e.message : String(e ?? ""),
-          { fallback: "Không thể xóa desc_variant." }
-        )
-      );
-    } finally {
-      setDeleteSubmitting(false);
-    }
-  }, [deleteTarget, reload, onReloadProductList]);
+  const {
+    editing,
+    viewing,
+    createOpen,
+    saving,
+    saveError,
+    deleteTarget,
+    deleteError,
+    deleteSubmitting,
+    openEdit,
+    openView,
+    openCreate,
+    closeEdit,
+    closeView,
+    closeCreate,
+    openDelete,
+    closeDelete,
+    handleCreated,
+    handleSave,
+    handleConfirmDelete,
+  } = useVariantContentActions({
+    reload,
+    onReloadProductList,
+    onOpenEditor,
+  });
 
   return (
     <>
@@ -257,10 +161,7 @@ export const VariantContentView: React.FC<VariantContentViewProps> = ({
                       {r.descVariantId != null && r.descVariantId > 0 ? (
                         <button
                           type="button"
-                          onClick={() => {
-                            setDeleteError(null);
-                            setDeleteTarget(r);
-                          }}
+                          onClick={() => openDelete(r)}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-rose-300 hover:bg-rose-500/15"
                           aria-label="Xóa"
                         >
@@ -359,8 +260,7 @@ export const VariantContentView: React.FC<VariantContentViewProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDeleteError(null);
-                              setDeleteTarget(row);
+                              openDelete(row);
                             }}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-rose-300 hover:bg-rose-500/15"
                             aria-label="Xóa desc_variant"
@@ -395,14 +295,12 @@ export const VariantContentView: React.FC<VariantContentViewProps> = ({
         saveError={saveError}
         deleteTarget={deleteTarget}
         deleteSubmitting={deleteSubmitting}
-        onCloseCreate={() => setCreateOpen(false)}
+        onCloseCreate={closeCreate}
         onCreated={handleCreated}
         onCloseView={closeView}
         onCloseEdit={closeEdit}
         onSave={handleSave}
-        onCloseDelete={() => {
-          if (!deleteSubmitting) setDeleteTarget(null);
-        }}
+        onCloseDelete={closeDelete}
         onConfirmDelete={handleConfirmDelete}
       />
     </>

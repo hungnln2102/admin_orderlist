@@ -2,6 +2,7 @@ import { VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import {
   getDiscountRatioInput,
   getMarginRatioInput,
+  multiplyValue,
 } from "@/shared/utils/pricing";
 import {
   CreateSupplierEntry,
@@ -148,13 +149,7 @@ export const sortSupplyItems = (items: SupplyPriceItem[]): SupplyPriceItem[] => 
 
 export const buildSupplyRowKey = (productId: number, sourceId: number): string => `${productId}-${sourceId}`;
 
-export const multiplyValue = (value?: number | null, ratio?: number | null): number | null => {
-  const direct = toNumberOrNull(ratio);
-  if (typeof direct === "number" && Number.isFinite(direct) && direct > 0) {
-    return direct;
-  }
-  return toNumberOrNull(value);
-};
+export { multiplyValue };
 
 export const multiplyBasePrice = (ratio?: number | null, basePrice?: number | null): number | null =>
   multiplyValue(basePrice, ratio);

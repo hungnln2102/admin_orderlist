@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { PencilIcon, TrashIcon, PlusIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
-import ColorPicker from "@/components/ui/ColorPicker";
+import { PlusIcon } from "@heroicons/react/24/outline";
 import { CategoryItem } from "@/lib/categoryApi";
 import { useCategoryManagement } from "../hooks/useCategoryManagement";
-import { getCategoryVisualStyle } from "../utils/categoryColors";
+import { CategoryTagCard } from "./CategoryTagCard";
+import { CategoryTagForm } from "./CategoryTagForm";
 
 interface CategoryTagManagerProps {
   onCategoriesChange?: () => void;
@@ -133,47 +133,20 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
 
       {/* Add New Category Form */}
       {isAdding && (
-        <div className="rounded-2xl border border-indigo-400/50 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-6 space-y-4 shadow-lg">
-          <div>
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2 block">
-              Tên Danh Mục
-            </label>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nhập tên danh mục..."
-              className="w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
-              autoFocus
-            />
-          </div>
-          
-          <ColorPicker
-            label="Màu Sắc"
-            value={newColor}
-            onChange={setNewColor}
-          />
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleCancelAdd}
-              disabled={creating}
-              className="px-5 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
-            >
-              Hủy
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveAdd}
-              disabled={!newName.trim() || creating}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50"
-            >
-              <CheckIcon className="h-4 w-4" />
-              {creating ? "Đang tạo..." : "Tạo"}
-            </button>
-          </div>
-        </div>
+        <CategoryTagForm
+          name={newName}
+          color={newColor}
+          colorLabel="Màu Sắc"
+          saving={creating}
+          submitLabel="Tạo"
+          savingLabel="Đang tạo..."
+          namePlaceholder="Nhập tên danh mục..."
+          autoFocus
+          onNameChange={setNewName}
+          onColorChange={setNewColor}
+          onCancel={handleCancelAdd}
+          onSubmit={handleSaveAdd}
+        />
       )}
 
       {/* Categories Grid */}
@@ -184,117 +157,35 @@ const CategoryTagManager: React.FC<CategoryTagManagerProps> = ({ onCategoriesCha
 
           if (isEditing) {
             return (
-              <div
+              <CategoryTagForm
                 key={category.id}
-                className="sm:col-span-2 rounded-2xl border border-indigo-400/50 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-6 space-y-4 shadow-lg"
-              >
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2 block">
-                    Tên Danh Mục
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white placeholder:text-slate-400 shadow-inner focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all"
-                  />
-                </div>
-                
-                <ColorPicker
-                  label="Màu Sắc"
-                  value={editColor}
-                  onChange={setEditColor}
-                />
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    disabled={updating}
-                    className="px-5 py-2.5 text-sm font-semibold text-slate-300 hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveEdit}
-                    disabled={!editName.trim() || updating}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg transition-all hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50"
-                  >
-                    <CheckIcon className="h-4 w-4" />
-                    {updating ? "Đang lưu..." : "Lưu"}
-                  </button>
-                </div>
-              </div>
+                name={editName}
+                color={editColor}
+                colorLabel="Màu Sắc"
+                saving={updating}
+                submitLabel="Lưu"
+                savingLabel="Đang lưu..."
+                onNameChange={setEditName}
+                onColorChange={setEditColor}
+                onCancel={handleCancelEdit}
+                onSubmit={handleSaveEdit}
+              />
             );
           }
 
           return (
-            <div
+            <CategoryTagCard
               key={category.id}
-              className="group rounded-2xl border border-white/15 bg-gradient-to-br from-slate-800/65 via-slate-700/55 to-slate-900/65 p-5 shadow-sm backdrop-blur-sm hover:border-white/25 transition-all"
-            >
-              <div className="flex items-start gap-4">
-                {/* Color Preview */}
-                <div
-                  className="h-14 w-14 rounded-xl border-2 border-white/20 flex-shrink-0 shadow-md"
-                  style={getCategoryVisualStyle(category.color)}
-                />
-
-                {/* Category Info */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-base font-semibold text-white truncate">{category.name}</h4>
-                  <p className="text-xs text-slate-400 mt-1 font-mono break-all line-clamp-3">
-                    {category.color || "#facc15"}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                {isDeleting ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirmId(null)}
-                      disabled={deleting}
-                      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
-                      title="Hủy"
-                    >
-                      <XMarkIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(category.id)}
-                      disabled={deleting}
-                      className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                      title="Xác nhận xóa"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => handleStartEdit(category)}
-                      disabled={editingId !== null || updating}
-                      className="p-2 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
-                      title="Sửa"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirmId(category.id)}
-                      disabled={editingId !== null || deleting}
-                      className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                      title="Xóa"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+              category={category}
+              isDeleting={isDeleting}
+              editDisabled={editingId !== null || updating}
+              deleteDisabled={editingId !== null || deleting}
+              deleting={deleting}
+              onEdit={handleStartEdit}
+              onRequestDelete={setDeleteConfirmId}
+              onCancelDelete={() => setDeleteConfirmId(null)}
+              onConfirmDelete={handleDelete}
+            />
           );
         })}
 

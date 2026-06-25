@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import {
   ProductDescription,
   saveProductDescription,
-} from "@/lib/productDescApi";
+} from "@/features/product-info/api/productDescApi";
 import { updateProductPrice } from "@/lib/productPricesApi";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { SavePayload } from "../components/EditProductModal";

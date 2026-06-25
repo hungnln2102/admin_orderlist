@@ -9,10 +9,10 @@ const { ORDERS_SCHEMA } = require("../config/dbSchema");
 const {
   normalizeOrderRow,
   sanitizeOrderWritePayload,
-  ensureSupplyRecord,
   normalizeTextInput,
 } = require("../domains/orders/controller/helpers");
 const { nextId } = require("./idService");
+const { ensureSupplierRecord } = require("../domains/supplies/services/supplierLookupService");
 const { generateUniqueOrderCode, VALID_PREFIXES } = require("./orderCodeService");
 const {
   openPaymentSlot,
@@ -37,7 +37,7 @@ const createOrder = async (orderData, trx = null) => {
     if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
       const name = normalizeTextInput(String(raw.supply));
       if (name) {
-        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplyRecord(name);
+        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplierRecord(name);
       }
       delete raw.supply;
     }
@@ -170,7 +170,7 @@ const updateOrder = async (id, updateData, trx = null) => {
     if (raw.supply != null && raw.supply !== "" && typeof raw.supply === "string") {
       const name = normalizeTextInput(String(raw.supply));
       if (name) {
-        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplyRecord(name);
+        raw[ORDERS_SCHEMA.ORDER_LIST.COLS.ID_SUPPLY] = await ensureSupplierRecord(name);
       }
       delete raw.supply;
     }

@@ -156,5 +156,3 @@ Task chi tiết trước khi sửa code:
 - [ ] Không đổi behavior public.
 - [ ] Inventory/log/API contract được cập nhật.
 - [ ] Validation hoặc smoke checklist liên quan đã pass.
-
-

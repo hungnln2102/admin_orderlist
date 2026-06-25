@@ -52,7 +52,7 @@ Mục đích: map đường đi từ code cũ sang kiến trúc mới. File này
 | --- | --- | --- | --- | --- | --- |
 | Orders | `frontend/src/features/orders`, `frontend/src/components/modals/*Order*` | `frontend/src/features/orders` | `shared/api`, `shared/components/modal`, `shared/hooks` | `not-started` | Cần gom modal order về feature |
 | Invoices | `frontend/src/features/invoices` | `frontend/src/features/invoices` | `shared/api`, `shared/components/data-table`, `shared/utils/currency/date` | `not-started` | Cần giữ behavior receipt/QR |
-| Products | `frontend/src/features/product-info`, `frontend/src/lib/productDescApi.ts` | `frontend/src/features/products` hoặc giữ `product-info` có chuẩn owner | `shared/api`, `shared/components/form` | `not-started` | Cần quyết định tên domain frontend |
+| Products | `frontend/src/features/product-info`, `frontend/src/features/product-info/api/productDescApi.ts` | `frontend/src/features/products` hoặc giữ `product-info` có chuẩn owner | `shared/api`, `shared/components/form` | `not-started` | Cần quyết định tên domain frontend |
 | Pricing | `frontend/src/features/pricing` | `frontend/src/features/pricing` | `shared/utils/currency/number` | `not-started` | Business rule pricing không đưa shared generic |
 | Supplies | `frontend/src/features/supply` | `frontend/src/features/supplies` | `shared/api`, `shared/components/data-table` | `not-started` | Cần thống nhất singular/plural |
 | Wallet | `frontend/src/features/usdt-wallets`, bank/account related features | `frontend/src/features/wallet` | `shared/api`, `shared/utils/currency/date` | `not-started` | Cần map rõ wallet vs bank accounts |
@@ -145,4 +145,3 @@ Copy block này cho từng page khi bắt đầu làm docs:
 - File này chưa phải danh sách triển khai cuối cùng; nó là bản đồ để làm docs từng page trước.
 - Sau khi docs từng page hoàn thành, cập nhật lại legacy path/API/database chính xác hơn.
 - Không xóa hoặc di chuyển code chỉ dựa trên file này nếu chưa có docs và parity checklist.
-

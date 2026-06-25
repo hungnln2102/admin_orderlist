@@ -50,11 +50,14 @@ describe("POST /orders createOrder flow", () => {
     jest.doMock("../../../../src/domains/orders/controller/helpers", () => ({
       normalizeOrderRow: normalizeOrderRowMock,
       sanitizeOrderWritePayload: jest.fn(() => sanitizePayload ?? { price: 100000 }),
-      ensureSupplyRecord: jest.fn(),
+      normalizeTextInput: jest.fn((value) => String(value || "").trim()),
+    }));
+    jest.doMock("../../../../src/domains/supplies/services/supplierCostService", () => ({
       ensureSupplierCost: jest.fn(),
+    }));
+    jest.doMock("../../../../src/domains/products/services/productVariantService", () => ({
       ensureVariantRecord: jest.fn(),
       resolveProductToVariantId: jest.fn().mockResolvedValue(null),
-      normalizeTextInput: jest.fn((value) => String(value || "").trim()),
     }));
     jest.doMock("../../../../src/services/idService", () => ({
       nextId: jest.fn().mockResolvedValue(123),

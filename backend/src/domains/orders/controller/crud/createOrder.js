@@ -3,10 +3,6 @@ const { TABLES, STATUS, COLS } = require("../constants");
 const {
     normalizeOrderRow,
     sanitizeOrderWritePayload,
-    ensureSupplyRecord,
-    ensureSupplierCost,
-    ensureVariantRecord,
-    resolveProductToVariantId,
     normalizeTextInput,
 } = require("../helpers");
 const { todayYMDInVietnam } = require("../../../../utils/normalizers");
@@ -42,7 +38,15 @@ const {
 const { resolveDashboardImportDeltaOnPaid } = require("../finance/dashboardImportDeltaOnPaid");
 const { syncMavnStoreProfitExpense } = require("../orderFinanceHelpers");
 const { writeUserEventLog } = require("../../../renew-adobe/services/systemEventLogService");
-const { findSupplierById } = require("../../../supplies/services/supplierLookupService");
+const {
+    ensureSupplierRecord,
+    findSupplierById,
+} = require("../../../supplies/services/supplierLookupService");
+const { ensureSupplierCost } = require("../../../supplies/services/supplierCostService");
+const {
+    ensureVariantRecord,
+    resolveProductToVariantId,
+} = require("../../../products/services/productVariantService");
 
 /** Số còn phải thu (giá − credit) ≤ ngưỡng này coi như đủ; đơn tạo xong ở trạng thái Đã Thanh Toán, không cần QR. */
 const CREDIT_BALANCE_TOLERANCE_VND = 5000;
@@ -91,7 +95,7 @@ const attachCreateOrderRoute = (router) => {
         if (rawSupplyName != null && rawSupplyName !== "") {
             const name = normalizeTextInput(String(rawSupplyName));
             if (name) {
-                const resolvedId = await ensureSupplyRecord(name);
+                const resolvedId = await ensureSupplierRecord(name);
                 payload[supplyIdCol] = resolvedId;
             }
             delete payload.supply;

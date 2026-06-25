@@ -47,6 +47,20 @@ export const getDiscountRatioInput = (value: unknown): number | null => {
 export const normalizeDiscountRatioInput = (value: unknown): number =>
   getDiscountRatioInput(value) ?? 0;
 
+
+export const resolveDirectNumberOrFallback = (
+  fallbackValue?: number | null,
+  directValue?: number | null
+): number | null => {
+  const direct = toFiniteNumberOrNull(directValue);
+  if (typeof direct === "number" && Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+  return toFiniteNumberOrNull(fallbackValue);
+};
+
+export const multiplyValue = resolveDirectNumberOrFallback;
+
 export const calculateSellingPriceFromMarginInput = (
   basePrice?: number | null,
   marginInput?: unknown

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   fetchProductDescriptions,
   ProductDescription,
-} from "@/lib/productDescApi";
+} from "@/features/product-info/api/productDescApi";
 import { PAGE_SIZE } from "../utils/productInfoHelpers";
 
 type UseVariantContentParams = {
