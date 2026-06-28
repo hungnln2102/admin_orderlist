@@ -24,7 +24,6 @@ export const ProfitChartCard: React.FC<ProfitChartCardProps> = ({
   selectedYear,
   onYearChange,
 }) => {
-  const formatCurrency = formatCurrency;
   return (
     <div className="relative rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/50 via-slate-900/60 to-slate-950/50 p-5 sm:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),0_10px_30px_-15px_rgba(34,197,94,0.2)] hover:shadow-[0_30px_60px_-12px_rgba(0,0,0,0.6),0_15px_40px_-15px_rgba(34,197,94,0.3)] transition-all duration-300 backdrop-blur-xl">
       <div className="mb-5 flex items-center justify-between">

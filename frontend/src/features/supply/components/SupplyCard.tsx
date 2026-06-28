@@ -1,5 +1,5 @@
 import { formatDateToDMY } from "@/shared/date";
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import React from "react";
 import {
   CurrencyDollarIcon,
@@ -19,8 +19,6 @@ interface SupplyCardProps {
   onEdit: (supply: Supply) => void;
   onDelete: (supply: Supply) => void;
 }
-
-const formatCurrency = formatCurrency;
 const formatDate = (date: string | null) =>
   date ? formatDateToDMY(date) : "--";
 
@@ -36,7 +34,6 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
   const statusColor = supply.isActive
     ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
     : "bg-slate-500/20 text-slate-300 border-slate-500/30";
-
   return (
     <div className="relative group overflow-hidden glass-panel rounded-[24px] p-4 transition-all duration-500 hover:border-indigo-500/40 shadow-2xl border border-white/10 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-900/50">
       {/* Glow Effect */}
@@ -91,7 +88,7 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
               </span>
             </div>
             <span className="text-[10px] font-medium text-emerald-400/80 mt-0.5 ml-5">
-              {formatCurrency(supply.monthlyImportValue)}
+              {formatMoney(supply.monthlyImportValue)}
             </span>
           </div>
 
@@ -118,11 +115,11 @@ export const SupplyCard: React.FC<SupplyCardProps> = ({
                       : "text-rose-400"
                 }`}
               >
-                {formatCurrency(netUnpaid)}
+                {formatMoney(netUnpaid)}
               </span>
             </div>
             <span className="text-[10px] font-medium text-white/40 mt-0.5 ml-5">
-              Đã trả: {formatCurrency(supply.totalPaidImport)}
+              Đã trả: {formatMoney(supply.totalPaidImport)}
             </span>
           </div>
         </div>

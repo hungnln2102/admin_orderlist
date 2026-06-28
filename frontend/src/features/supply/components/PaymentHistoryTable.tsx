@@ -1,9 +1,7 @@
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import React, { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { Payment } from "../types";
-
-const formatCurrency = formatCurrency;
 
 interface Props {
   supplyId: number;
@@ -29,7 +27,6 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
-
   return (
     <div className="bg-slate-900/80 rounded-xl border border-white/10 overflow-hidden">
       <div className="px-4 py-3 border-b border-white/10 flex justify-between items-center">
@@ -64,11 +61,11 @@ const PaymentHistoryTable: React.FC<Props> = ({ supplyId }) => {
               return (
                 <tr key={p.id} className="hover:bg-white/5">
                   <td className="px-4 py-2">{p.round}</td>
-                  <td className="px-4 py-2">{p.totalImport >= 0 ? formatCurrency(p.totalImport) : "—"}</td>
+                  <td className="px-4 py-2">{p.totalImport >= 0 ? formatMoney(p.totalImport) : "—"}</td>
                   <td className={`px-4 py-2 ${p.totalImport < 0 ? "text-rose-400 font-semibold" : ""}`}>
-                    {p.totalImport < 0 ? formatCurrency(Math.abs(p.totalImport)) : "—"}
+                    {p.totalImport < 0 ? formatMoney(Math.abs(p.totalImport)) : "—"}
                   </td>
-                  <td className="px-4 py-2">{p.paid > 0 ? formatCurrency(p.paid) : "—"}</td>
+                  <td className="px-4 py-2">{p.paid > 0 ? formatMoney(p.paid) : "—"}</td>
                 </tr>
               );
             })

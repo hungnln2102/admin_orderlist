@@ -1,11 +1,9 @@
 import { formatDateToDMY } from "@/shared/date";
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import React from "react";
 import { PowerIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Supply } from "../types";
 import PaymentHistoryTable from "./PaymentHistoryTable";
-
-const formatCurrency = formatCurrency;
 const formatDate = (date: string | null) => (date ? formatDateToDMY(date) : "--");
 
 interface Props {
@@ -125,7 +123,6 @@ const SupplyRow = ({
   onToggleStatus: (supply: Supply) => void;
 }) => {
   const netUnpaid = Number(supply.totalUnpaidImport ?? 0);
-
   return (
     <>
       <tr
@@ -142,10 +139,10 @@ const SupplyRow = ({
         </td>
         <td className="px-4 py-4 text-white/80 text-sm">
           <div>{supply.monthlyOrders} Đơn</div>
-          <div className="text-xs text-emerald-400">{formatCurrency(supply.monthlyImportValue)}</div>
+          <div className="text-xs text-emerald-400">{formatMoney(supply.monthlyImportValue)}</div>
         </td>
         <td className="px-4 py-4 text-white/80 text-sm">{formatDate(supply.lastOrderDate)}</td>
-        <td className="px-4 py-4 text-white/80 text-sm">{formatCurrency(supply.totalPaidImport)}</td>
+        <td className="px-4 py-4 text-white/80 text-sm">{formatMoney(supply.totalPaidImport)}</td>
         <td className="px-4 py-4 text-sm">
           {netUnpaid === 0 ? (
             <span className="text-white/60">0 ₫</span>
@@ -155,7 +152,7 @@ const SupplyRow = ({
                 netUnpaid > 0 ? "text-emerald-400" : "text-rose-400"
               }`}
             >
-              {formatCurrency(netUnpaid)}
+              {formatMoney(netUnpaid)}
             </span>
           )}
         </td>
