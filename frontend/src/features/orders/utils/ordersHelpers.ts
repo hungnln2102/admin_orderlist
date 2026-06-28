@@ -1,14 +1,16 @@
+import { formatDateToDMY } from "@/shared/date";
+import { roundGiaBanValue } from "@/shared/money";
 import {
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
   VIRTUAL_FIELDS,
   Order,
 } from "@/constants";
-import * as Helpers from "@/shared/utils";
+import { normalizeCompactCode, normalizeSearchText as normalizeSharedSearchText } from "@/shared/text";
 
 
 export const formatCurrency = (value: number | string) => {
-  const roundedNum = Helpers.roundGiaBanValue(value);
+  const roundedNum = roundGiaBanValue(value);
   return roundedNum.toLocaleString("vi-VN") + " VND";
 };
 
@@ -93,7 +95,7 @@ export const resolveDateDisplay = (
 ): string => {
   const value = displayValue ?? fallbackValue;
   if (value === null || value === undefined) return "";
-  return Helpers.formatDateToDMY(value) || String(value);
+  return formatDateToDMY(value) || String(value);
 };
 
 export const sanitizeDateLike = (
@@ -176,7 +178,7 @@ export const parseExpiryTime = (order: Order): number => {
     sanitizeDateLike(order[ORDER_FIELDS.EXPIRY_DATE]) ??
     sanitizeDateLike(order.expiry_date_display) ??
     sanitizeDateLike(order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY]);
-  const formatted = Helpers.formatDateToDMY(raw) || String(raw || "");
+  const formatted = formatDateToDMY(raw) || String(raw || "");
   const parts = formatted.split("/");
   if (parts.length === 3) {
     const [d, m, y] = parts.map(Number);
@@ -229,11 +231,11 @@ export const getOrderDurationDayBoundsMs = (
     const raw = sanitizeDateLike(
       order.registration_date ?? order[ORDER_FIELDS.ORDER_DATE]
     );
-    reg = Helpers.formatDateToDMY(raw) || "";
+    reg = formatDateToDMY(raw) || "";
   }
   if (!exp) {
     const raw = sanitizeDateLike(order.expiry_date ?? order[ORDER_FIELDS.EXPIRY_DATE]);
-    exp = Helpers.formatDateToDMY(raw) || "";
+    exp = formatDateToDMY(raw) || "";
   }
   const startMs = dmyDisplayToLocalStartMs(reg);
   if (startMs === null) return null;

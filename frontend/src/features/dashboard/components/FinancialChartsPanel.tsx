@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/shared/money";
 import React from "react";
 import {
   CartesianGrid,
@@ -16,7 +17,6 @@ import type {
   RevenueData,
   TaxData,
 } from "@/features/dashboard/api";
-import * as Helpers from "@/shared/utils";
 
 type FinancialChartsPanelProps = {
   revenueData: RevenueData[];
@@ -40,7 +40,7 @@ type FinancialChartRow = {
   tax: number;
 };
 
-const currencyFormatter = Helpers.formatCurrency;
+const currencyFormatter = formatCurrency;
 
 const axisCurrencyFormatter = (value: number) => {
   const absolute = Math.abs(Number(value) || 0);

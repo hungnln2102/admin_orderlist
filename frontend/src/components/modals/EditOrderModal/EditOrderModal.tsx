@@ -1,7 +1,7 @@
+import { formatDateToDMY } from "@/shared/date";
 import React, { useCallback, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../constants";
-import * as Helpers from "../../../shared/utils";
 import { useEditOrderLogic } from "./hooks/useEditOrderLogic";
 import { EditOrderModalProps, Order } from "./types";
 import { getSupplyName, normalizeDateLike } from "./utils";
@@ -66,7 +66,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
         formData.registration_date ||
         formData[ORDER_FIELDS.ORDER_DATE]
     );
-    return Helpers.formatDateToDMY(raw) || String(raw || "");
+    return formatDateToDMY(raw) || String(raw || "");
   }, [formData]);
 
   const orderExpiredDisplay = useMemo(() => {
@@ -76,7 +76,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({
         formData.expiry_date ||
         formData[ORDER_FIELDS.EXPIRY_DATE]
     );
-    return Helpers.formatDateToDMY(raw) || String(raw || "");
+    return formatDateToDMY(raw) || String(raw || "");
   }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {

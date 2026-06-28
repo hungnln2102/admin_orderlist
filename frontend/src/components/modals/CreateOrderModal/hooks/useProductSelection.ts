@@ -1,6 +1,6 @@
+import { getTodayDMY } from "@/shared/date";
 import { useCallback, useEffect } from "react";
 import { ORDER_FIELDS } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import { Order, Supply, SupplyPrice } from "../types";
 
 type RecalcPrice = (
@@ -59,7 +59,7 @@ export const useProductSelection = ({
         String(prev[ORDER_FIELDS.DAYS] || "0") === "0";
       if (alreadyCleared) return prev;
       const resetExpiry =
-        (prev[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+        (prev[ORDER_FIELDS.ORDER_DATE] as string) || getTodayDMY();
       return {
         ...prev,
         [ORDER_FIELDS.ID_PRODUCT]: "",

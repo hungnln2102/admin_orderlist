@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { ORDER_FIELDS } from "../../../../constants";
-import { isMavrykShopSupplierName } from "../../../../shared/utils/supply";
+import { isMavrykShopSupplierName } from "@/features/supply/utils/supplierRules";
 import { CustomerType, Order, Supply, SupplyPrice } from "../types";
 
 type RecalcPrice = (

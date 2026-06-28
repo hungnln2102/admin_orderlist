@@ -1,3 +1,5 @@
+import { daysUntilDate, isRegisteredToday } from "@/shared/date";
+import { roundGiaBanValue } from "@/shared/money";
 import {
   ORDER_FIELDS,
   ORDER_STATUSES,
@@ -5,7 +7,7 @@ import {
   Order,
   OrderDatasetKey,
 } from "@/constants";
-import * as Helpers from "@/shared/utils";
+import { getStatusPriority } from "../status";
 import {
   isGiftOrderCode,
   normalizeOrderCode,
@@ -56,7 +58,7 @@ export function enrichOrdersWithVirtualFields(
     const backendRemaining = parseNumeric(
       sanitizeNumberLike(order.so_ngay_con_lai)
     );
-    const fallbackRemaining = Helpers.daysUntilDate(
+    const fallbackRemaining = daysUntilDate(
       expirySource || formattedExpiryDate
     );
     const effectiveRemaining =
@@ -69,13 +71,13 @@ export function enrichOrdersWithVirtualFields(
       ORDER_STATUSES.CHUA_THANH_TOAN;
     const trangThaiText = String(rawStatus || "").trim();
 
-    const giaBanRaw = Helpers.roundGiaBanValue(
+    const giaBanRaw = roundGiaBanValue(
       Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
     );
     const giftOrder = isGiftOrderCode(order[ORDER_FIELDS.ID_ORDER]);
     /** Quà tặng: không có giá bán với khách — giá trị còn lại theo doanh thu = 0 (vẫn giữ giá gốc trong DB cho suy luận hoàn tiền). */
     const giaBan = giftOrder ? 0 : giaBanRaw;
-    const giaVon = Helpers.roundGiaBanValue(
+    const giaVon = roundGiaBanValue(
       Number.parseFloat(String(order[ORDER_FIELDS.COST] ?? 0)) || 0
     );
     const soNgayDangKy = Number(order[ORDER_FIELDS.DAYS]) || 0;
@@ -223,7 +225,7 @@ export function filterAndSortOrders(
           order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
           order[ORDER_FIELDS.ORDER_DATE]
       );
-      matchesStatus = Helpers.isRegisteredToday(regSrc);
+      matchesStatus = isRegisteredToday(regSrc);
     } else if (statusFilter === ORDER_STATUSES.CAN_GIA_HAN) {
       const remaining = Number(order[VIRTUAL_FIELDS.SO_NGAY_CON_LAI] ?? 0);
       matchesStatus = Number.isFinite(remaining) && remaining > 0 && remaining <= 4;
@@ -266,8 +268,8 @@ export function filterAndSortOrders(
       }
     }
 
-    const priorityA = Helpers.getStatusPriority(statusA);
-    const priorityB = Helpers.getStatusPriority(statusB);
+    const priorityA = getStatusPriority(statusA);
+    const priorityB = getStatusPriority(statusB);
 
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
@@ -341,7 +343,7 @@ export function computeOrderStats(
         order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
         order[ORDER_FIELDS.ORDER_DATE]
     );
-    return Helpers.isRegisteredToday(registrationSource);
+    return isRegisteredToday(registrationSource);
   }).length;
 
   const updatedStats = [
@@ -364,10 +366,10 @@ export function computeOrderFinancialStats(
       const isGiftOrder = isGiftOrderCode(orderCode);
       const sellingPrice = isGiftOrder
         ? 0
-        : Helpers.roundGiaBanValue(
+        : roundGiaBanValue(
             Number.parseFloat(String(order[ORDER_FIELDS.PRICE] ?? 0)) || 0
           );
-      const costPrice = Helpers.roundGiaBanValue(
+      const costPrice = roundGiaBanValue(
         Number.parseFloat(String(order[ORDER_FIELDS.COST] ?? 0)) || 0
       );
       const remainingValue = Number(order[VIRTUAL_FIELDS.GIA_TRI_CON_LAI] ?? 0);
@@ -395,39 +397,4 @@ export function computeOrderFinancialStats(
       totalSupplierRemainingValue: 0,
     }
   );
-}
-
-/** Cắt trang từ danh sách đã lọc. */
-export function getPaginated(
-  filteredOrders: Order[],
-  currentPage: number,
-  rowsPerPage: number
-): { currentOrders: Order[]; totalPages: number } {
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / rowsPerPage));
-  const indexOfLastRow = currentPage * rowsPerPage;
-  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-  const currentOrders = filteredOrders.slice(indexOfFirstRow, indexOfLastRow);
-  return { currentOrders, totalPages };
-}
-
-/** Sinh danh sách số trang + dấu "..." cho UI phân trang. */
-export function buildPaginationPages(
-  currentPage: number,
-  totalPages: number
-): (number | "...")[] {
-  const pages: (number | "...")[] = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-    return pages;
-  }
-  const clamp = (v: number, min: number, max: number) =>
-    Math.min(Math.max(v, min), max);
-  const start = clamp(currentPage - 1, 2, totalPages - 3);
-  const end = clamp(currentPage + 1, 4, totalPages - 1);
-  pages.push(1);
-  if (start > 2) pages.push("...");
-  for (let i = start; i <= end; i++) pages.push(i);
-  if (end < totalPages - 1) pages.push("...");
-  pages.push(totalPages);
-  return pages;
 }

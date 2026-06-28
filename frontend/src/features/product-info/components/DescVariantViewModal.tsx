@@ -6,7 +6,7 @@ import {
   htmlToPlainText,
   sanitizeHtmlForDisplay,
   toHtmlFromPlain,
-} from "../utils/productInfoHelpers";
+} from "@/shared/html";
 
 type DescVariantViewModalProps = {
   item: ProductDescription | null;

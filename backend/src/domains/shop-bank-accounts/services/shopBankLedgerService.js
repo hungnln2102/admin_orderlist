@@ -125,6 +125,20 @@ const insertLedgerAndUpdateAccount = async (
     throw new Error("Shop bank account not found.");
   }
 
+  if (sourceKind && sourceId) {
+    const existing = await findLedgerBySource(executor, sourceKind, sourceId);
+    if (existing) {
+      return {
+        skipped: true,
+        reason: "duplicate",
+        ledgerId: Number(existing.id) || 0,
+        balanceAfter: normalizeRoundedMoney(account.balance),
+        totalReceived: normalizeRoundedMoney(account.total_received),
+        totalWithdrawn: normalizeRoundedMoney(account.total_withdrawn),
+      };
+    }
+  }
+
   const currentBalance = normalizeRoundedMoney(account.balance);
   const nextBalance = currentBalance + normalizeRoundedMoney(signedAmount);
   const nextReceived = normalizeRoundedMoney(account.total_received) + normalizeRoundedMoney(incrementReceived);

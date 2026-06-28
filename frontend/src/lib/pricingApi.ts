@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from "../constants";
 import { apiFetch } from "./api";
-import * as Helpers from "./helpers";
+import { readJsonOrText } from "@/shared/http";
 
 export type CalculatePriceRequest = {
   supply_id?: number | string | null;
@@ -46,7 +46,7 @@ export const fetchCalculatedPrice = async (
   });
 
   const { data, rawText } =
-    await Helpers.readJsonOrText<CalculatePriceResponse>(response);
+    await readJsonOrText<CalculatePriceResponse>(response);
 
   if (!response.ok) {
     const message =

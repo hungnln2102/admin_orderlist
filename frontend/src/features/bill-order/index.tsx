@@ -3,7 +3,7 @@ import {
   API_ENDPOINTS,
   ORDER_CODE_PREFIXES,
 } from "@/constants";
-import { multiplyValue } from "@/shared/utils/pricing";
+import { multiplyValue } from "@/shared/pricing";
 import { apiFetch } from "@/shared/api/client";
 import { ORDER_COLS, VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import { BillOrderForm } from "./components/BillOrderForm";

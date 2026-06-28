@@ -1,9 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
-import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
-import { apiFetch } from "@/shared/api/client";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { showAppNotification } from "@/lib/notifications";
-import * as Helpers from "@/shared/utils";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 import {
@@ -11,11 +7,6 @@ import {
   PaymentReceipt,
   ReceiptCategory,
   buildExportWorksheet,
-  determineReceiptCategory,
-  formatCurrencyVndFull,
-  normalizeReceiptRow,
-  parseDMYDate,
-  resolveSender,
   toDisplayDate,
   toISODate,
 } from "./helpers";
@@ -25,6 +16,10 @@ import { CategoryToggle } from "./components/CategoryToggle";
 import { ReceiptsTable } from "./components/ReceiptsTable";
 import { QrModal } from "./components/QrModal";
 import { ReceiptDetailModal } from "./components/ReceiptDetailModal";
+import { InvoicesPagination } from "./components/InvoicesPagination";
+import { useInvoicesPagination } from "./hooks/useInvoicesPagination";
+import { useInvoiceReceipts } from "./hooks/useInvoiceReceipts";
+import { useInvoiceDerivations } from "./hooks/useInvoiceDerivations";
 
 export default function Invoices() {
   const { config: shopBankConfig } = useDefaultShopBankAccount();
@@ -35,11 +30,9 @@ export default function Invoices() {
   const [dateEnd, setDateEnd] = useState("");
   const [categoryFilter, setCategoryFilter] =
     useState<ReceiptCategory>("receipt");
-  const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
-  const [matchableOrders, setMatchableOrders] = useState<MatchableOrder[]>([]);
+  const { receipts, setReceipts, matchableOrders, loading, error, setError } =
+    useInvoiceReceipts();
   const [matchingReceiptId, setMatchingReceiptId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [rangePickerOpen, setRangePickerOpen] = useState(false);
   const [expandedReceiptId, setExpandedReceiptId] = useState<number | null>(
     null
@@ -54,166 +47,29 @@ export default function Invoices() {
   const [outOfFlowPage, setOutOfFlowPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  useEffect(() => {
-    const fetchReceipts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [receiptsResponse, ordersResponse] = await Promise.all([
-          apiFetch("/api/payment-receipts"),
-          apiFetch("/api/payment-receipts/matchable-orders?limit=500"),
-        ]);
-        if (!receiptsResponse.ok) {
-          throw new Error("Không thể tải biên nhận.");
-        }
-        const data = await receiptsResponse.json();
-        const rawList = Array.isArray(data?.receipts)
-          ? data.receipts
-          : Array.isArray(data)
-          ? data
-          : [];
-        setReceipts(rawList.map(normalizeReceiptRow));
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json();
-          const ordersRaw = Array.isArray(ordersData?.orders)
-            ? ordersData.orders
-            : Array.isArray(ordersData)
-            ? ordersData
-            : [];
-          const normalizedOrders = ordersRaw
-            .map((item: Partial<MatchableOrder>) => ({
-              id: Number(item?.id) || 0,
-              orderCode: String(item?.orderCode || "").trim().toUpperCase(),
-              transaction: String(item?.transaction || "").trim().toUpperCase(),
-              status: String(item?.status || ""),
-              customer: String(item?.customer || ""),
-              informationOrder: String(item?.informationOrder || ""),
-            }))
-            .filter((item: MatchableOrder) => item.orderCode);
-          setMatchableOrders(normalizedOrders);
-        } else {
-          setMatchableOrders([]);
-        }
-      } catch (err) {
-        console.error(err);
-        setError(err instanceof Error ? err.message : "Không thể tải biên nhận.");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { filteredReceipts, stats, categoryCounts } = useInvoiceDerivations({
+    receipts,
+    searchTerm,
+    dateStart,
+    dateEnd,
+    categoryFilter,
+  });
 
-    fetchReceipts();
-  }, []);
-
-  const filteredReceipts = useMemo(() => {
-    const normalized = searchTerm.trim().toLowerCase();
-    const startTime = parseDMYDate(dateStart);
-    const endTime = parseDMYDate(dateEnd);
-
-    return receipts.filter((item) => {
-      const recordCategory = determineReceiptCategory(item);
-      const matchesSearch =
-        !normalized ||
-        [item.orderCode, item.note, resolveSender(item)]
-          .map((value) => value?.toLowerCase() ?? "")
-          .some((value) => value.includes(normalized));
-
-      const paidTimestamp = parseDMYDate(
-        Helpers.formatDateToDMY(item.paidAt) || ""
-      );
-
-      const withinStart =
-        startTime === null ||
-        paidTimestamp === null ||
-        paidTimestamp >= startTime;
-      const withinEnd =
-        endTime === null || paidTimestamp === null || paidTimestamp <= endTime;
-
-      const matchesCategory = recordCategory === categoryFilter;
-
-      return matchesSearch && withinStart && withinEnd && matchesCategory;
-    });
-  }, [receipts, searchTerm, dateStart, dateEnd, categoryFilter]);
-
-  const stats = useMemo(() => {
-    const mavFlowReceipts = receipts.filter(
-      (item) => determineReceiptCategory(item) === "receipt"
-    );
-    const totalAmount = mavFlowReceipts.reduce((sum, item) => sum + item.amount, 0);
-    let latestPaidAt = "";
-    for (const item of mavFlowReceipts) {
-      const t = item.paidAt ?? "";
-      if (t && (!latestPaidAt || t > latestPaidAt)) latestPaidAt = t;
-    }
-
-    return [
-      {
-        name: "Tổng Biên Nhận",
-        value: mavFlowReceipts.length.toString(),
-        icon: CheckCircleIcon,
-        accent: STAT_CARD_ACCENTS.sky,
-      },
-      {
-        name: "Tổng Số Tiền",
-        value: formatCurrencyVndFull(totalAmount),
-        icon: CheckCircleIcon,
-        accent: STAT_CARD_ACCENTS.emerald,
-      },
-      {
-        name: "Biên Nhận Gần Nhất",
-        value: latestPaidAt
-          ? Helpers.formatDateToDMY(latestPaidAt) ?? "--"
-          : "--",
-        icon: XCircleIcon,
-        accent: STAT_CARD_ACCENTS.violet,
-      },
-    ];
-  }, [receipts]);
-
-  const categoryCounts = useMemo(() => {
-    return receipts.reduce(
-      (acc, item) => {
-        const category = determineReceiptCategory(item);
-        acc[category] += 1;
-        return acc;
-      },
-      { receipt: 0, "out-of-flow": 0 } as Record<ReceiptCategory, number>
-    );
-  }, [receipts]);
-
-  const activePage = categoryFilter === "receipt" ? receiptPage : outOfFlowPage;
-  const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / PAGE_SIZE));
-  const paginationItems = useMemo<(number | "ellipsis")[]>(() => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    const clamp = (value: number, min: number, max: number) =>
-      Math.min(Math.max(value, min), max);
-    const startPage = clamp(activePage - 1, 2, totalPages - 3);
-    const endPage = clamp(activePage + 1, 4, totalPages - 1);
-    const pages: (number | "ellipsis")[] = [1];
-
-    if (startPage > 2) pages.push("ellipsis");
-    for (let page = startPage; page <= endPage; page += 1) {
-      pages.push(page);
-    }
-    if (endPage < totalPages - 1) pages.push("ellipsis");
-    pages.push(totalPages);
-
-    return pages;
-  }, [activePage, totalPages]);
-  const pagedReceipts = filteredReceipts.slice(
-    (activePage - 1) * PAGE_SIZE,
-    activePage * PAGE_SIZE
-  );
-  const setActivePage = (updater: (current: number) => number) => {
-    if (categoryFilter === "receipt") {
-      setReceiptPage(updater);
-      return;
-    }
-    setOutOfFlowPage(updater);
-  };
+  const {
+    activePage,
+    totalPages,
+    paginationItems,
+    pagedItems: pagedReceipts,
+    setActivePage,
+  } = useInvoicesPagination({
+    items: filteredReceipts,
+    pageSize: PAGE_SIZE,
+    receiptPage,
+    outOfFlowPage,
+    activeCategory: categoryFilter,
+    setReceiptPage,
+    setOutOfFlowPage,
+  });
 
   useEffect(() => {
     setReceiptPage(1);
@@ -401,68 +257,13 @@ export default function Invoices() {
           shopBank={shopBank}
         />
 
-        <div className="flex flex-col gap-3 px-1 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            Trang {activePage}/{totalPages} ? {filteredReceipts.length} dòng
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              disabled={activePage <= 1}
-              onClick={() => setActivePage(() => 1)}
-            >
-              &lt;&lt;
-            </button>
-            <button
-              type="button"
-              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              disabled={activePage <= 1}
-              onClick={() => setActivePage((current) => Math.max(1, current - 1))}
-            >
-              &lt;
-            </button>
-            {paginationItems.map((item, index) =>
-              item === "ellipsis" ? (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="flex h-10 min-w-7 items-center justify-center font-black text-indigo-100/60"
-                >
-                  ...
-                </span>
-              ) : (
-                <button
-                  key={item}
-                  type="button"
-                  className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-black transition ${
-                    item === activePage
-                      ? "border-blue-400/40 bg-blue-600 text-white shadow-[0_0_24px_rgba(37,99,235,0.35)]"
-                      : "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                  }`}
-                  onClick={() => setActivePage(() => item)}
-                >
-                  {item}
-                </button>
-              )
-            )}
-            <button
-              type="button"
-              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              disabled={activePage >= totalPages}
-              onClick={() => setActivePage((current) => Math.min(totalPages, current + 1))}
-            >
-              &gt;
-            </button>
-            <button
-              type="button"
-              className="h-10 min-w-10 rounded-lg border border-white/10 bg-white/5 px-3 font-bold text-indigo-100/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-              disabled={activePage >= totalPages}
-              onClick={() => setActivePage(() => totalPages)}
-            >
-              &gt;&gt;
-            </button>
-          </div>
-        </div>
+        <InvoicesPagination
+          activePage={activePage}
+          totalPages={totalPages}
+          totalItems={filteredReceipts.length}
+          paginationItems={paginationItems}
+          onSetPage={setActivePage}
+        />
 
         {!loading && filteredReceipts.length === 0 && (
           <div className="text-center py-12">

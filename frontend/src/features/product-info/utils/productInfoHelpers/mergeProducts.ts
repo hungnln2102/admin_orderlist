@@ -1,8 +1,8 @@
+import { toHtmlFromPlain } from "@/shared/html";
 import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import {
   normalizeProductKey,
   normalizeVariantActive,
-  toHtmlFromPlain,
 } from "./basic";
 import type { MergedProduct, ProductPriceItem } from "./types";
 import { variantListSortRank } from "./variantStatus";

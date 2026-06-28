@@ -1,8 +1,8 @@
+import { formatNumberOnTyping } from "@/shared/money";
 import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { apiFetch } from '@/shared/api/client';
-import * as Helpers from '@/shared/utils';
 
 interface AddGoalModalProps {
   isOpen: boolean;
@@ -68,7 +68,7 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
   };
 
   const handleAmountChange = (value: string) => {
-    setTargetAmount(Helpers.formatNumberOnTyping(value));
+    setTargetAmount(formatNumberOnTyping(value));
   };
 
   // Format the display value with thousand separators

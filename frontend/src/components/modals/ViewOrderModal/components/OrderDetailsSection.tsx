@@ -1,5 +1,5 @@
 import type React from "react";
-import * as Helpers from "../../../../shared/utils";
+import { getStatusColor } from "@/features/orders/status";
 import { ORDER_FIELDS } from "../../../../constants";
 import type { OrderView } from "../types";
 
@@ -59,7 +59,7 @@ export const OrderDetailsSection = ({
           <dt className="font-medium text-slate-400 w-1/3">Trạng Thái:</dt>
           <dd className="w-2/3 text-right">
             <span
-              className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${Helpers.getStatusColor(
+              className={`inline-flex items-center px-3 py-1 text-sm font-bold rounded-full ${getStatusColor(
                 displayStatus
               )}`}
             >

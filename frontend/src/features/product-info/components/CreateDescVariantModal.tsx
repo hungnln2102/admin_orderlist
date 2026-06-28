@@ -6,7 +6,7 @@ import { normalizeErrorMessage } from "@/lib/textUtils";
 import {
   normalizeRichHtmlForSave,
   normalizeShortDescriptionForSave,
-} from "../utils/productInfoHelpers";
+} from "@/shared/html";
 import { DescVariantContentFields } from "./DescVariantContentFields";
 import { useWebsiteSeoAudit } from "./EditProductModal/useWebsiteSeoAudit";
 

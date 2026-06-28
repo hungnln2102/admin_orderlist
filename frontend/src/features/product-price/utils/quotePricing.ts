@@ -1,9 +1,9 @@
-import { roundGiaBanValue } from "@/shared/utils";
+import { roundGiaBanValue } from "@/shared/money";
 import { VARIANT_PRICING_COLS } from "@/lib/tableSql";
 import {
   calculateSellingPriceFromMarginInput,
   getDiscountRatioInput,
-} from "@/shared/utils/pricing";
+} from "@/shared/pricing";
 import type { ApiPriceEntry } from "../types";
 import { parseDurationFromSku } from "./quoteApiParsing";
 import {

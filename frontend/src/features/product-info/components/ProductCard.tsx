@@ -10,11 +10,13 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import {
-  MergedProduct,
   htmlToPlainText,
-  resolveVariantDisplayImageUrl,
   sanitizeHtmlForDisplay,
   toHtmlFromPlain,
+} from "@/shared/html";
+import {
+  MergedProduct,
+  resolveVariantDisplayImageUrl,
   variantHasDescVariantLinked,
 } from "../utils/productInfoHelpers";
 

@@ -1,5 +1,5 @@
+import { buildSepayQrUrl } from "@/shared/vietqr";
 import { useEffect, useMemo, useState } from "react";
-import * as Helpers from "@/shared/utils";
 import { apiFetch } from "@/shared/api/client";
 import type { ShopBankDisplay } from "../../helpers";
 import { digitsOnly, formatVndThousands } from "./helpers";
@@ -116,7 +116,7 @@ export const useQrModalController = ({
       : "Chưa Cập Nhật";
 
   const qrImageUrl = useMemo(() => {
-    return Helpers.buildSepayQrUrl({
+    return buildSepayQrUrl({
       accountNumber: shopBank.accountNumber,
       bankCode: shopBank.bankCode,
       amount: parsedAmount,

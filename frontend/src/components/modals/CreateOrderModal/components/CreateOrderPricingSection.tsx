@@ -1,7 +1,7 @@
+import { formatCurrency, formatCurrencyPlain } from "@/shared/money";
 import type React from "react";
 import { useMemo } from "react";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import { getCreateOrderPricingCopy } from "../createOrderPricingCopy";
 import {
   inputClass,
@@ -103,7 +103,7 @@ export const CreateOrderPricingSection = ({
               type="text"
               inputMode="numeric"
               name={ORDER_FIELDS.COST}
-              value={Helpers.formatCurrencyPlain(Number(costValue ?? 0))}
+              value={formatCurrencyPlain(Number(costValue ?? 0))}
               onChange={onCostChange}
               className={`${inputClass} font-semibold`}
             />
@@ -111,7 +111,7 @@ export const CreateOrderPricingSection = ({
             <input
               type="text"
               name={ORDER_FIELDS.COST}
-              value={Helpers.formatCurrency(costDisplay ?? 0)}
+              value={formatCurrency(costDisplay ?? 0)}
               readOnly
               title={copy.costFieldTitle}
               className={`${inputClass} font-semibold ${readOnlyClass}`}
@@ -128,7 +128,7 @@ export const CreateOrderPricingSection = ({
               value={
                 isGift
                   ? "0"
-                  : Helpers.formatCurrencyPlain(Number(priceValue ?? 0))
+                  : formatCurrencyPlain(Number(priceValue ?? 0))
               }
               onChange={isGift ? undefined : onPriceChange}
               readOnly={isGift}
@@ -143,7 +143,7 @@ export const CreateOrderPricingSection = ({
               name={ORDER_FIELDS.PRICE}
               inputMode={isGift ? "numeric" : undefined}
               value={
-                isGift ? "0" : Helpers.formatCurrency(priceValue ?? 0)
+                isGift ? "0" : formatCurrency(priceValue ?? 0)
               }
               readOnly
               title={copy.priceFieldTitle}

@@ -1,4 +1,4 @@
-import * as Helpers from "@/shared/utils";
+import { formatDateToDMY } from "@/shared/date";
 import type { LicenseStatus } from "../types";
 import { normalizeIncomingLicenseStatus } from "../utils/accountUtils";
 import {
@@ -132,7 +132,7 @@ export function flattenToUserRows(orders: OrderInfo[]): UserOrderRow[] {
       profile,
       display_status: displayStatus,
       expiry: order.expiry_date
-        ? Helpers.formatDateToDMY(order.expiry_date)
+        ? formatDateToDMY(order.expiry_date)
         : "—",
       expirySortTs: getExpirySortTs(order.expiry_date),
       accountId: aid,

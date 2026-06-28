@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { PhotoIcon } from "@heroicons/react/24/outline";
 import type { VariantImageItem } from "@/lib/variantImagesApi";
 import {
   deleteVariantImage,
@@ -7,6 +6,7 @@ import {
   uploadVariantImage,
 } from "@/lib/variantImagesApi";
 import { ImagePickerModal } from "./ImagePickerModal";
+import { ImageUploadSurface } from "./ImageUploadSurface";
 
 function withPreviewToken(url: string, token: number): string {
   if (!url || !token) return url;
@@ -184,56 +184,18 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         className="hidden"
       />
 
-      {imageUrl && !previewLoadError ? (
-        <div className="product-edit-image__preview group relative h-full overflow-hidden rounded-[28px] border">
-          <img
-            key={`${imageUrl}-${previewToken}`}
-            src={withPreviewToken(imageUrl, previewToken)}
-            alt="Product preview"
-            className="h-full w-full object-cover"
-            onError={() => setPreviewLoadError(true)}
-          />
-
-          <div className="product-edit-image__preview-overlay absolute inset-0 flex items-end justify-center gap-3 p-5">
-            <button
-              type="button"
-              onClick={handleOpenPicker}
-              className="product-edit-image__action product-edit-image__action--primary"
-            >
-              Chọn từ server
-            </button>
-            <button
-              type="button"
-              onClick={onImageRemove}
-              className="product-edit-image__action product-edit-image__action--danger"
-            >
-              Xóa
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div
-          onClick={handleOpenPicker}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          className={`product-edit-image__empty flex h-full cursor-pointer flex-col items-center justify-center gap-4 rounded-[28px] border p-6 text-center transition-all ${
-            isDragging ? "product-edit-image__empty--dragging" : ""
-          }`}
-        >
-          <PhotoIcon className="product-edit-image__icon h-16 w-16" />
-          <div>
-            <p className="product-edit-image__title mb-2 text-sm font-semibold text-white">
-              {imageUrl && previewLoadError
-                ? "Không tải được ảnh — nhấp để chọn ảnh khác"
-                : "Chọn hình ảnh sản phẩm"}
-            </p>
-            <p className="product-edit-image__hint text-xs">
-              Nhấp để chọn từ server hoặc kéo thả file
-            </p>
-          </div>
-        </div>
-      )}
+      <ImageUploadSurface
+        imageUrl={imageUrl}
+        previewUrl={withPreviewToken(imageUrl || "", previewToken)}
+        previewLoadError={previewLoadError}
+        isDragging={isDragging}
+        onOpenPicker={handleOpenPicker}
+        onRemove={onImageRemove}
+        onPreviewError={() => setPreviewLoadError(true)}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      />
 
       <ImagePickerModal
         open={pickerOpen}

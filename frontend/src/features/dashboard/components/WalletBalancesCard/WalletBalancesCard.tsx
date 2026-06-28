@@ -1,5 +1,6 @@
+import { formatDateToDMY } from "@/shared/date";
+import { formatDecimalOnTyping, formatNumberOnTyping } from "@/shared/money";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import * as Helpers from "@/shared/utils";
 import { apiFetch } from "@/shared/api/client";
 import { type WalletRow } from "../../hooks/useWalletBalances";
 import WalletBalancesHeader from "./WalletBalancesHeader";
@@ -107,7 +108,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
     
     setNewValues((prev) => ({ 
       ...prev, 
-      [field]: isVnd ? Helpers.formatNumberOnTyping(value) : Helpers.formatDecimalOnTyping(value)
+      [field]: isVnd ? formatNumberOnTyping(value) : formatDecimalOnTyping(value)
     }));
   }, [columns]);
 
@@ -118,7 +119,7 @@ const WalletBalancesCard: React.FC<WalletBalancesCardProps> = ({
   }, []);
 
   const handleSave = async () => {
-    const recordDate = newDate || Helpers.formatDateToDMY(new Date()) || "";
+    const recordDate = newDate || formatDateToDMY(new Date()) || "";
     if (!recordDate) return;
     const sameDayRow = rows.find((r) => r.recordDate === recordDate);
     const payload: Record<string, number> = {};

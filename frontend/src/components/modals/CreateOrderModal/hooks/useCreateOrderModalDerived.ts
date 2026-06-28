@@ -1,13 +1,13 @@
+import { addMonthsMinusOneDay, formatDateToDMY, getTodayDMY, inclusiveDaysBetween, parseMonthsFromInfo } from "@/shared/date";
 import { useCallback, useEffect, useMemo } from "react";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "../../../../constants";
 import {
   isImportOrderCodeOption,
   type OrderCodeSelectOption,
 } from "@/shared/hooks/usePricingTiers";
-import * as Helpers from "../../../../shared/utils";
 import { calculateExpirationDate } from "../helpers";
 import type { CreateOrderCreationKind, CustomerType, Order, Product, Supply } from "../types";
-import { isMavrykShopSupplierName } from "@/shared/utils/supply";
+import { isMavrykShopSupplierName } from "@/features/supply/utils/supplierRules";
 import { formatCurrency } from "@/features/orders/utils/ordersHelpers";
 import type { AvailableRefundCredit } from "@/lib/refundCreditsApi";
 
@@ -104,12 +104,12 @@ export const useCreateOrderModalDerived = ({
 
   const infoAValue = (formData[ORDER_FIELDS.INFORMATION_ORDER] as string) || "";
   const infoBValue = (formData[ORDER_FIELDS.ID_PRODUCT] as string) || "";
-  const registerDateValue = (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY();
+  const registerDateValue = (formData[ORDER_FIELDS.ORDER_DATE] as string) || getTodayDMY();
   const costValue = formData[ORDER_FIELDS.COST] as string | number | undefined;
   const priceValue = formData[ORDER_FIELDS.PRICE] as string | number | undefined;
 
   const registerDateDMY = useMemo(
-    () => (formData[ORDER_FIELDS.ORDER_DATE] as string) || Helpers.getTodayDMY(),
+    () => (formData[ORDER_FIELDS.ORDER_DATE] as string) || getTodayDMY(),
     [formData]
   );
   const totalDays = useMemo(() => Number(formData[ORDER_FIELDS.DAYS] || 0) || 0, [formData]);
@@ -240,9 +240,9 @@ export const useCreateOrderModalDerived = ({
 
       const regRaw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
       if (isCompleteDMY(raw) && isCompleteDMY(regRaw)) {
-        const normExpiry = Helpers.formatDateToDMY(raw) || raw;
-        const normReg = Helpers.formatDateToDMY(regRaw) || regRaw;
-        const days = Helpers.inclusiveDaysBetween(normReg, normExpiry);
+        const normExpiry = formatDateToDMY(raw) || raw;
+        const normReg = formatDateToDMY(regRaw) || regRaw;
+        const days = inclusiveDaysBetween(normReg, normExpiry);
         if (Number.isFinite(days) && days > 0) {
           patch[ORDER_FIELDS.EXPIRY_DATE] = normExpiry;
           patch[ORDER_FIELDS.DAYS] = String(days);
@@ -256,15 +256,15 @@ export const useCreateOrderModalDerived = ({
 
   const handleExpiryDateBlur = useCallback(() => {
     const raw = (formData[ORDER_FIELDS.EXPIRY_DATE] as string) || "";
-    const normalized = Helpers.formatDateToDMY(raw);
+    const normalized = formatDateToDMY(raw);
     const nextExpiry = normalized || raw;
     const patch: Partial<Order> = {
       [ORDER_FIELDS.EXPIRY_DATE]: nextExpiry,
     };
     const regRaw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
-    const normReg = Helpers.formatDateToDMY(regRaw) || regRaw;
+    const normReg = formatDateToDMY(regRaw) || regRaw;
     if (nextExpiry && normReg) {
-      const days = Helpers.inclusiveDaysBetween(normReg, nextExpiry);
+      const days = inclusiveDaysBetween(normReg, nextExpiry);
       if (Number.isFinite(days) && days > 0) {
         patch[ORDER_FIELDS.DAYS] = String(days);
       }
@@ -280,7 +280,7 @@ export const useCreateOrderModalDerived = ({
       };
 
       if (isCompleteDMY(raw)) {
-        const normalized = Helpers.formatDateToDMY(raw) || raw;
+        const normalized = formatDateToDMY(raw) || raw;
         if (totalDays > 0) {
           const computedExpiry = calculateExpirationDate(normalized, totalDays);
           if (computedExpiry && computedExpiry !== "N/A") {
@@ -298,7 +298,7 @@ export const useCreateOrderModalDerived = ({
 
   const handleRegisterDateBlur = useCallback(() => {
     const raw = (formData[ORDER_FIELDS.ORDER_DATE] as string) || "";
-    const normalized = Helpers.formatDateToDMY(raw);
+    const normalized = formatDateToDMY(raw);
     if (!normalized || normalized === raw.trim()) return;
     updateForm({
       [ORDER_FIELDS.ORDER_DATE]: normalized,
@@ -308,12 +308,12 @@ export const useCreateOrderModalDerived = ({
   useEffect(() => {
     if (!customMode || !customProductTouched) return;
     const months =
-      Helpers.parseMonthsFromInfo(infoAValue) || Helpers.parseMonthsFromInfo(infoBValue);
+      parseMonthsFromInfo(infoAValue) || parseMonthsFromInfo(infoBValue);
     const registerDate = registerDateValue;
 
     if (months > 0) {
-      const end = Helpers.addMonthsMinusOneDay(registerDate, months);
-      const days = Helpers.inclusiveDaysBetween(registerDate, end);
+      const end = addMonthsMinusOneDay(registerDate, months);
+      const days = inclusiveDaysBetween(registerDate, end);
       updateForm({
         [ORDER_FIELDS.DAYS]: String(days),
         [ORDER_FIELDS.EXPIRY_DATE]: end,

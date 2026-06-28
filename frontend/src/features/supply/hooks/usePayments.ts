@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { apiFetch } from "@/shared/api/client";
-import { buildSepayQrUrl } from "../utils/supplies";
+import { buildSepayQrUrl } from "@/shared/vietqr";
 import { useDefaultShopBankAccount } from "@/features/shop-bank-accounts/hooks/useDefaultShopBankAccount";
 import { encodeSupplierSignature } from "../utils/supplierPaymentSignature";
 export interface QrPayment {

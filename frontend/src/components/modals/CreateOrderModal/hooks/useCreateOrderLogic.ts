@@ -1,10 +1,10 @@
+import { getTodayDMY } from "@/shared/date";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import {
   CreateOrderPrefillContext,
   CreateOrderCreationKind,
@@ -81,7 +81,7 @@ export const useCreateOrderLogic = (
     productName,
   });
 
-  const todayDate = useMemo(() => Helpers.getTodayDMY(), []);
+  const todayDate = useMemo(() => getTodayDMY(), []);
 
   useEffect(() => {
     if (!isOpen) {

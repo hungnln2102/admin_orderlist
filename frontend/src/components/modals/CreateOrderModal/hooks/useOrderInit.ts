@@ -1,10 +1,10 @@
+import { getTodayDMY } from "@/shared/date";
 import { useEffect } from "react";
 import {
   DEFAULT_ORDER_CODE_PREFIX,
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import { INITIAL_FORM_DATA } from "../helpers";
 import { CreateOrderPrefillContext, CreateOrderCreationKind, CustomerType, Order, Supply, SupplyPrice } from "../types";
 
@@ -55,7 +55,7 @@ export const useOrderInit = ({
         initialType = DEFAULT_ORDER_CODE_PREFIX as CustomerType;
       }
     }
-    const initialDate = Helpers.getTodayDMY();
+    const initialDate = getTodayDMY();
 
     setCustomerType(initialType);
     setFormData({

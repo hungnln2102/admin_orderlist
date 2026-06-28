@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback } from "react";
-import { formatExactVnd } from "@/shared/utils/money";
+import { formatExactVnd } from "@/shared/money";
 
 type OrderPaymentQrSectionProps = {
   orderId: string;

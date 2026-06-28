@@ -1,5 +1,5 @@
+import { formatDateToDMY } from "@/shared/date";
 import React, { useMemo, useState } from "react";
-import * as Helpers from "@/shared/utils";
 import {
   extractTransactionCodeFromNote,
   MatchableOrder,
@@ -353,7 +353,7 @@ export const ReceiptsTable: React.FC<ReceiptsTableProps> = ({
                     <td className="px-5 py-5 last:rounded-r-[24px] glass-panel border-y border-white/5 group-hover/row:border-indigo-500/30 group-hover/row:bg-indigo-500/5 transition-all duration-500 text-right pr-6">
                       <span className="text-xs font-bold text-indigo-300/80 tracking-tighter">
                         {receipt.paidAt
-                          ? Helpers.formatDateToDMY(receipt.paidAt)
+                          ? formatDateToDMY(receipt.paidAt)
                           : "—"}
                       </span>
                     </td>

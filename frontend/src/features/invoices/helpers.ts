@@ -1,5 +1,5 @@
+import { formatDateToDMY } from "@/shared/date";
 import { PAYMENT_RECEIPT_COLS } from "@/lib/tableSql";
-import * as Helpers from "@/shared/utils";
 
 export type { ShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 export { toShopBankDisplay } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
@@ -198,7 +198,7 @@ export const buildExportWorksheet = (
     formatCurrencyVnd(receipt.amount),
     receipt.note || "",
     extractTransactionCodeFromNote(receipt.note),
-    receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "",
+    receipt.paidAt ? formatDateToDMY(receipt.paidAt) : "",
     determineReceiptCategory(receipt) === "receipt"
       ? "Biên nhận"
       : "Ngoài luồng",

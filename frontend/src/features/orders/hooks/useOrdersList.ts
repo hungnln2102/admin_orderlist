@@ -6,9 +6,8 @@ import {
   filterAndSortOrders,
   computeOrderStats,
   computeOrderFinancialStats,
-  getPaginated,
-  buildPaginationPages,
 } from "../utils/orderListTransform";
+import { getPaginated, buildPaginationPages } from "../utils/orderPagination";
 import { orderCreatedWithinIsoRange } from "../utils/ordersHelpers";
 
 export type OrdersDurationRange = { from: string; to: string };

@@ -1,6 +1,6 @@
+import { formatCurrency } from "@/shared/money";
 import React from "react";
 import type { MonthlySummaryData } from "@/features/dashboard/api";
-import * as Helpers from "@/shared/utils";
 
 interface MonthlySummaryTableProps {
   loading: boolean;
@@ -9,7 +9,7 @@ interface MonthlySummaryTableProps {
   onRefresh?: () => void;
 }
 
-const formatCurrency = Helpers.formatCurrency;
+const formatCurrency = formatCurrency;
 
 const formatMonthKey = (monthKey: string): string => {
   // Convert YYYY-MM to "Tháng M, YYYY" or similar

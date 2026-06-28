@@ -1,5 +1,5 @@
+import { convertDMYToYMD, daysUntilDate, formatDateToDMY } from "@/shared/date";
 import React from "react";
-import * as Helpers from "../../../shared/utils";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "../../../constants";
 import { isGiftOrderCode } from "../../../features/orders/utils/ordersHelpers";
@@ -33,8 +33,8 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     (order?.[ORDER_FIELDS.ORDER_DATE] as string) ||
     "";
   const normalizedOrderDate =
-    Helpers.convertDMYToYMD(
-      Helpers.formatDateToDMY(orderDateRaw) || orderDateRaw
+    convertDMYToYMD(
+      formatDateToDMY(orderDateRaw) || orderDateRaw
     ) || null;
 
   const importOrder = Boolean(orderId && isImportOrderId(orderId));
@@ -125,7 +125,7 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   );
 
   const fallbackRemaining =
-    Helpers.daysUntilDate(expirySource) ??
+    daysUntilDate(expirySource) ??
     parseNumberLike(order[ORDER_FIELDS.DAYS]);
   const displayRemainingDays =
     remainingFromBackend !== null && Number.isFinite(remainingFromBackend)
@@ -142,13 +142,13 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   const registrationDisplay =
     (order.registration_date_display ||
       order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] ||
-      Helpers.formatDateToDMY(registrationSource) ||
+      formatDateToDMY(registrationSource) ||
       String((order[ORDER_FIELDS.ORDER_DATE] as string) || "")) ??
     "";
   const expiryDisplay =
     order.expiry_date_display ||
     order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
-    Helpers.formatDateToDMY(expirySource) ||
+    formatDateToDMY(expirySource) ||
     String((order[ORDER_FIELDS.EXPIRY_DATE] as string) || "");
 
   const qrPayload = buildViewOrderPaymentQrPayload({

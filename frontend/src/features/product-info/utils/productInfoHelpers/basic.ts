@@ -25,8 +25,7 @@ export const stripDurationSuffix = (value: string): string => {
   return value.replace(/--\d+m$/i, "").trim();
 };
 
-export const toHtmlFromPlain = (value: string): string =>
-  (value || "").replace(/\n/g, "<br/>");
+export { toHtmlFromPlain } from "@/shared/html";
 
 /** Chuẩn hóa key để so khớp (không split/bỏ suffix, lấy đúng display_name). */
 export const normalizeProductKey = (value: string): string =>

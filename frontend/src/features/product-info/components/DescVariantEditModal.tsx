@@ -7,7 +7,7 @@ import {
   normalizeRichHtmlForSave,
   normalizeShortDescriptionForSave,
   toHtmlFromPlain,
-} from "../utils/productInfoHelpers";
+} from "@/shared/html";
 import ImageUpload from "./EditProductModal/ImageUpload";
 import { DescVariantContentFields } from "./DescVariantContentFields";
 import { useWebsiteSeoAudit } from "./EditProductModal/useWebsiteSeoAudit";

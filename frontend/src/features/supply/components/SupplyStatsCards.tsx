@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/shared/money";
 import React from "react";
 import {
   ShoppingBagIcon,
@@ -6,7 +7,6 @@ import {
   ClockIcon,
 } from "@heroicons/react/24/outline";
 import StatCard, { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
-import * as Helpers from "@/shared/utils";
 
 interface Props {
   orderCount: number;
@@ -34,19 +34,19 @@ const SupplyStatsCards: React.FC<Props> = ({
       />
       <StatCard
         title="Tổng nhập"
-        value={loading ? dash : Helpers.formatCurrency(totalCost)}
+        value={loading ? dash : formatCurrency(totalCost)}
         icon={CurrencyDollarIcon}
         accent={STAT_CARD_ACCENTS.emerald}
       />
       <StatCard
         title="Tổng hoàn"
-        value={loading ? dash : Helpers.formatCurrency(totalRefund)}
+        value={loading ? dash : formatCurrency(totalRefund)}
         icon={ArrowUturnLeftIcon}
         accent={STAT_CARD_ACCENTS.amber}
       />
       <StatCard
         title="Tổng chưa thanh toán"
-        value={loading ? dash : Helpers.formatCurrency(totalUnpaid)}
+        value={loading ? dash : formatCurrency(totalUnpaid)}
         icon={ClockIcon}
         accent={STAT_CARD_ACCENTS.rose}
       />

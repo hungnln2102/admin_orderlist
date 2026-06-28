@@ -1,4 +1,4 @@
-import * as Helpers from "@/shared/utils";
+import { formatDateToDMY } from "@/shared/date";
 
 export const normalizeIdentifier = (value: string | null | undefined): string => {
   return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -19,7 +19,7 @@ export const toCleanString = (value: unknown): string => {
 };
 
 export const formatDisplayDate = (value?: string | null): string => {
-  const normalized = Helpers.formatDateToDMY(value ?? "");
+  const normalized = formatDateToDMY(value ?? "");
   if (normalized) return normalized;
 
   const trimmed = (value || "").trim();

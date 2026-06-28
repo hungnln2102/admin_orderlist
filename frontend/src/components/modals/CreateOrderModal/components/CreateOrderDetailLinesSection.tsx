@@ -1,7 +1,7 @@
+import { formatCurrency } from "@/shared/money";
 import type React from "react";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ORDER_FIELDS } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import {
   inputClass,
   labelClass,
@@ -84,8 +84,8 @@ export const CreateOrderDetailLinesSection = ({
           </p>
           {completeLineCount > 0 && unitPrice > 0 ? (
             <p className="mt-2 text-xs font-semibold text-emerald-200/85">
-              {completeLineCount} đơn × {Helpers.formatCurrency(unitPrice)} ≈{" "}
-              {Helpers.formatCurrency(estimatedTotalPrice)}
+              {completeLineCount} đơn × {formatCurrency(unitPrice)} ≈{" "}
+              {formatCurrency(estimatedTotalPrice)}
             </p>
           ) : null}
         </div>

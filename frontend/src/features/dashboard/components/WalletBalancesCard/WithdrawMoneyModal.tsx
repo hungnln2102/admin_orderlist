@@ -4,7 +4,6 @@ import { ModalPortal } from "@/components/ui/ModalPortal";
 import { fetchShopBankAccounts, recordShopBankAccountWithdrawal } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
 import { formatShopBankMoneyDraft, parseShopBankMoneyInput } from "@/features/shop-bank-accounts/helpers/formatShopBankMoney";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
-import * as Helpers from "@/shared/utils";
 
 type WithdrawMoneyModalProps = {
   isOpen: boolean;

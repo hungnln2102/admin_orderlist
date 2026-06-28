@@ -1,9 +1,9 @@
+import { formatDateToDMY } from "@/shared/date";
 import React from "react";
 import { PencilIcon } from "@heroicons/react/24/outline";
 
 import { ResponsiveTable } from "@/components/ui/ResponsiveTable";
 import type { SupplyOrderCostRow } from "@/lib/suppliesApi";
-import * as Helpers from "@/shared/utils";
 
 import type {
   ActiveSupplyTab,
@@ -117,7 +117,7 @@ const ExternalImportTable: React.FC<ExternalImportTableProps> = ({
             <tr key={log.id || idx} className="text-sm text-white/90">
               <td className="px-4 py-3 text-white/50">{idx + 1}</td>
               <td className="px-4 py-3 text-white/70">
-                {Helpers.formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
+                {formatDateToDMY(log.expenseDate || log.createdAt || "") || "—"}
               </td>
               <td className="px-4 py-3">
                 <span

@@ -1,10 +1,10 @@
+import { formatNumberOnTyping } from "@/shared/money";
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { fetchShopBankAccounts } from "@/features/shop-bank-accounts/api/shopBankAccountApi";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
 import { apiFetch } from "@/shared/api/client";
-import * as Helpers from "@/shared/utils";
 
 type ExternalImportLogModalProps = {
   isOpen: boolean;
@@ -162,7 +162,7 @@ const ExternalImportLogModal: React.FC<ExternalImportLogModalProps> = ({
                 type="text"
                 value={amountInput}
                 onChange={(e) =>
-                  setAmountInput(Helpers.formatNumberOnTyping(e.target.value))
+                  setAmountInput(formatNumberOnTyping(e.target.value))
                 }
                 placeholder="0"
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"

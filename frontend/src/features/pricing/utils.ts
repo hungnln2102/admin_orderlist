@@ -3,7 +3,7 @@ import {
   getDiscountRatioInput,
   getMarginRatioInput,
   multiplyValue,
-} from "@/shared/utils/pricing";
+} from "@/shared/pricing";
 import {
   CreateSupplierEntry,
   ProductPricingRow,

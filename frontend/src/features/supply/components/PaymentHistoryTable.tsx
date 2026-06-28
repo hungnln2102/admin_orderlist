@@ -1,9 +1,9 @@
+import { formatCurrency } from "@/shared/money";
 import React, { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/shared/api/client";
 import { Payment } from "../types";
-import * as Helpers from "@/shared/utils";
 
-const formatCurrency = Helpers.formatCurrency;
+const formatCurrency = formatCurrency;
 
 interface Props {
   supplyId: number;

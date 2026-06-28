@@ -1,7 +1,7 @@
+import { convertDMYToYMD, formatDateToDMY } from "@/shared/date";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDaysIcon } from "@heroicons/react/24/outline";
-import * as Helpers from "@/shared/utils";
 import { toDisplayDate, toISODate } from "@/features/invoices/helpers";
 
 /** chartBucket: preset — day | month | year (một cột mỗi năm dương lịch). */
@@ -29,8 +29,8 @@ const parseRangeText = (raw: string): DashboardDateRangeValue | null => {
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(a) || !/^\d{2}\/\d{2}\/\d{4}$/.test(b)) {
     return null;
   }
-  const from = Helpers.convertDMYToYMD(a);
-  const to = Helpers.convertDMYToYMD(b);
+  const from = convertDMYToYMD(a);
+  const to = convertDMYToYMD(b);
   if (from > to) return null;
   return { from, to };
 };
@@ -55,8 +55,8 @@ export const DashboardDateRangeFilter: React.FC<Props> = ({
 
   useEffect(() => {
     if (value) {
-      const d0 = Helpers.formatDateToDMY(value.from) || value.from;
-      const d1 = Helpers.formatDateToDMY(value.to) || value.to;
+      const d0 = formatDateToDMY(value.from) || value.from;
+      const d1 = formatDateToDMY(value.to) || value.to;
       setText(`${d0} - ${d1}`);
       setLocalStart(d0);
       setLocalEnd(d1);
@@ -128,8 +128,8 @@ export const DashboardDateRangeFilter: React.FC<Props> = ({
       return;
     }
     if (value) {
-      const d0 = Helpers.formatDateToDMY(value.from) || value.from;
-      const d1 = Helpers.formatDateToDMY(value.to) || value.to;
+      const d0 = formatDateToDMY(value.from) || value.from;
+      const d1 = formatDateToDMY(value.to) || value.to;
       setText(`${d0} - ${d1}`);
     }
   }, [applyRange, text, value]);
@@ -145,8 +145,8 @@ export const DashboardDateRangeFilter: React.FC<Props> = ({
 
   const handleCalendarApply = () => {
     if (!localStart || !localEnd) return;
-    const from = Helpers.convertDMYToYMD(localStart);
-    const to = Helpers.convertDMYToYMD(localEnd);
+    const from = convertDMYToYMD(localStart);
+    const to = convertDMYToYMD(localEnd);
     if (from && to && from <= to) {
       applyRange({ from, to });
     }

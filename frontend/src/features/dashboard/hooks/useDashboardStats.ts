@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/shared/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArchiveBoxIcon,
@@ -21,7 +22,6 @@ import {
   type TaxData,
 } from "@/features/dashboard/api";
 import type { DashboardDateRangeValue } from "../components/DashboardDateRangeFilter";
-import * as Helpers from "@/shared/utils";
 import { normalizeErrorMessage } from "@/lib/textUtils";
 import { type OverviewStat } from "../components/OverviewStats";
 import { STAT_CARD_ACCENTS } from "@/components/ui/StatCard";
@@ -36,7 +36,7 @@ interface StatsApiResponse {
   availableProfit?: { current: number; previous: number };
 }
 
-const formatCurrency = Helpers.formatCurrency;
+const formatCurrency = formatCurrency;
 
 const toChangeLabel = (diff: number) => {
   if (!Number.isFinite(diff)) return "N/A";

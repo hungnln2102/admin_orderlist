@@ -5,7 +5,7 @@ import {
   VIRTUAL_FIELDS,
   Order,
 } from "@/constants";
-import * as Helpers from "@/shared/utils";
+import { getStatusColor } from "../status";
 import { prefetchQrImage } from "@/components/modals/ViewOrderModal/components/OrderPaymentQrSection";
 import { buildViewOrderPaymentQrPayload } from "@/components/modals/ViewOrderModal/paymentQr";
 import { getOrderQrEligibility } from "@/components/modals/ViewOrderModal/qrEligibility";
@@ -251,7 +251,7 @@ export const OrderRow = React.memo(function OrderRow({
 
         <td className={`${cellClass} text-center`}>
           <span
-            className={`inline-block px-2 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-full border shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)] whitespace-nowrap w-full truncate overflow-hidden text-ellipsis ${Helpers.getStatusColor(
+            className={`inline-block px-2 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-full border shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)] whitespace-nowrap w-full truncate overflow-hidden text-ellipsis ${getStatusColor(
               String(trangThaiText || "")
             )}`}
           >

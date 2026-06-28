@@ -1,7 +1,8 @@
+import { formatCurrency } from "@/shared/money";
+import { buildSepayQrUrl } from "@/shared/vietqr";
 import React, { useEffect, useMemo, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import * as Helpers from "@/shared/utils";
 import { BankOption } from "../types";
 import { useSupplyDetail } from "../hooks/useSupplyDetail";
 import { usePayments } from "../hooks/usePayments";
@@ -97,7 +98,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
     }
 
     if (isNegative) {
-      return Helpers.buildSepayQrUrl({
+      return buildSepayQrUrl({
         accountNumber: selectedShopBankAccount?.accountNumber || shopBank.accountNumber,
         bankCode:
           selectedShopBankAccount?.bankShortCode ||
@@ -108,7 +109,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
       });
     }
     if (!supply.numberBank || !supply.binBank) return null;
-    return Helpers.buildSepayQrUrl({
+    return buildSepayQrUrl({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
       amount,
@@ -253,15 +254,15 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                   <div className="grid grid-cols-2 gap-3 text-sm text-white/80">
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                       <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Đã trả</p>
-                      <p className="text-lg font-bold text-white mt-1">{Helpers.formatCurrency(stats?.totalPaidAmount || 0)}</p>
+                      <p className="text-lg font-bold text-white mt-1">{formatCurrency(stats?.totalPaidAmount || 0)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                       <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Còn nợ</p>
-                      <p className="text-lg font-bold text-orange-400 mt-1">{Helpers.formatCurrency(totalUnpaid)}</p>
+                      <p className="text-lg font-bold text-orange-400 mt-1">{formatCurrency(totalUnpaid)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                       <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Hoàn tiền</p>
-                      <p className="text-lg font-bold text-rose-400 mt-1">{Helpers.formatCurrency(totalSupplierRefund)}</p>
+                      <p className="text-lg font-bold text-rose-400 mt-1">{formatCurrency(totalSupplierRefund)}</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3 border border-white/5 transition-colors hover:bg-white/10">
                       <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider">Nợ đơn</p>
@@ -330,7 +331,7 @@ const SupplierDetailModal: React.FC<Props> = ({ isOpen, onClose, supplyId, banks
                                       <p className="text-xs font-semibold text-white/90 truncate">{order.idOrder || `#${order.orderListId}`}</p>
                                       <p className="text-[11px] text-white/60 truncate">{order.nccPaymentStatus || "—"}</p>
                                       <p className="text-[11px] text-emerald-300 mt-0.5">
-                                        Chi phí: {Helpers.formatCurrency(order.importCost)}
+                                        Chi phí: {formatCurrency(order.importCost)}
                                       </p>
                                     </div>
                                   ))

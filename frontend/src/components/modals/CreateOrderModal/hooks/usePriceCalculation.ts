@@ -1,9 +1,9 @@
+import { addMonthsMinusOneDay, formatDateToDMY, getTodayDMY, inclusiveDaysBetween, parseMonthsFromInfo } from "@/shared/date";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ORDER_CODE_PREFIXES,
   ORDER_FIELDS,
 } from "../../../../constants";
-import * as Helpers from "../../../../shared/utils";
 import { showAppNotification } from "@/lib/notifications";
 import { fetchCalculatedPrice } from "../../../../lib/pricingApi";
 import {
@@ -100,9 +100,9 @@ export const usePriceCalculation = ({
           mavryk_profit_mode?: boolean;
         };
         const normalizedRegisterDMY =
-          Helpers.formatDateToDMY(registerDateStr) ||
+          formatDateToDMY(registerDateStr) ||
           registerDateStr ||
-          Helpers.getTodayDMY();
+          getTodayDMY();
 
         const mavrykMode = Boolean(raw.mavryk_profit_mode);
         const mapped: CalculatedPriceResult = {
@@ -117,7 +117,7 @@ export const usePriceCalculation = ({
 
         const expiryRaw = (raw.expiry_date ?? raw.order_expired ?? raw.het_han ?? "").trim();
         const expiryDMY =
-          Helpers.formatDateToDMY(expiryRaw) ||
+          formatDateToDMY(expiryRaw) ||
           expiryRaw ||
           (mapped.days > 0
             ? calculateExpirationDate(normalizedRegisterDMY, mapped.days)
@@ -159,17 +159,17 @@ export const usePriceCalculation = ({
       if (!result) return;
 
       const safeRegister =
-        Helpers.formatDateToDMY(registerDMY) ||
+        formatDateToDMY(registerDMY) ||
         registerDMY ||
-        Helpers.getTodayDMY();
+        getTodayDMY();
       let days = Number(result.days || 0) || 0;
       let expiry =
         result.expiry_date ||
         (days > 0 ? calculateExpirationDate(safeRegister, days) : "");
 
       const monthsFromInfo =
-        Helpers.parseMonthsFromInfo(options?.infoOverride || "") ||
-        Helpers.parseMonthsFromInfo(
+        parseMonthsFromInfo(options?.infoOverride || "") ||
+        parseMonthsFromInfo(
           (
             options?.productNameOverride ||
             productName ||
@@ -178,8 +178,8 @@ export const usePriceCalculation = ({
         );
 
       if (monthsFromInfo > 0) {
-        const end = Helpers.addMonthsMinusOneDay(safeRegister, monthsFromInfo);
-        const derivedDays = Helpers.inclusiveDaysBetween(safeRegister, end);
+        const end = addMonthsMinusOneDay(safeRegister, monthsFromInfo);
+        const derivedDays = inclusiveDaysBetween(safeRegister, end);
         if (derivedDays > 0) {
           days = derivedDays;
           expiry = end;

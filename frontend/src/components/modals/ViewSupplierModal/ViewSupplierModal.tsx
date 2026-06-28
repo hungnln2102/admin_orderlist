@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/shared/money";
+import { buildSepayQrUrl } from "@/shared/vietqr";
 import React, { useMemo, useState } from "react";
 import {
   XMarkIcon,
@@ -7,7 +9,6 @@ import {
   CurrencyDollarIcon,
 } from "@heroicons/react/24/outline";
 import { apiFetch } from "../../../shared/api/client";
-import * as Helpers from "../../../shared/utils";
 import StatCard from "./components/StatCard";
 import { useSupplyOverview } from "./hooks/useSupplyOverview";
 import { ViewSupplierModalProps } from "./types";
@@ -91,7 +92,7 @@ export default function ViewSupplierModal({
     const amount = isNegative ? Math.abs(raw) : Math.max(0, raw - paid);
     if (amount <= 0) return null;
     if (isNegative) {
-      return Helpers.buildSepayQrUrl({
+      return buildSepayQrUrl({
         accountNumber: shopBank.accountNumber,
         bankCode: shopBank.bankCode,
         amount,
@@ -99,7 +100,7 @@ export default function ViewSupplierModal({
       });
     }
     if (!supply.numberBank || !supply.binBank) return null;
-    return Helpers.buildSepayQrUrl({
+    return buildSepayQrUrl({
       accountNumber: supply.numberBank,
       bankCode: supply.binBank,
       amount,
@@ -138,7 +139,7 @@ export default function ViewSupplierModal({
                   <StatCard title="Tổng Đơn" value={stats.totalOrders} accent="sky" Icon={ClipboardDocumentListIcon} />
                   <StatCard title="Đơn Hủy" value={stats.canceledOrders} accent="rose" Icon={XCircleIcon} />
                   <StatCard title="Tháng Này" value={stats.monthlyOrders} accent="violet" Icon={CalendarDaysIcon} />
-                  <StatCard title="Đã Thanh Toán" value={Helpers.formatCurrency(stats.totalPaidAmount)} accent="emerald" Icon={CurrencyDollarIcon} />
+                  <StatCard title="Đã Thanh Toán" value={formatCurrency(stats.totalPaidAmount)} accent="emerald" Icon={CurrencyDollarIcon} />
                 </div>
               </div>
 
@@ -149,7 +150,7 @@ export default function ViewSupplierModal({
                     <button key={p.id} onClick={() => setSelectedPaymentId(p.id)}
                       className={`w-full text-left rounded-xl border px-4 py-3 transition ${p.id === selectedPaymentId ? "border-indigo-500 bg-indigo-500/20" : "border-white/10 bg-white/5"}`}>
                       <p className="font-semibold">{p.round}</p>
-                      <p className="text-xs text-white/70">Tiền hàng: {Helpers.formatCurrency(p.totalImport || p.import_value)}</p>
+                      <p className="text-xs text-white/70">Tiền hàng: {formatCurrency(p.totalImport || p.import_value)}</p>
                     </button>
                   ))}
                 </div>
@@ -172,7 +173,7 @@ export default function ViewSupplierModal({
                              return (
                                <div className="grid grid-cols-2 gap-4 text-sm">
                                  <div><p className="text-white/60">Chủ TK</p><p>{isNegative ? shopBank.accountHolder : supply.sourceName}</p></div>
-                                 <div><p className="text-white/60">Số Tiền</p><p className="text-rose-400 font-bold text-lg">{Helpers.formatCurrency(displayAmount)}{isNegative ? " (NCC chuyển cho bạn)" : ""}</p></div>
+                                 <div><p className="text-white/60">Số Tiền</p><p className="text-rose-400 font-bold text-lg">{formatCurrency(displayAmount)}{isNegative ? " (NCC chuyển cho bạn)" : ""}</p></div>
                                  <div className="col-span-2"><p className="text-white/60">Nội dung</p><p className="font-mono bg-black/30 p-2 rounded">{selectedPayment.round}</p></div>
                                </div>
                              );

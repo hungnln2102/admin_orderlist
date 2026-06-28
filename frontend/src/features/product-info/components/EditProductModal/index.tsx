@@ -5,7 +5,7 @@ import {
   fetchProductDescriptions,
   ProductDescription,
 } from "@/features/product-info/api/productDescApi";
-import { htmlToPlainText } from "../../utils/productInfoHelpers";
+import { htmlToPlainText } from "@/shared/html";
 import { BasicInfoPanel } from "./BasicInfoPanel";
 import ImageUpload from "./ImageUpload";
 import { EditFormState, EditProductModalProps } from "./types";

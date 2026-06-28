@@ -1,4 +1,4 @@
-﻿# Refactor Log - `admin_orderlist`
+# Refactor Log - `admin_orderlist`
 
 Mục đích: ghi từng clean-code/refactor slice, source-of-truth đã chọn, duplicate/workaround đã xử lý, validation đã chạy và rủi ro còn lại.
 
@@ -1065,3 +1065,248 @@ Mục đích: ghi từng clean-code/refactor slice, source-of-truth đã chọn,
 ### Validation
 
 - [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Product Info - Variant Content Table Split
+
+### Muc Tieu
+
+- Reduce `VariantContentView.tsx` by moving table/card/action rendering out of the view container.
+- Keep desc_variant list, mobile cards, pagination and modal actions behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Variant content table/card/action rendering | `frontend/src/features/product-info/views/variant-content-view/VariantContentTable.tsx` | Inline in `VariantContentView.tsx` | extract view-local component |
+
+### Thay Doi
+
+- Added `VariantContentTable` with table rows, mobile cards, preview text and row actions.
+- `VariantContentView.tsx` now focuses on data loading, pagination state and modal orchestration.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Product Info - Image Upload Surface Split
+
+### Muc Tieu
+
+- Reduce `ImageUpload.tsx` by moving preview/dropzone UI out of upload orchestration.
+- Keep server picker, upload, delete, drag/drop and preview refresh behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Image upload preview/dropzone surface | `frontend/src/features/product-info/components/EditProductModal/ImageUploadSurface.tsx` | Inline in `ImageUpload.tsx` | extract component |
+
+### Thay Doi
+
+- Added `ImageUploadSurface` for preview, empty/dropzone and overlay actions.
+- `ImageUpload.tsx` now owns API state and delegates display surface rendering.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Product Info - Product Description API Contract Split
+
+### Muc Tieu
+
+- Reduce `productDescApi.ts` by separating API contracts and response normalization from request functions.
+- Keep existing import path and exported function/type names compatible for callers.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product description API types | `frontend/src/features/product-info/api/productDescTypes.ts` | `productDescApi.ts` | extract contract file |
+| Product description response normalizer | `frontend/src/features/product-info/api/productDescNormalizer.ts` | `productDescApi.ts` | extract feature API normalizer |
+| Product description API request functions | `frontend/src/features/product-info/api/productDescApi.ts` | same file | keep public API owner |
+
+### Thay Doi
+
+- Added `productDescTypes.ts` for all product description API interfaces/types.
+- Added `productDescNormalizer.ts` for saved product description response normalization.
+- `productDescApi.ts` re-exports the same public types and keeps all request functions at the same import path.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Product Info - Category Table Row Split
+
+### Muc Tieu
+
+- Reduce `CategoryTable.tsx` by moving package row, action buttons and expanded package items into a focused row component.
+- Keep expand/collapse, edit action, image cache-busting and pagination behavior unchanged.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Category package table row | `frontend/src/features/product-info/components/CategoryTableRow.tsx` | Inline in `CategoryTable.tsx` | extract component |
+
+### Thay Doi
+
+- Added `CategoryTableRow` for row display, category pills, image thumb and expanded items.
+- `CategoryTable.tsx` now owns expanded row state and pagination only.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Product Info - Product Description API Subdomain Split
+
+### Muc Tieu
+
+- Reduce `productDescApi.ts` by moving image and SEO endpoints into focused API files.
+- Keep all existing public imports from `productDescApi.ts` working through re-exports.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| Product description SEO audit API | `frontend/src/features/product-info/api/productDescSeoApi.ts` | `productDescApi.ts` | extract endpoint group |
+| Product description image API | `frontend/src/features/product-info/api/productDescImageApi.ts` | `productDescApi.ts` | extract endpoint group |
+| Product description CRUD/list API | `frontend/src/features/product-info/api/productDescApi.ts` | same file | keep public API owner |
+
+### Thay Doi
+
+- Added `productDescSeoApi.ts` for `auditProductSeo`.
+- Added `productDescImageApi.ts` for image upload/list/delete endpoints.
+- `productDescApi.ts` re-exports the extracted functions to preserve caller contracts.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## 2026-06-27 - Frontend Shared HTML Capability
+
+### Muc Tieu
+
+- Establish `shared/html` as the source-of-truth for generic HTML/text conversion helpers.
+- Stop duplicating HTML helpers across feature folders while keeping feature-specific product rules local.
+
+### Source-Of-Truth
+
+| Responsibility | Main file | Previous location | Decision |
+| --- | --- | --- | --- |
+| HTML sanitize/display helpers | `frontend/src/shared/html/sanitize.ts` | `product-info/utils/productInfoHelpers/htmlSanitize.ts` | move to shared capability |
+| HTML normalize/save helpers | `frontend/src/shared/html/normalize.ts` | `product-info/utils/productInfoHelpers/htmlNormalize.ts` | move to shared capability |
+| Plain text to HTML primitive | `frontend/src/shared/html/plain.ts` | `product-info/utils/productInfoHelpers/basic.ts` | move to shared capability |
+| Product-info compatibility exports | `frontend/src/features/product-info/utils/productInfoHelpers/htmlSanitize.ts`, `htmlNormalize.ts`, `basic.ts` | same files | keep re-export wrappers temporarily |
+
+### Thay Doi
+
+- Added `frontend/src/shared/html` with `sanitize`, `normalize`, `plain` and `index` exports.
+- Updated product-info components/helpers to import generic HTML utilities from `@/shared/html`.
+- Updated product-price quote formatting to reuse `htmlToPlainText` from `@/shared/html` instead of defining its own copy.
+- Kept product-specific helpers such as product key normalization, variant image resolution and merge rules inside `product-info`.
+
+### Validation
+
+- [x] `cd frontend; npm run build`
+
+
+## Frontend Shared Number/Money Capability
+- Added `frontend/src/shared/number` for generic finite-number parsing, positive-int parsing, and clamping primitives.
+- Moved VND formatting source-of-truth into `frontend/src/shared/money` while keeping `frontend/src/shared/utils/money.ts` as a compatibility re-export.
+- Updated shared pricing ratio helpers to reuse `shared/number` instead of maintaining a private duplicate numeric normalizer.
+- Preserved existing public exports through `@/shared/utils` and direct money imports.
+
+
+## Frontend Shared Money Input Primitives
+- Added generic integer/decimal money input parsing and draft formatting under `frontend/src/shared/money/input.ts`.
+- Converted shop-bank and USDT wallet money helpers into compatibility aliases over shared money primitives.
+- Reused signed integer money parsing in supply helpers instead of keeping a local parser clone.
+
+
+## Frontend Shared Date Capability
+- Moved date source-of-truth from `frontend/src/shared/utils/date.ts` into `frontend/src/shared/date/calendar.ts`.
+- Kept `frontend/src/shared/utils/date.ts` as a compatibility re-export so existing `@/shared/utils` imports continue to work.
+- Preserved existing date parsing/formatting behavior without touching UI flows or database code.
+
+
+## Frontend Supply Domain Capability
+- Moved supplier identity/import-price rules into `frontend/src/features/supply/utils/supplierRules.ts`.
+- Updated Create/Edit order flows to call the supply domain capability directly instead of `shared/utils/supply`.
+- Kept `frontend/src/shared/utils/supply.ts` as a temporary compatibility re-export for older imports.
+
+
+## Frontend Shared VietQR Capability
+- Moved VietQR/Sepay image URL builder into `frontend/src/shared/vietqr/imageUrl.ts`.
+- Kept `frontend/src/shared/utils/sepay.ts` as a compatibility re-export.
+- Updated order payment QR and supply payment helpers to import from the explicit VietQR capability.
+
+
+## Frontend Order Status Domain Capability
+- Moved order status color/priority metadata into `frontend/src/features/orders/status/orderStatusMeta.ts`.
+- Updated order list, order row, and order detail views to call the orders status capability directly.
+- Kept `frontend/src/shared/utils/status.ts` as a compatibility re-export for older aggregate helper imports.
+
+
+## Frontend Shared HTTP Capability
+- Moved `readJsonOrText` into `frontend/src/shared/http/responseBody.ts` as the source-of-truth for response body parsing.
+- Kept `frontend/src/shared/utils/response.ts` as a compatibility re-export for existing aggregate helper imports.
+
+
+## Frontend Dashboard/Supply Capability Imports
+- Replaced aggregate `@/shared/utils` usage in dashboard and supply files with explicit imports from `shared/money`, `shared/date`, and `shared/vietqr`.
+- Preserved existing formatting/date/QR behavior while making dependencies capability-based instead of catch-all helper based.
+
+
+## Frontend Create Order Capability Imports
+- Replaced CreateOrderModal aggregate shared helper imports with explicit `shared/date` and `shared/money` imports.
+- Preserved existing create-order date derivation, expiry calculation, and currency display behavior.
+
+
+## Frontend Shared Pricing Capability
+- Moved pricing ratio helpers from `frontend/src/shared/utils/pricing.ts` into `frontend/src/shared/pricing/ratio.ts`.
+- Updated bill-order, pricing, and product-price utilities to import pricing helpers from `@/shared/pricing`.
+- Kept `frontend/src/shared/utils/pricing.ts` as a compatibility re-export.
+
+
+## Frontend Remaining Utility Import Cleanup
+- Replaced aggregate shared helper imports in order, invoice, supplier modal, edit-order, renew-adobe, and package-product files with explicit capability imports.
+- Routed supplier-related types through the supply domain capability instead of `shared/utils`.
+- Preserved existing money/date/VietQR behavior and kept compatibility wrappers for any external imports.
+
+
+## Frontend Lib Helper Cleanup
+- Removed leftover unused aggregate helper imports from order row and wallet withdraw modal.
+- Updated `frontend/src/lib/pricingApi.ts` to call `readJsonOrText` from `@/shared/http` directly instead of going through `lib/helpers`.
+
+
+## Frontend Invoices Pagination Split
+- Extracted invoice pagination rendering into `frontend/src/features/invoices/components/InvoicesPagination.tsx`.
+- Reduced `frontend/src/features/invoices/index.tsx` by moving presentational pagination JSX out of the page container.
+- Preserved existing paging state and table filtering behavior.
+
+
+## Frontend Invoices Pagination Hook
+- Extracted invoice pagination calculation/state switching into `frontend/src/features/invoices/hooks/useInvoicesPagination.ts`.
+- Kept `frontend/src/features/invoices/index.tsx` focused on page orchestration while preserving receipt/out-of-flow separate page state.
+
+
+## Frontend Invoices Data Hook
+- Extracted payment receipt and matchable order loading into `frontend/src/features/invoices/hooks/useInvoiceReceipts.ts`.
+- Removed fetch/normalization workflow from `frontend/src/features/invoices/index.tsx` while preserving reconciliation state updates through `setReceipts`.
+
+
+## Frontend Invoices Derivation Hook
+- Extracted invoice filtering, stats, and category counts into `frontend/src/features/invoices/hooks/useInvoiceDerivations.ts`.
+- Kept `frontend/src/features/invoices/index.tsx` focused on state orchestration and actions.
+
+
+## Frontend Orders Pagination Utility Split
+- Moved order pagination helpers into `frontend/src/features/orders/utils/orderPagination.ts`.
+- Updated `useOrdersList` to import pagination helpers from the focused order pagination module.
+- Reduced `orderListTransform.ts` to transformation/stat responsibilities only.

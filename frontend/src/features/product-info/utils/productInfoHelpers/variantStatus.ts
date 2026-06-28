@@ -1,8 +1,6 @@
+import { htmlToPlainText, sanitizeHtmlForDisplay, splitCombinedContent, toHtmlFromPlain } from "@/shared/html";
 import type { ProductDescription } from "@/features/product-info/api/productDescApi";
 import type { MergedProduct } from "./types";
-import { toHtmlFromPlain } from "./basic";
-import { htmlToPlainText, sanitizeHtmlForDisplay } from "./htmlSanitize";
-import { splitCombinedContent } from "./htmlNormalize";
 
 /** Có ít nhất quy tắc hoặc mô tả thật (không rỗng sau tách + sanitize), giống logic cột bảng sản phẩm. */
 export const variantHasDescContent = (

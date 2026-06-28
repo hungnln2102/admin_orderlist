@@ -1,5 +1,5 @@
+import { formatCurrency } from "@/shared/money";
 import type { ShopBankAccountItem } from "@/features/shop-bank-accounts/types";
-import * as Helpers from "@/shared/utils";
 
 type UnpaidPayment = {
   id: number;
@@ -53,8 +53,8 @@ export function SupplierSettlementPanel({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-white/80">Chu kỳ chưa thanh toán</h3>
         <span className="text-xs text-white/60">
-          Cần chi {Helpers.formatCurrency(totalUnpaid)} | Hoàn về shop{" "}
-          {Helpers.formatCurrency(totalSupplierRefund)}
+          Cần chi {formatCurrency(totalUnpaid)} | Hoàn về shop{" "}
+          {formatCurrency(totalSupplierRefund)}
         </span>
       </div>
       {unpaidPayments.length === 0 ? (
@@ -90,11 +90,11 @@ export function SupplierSettlementPanel({
                           : "text-rose-400 font-semibold"
                       }
                     >
-                      {Helpers.formatCurrency(display)}
+                      {formatCurrency(display)}
                       {raw < 0 ? " (Hoàn về bạn)" : ""}
                     </p>
                     <p className="text-white/40 text-xs">
-                      Đã trả: {Helpers.formatCurrency(payment.paid || 0)}
+                      Đã trả: {formatCurrency(payment.paid || 0)}
                     </p>
                   </div>
                   <button

@@ -1,11 +1,12 @@
+import { formatDateToDMY } from "@/shared/date";
+import { formatCurrency } from "@/shared/money";
 import React from "react";
 import { PowerIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
-import * as Helpers from "@/shared/utils";
 import { Supply } from "../types";
 import PaymentHistoryTable from "./PaymentHistoryTable";
 
-const formatCurrency = Helpers.formatCurrency;
-const formatDate = (date: string | null) => (date ? Helpers.formatDateToDMY(date) : "--");
+const formatCurrency = formatCurrency;
+const formatDate = (date: string | null) => (date ? formatDateToDMY(date) : "--");
 
 interface Props {
   supplies: Supply[];

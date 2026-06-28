@@ -1,7 +1,7 @@
+import { formatNumberOnTyping } from "@/shared/money";
 import React, { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import * as Helpers from "@/shared/utils";
 import type { Goal } from "./budgets-goals/types";
 
 interface EditGoalAmountModalProps {
@@ -83,7 +83,7 @@ export const EditGoalAmountModal: React.FC<EditGoalAmountModalProps> = ({
                 type="text"
                 value={targetAmount}
                 onChange={(event) =>
-                  setTargetAmount(Helpers.formatNumberOnTyping(event.target.value))
+                  setTargetAmount(formatNumberOnTyping(event.target.value))
                 }
                 placeholder="0"
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"

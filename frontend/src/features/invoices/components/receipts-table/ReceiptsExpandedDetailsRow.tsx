@@ -1,6 +1,6 @@
+import { formatDateToDMY } from "@/shared/date";
 import type React from "react";
 
-import * as Helpers from "@/shared/utils";
 
 import {
   extractTransactionCodeFromNote,
@@ -63,7 +63,7 @@ const ReceiptsExpandedDetailsRow: React.FC<ReceiptsExpandedDetailsRowProps> = ({
               Ngày thanh toán
             </p>
             <p className="text-sm font-bold text-indigo-100/90">
-              {receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "—"}
+              {receipt.paidAt ? formatDateToDMY(receipt.paidAt) : "—"}
             </p>
           </div>
         </div>

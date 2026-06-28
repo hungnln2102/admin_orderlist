@@ -1,19 +1,19 @@
+import type { SupplyLike, SupplyPriceLike } from "@/features/supply/utils/supplierRules";
 import { Order as ApiOrder } from "../../../constants";
-import * as Helpers from "../../../shared/utils";
 
 export type Order = Omit<ApiOrder, "cost" | "price"> & {
   cost: number | string;
   price: number | string;
 };
 
-export interface Supply extends Helpers.SupplyLike {
+export interface Supply extends SupplyLike {
   id?: number;
   supplier_name?: string;
   source_name?: string;
   name?: string;
 }
 
-export interface SupplyPrice extends Helpers.SupplyPriceLike {
+export interface SupplyPrice extends SupplyPriceLike {
   id?: number;
   source_id?: number;
   price?: number;

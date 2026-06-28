@@ -1,6 +1,6 @@
+import { normalizeExactVnd } from "@/shared/money";
 import { ORDER_CODE_PREFIXES, ORDER_FIELDS } from "@/constants";
-import * as Helpers from "@/shared/utils";
-import { buildSepayQrUrl } from "@/shared/utils/sepay";
+import { buildSepayQrUrl } from "@/shared/vietqr";
 import { EMPTY_SHOP_BANK_QR_CONFIG } from "@/features/shop-bank-accounts/helpers/shopBankQrDefaults";
 
 export type ShopBankQrOverride = {
@@ -82,7 +82,7 @@ export const buildViewOrderPaymentQrPayload = ({
     if (!supplierAccount || !supplierBin) {
       return {
         qrCodeImageUrl: "",
-        effectiveQrAmount: Helpers.normalizeExactVnd(orderAmountCost),
+        effectiveQrAmount: normalizeExactVnd(orderAmountCost),
         qrMessage: idOrder,
         bankDisplay: "—",
         accountNoDisplay: "—",
@@ -91,7 +91,7 @@ export const buildViewOrderPaymentQrPayload = ({
         missingSupplierBank: true,
       };
     }
-    const effectiveQrAmount = Helpers.normalizeExactVnd(orderAmountCost);
+    const effectiveQrAmount = normalizeExactVnd(orderAmountCost);
     return {
       qrCodeImageUrl: buildSepayQrUrl({
         accountNumber: supplierAccount,
@@ -110,7 +110,7 @@ export const buildViewOrderPaymentQrPayload = ({
     };
   }
 
-  const effectiveQrAmount = Helpers.normalizeExactVnd(displayPriceAmount);
+  const effectiveQrAmount = normalizeExactVnd(displayPriceAmount);
   const canBuildShopQr = Boolean(accountNo && bankCode && effectiveQrAmount > 0);
   return {
     qrCodeImageUrl: canBuildShopQr

@@ -1,4 +1,4 @@
-import * as Helpers from "@/shared/utils";
+import { formatDateToDMY } from "@/shared/date";
 import {
   type WalletColumn,
   type WalletRow,
@@ -6,7 +6,7 @@ import {
 import { type DisplayColumn } from "./types";
 
 export const formatDate = (value: string) => {
-  const parsed = Helpers.formatDateToDMY(new Date(value));
+  const parsed = formatDateToDMY(new Date(value));
   return parsed || value;
 };
 

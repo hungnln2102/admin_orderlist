@@ -1,3 +1,5 @@
+import { formatDateToDMY } from "@/shared/date";
+import { formatCurrency } from "@/shared/money";
 import React from "react";
 import {
   CurrencyDollarIcon,
@@ -9,7 +11,6 @@ import {
   PowerIcon,
 } from "@heroicons/react/24/outline";
 import { Supply } from "../types";
-import * as Helpers from "@/shared/utils";
 
 interface SupplyCardProps {
   supply: Supply;
@@ -19,9 +20,9 @@ interface SupplyCardProps {
   onDelete: (supply: Supply) => void;
 }
 
-const formatCurrency = Helpers.formatCurrency;
+const formatCurrency = formatCurrency;
 const formatDate = (date: string | null) =>
-  date ? Helpers.formatDateToDMY(date) : "--";
+  date ? formatDateToDMY(date) : "--";
 
 export const SupplyCard: React.FC<SupplyCardProps> = ({
   supply,

@@ -1,7 +1,7 @@
+import { formatDateToDMY } from "@/shared/date";
 import React from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import * as Helpers from "@/shared/utils";
 import { PaymentReceipt, formatCurrencyVnd, resolveSender } from "../helpers";
 
 type ReceiptDetailModalProps = {
@@ -42,7 +42,7 @@ export const ReceiptDetailModal: React.FC<ReceiptDetailModalProps> = ({
             <div>
               <p className="text-gray-500 mb-1">Ngày Thanh Toán</p>
               <p className="font-semibold text-gray-900">
-                {receipt.paidAt ? Helpers.formatDateToDMY(receipt.paidAt) : "--"}
+                {receipt.paidAt ? formatDateToDMY(receipt.paidAt) : "--"}
               </p>
             </div>
             <div>

@@ -1,3 +1,5 @@
+import { normalizeSearchText } from "@/shared/text";
+
 export type WarehouseItem = {
   id?: number;
   category?: string | null;

@@ -1,3 +1,4 @@
+import { formatDateToDMY } from "@/shared/date";
 /**
  * OrderCard Component
  * Mobile-friendly card view for orders
@@ -12,7 +13,6 @@ import {
   PlusCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Order, ORDER_FIELDS, ORDER_STATUSES, VIRTUAL_FIELDS } from "@/constants";
-import * as Helpers from "@/shared/utils";
 import {
   formatCurrency,
   formatOrderCodeShort,
@@ -189,7 +189,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                     {order[VIRTUAL_FIELDS.ORDER_DATE_DISPLAY] || "—"}
                     <span className="text-white/25 mx-0.5">/</span>
                     {order[VIRTUAL_FIELDS.EXPIRY_DATE_DISPLAY] ||
-                      (expiryDate ? Helpers.formatDateToDMY(expiryDate) : "—")}
+                      (expiryDate ? formatDateToDMY(expiryDate) : "—")}
                   </p>
                   <p className="text-[10px] font-semibold text-sky-300/95 mt-0.5 tabular-nums">
                     {Number.isFinite(remaining) ? `${remaining} ngày còn lại` : "—"}
@@ -197,7 +197,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
                 </>
               ) : (
                 <p className="text-[11px] font-bold text-slate-300 tabular-nums">
-                  {expiryDate ? Helpers.formatDateToDMY(expiryDate) : "—"}
+                  {expiryDate ? formatDateToDMY(expiryDate) : "—"}
                 </p>
               )}
             </div>
