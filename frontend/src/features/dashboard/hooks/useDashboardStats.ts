@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArchiveBoxIcon,
@@ -36,8 +36,6 @@ interface StatsApiResponse {
   availableProfit?: { current: number; previous: number };
 }
 
-const formatCurrency = formatCurrency;
-
 const toChangeLabel = (diff: number) => {
   if (!Number.isFinite(diff)) return "N/A";
   const prefix = diff >= 0 ? "+" : "-";
@@ -61,7 +59,7 @@ const calculateStat = (
   const currentValue = Number.isFinite(Number(current)) ? Number(current) : 0;
   const previousValue = Number.isFinite(Number(previous)) ? Number(previous) : 0;
 
-  const displayValue = isCurrency ? formatCurrency(currentValue) : currentValue.toLocaleString("vi-VN");
+  const displayValue = isCurrency ? formatMoney(currentValue) : currentValue.toLocaleString("vi-VN");
 
   const diff = percentChange(currentValue, previousValue);
 

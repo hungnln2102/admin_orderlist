@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import React from "react";
 import {
   CartesianGrid,
@@ -57,7 +57,7 @@ export const RevenueChartCard: React.FC<RevenueChartCardProps> = ({
               tickFormatter={(value) => `${Math.round((value as number) / 1_000_000)}M`}
             />
             <Tooltip
-              formatter={(value: number) => [formatCurrency(value), "Doanh thu"]}
+              formatter={(value: number) => [formatMoney(value), "Doanh thu"]}
               labelStyle={{ color: "#111827", backgroundColor: "#fff" }}
               contentStyle={{ borderRadius: "12px", border: "1px solid rgba(79,70,229,0.3)", backgroundColor: "rgba(30,27,75,0.95)" }}
             />

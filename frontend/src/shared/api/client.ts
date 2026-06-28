@@ -1,9 +1,3 @@
-const readProcessEnv = (): Record<string, string | undefined> => {
-  if (typeof process === "undefined") return {};
-  const proc = process as { env?: Record<string, string | undefined> };
-  return proc.env ?? {};
-};
-
 const isDev =
   typeof import.meta !== "undefined" && import.meta.env?.DEV === true;
 
@@ -15,9 +9,6 @@ const RAW_API_BASE: string = (() => {
       ? import.meta.env?.VITE_API_BASE_URL || ""
       : "";
   if (metaBase) return metaBase;
-
-  const envBase = readProcessEnv().VITE_API_BASE_URL || "";
-  if (envBase) return envBase;
 
   return "http://localhost:3001";
 })();

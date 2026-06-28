@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/shared/money";
+import { formatCurrency as formatMoney } from "@/shared/money";
 import React from "react";
 import type { MonthlySummaryData } from "@/features/dashboard/api";
 
@@ -8,8 +8,6 @@ interface MonthlySummaryTableProps {
   data: MonthlySummaryData[];
   onRefresh?: () => void;
 }
-
-const formatCurrency = formatCurrency;
 
 const formatMonthKey = (monthKey: string): string => {
   // Convert YYYY-MM to "Tháng M, YYYY" or similar
@@ -100,21 +98,21 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({
                     {row.canceled_orders.toLocaleString("vi-VN")}
                   </td>
                   <td className="px-3 py-2 text-right text-emerald-300">
-                    {formatCurrency(row.total_revenue)}
+                    {formatMoney(row.total_revenue)}
                   </td>
                   <td className="px-3 py-2 text-right text-amber-300">
-                    {formatCurrency(row.total_profit)}
+                    {formatMoney(row.total_profit)}
                   </td>
                   <td className="px-3 py-2 text-right text-orange-300">
-                    {formatCurrency(row.total_refund)}
+                    {formatMoney(row.total_refund)}
                   </td>
                   <td className="px-3 py-2 text-right text-cyan-300/90">
-                    {formatCurrency(
+                    {formatMoney(
                       row.total_import != null ? row.total_import : 0
                     )}
                   </td>
                   <td className="px-3 py-2 text-right text-slate-300/90">
-                    {formatCurrency(
+                    {formatMoney(
                       row.total_tax != null ? row.total_tax : 0
                     )}
                   </td>
